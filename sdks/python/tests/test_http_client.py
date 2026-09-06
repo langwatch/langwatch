@@ -2,9 +2,10 @@
 with the same method up to five hops and drops credentials when it leaves the
 origin, every other method follows only an http to https upgrade of the same
 URL with the same method, headers and body, every refused redirect raises
-RedirectRefusedError, the generated REST client carries the transport, and no
-hand written call builds its own httpx client. The inner transport is
-httpx.MockTransport, so the assertions are on the requests that leave the
+RedirectRefusedError, every hop leaves through the transport httpx mounts for
+the hop's own URL, the generated REST client is built from the shared client
+classes, and no hand written call builds its own httpx client. The transports
+are httpx.MockTransport, so the assertions are on the requests that leave the
 process.
 
 Spec: specs/python-sdk/http-client-redirects.feature
@@ -25,9 +26,9 @@ import pytest
 
 from langwatch.client import Client
 from langwatch.http_client import (
-    AsyncSchemeUpgradeTransport,
+    LangWatchAsyncClient,
+    LangWatchClient,
     RedirectRefusedError,
-    SchemeUpgradeTransport,
     _reset_upgrade_warning,
     create_async_client,
     create_client,
@@ -553,11 +554,105 @@ def test_refuses_a_redirect_without_a_location(method: str):
     assert len(seen) == 1
 
 
+# --- The transport is chosen per hop ---
+
+
+def recording(handler):
+    """A MockTransport around `handler`, plus the requests it saw."""
+    seen: list[httpx.Request] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return handler(request)
+
+    return httpx.MockTransport(record), seen
+
+
+def scheme_mounts():
+    """An http mount answering 301 to the https URL and an https mount
+    answering 200, each with the requests it received."""
+    http_mount, http_seen = recording(lambda request: redirect(301, HTTPS_URL))
+    https_mount, https_seen = recording(
+        lambda request: httpx.Response(200, json={"ok": True})
+    )
+    return {"http://": http_mount, "https://": https_mount}, http_seen, https_seen
+
+
+def no_proxy_mounts():
+    """What HTTP_PROXY plus NO_PROXY=other.test produce: a catch-all proxy
+    mount and a direct mount for other.test. The proxy answers every request
+    with a 302 to other.test, the direct mount answers 200."""
+    proxy_mount, proxy_seen = recording(lambda request: redirect(302, OTHER_HOST))
+    direct_mount, direct_seen = recording(
+        lambda request: httpx.Response(200, text="direct")
+    )
+    return (
+        {"all://": proxy_mount, "all://other.test": direct_mount},
+        proxy_seen,
+        direct_seen,
+    )
+
+
+# @scenario "the https replay uses the mount of the https URL"
+def test_https_replay_uses_the_https_mount():
+    mounts, http_seen, https_seen = scheme_mounts()
+
+    with create_client(mounts=mounts) as client:
+        response = client.post(HTTP_URL, json={"a": 1})
+
+    assert response.json() == {"ok": True}
+    assert [str(r.url) for r in http_seen] == [HTTP_URL]
+    assert [str(r.url) for r in https_seen] == [HTTPS_URL]
+    assert https_seen[0].method == "POST"
+    assert https_seen[0].content == http_seen[0].content
+
+
+# @scenario "the https replay uses the mount of the https URL"
+@pytest.mark.asyncio
+async def test_https_replay_uses_the_https_mount_async():
+    mounts, http_seen, https_seen = scheme_mounts()
+
+    async with create_async_client(mounts=mounts) as client:
+        response = await client.post(HTTP_URL, json={"a": 1})
+
+    assert response.json() == {"ok": True}
+    assert [str(r.url) for r in http_seen] == [HTTP_URL]
+    assert [str(r.url) for r in https_seen] == [HTTPS_URL]
+    assert https_seen[0].method == "POST"
+
+
+# @scenario "a GET hop across a NO_PROXY boundary uses the mount of the new host"
+def test_get_hop_across_a_no_proxy_boundary_uses_the_mount_of_the_new_host():
+    mounts, proxy_seen, direct_seen = no_proxy_mounts()
+
+    with create_client(mounts=mounts) as client:
+        response = client.get(HTTPS_URL, headers=CREDENTIALS)
+
+    assert response.text == "direct"
+    assert [str(r.url) for r in proxy_seen] == [HTTPS_URL]
+    assert [str(r.url) for r in direct_seen] == [OTHER_HOST]
+    assert "authorization" not in direct_seen[0].headers
+    assert direct_seen[0].headers["host"] == "other.test"
+
+
+# @scenario "a GET hop across a NO_PROXY boundary uses the mount of the new host"
+@pytest.mark.asyncio
+async def test_get_hop_across_a_no_proxy_boundary_uses_the_mount_of_the_new_host_async():
+    mounts, proxy_seen, direct_seen = no_proxy_mounts()
+
+    async with create_async_client(mounts=mounts) as client:
+        response = await client.get(HTTPS_URL)
+
+    assert response.text == "direct"
+    assert [str(r.url) for r in proxy_seen] == [HTTPS_URL]
+    assert [str(r.url) for r in direct_seen] == [OTHER_HOST]
+
+
 # --- Every request goes through the shared client ---
 
 
-# @scenario "the generated API client uses the shared transport"
-def test_generated_client_carries_the_transport():
+# @scenario "the generated API client uses the shared client"
+def test_generated_client_is_built_from_the_shared_classes():
     Client.reset_for_testing()
     try:
         sdk = Client(
@@ -569,8 +664,8 @@ def test_generated_client_carries_the_transport():
         sync_http = rest.get_httpx_client()
         async_http = rest.get_async_httpx_client()
 
-        assert isinstance(sync_http._transport, SchemeUpgradeTransport)
-        assert isinstance(async_http._transport, AsyncSchemeUpgradeTransport)
+        assert isinstance(sync_http, LangWatchClient)
+        assert isinstance(async_http, LangWatchAsyncClient)
         assert sync_http.follow_redirects is False
         assert async_http.follow_redirects is False
         assert str(sync_http.base_url) == "http://langwatch.test"
@@ -584,15 +679,21 @@ def test_generated_client_carries_the_transport():
 # --- Environment proxy discovery ---
 #
 # httpx builds its environment proxy mounts only when it builds the transport
-# itself, so the factories must let it construct the client and wrap the
-# transports afterwards. These run against real loopback servers: a stub origin
-# and a stub proxy, each answering with its own name, so the assertion is on
-# which one actually received the request.
+# itself, so the factories pass every argument to httpx unchanged. These run
+# against real loopback servers: a stub origin and a stub proxy, each answering
+# with its own name, so the assertion is on which one actually received the
+# request. Both answer the path /redirect with a 301 to /api/v1/things.
 
 
 def _serve(body: bytes) -> "tuple[socketserver.TCPServer, int]":
     class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self):  # noqa: N802 - the BaseHTTPRequestHandler contract
+        def do_GET(self):  # the BaseHTTPRequestHandler contract names it so
+            if self.path.endswith("/redirect"):
+                self.send_response(301)
+                self.send_header("Location", "/api/v1/things")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             self.send_response(200)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -640,11 +741,12 @@ def test_create_async_client_routes_through_the_environment_proxy(
 
 
 # @scenario "the client keeps httpx's environment proxy discovery"
-def test_the_proxy_transport_carries_the_redirect_rule(origin_and_proxy: str):
+def test_a_redirect_answered_by_the_proxy_follows_the_rule(origin_and_proxy: str):
     with create_client() as client:
-        assert client._mounts
-        for mounted in client._mounts.values():
-            assert isinstance(mounted, SchemeUpgradeTransport)
+        response = client.get(origin_and_proxy.replace("/api/v1/things", "/redirect"))
+
+    assert response.text == "PROXY"
+    assert str(response.url) == origin_and_proxy
 
 
 # @scenario "the client keeps httpx's environment proxy discovery"
@@ -669,7 +771,7 @@ RAW_HTTPX_CALL = re.compile(
 )
 
 
-# @scenario "every hand written request uses the shared transport"
+# @scenario "every hand written request uses the shared client"
 def test_no_hand_written_request_builds_its_own_client():
     source_root = Path(__file__).resolve().parents[1] / "src" / "langwatch"
     offenders: list[str] = []

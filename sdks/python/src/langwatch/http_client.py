@@ -1,7 +1,9 @@
 """The one HTTP client for every request the SDK sends to the LangWatch API.
 
-httpx never follows a redirect on its own here. The transports in this module
-apply a rule per method to a 301, 302, 303, 307 or 308.
+httpx never follows a redirect on its own here. The clients in this module
+apply a rule per method to a 301, 302, 303, 307 or 308, one hop at a time,
+so httpx picks the transport (a proxy mount, a NO_PROXY exemption, or a
+transport the caller mounted) from the URL of every hop.
 
 GET and HEAD follow the redirect with the same method, up to five hops. A hop
 that keeps the origin, or only upgrades http to https on the same host and
@@ -235,14 +237,29 @@ def _plan_next(
     return _plan_upgrade(request, response, hops)
 
 
-class SchemeUpgradeTransport(httpx.BaseTransport):
-    """Wraps a sync transport and applies the redirect rule to its answers."""
+class LangWatchClient(httpx.Client):
+    """An `httpx.Client` that applies the redirect rule to every request.
 
-    def __init__(self, transport: httpx.BaseTransport | None = None) -> None:
-        self.transport: httpx.BaseTransport = transport or httpx.HTTPTransport()
+    Redirects are never followed by httpx itself. Each hop goes through
+    `httpx.Client.send`, which selects the transport for the hop's own URL, so
+    an https replay leaves through the https mount and a hop to another host
+    leaves through that host's mount.
+    """
 
-    def handle_request(self, request: httpx.Request) -> httpx.Response:
-        response = self.transport.handle_request(request)
+    def __init__(self, **httpx_kwargs: Any) -> None:
+        super().__init__(**{**httpx_kwargs, "follow_redirects": False})
+
+    def send(
+        self,
+        request: httpx.Request,
+        *,
+        stream: bool = False,
+        auth: Any = httpx.USE_CLIENT_DEFAULT,
+        follow_redirects: Any = httpx.USE_CLIENT_DEFAULT,
+    ) -> httpx.Response:
+        response = super().send(
+            request, stream=stream, auth=auth, follow_redirects=False
+        )
         hops = 0
         while response.status_code in REDIRECT_STATUSES:
             try:
@@ -253,23 +270,31 @@ class SchemeUpgradeTransport(httpx.BaseTransport):
                 _warn_once(request.url)
             request = next_request
             hops += 1
-            response = self.transport.handle_request(request)
+            response = super().send(
+                request, stream=stream, auth=auth, follow_redirects=False
+            )
         return response
 
-    def close(self) -> None:
-        self.transport.close()
 
+class LangWatchAsyncClient(httpx.AsyncClient):
+    """An `httpx.AsyncClient` that applies the redirect rule to every request,
+    one hop at a time through `httpx.AsyncClient.send`, the same way
+    `LangWatchClient` does."""
 
-class AsyncSchemeUpgradeTransport(httpx.AsyncBaseTransport):
-    """Wraps an async transport and applies the redirect rule to its answers."""
+    def __init__(self, **httpx_kwargs: Any) -> None:
+        super().__init__(**{**httpx_kwargs, "follow_redirects": False})
 
-    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
-        self.transport: httpx.AsyncBaseTransport = (
-            transport or httpx.AsyncHTTPTransport()
+    async def send(
+        self,
+        request: httpx.Request,
+        *,
+        stream: bool = False,
+        auth: Any = httpx.USE_CLIENT_DEFAULT,
+        follow_redirects: Any = httpx.USE_CLIENT_DEFAULT,
+    ) -> httpx.Response:
+        response = await super().send(
+            request, stream=stream, auth=auth, follow_redirects=False
         )
-
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        response = await self.transport.handle_async_request(request)
         hops = 0
         while response.status_code in REDIRECT_STATUSES:
             try:
@@ -280,48 +305,21 @@ class AsyncSchemeUpgradeTransport(httpx.AsyncBaseTransport):
                 _warn_once(request.url)
             request = next_request
             hops += 1
-            response = await self.transport.handle_async_request(request)
+            response = await super().send(
+                request, stream=stream, auth=auth, follow_redirects=False
+            )
         return response
-
-    async def aclose(self) -> None:
-        await self.transport.aclose()
-
-
-def _wrap_transports(client: Any, wrapper: type) -> None:
-    """Wrap the client's own transports in place, after httpx has built them.
-
-    httpx enables environment proxy discovery only when it builds the transport
-    itself (`allow_env_proxies = trust_env and transport is None`), so handing
-    it a ready-made transport would silently drop HTTP_PROXY, HTTPS_PROXY,
-    ALL_PROXY and the NO_PROXY routing that goes with them. The client is built
-    the stock way and its transport and every proxy mount are wrapped here, so
-    the rule applies to direct and proxied requests alike.
-    """
-    transport = getattr(client, "_transport", None)
-    if transport is not None and not isinstance(transport, wrapper):
-        client._transport = wrapper(transport)
-
-    mounts = getattr(client, "_mounts", None)
-    if not isinstance(mounts, dict):
-        return
-    for pattern, mounted in list(mounts.items()):
-        if mounted is not None and not isinstance(mounted, wrapper):
-            mounts[pattern] = wrapper(mounted)
 
 
 def create_client(**httpx_kwargs: Any) -> httpx.Client:
-    """An `httpx.Client` for the LangWatch API. Accepts the `httpx.Client`
-    keyword arguments (timeout, headers, base_url, and so on); a `transport`
-    argument becomes the inner transport."""
-    client = httpx.Client(follow_redirects=False, **httpx_kwargs)
-    _wrap_transports(client, SchemeUpgradeTransport)
-    return client
+    """A `LangWatchClient` for the LangWatch API. Accepts the `httpx.Client`
+    keyword arguments (timeout, headers, base_url, transport, mounts, and so
+    on) and passes them to httpx unchanged, so environment proxy discovery
+    works the stock way."""
+    return LangWatchClient(**httpx_kwargs)
 
 
 def create_async_client(**httpx_kwargs: Any) -> httpx.AsyncClient:
-    """An `httpx.AsyncClient` for the LangWatch API. Accepts the
-    `httpx.AsyncClient` keyword arguments; a `transport` argument becomes the
-    inner transport."""
-    client = httpx.AsyncClient(follow_redirects=False, **httpx_kwargs)
-    _wrap_transports(client, AsyncSchemeUpgradeTransport)
-    return client
+    """A `LangWatchAsyncClient` for the LangWatch API. Accepts the
+    `httpx.AsyncClient` keyword arguments and passes them to httpx unchanged."""
+    return LangWatchAsyncClient(**httpx_kwargs)

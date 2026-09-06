@@ -6,7 +6,10 @@ Feature: Python SDK HTTP client redirects
   Background: one client, one rule per method.
     Every request the SDK sends to the LangWatch API, from the generated
     OpenAPI client and from every hand written call, goes through
-    `langwatch.http_client`. httpx never follows a redirect on its own there.
+    `langwatch.http_client`. httpx never follows a redirect on its own there;
+    the shared client sends one hop at a time, so httpx picks the transport
+    (a proxy mount, a NO_PROXY exemption, or a mount the caller passed) from
+    the URL of every hop.
     A GET or HEAD follows a 301, 302, 303, 307 or 308 with the same method,
     up to five hops. A hop that keeps the origin, or only upgrades http to
     https on the same host and port, keeps every header; any other hop drops
@@ -137,16 +140,34 @@ Feature: Python SDK HTTP client redirects
     When the SDK sends a request
     Then the call raises RedirectRefusedError with no location
 
+  # --- The transport is chosen per hop ---
+
+  @unit
+  Scenario: the https replay uses the mount of the https URL
+    Given a client with one transport mounted for http and another for https
+    And the http transport answers a POST with a 301 to the same https URL
+    When the SDK sends the POST to the http URL
+    Then the http transport received the first request only
+    And the https transport received the replay with the same method and body
+
+  @unit
+  Scenario: a GET hop across a NO_PROXY boundary uses the mount of the new host
+    Given a client with a proxy transport mounted for every URL and a direct transport mounted for one host
+    And the proxy transport answers a GET with a 302 to that host
+    When the SDK sends the GET
+    Then the proxy transport received the first request only
+    And the direct transport received the hop without the credential headers
+
   # --- Every request goes through the shared client ---
 
   @unit
-  Scenario: the generated API client uses the shared transport
+  Scenario: the generated API client uses the shared client
     Given the SDK client is set up with an api key and an endpoint
     When the generated REST client builds its sync and async httpx clients
-    Then both carry the scheme upgrade transport and never follow redirects on their own
+    Then both are the shared client classes and never follow redirects on their own
 
   @unit
-  Scenario: every hand written request uses the shared transport
+  Scenario: every hand written request uses the shared client
     Given the SDK source tree outside the generated client and the shared module
     When the source is scanned for raw httpx client constructions and module level httpx calls
     Then none are found
@@ -155,6 +176,6 @@ Feature: Python SDK HTTP client redirects
   Scenario: the client keeps httpx's environment proxy discovery
     Given HTTP_PROXY names a proxy and the SDK sends a request to an http origin
     When the shared sync or async client sends it
-    Then the proxy receives the request and its transport applies the redirect rule
+    Then the proxy receives the request and a redirect it answers follows the rule
     And NO_PROXY sends the request straight to the origin instead
     And trust_env set to false ignores the environment proxy
