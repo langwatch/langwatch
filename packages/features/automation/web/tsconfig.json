@@ -1,18 +1,11 @@
 {
+  "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/automation-web.tsbuildinfo",
-    "target": "es2022",
-    "module": "preserve",
-    "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "lib": ["es2022", "dom", "dom.iterable"],
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true,
     "paths": {
       "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
       "@langwatch/dataset-contract": ["../../dataset/contract/src/index.ts"],

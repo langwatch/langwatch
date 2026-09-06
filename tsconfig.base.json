@@ -1,0 +1,26 @@
+{
+  // The compiler options every workspace package shares.
+  //
+  // A package's own tsconfig.json extends this file and then states only what
+  // is its own: its include/exclude, its lib and types, its jsx, its paths,
+  // and its own `tsBuildInfoFile` — the one option that must never be shared,
+  // because two packages pointed at one build-info file clobber each other's
+  // cache and each starts the next check cold.
+  //
+  // Nothing here is a preference: an option earns its place by already being
+  // stated the same way in every package that states it. A package that needs
+  // a different value restates it, and the restatement is then visible as the
+  // exception it is rather than as one line among twenty identical ones.
+  //
+  // See specs/setup/typescript-7.feature and dev/docs/adr/099-typescript-7-is-the-compiler.md.
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "incremental": true
+  }
+}

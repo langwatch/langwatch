@@ -193,6 +193,14 @@ export {
   type SkippedDataplaneS3Route,
 } from "./dataplane-s3";
 export {
+  assertGatewaySecretsAllOrNone,
+  GATEWAY_SECRET_ENVS,
+  GATEWAY_SECRET_GENERATE_COMMAND,
+  GATEWAY_SECRET_MIN_LENGTH,
+  type GatewaySecretEnv,
+  GatewaySecretsConfigurationError,
+} from "./gateway-secrets";
+export {
   assertObservabilityDoesNotSelfIngest,
   DEFAULT_LANGWATCH_ENDPOINT,
   type DeploymentAddress,

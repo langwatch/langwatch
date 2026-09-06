@@ -1,17 +1,10 @@
 {
+  "extends": "../../../../../tsconfig.base.json",
   "compilerOptions": {
-    "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/enterprise-governance-web.tsbuildinfo",
-    "target": "es2022",
-    "module": "preserve",
-    "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "lib": ["es2022", "dom", "dom.iterable"],
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "paths": {
       "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"],

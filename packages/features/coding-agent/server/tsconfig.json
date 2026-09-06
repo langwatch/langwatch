@@ -1,11 +1,8 @@
 {
+  "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/coding-agent-server.tsbuildinfo",
-    "target": "es2022",
     "lib": ["es2022"],
-    "module": "preserve",
-    "moduleResolution": "bundler",
     "paths": {
       "zod": ["../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod"],
       "@langwatch/coding-agent-contract": ["../contract/src/index.ts"],
@@ -14,12 +11,8 @@
       "@langwatch/github-contract": ["../../github/contract/src/index.ts"],
       "@langwatch/project-contract": ["../../project/contract/src/index.ts"]
     },
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"]
 }

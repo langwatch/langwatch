@@ -1,13 +1,7 @@
 {
+  "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "Preserve",
-    "moduleResolution": "Bundler",
-    "strict": true,
-    "incremental": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/share-server.tsbuildinfo",
-    "noEmit": true,
-    "skipLibCheck": true
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/share-server.tsbuildinfo"
   },
   "include": ["src/**/*.ts"]
 }

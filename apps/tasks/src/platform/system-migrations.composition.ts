@@ -10,7 +10,12 @@ import {
   PostgresIdentityNewbornSweepAdapter,
   PostgresIdentityUserMigrationsAdapter,
 } from "@langwatch/identity-server";
-import { PostgresSystemMigrationsAdapter, SystemMigrationsPassTask } from "@langwatch/ops-server";
+import { parseRoutingTable } from "@langwatch/clickhouse-client";
+import {
+  PostgresSystemMigrationsAdapter,
+  RoutingTableOrganizationDataplaneAdapter,
+  SystemMigrationsPassTask,
+} from "@langwatch/ops-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition";
@@ -49,6 +54,11 @@ export function buildSystemMigrationsPassTask({
         isSaaS: () => host.config.isSaaS,
         migrations: () => migrations,
         userMigrations: () => userMigrations,
+        // Read per pass rather than captured at boot, so a route added to the
+        // deployment reaches the next pass without a restart.
+        dataplane: RoutingTableOrganizationDataplaneAdapter.create({
+          routes: parseRoutingTable(process.env).routes,
+        }),
         newbornSweep: () => {
           sweep ??= newbornSweep({ database, eventing: identityEventing() });
 

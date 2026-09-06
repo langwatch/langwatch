@@ -1,18 +1,16 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // This package emits: `noEmit` from the shared base is turned back off
+    // here so a `tsc -p` build still writes its declarations.
+    "noEmit": false,
     "target": "es2020",
-    "module": "preserve",
-    "moduleResolution": "bundler",
     "lib": ["es2020"],
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "incremental": true,
     "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/clickhouse-client.tsbuildinfo",
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],

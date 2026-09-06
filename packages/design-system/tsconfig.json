@@ -1,18 +1,11 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/design-system.tsbuildinfo",
-    "target": "es2022",
-    "module": "preserve",
-    "moduleResolution": "bundler",
     "lib": ["es2022", "dom", "dom.iterable"],
     "jsx": "react-jsx",
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true
+    "verbatimModuleSyntax": true
   },
   "include": [
     ".storybook/**/*.ts",

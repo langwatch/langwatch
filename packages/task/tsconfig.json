@@ -1,18 +1,11 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2022",
-    "module": "preserve",
-    "moduleResolution": "bundler",
     "lib": ["es2022"],
     "types": ["node"],
-    "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/task.tsbuildinfo",
-    "noEmit": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],

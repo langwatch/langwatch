@@ -150,6 +150,16 @@ export {
   PostgresSystemMigrationsAdapter,
   type PostgresSystemMigrationsAdapterOptions,
 } from "./adapters/postgres.system-migrations.adapter";
+export { NullOrganizationDataplaneAdapter } from "./adapters/null.organization-dataplane.adapter";
+export { RoutingTableOrganizationDataplaneAdapter } from "./adapters/routing-table.organization-dataplane.adapter";
+export {
+  type OrganizationDataplane,
+  OrganizationDataplanePort,
+} from "./ports/organization-dataplane.port";
+export {
+  type OrganizationCohortAdmission,
+  SystemMigrationCohortService,
+} from "./services/system-migration-cohort.service";
 export { SystemMigrationsPassTask } from "./tasks/system-migrations-pass.task";
 export {
   ProcessManagerPurgeTask,

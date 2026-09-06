@@ -1,22 +1,16 @@
 {
+  "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
     "target": "es2020",
-    "module": "preserve",
-    "moduleResolution": "bundler",
     "lib": ["es2020"],
     // Deliberately NO "types": ["node"]. This package is isomorphic: the
     // frontend and the backend both import it, so a `node:*` import or a
     // `Buffer` reference must not compile here. That is the whole boundary —
     // enforced by the compiler rather than by a convention in a barrel.
     "types": [],
-    "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/identity.tsbuildinfo",
-    "noEmit": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],

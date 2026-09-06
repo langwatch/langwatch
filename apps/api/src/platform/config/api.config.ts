@@ -1,4 +1,5 @@
 import {
+  assertGatewaySecretsAllOrNone,
   assertObservabilityDoesNotSelfIngest,
   authzConfigDefinition,
   clickhouseConfigDefinition,
@@ -994,6 +995,10 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
     },
   }).value;
   refuseApiSelfIngest(value);
+  // All three or none: a deployment that set some of the gateway secrets boots
+  // and then fails on its first virtual-key request, which reads as an outage
+  // rather than as the configuration mistake it is.
+  assertGatewaySecretsAllOrNone(source);
   // Destructured out of the spread rather than overwritten: the projection's
   // `mail` is the raw environment, and leaving it in place would put an
   // unresolved gateway on a deployment that named no `BASE_HOST`.

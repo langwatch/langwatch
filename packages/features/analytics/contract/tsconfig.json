@@ -1,8 +1,7 @@
 {
+  "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/analytics-contract.tsbuildinfo",
-    "target": "es2022",
     // `dom` for the WHATWG globals a browser-loaded contract may name — the
     // spec-size measurement encodes with `TextEncoder`, which every runtime
     // this package loads in has and only `lib.dom` declares. It is NOT licence
@@ -10,14 +9,8 @@
     // entry point under plain node with no `window` and no `document`, so a
     // module that reached for one would fail before a single assertion ran.
     "lib": ["es2022", "dom"],
-    "module": "preserve",
-    "moduleResolution": "bundler",
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true,
     // No "node". The contract is loaded by the browser — the schema browser,
     // the time-window editor and the granularity picker all read the
     // vocabulary from it — so a `node:*` import or a `Buffer` reference must

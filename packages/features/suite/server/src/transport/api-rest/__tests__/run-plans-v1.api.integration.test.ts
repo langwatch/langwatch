@@ -332,6 +332,7 @@ describe("given the family's addresses", () => {
   // The family carries its version in its base path, so it is one of the four
   // the /api-and-/api/v1 twinning leaves alone: there is no bare alias and no
   // dated segment to answer on.
+  /** @scenario "The run plans family answers only under /api/v1" */
   it("serves the collection at /api/v1 and nowhere else", async () => {
     const { api, world } = mountSuiteFamilies();
     const plan = world.addPlan({ name: "Nightly" });

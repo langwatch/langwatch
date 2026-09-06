@@ -1,17 +1,10 @@
 {
+  "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/entitlement-contract.tsbuildinfo",
-    "target": "es2022",
-    "module": "preserve",
-    "moduleResolution": "bundler",
     "lib": ["es2022"],
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"]
 }

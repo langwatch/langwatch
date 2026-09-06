@@ -1,13 +1,8 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/config.tsbuildinfo",
-    "target": "ES2022",
-    "module": "Preserve",
-    "moduleResolution": "Bundler",
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
     // No "node". This package is loaded by the browser — `./public-app-config`
     // is the contract the client bundle parses out of the HTML shell — so a
     // `node:*` import or a `Buffer` reference must not compile here. The suite

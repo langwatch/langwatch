@@ -9,9 +9,11 @@ import {
 import { createLogger } from "@langwatch/observability";
 import {
   migrationRunsOnThisInstallation,
-  organizationMigrates,
   userMigrates,
 } from "../rules/ops-system-migration-cohort.rules";
+import { NullOrganizationDataplaneAdapter } from "./null.organization-dataplane.adapter";
+import type { OrganizationDataplanePort } from "../ports/organization-dataplane.port";
+import { SystemMigrationCohortService } from "../services/system-migration-cohort.service";
 import { PrismaMigrationMembershipRepository } from "../repositories/prisma/prisma.migration-membership.repository";
 import { PrismaUserTenantSourceRepository } from "../repositories/prisma/prisma.user-tenant-source.repository";
 import { RedisMigrationLeaseRepository } from "../repositories/redis/redis.migration-lease.repository";
@@ -56,6 +58,12 @@ export type PostgresSystemMigrationsAdapterOptions = Readonly<{
    * no user row behind it — a tenant no source enumerates.
    */
   newbornSweep: () => Promise<unknown>;
+  /**
+   * Where each organization's data lives. Not a filter — a private data plane
+   * never holds an organization back — but a pass that admits one says which
+   * instance it landed on. Omitted, every organization reads as shared.
+   */
+  dataplane?: OrganizationDataplanePort;
 }>;
 
 /**
@@ -195,17 +203,24 @@ export class PostgresSystemMigrationsAdapter {
     enrollments: PrismaSystemMigrationEnrollmentRepository;
     migrations: readonly SystemMigration[];
   }): Promise<(args: { tenantId: string; migrationName: string }) => boolean> {
-    const automatic = new Set(
-      migrations.filter((one) => one.enrolledAutomatically).map((one) => one.name),
-    );
     const enrolled = isSaaS
       ? await enrollments.findEnrolledOrganizationIdsByMigration()
       : new Map<string, Set<string>>();
-    return ({ tenantId, migrationName }) =>
-      organizationMigrates({
-        isSaaS,
-        enrolledAutomatically: automatic.has(migrationName),
-        enrolled: enrolled.get(migrationName)?.has(tenantId) ?? false,
-      });
+    const cohort = SystemMigrationCohortService.create({
+      isSaaS,
+      enrolled,
+      migrations,
+      dataplane: this.options.dataplane ?? NullOrganizationDataplaneAdapter.create(),
+    });
+    return ({ tenantId, migrationName }) => {
+      const admission = cohort.admits({ organizationId: tenantId, migrationName });
+      if (admission.admitted && admission.dataplane.kind === "private") {
+        logger.debug(
+          { migrationName, organizationId: tenantId, endpoint: admission.dataplane.endpoint },
+          "organization with a dedicated data plane is in this migration's cohort",
+        );
+      }
+      return admission.admitted;
+    };
   }
 }

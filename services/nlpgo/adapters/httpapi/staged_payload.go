@@ -29,6 +29,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -60,6 +61,9 @@ func validateStagedPayloadURL(raw string) error {
 	if err != nil {
 		return fmt.Errorf("staged payload url is unparseable: %w", err)
 	}
+	if origin := stagedPayloadTestOnlyOrigin(); origin != "" && originOf(u) == origin {
+		return nil
+	}
 	if u.Scheme != "https" {
 		return fmt.Errorf("staged payload url must be https, got %q", u.Scheme)
 	}
@@ -68,6 +72,35 @@ func validateStagedPayloadURL(raw string) error {
 		return fmt.Errorf("staged payload url host %q is not an AWS S3 host", host)
 	}
 	return nil
+}
+
+// StagedPayloadTestOnlyOriginEnv names ONE extra origin ("scheme://host:port")
+// the guard above accepts, so a test can stand a fake object store up on
+// loopback and drive the whole staging round trip against a live engine
+// without an AWS account. It admits exactly that origin and nothing else: it
+// is not a suffix, not a wildcard, and not a way to turn the guard off.
+//
+// It is refused outright on a deployed environment. ENVIRONMENT is the same
+// marker the rest of this service reads, and anything but a local or test one
+// ignores the variable rather than trusting it, so an operator who exported it
+// on a real installation widens nothing.
+const StagedPayloadTestOnlyOriginEnv = "NLPGO_TEST_ONLY_STAGED_PAYLOAD_ORIGIN"
+
+// stagedPayloadTestOnlyOrigin returns the admitted test origin, or "" when
+// there is none or the environment is not one where a test runs.
+func stagedPayloadTestOnlyOrigin() string {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("ENVIRONMENT"))) {
+	case "", "local", "development", "test":
+	default:
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(os.Getenv(StagedPayloadTestOnlyOriginEnv)))
+}
+
+// originOf renders the scheme and authority of u the way the environment
+// variable states them, so the comparison is exact rather than by host alone.
+func originOf(u *url.URL) string {
+	return strings.ToLower(u.Scheme + "://" + u.Host)
 }
 
 // isAWSS3Host reports whether host is an Amazon S3 endpoint. It requires both

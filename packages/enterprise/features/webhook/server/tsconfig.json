@@ -1,17 +1,10 @@
 {
+  "extends": "../../../../../tsconfig.base.json",
   "compilerOptions": {
-    "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/enterprise-webhook-server.tsbuildinfo",
-    "target": "es2022",
-    "module": "preserve",
-    "moduleResolution": "bundler",
     "lib": ["es2022", "dom"],
     "types": ["node"],
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "paths": {
       "@langwatch/enterprise-webhook-contract": ["../contract/src/index.ts"],

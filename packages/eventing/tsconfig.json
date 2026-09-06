@@ -1,18 +1,15 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2022",
-    "module": "preserve",
-    "moduleResolution": "bundler",
+    // This package emits: `noEmit` from the shared base is turned back off
+    // here so a `tsc -p` build still writes its declarations.
+    "noEmit": false,
     "lib": ["es2022"],
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "incremental": true,
     "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/eventing.tsbuildinfo",
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
