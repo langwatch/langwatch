@@ -11,50 +11,61 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// Azure addresses a model by deployment name, so Bifrost's Azure provider
-// refuses to build a URL for a key whose AzureKeyConfig.Deployments is empty
-// ("deployments not set") — the request never leaves the gateway, and the
-// caller sees an opaque provider error instead of a completion.
+// Azure addresses a model by deployment name, and its v1 API carries that name
+// in the request body's `model` field. Azure is raw-forwarded
+// (isOpenAICompatibleProvider), so the client's own bytes are what reach the
+// wire: whatever the gateway resolves has to land in that field, or it never
+// leaves the box.
 //
 // The control plane only emits `deployment_map` when the provider row carries
 // an explicit deployment mapping (config.materialiser.ts), which most Azure
 // rows do not: by default the model id IS the deployment name. Every other
 // dispatch path already closes that gap with domain.WithDeploymentSelfMap
-// (nlpgo's dispatcheradapter and gatewayproxy, #5760); the gateway did not,
-// so the same Azure provider that worked in the playground failed through the
-// gateway.
+// (nlpgo's dispatcheradapter and gatewayproxy, #5760); the gateway did not, so
+// the same Azure provider that worked in the playground missed its deployment
+// through the gateway.
 //
 // These tests drive the real dispatch path against a local upstream standing
-// in for the customer's Azure resource, so what they observe is the URL
-// Bifrost actually builds, not a restatement of the mapping helper.
+// in for the customer's Azure resource, so what they observe is the request
+// Bifrost actually sends, not a restatement of the mapping helper.
 
 // azureUpstream answers with an OpenAI-shaped chat completion (Azure's wire
-// format) and keeps the path of every request it received, in arrival order.
+// format) and keeps every request it received, in arrival order.
 type azureUpstream struct {
-	srv   *httptest.Server
-	mu    sync.Mutex
-	paths []string
+	srv    *httptest.Server
+	mu     sync.Mutex
+	bodies [][]byte
 }
 
-func (u *azureUpstream) received() []string {
+func (u *azureUpstream) received() [][]byte {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	return append([]string(nil), u.paths...)
+	return append([][]byte(nil), u.bodies...)
+}
+
+// deploymentAddressed reports the deployment the nth upstream request names.
+func (u *azureUpstream) deploymentAddressed(t *testing.T, n int) string {
+	t.Helper()
+	bodies := u.received()
+	require.Greater(t, len(bodies), n,
+		"the request must actually reach the customer's Azure resource")
+	return gjson.GetBytes(bodies[n], "model").String()
 }
 
 func newAzureUpstream(t *testing.T) *azureUpstream {
 	t.Helper()
 	u := &azureUpstream{}
 	u.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u.mu.Lock()
-		u.paths = append(u.paths, r.URL.Path)
-		u.mu.Unlock()
 		body, _ := io.ReadAll(r.Body)
+		u.mu.Lock()
+		u.bodies = append(u.bodies, body)
+		u.mu.Unlock()
 		if bytes.Contains(body, []byte(`"stream":true`)) {
 			w.Header().Set("Content-Type", "text/event-stream")
 			w.WriteHeader(http.StatusOK)
@@ -121,23 +132,27 @@ func TestDispatch_Azure_NoDeploymentMap_SelfMapsToModelID(t *testing.T) {
 	upstream := newAzureUpstream(t)
 	router := azureRouter(t)
 
-	resp, err := router.Dispatch(context.Background(), azureChatRequest(false),
+	req := azureChatRequest(false)
+	sent := append([]byte(nil), req.Body...)
+
+	resp, err := router.Dispatch(context.Background(), req,
 		azureCredNoDeploymentMap(upstream.srv.URL))
 	require.NoError(t, err,
-		"an Azure credential without an explicit deployment mapping must still dispatch; "+
-			"without the self-map Bifrost refuses with \"deployments not set\" and nothing leaves the gateway")
+		"an Azure credential without an explicit deployment mapping must still dispatch")
 	require.NotNil(t, resp)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	paths := upstream.received()
-	require.Len(t, paths, 1, "the request must actually reach the customer's Azure resource")
-	assert.Contains(t, paths[0], "/openai/deployments/gpt-5-mini/",
-		"the deployment defaults to the model id, so the URL must address deployment gpt-5-mini")
+	assert.Equal(t, "gpt-5-mini", upstream.deploymentAddressed(t, 0),
+		"the deployment defaults to the model id, so the request must address deployment gpt-5-mini")
+	// Azure is raw-forwarded to keep OpenAI's prompt-prefix auto-cache hitting.
+	// With nothing to remap, the customer's bytes must go out untouched.
+	assert.Equal(t, string(sent), string(upstream.received()[0]),
+		"with no deployment to remap the body must be forwarded byte-for-byte")
 }
 
 // The streaming lane resolves its credential separately from Dispatch, so it
-// needs its own self-map or /v1/chat/completions with stream:true keeps
-// failing on Azure while the non-streaming call succeeds.
+// needs its own resolution or stream:true keeps missing the deployment on
+// Azure while the non-streaming call gets it right.
 //
 // @scenario "Gateway streaming chat completion for an Azure model reaches the deployment named by the model id"
 func TestDispatchStream_Azure_NoDeploymentMap_SelfMapsToModelID(t *testing.T) {
@@ -147,22 +162,20 @@ func TestDispatchStream_Azure_NoDeploymentMap_SelfMapsToModelID(t *testing.T) {
 	iter, err := router.DispatchStream(context.Background(), azureChatRequest(true),
 		azureCredNoDeploymentMap(upstream.srv.URL))
 	require.NoError(t, err,
-		"the streaming lane must self-map the deployment too, or stream:true fails "+
+		"the streaming lane must resolve the deployment too, or stream:true fails "+
 			"on Azure providers the non-streaming lane serves fine")
 	for iter.Next(context.Background()) {
 	}
 	require.NoError(t, iter.Err(),
-		"the stream must drain cleanly; a mid-stream failure would leave the URL "+
-			"assertion below passing on a request that never produced a usable answer")
+		"the stream must drain cleanly; a mid-stream failure would leave the assertion "+
+			"below passing on a request that never produced a usable answer")
 
-	paths := upstream.received()
-	require.NotEmpty(t, paths, "the stream must actually reach the customer's Azure resource")
-	assert.Contains(t, paths[0], "/openai/deployments/gpt-5-mini/",
-		"the deployment defaults to the model id, so the URL must address deployment gpt-5-mini")
+	assert.Equal(t, "gpt-5-mini", upstream.deploymentAddressed(t, 0),
+		"the deployment defaults to the model id, so the request must address deployment gpt-5-mini")
 }
 
 // An explicit mapping is the provider saying the model id is NOT the
-// deployment name. The self-map must never overwrite it.
+// deployment name. Dropping it sends Azure a deployment it does not have.
 //
 // @scenario "An explicit deployment mapping still decides the deployment on the gateway lane"
 func TestDispatch_Azure_ExplicitDeploymentMap_Wins(t *testing.T) {
@@ -175,8 +188,29 @@ func TestDispatch_Azure_ExplicitDeploymentMap_Wins(t *testing.T) {
 	_, err := router.Dispatch(context.Background(), azureChatRequest(false), cred)
 	require.NoError(t, err)
 
-	paths := upstream.received()
-	require.Len(t, paths, 1)
-	assert.Contains(t, paths[0], "/openai/deployments/prod-mini-eastus/",
-		"the provider's own mapping decides the deployment; the self-map only fills a gap")
+	assert.Equal(t, "prod-mini-eastus", upstream.deploymentAddressed(t, 0),
+		"the provider's own mapping decides the deployment; the default only fills a gap")
+}
+
+// The two lanes read the deployment from the same place, so this covers the
+// streaming seam and the other credential shape at once: a deployment named
+// alongside the credential rather than in a mapping, which is what
+// WithDeploymentSelfMap folds into DeploymentMap for both lanes to read.
+//
+// @scenario "The streaming lane honors an explicit deployment name too"
+func TestDispatchStream_Azure_ExplicitDeployment_Wins(t *testing.T) {
+	upstream := newAzureUpstream(t)
+	router := azureRouter(t)
+
+	cred := azureCredNoDeploymentMap(upstream.srv.URL)
+	cred.Extra["deployment"] = "prod-mini-eastus"
+
+	iter, err := router.DispatchStream(context.Background(), azureChatRequest(true), cred)
+	require.NoError(t, err)
+	for iter.Next(context.Background()) {
+	}
+	require.NoError(t, iter.Err(), "the stream must drain cleanly")
+
+	assert.Equal(t, "prod-mini-eastus", upstream.deploymentAddressed(t, 0),
+		"the provider's own deployment name decides the deployment on the streaming lane too")
 }

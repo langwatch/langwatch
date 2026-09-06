@@ -217,6 +217,38 @@ func stripDropTuningParams(body []byte) []byte {
 	return out
 }
 
+// withResolvedDeployment points a raw-forwarded Azure body at the deployment
+// the credential names for this model.
+//
+// Azure addresses a model by deployment name, and its v1 API carries that name
+// in the request body's `model` field rather than in the URL. Bifrost resolves
+// model -> deployment through Key.Aliases, but Azure is raw-forwarded
+// (isOpenAICompatibleProvider), so the client's own bytes are what reach the
+// wire and Bifrost's resolved model never lands in them. A provider whose
+// deployment name differs from the model id would therefore be sent a name its
+// resource does not have, and Azure answers "deployment not found".
+//
+// Mutates only when the deployment actually differs from the model, so the
+// common case (deployment == model id) stays byte-identical and OpenAI's
+// prompt-prefix auto-cache keeps hitting — the same conditional-mutation rule
+// stripDropTuningParams follows. Callers apply WithDeploymentSelfMap first, so
+// DeploymentMap already carries both the provider's explicit mapping and the
+// self-mapped default.
+func withResolvedDeployment(body []byte, cred domain.Credential, model string) []byte {
+	if cred.ProviderID != domain.ProviderAzure {
+		return body
+	}
+	deployment := cred.DeploymentMap[model]
+	if deployment == "" || deployment == model {
+		return body
+	}
+	out, err := sjson.SetBytes(body, "model", deployment)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
 // isOpenAICompatibleProvider reports whether the destination provider
 // natively speaks OpenAI chat-completions wire format. When true, the
 // gateway raw-forwards the inbound body rather than parse+re-marshal,
