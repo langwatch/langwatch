@@ -8,7 +8,6 @@ describe("postgresReaderStatementsFor", () => {
         mode: "manage-role",
         readerPassword: "secret123",
         schema: "public",
-        role: "lwql_ro",
       });
 
       expect(result.statements.length).toBeGreaterThan(0);
@@ -25,7 +24,6 @@ describe("postgresReaderStatementsFor", () => {
         mode: "manage-role",
         readerPassword: undefined,
         schema: "public",
-        role: "lwql_ro",
       });
 
       expect(result.statements.length).toBeGreaterThan(0);

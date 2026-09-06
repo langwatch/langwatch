@@ -385,10 +385,15 @@ reads through this bridge yet (langwatch-saas#7387).
 role lwql_ro. The chart does not provision that role on a PostgreSQL it does not
 own, so confirm you have: (1) created lwql_ro on your PostgreSQL — read-only,
 granted SELECT on the approved lwql_* views only, never the superuser; and (2)
-supplied its password via clickhouse.lwqlAccessModel.existingSecret (the
-lwql_pg_password key) — the same Secret ClickHouse mounts for the lwql_postgres
-collection. If the role or its password is missing, the bridge stays dead and
-Postgres-resident LangWatchQL datasets fail to load.
+supplied clickhouse.lwqlAccessModel.existingSecret carrying BOTH keys —
+lwql_pg_password (the lwql_ro reader password) AND lwql_password (the
+langwatch_lwql ClickHouse identity password). That one Secret is the source of
+both: ClickHouse mounts it for the lwql_postgres collection AND creates the
+langwatch_lwql identity from it, and the app/workers read the query password
+(LWQL_CLICKHOUSE_PASSWORD) from it too. Both mounts are optional, so a Secret
+missing either key installs without error and silently leaves that identity
+with a password nobody set — the bridge (lwql_pg_password) or every query
+(lwql_password) then stays dead and LangWatchQL datasets fail to load.
 {{- end }}
 {{- else }}
 Your ClickHouse is external, so the chart cannot render config into it: the app

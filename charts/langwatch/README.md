@@ -317,8 +317,15 @@ against your PostgreSQL, dialing as the read-only role `lwql_ro`. The chart neve
 provisions that role on a PostgreSQL it does not own — `LWQL_MANAGE_POSTGRES_READER`
 is emitted only for chart-managed PostgreSQL — and it will not autogenerate a
 password nobody set on your server. So this posture **requires** you to create
-the reader yourself and hand the chart its password via
-`clickhouse.lwqlAccessModel.existingSecret`; the render fails otherwise.
+the reader yourself and hand the chart a Secret via
+`clickhouse.lwqlAccessModel.existingSecret` that carries **both** the reader
+password (`lwql_pg_password`) **and** the `langwatch_lwql` ClickHouse identity
+password (`lwql_password`); the render fails otherwise. That one Secret backs
+both credentials: `existingSecret` redirects both the subchart's mount (from
+which the owning ClickHouse pod creates the `langwatch_lwql` identity) and this
+chart's `lwqlSecretName` (from which the app/workers read
+`LWQL_CLICKHOUSE_PASSWORD`), so a Secret carrying only `lwql_pg_password` would
+leave `langwatch_lwql` with a password nobody set.
 
 Create the reader with the same shape the app converges on a chart-managed
 PostgreSQL (`postgresReaderRoleStatements` in
@@ -338,11 +345,23 @@ GRANT SELECT ON "public"."lwql_traces" TO "lwql_ro";
 -- ...one GRANT SELECT per approved lwql_* view
 ```
 
-Then create a Secret you own carrying that password under the `lwql_pg_password`
-key (or whatever `clickhouse.lwqlAccessModel.postgres.passwordSecretKey` names)
-and point `clickhouse.lwqlAccessModel.existingSecret` at it. That is the same
-Secret ClickHouse mounts for the named collection, so the bridge dials `lwql_ro`
-with the exact password you set on it.
+Then create a Secret you own carrying **two** keys and point
+`clickhouse.lwqlAccessModel.existingSecret` at it:
+
+- `lwql_pg_password` (or whatever
+  `clickhouse.lwqlAccessModel.postgres.passwordSecretKey` names) — the `lwql_ro`
+  reader password. ClickHouse mounts this Secret for the named collection, so the
+  bridge dials `lwql_ro` with the exact password you set on it.
+- `lwql_password` (or whatever `clickhouse.lwqlAccessModel.passwordSecretKey`
+  names) — the `langwatch_lwql` ClickHouse identity password. `existingSecret`
+  redirects this chart's `lwqlSecretName` at the same Secret, so the owning
+  ClickHouse pod creates `langwatch_lwql` from it and the app/workers read
+  `LWQL_CLICKHOUSE_PASSWORD` from it.
+
+Both mounts are `optional: true`, so a Secret missing either key installs without
+error and silently leaves that identity with a password nobody set — omit
+`lwql_pg_password` and the bridge is dead; omit `lwql_password` and every
+LangWatchQL query is refused. Include both.
 
 ### Pod security
 

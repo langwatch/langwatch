@@ -364,12 +364,24 @@ export default async function execute() {
     //     crashloop a default-on feature (a non-superuser DATABASE_URL) or
     //     silently rotate the operator's own reader password.
     const readerMode = lwqlPostgresReaderModeFromEnv();
-    const readerResult = postgresReaderStatementsFor({
-      mode: readerMode,
-      readerPassword: process.env.LWQL_POSTGRES_READER_PASSWORD,
-      schema: postgresSchema,
-      role: process.env.LWQL_POSTGRES_READER_ROLE,
-    });
+    // The two modes take different inputs (manage-role converges the dedicated
+    // lwql_ro reader from the password alone; grants-only re-grants a
+    // caller-named role), so dispatch per arm rather than passing a role that
+    // the manage-role arm would ignore. Runtime behavior is unchanged: on
+    // manage-role, role was already discarded here (the app always converges
+    // lwql_ro), so it is simply not passed.
+    const readerResult =
+      readerMode === "manage-role"
+        ? postgresReaderStatementsFor({
+            mode: "manage-role",
+            readerPassword: process.env.LWQL_POSTGRES_READER_PASSWORD,
+            schema: postgresSchema,
+          })
+        : postgresReaderStatementsFor({
+            mode: "grants-only",
+            schema: postgresSchema,
+            role: process.env.LWQL_POSTGRES_READER_ROLE,
+          });
     if (readerResult.warningMessage) {
       logger.warn(readerResult.warningMessage);
     }
