@@ -12,7 +12,7 @@ import {
   type BillingWebhookOrganizationPort,
   type BillingWebhookSubscriptionPort,
   type SubscriptionWithOrg,
-} from "../../index";
+} from "../../index.ts";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
 const mockSendSlackBillingThresholdFailureAlert = vi.fn().mockResolvedValue(undefined);
@@ -197,6 +197,7 @@ describe("EEWebhookService", () => {
         });
       });
 
+      /** @scenario "A checkout completion grants the plan the customer paid for" */
       /** @scenario Successful checkout links and activates the subscription */
       it("activates subscription and cancels trial subscriptions", async () => {
         subRepo.linkStripeId.mockResolvedValue({ count: 1 });
@@ -311,6 +312,7 @@ describe("EEWebhookService", () => {
         });
       });
 
+      /** @scenario "A best-effort side effect that throws does not abandon the webhook" */
       /** @scenario Checkout succeeds even when invite approval fails */
       it("continues when invite approval fails", async () => {
         const mockInviteApprover = {
@@ -525,6 +527,7 @@ describe("EEWebhookService", () => {
 
   describe("handleInvoicePaymentSucceeded()", () => {
     describe("when no subscription found", () => {
+      /** @scenario "A Stripe event naming a subscription we do not know is ignored, not failed" */
       /** @scenario Unrecognized subscription ID is ignored by <handler> */
       it("skips without error", async () => {
         subRepo.tryFindByStripeId.mockResolvedValue(null);
@@ -575,6 +578,7 @@ describe("EEWebhookService", () => {
     });
 
     describe("when subscription is already active", () => {
+      /** @scenario "The same Stripe event delivered twice changes the plan once" */
       /** @scenario Subsequent payment renewals do not re-notify */
       it("does not set startDate and does not notify", async () => {
         subRepo.tryFindByStripeId.mockResolvedValue(
@@ -999,6 +1003,7 @@ describe("EEWebhookService", () => {
     });
 
     describe("when subscription is ACTIVE", () => {
+      /** @scenario "A failed invoice payment does not immediately remove the plan" */
       /** @scenario Payment failure on an active subscription records the failure */
       it("keeps status as ACTIVE with failed payment date", async () => {
         subRepo.tryFindByStripeId.mockResolvedValue(
@@ -1074,6 +1079,7 @@ describe("EEWebhookService", () => {
     });
 
     describe("when subscription exists", () => {
+      /** @scenario "A deleted subscription returns the organization to the free plan" */
       /** @scenario Subscription deletion cancels the subscription */
       it("cancels and nullifies overrides", async () => {
         subRepo.tryFindByStripeId.mockResolvedValue(
@@ -1325,6 +1331,7 @@ describe("EEWebhookService", () => {
     });
 
     describe("when subscription is active", () => {
+      /** @scenario "A subscription update recalculates the quantity for every priced item" */
       /** @scenario Active subscription recalculates quantities from Stripe items */
       /** @scenario Active subscription update clears a trial license */
       it("recalculates quantities and updates", async () => {

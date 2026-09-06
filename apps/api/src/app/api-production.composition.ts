@@ -77,7 +77,10 @@ import {
   composeEvaluatorService,
   refusingEvaluatorFeature,
 } from "../features/evaluator/evaluator.composition.ts";
-import { composePromptFeature, refusingPromptFeature } from "../features/prompt/prompt.composition.ts";
+import {
+  composePromptFeature,
+  refusingPromptFeature,
+} from "../features/prompt/prompt.composition.ts";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
 import {
   composeFeatureFlagFeature,
@@ -354,7 +357,10 @@ import {
 import { ApiHandlerManagedCredentials } from "./api-handler-managed-credential.ts";
 import { apiClientAddress } from "./api-client-address.ts";
 import { extractApiKeyRequestCredentials } from "./api-key-request-credentials.ts";
-import { composeApiTraceIngest, LoggedApiTraceIngestAbsence } from "./api-trace-ingest.composition.ts";
+import {
+  composeApiTraceIngest,
+  LoggedApiTraceIngestAbsence,
+} from "./api-trace-ingest.composition.ts";
 import { composeApiTraceSpool } from "./api-trace-spool.composition.ts";
 import { ApiTraceMediaStore } from "./api-packaged-rest.composition.ts";
 import {

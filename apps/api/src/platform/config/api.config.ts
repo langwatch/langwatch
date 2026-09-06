@@ -259,6 +259,27 @@ export const apiConfigDefinition = RuntimeConfig.define({
    * SPF. `BASE_HOST` is read from `publicBaseUrl`, not re-bound here.
    */
   mail: { ...mailConfigDefinition },
+  /**
+   * The payment provider, under the names every LangWatch tier already reads
+   * them by. Every leaf is optional: a self-hosted or OSS install bills through
+   * nobody, and `resolveApiBillingConfig` answers nothing rather than letting a
+   * half-configured Stripe boot a webhook that cannot verify a signature.
+   */
+  billing: {
+    stripeSecretKey: Config.value(optionalEnvironmentString, { env: "STRIPE_SECRET_KEY" }),
+    stripeWebhookSecret: Config.value(optionalEnvironmentString, {
+      env: "STRIPE_WEBHOOK_SECRET",
+    }),
+    licensePaymentLinkId: Config.value(optionalEnvironmentString, {
+      env: "STRIPE_LICENSE_PAYMENT_LINK_ID",
+    }),
+    licensePrivateKey: Config.value(optionalEnvironmentString, {
+      env: "LANGWATCH_LICENSE_PRIVATE_KEY",
+    }),
+    slackSubscriptionsChannel: Config.value(optionalEnvironmentString, {
+      env: "SLACK_CHANNEL_SUBSCRIPTIONS",
+    }),
+  },
   infrastructure: {
     /**
      * Optional, like Redis: no database composes none, never an
@@ -602,9 +623,22 @@ function resolveNlpLambdaFleetConfig(
 export type ApiConfig = Readonly<
   Omit<
     ApiConfigProjection,
-    "authz" | "browserSession" | "infrastructure" | "mail" | "shutdown" | "validateTrpcOutput"
+    | "authz"
+    | "billing"
+    | "browserSession"
+    | "infrastructure"
+    | "mail"
+    | "shutdown"
+    | "validateTrpcOutput"
   > & {
     authz: ApiAuthzConfig;
+    /**
+     * The payment provider, present only when this deployment can both call
+     * Stripe and verify what Stripe calls back with. Absent everywhere else,
+     * which is what leaves the webhook route unmounted rather than mounted
+     * over a client that cannot authenticate a delivery.
+     */
+    billing: ApiBillingConfig | undefined;
     /**
      * Whether this process checks every tRPC answer against the output schema
      * its procedure declares. Resolved here, once, so no surface below reads an
@@ -663,9 +697,11 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
   // unresolved gateway on a deployment that named no `BASE_HOST`.
   const { mail: mailSource, ...rest } = value;
   const mail = resolveApiMailConfig(mailSource, value.infrastructure.execution.publicBaseUrl);
+  const { billing: billingSource, ...withoutBilling } = rest;
   return {
-    ...rest,
+    ...withoutBilling,
     ...(mail ? { mail } : {}),
+    billing: resolveApiBillingConfig(billingSource),
     featureFlags: resolveFeatureFlagConfig(source),
     // Unset means "follow the deployment": on in development and test, off in
     // production, where a drifted schema must not turn a working read into a
@@ -803,6 +839,44 @@ function refuseApiSelfIngest(value: ApiConfigProjection): void {
       { env: "API_HOST/API_PORT", value: value.host, port: value.port },
     ],
   });
+}
+
+/**
+ * What this process needs to bill through Stripe. The two credentials are the
+ * whole gate: without the secret key nothing can be charged, and without the
+ * signing secret a delivery cannot be told apart from an attacker's POST.
+ */
+export type ApiBillingConfig = Readonly<{
+  stripeSecretKey: string;
+  /** Verified over the raw bytes, per request, so a rotation needs no restart. */
+  stripeWebhookSecret: string;
+  /** The payment link a self-hosted licence purchase arrives on, where one is sold. */
+  licensePaymentLinkId: string | undefined;
+  /** Signs an issued licence key; absent means a licence checkout cannot be fulfilled. */
+  licensePrivateKey: string | undefined;
+  /** Where the operators' billing notices go, if this deployment named a channel. */
+  slackSubscriptionsChannel: string | undefined;
+}>;
+
+/**
+ * Nothing unless BOTH credentials are present. Half a Stripe configuration is
+ * the shape that boots and then refuses every delivery, which reads as an
+ * outage rather than as the configuration mistake it is.
+ */
+function resolveApiBillingConfig(
+  billing: ApiConfigProjection["billing"],
+): ApiBillingConfig | undefined {
+  const stripeSecretKey = billing.stripeSecretKey?.trim();
+  const stripeWebhookSecret = billing.stripeWebhookSecret?.trim();
+  if (!stripeSecretKey || !stripeWebhookSecret) return undefined;
+
+  return {
+    stripeSecretKey,
+    stripeWebhookSecret,
+    licensePaymentLinkId: billing.licensePaymentLinkId?.trim() || undefined,
+    licensePrivateKey: billing.licensePrivateKey?.trim() || undefined,
+    slackSubscriptionsChannel: billing.slackSubscriptionsChannel?.trim() || undefined,
+  };
 }
 
 /**
