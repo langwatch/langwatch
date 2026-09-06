@@ -405,6 +405,12 @@ export type ApiClickHouseConfigResolution = Readonly<{
   /** The restricted identity a member's own SQL runs as; absent means unprovisioned. */
   langwatchQl: ApiLangWatchQLConfigResolution | undefined;
   /**
+   * The database the approved views read FROM, taken off this process's own connection
+   * string. Resolved here rather than parsed at a call site: reading the deployment's
+   * connection string is configuration, and a second parse is a second answer.
+   */
+  sourceDatabase: string | undefined;
+  /**
    * The dedicated readonly account the operator EXPLAIN endpoint runs as;
    * absent means that endpoint is not served at all rather than falling back
    * to the application's own connection.
@@ -733,6 +739,7 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       clickhouse: {
         url: value.infrastructure.clickhouse.url?.trim() || undefined,
         langwatchQl: resolveLangWatchQLConnection(value.infrastructure.clickhouse.langwatchQl),
+        sourceDatabase: clickHouseDatabaseOf(value.infrastructure.clickhouse.url),
         opsUrl: value.infrastructure.clickhouse.opsUrl?.trim() || undefined,
         privateRoutes: resolvePrivateClickHouseRoutes(source),
         poolSizing: poolSizingFromEnv(environmentStrings(source)),
@@ -984,6 +991,22 @@ function isEnabledFlag(value: string | undefined): boolean {
  * means the workbench was meant to run; the omission is named (var names
  * only, one of these is a password).
  */
+/**
+ * The database an unqualified table name resolves to on this process's own ClickHouse:
+ * the connection URL's path. A malformed or absent URL answers nothing rather than a
+ * guess — the surfaces that need it already refuse without a ClickHouse at all.
+ */
+function clickHouseDatabaseOf(url: string | undefined): string | undefined {
+  const trimmed = url?.trim();
+  if (!trimmed) return undefined;
+  try {
+    const database = new URL(trimmed).pathname.replace(/^\//, "");
+    return database.length > 0 ? database : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function resolveLangWatchQLConnection(
   value: Readonly<{
     url: string | undefined;

@@ -21,6 +21,7 @@ import {
   PostgresProjectAdapter,
   ProjectCredentialsAdapter,
   ProjectDiagnosticsPort,
+  type ProjectKeyMapPort,
 } from "@langwatch/project-server";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { ApiOrganizationSettingsSecretAdapter } from "./api-organization-settings-secret.adapter.ts";
@@ -38,6 +39,12 @@ export type ApiTenancyCompositionOptions = {
   encryption: SecretEncryptionPort;
   /** The HMAC key an API key's stored hash is derived under, verbatim. */
   pepper: string;
+  /**
+   * The LangWatchQL key map, where this process opened a ClickHouse. A project's key has
+   * to reach the table the approved views read, or a governed query against a project
+   * created after the last backfill resolves nothing.
+   */
+  keyMap?: ProjectKeyMapPort | undefined;
 };
 
 /**
@@ -95,15 +102,16 @@ export class ApiTenancyComposition {
       ),
     }).build();
 
-    // `keyMap` and `storedObjects` are deliberately absent, and the adapter declares both
-    // optional because absence is a supported shape rather than a gap this root is
-    // papering over. Both are reach-outs to systems this process does not hold — a
-    // ClickHouse key map and the stored-object application — and a project deleted here
-    // leaves that cleanup to the tier that owns them.
+    // `storedObjects` is deliberately absent, and the adapter declares it optional because
+    // absence is a supported shape rather than a gap this root is papering over: a project
+    // deleted here leaves the stored-object cleanup to the tier that owns it. `keyMap` is
+    // not in that category — it is this process's own ClickHouse, and it is supplied
+    // wherever one was opened.
     const projects = PostgresProjectAdapter.create({
       database,
       credentials: ProjectCredentialsAdapter.create(),
       organizations,
+      ...(options.keyMap ? { keyMap: options.keyMap } : {}),
       diagnostics: LoggedApiProjectDiagnostics.create(),
     }).build();
 

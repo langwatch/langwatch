@@ -289,6 +289,26 @@ export {
   IdentityWriteGateService,
 } from "./services/identity-write-gate.service.ts";
 export { IdentityWriteGateStatePort } from "./ports/identity-write-gate-state.port.ts";
+
+// better-auth's `database:` entry and its two account ceremonies (ADR-116 §1,
+// §5). Exported because the process that mounts better-auth composes them; a
+// deployment that reaches neither runs the stock storage engine and no
+// ceremonies, which is what it did before they were written.
+export {
+  BetterAuthCeremonyBridgeAdapter,
+  IdentityCeremoniesAdapter,
+} from "./adapters/better-auth.identity-ceremonies.adapter.ts";
+export {
+  BetterAuthIdentityStorageAdapter,
+  type IdentityStorageAdapterDeps,
+} from "./adapters/better-auth.identity-storage.adapter.ts";
+export { PrismaIdentityAccountsRepository } from "./repositories/prisma/prisma.identity-accounts.repository.ts";
+export { PrismaIdentityNewbornRepository } from "./repositories/prisma/prisma.identity-newborn.repository.ts";
+export { PrismaIdentityResolutionRepository } from "./repositories/prisma/prisma.identity-resolution.repository.ts";
+export {
+  PrismaIdentityUsersRepository,
+  type PrismaIdentityUsersDatabase,
+} from "./repositories/prisma/prisma.identity-users.repository.ts";
 export {
   SsoConnectionBackofficeService,
   type BackofficeSsoConnection,

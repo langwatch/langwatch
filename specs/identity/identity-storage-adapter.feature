@@ -513,3 +513,22 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     When better-auth reads their account
     Then the row carries the stored issuer
     And never the synthetic form built from the provider id
+
+  # The adapter and the ceremonies have to be COMPOSED to route anything. An
+  # API process that mounts better-auth over the stock Prisma engine and the
+  # no-op ceremonies runs the legacy branch for everybody, latched or not, and
+  # says nothing about it: the gate reads closed for a reason nobody chose.
+
+  @unit
+  Scenario: The API process composes the identity branch when it has an event stack
+    Given an API process that registered its identity pipeline
+    When it composes better-auth
+    Then better-auth's storage is the identity adapter rather than the stock engine
+    And the account ceremonies it binds are the bridge ceremonies
+
+  @unit
+  Scenario: An API process with no event stack names the branch it did not compose
+    Given an API process that registered no identity pipeline
+    When it composes better-auth
+    Then better-auth's storage is the stock engine
+    And the absence is reported once, naming what a user delete, an account write and an account delete no longer do

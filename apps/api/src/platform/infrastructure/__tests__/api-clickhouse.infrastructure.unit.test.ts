@@ -50,6 +50,7 @@ function compose(options: {
     clickhouse: {
       url: options.shared,
       langwatchQl: undefined,
+      sourceDatabase: undefined,
       opsUrl: undefined,
       privateRoutes: options.privateRoutes ?? [],
       poolSizing,

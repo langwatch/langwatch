@@ -281,7 +281,11 @@ import {
   ApiTrpcFeaturesComposition,
   LoggedApiTrpcFeaturesAbsence,
 } from "./api-trpc-features.composition.ts";
-import { generateClickHouseFilterConditions } from "@langwatch/analytics-server";
+import {
+  generateClickHouseFilterConditions,
+  LwqlKeyMapClickHouseRepository,
+  LwqlKeyMapService,
+} from "@langwatch/analytics-server";
 import { composeApiModelProviderHost } from "./api-model-provider-host.composition.ts";
 import {
   composeApiStudioHost,
@@ -648,9 +652,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedPresence!: ComposedPresenceFeature;
   private composedApiKey!: ComposedApiKeyFeature;
   /**
-   * The identity ledgers' event stack, or none.
+   * The identity ledgers' event stack. Always composed — a process with no queue gets one
+   * whose senders are absent, and every write through it refuses BY NAME rather than the
+   * whole stack being missing and each caller inventing its own answer.
    */
-  private composedIdentityEventing: ApiEventingIdentityAdapter | undefined;
+  private composedIdentityEventing!: ApiEventingIdentityAdapter;
   /**
    * The four things the execution features are built from and hand to each other, held because
    * a feature composed later reads one: the studio graph and its engine, the ONE dataset
@@ -828,11 +834,24 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         })
       : refusingFeatureFlagFeature();
     this.composedEventing = this.composeEventing(options, queueInfrastructure);
+    // The four identity definitions, registered PRODUCER-only on this process's own
+    // Eventing. Before the Auth graph rather than beside the person-shaped features,
+    // because Better Auth's storage and its three account ceremonies stage through them
+    // too: composed after, the deployment's own transport would be built over an event
+    // stack that did not exist yet and would run the legacy branch forever.
+    this.composedIdentityEventing = ApiEventingIdentityAdapter.create({
+      pipelines: composeApiIdentityPipelines({
+        eventing: this.composedEventing?.eventSourcing,
+        processName: options.config.serviceName,
+        report: LoggedApiIdentityPipelinesAbsence.create(createLogger(options.config.serviceName)),
+      }),
+    });
     const authz = this.resolveAuthz(options, queueInfrastructure);
     const readiness = this.options.readiness ?? queueInfrastructure?.readiness;
     const metrics = resolveApiMetrics({ options, injected: this.options.metrics });
     const encryption = composeApiSecretEncryption(options)?.encryption;
     this.composedEncryption = encryption;
+    this.resolveClickHouse(options);
     const tenancy = authz ? this.resolveTenancy(options, encryption) : undefined;
     // Before the Auth graph, because the password-reset link leaves through it
     // and that graph is where Better Auth is composed. Nothing downstream of a
@@ -2274,6 +2293,20 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         : undefined,
       encryption,
       pepper: options.config.apiKeyPepper,
+      // The LangWatchQL key map, over the ClickHouse this process opened above. A project
+      // created here writes its key to the table the approved views read, so a governed
+      // query against it resolves without waiting for the deploy-time backfill.
+      ...(this.composedClickHouse && options.config.infrastructure.clickhouse.sourceDatabase
+        ? {
+            keyMap: LwqlKeyMapService.create({
+              repository: LwqlKeyMapClickHouseRepository.create({
+                resolveClient: this.composedClickHouse.resolveClient,
+              }),
+              sourceDatabase: options.config.infrastructure.clickhouse.sourceDatabase,
+              connection: options.config.infrastructure.clickhouse.langwatchQl ?? null,
+            }),
+          }
+        : {}),
       report: LoggedApiTenancyAbsence.create(logger),
     });
     if (!this.composedTenancy) return undefined;
@@ -2323,6 +2356,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The SAME Redis Better Auth's own session cache lives in, so revoking a
       // session through this process clears the entry the other tier reads.
       redis: queueInfrastructure?.redis ?? null,
+      // The identity event stack, which is what makes Better Auth's storage the identity
+      // adapter and its account hooks the bridge ceremonies (ADR-116 §1, §5) rather than
+      // the stock Prisma engine and three no-ops. The SAME registration every other
+      // identity write on this process stages through.
+      identityEventing: this.composedIdentityEventing,
       // Where an uploaded avatar's bytes land: the content-addressed store the stored-object
       // feature opens, read at the UPLOAD rather than here. That feature composes further down
       // — it stands on services that stand on the session this graph verifies — so a store read
@@ -2854,6 +2892,38 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
+   * Opens this process's ClickHouse, once.
+   *
+   * Before the tenancy graph rather than inside the analytics half, because the project
+   * directory needs the LangWatchQL key map and the key map is a ClickHouse write: opened
+   * later, a project created on this process never reached the table the approved views
+   * read, and a governed query against it resolved nothing until the next backfill.
+   *
+   * It needs no tenancy of its own — a database connection, the operator's endpoints and
+   * the tenant directory over the same client — so the move costs nothing.
+   */
+  private resolveClickHouse(
+    options: ApiRuntimeCompositionOptions,
+  ): ApiClickHouseInfrastructure | undefined {
+    if (this.composedClickHouse) return this.composedClickHouse;
+    const database = this.composedDatabase?.connection;
+    if (!database) return undefined;
+
+    this.composedClickHouse = ApiClickHouseInfrastructure.tryCreate({
+      resources: options.resources,
+      clickhouse: options.config.infrastructure.clickhouse,
+      // The routing directory, over the three kinds of tenant the event store
+      // carries: a project names its owner, an organization names itself, and
+      // a user is platform-level. The SAME implementation the worker process
+      // composes — a project-only directory here answered an organization- or
+      // user-tenanted read with a refusal the worker never gave.
+      directory: PostgresTenantDirectoryAdapter.create({ database: database.client }),
+      report: LoggedApiClickHouseAbsence.create(createLogger(options.config.serviceName)),
+    });
+    return this.composedClickHouse;
+  }
+
+  /**
    * Opens this process's ClickHouse and composes the analytics half of the collaborator set
    * over it.
    */
@@ -2869,18 +2939,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // collaborator set whole and hands it in rather than having this half built for it.
     const projects = this.composedTenancy?.projects;
     if (!database || !projects) return refusingAnalyticsFeature();
-
-    this.composedClickHouse = ApiClickHouseInfrastructure.tryCreate({
-      resources: options.resources,
-      clickhouse: options.config.infrastructure.clickhouse,
-      // The routing directory, over the three kinds of tenant the event store
-      // carries: a project names its owner, an organization names itself, and
-      // a user is platform-level. The SAME implementation the worker process
-      // composes — a project-only directory here answered an organization- or
-      // user-tenanted read with a refusal the worker never gave.
-      directory: PostgresTenantDirectoryAdapter.create({ database: database.client }),
-      report: LoggedApiClickHouseAbsence.create(createLogger(options.config.serviceName)),
-    });
 
     return composeAnalyticsFeature({
       prisma: database.client,
@@ -2919,22 +2977,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     }
 
     const session = auth.compose();
-    // The three identity definitions, registered PRODUCER-only on this process's own Eventing.
-    // Composed BEFORE the features because every ledger write below stages through them: the
-    // thirteen identifier and two-step commands, the five a join request has, and the fourteen
-    // a single sign-on connection has.
-    const identityPipelines = composeApiIdentityPipelines({
-      eventing: this.composedEventing?.eventSourcing,
-      processName,
-      report: LoggedApiIdentityPipelinesAbsence.create(createLogger(processName)),
-    });
-    // Held on the composition as well as handed down: the SCIM directory-sync
-    // history stages through the SAME producer registrations, and a second
-    // adapter would resolve senders out of a second registry.
-    const identityEventing = ApiEventingIdentityAdapter.create({
-      pipelines: identityPipelines,
-    });
-    this.composedIdentityEventing = identityEventing;
+    // The ONE registration this process made, taken rather than repeated. Every ledger
+    // write below stages through it — the thirteen identifier and two-step commands, the
+    // five a join request has, the fourteen a connection has and the five a directory's
+    // push states — and a second adapter would resolve senders out of a second registry.
+    const identityEventing = this.composedIdentityEventing;
 
     this.composedAuthFeature = composeAuthFeature({
       prisma: database.client,
@@ -3019,9 +3066,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const database = this.composedDatabase?.connection;
     if (!database) return refusingStoredObjectFeature();
 
+    const clickHouse = this.composedClickHouse;
     const feature = composeStoredObjectFeature({
       prisma: database.client,
-      resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+      resolveClickHouseClient: clickHouse?.resolveClient ?? null,
+      // Every instance this process opened, for the id-only lookup an old trace's media
+      // still arrives as: the row names no tenant, so the owner is found by asking each
+      // instance rather than by routing. Absent, those media resolve to nothing.
+      clickHouseInstances: clickHouse ? () => clickHouse.instances() : null,
       storage: options.config.infrastructure.storedObjects,
       report: LoggedApiStoredObjectAbsence.create(createLogger(options.config.serviceName)),
     });
@@ -3695,6 +3747,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // the explorer says so by name.
       eventLogClient: this.composedClickHouse?.resolveSharedClient() ?? null,
       eventing: this.composedEventing?.eventSourcing,
+      // The SAME Redis the queue owns, which the worker publishes the ops snapshot on.
+      // Without it the /ops dashboards read a snapshot nothing wrote and report an empty
+      // fleet, which is a wrong answer rather than a missing one.
+      redis: this.composedQueueRedis ?? null,
       report: LoggedApiOpsAbsence.create(createLogger(options.config.serviceName)),
     });
   }

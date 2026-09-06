@@ -115,6 +115,7 @@ export {
   LwqlKeyMapErrorSinkPort,
   LwqlKeyMapService,
 } from "./services/langwatch-ql-key-map.service.ts";
+export { LwqlKeyMapClickHouseRepository } from "./repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 
 // The production provisioning statements and names the deploy task runs. Kept
 // beside the runtime reader deliberately: the views a query reads and the

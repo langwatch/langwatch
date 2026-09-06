@@ -17,7 +17,27 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
 import type { RoutingDecision, SignInMethodPolicy } from "@langwatch/identity-contract";
 import { sendResetPasswordEmail } from "@langwatch/mail";
-import { SignInMethodPolicyService } from "@langwatch/identity-server";
+import {
+  BetterAuthCeremonyBridgeAdapter,
+  BetterAuthIdentityStorageAdapter,
+  IdentityBirthService,
+  IdentityCeremoniesAdapter,
+  IdentityLedgerWriterAdapter,
+  IdentityService,
+  IdentityWriteGateService,
+  newIdentityCommandId,
+  PostgresIdentityGuardsAdapter,
+  PrismaIdentityAccountsRepository,
+  PrismaIdentityHeadsRepository,
+  PrismaIdentityNewbornRepository,
+  PrismaIdentityProjectionRepository,
+  PrismaIdentityResolutionRepository,
+  PrismaIdentityUsersRepository,
+  SignInMethodPolicyService,
+} from "@langwatch/identity-server";
+import { BetterAuthIdentityBirthAdapter } from "@langwatch/identity-server/adapters/better-auth-identity-birth";
+import type { IdentityEventingPort } from "@langwatch/identity-server";
+import { PrismaSystemMigrationStateRepository } from "@langwatch/ops-server";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -311,6 +331,150 @@ export class UnavailableApiBetterAuthGrants {
   }
 }
 
+/**
+ * The identity branch of Better Auth's storage, and the two account ceremonies bound
+ * beside it (ADR-116 §1 and §5).
+ *
+ * Composed as a pair because they fork on the SAME question: the write gate's per-user
+ * answer, birth-aware. The adapter states an attach itself for a user it routes to the
+ * identity branch, so the hooks are handed the BRIDGE, which defers for exactly those
+ * users — a second statement in one request appends the event twice.
+ *
+ * The gate ships closed: `isUserOnIdentityWrites` is `finalized` and nothing else, so a
+ * deployment whose identifier backfill has enrolled nobody runs Better Auth's own Prisma
+ * engine, byte for byte, and every ceremony returns having done nothing.
+ */
+export class ApiBetterAuthIdentityBranch {
+  static compose(options: {
+    database: PrismaClient;
+    eventing: IdentityEventingPort;
+  }): ApiBetterAuthIdentityBranch {
+    const { database, eventing } = options;
+    const guards = PostgresIdentityGuardsAdapter.create({ database }).build();
+    // The SAME address lock the guards claim through (ADR-116 §6): the fold releases it
+    // once no live identifier of that user carries the value, so a second instance here
+    // would release something this process never claimed.
+    const projectionStore = PrismaIdentityProjectionRepository.create({
+      prisma: database,
+      reservations: guards.reservations,
+    });
+    const ledger = IdentityLedgerWriterAdapter.create({ projectionStore, eventing });
+    const writeGate = IdentityWriteGateService.create({
+      state: PrismaSystemMigrationStateRepository.create({ prisma: database }),
+    });
+    const isLatched = (input: { userId: string }) => writeGate.isUserOnIdentityWrites(input);
+
+    const ceremonies = IdentityCeremoniesAdapter.create(
+      PrismaIdentityHeadsRepository.create(database),
+      PrismaIdentityUsersRepository.create(database),
+      IdentityService.create(guards.identityGuards, ledger),
+      isLatched,
+      { now: Date.now, newCommandId: newIdentityCommandId },
+    );
+
+    const storage = BetterAuthIdentityStorageAdapter.create({
+      // better-auth's own published engine, unbound: the legacy branch delegates to it
+      // verbatim, which is what makes an unlatched user's traffic unchanged.
+      legacyEngine: (betterAuthOptions) =>
+        prismaAdapter(database, { provider: "postgresql" })(betterAuthOptions),
+      accounts: PrismaIdentityAccountsRepository.create(database),
+      resolution: PrismaIdentityResolutionRepository.create(database),
+      ceremonies,
+      isUserOnIdentityWrites: isLatched,
+      isAnyoneOnIdentityWrites: () => writeGate.isAnyoneOnIdentityWrites(),
+      birth: IdentityBirthService.create({
+        guards: guards.identityGuards,
+        ledger,
+        rows: PrismaIdentityNewbornRepository.create(database),
+        reservations: guards.reservations,
+        // The gate's cached answers for this user, dropped once their rows commit
+        // (ADR-116 §3) — otherwise the newborn reads as unlatched for the cache TTL and
+        // their first ceremony states nothing.
+        forgetGate: ({ userId }) => {
+          IdentityWriteGateService.forget({ userId });
+        },
+      }),
+    });
+
+    return new ApiBetterAuthIdentityBranch(
+      storage,
+      BetterAuthCeremonyBridgeAdapter.create({
+        ceremonies,
+        routesToIdentity: BetterAuthIdentityBirthAdapter.birthAwareGate(isLatched),
+      }),
+      ceremonies,
+    );
+  }
+
+  private constructor(
+    private readonly storageAdapter: BetterAuthIdentityStorageAdapter,
+    private readonly bridge: BetterAuthCeremonyBridgeAdapter,
+    private readonly ceremonies: IdentityCeremoniesAdapter,
+  ) {}
+
+  storage(): BetterAuthStoragePort {
+    return ApiIdentityBetterAuthStorage.create(this.storageAdapter);
+  }
+
+  identity(): BetterAuthIdentityCeremoniesPort {
+    return ApiIdentityBetterAuthCeremonies.create({
+      bridge: this.bridge,
+      ceremonies: this.ceremonies,
+    });
+  }
+}
+
+/** Better Auth's `database:` entry, as the identity storage adapter answers it. */
+export class ApiIdentityBetterAuthStorage extends BetterAuthStoragePort {
+  static create(adapter: BetterAuthIdentityStorageAdapter): ApiIdentityBetterAuthStorage {
+    return new ApiIdentityBetterAuthStorage(adapter);
+  }
+
+  private constructor(private readonly adapterFactory: BetterAuthIdentityStorageAdapter) {
+    super();
+  }
+
+  adapter(): unknown {
+    return this.adapterFactory.factory();
+  }
+}
+
+/**
+ * The three `databaseHooks` ceremonies. The account pair goes through the bridge and the
+ * user erasure does not: nothing else states an erasure, so there is nothing to defer to.
+ */
+export class ApiIdentityBetterAuthCeremonies extends BetterAuthIdentityCeremoniesPort {
+  static create(deps: {
+    bridge: BetterAuthCeremonyBridgeAdapter;
+    ceremonies: IdentityCeremoniesAdapter;
+  }): ApiIdentityBetterAuthCeremonies {
+    return new ApiIdentityBetterAuthCeremonies(deps);
+  }
+
+  private constructor(
+    private readonly deps: {
+      bridge: BetterAuthCeremonyBridgeAdapter;
+      ceremonies: IdentityCeremoniesAdapter;
+    },
+  ) {
+    super();
+  }
+
+  beforeUserDelete(user: { id: string }): Promise<void> {
+    return this.deps.ceremonies.beforeUserDelete(user);
+  }
+
+  tryBeforeAccountCreate(
+    account: BetterAuthAccountRow,
+  ): Promise<{ data: { id: string } } | undefined> {
+    return this.deps.bridge.tryBeforeAccountCreate(account);
+  }
+
+  beforeAccountDelete(account: BetterAuthAccountRow): Promise<void> {
+    return this.deps.bridge.beforeAccountDelete(account);
+  }
+}
+
 export type ApiBetterAuthCompositionOptions = Readonly<{
   /** The deployment's browser-session identity; without it, no transport. */
   configuration: ApiBrowserSessionConfig;
@@ -337,6 +501,13 @@ export type ApiBetterAuthCompositionOptions = Readonly<{
   mail?: ApiPasswordResetMailPort | undefined;
   /** Sign-up's address confirmation, for the passkey ceremony. */
   signUpVerification?: SignUpVerificationPort | undefined;
+  /**
+   * The identity pipeline this process produces commands on. With it, Better Auth's
+   * storage and its three account ceremonies are the identity branch (ADR-116); without
+   * it there is nothing to append to, so the stock Prisma engine and the no-op ceremonies
+   * stand in and this composition says so once at boot.
+   */
+  identityEventing?: IdentityEventingPort | undefined;
   logger: Logger;
 }>;
 
@@ -354,12 +525,25 @@ export function composeApiBetterAuth(options: ApiBetterAuthCompositionOptions) {
     );
   }
 
+  const identityBranch = options.identityEventing
+    ? ApiBetterAuthIdentityBranch.compose({
+        database: options.database,
+        eventing: options.identityEventing,
+      })
+    : undefined;
+
+  if (!identityBranch) {
+    logger.warn(
+      "Better Auth composed no identity pipeline: it runs the stock Prisma storage engine, and a user delete erases no identifier, an account write is not restated as an attach and an account delete detaches nothing",
+    );
+  }
+
   return createBetterAuthTransport({
     auth: options.auth,
     users: options.users,
     database: PrismaBetterAuthHooksRepository.create(options.database),
     redis: options.redis,
-    storage: ApiPrismaBetterAuthStorage.create(options.database),
+    storage: identityBranch?.storage() ?? ApiPrismaBetterAuthStorage.create(options.database),
     deployment: {
       baseUrl: configuration.baseUrl,
       publicBaseUrl: configuration.publicBaseUrl,
@@ -385,7 +569,7 @@ export function composeApiBetterAuth(options: ApiBetterAuthCompositionOptions) {
       licensing: options.licensing,
       logger,
     }),
-    identity: AbsentApiBetterAuthIdentityCeremonies.create(),
+    identity: identityBranch?.identity() ?? AbsentApiBetterAuthIdentityCeremonies.create(),
     invites: AbsentApiBetterAuthPendingInvites.create(logger),
     announcements: LoggedApiBetterAuthAnnouncements.create(logger),
     shadow: OffApiSignInRouterShadow.create(),
@@ -396,18 +580,18 @@ export function composeApiBetterAuth(options: ApiBetterAuthCompositionOptions) {
   });
 }
 
-/** Names this composition's absences once, at boot, where an operator reads them. */
+/**
+ * Names this composition's absences once, at boot, where an operator reads them.
+ *
+ * The storage routing and the identifier ceremonies left this list when they were
+ * composed: they are the identity branch now, and a line saying otherwise told an
+ * operator their enrolled users were on the legacy path when they were not.
+ */
 export function announceApiBetterAuthAbsences(logger: Logger): void {
   logger.warn(
     {
-      absent: [
-        "identity-storage-routing",
-        "identity-ceremonies",
-        "pending-invitations",
-        "sign-in-router-shadow.api",
-        "sso-providers",
-      ],
+      absent: ["pending-invitations", "sign-in-router-shadow.api", "sso-providers"],
     },
-    "Better Auth composed over the stock Prisma storage engine: this process enrols nobody onto event-sourced identity storage, appends no identifier ceremonies, applies no pending invitation on a domain auto-join, runs no sign-in router shadow and mounts no SSO provider",
+    "Better Auth composed: this process applies no pending invitation on a domain auto-join, runs no sign-in router shadow and mounts no SSO provider",
   );
 }

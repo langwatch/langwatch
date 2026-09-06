@@ -5,6 +5,7 @@ import {
   BetterAuthAccountQueriesAdapter,
   PostgresIdentityEmailAdapter,
 } from "@langwatch/identity-server";
+import type { IdentityEventingPort } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
@@ -143,6 +144,12 @@ export type ApiAuthCompositionOptions = {
   /** Sign-up's address confirmation, for the passkey ceremony. */
   signUpVerification?: SignUpVerificationPort | undefined;
   /**
+   * The identity pipeline this process produces commands on, where it registered one.
+   * The ONE registration, passed through rather than re-composed: Better Auth's storage
+   * and its account ceremonies append to the same log every other identity write does.
+   */
+  identityEventing?: IdentityEventingPort | undefined;
+  /**
    * The process's Redis, where it has one. Better Auth caches live sessions there under
    * its own key prefix, so revoking a session has to clear that cache as well as the row.
    */
@@ -265,6 +272,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
         authzGrants: options.authzGrants,
         mail: options.mail,
         signUpVerification: options.signUpVerification,
+        identityEventing: options.identityEventing,
         logger,
       }) as unknown as BetterAuthSessionLookup,
       baseUrl: configuration.baseUrl,
