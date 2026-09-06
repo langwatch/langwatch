@@ -156,7 +156,7 @@ func TestResolve_BudgetPeriodRunning_DoesNotForceRefresh(t *testing.T) {
 
 /** @scenario "a boundary that is already behind the gateway is asked about once" */
 func TestResolve_BudgetBoundaryLongPast_RefreshesOnce(t *testing.T) {
-	// The refresh answers with the same past boundary, modelling a budget
+	// The refresh answers with the same past boundary, modeling a budget
 	// whose stored instant simply never moves (a MANUAL window, a skewed
 	// clock). Without the one-shot rule this is a fetch on every request for
 	// as long as the entry lives.
@@ -199,5 +199,5 @@ func TestResolve_NoBudgetBoundary_KeepsConditionalRefresh(t *testing.T) {
 	awaitConfigRefresh(t, e)
 
 	assert.Equal(t, []string{"42"}, fetcher.conditionals(),
-		"past the TTL it still revalidates, so a key with no budget costs no extra materialisation")
+		"past the TTL it still revalidates, so a key with no budget costs no extra materialization")
 }

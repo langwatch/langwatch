@@ -171,7 +171,7 @@ func (e *entry) currentConfigETag() string {
 // from the key's revision and its provider set, and a period ending moves
 // neither, so a conditional refresh of a bundle whose spend figures expired at
 // midnight comes back 304 and leaves those figures in place. Unconditional
-// costs one materialisation per key per period.
+// costs one materialization per key per period.
 func (e *entry) refreshConfigETag() string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
