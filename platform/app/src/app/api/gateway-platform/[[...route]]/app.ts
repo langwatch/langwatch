@@ -965,6 +965,54 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
   },
 );
 
+/**
+ * The read-only checks a virtual-key create passes before anything is written.
+ *
+ * The SAME pre-flight sequence the tRPC create runs, with the actor swapped for
+ * the API credential: the scope gate (create on the caller's own project,
+ * manage at every scope beyond it), scopes inside the caller's org, guardrail
+ * refs project-local.
+ */
+async function preflightVirtualKeyCreate({
+  actor,
+  organizationId,
+  callerProjectId,
+  scopes,
+  traceProjectId,
+  guardrailAttachments,
+}: {
+  actor: Parameters<typeof assertActorCanCreateScopes>[0]["actor"];
+  organizationId: string;
+  callerProjectId: string;
+  scopes: Parameters<typeof assertActorCanCreateScopes>[1]["scopes"];
+  traceProjectId: string | null | undefined;
+  guardrailAttachments: Parameters<typeof assertGuardrailAttachmentsAllowed>[2];
+}): Promise<void> {
+  await assertActorCanCreateScopes(
+    { prisma, actor },
+    { scopes, callerProjectId },
+  );
+  await assertScopesBelongToOrg(prisma, organizationId, scopes);
+  await assertTraceProjectBelongsToOrg(prisma, organizationId, traceProjectId);
+  // The destination routes traces AND budget debits into that project, so
+  // choosing it needs the same manage grant the old PROJECT scope enforced.
+  if (traceProjectId) {
+    await assertActorCanManageAllScopes({ prisma, actor }, [
+      { scopeType: "PROJECT", scopeId: traceProjectId },
+    ]);
+  }
+  const vkProjectId = await resolveVkProjectId(prisma, organizationId, {
+    vkId: null,
+    inputScopes: scopes,
+    traceProjectId: traceProjectId ?? null,
+  });
+  await assertGuardrailAttachmentsAllowed(
+    { prisma, actor },
+    vkProjectId,
+    guardrailAttachments,
+  );
+}
+
 secured.access(apiKeyPermission("virtualKeys:create")).post(
   "/virtual-keys",
   describeRoute({
@@ -1017,38 +1065,14 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
     const scopes = scopesFromWire(body.data.scopes, project.id);
     const service = VirtualKeyService.create(prisma);
     try {
-      // The SAME pre-flight sequence the tRPC create runs, with the actor
-      // swapped for the API credential: the scope gate (create on the
-      // caller's own project, manage at every scope beyond it), scopes
-      // inside the caller's org, guardrail refs project-local.
-      await assertActorCanCreateScopes(
-        { prisma, actor },
-        { scopes, callerProjectId: project.id },
-      );
-      await assertScopesBelongToOrg(prisma, organizationId, scopes);
-      await assertTraceProjectBelongsToOrg(
-        prisma,
+      await preflightVirtualKeyCreate({
+        actor,
         organizationId,
-        body.data.trace_project_id,
-      );
-      // The destination routes traces AND budget debits into that
-      // project, so choosing it needs the same manage grant the old
-      // PROJECT scope enforced.
-      if (body.data.trace_project_id) {
-        await assertActorCanManageAllScopes({ prisma, actor }, [
-          { scopeType: "PROJECT", scopeId: body.data.trace_project_id },
-        ]);
-      }
-      const vkProjectId = await resolveVkProjectId(prisma, organizationId, {
-        vkId: null,
-        inputScopes: scopes,
-        traceProjectId: body.data.trace_project_id ?? null,
+        callerProjectId: project.id,
+        scopes,
+        traceProjectId: body.data.trace_project_id,
+        guardrailAttachments: body.data.config?.guardrailAttachments,
       });
-      await assertGuardrailAttachmentsAllowed(
-        { prisma, actor },
-        vkProjectId,
-        body.data.config?.guardrailAttachments,
-      );
       const input: CreateVirtualKeyInput = {
         organizationId,
         name: body.data.name,

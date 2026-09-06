@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useCredentialProbeGate } from "~/hooks/useCredentialProbeGate";
 import { useModelProviderApiKeyValidation } from "~/hooks/useModelProviderApiKeyValidation";
 import { useModelProviderForm } from "~/hooks/useModelProviderForm";
@@ -43,34 +50,29 @@ const EMPTY_PROVIDER = (provider: string): MaybeStoredModelProvider => ({
   extraHeaders: [],
 });
 
-export function useGuidedProviderConnect({
-  provider,
-  projectId,
-  organizationId,
-  onConnected,
-  onFailed,
-}: {
-  provider: GuidedProvider;
-  projectId: string;
-  organizationId: string;
-  onConnected: (connected: GuidedConnectedProvider) => void;
-  onFailed: (failure: { provider: string; code: string }) => void;
-}) {
-  const spec = registrySpecFor(provider);
-  const backendKey = spec.backendModelProviderKey;
-  const models = useMemo(
-    () => (provider.kind === "api-key" ? guidedChatModels(provider) : []),
-    [provider],
-  );
+/** What to show when a save or a role write fails without saying why. */
+function saveErrorMessage(error: unknown): string {
+  return error instanceof Error && error.message
+    ? error.message
+    : "Couldn't save this provider";
+}
 
-  const { providers, isLoading } = useModelProvidersSettings({ projectId });
-  // Keyed on content, not on the query result's identity: every refetch
-  // (the key probe invalidates the list, so does a window focus) returns new
-  // arrays, and the shared form resets its fields whenever its provider
-  // changes, which threw away the key the customer had just typed.
-  const storedSignature = JSON.stringify(
-    providers?.[backendKey as keyof typeof providers] ?? null,
-  );
+/**
+ * The row already stored for this provider, keyed on content rather than on
+ * the query result's identity.
+ *
+ * Every refetch (the key probe invalidates the list, so does a window focus)
+ * returns new arrays, and the shared form resets its fields whenever its
+ * provider changes, which threw away the key the customer had just typed.
+ */
+function useStoredProvider({
+  providers,
+  backendKey,
+}: {
+  providers: Record<string, unknown> | undefined;
+  backendKey: string;
+}): { stored: MaybeStoredModelProvider; isUsingEnvVars: boolean } {
+  const storedSignature = JSON.stringify(providers?.[backendKey] ?? null);
   const stored: MaybeStoredModelProvider = useMemo(
     () =>
       storedSignature === "null"
@@ -82,71 +84,82 @@ export function useGuidedProviderConnect({
     stored.enabled &&
     (!stored.customKeys ||
       Object.keys(stored.customKeys as Record<string, unknown>).length === 0);
+  return { stored, isUsingEnvVars };
+}
 
-  const [status, setStatus] = useState<GuidedConnectStatus>("idle");
-  const [model, setModelState] = useState<string>(models[0] ?? "");
-  const [manualModel, setManualModelState] = useState("");
-  const [saveError, setSaveError] = useState<string | undefined>();
-
-  const setRoleAssignment =
-    api.modelProvider.setRoleAssignmentForScope.useMutation();
-  const recordProvider = api.onboarding.recordProvider.useMutation();
-
+/**
+ * Which model the person picked, and where they picked it.
+ *
+ * An api-key provider offers a list to choose from; a manual one is typed in.
+ * This is the one place that difference lives, so nothing downstream asks the
+ * provider's kind again to find the answer.
+ */
+function useModelChoice(provider: GuidedProvider): {
+  models: string[];
+  model: string;
+  setModel: (next: string) => void;
+  manualModel: string;
+  setManualModel: (next: string) => void;
+  finalModel: string;
+} {
+  const models = useMemo(
+    () => (provider.kind === "api-key" ? guidedChatModels(provider) : []),
+    [provider],
+  );
+  const [model, setModel] = useState<string>(models[0] ?? "");
+  const [manualModel, setManualModel] = useState("");
   const finalModel = (provider.kind === "manual" ? manualModel : model).trim();
-  const fullModel = finalModel ? `${backendKey}/${finalModel}` : "";
-  const finishRef = useRef<(() => Promise<void>) | null>(null);
+  return { models, model, setModel, manualModel, setManualModel, finalModel };
+}
 
-  const [state, actions] = useModelProviderForm({
-    provider: stored,
-    projectId,
-    organizationId,
-    // The person who just created the organization administers it, so the
-    // row saves at the organization and serves every project under it.
-    canManageOrganization: true,
-    canManageTeam: false,
-    enabledProvidersCount: 1,
-    isUsingEnvVars,
-    onSuccess: () => {
-      void finishRef.current?.();
-    },
-    onError: (error) => {
-      setStatus("idle");
-      setSaveError(
-        error instanceof Error && error.message
-          ? error.message
-          : "Couldn't save this provider",
-      );
-      onFailed({ provider: backendKey, code: "save_failed" });
-    },
-  });
-
-  const {
-    validate,
-    isValidating,
-    validationError,
-    validationErrorCode,
-    clearError,
-  } = useModelProviderApiKeyValidation(
-    backendKey,
-    state.customKeys,
-    projectId,
-    organizationId,
-    state.scopes,
+/**
+ * Whether Connect can be pressed: every required field filled, and a model
+ * named. A typed model needs more than one character; a picked one is
+ * whatever the list offered.
+ */
+export function connectReady({
+  provider,
+  customKeys,
+  finalModel,
+  status,
+}: {
+  provider: GuidedProvider;
+  customKeys: Record<string, string>;
+  finalModel: string;
+  status: GuidedConnectStatus;
+}): boolean {
+  if (status !== "idle") return false;
+  const filled = provider.fields.every(
+    (field) =>
+      field.optional || (customKeys[field.key]?.trim().length ?? 0) > 3,
   );
+  const minimum = provider.kind === "api-key" ? 1 : 2;
+  return filled && finalModel.length >= minimum;
+}
 
-  const { probeRequired, recordRefusal, clearRefusal } = useCredentialProbeGate(
-    {
-      customKeys: state.customKeys,
-      resetKey: provider.id,
-    },
-  );
-
-  // The model is chosen before Connect, so the form holds it when the save
-  // reads its snapshot. Marking the provider as the default is what makes
-  // the save write the picked model as the Default role at the
-  // organization, on top of the seed's flagship. The form clears both
-  // whenever its stored row changes (the list finishing its first load is
-  // one such change), so the pick is applied again on the same row change.
+/**
+ * Points the shared form at the picked model.
+ *
+ * The model is chosen before Connect, so the form holds it when the save
+ * reads its snapshot. Marking the provider as the default is what makes the
+ * save write the picked model as the Default role at the organization, on top
+ * of the seed's flagship. The form clears both whenever its stored row
+ * changes (the list finishing its first load is one such change), so the pick
+ * is applied again on the same row change.
+ */
+function useApplyPickedModel({
+  actions,
+  provider,
+  fullModel,
+  finalModel,
+  stored,
+}: {
+  actions: ReturnType<typeof useModelProviderForm>[1];
+  provider: GuidedProvider;
+  fullModel: string;
+  finalModel: string;
+  stored: MaybeStoredModelProvider;
+}): void {
   const { setProjectDefaultModel, setCustomModels, setUseAsDefaultProvider } =
     actions;
   useEffect(() => {
@@ -167,6 +180,246 @@ export function useGuidedProviderConnect({
     setCustomModels,
     setUseAsDefaultProvider,
   ]);
+}
+
+/**
+ * Whether the panel should say the server's own key is in use: the form shows
+ * the mask instead of a key, and a save without a typed key keeps using the
+ * server's, so it does not ask for a key it does not need.
+ */
+function usesEnvironmentKeyFor({
+  isUsingEnvVars,
+  provider,
+  customKeys,
+}: {
+  isUsingEnvVars: boolean;
+  provider: GuidedProvider;
+  customKeys: Record<string, string>;
+}): boolean {
+  return (
+    isUsingEnvVars &&
+    provider.fields.some(
+      (field) =>
+        field.secret && customKeys[field.key] === MASKED_KEY_PLACEHOLDER,
+    )
+  );
+}
+
+/**
+ * What the guided flow writes once the shared form's save has landed: Langy's
+ * own role pointed at the picked model, and the connection recorded on the
+ * organization, so the panel that opens after landing has a model to run on.
+ */
+async function finishGuidedConnect({
+  setRoleAssignment,
+  recordProvider,
+  organizationId,
+  backendKey,
+  fullModel,
+  finalModel,
+}: {
+  setRoleAssignment: {
+    mutateAsync: (input: {
+      scopeType: "ORGANIZATION";
+      scopeId: string;
+      role: "LANGY";
+      model: string;
+    }) => Promise<unknown>;
+  };
+  recordProvider: {
+    mutateAsync: (input: {
+      organizationId: string;
+      provider: string;
+      model: string;
+    }) => Promise<unknown>;
+  };
+  organizationId: string;
+  backendKey: string;
+  fullModel: string;
+  finalModel: string;
+}): Promise<void> {
+  await setRoleAssignment.mutateAsync({
+    scopeType: "ORGANIZATION",
+    scopeId: organizationId,
+    role: "LANGY",
+    model: fullModel,
+  });
+  await recordProvider.mutateAsync({
+    organizationId,
+    provider: backendKey,
+    model: finalModel,
+  });
+}
+
+/**
+ * The finish: the two guided writes, then the panel is told the provider is
+ * connected. A failure here leaves the status idle with the reason on the
+ * credential field, the same way a refused save does.
+ */
+async function runFinish({
+  setRoleAssignment,
+  recordProvider,
+  organizationId,
+  backendKey,
+  fullModel,
+  finalModel,
+  provider,
+  setStatus,
+  setSaveError,
+  onConnected,
+  onFailed,
+}: Parameters<typeof finishGuidedConnect>[0] & {
+  provider: GuidedProvider;
+  setStatus: (status: GuidedConnectStatus) => void;
+  setSaveError: (message: string | undefined) => void;
+  onConnected: (connected: GuidedConnectedProvider) => void;
+  onFailed: (failure: { provider: string; code: string }) => void;
+}): Promise<void> {
+  try {
+    await finishGuidedConnect({
+      setRoleAssignment,
+      recordProvider,
+      organizationId,
+      backendKey,
+      fullModel,
+      finalModel,
+    });
+  } catch (error) {
+    setStatus("idle");
+    setSaveError(saveErrorMessage(error));
+    onFailed({ provider: backendKey, code: "save_failed" });
+    return;
+  }
+  setStatus("connected");
+  onConnected({ provider: backendKey, model: finalModel, kind: provider.kind });
+}
+
+/**
+ * The shared credential form, wired for the guided flow, with the key probe
+ * and the refusal gate that go with it.
+ *
+ * The form saves the row at the organization scope, the same write the
+ * settings drawer makes; `finishRef` is what the guided flow adds on top,
+ * called once the save has landed.
+ */
+function useGuidedCredentialForm({
+  stored,
+  provider,
+  projectId,
+  organizationId,
+  backendKey,
+  isUsingEnvVars,
+  finishRef,
+  setStatus,
+  setSaveError,
+  onFailed,
+}: {
+  stored: MaybeStoredModelProvider;
+  provider: GuidedProvider;
+  projectId: string;
+  organizationId: string;
+  backendKey: string;
+  isUsingEnvVars: boolean;
+  finishRef: MutableRefObject<(() => Promise<void>) | null>;
+  setStatus: (status: GuidedConnectStatus) => void;
+  setSaveError: (message: string | undefined) => void;
+  onFailed: (failure: { provider: string; code: string }) => void;
+}) {
+  const [state, actions] = useModelProviderForm({
+    provider: stored,
+    projectId,
+    organizationId,
+    // The person who just created the organization administers it, so the
+    // row saves at the organization and serves every project under it.
+    canManageOrganization: true,
+    canManageTeam: false,
+    enabledProvidersCount: 1,
+    isUsingEnvVars,
+    onSuccess: () => {
+      void finishRef.current?.();
+    },
+    onError: (error) => {
+      setStatus("idle");
+      setSaveError(saveErrorMessage(error));
+      onFailed({ provider: backendKey, code: "save_failed" });
+    },
+  });
+
+  const validation = useModelProviderApiKeyValidation(
+    backendKey,
+    state.customKeys,
+    projectId,
+    organizationId,
+    state.scopes,
+  );
+
+  const gate = useCredentialProbeGate({
+    customKeys: state.customKeys,
+    resetKey: provider.id,
+  });
+
+  return { state, actions, ...validation, ...gate };
+}
+
+export function useGuidedProviderConnect({
+  provider,
+  projectId,
+  organizationId,
+  onConnected,
+  onFailed,
+}: {
+  provider: GuidedProvider;
+  projectId: string;
+  organizationId: string;
+  onConnected: (connected: GuidedConnectedProvider) => void;
+  onFailed: (failure: { provider: string; code: string }) => void;
+}) {
+  const spec = registrySpecFor(provider);
+  const backendKey = spec.backendModelProviderKey;
+  const choice = useModelChoice(provider);
+  const { models, model, manualModel, finalModel } = choice;
+
+  const { providers, isLoading } = useModelProvidersSettings({ projectId });
+  const { stored, isUsingEnvVars } = useStoredProvider({
+    providers: providers as Record<string, unknown> | undefined,
+    backendKey,
+  });
+
+  const [status, setStatus] = useState<GuidedConnectStatus>("idle");
+  const [saveError, setSaveError] = useState<string | undefined>();
+
+  const setRoleAssignment =
+    api.modelProvider.setRoleAssignmentForScope.useMutation();
+  const recordProvider = api.onboarding.recordProvider.useMutation();
+
+  const fullModel = finalModel ? `${backendKey}/${finalModel}` : "";
+  const finishRef = useRef<(() => Promise<void>) | null>(null);
+
+  const form = useGuidedCredentialForm({
+    stored,
+    provider,
+    projectId,
+    organizationId,
+    backendKey,
+    isUsingEnvVars,
+    finishRef,
+    setStatus,
+    setSaveError,
+    onFailed,
+  });
+  const { state, actions } = form;
+  const {
+    validate,
+    isValidating,
+    validationError,
+    validationErrorCode,
+    clearError,
+    probeRequired,
+    recordRefusal,
+    clearRefusal,
+  } = form;
+
+  useApplyPickedModel({ actions, provider, fullModel, finalModel, stored });
 
   const setField = useCallback(
     (key: string, value: string) => {
@@ -177,63 +430,33 @@ export function useGuidedProviderConnect({
     [actions, clearError],
   );
 
-  const setModel = useCallback((next: string) => setModelState(next), []);
-  const setManualModel = useCallback(
-    (next: string) => setManualModelState(next),
-    [],
-  );
+  const usesEnvironmentKey = usesEnvironmentKeyFor({
+    isUsingEnvVars,
+    provider,
+    customKeys: state.customKeys,
+  });
 
-  // A self-hosted server can carry the key in its environment. The form then
-  // shows the mask instead of a key, and a save without a typed key keeps
-  // using the server's; the panel says so rather than asking for a key it
-  // does not need.
-  const usesEnvironmentKey =
-    isUsingEnvVars &&
-    provider.fields.some(
-      (field) =>
-        field.secret && state.customKeys[field.key] === MASKED_KEY_PLACEHOLDER,
-    );
+  const ready = connectReady({
+    provider,
+    customKeys: state.customKeys,
+    finalModel,
+    status,
+  });
 
-  const ready =
-    status === "idle" &&
-    provider.fields.every(
-      (field) =>
-        field.optional || (state.customKeys[field.key]?.trim().length ?? 0) > 3,
-    ) &&
-    (provider.kind === "api-key"
-      ? finalModel.length > 0
-      : finalModel.length > 1);
-
-  finishRef.current = async () => {
-    try {
-      await setRoleAssignment.mutateAsync({
-        scopeType: "ORGANIZATION",
-        scopeId: organizationId,
-        role: "LANGY",
-        model: fullModel,
-      });
-      await recordProvider.mutateAsync({
-        organizationId,
-        provider: backendKey,
-        model: finalModel,
-      });
-    } catch (error) {
-      setStatus("idle");
-      setSaveError(
-        error instanceof Error && error.message
-          ? error.message
-          : "Couldn't save this provider",
-      );
-      onFailed({ provider: backendKey, code: "save_failed" });
-      return;
-    }
-    setStatus("connected");
-    onConnected({
-      provider: backendKey,
-      model: finalModel,
-      kind: provider.kind,
+  finishRef.current = () =>
+    runFinish({
+      setRoleAssignment,
+      recordProvider,
+      organizationId,
+      backendKey,
+      fullModel,
+      finalModel,
+      provider,
+      setStatus,
+      setSaveError,
+      onConnected,
+      onFailed,
     });
-  };
 
   const connect = useCallback(async () => {
     if (!ready) return;
@@ -242,8 +465,8 @@ export function useGuidedProviderConnect({
 
     if (probeRequired) {
       setStatus("checking");
-      const valid = await validate();
-      if (!valid) {
+      const refused = !(await validate());
+      if (refused) {
         recordRefusal();
         setStatus("idle");
         onFailed({
@@ -263,11 +486,7 @@ export function useGuidedProviderConnect({
       await actions.submit();
     } catch (error) {
       setStatus("idle");
-      setSaveError(
-        error instanceof Error && error.message
-          ? error.message
-          : "Couldn't save this provider",
-      );
+      setSaveError(saveErrorMessage(error));
       onFailed({ provider: backendKey, code: "save_failed" });
     }
   }, [
@@ -290,9 +509,9 @@ export function useGuidedProviderConnect({
     setField,
     models,
     model,
-    setModel,
+    setModel: choice.setModel,
     manualModel,
-    setManualModel,
+    setManualModel: choice.setManualModel,
     status: isValidating && status === "idle" ? "checking" : status,
     ready,
     usesEnvironmentKey,

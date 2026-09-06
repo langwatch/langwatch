@@ -392,6 +392,80 @@
 			}
 		},
 		{
+			// The guided provider connect hook, for the line count only. Its
+			// branches are out: which model was picked and where, the stored
+			// row, whether Connect can be pressed, what the picked model does
+			// to the form, whether the server's own key is in use, and the two
+			// writes the finish makes are each a named function above it, and
+			// the file reports no cognitive complexity at all.
+			//
+			// What is left is a composition of four hooks whose length is its
+			// interface: a named-parameter signature, the parameter objects
+			// those four hooks take, and the shape it hands back to the panel.
+			// Cutting it again only moves an argument list from one side of a
+			// call to the other.
+			//
+			// REMOVE THIS BLOCK if logic ever comes back into the body -- the
+			// moment the cognitive rule fires here, the line count is telling
+			// the truth again.
+			"includes": [
+				"src/features/guided-onboarding/takeover/useGuidedProviderConnect.ts"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
+		{
+			// The guided onboarding flow's render markup: the takeover screens,
+			// the Home offer that resumes it, and the panel cards the guided
+			// conversation drives.
+			//
+			// Same category as the front-door screens above, and scoped to the
+			// same kind of file. The length of a screen here is a count of the
+			// states it can be in (picking paths, connecting a provider,
+			// probing a credential, refused, connected) and the cognitive
+			// complexity is conditional markup and a map over rendered
+			// options, not branching logic: the rule counts JSX the same way
+			// it counts an if. Cutting one of these into presentational
+			// children moves the markup away from the state that drives it and
+			// draws the split to please a counter rather than to name a part
+			// anyone reuses.
+			//
+			// The flow's logic is deliberately NOT here. The tour engine, the
+			// tour host, the welcome screen's guided submit, the home page's
+			// reach hook and the provider connect hook were over the limits
+			// for the reason the rule exists, and were split by responsibility
+			// rather than covered by this block.
+			//
+			// REMOVE THIS BLOCK when the experiment_onboarding_langy_guided A/B
+			// concludes. If the flow ships, these screens stop carrying the
+			// unflagged path beside the flagged one and should come back under
+			// the limits on their own; if they do not, split them then. If the
+			// flow goes, the files go with it.
+			"includes": [
+				"src/features/guided-onboarding/home/GuidedOnboardingOffer.tsx",
+				"src/features/guided-onboarding/takeover/GuidedTakeover.tsx",
+				"src/features/guided-onboarding/takeover/ProviderScreen.tsx",
+				"src/features/guided-onboarding/takeover/ValueScreen.tsx",
+				"src/features/guided-onboarding/tour/TourOverlay.tsx",
+				"src/features/langy/components/derived-cards/GuidedTourCard.tsx",
+				"src/features/langy/components/derived-cards/LangyChoicesCard.tsx",
+				"src/features/langy/components/derived-cards/LangyCodeAccessCard.tsx"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveCognitiveComplexity": "off",
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
+		{
 			// The identity fold. Its length is a count of the event types the
 			// aggregate answers to, one arm each, and every arm is a
 			// projection write with no logic above it. A fold that grows by

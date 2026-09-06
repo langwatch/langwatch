@@ -1885,7 +1885,7 @@ export interface paths {
         put?: never;
         /**
          * Create virtual key
-         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project, where `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
         post: operations["postApiGatewayV1VirtualKeys"];
         delete?: never;
@@ -2390,7 +2390,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made. */
+        /** @description List the open requests Langy made for a folder of mine, on every project I can read. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made. */
         get: operations["listLangyControlRequests"];
         put?: never;
         post?: never;
@@ -5995,6 +5995,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description No process is holding the connected agent right now */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     callConnectedAgent: {
@@ -6685,6 +6692,7 @@ export interface operations {
                     };
                     traceIds?: string[];
                     negateFilters?: boolean;
+                    excludeOrigins?: string[];
                     series: {
                         /** @enum {string} */
                         metric: "metadata.trace_id" | "metadata.user_id" | "metadata.thread_id" | "metadata.span_type" | "sentiment.thumbs_up_down" | "performance.completion_time" | "performance.first_token" | "performance.total_cost" | "performance.cost_billed" | "performance.cost_non_billed" | "performance.prompt_tokens" | "performance.completion_tokens" | "performance.cache_read_tokens" | "performance.cache_write_tokens" | "performance.reasoning_tokens" | "performance.total_processed_tokens" | "performance.total_tokens" | "performance.tokens_per_second" | "events.event_type" | "events.event_score" | "events.event_details" | "evaluations.evaluation_score" | "evaluations.evaluation_pass_rate" | "evaluations.evaluation_runs" | "threads.average_duration_per_thread";
@@ -11747,6 +11755,7 @@ export interface operations {
                     };
                     traceIds?: string[];
                     negateFilters?: boolean;
+                    excludeOrigins?: string[];
                     series: {
                         /** @enum {string} */
                         metric: "metadata.trace_id" | "metadata.user_id" | "metadata.thread_id" | "metadata.span_type" | "sentiment.thumbs_up_down" | "performance.completion_time" | "performance.first_token" | "performance.total_cost" | "performance.cost_billed" | "performance.cost_non_billed" | "performance.prompt_tokens" | "performance.completion_tokens" | "performance.cache_read_tokens" | "performance.cache_write_tokens" | "performance.reasoning_tokens" | "performance.total_processed_tokens" | "performance.total_tokens" | "performance.tokens_per_second" | "events.event_type" | "events.event_score" | "events.event_details" | "evaluations.evaluation_score" | "evaluations.evaluation_pass_rate" | "evaluations.evaluation_runs" | "threads.average_duration_per_thread";
@@ -13303,7 +13312,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Caller lacks virtualKeys:manage at a requested scope */
+            /** @description Caller lacks virtualKeys:create on its own project, or virtualKeys:manage at a scope beyond it */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -18003,10 +18012,12 @@ export interface operations {
                                 tool: "local_edit";
                                 params: {
                                     path: string;
-                                    edits: {
+                                    edits: ({
                                         oldText: string;
                                         newText: string;
-                                    }[];
+                                    } | {
+                                        append: string;
+                                    })[];
                                 };
                             } | {
                                 /** @constant */
@@ -18042,6 +18053,12 @@ export interface operations {
                                 params: {
                                     path?: string;
                                     limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_langwatch_env";
+                                params: {
+                                    path?: string;
                                 };
                             });
                         } | {
@@ -18149,7 +18166,7 @@ export interface operations {
                         };
                         error?: {
                             /** @enum {string} */
-                            code: "path_refused" | "command_refused" | "permission_denied" | "permission_expired" | "cancelled" | "timeout" | "exec_failed" | "not_found";
+                            code: "path_refused" | "command_refused" | "permission_denied" | "permission_expired" | "cancelled" | "timeout" | "exec_failed" | "not_found" | "key_refused";
                             message: string;
                         };
                     } | {
@@ -29406,6 +29423,7 @@ export interface operations {
                     };
                     traceIds?: string[];
                     negateFilters?: boolean;
+                    excludeOrigins?: string[];
                     /** @description Removed. Offset pagination is no longer supported and any value other than 0 is rejected. Page with the scrollId returned by the previous response instead. The field remains on the schema so that sending it produces an explanatory error rather than being silently discarded. */
                     pageOffset?: number;
                     pageSize?: number;

@@ -28,12 +28,12 @@ vi.mock("~/utils/compat/next-router", () => ({
 }));
 
 import { useGuidedTourStore } from "../guidedTourStore";
+import { TourLayer } from "../TourLayer";
 import {
   TOUR_ACTION_CEILING_MS,
   TOUR_MISSING_TARGET_MS,
   TOUR_TARGET_POLL_MS,
-  TourLayer,
-} from "../TourLayer";
+} from "../tourGeometry";
 import { useTourRegistry } from "../tourRegistry";
 import { readMs, TOUR_STEPS } from "../tourSteps";
 

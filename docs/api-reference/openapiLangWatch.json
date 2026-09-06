@@ -6734,6 +6734,12 @@
                   "negateFilters": {
                     "type": "boolean"
                   },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "series": {
                     "type": "array",
                     "items": {
@@ -19352,6 +19358,12 @@
                   },
                   "negateFilters": {
                     "type": "boolean"
+                  },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   },
                   "series": {
                     "type": "array",
@@ -35458,19 +35470,35 @@
                                               "edits": {
                                                 "type": "array",
                                                 "items": {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "oldText": {
-                                                      "type": "string",
-                                                      "minLength": 1
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "oldText": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        },
+                                                        "newText": {
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "oldText",
+                                                        "newText"
+                                                      ]
                                                     },
-                                                    "newText": {
-                                                      "type": "string"
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "append": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "append"
+                                                      ]
                                                     }
-                                                  },
-                                                  "required": [
-                                                    "oldText",
-                                                    "newText"
                                                   ]
                                                 },
                                                 "minItems": 1,
@@ -35624,6 +35652,29 @@
                                                 "type": "integer",
                                                 "exclusiveMinimum": 0,
                                                 "maximum": 20000
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_langwatch_env"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "path": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 4096
                                               }
                                             }
                                           }
@@ -36049,7 +36100,8 @@
                                     "cancelled",
                                     "timeout",
                                     "exec_failed",
-                                    "not_found"
+                                    "not_found",
+                                    "key_refused"
                                   ]
                                 },
                                 "message": {
@@ -36297,7 +36349,7 @@
             }
           }
         },
-        "description": "List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
+        "description": "List the open requests Langy made for a folder of mine, on every project I can read. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
         "tags": [
           "Langy"
         ],
@@ -65744,6 +65796,12 @@
                   },
                   "negateFilters": {
                     "type": "boolean"
+                  },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   },
                   "pageOffset": {
                     "type": "number",

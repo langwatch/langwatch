@@ -38,36 +38,45 @@ interface ResumableOrganization {
   }[];
 }
 
+/** What the tailor step recorded, when it recorded a string. */
+function usageStyleOf(signupData: unknown): string | null {
+  if (!signupData || typeof signupData !== "object") return null;
+  const usage = (signupData as Record<string, unknown>).usage;
+  return typeof usage === "string" ? usage : null;
+}
+
+/** Where this one organization stands, or null if it is not resumable. */
+function resumeForOrganization(
+  organization: ResumableOrganization,
+): GuidedResume | null {
+  if (parseOnboardingVariant(organization.signupData) !== "guided") return null;
+  const state = parseGuidedOnboardingState(organization.signupData);
+  if (state.provider || state.providerSkippedAt) return null;
+
+  const project = organization.teams
+    .filter((team) => !team.isPersonal)
+    .flatMap((team) => team.projects)[0];
+  if (!project) return null;
+
+  return {
+    organizationId: organization.id,
+    organizationName: organization.name,
+    projectId: project.id,
+    projectSlug: project.slug,
+    usageStyle: usageStyleOf(organization.signupData),
+    paths: state.paths,
+    phase: state.paths.length > 0 ? "provider" : "hello",
+  };
+}
+
 export function resolveGuidedResume({
   organizations,
 }: {
   organizations: ResumableOrganization[] | undefined;
 }): GuidedResume | null {
   for (const organization of organizations ?? []) {
-    if (parseOnboardingVariant(organization.signupData) !== "guided") continue;
-    const state = parseGuidedOnboardingState(organization.signupData);
-    if (state.provider || state.providerSkippedAt) continue;
-
-    const project = organization.teams
-      .filter((team) => !team.isPersonal)
-      .flatMap((team) => team.projects)[0];
-    if (!project) continue;
-
-    const signupData =
-      organization.signupData && typeof organization.signupData === "object"
-        ? (organization.signupData as Record<string, unknown>)
-        : {};
-    const usage = signupData.usage;
-
-    return {
-      organizationId: organization.id,
-      organizationName: organization.name,
-      projectId: project.id,
-      projectSlug: project.slug,
-      usageStyle: typeof usage === "string" ? usage : null,
-      paths: state.paths,
-      phase: state.paths.length > 0 ? "provider" : "hello",
-    };
+    const resume = resumeForOrganization(organization);
+    if (resume) return resume;
   }
   return null;
 }

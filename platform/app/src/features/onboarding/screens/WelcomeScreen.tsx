@@ -1,7 +1,7 @@
 import { Box, HStack, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { showErrorToast } from "~/features/errors";
@@ -18,7 +18,10 @@ import { OnboardingNavigation } from "../components/navigation/OnboardingNavigat
 import { OnboardingFormProvider } from "../contexts/form-context";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 import { OnboardingScreenIndex } from "../types/types";
-import { resolveWelcomeRedirect } from "../utils/welcome-redirect";
+import {
+  resolveWelcomeRedirect,
+  type WelcomeRedirectDecision,
+} from "../utils/welcome-redirect";
 import { useCreateWelcomeScreens } from "./create-welcome-screens";
 
 /** The guided variant's screens without a card: Langy has the whole page. */
@@ -27,6 +30,111 @@ const TAKEOVER_SCREENS = new Set<OnboardingScreenIndex>([
   OnboardingScreenIndex.VALUE,
   OnboardingScreenIndex.PROVIDER,
 ]);
+
+/**
+ * Where a welcome that is not onboarding sends the user: a pending
+ * continuation first (the CLI device approval sends one), then the home
+ * resolver's own answer.
+ */
+function welcomeDestination({
+  decision,
+  returnTo,
+}: {
+  decision: Exclude<WelcomeRedirectDecision, { kind: "onboard" }>;
+  returnTo: string | null;
+}): string {
+  if (returnTo) return returnTo;
+  return decision.kind === "home" ? "/" : `/${decision.slug}`;
+}
+
+/** The one thing to say when the organization could not be set up. */
+const ORG_SETUP_FAILED = "Couldn't finish setting up your organization";
+
+/**
+ * The guided variant creates the organization and its project on leaving the
+ * tailor step: the provider key is organization-scoped, the picks are stored
+ * on the organization and Langy needs a project. The project is created for
+ * every pick (a governance-first pick still gets one).
+ *
+ * `created` is set once and kept, because the takeover reads it while the
+ * organization list catches up and the welcome redirect stands down for it.
+ */
+function useGuidedOrganizationCreate({
+  getFormData,
+  initializeOrganization,
+  utils,
+  navigation,
+}: {
+  getFormData: () => ReturnType<
+    typeof useOnboardingFlow
+  >["getFormData"] extends () => infer F
+    ? F
+    : never;
+  initializeOrganization: ReturnType<
+    typeof api.onboarding.initializeOrganization.useMutation
+  >;
+  utils: ReturnType<typeof api.useUtils>;
+  navigation: ReturnType<typeof useOnboardingFlow>["navigation"];
+}): {
+  created: { organizationId: string; projectSlug: string } | null;
+  leavingCard: boolean;
+  createGuidedOrganization: () => void;
+} {
+  const [created, setCreated] = useState<{
+    organizationId: string;
+    projectSlug: string;
+  } | null>(null);
+  /* the card fades out before the takeover comes in */
+  const [leavingCard, setLeavingCard] = useState(false);
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  const createGuidedOrganization = useCallback(() => {
+    const form = getFormData();
+    initializeOrganization.mutate(
+      {
+        orgName: form.organizationName ?? "",
+        phoneNumber: form.phoneNumber ?? "",
+        primaryIntent: "LLM_OPS",
+        onboardingVariant: "guided",
+        signUpData: {
+          usage: form.usageStyle,
+          solution: form.solutionType,
+          terms: form.agreement,
+          companySize: form.companySize,
+          ...form.attribution,
+        },
+      },
+      {
+        onSuccess: (response) => {
+          trackEventOnce("organization_initialized", {
+            category: "onboarding",
+            label: "organization_onboarding_completed",
+            intent: "LLM_OPS",
+            variant: "guided",
+          });
+          setCreated({
+            organizationId: response.organizationId,
+            projectSlug: response.projectSlug ?? "",
+          });
+          void utils.organization.getAll.invalidate();
+          setLeavingCard(true);
+          timers.current.push(
+            window.setTimeout(() => {
+              navigation.nextScreen();
+              setLeavingCard(false);
+            }, TAKEOVER_FADE_MS),
+          );
+        },
+        onError: (error) => {
+          showErrorToast({ error, fallbackTitle: ORG_SETUP_FAILED });
+        },
+      },
+    );
+  }, [getFormData, initializeOrganization, navigation, utils]);
+
+  return { created, leavingCard, createGuidedOrganization };
+}
 
 export const WelcomeScreen: React.FC = () => {
   const router = useRouter();
@@ -61,17 +169,13 @@ export const WelcomeScreen: React.FC = () => {
 
   const guided = flow.variant === "guided";
 
-  // The organization the guided flow created on leaving the tailor step. Set
-  // once and kept: the takeover reads it while the organization list catches
-  // up, and the redirect below stands down for it.
-  const [created, setCreated] = useState<{
-    organizationId: string;
-    projectSlug: string;
-  } | null>(null);
-  // The card fades out before the takeover comes in.
-  const [leavingCard, setLeavingCard] = useState(false);
-  const timers = useRef<number[]>([]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const { created, leavingCard, createGuidedOrganization } =
+    useGuidedOrganizationCreate({
+      getFormData,
+      initializeOrganization,
+      utils,
+      navigation,
+    });
 
   // A guided organization whose takeover is unfinished: a reload, a closed
   // tab or a second device resumes it from the durable state instead of
@@ -93,31 +197,24 @@ export const WelcomeScreen: React.FC = () => {
       : null;
 
   useEffect(() => {
-    // Wait until org data has finished loading before deciding
-    if (organizationIsLoading) return;
+    // Nothing is decided while the org data is still loading, and nothing is
+    // decided for the organization this page just created: the takeover is
+    // running on it, so the list catching up must not send the user away.
+    if (organizationIsLoading || created) return;
 
-    // The organization this page just created: the takeover is running on
-    // it, so the list catching up must not send the user away.
-    if (created) return;
-
-    if (resume) {
-      setOnboardingNeeded(true);
-      return;
-    }
-
-    const decision = resolveWelcomeRedirect({
-      organizations,
-      currentProjectSlug: project?.slug ?? null,
-    });
+    const decision: WelcomeRedirectDecision = resume
+      ? { kind: "onboard" }
+      : resolveWelcomeRedirect({
+          organizations,
+          currentProjectSlug: project?.slug ?? null,
+        });
 
     if (decision.kind === "onboard") {
       setOnboardingNeeded(true);
       return;
     }
     setOnboardingNeeded(false);
-    void router.push(
-      returnTo ?? (decision.kind === "home" ? "/" : `/${decision.slug}`),
-    );
+    void router.push(welcomeDestination({ decision, returnTo }));
   }, [
     organizationIsLoading,
     organizations,
@@ -195,63 +292,7 @@ export const WelcomeScreen: React.FC = () => {
         // actually has. Signing up is the worst possible place to be told
         // nothing.
         onError: (error) => {
-          showErrorToast({
-            error,
-            fallbackTitle: "Couldn't finish setting up your organization",
-          });
-        },
-      },
-    );
-  }
-
-  /**
-   * The guided variant creates the organization and its project on leaving
-   * the tailor step: the provider key is organization-scoped, the picks are
-   * stored on the organization and Langy needs a project. The project is
-   * created for every pick (a governance-first pick still gets one).
-   */
-  function handleGuidedCreate() {
-    const form = getFormData();
-    initializeOrganization.mutate(
-      {
-        orgName: form.organizationName ?? "",
-        phoneNumber: form.phoneNumber ?? "",
-        primaryIntent: "LLM_OPS",
-        onboardingVariant: "guided",
-        signUpData: {
-          usage: form.usageStyle,
-          solution: form.solutionType,
-          terms: form.agreement,
-          companySize: form.companySize,
-          ...form.attribution,
-        },
-      },
-      {
-        onSuccess: (response) => {
-          trackEventOnce("organization_initialized", {
-            category: "onboarding",
-            label: "organization_onboarding_completed",
-            intent: "LLM_OPS",
-            variant: "guided",
-          });
-          setCreated({
-            organizationId: response.organizationId,
-            projectSlug: response.projectSlug ?? "",
-          });
-          void utils.organization.getAll.invalidate();
-          setLeavingCard(true);
-          timers.current.push(
-            window.setTimeout(() => {
-              navigation.nextScreen();
-              setLeavingCard(false);
-            }, TAKEOVER_FADE_MS),
-          );
-        },
-        onError: (error) => {
-          showErrorToast({
-            error,
-            fallbackTitle: "Couldn't finish setting up your organization",
-          });
+          showErrorToast({ error, fallbackTitle: ORG_SETUP_FAILED });
         },
       },
     );
@@ -421,7 +462,7 @@ export const WelcomeScreen: React.FC = () => {
                 onPrev={navigation.prevScreen}
                 onNext={
                   createsOrganizationHere
-                    ? handleGuidedCreate
+                    ? createGuidedOrganization
                     : navigation.nextScreen
                 }
                 onSkip={navigation.skipScreen}

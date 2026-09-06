@@ -8,6 +8,7 @@
  * of a guided setup so the Home offer and the campaigns see the path finish.
  */
 import { scopedApiKey } from "@/internal/credentialContext";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
@@ -66,7 +67,7 @@ export class OnboardingApiService {
     path: string,
     options?: RequestInit,
   ): Promise<T> {
-    const response = await fetch(`${this.endpoint}${path}`, {
+    const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...options,
       headers: {
         ...buildAuthHeaders({ apiKey: this.apiKey }),

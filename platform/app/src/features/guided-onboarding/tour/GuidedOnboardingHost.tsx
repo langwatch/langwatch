@@ -129,6 +129,28 @@ function queueKickoffOnceScoped({
   return release;
 }
 
+/**
+ * How the tour ended, for a landing that queues the kickoff without running
+ * one: a path with no tour never had one, and a path with a tour reached this
+ * point because a previous landing already ended it.
+ */
+export function tourStatusForLanding(
+  state: GuidedOnboardingState,
+  path: GuidedPath,
+): GuidedKickoffTourStatus {
+  if (!pathHasTour(path)) return "none";
+  const skippedAndNotCompleted =
+    !!state.tourSkippedAt && !state.tourCompletedAt;
+  return skippedAndNotCompleted ? "skipped" : "completed";
+}
+
+/** Docks the panel, which every landing does before it tours or kicks off. */
+function dockPanel(): void {
+  const langy = useLangyStore.getState();
+  langy.openPanel();
+  langy.setPanelMode("sidebar");
+}
+
 /** A release to run when the component unmounts, set by whoever waits. */
 function useReleaseOnUnmount(): MutableRefObject<() => void> {
   const release = useRef<() => void>(() => undefined);
@@ -180,19 +202,21 @@ export function GuidedOnboardingHost() {
     if (!path || handled.current.has(path)) return;
     handled.current.add(path);
 
-    const orgName = organization?.name ?? "";
-    const firstName = firstNameOf(session.data?.user?.name);
-    const langy = useLangyStore.getState();
     const queue = (tourStatus: GuidedKickoffTourStatus) => {
       releasePending.current = queueKickoffOnceScoped({
         organizationId,
-        kickoff: buildKickoff({ path, state, orgName, firstName, tourStatus }),
+        kickoff: buildKickoff({
+          path,
+          state,
+          orgName: organization?.name ?? "",
+          firstName: firstNameOf(session.data?.user?.name),
+          tourStatus,
+        }),
       });
     };
 
     if (landingNeedsTour(state)) {
-      langy.openPanel();
-      langy.setPanelMode("sidebar");
+      dockPanel();
       useGuidedTourStore.getState().start(path, {
         onEnd: (status) => {
           recordTour.mutate({ organizationId, status });
@@ -202,15 +226,8 @@ export function GuidedOnboardingHost() {
       return;
     }
     if (landingNeedsKickoff(state)) {
-      langy.openPanel();
-      langy.setPanelMode("sidebar");
-      queue(
-        pathHasTour(path)
-          ? state.tourSkippedAt && !state.tourCompletedAt
-            ? "skipped"
-            : "completed"
-          : "none",
-      );
+      dockPanel();
+      queue(tourStatusForLanding(state, path));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onOnboarding, guided, state, organizationId]);
