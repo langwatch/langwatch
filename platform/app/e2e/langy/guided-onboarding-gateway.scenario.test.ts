@@ -17,8 +17,10 @@ import { describe, expect, it } from "vitest";
 import {
   assertPathCompletedAfterSkill,
   attachKickoffConversation,
+  expectSnippetOnThisGateway,
   GUIDED_LINES,
   GUIDED_TONE_CRITERIA,
+  gatewayPublicUrl,
   listVirtualKeys,
   mintVirtualKey,
   queueGuidedKickoff,
@@ -108,8 +110,21 @@ describe("Langy sets up the gateway from the kickoff", () => {
       expect(keys.filter((key) => key.name === KEY_NAME)).toHaveLength(1);
 
       const text = allAssistantText(result);
-      expect(saysVerbatim(text, GUIDED_LINES.gatewayLive)).toBe(true);
-      expect(text).toMatch(/OPENAI_BASE_URL/);
+      // The tour minted the key, so the first thing Langy says is that it is
+      // live: nothing about the key already existing comes before it.
+      const firstLine =
+        text
+          .split("\n")
+          .map((line) => line.trim())
+          .find((line) => line !== "") ?? "";
+      expect(saysVerbatim(firstLine, GUIDED_LINES.gatewayLive)).toBe(true);
+      expect(text).not.toMatch(
+        /already (exists?|have|had|minted|created|set up|there)/i,
+      );
+      expectSnippetOnThisGateway({
+        text,
+        gatewayUrl: await gatewayPublicUrl(),
+      });
       expect(text).toMatch(/OPENAI_API_KEY/);
       expect(saysVerbatim(text, GUIDED_LINES.gatewayClose)).toBe(true);
       expect(
@@ -195,6 +210,10 @@ describe("Langy sets up the gateway from the kickoff", () => {
         text.indexOf("production-app"),
       );
       expect(saysVerbatim(text, GUIDED_LINES.gatewayLive)).toBe(true);
+      expectSnippetOnThisGateway({
+        text,
+        gatewayUrl: await gatewayPublicUrl(),
+      });
       expect(text).toMatch(/OPENAI_API_KEY="?[A-Za-z0-9_-]{16,}/);
       expect(saysVerbatim(text, GUIDED_LINES.gatewayClose)).toBe(true);
       assertPathCompletedAfterSkill({

@@ -566,6 +566,35 @@ export async function conversationMessages(
   return snapshot.messages;
 }
 
+/**
+ * This instance's public gateway base URL, without the /v1 suffix: what the
+ * app's own snippets print, and what the gateway path's snippet has to name.
+ */
+export async function gatewayPublicUrl(): Promise<string> {
+  const cookie = await getSessionCookie();
+  const publicEnv = await trpcQuery<{ GATEWAY_BASE_URL?: string }>({
+    cookie,
+    path: "publicEnv",
+    input: {},
+  });
+  const url = publicEnv.GATEWAY_BASE_URL?.replace(/\/+$/, "");
+  if (!url) throw new Error("publicEnv names no GATEWAY_BASE_URL");
+  return url;
+}
+
+/** The snippet points the app at this instance's gateway, never the SaaS one. */
+export function expectSnippetOnThisGateway({
+  text,
+  gatewayUrl,
+}: {
+  text: string;
+  gatewayUrl: string;
+}): void {
+  const escaped = gatewayUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  expect(text).toMatch(new RegExp(`OPENAI_BASE_URL=["']?${escaped}/v1`));
+  expect(text).not.toMatch(/gateway\.langwatch\.ai/);
+}
+
 /** Wait until the organization lists the path as done, or give up. */
 export async function waitForPathDone({
   organizationId,
