@@ -1,13 +1,7 @@
 /**
- * Gateway cache-control rules over the process's tRPC transport.
- *
- * Every procedure is organization-scoped. The rule bundle reaches the gateway
- * through the config materialiser, not through here; this is the platform UI
- * and CLI surface for the rules themselves.
- *
- * Transport only: input parsing, the wire DTO, and delegation to the feature's
- * application, which holds the cache-rule capability because it is built over
- * persistence this transport does not hold.
+ * Gateway cache-control rules over tRPC, organization-scoped. The rule bundle reaches the
+ * gateway through the config materialiser, not through here; this is the platform UI/CLI
+ * surface for the rules themselves.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -20,14 +14,7 @@ import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from 
 import { z } from "zod";
 import type { GatewayApp } from "#app/gateway.app";
 
-/**
- * The process supplies authentication; authorization arrives as `policy`.
- *
- * `app` is the slice of the process's application this feature reaches, not the
- * feature's application itself, because a tRPC root is shared by every feature
- * mounted on it and so carries all of them. The REST family, built per process,
- * holds {@link GatewayApp} directly.
- */
+/** `app` is the slice of the process's application this feature reaches; the root is shared. */
 export type GatewayCacheRuleTrpcContext = Readonly<{
   app: Readonly<{ gateway: GatewayApp }>;
   actor(): Readonly<{ id: string }>;

@@ -1,26 +1,7 @@
 /**
- * Custom LLM model costs over the process's tRPC transport.
- *
- * A model cost is a regex plus a rate card, stored against one scope inside
- * one organization, and read back by the ingestion pipeline when it prices a
- * span. The surface is small on purpose:
- *
- *   getAllForProject    the rules the project's settings page renders.
- *   createOrUpdate      write one rule at a scope the caller may manage.
- *   delete              remove one, authorized against the STORED row's scope.
- *   tryGetModelLimits      the registry's context/output ceilings for a model.
- *   previewMatchingSpans  which recently-seen models the regex being typed
- *                       would match, and what those spans would have cost.
- *
- * Costs carry no credentials, so nothing here is redacted on the way into the
- * audit log. Tenancy is the whole game instead: a scope target must resolve to
- * a single organization, and both write paths authorize inside the resolver
- * against the scope rather than against the caller-supplied `projectId`.
- *
- * Transport only: input parsing, the authorization declarations, and
- * delegation to `ModelProviderApp`. The regex-safety predicate, the model
- * registry lookup and the span preview arrive as ports because they are
- * process capabilities rather than this feature's persistence.
+ * Custom LLM model costs (regex + rate card) over tRPC. Carries no credentials, so
+ * tenancy is the whole game: both write paths authorize against the scope the
+ * resolver derives, never the caller-supplied `projectId`.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission, EnforcedScopeFields } from "@langwatch/authz-contract";
@@ -41,27 +22,13 @@ import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from 
 import { z } from "zod";
 import type { ModelProviderApp, SpanReader } from "#app/model-provider.app";
 
-/**
- * The process supplies authentication; authorization arrives as `policy`.
- *
- * `app` is the slice of the process's application this feature reaches. Costs
- * are the model-provider feature answering, so they arrive through the same
- * {@link ModelProviderApp} the provider and translation surfaces call — which
- * is also where the request's span reader comes from, rather than from a
- * `traces` entry this surface used to name for itself.
- */
+/** Auth from the process; `app` is the {@link ModelProviderApp} used by the other surfaces. */
 export type LlmModelCostTrpcContext = Readonly<{
   app: Readonly<{ modelProviders: ModelProviderApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
-/**
- * A process middleware chain applied to one already-parsed procedure.
- *
- * Applied AFTER the feature's own `.input()` rather than composed ahead of
- * it: tRPC runs middlewares in the order they were added, so a check
- * installed before the parser would see no input to read a scope id from.
- */
+/** Applied after this feature's `.input()`: reads its scope id from the parsed input. */
 type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
 
 type LlmModelCostTrpcProcedures<
@@ -73,30 +40,19 @@ type LlmModelCostTrpcProcedures<
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /** The process's full policy chain for one declared permission. */
   policy(permission: AuthzPermission): ProcedureDecorator;
-  /**
-   * The declaration for a write whose real check happens in the resolver,
-   * against a scope loaded at runtime. `enforces` names each input field the
-   * resolver is claiming to have covered, with the reason it may be trusted.
-   */
+  /** For a write checked in the resolver; `enforces` names the input fields it covers. */
   resolverAuthorizedPolicy(enforces: EnforcedScopeFields): ProcedureDecorator;
   /** Whether the chain checks every answer against its declared output schema. */
   validateOutput: boolean;
 }>;
 
 /**
- * The process capabilities this transport needs that are not the Model
- * Provider service's own.
- *
- * Declared as a constraint and consumed through the generic below, so the
- * concrete return shapes the process wires in survive into the router's
- * inferred output types instead of collapsing to the loose shape here.
+ * Process capabilities beyond the Model Provider service's own. Declared as a
+ * constraint so the process's concrete return shapes survive into the router's
+ * inferred output types.
  */
 export type LlmModelCostTrpcPorts = Readonly<{
-  /**
-   * Whether a caller-supplied pattern is free of catastrophic backtracking.
-   * A port rather than a local copy so the form, this schema and the
-   * match-time gate can never disagree about which patterns are allowed.
-   */
+  /** Catastrophic-backtracking check, as a port so the form/schema/gate agree. */
   isSafeRegex(pattern: string): boolean;
   /** The registry's context-window and output ceilings for a model id. */
   tryGetModelLimits(model: string): ModelLimits | null;
@@ -116,12 +72,7 @@ export type LlmModelCostTrpcPorts = Readonly<{
   }): Promise<CostRuleMatchingSpansPreview>;
 }>;
 
-/**
- * Installs the complete `llmModelCost.*` tRPC surface on a process-owned
- * root. The procedure and the policy bag are injected by the process so its
- * auth, audit, error, logging and tracing policies wrap every feature
- * procedure consistently.
- */
+/** Installs the `llmModelCost.*` tRPC surface; procedure and policy are process-injected. */
 export class LlmModelCostTrpcApi {
   static create<
     TContext extends LlmModelCostTrpcContext,
@@ -219,10 +170,7 @@ export class LlmModelCostTrpcApi {
               return await ctx.app.modelProviders.deleteCost(input, ctx.actor());
             }),
         )
-        /**
-         * Get model limits for a given model
-         * TODO: This doesn't need to be protected, but TRPC throws without it
-         */
+        // TODO: doesn't need to be protected, but tRPC throws without a permission.
         .query("tryGetModelLimits", (p) =>
           p
             .withInput(modelCostModelLimitsTrpcInputSchema)
@@ -230,12 +178,7 @@ export class LlmModelCostTrpcApi {
             .withPermission("project:view")
             .handle(async ({ input }) => ports.tryGetModelLimits(input.model)),
         )
-        /**
-         * Live preview for the cost rule drawer: which recently-seen models (and
-         * sample spans) would this regex match, and what would those spans cost at
-         * the rates being edited. Gated on traces:view, the response exposes span
-         * metadata (model names, token counts, trace ids), not cost-rule config.
-         */
+        // Gated on traces:view: the response exposes span metadata, not cost-rule config.
         .query("previewMatchingSpans", (p) =>
           p
             .withInput(previewMatchingSpansInputSchema)

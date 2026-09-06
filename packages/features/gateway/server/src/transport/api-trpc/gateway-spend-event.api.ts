@@ -1,14 +1,7 @@
 /**
- * The gateway spend-event ledger over the process's tRPC transport.
- *
- * A read-only, newest-first, cursor-paged view over `gateway_spend`, the
- * per-request billing record the gateway_spend pipeline writes unconditionally.
- * Project-scoped, like the neighbouring usage reads; organization-wide rollups
- * are a later fast-follow.
- *
- * Transport only: input parsing, the ClickHouse-absent degrade, and delegation.
- * Resolving virtual-key display names is a persistence read this transport does
- * not own, so the feature's application holds it.
+ * The gateway spend-event ledger over tRPC: a read-only, newest-first, cursor-paged view
+ * over `gateway_spend`. Project-scoped, like the neighbouring usage reads; organization-wide
+ * rollups are a later fast-follow.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -33,12 +26,7 @@ type GatewaySpendEventTrpcProcedures<
 > = Readonly<{
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  /**
-   * Tracing, logging, error shaping, scope lineage, the check, and audit,
-   * applied AFTER this feature's input parser: tRPC runs middlewares in the
-   * order they were added, and the check reads its scope id from the validated
-   * input.
-   */
+  /** Applied after this feature's input parser: the check reads its scope id from it. */
   policy(permission: AuthzPermission): ProcedureDecorator;
   /** @see the mount field of the same name. */
   validateOutput: boolean;

@@ -1,4 +1,4 @@
-/** Manages evaluation execution across multiple cells: builds and dispatches workflows, maps events to SSE, and coordinates parallel, abortable runs. */
+/** Manages evaluation execution across cells: builds/dispatches workflows, maps events to SSE. */
 
 import {
   type ESBatchEvaluationTarget,
@@ -87,12 +87,12 @@ export class ExperimentRunOrchestratorService {
     return new ExperimentRunOrchestratorService();
   }
 
-  /** The dataset rows a run may touch, given its scope. Delegates to {@link ExperimentCellPlanService}. */
+  /** The dataset rows a run may touch, given its scope. See {@link ExperimentCellPlanService}. */
   static resolveScopedRowIndices = (
     input: Parameters<ExperimentCellPlanService["resolveScopedRowIndices"]>[0],
   ): number[] => cellPlan.resolveScopedRowIndices(input);
 
-  /** Generates all cells to execute based on the scope. Delegates to {@link ExperimentCellPlanService}. */
+  /** Generates all cells to execute for the scope. See {@link ExperimentCellPlanService}. */
   static generateCells = (
     state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">,
     datasetRows: Array<Record<string, unknown>>,
@@ -106,7 +106,7 @@ export class ExperimentRunOrchestratorService {
       seedTargetOutputs: options.seedTargetOutputs,
     });
 
-  /** How many cells a scope will dispatch, before the run starts. Delegates to {@link ExperimentCellPlanService}. */
+  /** How many cells a scope dispatches. See {@link ExperimentCellPlanService}. */
   static countScopedCells = ({
     state,
     datasetRows,
@@ -119,19 +119,15 @@ export class ExperimentRunOrchestratorService {
     seedTargetOutputs?: Record<string, SeededTargetOutput>;
   }): number => cellPlan.countScopedCells({ state, datasetRows, scope, seedTargetOutputs });
 
-  /** "a", "a and b", "a, b and c" — for the skip-reason message. Delegates to the comparison-skip process. */
+  /** "a", "a and b", "a, b and c" for the skip-reason message. See the comparison-skip process. */
   static formatList = (names: string[]): string => processFormatList(names);
 
-  /** The row-level error copy for a skipped comparison. Delegates to the comparison-skip process. */
+  /** The row-level error copy for a skipped comparison. See the comparison-skip process. */
   static comparisonSkipMessage = (
     reason: Pick<ComparisonSkipReason, "kind" | "variantNames">,
   ): { detail: string; errorType: string } => processComparisonSkipMessage(reason);
 
-  /**
-   * The Phase 2 back-fill event for one REUSED (not executed) candidate output (#5789 fix 2), or `null` when this
-   * entry does not need one: it was already produced this run, its key does not parse to a row/target pair, its row
-   * is outside this run's scope, the row no longer exists, or the seeded output itself is absent.
-   */
+  /** Back-fill event for one REUSED candidate output, or null when this entry needs none. */
   static tryBuildSeededTargetResultEvent(
     key: string,
     seeded: SeededTargetOutput,
@@ -181,7 +177,7 @@ export class ExperimentRunOrchestratorService {
     } as EvaluationV3Event;
   }
 
-  /** Phase 2 generator for comparison evaluators. Delegates to {@link ExperimentComparisonPlanService}. */
+  /** Phase 2 generator for comparison evaluators. See {@link ExperimentComparisonPlanService}. */
   static generateComparisonCells = ({
     state,
     datasetRows,
@@ -207,11 +203,7 @@ export class ExperimentRunOrchestratorService {
       scopedRowIndices,
     });
 
-  /**
-   * Prices an LLM node's token usage at the project's canonical model rate. Kept as its own tiny implementation (not
-   * a delegation) — it only reaches `cost`, and {@link ExperimentCellExecutionService} is built from the full port
-   * bag plus a workflow service this call site does not have.
-   */
+  /** Its own tiny implementation, not a delegation: it only reaches `cost`, not a full port bag. */
   static priceMetrics = async (
     cost: ExperimentModelCostPort,
     projectId: string,
@@ -230,7 +222,7 @@ export class ExperimentRunOrchestratorService {
     return cost.tryPriceTokens({ projectId, model: metrics.model, inputTokens, outputTokens });
   };
 
-  /** Executes a single cell and yields events. Delegates to {@link ExperimentCellExecutionService}. */
+  /** Executes a single cell and yields events. See {@link ExperimentCellExecutionService}. */
   static async *executeCell(
     cell: ExecutionCell,
     projectId: string,
@@ -251,7 +243,7 @@ export class ExperimentRunOrchestratorService {
     });
   }
 
-  /** Executes a single cell whose target is a whole studio workflow. Delegates to {@link ExperimentWorkflowCellService}. */
+  /** Executes a cell targeting a studio workflow. See {@link ExperimentWorkflowCellService}. */
   static async *executeWorkflowCell({
     cell,
     projectId,
@@ -289,9 +281,8 @@ export class ExperimentRunOrchestratorService {
   }
 
   /**
-   * turn through the relay dispatcher, since the agent runs in the customer's own process. Each row is
-   * its own conversation, no history carried. Delegates to {@link ExperimentConnectedCellService}.
-   * Executes a single cell whose target is a connected agent (ADR-128): one
+   * Executes a cell whose target is a connected agent (ADR-128): one turn through the relay
+   * dispatcher. Each row is its own conversation. See {@link ExperimentConnectedCellService}.
    */
   static async *executeConnectedCell(input: ConnectedCellInput): AsyncGenerator<EvaluationV3Event> {
     const { ports, workflows, dispatch, sleep, now, ...cellInput } = input;
@@ -305,7 +296,7 @@ export class ExperimentRunOrchestratorService {
     }).executeConnectedCell(cellInput);
   }
 
-  /** Builds the per-evaluator dispatch input. Delegates to {@link ExperimentEvaluatorInputService}. */
+  /** Builds the per-evaluator dispatch input. See {@link ExperimentEvaluatorInputService}. */
   static buildEvaluatorInputs = (
     cell: ExecutionCell,
     evaluatorId: string,
@@ -313,7 +304,7 @@ export class ExperimentRunOrchestratorService {
   ): Record<string, unknown> =>
     evaluatorInputSvc.buildEvaluatorInputs({ cell, evaluatorId, targetOutput });
 
-  /** What the row calls the evaluator column that could not run. Delegates to {@link ExperimentEvaluatorInputService}. */
+  /** Row label for a column that couldn't run. See {@link ExperimentEvaluatorInputService}. */
   static evaluatorTargetDisplayName = ({
     target,
     loadedEvaluators,
@@ -325,7 +316,7 @@ export class ExperimentRunOrchestratorService {
       target,
     });
 
-  /** Whether dispatching this evaluator COLUMN would hand it nothing to read. Delegates to {@link ExperimentEvaluatorInputService}. */
+  /** Whether this evaluator COLUMN gets nothing. See {@link ExperimentEvaluatorInputService}. */
   static evaluatorTargetHasNoResolvedInputs = ({
     cell,
     loadedEvaluators,
@@ -339,7 +330,7 @@ export class ExperimentRunOrchestratorService {
       },
     );
 
-  /** Whether dispatching would hand the evaluator nothing to read. Delegates to {@link ExperimentEvaluatorInputService}. */
+  /** Whether the evaluator gets nothing. See {@link ExperimentEvaluatorInputService}. */
   static hasNoResolvedInputs = ({
     cell,
     evaluator,
@@ -350,17 +341,17 @@ export class ExperimentRunOrchestratorService {
     inputs: Record<string, unknown>;
   }): boolean => evaluatorInputSvc.hasNoResolvedInputs({ cell, evaluator, inputs });
 
-  /** Build the per-target metadata stored with a run. Delegates to {@link ExperimentResultDispatchService}. */
+  /** Per-target metadata stored with a run. See {@link ExperimentResultDispatchService}. */
   static buildTargetMetadata = (
     input: Parameters<ExperimentResultDispatchService["buildTargetMetadata"]>[0],
   ): ESBatchEvaluationTarget[] => resultDispatches.buildTargetMetadata(input);
 
-  /** Build the recordTargetResult dispatch payload. Delegates to {@link ExperimentResultDispatchService}. */
+  /** Build the recordTargetResult dispatch payload. See {@link ExperimentResultDispatchService}. */
   static buildTargetResultDispatch = (
     input: Parameters<ExperimentResultDispatchService["tryBuildTargetResultDispatch"]>[0],
   ): RecordTargetResultCommandData | null => resultDispatches.tryBuildTargetResultDispatch(input);
 
-  /** Build the recordEvaluatorResult dispatch payload. Delegates to {@link ExperimentResultDispatchService}. */
+  /** The recordEvaluatorResult dispatch payload. See {@link ExperimentResultDispatchService}. */
   static buildEvaluatorResultDispatch = (
     input: Parameters<ExperimentResultDispatchService["buildEvaluatorResultDispatch"]>[0],
   ): RecordEvaluatorResultCommandData => resultDispatches.buildEvaluatorResultDispatch(input);
@@ -374,7 +365,7 @@ export class ExperimentRunOrchestratorService {
   ): ReturnType<ExperimentCarriedBoardService["buildCarriedOverDispatches"]> =>
     carriedBoard.buildCarriedOverDispatches(input);
 
-  /** Main orchestrator: executes all cells and yields SSE events, with parallel execution under a semaphore. */
+  /** Main orchestrator: executes all cells and yields SSE events under a parallel semaphore. */
   static runOrchestrator(input: OrchestratorInput): AsyncGenerator<EvaluationV3Event> {
     return ExperimentRunDriverService.runOrchestrator(input);
   }

@@ -213,11 +213,8 @@ const workbenchWriteErrorResponses = {
 };
 
 /**
- * A route that authenticates in its own handler answers its own statuses — a
- * credential refusal, a hand-rolled 400, a stream — so its answer is written
- * through rather than validated against one success schema. Every one of them
- * declares its 200 body in `withDocs`, which is what the published document
- * carries.
+ * A route that authenticates in its own handler answers its own statuses, written through
+ * rather than validated against one success schema; each declares its 200 body in `withDocs`.
  */
 const HANDLER_ANSWER_REASON =
   "the handler authenticates the caller itself and answers the status its own refusal names, " +
@@ -244,12 +241,7 @@ const slugVersionParamsSchema = z.object({
   version: z.string().min(1),
 });
 
-/**
- * The three list-runs query fields, read as sent. A page number that is not a
- * positive integer has always fallen back rather than refused the request, and
- * a missing `experimentSlug` answers this family's own 400, so none of them is
- * declared required here.
- */
+/** A bad page number falls back rather than refusing; a missing slug 400s in the handler. */
 const listRunsQuerySchema = z.object({
   experimentSlug: z.string().optional().describe("Slug of the experiment whose runs you want"),
   page: z.string().optional().describe("1-based page number"),
@@ -533,11 +525,8 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
 
     const { ports: runPorts, progress } = requireRunLoop();
 
-    // Ownership check: holding evaluations:manage on `projectId` does NOT grant the right to abort a run that belongs
-    // to a different project. The runId is attacker-controlled, so verify the run is owned by the authenticated
-    // project before signaling an abort. Without this, a user could abort another tenant's experiment run by guessing
-    // its runId. In-flight runs register their owner through the abort port, which is set before the first frame of
-    // either path. The progress store is the fallback: it also holds the owner, for as long as the run state lives.
+    // The runId is attacker-controlled: verify it is owned by the authenticated project before
+    // signaling an abort, or a caller could abort another tenant's run by guessing its id.
     const ownerProjectId =
       (await runPorts.abort.tryGetRunningProjectId(runId)) ??
       (await progress.tryGetRunState(runId))?.projectId;
@@ -557,11 +546,8 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
   ) => {
     const { slug } = input;
 
-    // Starting a run CREATES a run row against an experiment that already exists; it does not administer
-    // the evaluations family. Asking for `:manage` here refused every least-privilege key that
-    // legitimately holds the create — the Langy session key among them, which stops short of `:manage`
-    // precisely because `:manage` implies the delete. `:manage` still satisfies `:create` through the
-    // permission hierarchy, so narrowing the grain takes access away from nobody.
+    // Starting a run CREATES a row; it doesn't administer the family, so this asks for
+    // `:create`, not `:manage` — `:manage` still satisfies it through the permission hierarchy.
     const credential = await ports.authenticateCredential({
       request: c.req.raw,
       permission: "evaluations:create",
@@ -905,11 +891,9 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     const { project, markUsed } = credential;
     const { progress } = requireRunLoop();
 
-    // Resolve the owning experiment. The results store is keyed on (TenantId, ExperimentId, RunId) — runId alone is not unique across
-    // experiments (SDK callers can reuse a stable run_id) — so we must know the experimentId before we query results. Two sources, tried in
-    // order: 1. the progress store — covers fresh runs. 2. experimentSlug query param → a row lookup — covers older runs whose run state has
-    // expired but whose result rows remain. The previous "most recently updated experiment in the project" fallback was unsafe: it returned
-    // cryptic 404s whenever the user had edited any other experiment after the one that owned this run.
+    // The results store is keyed on (TenantId, ExperimentId, RunId) — runId alone is not unique
+    // across experiments — so the experimentId must be resolved first: the progress store for a
+    // fresh run, or the experimentSlug param for one whose run state has expired.
     const runState = await progress.tryGetRunState(runId);
     const slugFromState =
       runState && runState.projectId === project.id ? runState.experimentSlug : undefined;
@@ -1391,11 +1375,8 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
 }
 
 /**
- * `/api/evaluations/v3/*` — the family's older name, re-dispatched.
- *
- * It TERMINATES NOTHING: the canonical route authenticates the forwarded
- * request exactly as it would a direct one, so the older URL answers whatever
- * the canonical one does.
+ * `/api/evaluations/v3/*` — the family's older name, re-dispatched. TERMINATES NOTHING:
+ * the canonical route authenticates the forwarded request exactly as a direct one.
  */
 export function createExperimentV3LegacyAliasRestApp(options: {
   security: AppRestSecurity;

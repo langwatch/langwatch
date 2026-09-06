@@ -143,46 +143,23 @@ export type ModelProviderTrpcPorts<
 type CanonicalProvider = {
   id: string;
   provider: string;
-  /**
-   * The row's own display name. Carried because a multi-instance setup names its rows ("OpenAI" at organization scope, "OpenAI2" on a project) and every surface that lists
-   * providers labels them with it: the settings table, the routing-policy credential picker, the budget drawer's provider select. With it narrowed away those all fell back to
-   * the registry name, so two rows for the same vendor rendered identically. Not sensitive: a name is what an admin typed into the form, never a credential.
-   */
+  /** Per-row display name, so multi-instance rows don't collapse to one vendor label. */
   name: string;
   enabled: boolean;
-  /**
-   * When set, an admin has withdrawn the credential. Carried because the gateway pickers fail closed on it — `isRoutable` in
-   * `components/gateway/eligibleModelProviders.ts` requires `enabled === true && !disabledAt` — and a row that arrives without the field
-   * reads as "never withdrawn", so a disabled credential was being advertised as eligible. The routing-policy picker renders it too.
-   */
+  /** Set when withdrawn; `isRoutable` fails closed on it, so pickers must see it. */
   disabledAt?: Date | null;
-  /**
-   * Last known reachability of the credential. The routing-policy credential picker renders
-   * it per row (`useRoutingPolicyDrawerForm`), and defaults to "UNKNOWN" when absent — which
-   * is what every row showed while this was narrowed away.
-   */
+  /** Last known reachability, rendered by the routing-policy credential picker. */
   healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
   customKeys: Record<string, unknown> | null;
   customModels: Array<{ id: string; label: string; type: string }>;
   customEmbeddingsModels: Array<{ id: string; label: string; type: string }>;
   models?: string[] | null;
   embeddingsModels?: string[] | null;
-  /**
-   * Where the provider is attached. Carried because the model-providers settings page filters and orders by it — narrowing it
-   * away here left `filterProvidersByScope` nothing to read, so picking any scope but "all" emptied the table. Not sensitive: a
-   * scope says which organization, team or project a provider belongs to, never anything about its credentials.
-   */
+  /** Where the provider is attached; `filterProvidersByScope` reads it directly. */
   scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
-  /**
-   * The operator's own skip-permissions list, or null when the provider's registry default applies (ADR-129). The drawer seeds its field from
-   * the listed row, so narrowing it away made a saved list read back as the default on reopen.
-   */
+  /** Operator override, or null to fall through to the registry default (ADR-129). */
   langySkipPermissionsModels?: string[] | null;
-  /**
-   * The gateway knobs the Advanced (Gateway) accordion edits, dropped here
-   * the same way `langySkipPermissionsModels` was: a saved value read back
-   * as unset on reopen (specs/ai-gateway/gateway-provider-settings.feature).
-   */
+  /** Gateway knobs the Advanced (Gateway) accordion edits. */
   rateLimitRpm?: number | null;
   rateLimitTpm?: number | null;
   rateLimitRpd?: number | null;
@@ -226,11 +203,7 @@ function toLegacyProvider(provider: CanonicalProvider): ModelProviderListEntry {
   };
 }
 
-/**
- * The entry is `as const` so `Object.fromEntries` sees a two-tuple and takes its typed overload. Without it the call is only one refactor away from
- * the `Iterable<readonly any[]>: any` overload — today's tuple is inferred from the callback's contextual type, and a hoisted `const entries` is
- * enough to lose it. An erased map answers `any` for both provider reads, which `toLegacyProvider`'s annotation cannot catch: `any` satisfies it.
- */
+/** `as const` keeps the tuple typed so `Object.fromEntries` doesn't erase to `any`. */
 function toLegacyProviderMap(providers: Record<string, CanonicalProvider>) {
   return Object.fromEntries(
     Object.entries(providers).map(([key, provider]) => [key, toLegacyProvider(provider)] as const),
@@ -313,11 +286,7 @@ export class ModelProviderTrpcApi {
               );
             }),
         )
-        /**
-         * List shape: one entry per stored ModelProvider row, no collapsing by provider key. Use this for surfaces that need to render every row
-         * (the settings page Model Providers table) rather than the narrowest-scope-per-provider view returned by `getAllForProjectForFrontend`.
-         * Multi-instance setups (e.g. two "OpenAI" rows at different scopes) appear as two distinct entries.
-         */
+        /** One entry per stored row, uncollapsed — for surfaces that must render every row. */
         .query("listAllForProjectForFrontend", (p) =>
           p
             .withInput(modelProviderProjectTrpcInputSchema)
@@ -329,11 +298,7 @@ export class ModelProviderTrpcApi {
               ).map(toLegacyProvider);
             }),
         )
-        /**
-         * Org-wide variant: returns every ModelProvider attached anywhere inside the organization (org + every team +
-         * every project), including env-fed pseudo-rows. The model-providers settings page uses this for the "All you can
-         * see" view so an admin sees the providers a sibling project's owner has configured.
-         */
+        /** Org-wide variant: every provider anywhere in the organization, env-fed rows included. */
         .query("listAllForOrganizationForFrontend", (p) =>
           p
             .withInput(modelProviderOrganizationTrpcInputSchema)
@@ -439,11 +404,7 @@ export class ModelProviderTrpcApi {
               return await ctx.app.modelProviders.testConnection(input, ctx.actor());
             }),
         )
-        /**
-         * Codex sign-in, step 1: ask OpenAI for a device code. Nothing is stored — the pending sign-in's identifiers
-         * travel to the client and come back on every poll, so polling works across server instances.
-         * Spec: specs/model-providers/codex-account-provider.feature
-         */
+        /** Codex step 1: request a device code. Nothing stored; round-trips via the client. */
         .mutation("codexSignInStart", (p) =>
           p
             .withInput(modelProviderProjectTrpcInputSchema)
@@ -453,11 +414,7 @@ export class ModelProviderTrpcApi {
               return await ports.startCodexDeviceSignIn();
             }),
         )
-        /**
-         * Codex sign-in, step 2..n: one poll of the pending device authorization. While the user hasn't approved yet this returns `{ status: "pending" }`. On approval it
-         * exchanges the code, saves the provider row with the encrypted token set at the requested scopes (service authz fails closed on any non-manageable scope), and —
-         * when the caller asks — writes the coding-assistant defaults so Langy and the tiny assists start using the account immediately.
-         */
+        /** Codex step 2..n: poll approval, save the token, optionally set coding defaults. */
         .mutation("codexSignInPoll", (p) =>
           p
             .withInput(modelProviderCodexSignInPollTrpcInputSchema)
@@ -516,11 +473,7 @@ export class ModelProviderTrpcApi {
               };
             }),
         )
-        /**
-         * Point the coding-assistant roles (LANGY + FAST) at the codex model, after the fact. The
-         * settings-page connect flow doesn't write defaults during sign-in; it asks with a dialog once
-         * connected and calls this on "yes" — the same role writes the Langy/onboarding flows perform inline.
-         */
+        /** Points the coding-assistant roles at codex, after the connect dialog's "yes". */
         .mutation("codexApplyCodingDefaults", (p) =>
           p
             .withInput(modelProviderCodexApplyCodingDefaultsTrpcInputSchema)
@@ -541,11 +494,7 @@ export class ModelProviderTrpcApi {
               return { applied: true as const };
             }),
         )
-        /**
-         * The connected Codex account for a project, for the setup surfaces' connected state. Never returns tokens, and deliberately NOT the account email:
-         * this is a project:view query, so a plain member must not read the (often personal) OpenAI address the connecting admin signed in with. The plan tier
-         * is non-identifying. The connector still sees their own email at connect time from the sign-in mutation's result.
-         */
+        /** Connected-state only: no tokens, no email — a member must not read the admin's. */
         .query("codexStatus", (p) =>
           p
             .withInput(modelProviderProjectTrpcInputSchema)
@@ -566,10 +515,7 @@ export class ModelProviderTrpcApi {
               };
             }),
         )
-        /**
-         * Validates a stored or env var API key against a custom or default base URL.
-         * Gets API key from DB or env var and validates against the provided URL (or default if not provided).
-         */
+        /** Validates a stored or env-var API key against a custom or default base URL. */
         .query("validateKeyWithCustomUrl", (p) =>
           p
             .withInput(modelProviderValidateKeyWithCustomUrlTrpcInputSchema)
@@ -590,16 +536,8 @@ export class ModelProviderTrpcApi {
               });
             }),
         )
-        // ──────────────────────────────────────────────────────────────────────── Role + feature-keyed
-        // default models (Area B3.2). Writes go through The canonical Model Provider service so they land in
-        // the new `ModelDefault` table; the legacy Organization/Team/Project scalar columns become read-only
-        // fallback during the compat window. See specs/model-providers/role-based-default-models.feature.
-        // ────────────────────────────────────────────────────────────────────────
-        /**
-         * Cascade-resolve a single feature key for a project. Wraps `resolveModelForFeature` for frontend consumers that used to read
-         * `project.defaultModel` / etc directly. Returns null when nothing is configured at any scope rather than throwing, so the
-         * caller can render a placeholder selector + a "configure a default" hint without an exception-based control flow.
-         */
+        // Role + feature-keyed defaults; specs/model-providers/role-based-default-models.feature
+        /** Cascade-resolves a feature key; returns null, not a throw, when unconfigured. */
         .query("getResolvedDefault", (p) =>
           p
             .withInput(modelDefaultResolvedTrpcInputSchema)
@@ -627,11 +565,7 @@ export class ModelProviderTrpcApi {
               );
             }),
         )
-        /**
-         * Single-key writers used by the provider-create "Set as default" flow and any tactical "change just this role at
-         * this scope" UI. Both go through the canonical Model Provider service which finds the (newest) config attached at
-         * the scope and updates the matching key in place, or creates a new config if none exists.
-         */
+        /** Single-key writers: update the matching key in place, or create one if absent. */
         .mutation("setRoleAssignmentForScope", (p) =>
           p
             .withInput(modelDefaultRoleAssignmentTrpcInputSchema)

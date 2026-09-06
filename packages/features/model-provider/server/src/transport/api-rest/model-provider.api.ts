@@ -131,11 +131,8 @@ export function createModelProvidersRestApp(options: {
       defaultModel = `${provider}/${defaultModel}`;
     }
 
-    // REST endpoint is keyed on the provider string in the URL and preserves the legacy single-instance
-    // upsert contract. The multi-instance create flow lives behind the tRPC `update` procedure, which goes
-    // through the id-based path. Nothing is caught here on purpose. Every failure `upsert` raises is a
-    // HandledError carrying its own status and code, and the framework boundary renders it; catching them
-    // to rethrow one 400 replaced every status with 400 and every code with `http_error`.
+    // Uncaught on purpose: upsert's HandledError carries its own status/code and the
+    // framework boundary renders it; catching to rethrow flattened every case to 400.
     await modelProviderService.upsert({
       projectId: project.id,
       provider,

@@ -1,5 +1,7 @@
 /**
- * Gateway budget administration over tRPC. A budget is always org-scoped, but constrains one of ORGANIZATION/TEAM/PROJECT/VIRTUAL_KEY/PRINCIPAL/GROUP; normalising a screen's (scope kind, target id) onto scopeType + the typed column is the service's job, not this transport's. Transport only: procedure names, input parsing, wire DTO, delegation to the one budget-decision service. The two non-budget reads (org existence, provider/group label resolution) arrive as ports, not a Prisma client, so no persistence reaches the transport.
+ * Gateway budget administration over tRPC. Normalising a screen's (scope kind, target id) onto
+ * scopeType + the typed column is the service's job, not this transport's, which only parses
+ * input and delegates to the one budget-decision service.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -36,9 +38,7 @@ export type GatewayBudgetTrpcContext = Readonly<{
   actor(): Readonly<{ id: string }>;
 }>;
 
-/**
- * A middleware chain applied to one already-parsed procedure, returned rather than composed ahead of .input() — tRPC appends the input parser at the call site, so a check installed earlier would read input === undefined; every declaration here takes its scope id from the validated input.
- */
+/** Applied after `.input()`, not ahead of it: every declaration reads its scope id from it. */
 type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
 
 type GatewayBudgetTrpcProcedures<
@@ -200,9 +200,8 @@ export class GatewayBudgetTrpcApi {
               };
             }),
         )
-        /**
-         * Groups a budget can target, for whoever may create budgets. group.listAll exposes role-binding maps and demands organization:manage; a budget creator only needs names and sizes, so this stays gated by the same permission as the create it serves.
-         */
+        // group.listAll demands organization:manage; a creator only needs names and sizes,
+        // so this stays gated by the same permission as the create it serves.
         .query("groupTargets", (p) =>
           p
             .withInput(gatewayBudgetApiOrganizationInputSchema)

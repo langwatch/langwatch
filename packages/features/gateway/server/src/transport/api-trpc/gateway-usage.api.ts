@@ -1,19 +1,7 @@
 /**
- * Gateway usage reads over the process's tRPC transport.
- *
- * Historical spend from the ClickHouse `trace_summaries` cost path — the same
- * source the keys table's "Spent this month" column reads — grouped by key,
- * model and day.
- *
- * Organization-scoped, like the virtual-keys surface: usage spans every project
- * of the organization, because traces land in a key's trace destination rather
- * than in whichever project the viewer has selected. Visibility follows the same
- * membership rule as the keys table, so the page and the table agree on which
- * keys exist and what they spent.
- *
- * Transport only. Membership visibility and the usage reader both need
- * persistence this transport does not hold, so the feature's application holds
- * them.
+ * Gateway usage reads over tRPC. Organization-scoped, like virtual-keys: usage spans every
+ * project since traces land in a key's trace destination, not the viewer's selected project.
+ * Visibility follows the same membership rule as the keys table, so the two agree.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";

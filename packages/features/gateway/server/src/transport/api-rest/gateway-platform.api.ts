@@ -1,5 +1,7 @@
 /**
- * Public REST API for managing AI Gateway resources (SDKs, CLIs, CI), paralleling the virtualKeys/gatewayBudgets/gatewayUsage tRPC routers. Auth: project API key or scoped API key. One implementation of every write rule — handlers call the SAME GatewayApp operations tRPC mutations call, so the two doors can't drift; handlers only translate wire casing and map TRPCError onto HTTP. Writes are audited to AuditLog (gateway shape); which actor a credential writes as is the process's decision, arriving as actorForCredential.
+ * Public REST API for AI Gateway resources, paralleling the tRPC routers. Handlers call the
+ * SAME GatewayApp operations tRPC mutations call, so the two doors can't drift; they only
+ * translate wire casing and map TRPCError onto HTTP.
  */
 
 import { apiKeyPermission } from "@langwatch/api";
@@ -207,9 +209,7 @@ const spendSummaryDtoSchema = z.object({
   }),
 });
 
-/**
- * Spend window, in epoch milliseconds — this route used to take ISO-8601 while every other spend endpoint took epoch-ms, forcing one reconciliation script to hold two time formats for the same concept. Echoed window matches the input unit so a caller can feed a response straight back as the next request.
- */
+/** Spend window in epoch ms, matching every other spend endpoint; echoed in the same unit. */
 const vkSpendWindowSchema = z.object({
   from: z.coerce.number().int().positive().safe().optional(),
   to: z.coerce.number().int().positive().safe().optional(),
@@ -263,9 +263,7 @@ const nextCursorSchema = z
 
 // ── Request wire schemas ────────────────────────────────────────────────
 
-/**
- * Page controls every unbounded list takes, matching /spend-events. cursor is opaque, passed back verbatim; a present-but-garbled cursor is a 400 rather than a silent restart that would re-serve everything the caller already has.
- */
+/** Opaque cursor, matching /spend-events; a garbled one is a 400, not a silent restart. */
 const pageQuerySchema = z.object({
   cursor: z.string().max(500).optional(),
   limit: z.coerce
@@ -277,9 +275,7 @@ const pageQuerySchema = z.object({
     .default(PAGE_LIMIT_DEFAULT),
 });
 
-/**
- * The ?external_id= filter both governed lists take: exact match on the caller's own id, making the list the lookup for a resource whose LangWatch id was never stored. Returns a page, not a single row, so one shape serves both readings and an unclaimed id gets an empty page, not a 404.
- */
+/** Exact match on the caller's own id; returns a page (empty if unclaimed), never a 404. */
 const externalIdFilterSchema = z
   .string()
   .max(EXTERNAL_ID_MAX_LENGTH)
@@ -345,9 +341,7 @@ const scopeWireSchema = z.object({
   scope_id: z.string().min(1),
 });
 
-/**
- * A positive USD amount on the wire: a number, or a decimal string (the form that survives JSON round-trips without float drift). The string branch is validated here so a malformed value answers 400 instead of exploding into a Prisma Decimal parse further down.
- */
+/** Number or decimal string (survives JSON without float drift); a bad value 400s right here. */
 const usdAmountSchema = z
   .number()
   .positive()
@@ -377,9 +371,7 @@ const createVirtualKeySchema = z.object({
    * the plain reseller flow (mint a key for this project) needs no ids.
    */
   scopes: z.array(scopeWireSchema).min(1).optional(),
-  /**
-   * Where this key's traces and costs land. NOT a scope — grants no visibility or operate rights. Omit it and the destination comes from the key's single project scope, or the org's governance project when nothing else names one; either way it's stored on the key.
-   */
+  /** Where traces/costs land. NOT a scope: grants no visibility or operate rights. */
   trace_project_id: z.string().nullable().optional(),
   routing_policy_id: z.string().nullable().optional(),
   routing_mode: routingModeWireSchema.optional(),
@@ -396,9 +388,7 @@ const createVirtualKeySchema = z.object({
   external_id: externalIdSchema.nullable().optional(),
   /** Customer-owned bookkeeping. Never read by the gateway. */
   metadata: resourceMetadataSchema.optional(),
-  /**
-   * Only "user". Product-managed purposes (langy) are provisioned by the product itself, never over the public API — a product-managed key is hidden from reads and refuses mutations, nothing a customer can ever want to mint.
-   */
+  /** Only "user": product-managed purposes are provisioned by the product, never over this API. */
   purpose: z.literal("user").optional(),
 });
 
@@ -529,9 +519,7 @@ type GatewayContext = ProjectScopedContext<EndpointVariables>;
  */
 type GatewayErrorContext = Parameters<RestErrorHandler>[1];
 
-/**
- * Identity this request authorizes as, plus the id audit rows record. Which principal a credential stands for is the process's decision (a scoped API key acts as its owning user; a legacy project key carries none and acts as a synthetic machine principal for its project) — the application answers it, this transport only supplies the two facts it holds.
- */
+/** Which principal a credential stands for is the process's call; this only holds the facts. */
 type ActorRequestReader = Parameters<typeof projectOf>[0] & {
   get(key: "resolvedToken"): ResolvedApiKeyToken | undefined;
 };
@@ -548,7 +536,8 @@ function actorForRequest(
 
 /**
  * security pass 2026-09-04, finding H12
- * Budgets and cache rules are org-owned rows a project credential addresses by id, so every write reaches the whole tenant. The route's declared permission resolves at the caller's OWN project; this resolves the same permission at the organization the write actually acts on.
+ * A project credential addresses an org-owned row by id, so every write reaches the whole
+ * tenant. This resolves the same permission at the organization the write actually acts on.
  */
 async function authorizeOrganizationWide(
   c: ActorRequestReader,
@@ -573,9 +562,7 @@ const TRPC_HTTP_STATUS: Record<string, ContentfulStatusCode> = {
   TOO_MANY_REQUESTS: 429,
 };
 
-/**
- * Answers error as the canonical envelope with this family's status — one helper for every refusal, so a code path can't hand-build a body that drifts from {@link apiErrorSchema}.
- */
+/** One helper per refusal, so no path builds a body that drifts from {@link apiErrorSchema}. */
 function errorResponse(
   c: GatewayErrorContext,
   args: {
@@ -588,9 +575,7 @@ function errorResponse(
   return c.json(apiErrorBody({ ...args, ...requestTraceIds(c) }), args.status);
 }
 
-/**
- * Maps a service-layer TRPCError onto the canonical error envelope. Service messages follow snake_code: detail, so the machine code survives onto the wire for SDKs to branch on. Anything not a TRPCError is rethrown for the app-level error handler.
- */
+/** Service messages follow snake_code: detail, so the machine code survives onto the wire. */
 function trpcErrorResponse(c: GatewayErrorContext, error: unknown): Response {
   // The service layer and the shared preconditions raise HandledErrors
   // (ADR-045). They already carry the two things this envelope needs, a
@@ -664,9 +649,7 @@ function budgetFromWire(
   return parsed.data;
 }
 
-/**
- * Public REST surface for the AI Gateway control plane, built against one process's security and gateway application. gateway() resolves per request rather than being held — mounting the family must not construct a service, letting the OpenAPI generator and route-registry audits build every route with no running process.
- */
+/** gateway() resolves per request, not held, so mounting needs no process already running. */
 export function createGatewayPlatformRestApp(options: {
   security: AppRestSecurity;
   gateway: () => GatewayApp;

@@ -3,22 +3,9 @@ import type { GatewaySpendEventsPort } from "../../ports/gateway-spend-events.po
 import type { GatewaySpendState } from "../../projections/gateway-spend.projection";
 
 /**
- * FoldProjectionStore adapter for the gateway spend fold.
- *
- * The `gateway_spend` row round-trips the WHOLE working state (every field
- * is an explicit column), so `get` decodes the last committed row and the
- * delivery path never reads the event log at all: an absent row means a
- * new request and the fold starts from init(). Rows stamped with an older
- * projection version report a miss; the version bump that first creates
- * such rows must reintroduce `refoldOnStoreMiss` on the projection so that
- * population self-heals one aggregate at a time, or those misses fold from
- * init() and overwrite committed rows with partial state.
- *
- * No applied-event bookkeeping rides here: the fold is absolute-writes-only
- * and every command carries a per-(request, lifecycle-step) idempotency key
- * at the event store, so a redelivered batch re-sets identical state and
- * the ReplacingMergeTree version (the fold's monotonic updatedAt) replaces
- * rather than duplicates.
+ * FoldProjectionStore adapter for the gateway spend fold. `gateway_spend` round-trips the
+ * WHOLE working state, so `get` decodes the last committed row; a version-stamped miss needs
+ * `refoldOnStoreMiss` reintroduced, or it overwrites partial state from init().
  */
 export class GatewaySpendStore implements FoldProjectionStore<GatewaySpendState> {
   static create(repo: GatewaySpendEventsPort): GatewaySpendStore {

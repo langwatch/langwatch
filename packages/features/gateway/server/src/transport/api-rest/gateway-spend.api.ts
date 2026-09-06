@@ -1,6 +1,7 @@
 /**
  * @see ADR-072 (pull gates under the same plan flag as push)
- * Billing reconciliation REST surface: cursor-paged pull over per-request spend, its rollup fast path, one end user's standing, and replay onto a webhook endpoint. Organization-scoped, gated on the webhook platform's plan flag — pull and push are two views of one Enterprise capability, answering the same envelopes from the same ledger. Every refusal is the canonical envelope, so a client reads one shape here, on the platform routes, and from the Go data plane.
+ * Billing reconciliation REST: cursor-paged spend pull, its rollup fast path, one end
+ * user's standing, and webhook replay — two views of one ledger, one canonical envelope.
  */
 import { createLogger } from "@langwatch/observability";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
@@ -46,9 +47,7 @@ const spendGrouping = GatewaySpendGroupingAdapter.create();
 
 const logger = createLogger("langwatch:api:gateway-spend");
 
-/**
- * Route documentation is part of the contract: the fixed 13-month window and downstream dedup guidance are load-bearing for reconciliation consumers, so they're pinned here as constants rather than written inline at each route.
- */
+/** Pinned as constants: the 13-month window and dedup guidance are load-bearing for consumers. */
 export const SPEND_EVENTS_PULL_DESCRIPTION =
   "Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of writing; both vendors own those numbers, so confirm the current one before you rely on it): re-pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the one difference is `status=admitted`, which only this read answers, because an admitted request is still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b` matches either); name two different filters to narrow. `metadata` is written `key:value`, split on the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres records and are resolved to the projects and keys they cover, so a team with no projects or an external id nobody minted answers with no spend rather than with everything.";
 
@@ -59,7 +58,9 @@ export const END_USER_SPEND_DESCRIPTION =
   "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.";
 
 /**
- * Seam between the billing reconciliation REST surface and its process. Two kinds of entry: capabilities the process composed once and shares with workers + the tRPC ledger screen (spend-events reader, budget ledger, webhook endpoint/event/delivery trio, so this family reads exactly what push writes), and decisions the application still owns (which Postgres records a filter names and what they resolve to in CH, how long an outcome may still arrive, what "datastore down" means). The webhook half is described structurally, not by name — its registry, log, delivery path, envelope and subscription grammar all belong to the Enterprise webhook platform this core package may not depend on; what's written here is exactly what these four routes call, and the process binds the real implementations.
+ * Seam between this REST surface and its process. The webhook half is described
+ * structurally, not by name: it belongs to the Enterprise webhook platform, which
+ * this core package may not depend on, so the process binds the real implementations.
  */
 
 /** One row of the spend ledger, as the events reader hands it over. */
@@ -139,9 +140,7 @@ export type GatewaySpendRestPorts = Readonly<{
    */
   spendEventEnvelope(row: SpendLedgerRow): GatewaySpendEnvelope;
 
-  /**
-   * Whether an endpoint's subscriptions cover one envelope type. The selector grammar (exact type, family.* wildcard, *) is the webhook platform's; a second reading of it here could disagree with the one the push path applies.
-   */
+  /** Selector grammar is the webhook platform's; a second reading here could disagree with push. */
   endpointAcceptsEvent(input: { enabledEvents: readonly string[]; eventType: string }): boolean;
 
   /**
@@ -150,9 +149,7 @@ export type GatewaySpendRestPorts = Readonly<{
    */
   settlementPolicy: GatewaySettlementPolicyPort;
 
-  /**
-   * Spend filters naming Postgres records (projects, teams, the caller's own external ids), resolved into the tenant/VK ids ClickHouse actually stores. A filter resolving to nothing resolves to an EMPTY list, never to "unfiltered".
-   */
+  /** Resolves Postgres filters to CH ids. A no-match resolves to EMPTY, never "unfiltered". */
   resolveSpendScope(input: {
     organizationId: string;
     projectIds?: string[];
@@ -177,18 +174,14 @@ export type GatewaySpendRestPorts = Readonly<{
   spendStoreUnavailable(): Error;
 }>;
 
-/**
- * The spend-events reader, or the process's own refusal. The ledger is the only store spend accrues in, so a deployment without it has no figures and says so rather than answering with a zero indistinguishable from a quiet month.
- */
+/** The ledger is the only store spend accrues in; without it we say so, not a zero. */
 function requireSpendEvents(ports: GatewaySpendRestPorts): GatewaySpendEventsService {
   const service = ports.spendEvents;
   if (!service) throw ports.spendStoreUnavailable();
   return service;
 }
 
-/**
- * One end of a read window, in milliseconds — published rather than left to the reader, since seconds and ms are both plausible for a bare integer and the wrong one silently answers over the wrong window (a seconds epoch lands in 1970 and reads empty). Bounded by hand, not .safe(), which would publish a symmetric minimum documenting a negative epoch as acceptable when the server actually refuses it.
- */
+/** Milliseconds, not seconds: a seconds epoch silently lands in 1970 and reads empty. */
 const epochMs = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).meta({
   description:
     "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
@@ -332,9 +325,7 @@ const replayResultSchema = z.object({
 /** The refusals every route here documents; the 200 comes from its output. */
 const spendResponses = canonicalBaseResponses;
 
-/**
- * One or two dimensions, comma separated — two is the ceiling since a third multiplies the group count past what one cursor walk serves usefully, and a caller wanting a third really wants the events read. Validated inside the transform, not piped into an array schema, so a refusal names group_by, not group_by.0 — an index the caller never wrote maps onto nothing a client can point at.
- */
+/** Validated in the transform, not an array schema, so a refusal names group_by, not group_by.0. */
 const groupBySchema = z
   .string()
   .transform((raw, ctx): SpendGroupByKey[] => {
@@ -365,7 +356,8 @@ const QUERY_BOOLEAN_TRUE = ["true", "1", "yes"];
 const QUERY_BOOLEAN_FALSE = ["false", "0", "no", ""];
 
 /**
- * A boolean spelled in a query string. z.coerce.boolean() is JS Boolean(), so every non-empty string is true and allow_unstable=false would turn the guard OFF — the most obvious spelling of "off" must not mean "on", and an unrecognised spelling is refused by name. Case is folded since the caller's HTTP library picks it, not the caller (Python requests renders True, httpx renders true) — this param is documented for Python, so refusing True would reject the exact request our docs ask for.
+ * z.coerce.boolean() is JS Boolean(): every non-empty string is true, so allow_unstable=false
+ * would turn the guard OFF. Case is folded since the caller's HTTP library picks it, not them.
  */
 const queryBoolean = z
   .string()
@@ -434,9 +426,7 @@ const REPLAY_MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const REPLAY_MAX_ENVELOPES = 10_000;
 const REPLAY_PAGE_SIZE = 200;
 
-/**
- * Walks the window counting only what this endpoint subscribes to, refusing as soon as the count passes the cap — BEFORE a single envelope is queued. Replay exists to reach past a consumer's dedup window, so enqueueing part of one and then erroring is the worst outcome: the receiver gets envelopes the caller was told never shipped, and the natural retry mints a fresh replay id and ships them again.
- */
+/** Refuses as soon as the cap is passed, BEFORE any envelope is queued: no partial ships. */
 async function assertReplayWindowWithinCap({
   events,
   endpoint,
@@ -581,9 +571,7 @@ function handleGatewaySpendApiError(
   };
 }
 
-/**
- * Billing reconciliation REST family, built against one process's security and spend ledger. spend() resolves per request rather than being held, so mounting constructs nothing and the spec generator can build every route with no running process; the plan gate and canonical error mapping are installed as middleware at route declaration, before any request exists.
- */
+/** spend() resolves per request, not held, so mounting constructs nothing at all. */
 export function createGatewaySpendRestApp(options: {
   security: AppRestSecurity;
 
@@ -593,9 +581,7 @@ export function createGatewaySpendRestApp(options: {
    * store, so the application supplies the check.
    */
   billingPlanGate: MiddlewareHandler;
-  /**
-   * Any thrown value as the canonical envelope, in the application's own error taxonomy. The family installs its own onError to log what the caller received, delegating rendering here rather than keeping a second mapping of its own.
-   */
+  /** Renders any thrown value as the canonical envelope; the family's onError only logs it. */
   canonicalError: (
     error: unknown,
     c: Context,

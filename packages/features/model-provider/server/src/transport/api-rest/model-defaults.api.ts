@@ -25,20 +25,12 @@ import {
 
 const logger = createLogger("langwatch:api:model-defaults");
 
-/**
- * The service authorizes each named scope against the key's OWNING USER, so the key's own grants
- * capped nothing: a read-only key minted for CI could repoint the organization's models. The ceiling
- * is checked at the project the credential resolved to; a legacy project key keeps its full access.
- */
+/** Ceiling on the project a key resolved to — the service checks scopes against the owning user. */
 const MODEL_DEFAULTS_WRITE_PERMISSION = "project:manage" as const;
 
 const configIdParamsSchema = z.object({ id: z.string().min(1) });
 
-/**
- * Uniform error mapping for the default-model write handlers: a typed HTTPException (e.g. the 404 orphan-config
- * ownership backstop) and any HandledError (the app's onError serialises those with their own status and code)
- * pass through untouched, any other Error collapses to a 400, and non-Error throwables re-throw as-is.
- */
+/** HTTPException and HandledError pass through untouched; any other Error collapses to a 400. */
 function rethrowModelDefaultsWriteError(err: unknown): never {
   if (err instanceof HTTPException) throw err;
   if (HandledError.isHandled(err)) throw err;
@@ -49,18 +41,12 @@ function rethrowModelDefaultsWriteError(err: unknown): never {
 }
 
 /**
- * REST for /api/model-defaults — CRUD for ModelDefaultConfig rows so CLI /
- * external API users can configure cascading default models without going
- * through the settings UI. Mirrors the tRPC surface over the SAME service, so
- * behaviour stays consistent across the two entrypoints.
+ * REST CRUD for ModelDefaultConfig rows, for CLI/external API users. Mirrors
+ * the tRPC surface over the same service so behaviour stays consistent.
  */
 export function createModelDefaultsRestApp(options: {
   security: AppRestSecurity;
-  /**
-   * Resolved per request, as reading it off the Hono context used to be:
-   * mounting a family must not force its services to be constructed, which is
-   * what lets the OpenAPI spec generator build this app with none.
-   */
+  /** Lazy: mounting a family must not force its services to construct (OpenAPI needs none). */
   modelProviders: () => ModelProviderService;
 }): MountableRestApp {
   const { security, modelProviders } = options;
@@ -116,7 +102,10 @@ export function createModelDefaultsRestApp(options: {
         actorId: userId,
       });
       const id = saved.id;
-      logger.info({ projectId: projectId(c), configId: id, userId }, "Created default-model config");
+      logger.info(
+        { projectId: projectId(c), configId: id, userId },
+        "Created default-model config",
+      );
       return { id };
     } catch (err) {
       rethrowModelDefaultsWriteError(err);
@@ -125,7 +114,8 @@ export function createModelDefaultsRestApp(options: {
 
   const updateHandler = async (
     c: ModelDefaultsContext,
-    input: z.infer<typeof configIdParamsSchema> & z.infer<typeof updateModelDefaultConfigInputSchema>,
+    input: z.infer<typeof configIdParamsSchema> &
+      z.infer<typeof updateModelDefaultConfigInputSchema>,
   ) => {
     const userId = actorId(c);
     try {
@@ -147,7 +137,10 @@ export function createModelDefaultsRestApp(options: {
     }
   };
 
-  const deleteHandler = async (c: ModelDefaultsContext, input: z.infer<typeof configIdParamsSchema>) => {
+  const deleteHandler = async (
+    c: ModelDefaultsContext,
+    input: z.infer<typeof configIdParamsSchema>,
+  ) => {
     const userId = actorId(c);
     try {
       if (!userId) throw new ModelDefaultUserKeyRequiredError();
@@ -164,13 +157,11 @@ export function createModelDefaultsRestApp(options: {
   return (
     service
       .registerRoute("get", "/", MANAGEMENT_API_VERSION, snapshotHandler, (b) =>
-        policy(requires("project:view"))(b)
-          .withOutput(apiResponseModelDefaultsSchema)
-          .withDocs({
-            description:
-              "Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read.",
-            responses: baseResponses,
-          }),
+        policy(requires("project:view"))(b).withOutput(apiResponseModelDefaultsSchema).withDocs({
+          description:
+            "Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read.",
+          responses: baseResponses,
+        }),
       )
       // The canonical service gates every target scope against the KEY OWNER,
       // so the route declares the API-key ceiling on top: without it a

@@ -1,5 +1,7 @@
 /**
- * Virtual keys over tRPC, organization-scoped (every procedure takes organizationId). Authorization is per-scope, not org-wide: create needs virtualKeys:manage on EVERY requested scope, mutating needs the operation's permission on AT LEAST ONE scope the key already lives in — data-dependent, so it happens in the resolver, declared here by name. Visibility is separate: a caller SEES a key when one of its scopes intersects their membership set (a plain member can list without virtualKeys:view); an unseen key answers as nonexistent. The plaintext key is returned by exactly create and rotate, exactly once at mint, never as an audited argument — every other procedure answers the DTO (displayPrefix, no secret material). Transport only: per-scope authorization, DTO projection and budget resolvers are the application's, shared with the public REST door.
+ * Virtual keys over tRPC, organization-scoped. Authorization is per-scope, data-dependent,
+ * so it happens in the resolver. The plaintext key is returned only by create and rotate,
+ * once at mint; every other procedure answers the DTO only.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -27,14 +29,10 @@ import type { GatewayActor, GatewayApp, GatewayVirtualKeyBudgetInput } from "#ap
 
 /** The process supplies authentication; authorization arrives as the policies. */
 export type VirtualKeyTrpcContext = Readonly<{
-  /**
-   * The slice of the process's application this feature reaches, not the feature's application itself — a tRPC root is shared by every mounted feature. The REST family, built per process, holds {@link GatewayApp} directly.
-   */
+  /** The slice of the process's application this feature reaches; the tRPC root is shared. */
   app: Readonly<{ gateway: GatewayApp }>;
   actor(): Readonly<{ id: string }>;
-  /**
-   * The process's authenticated principal, carried straight back into the application's per-scope checks. Opaque on purpose — a principal here is a browser session, and what a session IS belongs to the process's authentication, not this feature; the transport only hands it on.
-   */
+  /** Opaque on purpose: what a session IS belongs to authentication, not this feature. */
   session: GatewayActor;
 }>;
 
@@ -47,9 +45,7 @@ type VirtualKeyTrpcProcedures<
 > = Readonly<{
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  /**
-   * Declaration for a procedure whose scope set is data the resolver loads at runtime, so the resolver performs the real check (records why + which permissions). Applied AFTER this feature's input parser, not composed ahead of it — tRPC appends input middleware at .input()'s call site and runs in add order, so an earlier policy would see input === undefined and the audit row would land with no arguments.
-   */
+  /** For a scope set loaded at runtime. Applied after `.input()`, or it sees no input. */
   resolverAuthorizedPolicy(options: {
     reason: string;
     permissions: readonly AuthzPermission[];
@@ -58,9 +54,7 @@ type VirtualKeyTrpcProcedures<
   validateOutput: boolean;
 }>;
 
-/**
- * The canonical budget parser, taken rather than restated — its decimal regex and positive-amount refinement are the write path's contract and must not drift from a second copy. An argument rather than read off {@link GatewayApp} since a tRPC input parser is fixed when the router is BUILT while the application is per-request; REST reaches the same parser via app.schemas at request time.
- */
+/** Taken, not restated: a tRPC input parser is fixed at BUILD, while the app is per-request. */
 export type VirtualKeyTrpcSchemas = Readonly<{
   virtualKeyBudgetInput: z.ZodType<GatewayVirtualKeyBudgetInput>;
 }>;
@@ -153,9 +147,7 @@ export class VirtualKeyTrpcApi {
               return ctx.app.gateway.toVirtualKeyCamelDto(vk);
             }),
         )
-        /**
-         * Spend per key this calendar month, for keys the caller can see — reads the cost path, the same source the Usage tab reads, so the table number matches the page a click lands on. Keys with their own budget also get its limit + CURRENT-PERIOD spend (a different measurement from the month total, e.g. a daily cap), both in this one batched call so the table never asks per row.
-         */
+        // Reads the same cost path the Usage tab does, so the table matches the linked page.
         .query("spendThisMonth", (p) =>
           p
             .withInput(virtualKeyApiOrganizationInputSchema)
@@ -207,9 +199,7 @@ export class VirtualKeyTrpcApi {
               }));
             }),
         )
-        /**
-         * Every budget that would constrain this key: the "already applies" list under the budget field in create/edit drawers. Takes a draft (picked scopes, no key row yet) so the list is answerable before the key exists.
-         */
+        // Takes a draft (picked scopes, no key row yet) so the list is answerable pre-create.
         .query("applicableBudgets", (p) =>
           p
             .withInput(virtualKeyApiApplicableBudgetsInputSchema)
@@ -222,11 +212,9 @@ export class VirtualKeyTrpcApi {
               RESOLVER_AUTHORIZED,
             )
             .handle(async ({ ctx, input }) => {
-              // Authorization first — this resolver answers budget names, limits,
-              // live spend and (for a principal) their name, so an org id alone
-              // must not be enough. For an existing key, the caller must SEE it,
-              // and resolution binds to STORED ownership; caller-supplied scopes/
-              // destination/principal are ignored, or a visible org-wide key could leak a sibling's data.
+              // For an existing key, the caller must SEE it, and resolution binds to STORED
+              // ownership; caller-supplied scopes/destination/principal are ignored, or an
+              // org-wide key could leak a sibling's data.
               if (input.virtualKeyId) {
                 const vk = await ctx.app.gateway.requireVisibleVirtualKeyForUser({
                   organizationId: input.organizationId,

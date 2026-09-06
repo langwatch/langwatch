@@ -1,7 +1,7 @@
 /**
- * @see ADR-097
- * Spec: specs/ai-gateway/realtime-sessions.feature
- * POST /api/elevenlabs/webhook/:modelProviderId. The gateway's public POST /v1/convai/webhook/{model_provider_id} relays raw bytes here since the per-tenant secret lives in this database (the admin surface, often VPN-only); route and HMAC are transcribed unchanged so existing ElevenLabs configs keep working. A brokered conversation reports nothing over its socket, so this is the only path to billing besides the reconciler. Tenant is the path parameter verified against its own provider row (one HMAC, not a walk; unmatched id 404s so ids can't be probed). Every parsable delivery is acknowledged — not politeness: retries aren't guaranteed (off for HIPAA) and 10+ consecutive failures disable the webhook for every tenant on the endpoint. This is why the webhook is an optimisation, not the billing path: the reconciliation worker re-asks the vendor on a schedule, so a lost delivery costs latency not money, and an unmatched call settles cost-unknown at grace, visibly, until a later report supersedes it.
+ * @see ADR-097; specs/ai-gateway/realtime-sessions.feature
+ * An optimisation, not the billing path: the reconciliation worker re-asks the vendor on a
+ * schedule, so a lost delivery costs latency, not money.
  */
 
 import { publicEndpoint } from "@langwatch/api";
@@ -33,14 +33,10 @@ const WEBHOOK_PUBLIC_REASON =
   "its ElevenLabs-Signature HMAC against the secret stored on the provider " +
   "row the path names.";
 
-/**
- * How far out of date a delivery's own signed timestamp may be — bounding it (30 min, well past any vendor retry) stops a captured delivery from being replayed later; an attacker can't move it without breaking the signature.
- */
+/** 30 min, well past any vendor retry, stops a captured delivery from being replayed later. */
 const SIGNATURE_TOLERANCE_SECONDS = 30 * 60;
 
-/**
- * The one event type this handler acts on. post_call_audio and call_initiation_failure both carry data.conversation_id for the same conversation with no data.metadata, so without this check they'd match the open session and close it at zero.
- */
+/** Other event types share this conversation_id with no metadata, and would close it at zero. */
 const BILLABLE_EVENT_TYPE = "post_call_transcription";
 
 /**
@@ -80,9 +76,7 @@ const postCallSchema = z.object({
     .optional(),
 });
 
-/**
- * Verifies ElevenLabs-Signature: t=<unix>,v0=<hex>. Signed payload is timestamp + dot + raw request bytes, so the body must be read as text and never re-serialized — a JSON round trip reorders keys and the signature stops matching.
- */
+/** Payload is timestamp + dot + raw bytes: never re-serialize, or reordered keys break it. */
 export function verifyElevenLabsSignature(params: {
   rawBody: string;
   header: string | undefined;

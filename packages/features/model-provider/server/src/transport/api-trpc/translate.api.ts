@@ -1,12 +1,6 @@
 /**
- * Machine translation of content a reader is already looking at, over the
- * process's tRPC transport.
- *
- * Owned by model-provider rather than by traces: what the procedure decides is
- * which configured model answers and how a provider failure is reported. The
- * text arrives from the caller; nothing here reads a trace.
- *
- * Transport only: gate, input parsing and delegation to `ModelProviderApp`.
+ * Machine translation over tRPC. Owned by model-provider, not traces: the
+ * procedure only picks a model and reports failures; text comes from the caller.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -23,13 +17,7 @@ const TRANSLATE_FEATURE_KEY = "translate.text";
  */
 const TRANSLATE_TEXT_MAX_CHARS = 100_000;
 
-/**
- * The process supplies authentication; authorization arrives as `policy`.
- *
- * `app` is the slice of the process's application this feature reaches.
- * Translation is the model-provider feature answering, so it arrives through
- * the same {@link ModelProviderApp} the provider and cost surfaces call.
- */
+/** Auth from the process; `app` is the {@link ModelProviderApp} the provider/cost surfaces use. */
 export type TranslateTrpcContext = Readonly<{
   app: Readonly<{ modelProviders: ModelProviderApp }>;
 }>;
@@ -41,15 +29,7 @@ type TranslateTrpcProcedures<
 > = Readonly<{
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  /**
-   * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one declared permission.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
-   */
+  /** Applied after this feature's parser: reads its scope id from validated input. */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
   /** Whether the chain checks every answer against its declared output schema. */
   validateOutput: boolean;
@@ -90,9 +70,8 @@ export class TranslateTrpcApi {
         procedures,
         validateOutput: procedures.validateOutput,
       })
-        // Translation reads content the caller can already see — gate on the
-        // same permission that grants viewing the trace, so read-only members
-        // (VIEWER, demo/public view) aren't shown an action that then 403s.
+        // Gated on trace-view, not a translate-specific permission: read-only members
+        // must not be shown an action that then 403s.
         .mutation("translate", (p) =>
           p
             .withInput(translateInputSchema)
@@ -100,20 +79,14 @@ export class TranslateTrpcApi {
             .withPermission("traces:view")
             .handle(async ({ ctx, input }) => {
               const feature = featureByKey(TRANSLATE_FEATURE_KEY);
-              // A missing registry entry is a build-time mistake in the process
-              // that composed this surface, not a cause a customer can act on, so
-              // it stays an ordinary error and degrades to an unknown failure
-              // carrying a trace id rather than being dressed up as handled.
+              // A missing registry entry is a build-time mistake, not a customer-actionable
+              // cause, so it stays a plain Error and degrades to unknown + trace id.
               if (!feature) {
                 throw new Error(`${TRANSLATE_FEATURE_KEY} feature is not registered`);
               }
 
-              // Any provider/SDK failure during the call surfaces as a typed
-              // AiCallFailedError → "double-check your model configuration" toast
-              // carrying the real (truncated) provider error message. `wrapAiCall`
-              // truncates that message to the first line for the client and logs
-              // the FULL underlying error server-side — the later lines (provider
-              // status bodies, gateway 404 detail) are what prod triage needs.
+              // wrapAiCall truncates the provider error to its first line for the client
+              // and logs the full error server-side, where triage needs it.
               const { translation } = await ports.wrapAiCall(feature, () =>
                 ctx.app.modelProviders.translate({
                   projectId: input.projectId,

@@ -1,15 +1,6 @@
 /**
- * Gateway guardrails over the process's tRPC transport.
- *
- * A guardrail is a project-scoped first-class resource the gateway invokes per
- * direction on inbound and outbound traffic. A virtual key opts in through
- * `config.guardrailAttachments[]`; this is the administrative surface behind
- * /gateway/guardrails.
- *
- * Transport only. The guardrail capability is built over persistence and the
- * evaluator and monitor services, so the feature's application holds it
- * already-built and this transport never sees either service.
- *
+ * Gateway guardrails over tRPC: the administrative surface behind /gateway/guardrails. A
+ * virtual key opts in through `config.guardrailAttachments[]`.
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
 import { createTrpcService } from "@langwatch/api/trpc";
