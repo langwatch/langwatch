@@ -4303,7 +4303,7 @@ Run this more often than you read `/readyz`. The probe reports process state onl
 ---
 title: Credential-leak incident response
 description: What to do when a LangWatch AI Gateway virtual key leaks, from containment to rotation and the audit trail afterwards.
-sidebarTitle: Responding to credential-leaks
+sidebarTitle: Responding to credential leaks
 ---
 
 The gateway gives you three operations on a leaked virtual key: disable, revoke and rotate. They differ in what happens to the old secret and in how fast the change reaches every pod.
@@ -5900,6 +5900,8 @@ Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create 
 
 Tick **Make this the default where it applies** so new keys in that scope pick it up, or attach it per key under **AI Gateway > Virtual Keys**, **Edit**, **Routing**. A key with neither runs in routing mode `none`, and the policy's restrictions never apply to it.
 
+Expand **Restrictions** and add one rule now, so you have something to test at the end. Under **Tools**, put `^shell_.*` in the **Refuse** box. Any request that declares a tool whose name starts with `shell_` is then refused before it reaches a provider.
+
 <Frame caption="The policy drawer: where it applies, the providers in order, and the model tiers.">
   <img src="/images/ai-gateway/routing-policy-editor.png" alt="The New routing policy drawer with the scope, the ordered providers and the model tiers" />
 </Frame>
@@ -5941,7 +5943,20 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 3. Open **AI Gateway > Usage** (`/gateway/usage`) for the request and its cost.
 
-A `200` with an OpenAI-shaped body means the credential and the key resolve. It does not prove the policy applies: check the key's **Routing** section names the policy, then send a request for a model the policy refuses and confirm the answer is `403 policy_violation`. If a request is refused unexpectedly, [Troubleshooting](/ai-gateway/troubleshooting) maps the error codes to their cause.
+A `200` with an OpenAI-shaped body means the credential and the key resolve. It does not prove the policy applies. Check that the key's **Routing** section names the policy, then send a request that declares the tool the policy refuses:
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "model": "openai/gpt-5-mini",
+        "messages": [{"role": "user", "content": "Clean up the build folder"}],
+        "tools": [{"type": "function", "function": {"name": "shell_exec", "parameters": {"type": "object", "properties": {}}}}]
+      }'
+```
+
+The answer is `403` with `"code": "policy_violation"` and the message `tool "shell_exec" is blocked by policy`. If a request is refused unexpectedly, [Troubleshooting](/ai-gateway/troubleshooting) maps the error codes to their cause.
 
 ---
 
@@ -6377,13 +6392,19 @@ The key's own model allowlist is checked against the served model, so a mapping 
 
 ## Provider order
 
-The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model on a provider the policy does not include is refused with `400 model_not_allowed`. A policy rule that blocks the model, or a model outside an allow-only list, is refused with `403 policy_violation` instead. The message names the model, not the policy:
+The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model on a provider the policy does not include is refused with `400 model_not_allowed`, and the message names the policy:
+
+```json
+{"error": {"type": "model_not_allowed", "code": "model_not_allowed", "message": "The \"anthropic\" provider is not available on this key: its routing policy \"EU only\" does not include this provider. Ask the key's owner to add it to the routing policy, or send the request to a provider the policy allows.", "fault": "customer"}}
+```
+
+The key's own provider access can still list that provider; the policy is what refuses it. A provider that the key's provider access drops answers `400 model_not_allowed` too, with a message that points at the key's allowed providers instead of the policy. The code is the same for both; the message is what tells them apart.
+
+A [policy rule](/ai-gateway/policy-rules) under **Restrictions** is a different refusal. A model a rule blocks, or a model outside an allow-only list, answers `403 policy_violation`, and the message names the model, not the policy:
 
 ```json
 {"error": {"type": "policy_violation", "code": "policy_violation", "message": "model \"gemini-2.5-flash\" is not in allowlist", "fault": "customer"}}
 ```
-
-The key's own provider access can still list that provider; the policy is what refuses it.
 
 See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers the move to the next provider.
 
@@ -6401,7 +6422,7 @@ See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers t
 </Frame>
   </Step>
   <Step title="Verify">
-    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider that the key's **Provider access** still lists but that the policy does not, and check for `403` and `"code": "policy_violation"`. A model the key cannot reach at all answers `400 model_not_allowed` instead, which tests the key rather than the policy.
+    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider that the key's **Provider access** still lists but that the policy does not, and check for `400` and `"code": "model_not_allowed"`; the message names the routing policy, which is what tells you the policy refused it rather than the key. To test a **Restrictions** rule instead, send a request that matches one and check for `403` and `"code": "policy_violation"`.
   </Step>
 </Steps>
 

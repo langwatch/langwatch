@@ -59,13 +59,19 @@ The key's own model allowlist is checked against the served model, so a mapping 
 
 ## Provider order
 
-The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model on a provider the policy does not include is refused with `400 model_not_allowed`. A policy rule that blocks the model, or a model outside an allow-only list, is refused with `403 policy_violation` instead. The message names the model, not the policy:
+The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model on a provider the policy does not include is refused with `400 model_not_allowed`, and the message names the policy:
+
+```json
+{"error": {"type": "model_not_allowed", "code": "model_not_allowed", "message": "The \"anthropic\" provider is not available on this key: its routing policy \"EU only\" does not include this provider. Ask the key's owner to add it to the routing policy, or send the request to a provider the policy allows.", "fault": "customer"}}
+```
+
+The key's own provider access can still list that provider; the policy is what refuses it. A provider that the key's provider access drops answers `400 model_not_allowed` too, with a message that points at the key's allowed providers instead of the policy. The code is the same for both; the message is what tells them apart.
+
+A [policy rule](/ai-gateway/policy-rules) under **Restrictions** is a different refusal. A model a rule blocks, or a model outside an allow-only list, answers `403 policy_violation`, and the message names the model, not the policy:
 
 ```json
 {"error": {"type": "policy_violation", "code": "policy_violation", "message": "model \"gemini-2.5-flash\" is not in allowlist", "fault": "customer"}}
 ```
-
-The key's own provider access can still list that provider; the policy is what refuses it.
 
 See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers the move to the next provider.
 
@@ -83,7 +89,7 @@ See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers t
 </Frame>
   </Step>
   <Step title="Verify">
-    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider that the key's **Provider access** still lists but that the policy does not, and check for `403` and `"code": "policy_violation"`. A model the key cannot reach at all answers `400 model_not_allowed` instead, which tests the key rather than the policy.
+    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider that the key's **Provider access** still lists but that the policy does not, and check for `400` and `"code": "model_not_allowed"`; the message names the routing policy, which is what tells you the policy refused it rather than the key. To test a **Restrictions** rule instead, send a request that matches one and check for `403` and `"code": "policy_violation"`.
   </Step>
 </Steps>
 

@@ -50,6 +50,8 @@ Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create 
 
 Tick **Make this the default where it applies** so new keys in that scope pick it up, or attach it per key under **AI Gateway > Virtual Keys**, **Edit**, **Routing**. A key with neither runs in routing mode `none`, and the policy's restrictions never apply to it.
 
+Expand **Restrictions** and add one rule now, so you have something to test at the end. Under **Tools**, put `^shell_.*` in the **Refuse** box. Any request that declares a tool whose name starts with `shell_` is then refused before it reaches a provider.
+
 <Frame caption="The policy drawer: where it applies, the providers in order, and the model tiers.">
   <img src="/images/ai-gateway/routing-policy-editor.png" alt="The New routing policy drawer with the scope, the ordered providers and the model tiers" />
 </Frame>
@@ -91,4 +93,17 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 3. Open **AI Gateway > Usage** (`/gateway/usage`) for the request and its cost.
 
-A `200` with an OpenAI-shaped body means the credential and the key resolve. It does not prove the policy applies: check the key's **Routing** section names the policy, then send a request for a model the policy refuses and confirm the answer is `403 policy_violation`. If a request is refused unexpectedly, [Troubleshooting](/ai-gateway/troubleshooting) maps the error codes to their cause.
+A `200` with an OpenAI-shaped body means the credential and the key resolve. It does not prove the policy applies. Check that the key's **Routing** section names the policy, then send a request that declares the tool the policy refuses:
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "model": "openai/gpt-5-mini",
+        "messages": [{"role": "user", "content": "Clean up the build folder"}],
+        "tools": [{"type": "function", "function": {"name": "shell_exec", "parameters": {"type": "object", "properties": {}}}}]
+      }'
+```
+
+The answer is `403` with `"code": "policy_violation"` and the message `tool "shell_exec" is blocked by policy`. If a request is refused unexpectedly, [Troubleshooting](/ai-gateway/troubleshooting) maps the error codes to their cause.
