@@ -17,16 +17,16 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository";
 import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
+  startMigratedTraceClickHouse,
+  testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support";
 
 const tenantId = `test-tsumm-resolve-${nanoid()}`;
 const presentTraceId = `trace-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
 
-const clickHouseUrl = testClickHouseUrl();
-const integration = describe.skipIf(clickHouseUrl === null);
+const clickHouseConfigured = testClickHouseConfigured();
+const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repo: TraceSummaryClickHouseRepository;
@@ -72,8 +72,8 @@ function makeRow(traceId: string, occurredAtMs: number) {
 }
 
 beforeAll(async () => {
-  if (!clickHouseUrl) return;
-  ch = createTestClickHouseClient(clickHouseUrl);
+  if (!clickHouseConfigured) return;
+  ch = await startMigratedTraceClickHouse();
   repo = TraceSummaryClickHouseRepository.create({
     resolveClient: async () => ch,
     defaultRetentionDays: 30,

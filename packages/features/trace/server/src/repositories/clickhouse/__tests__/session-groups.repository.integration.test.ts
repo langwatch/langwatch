@@ -8,7 +8,7 @@
  * `platform/app/src/server/app-layer/traces/repositories/__tests__/session-groups.clickhouse.repository.integration.test.ts`.
  * `SessionGroupsClickHouseRepository` now lives beside this file, over the
  * production connection this package's other ClickHouse suites already use
- * (`createTestClickHouseClient` / `testClickHouseUrl`) rather than the
+ * (`startMigratedTraceClickHouse` / `testClickHouseConfigured`) rather than the
  * monolith's testcontainers harness. The log fixture is written as a raw
  * `log_records` row rather than through the deleted OTLP canonicaliser —
  * `SessionGroupsClickHouseRepository` reads the table directly and does not
@@ -21,12 +21,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SessionGroupsClickHouseRepository } from "../session-groups.repository";
 import type { SessionGroupsQuery } from "../../session-groups.repository";
 import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
+  startMigratedTraceClickHouse,
+  testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support";
 
-const clickHouseUrl = testClickHouseUrl();
-const integration = describe.skipIf(clickHouseUrl === null);
+const clickHouseConfigured = testClickHouseConfigured();
+const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repository: SessionGroupsClickHouseRepository;
@@ -228,7 +228,7 @@ function query(overrides: Partial<SessionGroupsQuery> = {}): SessionGroupsQuery 
 
 integration("given two sessions with several traces each", () => {
   beforeAll(async () => {
-    ch = createTestClickHouseClient(clickHouseUrl!);
+    ch = await startMigratedTraceClickHouse();
     repository = new SessionGroupsClickHouseRepository(async () => ch);
 
     await insertTraceSummaries([

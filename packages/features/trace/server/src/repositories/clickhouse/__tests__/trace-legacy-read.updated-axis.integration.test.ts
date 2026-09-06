@@ -10,13 +10,13 @@ import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository";
 import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
+  startMigratedTraceClickHouse,
+  testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support";
 import { openProtections } from "./open-protections";
 
-const clickHouseUrl = testClickHouseUrl();
-const integration = describe.skipIf(clickHouseUrl === null);
+const clickHouseConfigured = testClickHouseConfigured();
+const integration = describe.skipIf(!clickHouseConfigured);
 
 const tenantId = `test-updated-axis-${nanoid()}`;
 const now = Date.now();
@@ -138,8 +138,8 @@ function traceIdsOf(result: TracesForProjectResult): string[] {
 
 integration("updated date-axis pagination (integration)", () => {
   beforeAll(async () => {
-    if (clickHouseUrl === null) return;
-    ch = createTestClickHouseClient(clickHouseUrl);
+    if (!clickHouseConfigured) return;
+    ch = await startMigratedTraceClickHouse();
     service = TraceLegacyReadClickHouseRepository.create({
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),

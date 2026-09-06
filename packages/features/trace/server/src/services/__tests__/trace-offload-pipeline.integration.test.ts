@@ -27,7 +27,11 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-vi.mock("@langwatch/observability", () => ({
+// Partial: only the logger is silenced. A full replacement drops the rest of
+// the module (createWarnThrottle among them), which modules pulled in
+// transitively call at import time.
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/observability")>()),
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

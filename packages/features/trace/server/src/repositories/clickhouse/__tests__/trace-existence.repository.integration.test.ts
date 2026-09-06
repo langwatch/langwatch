@@ -13,8 +13,8 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ClickHouseTraceExistenceRepository } from "../trace-existence.repository";
 import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
+  startMigratedTraceClickHouse,
+  testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support";
 
 const tenantId = `test-texist-${nanoid()}`;
@@ -23,8 +23,8 @@ const liveTraceId = `trace-${nanoid()}`;
 const otherTenantTraceId = `trace-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
 
-const clickHouseUrl = testClickHouseUrl();
-const integration = describe.skipIf(clickHouseUrl === null);
+const clickHouseConfigured = testClickHouseConfigured();
+const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repo: ClickHouseTraceExistenceRepository;
@@ -70,8 +70,8 @@ function makeRow(tenant: string, traceId: string, occurredAtMs: number) {
 }
 
 beforeAll(async () => {
-  if (!clickHouseUrl) return;
-  ch = createTestClickHouseClient(clickHouseUrl);
+  if (!clickHouseConfigured) return;
+  ch = await startMigratedTraceClickHouse();
   repo = ClickHouseTraceExistenceRepository.create({
     resolveClient: async () => ch,
   });

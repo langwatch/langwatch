@@ -18,7 +18,7 @@
  * (`../span-storage.repository`); the fixed testcontainer bootstrap it used
  * (`startTestContainers`) went with the monolith, so this uses the shape
  * every other suite in this package uses instead —
- * `createTestClickHouseClient`/`testClickHouseUrl`, skipped when no test
+ * `startMigratedTraceClickHouse`/`testClickHouseConfigured`, skipped when no test
  * ClickHouse is configured. Ported only the "single-trace reads" describe
  * (basic reads, OTel events, and the per-trace event-badge rollups it
  * carries every `@scenario`-tagged case in this file) — the sibling describes
@@ -35,12 +35,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository";
 import { MAX_EVENT_NAMES_PER_TRACE } from "../../span-storage.repository";
 import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
+  startMigratedTraceClickHouse,
+  testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support";
 
-const clickHouseUrl = testClickHouseUrl();
-const integration = describe.skipIf(clickHouseUrl === null);
+const clickHouseConfigured = testClickHouseConfigured();
+const integration = describe.skipIf(!clickHouseConfigured);
 
 const tenantId = `test-span-fetch-${nanoid()}`;
 const traceId = `trace-${nanoid()}`;
@@ -116,8 +116,8 @@ async function insertRows(rows: ReturnType<typeof makeSpanRow>[]) {
 }
 
 beforeAll(async () => {
-  if (clickHouseUrl === null) return;
-  ch = createTestClickHouseClient(clickHouseUrl);
+  if (!clickHouseConfigured) return;
+  ch = await startMigratedTraceClickHouse();
   repo = new SpanStorageClickHouseRepository(async () => ch);
 
   const rows = Array.from({ length: TOTAL_SPANS }, (_, i) => makeSpanRow(i));

@@ -8,12 +8,12 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository";
 import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
+  startMigratedTraceClickHouse,
+  testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support";
 
-const clickHouseUrl = testClickHouseUrl();
-const integration = describe.skipIf(clickHouseUrl === null);
+const clickHouseConfigured = testClickHouseConfigured();
+const integration = describe.skipIf(!clickHouseConfigured);
 
 const tenantId = `test-trace-prefix-${nanoid()}`;
 const otherTenantId = `test-trace-prefix-other-${nanoid()}`;
@@ -75,7 +75,7 @@ let service: TraceLegacyReadClickHouseRepository;
 
 integration("TraceLegacyReadClickHouseRepository.resolveTraceIdByPrefix (integration)", () => {
   beforeAll(async () => {
-    ch = createTestClickHouseClient(clickHouseUrl!);
+    ch = await startMigratedTraceClickHouse();
     service = TraceLegacyReadClickHouseRepository.create({
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),

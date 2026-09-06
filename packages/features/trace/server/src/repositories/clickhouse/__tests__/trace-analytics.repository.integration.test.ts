@@ -19,12 +19,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { TraceAnalyticsRow } from "@langwatch/trace-server";
 import { TraceAnalyticsClickHouseRepository } from "../trace-analytics.repository";
 import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
+  startMigratedTraceClickHouse,
+  testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support";
 
-const clickHouseUrl = testClickHouseUrl();
-const integration = describe.skipIf(clickHouseUrl === null);
+const clickHouseConfigured = testClickHouseConfigured();
+const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repo: TraceAnalyticsClickHouseRepository;
@@ -86,8 +86,8 @@ function traceRow(over: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
 }
 
 beforeAll(async () => {
-  if (!clickHouseUrl) return;
-  ch = createTestClickHouseClient(clickHouseUrl);
+  if (!clickHouseConfigured) return;
+  ch = await startMigratedTraceClickHouse();
   repo = TraceAnalyticsClickHouseRepository.create({
     resolveClient: async () => ch,
     defaultRetentionDays: 30,

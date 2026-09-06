@@ -10,12 +10,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceQueryClickHouseAdapter } from "../../../adapters/trace-query.clickhouse.adapter";
 import { TraceListClickHouseRepository } from "../trace-list.repository";
 import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
+  startMigratedTraceClickHouse,
+  testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support";
 
-const clickHouseUrl = testClickHouseUrl();
-const integration = describe.skipIf(clickHouseUrl === null);
+const clickHouseConfigured = testClickHouseConfigured();
+const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repo: TraceListClickHouseRepository;
@@ -109,8 +109,8 @@ integration("TraceListClickHouseRepository filtering across row versions", () =>
     });
 
   beforeAll(async () => {
-    if (!clickHouseUrl) return;
-    ch = createTestClickHouseClient(clickHouseUrl);
+    if (!clickHouseConfigured) return;
+    ch = await startMigratedTraceClickHouse();
     repo = TraceListClickHouseRepository.create(async () => ch);
 
     // Two versions of one trace, written as two parts so no merge collapses
