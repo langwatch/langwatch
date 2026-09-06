@@ -49,6 +49,8 @@ export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   queuePayloads?: QueuePayloadDecoderPort | undefined;
   users: UserService;
   auth: AuthService;
+  /** True once the connection projection decides sign-in (`SSOCONN_ROUTING=enforce`). */
+  legacySsoStringWritesRetired?: boolean | undefined;
   scheduler: {
     repository: SchedulerOpsRepository;
     wake: SchedulerWakePort;
@@ -91,6 +93,7 @@ export class PostgresOpsAdapter {
         users: this.options.users,
         auth: this.options.auth,
         audit: this.options.audit,
+        legacySsoStringWritesRetired: this.options.legacySsoStringWritesRetired,
       }),
       blobStore: BlobStoreService.create(
         this.options.redis

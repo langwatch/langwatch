@@ -180,6 +180,12 @@ function refusingOps<T>(): T {
 function composeOps(options: OpsFeatureCollaborators, logger: Logger): OpsApp {
   const operations = PostgresOpsAdapter.create({
     adminEmails: options.adminEmails,
+    // Once the connection projection decides sign-in, editing the legacy
+    // `ssoDomain`/`ssoProvider` strings changes nothing a person experiences,
+    // so the backoffice refuses rather than accepting a no-op (ADR-117 §5).
+    // The flip is one value in one place, which is what makes it reversible in
+    // a hurry.
+    legacySsoStringWritesRetired: process.env.SSOCONN_ROUTING === "enforce",
     database: options.prisma,
     audit: new ApiOpsAuditSink(options.audit, logger),
     users: options.users,

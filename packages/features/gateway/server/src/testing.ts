@@ -3,3 +3,7 @@
  */
 export { GatewayUsageService } from "./services/gateway-usage.service";
 export { PostgresVirtualKeyAdapter } from "./adapters/postgres.virtual-key.adapter";
+/** The complete Project contract fake the budget suites compose against; named
+ *  here so a suite in another package composes the same one rather than
+ *  carrying a second copy of thirty stub methods. */
+export { TestProjectService } from "./__tests__/support/test-project-service";

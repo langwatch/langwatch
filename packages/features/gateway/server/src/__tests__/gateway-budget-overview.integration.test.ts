@@ -71,18 +71,24 @@ class SuiteProjectService extends TestProjectService {
   }: {
     projectIds: string[];
   }): ReturnType<ProjectService["listNamesByIds"]> {
-    return await prisma.project.findMany({
+    const rows = await prisma.project.findMany({
       where: { id: { in: projectIds } },
       select: {
         id: true,
         name: true,
         slug: true,
         teamId: true,
-        organizationId: true,
         isPersonal: true,
         ownerUserId: true,
+        team: { select: { organizationId: true } },
       },
     });
+
+    // A project carries its organization through its team, not on its own row.
+    return rows.map(({ team, ...project }) => ({
+      ...project,
+      organizationId: team.organizationId,
+    }));
   }
 }
 
@@ -277,6 +283,40 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
       // over the same two reads.
       expect(Number(onOverview!.spentUsd)).toBeCloseTo(3.3, 6);
       expect(Number(detail!.spentUsd)).toBeCloseTo(3.3, 6);
+    });
+  });
+
+  describe("given the same seeded budget read through every surface", () => {
+    /** @scenario "Every surface reports the same spend for the same budget" */
+    it("the member overview, the budget's own overview read and the budget detail agree on spentUsd", async () => {
+      const service = overviewService();
+      const overview = await service.overviewForUser({
+        organizationId: ORG_ID,
+        userId: USER_ID,
+      });
+      const onOverview = overview.budgets.find((b) => b.id === BUDGET_ORG_ID);
+      expect(onOverview).toBeDefined();
+
+      const perBudget = await service.tryOverviewForBudget({
+        organizationId: ORG_ID,
+        budgetId: BUDGET_ORG_ID,
+      });
+      expect(perBudget).not.toBeNull();
+
+      const detail = await budgetDecisions.tryGetDetail({
+        id: BUDGET_ORG_ID,
+        organizationId: ORG_ID,
+      });
+      expect(detail).not.toBeNull();
+
+      // The property the initiative exists for: one number, everywhere. /me
+      // and the CLI endpoint are transports over `overviewForUser`; the
+      // budgets settings read is a transport over `tryGetDetail`, a different
+      // query against the same ledger.
+      expect(Number(onOverview!.spentUsd)).toBeCloseTo(2.43, 6);
+      expect(Number(perBudget!.spentUsd)).toBeCloseTo(Number(onOverview!.spentUsd), 6);
+      expect(Number(detail!.budget.spentUsd)).toBeCloseTo(Number(onOverview!.spentUsd), 6);
+      expect(perBudget!.scopePhrase).toBe(onOverview!.scopePhrase);
     });
   });
 

@@ -131,9 +131,23 @@ export function parseRoutingTable(env: Record<string, string | undefined>): Rout
   return { routes, skipped, ambiguous };
 }
 
+/**
+ * The answer for a tenant that belongs to no organisation because it is not
+ * that kind of thing. A user aggregate records how somebody signs in, which is
+ * true of them before, across and after every organisation they belong to, so
+ * membership must not decide where it lands - picking one of several would put
+ * their identity history on an instance chosen by accident. Such a tenant is
+ * placed on the shared instance and nothing is looked up to get there.
+ */
+export const PLATFORM_TENANT = "__platform__" as const;
+
 /** Resolves a tenant to its organisation. Backed by the control-plane database. */
 export interface TenantDirectory {
-  /** Null means "no such tenant", which is an error, never a shared fallback. */
+  /**
+   * The organisation this tenant routes by, or `PLATFORM_TENANT` for one that
+   * is platform-level. Null means "no such tenant", which is an error, never a
+   * shared fallback.
+   */
   organizationForTenant(tenantId: string): Promise<string | null>;
 }
 
@@ -215,6 +229,7 @@ export function createTenantRouter({
       if (tenantId === "") throw new UnknownTenantError(tenantId);
 
       const organizationId = await organizationFor(tenantId);
+      if (organizationId === PLATFORM_TENANT) return { kind: "shared" };
       const url = table.routes.get(organizationId);
       return url === undefined ? { kind: "shared" } : { kind: "private", organizationId, url };
     },

@@ -104,6 +104,7 @@ export type {
 export {
   createTenantRouter,
   DuplicateRouteError,
+  PLATFORM_TENANT,
   PRIVATE_ROUTE_ENV_PREFIX,
   parseRoutingTable,
   UnknownTenantError,

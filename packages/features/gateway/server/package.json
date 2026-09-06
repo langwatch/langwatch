@@ -108,6 +108,8 @@
   },
   "devDependencies": {
     "@clickhouse/client": "^1.23.0",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@types/jsonwebtoken": "^9.0.7",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"

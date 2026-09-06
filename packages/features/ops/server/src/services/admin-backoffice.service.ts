@@ -7,6 +7,8 @@ import {
 } from "@langwatch/ops-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import type { UserService } from "@langwatch/user-contract";
+import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
+import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules";
 import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository";
 import type { AdminAuditSink } from "./impersonation.service";
 
@@ -17,6 +19,8 @@ export interface AdminBackofficeServiceOptions {
   users: UserService;
   auth: AuthService;
   audit: AdminAuditSink;
+  /** True once the connection projection decides sign-in (`SSOCONN_ROUTING=enforce`). */
+  legacySsoStringWritesRetired?: boolean | undefined;
 }
 
 /** Ops-owned application service for the legacy react-admin wire surface. */
@@ -26,6 +30,7 @@ export class AdminBackofficeService {
     private readonly users: UserService,
     private readonly auth: AuthService,
     private readonly audit: AdminAuditSink,
+    private readonly legacySsoStringWritesRetired: boolean,
   ) {}
 
   static create(options: AdminBackofficeServiceOptions): AdminBackofficeService {
@@ -34,6 +39,7 @@ export class AdminBackofficeService {
       options.users,
       options.auth,
       options.audit,
+      options.legacySsoStringWritesRetired ?? false,
     );
   }
 
@@ -144,6 +150,15 @@ export class AdminBackofficeService {
     }
 
     const data = { ...input.params.data };
+    const retiredColumns = legacySsoStringWritesToRefuse({
+      data,
+      retired: this.legacySsoStringWritesRetired,
+    });
+    if (retiredColumns.length > 0) {
+      throw new SsoConnectionStringEditRetiredError(
+        `legacy sso columns are derived: ${retiredColumns.join(", ")}`,
+      );
+    }
     if (typeof data.ssoDomain === "string" && data.ssoDomain.trim() !== "") {
       data.ssoDomain = data.ssoDomain.trim().toLowerCase();
     }

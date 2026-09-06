@@ -394,6 +394,7 @@ describe("WorkerProductionComposition", () => {
      * the App and the worker fail the same misconfiguration identically.
      */
     /** @scenario "A SaaS worker refuses to compose without the credential its reports are sent with" */
+    /** @scenario "A SaaS worker refuses to meter without a pipeline to report through" */
     it("refuses to compose a SaaS graph with no Stripe secret to report through", () => {
       expect(() => compositionFor({ IS_SAAS: "true" })).toThrow(/Stripe secret key is required/);
     });

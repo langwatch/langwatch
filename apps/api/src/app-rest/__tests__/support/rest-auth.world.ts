@@ -13,7 +13,7 @@ import type {
   OrganizationApiKeyResolution,
   ResolvedApiKeyToken,
 } from "@langwatch/api-key-contract";
-import type { AppRestSecurity } from "@langwatch/api/rest";
+import type { AppRestSecurity, IdempotentRunner } from "@langwatch/api/rest";
 import {
   builtinRoleGrants,
   permissionSatisfiedBy,
@@ -165,14 +165,19 @@ export class RestAuthWorld {
     return { authorization: `Bearer ${token}` };
   }
 
-  /** The process's real REST enforcement, composed over this world. */
-  security(): AppRestSecurity {
+  /**
+   * The process's real REST enforcement, composed over this world. A suite
+   * about a keyed create passes the receipt ledger its process composed;
+   * without one, a family declaring `withIdempotency(...)` refuses to build.
+   */
+  security(options: { idempotency?: IdempotentRunner } = {}): AppRestSecurity {
     return ApiRestSecurity.create({
       apiKeys: this.apiKeyService(),
       authz: this.authzService(),
       organizations: this.organizationService(),
       observability: ApiRestObservabilityComposition.create(),
       logger: { error: () => {} },
+      ...(options.idempotency ? { idempotency: options.idempotency } : {}),
     });
   }
 

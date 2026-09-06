@@ -1,3 +1,4 @@
+import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
 import { startWorkerMetricsServer } from "../platform/liveness/worker-metrics.server";
 import { WorkerClickHouseInfrastructure } from "../platform/infrastructure/worker-clickhouse.infrastructure";
@@ -41,17 +42,30 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
     const clickhouse = WorkerClickHouseInfrastructure.create({
       resources,
       clickhouse: config.infrastructure.clickhouse,
-      // The routing directory: which organization a project belongs to. It is
-      // read through the same client every other repository uses, so a project
-      // that moves organizations is routed to its new endpoint on the next
-      // resolution rather than on the next deploy.
+      // The routing directory, over the three kinds of tenant the event store
+      // carries: a project names its owner, an organization names itself, and
+      // a user is platform-level, so no membership is consulted. Read through
+      // the same client every repository uses, so a project that moves
+      // organizations routes to its new endpoint on the next resolution.
       directory: {
         organizationForTenant: async (tenantId: string) => {
           const project = await database.connection.client.project.findUnique({
             where: { id: tenantId },
             select: { team: { select: { organizationId: true } } },
           });
-          return project?.team?.organizationId ?? null;
+          if (project?.team?.organizationId) return project.team.organizationId;
+
+          const organization = await database.connection.client.organization.findUnique({
+            where: { id: tenantId },
+            select: { id: true },
+          });
+          if (organization) return organization.id;
+
+          const user = await database.connection.client.user.findUnique({
+            where: { id: tenantId },
+            select: { id: true },
+          });
+          return user ? PLATFORM_TENANT : null;
         },
       },
     });
