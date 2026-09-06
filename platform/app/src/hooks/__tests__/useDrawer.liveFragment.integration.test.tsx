@@ -1,0 +1,137 @@
+/**
+ * @vitest-environment jsdom
+ */
+
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  clearDrawerStack,
+  clearFlowCallbacks,
+  useDrawer,
+  useUpdateDrawerParams,
+} from "../useDrawer";
+
+const mockPush = vi.fn();
+const mockReplace = vi.fn();
+
+/**
+ * The hash React Router still believes the page is on. The traces bar state
+ * moves the real fragment with a raw `history.replaceState`, which the router
+ * never observes, so its copy lags behind from the first filter edit onwards.
+ */
+let staleRouterHash = "";
+let routerQuery: Record<string, string> = {};
+
+vi.mock("~/utils/compat/next-router", () => ({
+  useRouter: () => ({
+    query: routerQuery,
+    pathname: "/acme/traces",
+    asPath:
+      "/acme/traces" +
+      (Object.keys(routerQuery).length > 0
+        ? "?" + new URLSearchParams(routerQuery).toString()
+        : "") +
+      staleRouterHash,
+    push: mockPush,
+    replace: mockReplace,
+  }),
+}));
+
+describe("useDrawer URL fragment", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    routerQuery = {};
+    staleRouterHash = "";
+    window.history.replaceState({}, "", "/acme/traces");
+    clearDrawerStack();
+    clearFlowCallbacks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  describe("given the traces page moved the fragment behind React Router's back", () => {
+    beforeEach(() => {
+      // What the user did: opened the Conversations lens (a router
+      // navigation, so the router saw it), then narrowed the window to 24
+      // hours (a raw replaceState, so it did not).
+      staleRouterHash = "#conversations";
+      window.history.replaceState(
+        {},
+        "",
+        "/acme/traces#conversations?preset=24h",
+      );
+    });
+
+    describe("when a drawer is opened", () => {
+      it("republishes the fragment the browser is actually on", () => {
+        const { result } = renderHook(() => useDrawer());
+
+        act(() => {
+          result.current.openDrawer("traceV2Details", { traceId: "trace-1" });
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        expect(pushed).toContain("drawer.open=traceV2Details");
+        expect(pushed).toContain("#conversations?preset=24h");
+      });
+    });
+
+    describe("when the drawer is closed", () => {
+      it("republishes the fragment the browser is actually on", () => {
+        const { result } = renderHook(() => useDrawer());
+
+        act(() => {
+          result.current.closeDrawer();
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        expect(pushed).toContain("#conversations?preset=24h");
+      });
+    });
+
+    describe("when drawer params are updated", () => {
+      it("republishes the fragment the browser is actually on", () => {
+        const { result } = renderHook(() => useUpdateDrawerParams());
+
+        act(() => {
+          result.current({ mode: "conversation" });
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        expect(pushed).toContain("#conversations?preset=24h");
+      });
+    });
+  });
+
+  describe("given the browser and the router agree on the fragment", () => {
+    it("keeps that fragment", () => {
+      staleRouterHash = "#conversations";
+      window.history.replaceState({}, "", "/acme/traces#conversations");
+      const { result } = renderHook(() => useDrawer());
+
+      act(() => {
+        result.current.openDrawer("traceV2Details", { traceId: "trace-1" });
+      });
+
+      const pushed = mockPush.mock.calls[0]?.[0] as string;
+      expect(pushed).toContain("#conversations");
+      expect(pushed).not.toContain("preset");
+    });
+  });
+
+  describe("given no fragment at all", () => {
+    it("pushes a URL without one", () => {
+      const { result } = renderHook(() => useDrawer());
+
+      act(() => {
+        result.current.openDrawer("traceV2Details", { traceId: "trace-1" });
+      });
+
+      const pushed = mockPush.mock.calls[0]?.[0] as string;
+      expect(pushed).not.toContain("#");
+    });
+  });
+});
