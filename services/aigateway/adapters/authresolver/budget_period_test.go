@@ -138,7 +138,13 @@ func TestResolve_BudgetPeriodRunning_DoesNotForceRefresh(t *testing.T) {
 	svc := newBudgetService(t, fetcher)
 
 	rawKey := "vk-lw-budget-running"
-	seedBudgetEntry(t, svc, rawKey, time.Now().Add(1*time.Hour), "42")
+	e := seedBudgetEntry(t, svc, rawKey, time.Now().Add(1*time.Hour), "42")
+
+	// The claim is that the boundary alone triggers nothing, so the other half
+	// of the staleness check has to be out of the way: assert the config is
+	// inside its TTL rather than assume it.
+	require.False(t, e.configStale(60*time.Second),
+		"the entry must start fresh, or this proves nothing about the boundary")
 
 	got, err := svc.Resolve(context.Background(), rawKey)
 	require.NoError(t, err)
