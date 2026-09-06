@@ -19,6 +19,7 @@ import prompts from "prompts";
 import type { WorkspaceInfo } from "../../../agent/local-control-protocol";
 import { buildAuthHeaders } from "../../../internal/api/auth";
 import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
+import { langwatchFetch } from "../../../internal/http/langwatchFetch";
 import { resolveCredentials } from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
 import {
@@ -186,7 +187,7 @@ export function createControlApi({
   endpoint,
   apiKey,
   projectId,
-  fetchImpl = fetch,
+  fetchImpl = langwatchFetch,
 }: {
   endpoint: string;
   apiKey: string;
