@@ -18,6 +18,7 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { runtimePresence } from "~/server/connected-agents/presence.read";
 import { resolveConnectedTarget } from "~/server/scenarios/connected-target.service";
 import { ScenarioReservedSetIdError } from "~/server/scenarios/errors";
 import {
@@ -322,6 +323,7 @@ export async function launchScenarioRun({
     projectId,
     target: requestedTarget,
     actor,
+    presence: runtimePresence,
   });
   const { parameters, secretParameters, scenarioVersion } =
     await resolveParametersForRun({

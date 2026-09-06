@@ -112,8 +112,9 @@ export function describeScope(scope: RunPlanScope | null | undefined): string {
 
 /**
  * The target types a run may go against. A `connected` target names an
- * agent by id, or by `<name>@<environment>`; the platform resolves the
- * second form, so it is passed through as the reference id.
+ * agent by `<name>` (the agent in development, or the one other environment
+ * it is online in), by `<name>@<environment>`, or by id; the platform
+ * resolves the names, so they are passed through as the reference id.
  */
 const TARGET_TYPES = [
   "prompt",
@@ -218,7 +219,7 @@ export function parseTargets(
   if (!targetStrings || targetStrings.length === 0) {
     console.error(
       chalk.red(
-        "Error: --target is required. Give at least one, as <type>:<referenceId> (for example connected:agent_abc123 or connected:support-agent@production).",
+        "Error: --target is required. Give at least one, as <type>:<referenceId> (for example connected:support-agent, connected:support-agent@production or connected:agent_abc123).",
       ),
     );
     process.exit(1);
@@ -229,7 +230,7 @@ export function parseTargets(
     if (colonIndex === -1) {
       console.error(
         chalk.red(
-          `Error: invalid target "${value}". Use <type>:<referenceId>, for example connected:agent_abc123 or connected:support-agent@production.`,
+          `Error: invalid target "${value}". Use <type>:<referenceId>, for example connected:support-agent, connected:support-agent@production or connected:agent_abc123.`,
         ),
       );
       process.exit(1);
@@ -272,6 +273,48 @@ export function parseTargets(
       runParameters: parseTargetParameters({ query, target: value }),
     };
   });
+}
+
+/** How long `--wait` polls when no number of minutes is given. */
+export const DEFAULT_WAIT_MINUTES = 45;
+
+/** What `--wait` asked for. */
+export interface WaitOptions {
+  /** How long the poll runs before it gives up. */
+  timeoutMs: number;
+}
+
+/**
+ * Reads the `--wait [minutes]` flag.
+ *
+ * A bare `--wait` polls for 45 minutes, which covers a suite of slow agents
+ * with repeats; a number of minutes replaces that limit. Anything else is
+ * refused before the run is scheduled, so a typo does not start a batch the
+ * command then never waits for.
+ *
+ * @see specs/features/run-plan-cli.feature
+ */
+export function parseWait(
+  value: boolean | string | undefined,
+): WaitOptions | undefined {
+  if (value === undefined || value === false) return undefined;
+  if (value === true) return { timeoutMs: DEFAULT_WAIT_MINUTES * 60 * 1000 };
+  const minutes = Number(value);
+  const timeoutMs = minutes * 60 * 1000;
+  if (
+    value.trim() === "" ||
+    !Number.isFinite(minutes) ||
+    minutes <= 0 ||
+    !Number.isFinite(timeoutMs)
+  ) {
+    console.error(
+      chalk.red(
+        `Error: --wait takes a number of minutes, such as --wait 90, not "${value}".`,
+      ),
+    );
+    process.exit(1);
+  }
+  return { timeoutMs };
 }
 
 /**

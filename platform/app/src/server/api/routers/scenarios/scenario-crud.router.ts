@@ -8,6 +8,7 @@ import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
+import { scenarioFieldValuesSchema } from "~/server/scenarios/suite-fields";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { projectSchema } from "./schemas";
 
@@ -28,6 +29,7 @@ const createScenarioSchema = projectSchema.extend({
   // Turn config (ADR-015); null clears back to SDK default.
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  fields: scenarioFieldValuesSchema.optional(),
   // The test suite this scenario is filed in; absent or null files it into Default.
   testSuiteId: z.string().nullish(),
 });
@@ -43,6 +45,8 @@ const updateScenarioSchema = projectSchema.extend({
   parameters: scenarioParameterDefinitionsSchema.optional(),
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  // Sent, this replaces the whole record; an empty record clears every value.
+  fields: scenarioFieldValuesSchema.optional(),
   // Absent = keep the current test suite; null = unfile; a test suite id = move.
   testSuiteId: z.string().nullish(),
   // The version the editor loaded. When sent, a save against any other

@@ -122,6 +122,75 @@
 			"supportsImageOutput": false,
 			"supportsAudioOutput": true
 		},
+		"openai/gpt-image-2": {
+			"id": "openai/gpt-image-2",
+			"name": "OpenAI: GPT Image 2",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 5e-6,
+				"outputCostPerToken": 0,
+				"inputCacheReadPerToken": 1.25e-6,
+				"imageCostPerToken": 8e-6,
+				"imageOutputCostPerToken": 3e-5
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->image",
+			"mode": "image",
+			"description": "OpenAI image generation and editing. Priced per token in three buckets from OpenAI's pricing page: text input $5, image input $8 and image output $30 per million tokens; a 1024x1024 image is about 1600 output image tokens.",
+			"supportsImageInput": true,
+			"supportsAudioInput": false,
+			"supportsImageOutput": true,
+			"supportsAudioOutput": false
+		},
+		"openai/gpt-image-1": {
+			"id": "openai/gpt-image-1",
+			"name": "OpenAI: GPT Image 1",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 5e-6,
+				"outputCostPerToken": 0,
+				"inputCacheReadPerToken": 1.25e-6,
+				"imageCostPerToken": 1e-5,
+				"imageOutputCostPerToken": 4e-5
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->image",
+			"mode": "image",
+			"description": "OpenAI image generation and editing. Priced per token in three buckets from OpenAI's pricing page: text input $5, image input $10 and image output $40 per million tokens; a 1024x1024 image is about 1600 output image tokens.",
+			"supportsImageInput": true,
+			"supportsAudioInput": false,
+			"supportsImageOutput": true,
+			"supportsAudioOutput": false
+		},
+		"openai/gpt-image-1-mini": {
+			"id": "openai/gpt-image-1-mini",
+			"name": "OpenAI: GPT Image 1 mini",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 2e-6,
+				"outputCostPerToken": 0,
+				"inputCacheReadPerToken": 2e-7,
+				"imageCostPerToken": 2.5e-6,
+				"imageOutputCostPerToken": 8e-6
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->image",
+			"mode": "image",
+			"description": "OpenAI image generation and editing on the smaller engine. Priced per token in three buckets from OpenAI's pricing page: text input $2, image input $2.50 and image output $8 per million tokens.",
+			"supportsImageInput": true,
+			"supportsAudioInput": false,
+			"supportsImageOutput": true,
+			"supportsAudioOutput": false
+		},
 		"openai/gpt-4o-transcribe": {
 			"id": "openai/gpt-4o-transcribe",
 			"name": "OpenAI: GPT-4o Transcribe",

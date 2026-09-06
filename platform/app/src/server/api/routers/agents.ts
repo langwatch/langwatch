@@ -9,6 +9,7 @@ import {
   agentPresenceView,
   readAgentPresence,
 } from "~/server/connected-agents/presence.read";
+import type { ConnectedAgentSelectability } from "~/server/connected-agents/selectable";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import {
   type AgentComponentConfig,
@@ -40,17 +41,20 @@ async function withConnectedAgentViews<T extends AgentWithFields>({
   agents,
   projectId,
   agentService,
+  viewerUserId,
 }: {
   agents: T[];
   projectId: string;
   agentService: AgentService;
+  /** The person reading, so each row says whether they can choose it. */
+  viewerUserId: string | null;
 }): Promise<
   (T & {
     parameters: ScenarioParameterDefinition[];
     owner: { userId: string; name: string | null } | null;
     status: AgentPresenceStatus;
     instances: AgentInstanceView[];
-  })[]
+  } & ConnectedAgentSelectability)[]
 > {
   const [owners, presence] = await Promise.all([
     agentService.ownersOf(agents),
@@ -59,7 +63,7 @@ async function withConnectedAgentViews<T extends AgentWithFields>({
   return agents.map((agent) => ({
     ...agent,
     parameters: declaredAgentParameters(agent),
-    ...agentPresenceView({ agent, owners, presence }),
+    ...agentPresenceView({ agent, owners, presence, viewerUserId }),
   }));
 }
 
@@ -89,6 +93,7 @@ export const agentsRouter = createTRPCRouter({
         agents,
         projectId: input.projectId,
         agentService,
+        viewerUserId: ctx.session.user.id,
       });
     }),
 
@@ -110,6 +115,7 @@ export const agentsRouter = createTRPCRouter({
         agents: [agent],
         projectId: input.projectId,
         agentService,
+        viewerUserId: ctx.session.user.id,
       });
       return view ?? null;
     }),

@@ -13,8 +13,9 @@
 import { Box, Button, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
 import { LuArrowLeft } from "react-icons/lu";
 
-import { CopyButton } from "~/components/CopyButton";
+import { RenderCode } from "~/components/code/RenderCode";
 import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
+import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import {
@@ -96,6 +97,10 @@ function SnippetTabs({
 }: {
   snippets: Record<(typeof SNIPPET_LANGUAGES)[number], string>;
 }) {
+  // The theme is unresolved for the first render, before the theme provider
+  // mounts, and that render paints light rather than a dark block that flips.
+  const { colorMode } = useColorMode();
+  const codeColorMode = colorMode === "dark" ? "dark" : "light";
   return (
     // Without a colorPalette the line variant paints the selected trigger
     // with the default palette's fg, which reads fainter than the unselected
@@ -118,9 +123,14 @@ function SnippetTabs({
           <VStack align="stretch" gap={2}>
             <CodeBlock
               code={INSTALL_COMMANDS[language]}
-              label="Install command"
+              language="bash"
+              colorMode={codeColorMode}
             />
-            <CodeBlock code={snippets[language]} label="Snippet" />
+            <CodeBlock
+              code={snippets[language]}
+              language={language}
+              colorMode={codeColorMode}
+            />
           </VStack>
         </Tabs.Content>
       ))}
@@ -128,28 +138,39 @@ function SnippetTabs({
   );
 }
 
-function CodeBlock({ code, label }: { code: string; label: string }) {
+/**
+ * A highlighted block that follows the app color mode. Long lines keep their
+ * width and scroll sideways, so the code the reader copies is the code shown.
+ */
+function CodeBlock({
+  code,
+  language,
+  colorMode,
+}: {
+  code: string;
+  language: string;
+  colorMode: "light" | "dark";
+}) {
   return (
-    <HStack
-      align="start"
-      gap={2}
-      background="bg.muted"
+    <Box
       borderRadius="md"
-      paddingX={3}
-      paddingY={2}
+      borderWidth="1px"
+      borderColor="border"
+      overflow="hidden"
+      width="full"
+      // The GitHub themes Shiki paints with, so the padding around the
+      // <pre> is the same color as the code itself.
+      background={colorMode === "dark" ? "#24292e" : "#ffffff"}
+      data-testid={`connect-code-${language}`}
     >
-      <Box
-        as="pre"
-        flex={1}
-        overflowX="auto"
-        fontFamily="mono"
-        fontSize="12px"
-        whiteSpace="pre"
-      >
-        {code}
-      </Box>
-      <CopyButton value={code} label={label} />
-    </HStack>
+      <RenderCode
+        code={code}
+        language={language}
+        colorMode={colorMode}
+        wrap={false}
+        style={{ width: "100%", fontSize: "12px", padding: "12px" }}
+      />
+    </Box>
   );
 }
 

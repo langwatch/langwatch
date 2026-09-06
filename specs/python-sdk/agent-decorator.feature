@@ -124,6 +124,13 @@ Feature: Python SDK connect_agent decorator
     When the scenario library calls .call(input) with messages, new_messages and thread_id
     Then the function runs with those turn fields and the reply is returned
 
+  @unit
+  Scenario: The decorated function is accepted as the agent under test
+    Given a decorated function passed to scenario.run as the agent under test
+    When the scenario executor picks the agent for the agent role
+    Then it finds the decorated function under that role
+    And the role is resolved without importing the scenario package at module load
+
   # --- Run parameters from the signature ---
 
   @unit
@@ -319,6 +326,12 @@ Feature: Python SDK connect_agent decorator
     Given a call in flight
     When a cancel frame with its call id arrives
     Then the function is cancelled and no result is sent for it
+
+  @unit
+  Scenario: A connected agent takes ten calls at once unless told otherwise
+    Given a decorated function with no concurrency argument
+    Then it registers with ten calls at once, in every environment
+    And a concurrency argument replaces that number
 
   @unit
   Scenario: A call past the concurrency limit answers agent_busy

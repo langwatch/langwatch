@@ -28,6 +28,12 @@ export type RunPlanRunBody = NonNullable<
 /** The configuration half of a run request. */
 export type RunPlanConfig = RunPlanRunBody["config"];
 
+/**
+ * One evaluator a plan runs beside the ones its test suites attach. It reads
+ * the conversation and the trace, never a scenario field.
+ */
+export type RunPlanEvaluator = NonNullable<RunPlanConfig["evaluators"]>[number];
+
 /** What a scheduled run answers with. */
 export type RunPlanRunResult =
   paths["/api/v1/run-plans/run"]["post"]["responses"]["200"]["content"]["application/json"];

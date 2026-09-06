@@ -40,6 +40,8 @@ export function RunDialogFooter({
   caseCount,
   targetCount,
   blockedReason,
+  warning,
+  onRun,
   onClose,
 }: {
   controller: RunDialogController;
@@ -50,6 +52,13 @@ export function RunDialogFooter({
   targetCount: number;
   /** Why the run cannot start, when it cannot. Shown as the button tooltip. */
   blockedReason: string | null;
+  /**
+   * What Run does first instead of running, when something holds it: the
+   * button stays enabled and says so over the pointer.
+   */
+  warning?: string | null;
+  /** What Run does. Defaults to queueing the run. */
+  onRun?: () => void;
   onClose: () => void;
 }) {
   const runButton = (
@@ -58,8 +67,9 @@ export function RunDialogFooter({
       colorPalette="blue"
       disabled={isRunBlocked}
       loading={controller.isBusy}
-      onClick={() => void controller.run()}
+      onClick={onRun ?? (() => void controller.run())}
       data-testid="run-dialog-run"
+      data-warning={warning ?? undefined}
     >
       <Play size={13} />
       {runButtonLabel({ caseCount, targetCount })}
@@ -96,6 +106,12 @@ export function RunDialogFooter({
           {/* A disabled button never dispatches pointer events, which would
               keep the tooltip from firing; wrap it in a span so the hover
               still lands on something. */}
+          <Box as="span" display="inline-flex">
+            {runButton}
+          </Box>
+        </Tooltip>
+      ) : !isRunBlocked && warning ? (
+        <Tooltip content={warning}>
           <Box as="span" display="inline-flex">
             {runButton}
           </Box>

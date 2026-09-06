@@ -143,6 +143,100 @@ afterEach(() => {
   process.exitCode = undefined;
 });
 
+describe("runRunPlanCommand() with --evaluators-json", () => {
+  /** @scenario "Run with a plan evaluator" */
+  it("sends the plan's own evaluators inside the configuration", async () => {
+    await runRunPlanCommand({
+      all: true,
+      target: ["http:agent_abc"],
+      evaluatorsJson: JSON.stringify([
+        {
+          evaluatorId: "evaluator_pii",
+          required: false,
+          mappings: {
+            input: {
+              type: "source",
+              sourceId: "conversation",
+              path: ["first_user_message"],
+            },
+          },
+        },
+      ]),
+    });
+
+    expect(runSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          evaluators: [
+            expect.objectContaining({
+              evaluatorId: "evaluator_pii",
+              required: false,
+            }),
+          ],
+        }),
+      }),
+    );
+  });
+
+  /** @scenario "Run with a plan evaluator" */
+  it("refuses a mapping to a scenario field, which a plan never reads", async () => {
+    await expect(
+      runRunPlanCommand({
+        all: true,
+        target: ["http:agent_abc"],
+        evaluatorsJson: JSON.stringify([
+          {
+            evaluatorId: "evaluator_sql",
+            mappings: {
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+            },
+          },
+        ]),
+      }),
+    ).rejects.toThrow(ProcessExitError);
+    expect(runSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("getRunPlanCommand() with evaluators", () => {
+  /** @scenario "Read a run plan shows its evaluators" */
+  it("shows each evaluator with its gate and its mappings", async () => {
+    getSpy.mockResolvedValue(
+      makePlan({
+        evaluators: [
+          {
+            id: "att_pii",
+            evaluatorId: "evaluator_pii",
+            required: false,
+            mappings: {
+              input: {
+                type: "source",
+                sourceId: "conversation",
+                path: ["transcript"],
+              },
+            },
+          },
+        ],
+      }),
+    );
+
+    const result = await getRunPlanCommand("plan_abc");
+    result?.table();
+
+    const printed = vi
+      .mocked(console.log)
+      .mock.calls.map((call) => String(call[0]))
+      .join("\n");
+    expect(printed).toContain("evaluator_pii");
+    expect(printed).toContain("reports only");
+    expect(printed).toContain("conversation.transcript");
+  });
+});
+
 /**
  * A fresh response per call. A `Response` body can be read once, so handing the
  * same object to every poll turns the second read into a poll FAILURE.
@@ -160,17 +254,20 @@ const answersWith = (runs: unknown[]) =>
 const runWithFakeTimers = async ({
   advanceMs,
   format = "json",
+  wait = true,
 }: {
   advanceMs: number;
   /** The commander default is "table", which is the human path. */
   format?: string;
+  /** What the command line said after `--wait`: `true` when bare. */
+  wait?: boolean | string;
 }): Promise<void> => {
   vi.useFakeTimers();
   try {
     const promise = runRunPlanCommand({
       all: true,
       target: ["http:agent_abc"],
-      wait: true,
+      wait,
       format,
     });
     await vi.advanceTimersByTimeAsync(advanceMs);
@@ -587,13 +684,46 @@ describe("runRunPlanCommand()", () => {
       runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
       answersWith([{ batchRunId: "batch_123", status: "IN_PROGRESS" }]);
 
-      await runWithFakeTimers({ advanceMs: 10 * 60 * 1000 + 3000 });
+      await runWithFakeTimers({ advanceMs: 45 * 60 * 1000 + 3000 });
 
       const documents = printedDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("timeout");
       expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when --wait is given a number of minutes", () => {
+    /** @scenario "Wait for a number of minutes" */
+    it("stops waiting at that many minutes", async () => {
+      runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
+      answersWith([{ batchRunId: "batch_123", status: "IN_PROGRESS" }]);
+
+      await runWithFakeTimers({ wait: "1", advanceMs: 60 * 1000 + 3000 });
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.outcome).toBe("timeout");
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when --wait is given something that is not a number of minutes", () => {
+    /** @scenario "Wait with a value that is not a number of minutes" */
+    it("refuses before scheduling anything", async () => {
+      await expect(
+        runRunPlanCommand({
+          all: true,
+          target: ["http:agent_abc"],
+          wait: "soon",
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(runSpy).not.toHaveBeenCalled();
+      const reported = vi.mocked(console.error).mock.calls.flat().join("\n");
+      expect(reported).toContain("--wait takes a number of minutes");
     });
   });
 

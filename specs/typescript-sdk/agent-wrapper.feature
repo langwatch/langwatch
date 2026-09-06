@@ -58,6 +58,11 @@ Feature: connectAgent turns a function into a simulation target
       And the agent name, environment, concurrency and timeout
       And the parameters as a JSON Schema object
 
+    Scenario: The agent takes ten calls at once unless told otherwise
+      When an agent is defined without a concurrency option
+      Then the register frame advertises ten calls at once, in every environment
+      And a concurrency option replaces that number
+
   Rule: The handler receives the turn fields and returns one of four shapes
 
     Scenario: A call frame reaches the handler as one object

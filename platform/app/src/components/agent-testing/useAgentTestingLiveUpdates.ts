@@ -61,6 +61,11 @@ export function useAgentTestingLiveUpdates(projectId: string): {
       // just finished makes that count one higher, and a stale count names
       // the new run after the one before it.
       void utils.scenarios.getScenarioSetBatchRunCount.invalidate();
+      // The results page polls only while the stream is down, so the rows
+      // and the header pills read again on every update here. The last
+      // update of a run is the one its evaluators send after it finished.
+      void utils.scenarios.getResultsOverview.invalidate();
+      void utils.scenarios.getResultAtoms.invalidate();
     },
     enabled: !!projectId,
     debounceMs: 500,

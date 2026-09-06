@@ -18,6 +18,7 @@ import type {
 import { ADOPTABLE_CONVERSATION_ID } from "~/server/app-layer/langy/langy-conversation.service";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
+import { canModelSkipPermissions } from "~/server/app-layer/langy/langySkipPermissions";
 import {
   type LangyTurnContext,
   langyTurnContextSchema,
@@ -32,6 +33,15 @@ import {
   type UiActionRedis,
 } from "~/server/app-layer/langy/ui-actions/ui-action.service";
 import type { Session } from "~/server/auth";
+import { prisma } from "~/server/db";
+import { toControlRequestWire } from "~/server/langy-local-control/control-request.service";
+import {
+  LangyLocalSkipModelNotAllowedError,
+  LangyWaitExpiredError,
+} from "~/server/langy-local-control/errors";
+import { workspaceChannel } from "~/server/langy-local-control/keys";
+import { getLocalControlRuntime } from "~/server/langy-local-control/runtime";
+import { reconcileSkipPolicy } from "~/server/langy-local-control/skip-policy";
 import {
   checkLangyMessageRateLimit,
   checkLangyWarmRateLimit,
@@ -247,6 +257,59 @@ async function canWatchTurn({
 }
 
 /** The claim/complete side of the UI-action channel, on the shared app deps. */
+/**
+ * The conversation, when it is this caller's to act on.
+ *
+ * A conversation the caller cannot see dies as not-found rather than as a
+ * refusal, exactly like every other Langy read, so an id never confirms that
+ * it exists.
+ */
+async function requireOwnConversation({
+  projectId,
+  conversationId,
+  userId,
+}: {
+  projectId: string;
+  conversationId: string;
+  userId: string;
+}): Promise<ConversationDetail> {
+  const conversation = await getApp().langy.conversations.findByIdVisible({
+    id: conversationId,
+    projectId,
+    userId,
+  });
+  if (!conversation) throw new LangyConversationNotFoundError(conversationId);
+  return conversation;
+}
+
+/**
+ * The card, when it belongs to a conversation this caller can act on.
+ *
+ * The wait record names its own conversation and project, so answering a card
+ * with an id from another chat refuses before the answer reaches the folder.
+ */
+async function requireOwnWait({
+  projectId,
+  conversationId,
+  userId,
+  waitId,
+}: {
+  projectId: string;
+  conversationId: string;
+  userId: string;
+  waitId: string;
+}): Promise<void> {
+  await requireOwnConversation({ projectId, conversationId, userId });
+  const wait = await getLocalControlRuntime().waits.read(waitId);
+  if (
+    !wait ||
+    wait.projectId !== projectId ||
+    wait.conversationId !== conversationId
+  ) {
+    throw new LangyWaitExpiredError({ waitId });
+  }
+}
+
 function createUiActionService(): LangyUiActionService {
   const redis = getApp().redis as unknown as UiActionRedis;
   return new LangyUiActionService({
@@ -797,6 +860,295 @@ export const langyRouter = createTRPCRouter({
           ...(input.errorCode ? { errorCode: input.errorCode } : {}),
         },
       });
+    }),
+
+  // ── the developer's own folder (ADR-129) ─────────────────────────────────
+
+  /**
+   * The developer's answer to one permission card. The answer becomes the
+   * `permission` frame the command line is waiting on, and the same turn goes
+   * on with its plan intact.
+   *
+   * A card that already settled refuses with `langy_wait_expired`, which is
+   * what tells the panel to fall back to sending the answer as a message.
+   */
+  answerLocalPermission: langyCreateProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        waitId: z.string(),
+        decision: z.enum(["allow_once", "allow_pattern", "deny"]),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ answered: true }> => {
+      await requireOwnWait({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+        waitId: input.waitId,
+      });
+      await getLocalControlRuntime().waits.answer({
+        waitId: input.waitId,
+        userId: ctx.session.user.id,
+        decision: input.decision,
+      });
+      return { answered: true };
+    }),
+
+  /** The developer's answer to one question card. */
+  answerQuestion: langyCreateProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        waitId: z.string(),
+        answers: z
+          .array(
+            z.object({
+              question: z.string(),
+              selected: z.array(z.string()),
+              other: z.string().max(4000).optional(),
+            }),
+          )
+          .min(1)
+          .max(4),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ answered: true }> => {
+      await requireOwnWait({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+        waitId: input.waitId,
+      });
+      await getLocalControlRuntime().waits.answer({
+        waitId: input.waitId,
+        userId: ctx.session.user.id,
+        answers: input.answers.map((answer) => ({
+          question: answer.question,
+          selected: answer.selected,
+          ...(answer.other !== undefined ? { other: answer.other } : {}),
+        })),
+      });
+      return { answered: true };
+    }),
+
+  /**
+   * Turn the permission cards off for this conversation, or back on.
+   *
+   * The server owns one half of this and one half only: whether the model
+   * running the conversation is on its provider's allowed list. The command
+   * line keeps the folder boundary and the privilege rule whatever the answer
+   * is, so nothing here can widen what may run on the machine.
+   */
+  setLocalPolicy: langyCreateProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        skipPermissions: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ skipPermissions: boolean }> => {
+      const conversation = await requireOwnConversation({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+      });
+      const runtime = getLocalControlRuntime();
+      let model = conversation.lastModel ?? "";
+      if (input.skipPermissions) {
+        const decision = await canModelSkipPermissions({
+          projectId: input.projectId,
+          model,
+        });
+        if (!decision.allowed) {
+          throw new LangyLocalSkipModelNotAllowedError({
+            model: decision.modelId || model,
+            provider: decision.provider,
+          });
+        }
+        model = `${decision.provider}/${decision.modelId}`;
+      }
+      await runtime.presence.writePolicy({
+        conversationId: input.conversationId,
+        skipPermissions: input.skipPermissions,
+      });
+      await getApp().commands.langy.changeLocalPolicy({
+        tenantId: input.projectId,
+        occurredAt: Date.now(),
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+        skipPermissions: input.skipPermissions,
+        ...(model ? { model } : {}),
+      });
+      await runtime.store.publish(
+        workspaceChannel(input.conversationId),
+        JSON.stringify({
+          policy: { skipPermissions: input.skipPermissions },
+        }),
+      );
+      return { skipPermissions: input.skipPermissions };
+    }),
+
+  /** Close the shared folder from the panel header chip. */
+  disconnectLocalWorkspace: langyCreateProcedure
+    .input(z.object({ conversationId: z.string() }))
+    .mutation(async ({ input, ctx }): Promise<{ disconnected: boolean }> => {
+      await requireOwnConversation({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+      });
+      const runtime = getLocalControlRuntime();
+      const workspace = await runtime.presence.read(input.conversationId);
+
+      // The credential goes first, and it goes whether or not a folder is
+      // there to be told.
+      //
+      // The frame below is best effort: a command line that lost the network a
+      // second before this never receives it, and its own reconnect used to
+      // pass authentication on a binding that lives six hours, restoring the
+      // folder the reader had just disconnected. Revoking first closes that
+      // door, and revoking independently of presence closes it again for a
+      // record that had already lapsed.
+      await runtime.requests.revokeConversationBindings(input.conversationId);
+
+      // Then tell the command line, so it prints why it is exiting rather
+      // than reading a closed socket as a network fault.
+      await runtime.store.publish(
+        workspaceChannel(input.conversationId),
+        JSON.stringify({
+          disconnect: { reason: "Disconnected from the LangWatch panel." },
+        }),
+      );
+      await runtime.presence.deregister({
+        conversationId: input.conversationId,
+      });
+      for (const call of await runtime.dispatcher.listPendingForConversation(
+        input.conversationId,
+      )) {
+        await runtime.dispatcher.cancel({
+          callId: call.callId,
+          message:
+            "The shared folder was disconnected, so the command did not finish.",
+        });
+      }
+      // The durable line belongs to a folder that was there. With no record
+      // to name, the revoke above is the whole of what this did.
+      if (!workspace) return { disconnected: false };
+      await getApp().commands.langy.disconnectLocalWorkspace({
+        tenantId: input.projectId,
+        occurredAt: Date.now(),
+        conversationId: input.conversationId,
+        instanceId: workspace.instanceId,
+        reason: "panel",
+      });
+      return { disconnected: true };
+    }),
+
+  /** Remember, or forget, how Langy should reach this person's code. */
+  setCodeAccessPreference: langyUpdateProcedure
+    .input(z.object({ preference: z.enum(["github"]).nullable() }))
+    .mutation(
+      async ({ input, ctx }): Promise<{ preference: "github" | null }> => {
+        await prisma.user.update({
+          where: { id: ctx.session.user.id },
+          data: { langyCodeAccessPreference: input.preference },
+        });
+        return { preference: input.preference };
+      },
+    ),
+
+  /**
+   * The remembered choice on its own, for the settings page: it shows and
+   * clears the preference outside any conversation, so it has no folder to
+   * read and no conversation id to read one with.
+   */
+  getCodeAccessPreference: langyReadProcedure.query(
+    async ({ ctx }): Promise<{ preference: "github" | null }> => {
+      const user = await prisma.user.findUnique({
+        where: { id: ctx.session.user.id },
+        select: { langyCodeAccessPreference: true },
+      });
+      return {
+        preference:
+          user?.langyCodeAccessPreference === "github"
+            ? ("github" as const)
+            : null,
+      };
+    },
+  ),
+
+  /**
+   * Every card the developer's machine put up in this conversation, and
+   * whether the folder is connected, off the durable record (ADR-129).
+   *
+   * The panel reads it on open and while a turn is in flight, which is what
+   * puts a card raised before this tab was watching on screen, keeps the
+   * cards of a finished conversation on screen when it is reopened, and tells
+   * the code access card that the folder connected on a turn this tab never
+   * subscribed to.
+   */
+  localRecord: langyReadProcedure
+    .input(z.object({ conversationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      return await getApp().langy.conversations.getLocalRecord({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  /** What the panel chip, the code access card and the settings page read. */
+  getLocalWorkspace: langyReadProcedure
+    .input(z.object({ conversationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const conversation = await requireOwnConversation({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+      });
+      const runtime = getLocalControlRuntime();
+      const connected = await runtime.presence.read(input.conversationId);
+      const pendingRequest = await runtime.requests.findOpenForConversation({
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+        conversationId: input.conversationId,
+      });
+      const user = await prisma.user.findUnique({
+        where: { id: ctx.session.user.id },
+        select: { langyCodeAccessPreference: true },
+      });
+      // The card offers the skip switch only when the model behind the
+      // conversation is on its provider's list, so the panel reads the same
+      // answer the permission card was built with.
+      const skipAllowed = conversation.lastModel
+        ? (
+            await canModelSkipPermissions({
+              projectId: input.projectId,
+              model: conversation.lastModel,
+            })
+          ).allowed
+        : false;
+      return {
+        connected: connected !== null,
+        workspace: connected
+          ? { ...connected.workspace, hostname: connected.hostname }
+          : null,
+        skipAllowed,
+        skipPermissions: await reconcileSkipPolicy({
+          runtime,
+          projectId: input.projectId,
+          conversationId: input.conversationId,
+          model: conversation.lastModel,
+        }),
+        pendingRequest: pendingRequest
+          ? toControlRequestWire(pendingRequest)
+          : null,
+        codeAccessPreference:
+          user?.langyCodeAccessPreference === "github"
+            ? ("github" as const)
+            : null,
+      };
     }),
 
   /**

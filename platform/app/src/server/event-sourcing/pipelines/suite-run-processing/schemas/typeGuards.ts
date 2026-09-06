@@ -1,6 +1,7 @@
 import { SUITE_RUN_EVENT_TYPES } from "./constants";
 import type {
   SuiteRunItemCompletedEvent,
+  SuiteRunItemRegradedEvent,
   SuiteRunItemStartedEvent,
   SuiteRunProcessingEvent,
   SuiteRunStartedEvent,
@@ -22,4 +23,10 @@ export function isSuiteRunItemCompletedEvent(
   event: SuiteRunProcessingEvent,
 ): event is SuiteRunItemCompletedEvent {
   return event.type === SUITE_RUN_EVENT_TYPES.ITEM_COMPLETED;
+}
+
+export function isSuiteRunItemRegradedEvent(
+  event: SuiteRunProcessingEvent,
+): event is SuiteRunItemRegradedEvent {
+  return event.type === SUITE_RUN_EVENT_TYPES.ITEM_REGRADED;
 }

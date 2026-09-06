@@ -71,7 +71,7 @@ export interface LangyEffectPorts {
 }
 
 export interface CreateLangyEffectPortsOptions {
-  handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
+  handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash" | "isStopped">;
   worker: Pick<LangyWorkerPort, "dispatch">;
   mintSessionKey: (args: {
     userId: string;
@@ -151,6 +151,18 @@ export function createLangyEffectPorts(
           conversationId,
           turnId,
         });
+
+        // The user stopped this turn. Its terminal is already on the record, so
+        // dispatching now would spend a worker on an answer that has nowhere to
+        // land — and on a turn admitted just before the stop, this intent is
+        // the only thing left that could still start the work.
+        if (await deps.handoffStore.isStopped({ conversationId, turnId })) {
+          logger.info(
+            { projectId, conversationId, turnId },
+            "langy turn was stopped before dispatch; not starting the work",
+          );
+          return;
+        }
 
         let dispatchHandoff = handoff;
         let intent: "create" | "revive" | "continue" = handoff.resumeToken

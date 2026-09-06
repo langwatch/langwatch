@@ -6,6 +6,8 @@ import {
   buildSimulationRunEventView,
   handleCancelRequested,
   handleRunActivity,
+  handleRunEvaluated,
+  handleRunFinished,
   handleRunQueued,
   handleTerminal,
   simulationRunExecutionWake,
@@ -14,6 +16,7 @@ import {
   createCancelExecutionHandler,
   createExecuteRunHandler,
   createFinishRunHandler,
+  createRecordEvaluationsHandler,
   type SimulationRunExecutionDispatchDeps,
 } from "./simulationRunExecutionIntentHandlers";
 import {
@@ -21,6 +24,7 @@ import {
   executeRunIntentSchema,
   finishRunIntentSchema,
   INITIAL_SIMULATION_RUN_EXECUTION_STATE,
+  recordEvaluationsIntentSchema,
   SIMULATION_RUN_EXECUTION_INTENT_TYPES,
 } from "./simulationRunExecutionProcess.types";
 
@@ -28,6 +32,8 @@ export {
   buildSimulationRunEventView,
   handleCancelRequested,
   handleRunActivity,
+  handleRunEvaluated,
+  handleRunFinished,
   handleRunQueued,
   handleTerminal,
   simulationRunExecutionWake,
@@ -36,6 +42,7 @@ export {
   createCancelExecutionHandler,
   createExecuteRunHandler,
   createFinishRunHandler,
+  createRecordEvaluationsHandler,
   type SimulationRunExecutionCommands,
   type SimulationRunExecutionDispatchDeps,
   type SimulationRunExecutionPoolPort,
@@ -44,11 +51,17 @@ export {
   CANCEL_GRACE_MS,
   type CancelExecutionIntent,
   cancelExecutionIntentSchema,
+  EVALUATION_DEADLINE_MS,
+  EVALUATION_LOST_DETAILS,
   type ExecuteRunIntent,
   executeRunIntentSchema,
   type FinishRunIntent,
   finishRunIntentSchema,
   INITIAL_SIMULATION_RUN_EXECUTION_STATE,
+  type PendingEvaluator,
+  pendingEvaluatorSchema,
+  type RecordEvaluationsIntent,
+  recordEvaluationsIntentSchema,
   SIMULATION_RUN_EXECUTION_INTENT_TYPES,
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
   type SimulationRunExecutionIntents,
@@ -68,7 +81,10 @@ export {
  * - cancellation: cancel_requested -> cancel intent (Redis pub/sub stays the
  *   cross-pod transport) with a CANCEL_GRACE_MS force-terminal backstop;
  * - stalls: the wake finishes the run ERROR/"stalled" after
- *   STALL_THRESHOLD_MS without activity, replacing read-time derivation.
+ *   STALL_THRESHOLD_MS without activity, replacing read-time derivation;
+ * - lost grading jobs: a run that finished owing evaluator results waits in
+ *   `evaluating`, and the wake records one errored result per evaluator
+ *   after EVALUATION_DEADLINE_MS when the evaluated event never came.
  *
  * `message_snapshot`, `text_message_start` and `text_message_end` count as
  * activity only — their content never crosses `toPayload`.
@@ -94,13 +110,19 @@ export function simulationRunExecutionPM(
         finishRunIntentSchema,
         createFinishRunHandler(deps),
       )
+      .intent(
+        SIMULATION_RUN_EXECUTION_INTENT_TYPES.RECORD_EVALUATIONS,
+        recordEvaluationsIntentSchema,
+        createRecordEvaluationsHandler(deps),
+      )
       .on(SIMULATION_RUN_EVENT_TYPES.QUEUED, handleRunQueued)
       .on(SIMULATION_RUN_EVENT_TYPES.STARTED, handleRunActivity)
       .on(SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT, handleRunActivity)
       .on(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START, handleRunActivity)
       .on(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END, handleRunActivity)
       .on(SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED, handleCancelRequested)
-      .on(SIMULATION_RUN_EVENT_TYPES.FINISHED, handleTerminal)
+      .on(SIMULATION_RUN_EVENT_TYPES.FINISHED, handleRunFinished)
+      .on(SIMULATION_RUN_EVENT_TYPES.EVALUATED, handleRunEvaluated)
       .on(SIMULATION_RUN_EVENT_TYPES.DELETED, handleTerminal)
       .onWake(simulationRunExecutionWake)
       .toPayload(buildSimulationRunEventView)

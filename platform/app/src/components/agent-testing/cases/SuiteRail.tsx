@@ -58,7 +58,8 @@ export type SuiteRailProps = {
   onNewSuite: () => void;
   onNewTestCase: (suiteId: string) => void;
   onRunSuite: (suiteId: string) => void;
-  onRenameSuite: (suiteId: string) => void;
+  /** Opens the suite editor on one suite. */
+  onEditSuite: (suiteId: string) => void;
   onArchiveSuite: (suiteId: string) => void;
   isArchiving?: boolean;
   period: Period;

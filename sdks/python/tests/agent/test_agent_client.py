@@ -217,7 +217,7 @@ async def test_register_carries_sdk_instance_and_agents():
                         "type": "object",
                         "properties": {"plan": {"type": "string", "default": "free"}},
                     },
-                    "concurrency": 1,
+                    "concurrency": 10,
                     "timeoutMs": 120000,
                     "sticky": False,
                 }

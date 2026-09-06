@@ -1350,3 +1350,57 @@ describe("given two targets stored under the same name", () => {
     });
   });
 });
+
+/**
+ * A batch evaluation exports the dataset a person uploaded and the reasoning a
+ * model wrote, into a file whose whole purpose is to be opened in a
+ * spreadsheet. A cell opening with `=` is a formula Excel and Sheets execute,
+ * and RFC 4180 quoting does not prevent that — quoting protects the CSV
+ * grammar, not the reader. The guard belongs where the string is serialized,
+ * not in every builder above it.
+ *
+ * `buildCsvData` is deliberately left uncovered here: it returns the values as
+ * they are, and its callers assert on content. The apostrophe appears when the
+ * file is written.
+ *
+ * @see src/utils/csvFormulaGuard.ts
+ */
+describe("spreadsheet formula injection", () => {
+  const FORMULA = "=cmd|' /c calc'!A1";
+
+  it("defuses a formula in a dataset cell", () => {
+    const csv = generateCsvContent(
+      createMinimalData({
+        datasetColumns: [{ name: "input", hasImages: false }],
+        rows: [{ index: 0, datasetEntry: { input: FORMULA }, targets: {} }],
+      }),
+    );
+
+    expect(csv).toContain(`'${FORMULA}`);
+  });
+
+  it("defuses a formula in a column heading someone named", () => {
+    const csv = generateCsvContent(
+      createMinimalData({
+        datasetColumns: [{ name: FORMULA, hasImages: false }],
+        rows: [],
+      }),
+    );
+
+    // The heading is slugified on the way in, so the assertion is on the
+    // leading apostrophe rather than on the name as it was typed.
+    expect(csv.split("\r\n")[0]).toContain("'=cmd");
+  });
+
+  it("leaves a negative number alone so a number column stays numeric", () => {
+    const csv = generateCsvContent(
+      createMinimalData({
+        datasetColumns: [{ name: "score", hasImages: false }],
+        rows: [{ index: 0, datasetEntry: { score: "-5" }, targets: {} }],
+      }),
+    );
+
+    expect(csv).not.toContain("'-5");
+    expect(csv).toContain("-5");
+  });
+});

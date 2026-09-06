@@ -32,7 +32,7 @@ const llmPrefix = "/llm"
 const maxErrorBodyBytes = 64 * 1024
 
 // codexModelPrefix marks a turn whose model is served by the gateway's codex
-// provider. The worker itself never sees the prefix (opencode runs its native
+// provider. The worker itself never sees the prefix (it runs its native
 // openai provider); the proxy restores it request-side so the gateway routes
 // to the codex credential.
 const codexModelPrefix = "openai_codex/"
@@ -98,7 +98,7 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 	}
 	// pi workers export no OTLP of their own: the relay retells each mediated
 	// LLM call as one gen_ai span into the customer's trace (see genai.go).
-	// nil for every other harness, and for calls with no turn to parent under.
+	// nil for calls with no turn to parent under.
 	genAI := newGenAICall(r, entry, req)
 	target, err := llmTargetURL(entry.info.GatewayBaseURL, req.PathValue("token"), req.URL)
 	if err != nil {
@@ -124,7 +124,7 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			if pr.In.Header.Get("x-api-key") != "" {
 				pr.Out.Header.Set("x-api-key", entry.info.LLMVirtualKey)
 			}
-			// Codex turns run opencode's NATIVE openai provider (the Responses
+			// Codex turns run the NATIVE openai provider (the Responses
 			// dialect the codex backend speaks), so the worker's request says
 			// "gpt-…"; restore the full provider-prefixed id on the wire and
 			// the gateway routes it to the codex credential. See provision.go.
@@ -162,7 +162,7 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		// Negative ⇒ flush immediately after each write: SSE pass-through.
 		FlushInterval: -1,
 		// EVERY failed call is captured so the turn's terminal error frame
-		// carries the REAL cause — opencode launders this body into
+		// carries the REAL cause — the agent launders this body into
 		// "AI_APICallError" prose the control plane must never trust. A typed
 		// gateway herr envelope decodes losslessly (herr.FromBody — the
 		// cross-process continuation); a provider-native body the gateway

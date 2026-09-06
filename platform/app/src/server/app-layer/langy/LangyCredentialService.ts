@@ -12,7 +12,6 @@ import {
   mintLangySessionApiKey,
 } from "./langyApiKey";
 import { LANGY_GITHUB_ENABLED } from "./langyGithub.enabled";
-import type { LangyHarness } from "./langyHarness";
 import { provisionLangyVirtualKey } from "./langyVirtualKey";
 
 const logger = createLogger("langwatch:langy:credentials");
@@ -78,7 +77,7 @@ export function resolveLangyMirrorTier(
 }
 
 /**
- * The Langy worker hands `gatewayBaseUrl` straight to OpenCode as
+ * The Langy worker hands `gatewayBaseUrl` straight to the agent as
  * `OPENAI_BASE_URL`, so it must point at the gateway's OpenAI-compatible
  * surface — the `/v1` prefix under which `/responses` and `/chat/completions`
  * live. `LW_GATEWAY_BASE_URL` is shared with the Go gateway's control-plane
@@ -119,7 +118,7 @@ export function resolveWorkerCallbackUrl(
 }
 
 /**
- * The AI gateway base URL opencode dials (handed to it as OPENAI_BASE_URL). Same
+ * The AI gateway base URL the worker dials (handed to it as OPENAI_BASE_URL). Same
  * container caveat as {@link resolveWorkerCallbackUrl}: `LANGY_WORKER_GATEWAY_URL`
  * (a `host.docker.internal` address haven injects for a containerized worker) wins
  * when present; otherwise the usual LW_GATEWAY_PUBLIC_URL / LW_GATEWAY_BASE_URL.
@@ -204,11 +203,11 @@ export type LangyCredentials = {
    * what I was given" rather than "mint whatever I name".
    */
   langwatchApiKeyId?: string;
-  /** Project's Langy VK secret. Used by opencode as OPENAI_API_KEY against the AI gateway. */
+  /** Project's Langy VK secret. Used by the worker as OPENAI_API_KEY against the AI gateway. */
   llmVirtualKey: string;
   /** Control plane base URL — set as LANGWATCH_ENDPOINT for the MCP server. */
   langwatchEndpoint: string;
-  /** AI gateway base URL — set as OPENAI_BASE_URL for opencode. */
+  /** AI gateway base URL — set as OPENAI_BASE_URL for the worker. */
   gatewayBaseUrl: string;
   /**
    * The organization the project belongs to. Returned here so callers that
@@ -256,14 +255,6 @@ export type LangyCredentials = {
    * manager mirrors nothing without a destination.
    */
   mirrorTier?: LangyMirrorTier;
-  /**
-   * Which worker harness serves this turn (`release_langy_pi_harness`,
-   * resolved once per turn, see `langyHarness.ts`). Part of the worker
-   * credential signature on the Go side, where absent and "opencode" collapse
-   * so pre-flag workers never respawn on deploy; a flag flip is a probe MISS
-   * and the worker re-warms on the other harness.
-   */
-  harness?: LangyHarness;
 };
 
 /**
