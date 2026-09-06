@@ -112,6 +112,13 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // vitest, and their tests live beside them. Without this root, a scenario
   // describing what a guard refuses could only ever be @unimplemented.
   ".github/scripts",
+  // dev/scripts' own JS/TS logic (e.g. dev-supervisor.mjs's debounce and
+  // signal handling) is tested with `node --test`, not vitest, and lives
+  // beside the scripts it tests. DEFAULT_BATS_TEST_ROOTS already scans this
+  // same directory for `.bats` files; this is its `.test.mjs` counterpart.
+  // Without it, a scenario describing dev-tooling behavior could only ever
+  // be @unimplemented.
+  "dev/scripts/__tests__",
 ];
 
 /**

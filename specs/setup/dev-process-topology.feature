@@ -102,3 +102,35 @@ Feature: The local development process topology
     Given a developer who set the api port explicitly
     When the launcher derives its ports
     Then their value is kept and nothing is derived over it
+
+  # --- Debounced restart on change ---
+
+  # `tsx watch` (apps/api and apps/worker's dev script) restarts the instant a
+  # file changes, with no quiet window: an agent editing five files across a
+  # feature package in the same second is five restarts, not one — five
+  # reconnects to Postgres/ClickHouse/Redis. dev/scripts/dev-supervisor.mjs's
+  # `--watch` mode wraps the same command with a debounced quiet window
+  # instead, coalescing a burst into one restart. See
+  # dev/scripts/__tests__/dev-supervisor-watch.unit.test.mjs.
+
+  @unit
+  Scenario: A burst of source changes restarts the API once
+    Given the api lane's dev script running under a debounced watch
+    When five files change within the same quiet window
+    Then exactly one restart happens
+    And it reports how many files triggered it
+
+  # --- The worker drains before a restart takes it down ---
+
+  # A restart is a takedown-and-respawn: SIGTERM, then SIGKILL only after a
+  # grace period. The worker's own shutdown handler
+  # (apps/worker/src/platform/lifecycle/worker.signals.ts) treats SIGTERM as
+  # "finish what is running, then exit" — an in-flight GroupQueue job gets a
+  # chance to complete instead of being cut off mid-job.
+
+  @unit
+  Scenario: A restart lets the worker drain before it exits
+    Given a running process that finishes its own shutdown work on SIGTERM
+    When a restart takes it down
+    Then it is given the chance to finish before anything forces it
+    And a process that ignores SIGTERM is still killed once the grace period elapses

@@ -64,11 +64,54 @@
  *   LANGWATCH_DEV_WATCH_MS=N     how often the launcher is checked (tests use this)
  *
  *   node dev/scripts/dev-supervisor.mjs <command> [args...]
+ *
+ * --- --watch: debounced restart-on-change ------------------------------
+ *
+ * `tsx watch` restarts the moment a file changes, with no quiet window: five
+ * files touched in the same second (an agent editing across a feature
+ * package) is five reconnects to Postgres/ClickHouse/Redis, not one. This
+ * mode replaces `tsx watch <entry>` with `dev-supervisor.mjs --watch -- tsx
+ * <entry>`, reusing the same SIGTERM-wait-SIGKILL machinery (`stackControls`)
+ * above (a restart IS a takedown-and-respawn) instead of adding a second
+ * script.
+ *
+ * It watches its own directory tree plus `../../packages` (every workspace
+ * package apps/api and apps/worker are allowed to import — architecture-lint
+ * already forbids either from importing a `web`/`apps/ui` package, so this is
+ * a safe superset with nothing to keep in sync by hand) via `fs.watch`
+ * (native, recursive on macOS/Windows; degrades to unwatched with a warning
+ * where recursive watch is unsupported, same "never a gate" rule as above).
+ * Changes are coalesced into one restart after a quiet window with no new
+ * events; test files, `__tests__`, `dist`, `generated` and build-info churn
+ * never count. One line is printed per restart naming how many files
+ * triggered it. The restart itself is SIGTERM, wait, SIGKILL — the same grace
+ * period a stack takedown gets, so a worker mid-drain (see
+ * apps/worker/src/platform/lifecycle/worker.signals.ts) is asked to finish,
+ * not cut off.
+ *
+ *   LANGWATCH_DEV_WATCH_DIRS=a,b        dirs to watch, relative to cwd (default: src,../../packages)
+ *   LANGWATCH_DEV_WATCH_DEBOUNCE_MS=N   quiet window before restarting (default: 400)
+ *
+ *   node dev/scripts/dev-supervisor.mjs --watch -- <command> [args...]
+ *
+ * When LANGWATCH_DEV_BUNDLE_ENTRY and LANGWATCH_DEV_BUNDLE_OUT are both set,
+ * the debounce boundary is a REBUILD, not a restart: `tsx` re-transforms
+ * every loaded module on every cold start, so a plain restart still pays that
+ * cost each time. Instead, `<command>` should be a plain `node` invocation of
+ * the bundle's output path (see dev/scripts/lib/dev-bundle.mjs), and every
+ * quiet-window firing rebuilds that bundle first via esbuild. A successful
+ * rebuild is what triggers the restart; a failed one prints esbuild's error
+ * and leaves the previous process — and the bundle it is still running —
+ * untouched.
+ *
+ *   LANGWATCH_DEV_BUNDLE_ENTRY=src/x.entrypoint.ts   entry, relative to cwd
+ *   LANGWATCH_DEV_BUNDLE_OUT=dist-dev/x.cjs          bundle output, relative to cwd
  */
 
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** How long the stack gets between SIGTERM and SIGKILL. */
@@ -79,6 +122,24 @@ const WATCH_INTERVAL_MS = 1_000;
 const NESTED = "LANGWATCH_DEV_SUPERVISED";
 /** Re-entry flag for the sentinel process; never typed by hand. */
 const SENTINEL_FLAG = "--sentinel";
+/** Opts a command into debounced watch-and-restart instead of a one-shot run. */
+const WATCH_FLAG = "--watch";
+/** Default quiet window: how long the tree must be still before restarting. */
+const DEFAULT_WATCH_DEBOUNCE_MS = 400;
+/** Default watch roots, relative to cwd: the package's own source, plus every
+ * workspace package (architecture-lint already forbids api/worker code from
+ * reaching a web/ui package, so this needs no per-app allowlist). */
+const DEFAULT_WATCH_DIRS = ["src", "../../packages"];
+/** Never worth a restart: tests, build output, generated code, watcher noise. */
+const WATCH_IGNORE_PATTERNS = [
+  /(^|\/)__tests__(\/|$)/,
+  /\.test\.[cm]?[jt]sx?$/,
+  /\.spec\.[cm]?[jt]sx?$/,
+  /(^|\/)(dist|generated)(\/|$)/,
+  /\.tsbuildinfo$/,
+  /(^|\/)node_modules(\/|$)/,
+  /(^|\/)\.git(\/|$)/,
+];
 /** The pipe the sentinel reports the stack's pid, then its exit code, on. */
 const HANDSHAKE_FD = 3;
 const PREFIX = "dev-supervisor:";
@@ -134,6 +195,7 @@ function disabled(env) {
 
 async function main(argv, env) {
   if (argv[0] === SENTINEL_FLAG) return await runSentinel(argv.slice(1), env);
+  if (argv[0] === WATCH_FLAG) return await runWatchSupervisor(argv.slice(1), env);
   if (argv.length === 0) {
     stderr(`${PREFIX} usage: dev-supervisor.mjs <command> [args...]\n`);
     return 64;
@@ -148,6 +210,212 @@ async function main(argv, env) {
 
   const leader = launchingGroupLeader();
   return await passThrough(argv, env, { detached: leader !== null, leader });
+}
+
+// --- --watch: debounced restart-on-change ---------------------------------
+
+/** Whether a changed path is churn nobody should restart for. */
+export function shouldIgnoreWatchPath(relativePath) {
+  const normalized = relativePath.split(path.sep).join("/");
+  return WATCH_IGNORE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+/** The watch roots and quiet window, from the environment (or its defaults). */
+export function resolveWatchConfig(env) {
+  const rawDirs = (env.LANGWATCH_DEV_WATCH_DIRS ?? "").trim();
+  const dirs =
+    rawDirs === ""
+      ? DEFAULT_WATCH_DIRS
+      : rawDirs
+          .split(",")
+          .map((d) => d.trim())
+          .filter(Boolean);
+  return {
+    dirs,
+    debounceMs: positiveInt(env.LANGWATCH_DEV_WATCH_DEBOUNCE_MS, DEFAULT_WATCH_DEBOUNCE_MS),
+  };
+}
+
+/** The dev-bundle entry/output, or null when the caller wants a plain restart with no rebuild. */
+export function resolveBundleConfig(env) {
+  const entry = (env.LANGWATCH_DEV_BUNDLE_ENTRY ?? "").trim();
+  const outfile = (env.LANGWATCH_DEV_BUNDLE_OUT ?? "").trim();
+  if (entry === "" || outfile === "") return null;
+  return { entry, outfile };
+}
+
+/**
+ * Coalesces a burst of file-change notifications into one call after the
+ * tree has been quiet for `debounceMs`. Each `note(file)` both restarts the
+ * quiet window and adds `file` to the set `onFire` receives, so a restart
+ * always reports every file that contributed to it, not just the last one.
+ */
+export function createDebouncer({ debounceMs, onFire }) {
+  let timer = null;
+  const pending = new Set();
+  const note = (file) => {
+    pending.add(file);
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      const files = [...pending];
+      pending.clear();
+      onFire(files);
+    }, debounceMs);
+    timer.unref?.();
+  };
+  const cancel = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    pending.clear();
+  };
+  return { note, cancel };
+}
+
+/**
+ * Watches `dirs` (relative to cwd) and feeds every non-ignored change into
+ * `debouncer`. Missing or unwatchable directories are skipped with a warning
+ * — the same "never a gate" rule the rest of this file follows: a command
+ * that cannot be watched still runs, just without live reload.
+ */
+function watchDirs(dirs, debouncer) {
+  const watchers = [];
+  for (const dir of dirs) {
+    const abs = path.resolve(process.cwd(), dir);
+    if (!fs.existsSync(abs)) continue;
+    try {
+      const watcher = fs.watch(abs, { recursive: true }, (_event, filename) => {
+        if (!filename) return;
+        const rel = path.join(dir, filename);
+        if (shouldIgnoreWatchPath(rel)) return;
+        debouncer.note(rel);
+      });
+      watchers.push(watcher);
+    } catch (err) {
+      stderr(
+        `${PREFIX} not watching ${dir} (${err.message}); changes there need a manual restart\n`,
+      );
+    }
+  }
+  return watchers;
+}
+
+/**
+ * `--watch -- <command>`: runs `<command>` as a plain (non-detached) child —
+ * deliberately in the SAME process group as this supervisor, not a group of
+ * its own, so an external group-wide SIGTERM (haven's procsupervisor, or the
+ * outer takedown this file does elsewhere) reaches the child directly and
+ * does not depend on this process forwarding it in time — and replaces it,
+ * debounced, whenever the watched tree changes. A restart targets the
+ * child's own pid (never the group, which is shared with us). Exits with the
+ * command's own code when it exits on its own; forwards SIGINT/SIGTERM/SIGHUP
+ * to the current child rather than leaving it running underneath an
+ * already-dead supervisor.
+ */
+async function runWatchSupervisor(rawArgv, env) {
+  const argv = rawArgv[0] === "--" ? rawArgv.slice(1) : rawArgv;
+  if (argv.length === 0) {
+    stderr(`${PREFIX} usage: dev-supervisor.mjs --watch -- <command> [args...]\n`);
+    return 64;
+  }
+  const { dirs, debounceMs } = resolveWatchConfig(env);
+  const graceMs = positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS);
+  const bundle = resolveBundleConfig(env);
+
+  /**
+   * Rebuilds the dev bundle when one is configured; a no-op (always ok)
+   * otherwise. The import is deliberately dynamic and deliberately scoped to
+   * only this branch: packages/architecture-lint/tests/dev-supervisor.test.ts
+   * copies this whole file to a scratch directory and runs the copy in
+   * isolation to provoke failures that cannot be triggered from the outside
+   * (see its `supervisorWith` helper) — an invariant its own comment states
+   * plainly ("it imports nothing but node builtins, so it runs anywhere"). A
+   * static top-level `import` of a sibling file would break that the moment
+   * the copy tried to load, whether or not bundling was ever configured; a
+   * dynamic import reached only when a caller actually asks for bundling
+   * does not.
+   */
+  const rebuild = async () => {
+    if (bundle === null) return { ok: true };
+    const { buildDevBundle } = await import("./lib/dev-bundle.mjs");
+    const result = await buildDevBundle({ appDir: process.cwd(), ...bundle });
+    if (!result.ok) {
+      stderr(`${PREFIX} bundle failed, keeping the previous run:\n`);
+      for (const line of result.errors) stderr(`${PREFIX}   ${line}\n`);
+    }
+    return result;
+  };
+
+  let child = null;
+  let restarting = false;
+  let settledCode = 0;
+
+  const spawnOne = () => {
+    child = startChild(argv, env, false);
+    if (child === null) return false;
+    child.on("close", (code, signal) => {
+      if (restarting) return; // this exit was ours; the restart owns what happens next
+      settledCode = exitCodeFor({ code, signal });
+      finish();
+    });
+    return true;
+  };
+
+  let resolveExit;
+  const exited = new Promise((resolve) => {
+    resolveExit = resolve;
+  });
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    debouncer.cancel();
+    for (const w of watchers) w.close();
+    resolveExit(settledCode);
+  };
+
+  const debouncer = createDebouncer({
+    debounceMs,
+    onFire: async (files) => {
+      if (finished || child === null) return;
+      // The rebuild IS the debounce boundary when one is configured: a
+      // restart only happens on a successful bundle, so a broken edit never
+      // takes down the process that was still working.
+      const built = await rebuild();
+      if (!built.ok) return;
+      if (finished || child === null) return;
+      const noun = files.length === 1 ? "file" : "files";
+      stderr(
+        `${PREFIX} restarting (${files.length} ${noun} changed): ${files.slice(0, 3).join(", ")}${files.length > 3 ? ", …" : ""}\n`,
+      );
+      restarting = true;
+      const stack = stackControls({ target: child.pid, graceMs });
+      if (!(await stack.takeDown())) {
+        stderr(`${PREFIX} some of the previous run outlived SIGKILL, restarting anyway\n`);
+      }
+      restarting = false;
+      if (finished) return;
+      if (!spawnOne()) finish();
+    },
+  });
+
+  const watchers = watchDirs(dirs, debouncer);
+  const firstBuild = await rebuild();
+  if (!firstBuild.ok) {
+    for (const w of watchers) w.close();
+    return 1;
+  }
+  if (!spawnOne()) return 127;
+
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+    process.on(signal, () => {
+      if (finished || child === null) return;
+      restarting = true; // the close handler must not treat this as a real exit
+      void stackControls({ target: child.pid, graceMs }).takeDown().then(finish);
+    });
+  }
+
+  return await exited;
 }
 
 /** Starts the command, or reports why it could not start and returns null. */
@@ -169,7 +437,7 @@ function startChild(argv, env, detached) {
  * child, which addresses its whole process group; for a child we could not
  * detach it is just the child, the honest limit of an unsupervised run.
  */
-function stackControls({ target, graceMs }) {
+export function stackControls({ target, graceMs }) {
   const send = (signal) => {
     try {
       process.kill(target, signal);
@@ -526,4 +794,23 @@ function exitCodeFor(childResult) {
   return code ?? 0;
 }
 
-process.exitCode = await main(process.argv.slice(2), process.env);
+// Guarded so tests can `import` the functions above without this running:
+// only true when this file is the one node was actually asked to execute.
+// realpathSync on both sides on purpose — a straight string compare breaks
+// the moment either path crosses a symlink (macOS's /tmp -> /private/tmp is
+// exactly this: `argv[1]` keeps the invoked, symlinked path while
+// `import.meta.url` already reports the resolved one), which read as "never
+// run" everywhere packages/architecture-lint/tests/dev-supervisor.test.ts
+// copies this file into a scratch tmp dir and executes the copy.
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  try {
+    return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
+  process.exitCode = await main(process.argv.slice(2), process.env);
+}
