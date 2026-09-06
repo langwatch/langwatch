@@ -154,9 +154,35 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     if (!searchOpen) setSearchQuery("");
   }, [searchOpen]);
 
+  // Clicking a row that carries a drilldown ALSO opens it. Without this the
+  // sub-options are reachable only through the trailing chevron, which reads
+  // as decoration: operators clicked the evaluator, got a filter, and never
+  // learned that pass/fail (or an event's metric values) were one level down.
+  // The layout freeze keeps the clicked row where it was clicked, so the
+  // drilldown opens in place instead of appearing in the pinned block after
+  // the pointer leaves — the reason the click looked inert.
+  //
+  // We mirror the filter state rather than latch: activating opens, undoing
+  // the same click closes again, so a row never keeps an open drilldown it
+  // no longer contributes to. `getValueState` still reports the PRE-toggle
+  // state here, so "neutral" means the click is about to activate the row.
   const handleToggle = useCallback(
-    (value: string) => onToggle(field, value),
-    [onToggle, field],
+    (value: string) => {
+      if (renderInactiveRowExtras) {
+        const willActivate = getValueState(value) === "neutral";
+        setExpandedInactiveRows((prev) => {
+          const next = new Set(prev);
+          if (willActivate) {
+            next.add(value);
+          } else {
+            next.delete(value);
+          }
+          return next;
+        });
+      }
+      onToggle(field, value);
+    },
+    [onToggle, field, renderInactiveRowExtras, getValueState],
   );
   const handleExclude = useCallback(
     (value: string) => onExclude(field, value),

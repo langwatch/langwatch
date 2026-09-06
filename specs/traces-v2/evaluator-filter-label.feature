@@ -32,6 +32,33 @@ Rule: Inline drilldown toggle on inactive evaluator rows
     Then the verdict/score drilldown expands below the row
     And the evaluator is not added to the filter by the click itself
 
+Rule: Picking a row opens its drilldown
+  The trailing chevron was the only way in, and it reads as decoration:
+  operators clicked the evaluator itself, got the filter, and never learned
+  that pass/fail lived one level down. So the row's own click opens the
+  drilldown as well as applying the filter — the sub-options are visible the
+  moment the filter lands, without a second, unadvertised gesture. The
+  behaviour belongs to the section, so event rows and their metric values
+  gain it on the same terms.
+
+  Scenario: Clicking an evaluator row opens its verdict drilldown
+    Given an inactive evaluator row with verdict/score aggregates
+    When the user clicks the row itself
+    Then the verdict/score drilldown expands below the row
+    And the evaluator is added to the filter
+
+  # Latching the open state would leave a row displaying verdict controls
+  # for a filter it no longer contributes to.
+  Scenario: Clicking the same row again closes the drilldown it opened
+    Given an evaluator row whose drilldown was opened by clicking the row
+    When the user clicks the row a second time to drop the filter
+    Then the drilldown collapses with it
+
+  Scenario: A row carrying no drilldown filters exactly as before
+    Given a facet section whose rows have no sub-options
+    When the user clicks a row
+    Then only the filter is applied
+
 Rule: Score slider is suppressed when the score only mirrors the verdict
   An evaluator that emits a binary 0/1 score alongside its pass/fail
   verdict produced a confusing pairing: the verdict pill rows AND a score
