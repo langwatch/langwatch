@@ -268,6 +268,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       expect(callBody.payload.workflow.nodes[2].id).toBe("end");
     });
 
+    /** @scenario A successful engine response is still returned unchanged */
     it("returns the end node output as a response string", async () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
