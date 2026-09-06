@@ -81,9 +81,16 @@ export async function publishDeviceCodeSettled({
 }
 
 /**
- * Resolve with the status the browser published for this device code, or with
- * null when `signal` aborts first. A subscribe that fails resolves null too,
- * which drops the stream and leaves the CLI polling.
+ * Watch for the status the browser publishes for this device code.
+ *
+ * `subscribed` resolves once the channel is live, or once it is known that it
+ * never will be. It is what lets the caller re-read the record before it
+ * commits to waiting: a code settled between the caller's own read and this
+ * subscribe published to nobody, and Redis pub/sub keeps nothing for a late
+ * subscriber.
+ *
+ * `settled` resolves with the published status, or with null when the signal
+ * aborts first or the subscribe failed.
  */
 export function waitForDeviceCodeSettled({
   redis,
@@ -94,18 +101,28 @@ export function waitForDeviceCodeSettled({
   deviceCode: string;
   /** Aborts the wait: the stream closed, or the device code ran out of time. */
   signal: AbortSignal;
-}): Promise<string | null> {
+}): { subscribed: Promise<void>; settled: Promise<string | null> } {
   const connection = ensureSubscriber(redis);
-  if (!connection) return Promise.resolve(null);
+  if (!connection) {
+    return { subscribed: Promise.resolve(), settled: Promise.resolve(null) };
+  }
 
   const channel = channelFor(deviceCode);
-  return new Promise<string | null>((resolve) => {
-    let settled = false;
+  let markSubscribed: () => void = () => {
+    // Replaced below, before anything can call it.
+  };
+  const subscribed = new Promise<void>((resolve) => {
+    markSubscribed = resolve;
+  });
+
+  const settled = new Promise<string | null>((resolve) => {
+    let done = false;
     const finish = (status: string | null) => {
-      if (settled) return;
-      settled = true;
+      if (done) return;
+      done = true;
       signal.removeEventListener("abort", onAbort);
       release({ connection, channel, listener });
+      markSubscribed();
       resolve(status);
     };
     const listener: Listener = (status) => finish(status);
@@ -124,14 +141,19 @@ export function waitForDeviceCodeSettled({
     }
     channelListeners.add(listener);
 
-    void connection.subscribe(channel).catch((error: unknown) => {
-      logger.debug(
-        { error },
-        "[auth-cli] could not subscribe to the device-code settlement; the CLI's own poll still settles the login",
-      );
-      finish(null);
-    });
+    connection.subscribe(channel).then(
+      () => markSubscribed(),
+      (error: unknown) => {
+        logger.debug(
+          { error },
+          "[auth-cli] could not subscribe to the device-code settlement; the CLI's own poll still settles the login",
+        );
+        finish(null);
+      },
+    );
   });
+
+  return { subscribed, settled };
 }
 
 function release({

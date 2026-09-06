@@ -146,6 +146,28 @@ describe("CLI device-approval stream", () => {
       });
     });
 
+    describe("when the code settles while the stream is still subscribing", () => {
+      /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
+      it("emits anyway, because the stream re-reads once its channel is live", async () => {
+        const deviceCode = await mintDeviceCode();
+
+        // Redis pub/sub keeps nothing for a late subscriber. Approving in the
+        // same tick as the request lands the publication in the window where
+        // the route has read `pending` but has not subscribed yet, which is
+        // the window the re-read exists to cover.
+        const [stream] = await Promise.all([
+          openApprovalStream(deviceCode),
+          approveDeviceCode({
+            deviceCode,
+            userId: USER_ID,
+            organizationId: ORG_ID,
+          }),
+        ]);
+
+        expect(await readFirstFrame(stream)).toBe('{"status":"approved"}');
+      });
+    });
+
     describe("when the code settled before the CLI opened the stream", () => {
       /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
       it("emits at once rather than holding the connection open", async () => {

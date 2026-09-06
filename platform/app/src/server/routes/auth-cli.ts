@@ -1098,6 +1098,17 @@ const APPROVAL_KEEPALIVE_MS = 15_000;
 const MAX_OPEN_APPROVAL_STREAMS = 512;
 let openApprovalStreams = 0;
 
+/** The device code's status once it has settled, or null while it is pending. */
+async function readDeviceCodeStatus(
+  redis: ReturnType<typeof getRedis>,
+  deviceCode: string,
+): Promise<string | null> {
+  const raw = await redis.get(deviceCodeKey(deviceCode));
+  if (!raw) return "expired";
+  const status = (JSON.parse(raw) as DeviceCodeRecord).status;
+  return status === "pending" ? null : status;
+}
+
 /**
  * Tell the CLI the moment its device code settles, so `langwatch login` does
  * not sit on the spinner until its next scheduled poll.
@@ -1165,11 +1176,20 @@ secured.access(CLI_POLICY).get("/device-approval", async (c: Context) => {
     }, APPROVAL_KEEPALIVE_MS);
 
     try {
-      const status = await waitForDeviceCodeSettled({
+      const watch = waitForDeviceCodeSettled({
         redis,
         deviceCode,
         signal: controller.signal,
       });
+      await watch.subscribed;
+
+      // Redis pub/sub keeps nothing for a late subscriber, so a code settled
+      // between the read above and that subscribe published to no one. Read it
+      // once more now that the channel is live: from here on, either the
+      // record already says so or the publication reaches us.
+      const status =
+        (await readDeviceCodeStatus(redis, deviceCode)) ??
+        (await watch.settled);
       if (status) {
         await stream.writeSSE({ data: JSON.stringify({ status }) });
       }
