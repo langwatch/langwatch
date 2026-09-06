@@ -27,3 +27,11 @@ export abstract class NlpLambdaArnCachePort {
 export abstract class NlpLambdaArnResolverPort {
   abstract resolve(input: { projectId: string; imageUri: string }): Promise<string>;
 }
+
+/**
+ * Which function one project's engine answers on, as the caller needs it. The
+ * resolution behind it is cached and single-flighted; a caller only asks.
+ */
+export abstract class NlpLambdaFunctionPort {
+  abstract arnFor(input: { projectId: string }): Promise<string>;
+}

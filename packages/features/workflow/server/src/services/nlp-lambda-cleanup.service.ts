@@ -5,9 +5,7 @@
  */
 import type { Logger } from "@langwatch/observability";
 import { NlpLambdaFleetPort } from "../ports/nlp-lambda-fleet.port.ts";
-
-/** The name every studio engine function and its log group carries. */
-export const NLP_LAMBDA_NAME_PREFIX = "langwatch_nlp-";
+import { NLP_LAMBDA_NAME_PREFIX } from "../rules/nlp-lambda-config.rules.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FUNCTION_IDLE_DAYS = 7;

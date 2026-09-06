@@ -41,6 +41,7 @@ export {
 export {
   NlpLambdaArnCachePort,
   NlpLambdaArnResolverPort,
+  NlpLambdaFunctionPort,
   type NlpLambdaArnEntry,
 } from "./ports/nlp-lambda-arn.port.ts";
 export {
@@ -63,7 +64,11 @@ export {
   WorkflowStudioDispatchService,
   type WorkflowStudioDispatchInput,
 } from "./services/workflow-studio-dispatch.service.ts";
-export { WorkflowApp, type WorkflowAppDependencies, type WorkflowCaller } from "./app/workflow.app.ts";
+export {
+  WorkflowApp,
+  type WorkflowAppDependencies,
+  type WorkflowCaller,
+} from "./app/workflow.app.ts";
 export {
   WorkflowAgentMappingPort,
   WorkflowDslMigrationPort,
@@ -143,7 +148,28 @@ export {
 export { NlpLambdaFleetPort, type NlpLambdaFunction } from "./ports/nlp-lambda-fleet.port.ts";
 export { AwsNlpLambdaFleetAdapter } from "./adapters/aws.nlp-lambda-fleet.adapter.ts";
 export {
-  NLP_LAMBDA_NAME_PREFIX,
   NlpLambdaCleanupService,
   type NlpLambdaCleanupReport,
 } from "./services/nlp-lambda-cleanup.service.ts";
+export {
+  LAMBDA_INVOCATION_TIMEOUT_SECONDS,
+  NLP_LAMBDA_CONFIG_ENV,
+  NLP_LAMBDA_MEMORY_SIZE_MB,
+  NLP_LAMBDA_NAME_PREFIX,
+  STUDIO_STAGING_PREFIX,
+  buildStudioLambdaEnvironment,
+  clampCodeBlockTimeoutSeconds,
+  resolveStudioLambdaConfig,
+  type StudioLambdaConfig,
+} from "./rules/nlp-lambda-config.rules.ts";
+export {
+  NlpLambdaStreamInvokePort,
+  type NlpLambdaStreamChunk,
+} from "./ports/nlp-lambda-stream.port.ts";
+export { AwsNlpLambdaStreamInvokeAdapter } from "./adapters/aws.nlp-lambda-stream-invoke.adapter.ts";
+export { AwsNlpLambdaArnResolverAdapter } from "./adapters/aws.nlp-lambda-arn-resolver.adapter.ts";
+export { InMemoryNlpLambdaArnCacheAdapter } from "./adapters/memory.nlp-lambda-arn-cache.adapter.ts";
+export {
+  LambdaWorkflowStudioStreamAdapter,
+  type LambdaWorkflowStudioStreamOptions,
+} from "./adapters/lambda.workflow-studio-stream.adapter.ts";
