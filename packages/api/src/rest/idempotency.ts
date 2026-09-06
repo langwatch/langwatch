@@ -65,15 +65,16 @@ export function readIdempotencyKey(raw: string | undefined | null): string | nul
   return key;
 }
 
-/** What a handler hands back: the status and body it wants answered with. */
-export interface IdempotentHandlerResult<T> {
-  status: number;
-  body: T;
-}
-
-/** The handler ran: its own result, still to be serialised by the route. */
-export interface IdempotentExecuted<T> extends IdempotentHandlerResult<T> {
+/**
+ * The handler ran: the response it wrote, and the status that response carries.
+ *
+ * The whole `Response` travels back so the route answers with the very bytes
+ * the ledger stored, rather than serialising the same value a second time.
+ */
+export interface IdempotentExecuted {
   isReplayed: false;
+  status: number;
+  response: Response;
 }
 
 /**
@@ -88,7 +89,7 @@ export interface IdempotentReplayed {
   serializedBody: string;
 }
 
-export type IdempotentOutcome<T> = IdempotentExecuted<T> | IdempotentReplayed;
+export type IdempotentOutcome = IdempotentExecuted | IdempotentReplayed;
 
 /**
  * The ledger a packaged create dispatches through.
@@ -110,8 +111,12 @@ export type IdempotentRunner = (input: {
   key: string | null;
   /** The body as the route's validator produced it, not the raw bytes. */
   validatedBody: unknown;
-  handler: () => Promise<IdempotentHandlerResult<unknown>>;
-}) => Promise<IdempotentOutcome<unknown>>;
+  /**
+   * Runs the create and writes its response. The ledger stores that response's
+   * bytes as they are, which is what a replay hands back.
+   */
+  handler: () => Promise<Response>;
+}) => Promise<IdempotentOutcome>;
 
 /**
  * The `Idempotency-Key` request header, as the creates document it.
@@ -157,21 +162,23 @@ export const idempotentReplayHeaders = {
  * absent rather than `false` on a first execution, so its presence alone is
  * the signal.
  */
-export function idempotentJson<T>({
+export function idempotentJson({
   c,
   outcome,
 }: {
   c: Context;
-  outcome: IdempotentOutcome<T>;
+  outcome: IdempotentOutcome;
 }): Response {
-  if (!outcome.isReplayed) {
-    return c.json(outcome.body as Record<string, unknown>, outcome.status as ContentfulStatusCode);
-  }
+  // A first execution answers with the response it already wrote: those are
+  // the bytes the receipt holds, so the replay below stands in for exactly
+  // what the caller saw.
+  if (!outcome.isReplayed) return outcome.response;
 
   c.header(IDEMPOTENT_REPLAY_HEADER, "true");
   // The stored bytes are written through rather than parsed and re-serialised,
   // so a replay cannot drift from the response it is standing in for. The
   // content type is set by hand for the same reason `c.json` is not used.
   c.header("Content-Type", "application/json");
+  if (outcome.serializedBody === "") return c.body(null, outcome.status as ContentfulStatusCode);
   return c.body(outcome.serializedBody, outcome.status as ContentfulStatusCode);
 }

@@ -13,6 +13,7 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { SecretService } from "@langwatch/secret-contract";
 import { createApiKeysRestApp } from "@langwatch/api-key-server";
+import { PostgresTenantDirectoryAdapter } from "@langwatch/organization-server";
 import { PostgresSecretAdapter, type SecretEncryptionPort } from "@langwatch/secret-server";
 import { RESERVED_PROJECT_SECRET_NAMES } from "@langwatch/secret-contract";
 import { Hono } from "hono";
@@ -2805,12 +2806,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.composedClickHouse = ApiClickHouseInfrastructure.tryCreate({
       resources: options.resources,
       clickhouse: options.config.infrastructure.clickhouse,
-      // The routing directory is the project service: which organization a
-      // tenant belongs to is a project row, and it is the one question the
-      // tenant router asks.
-      directory: {
-        organizationForTenant: async (tenantId) => await projects.getOrganizationId(tenantId),
-      },
+      // The routing directory, over the three kinds of tenant the event store
+      // carries: a project names its owner, an organization names itself, and
+      // a user is platform-level. The SAME implementation the worker process
+      // composes — a project-only directory here answered an organization- or
+      // user-tenanted read with a refusal the worker never gave.
+      directory: PostgresTenantDirectoryAdapter.create({ database: database.client }),
       report: LoggedApiClickHouseAbsence.create(createLogger(options.config.serviceName)),
     });
 

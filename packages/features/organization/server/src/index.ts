@@ -46,6 +46,11 @@ export {
   type RoleBindingScope,
 } from "./services/personal-team-scope.service";
 export { PostgresPersonalTeamScopeAdapter } from "./adapters/postgres.personal-team-scope.adapter";
+export {
+  TenantDirectoryService,
+  type TenantOwnershipReader,
+} from "./services/tenant-directory.service";
+export { PostgresTenantDirectoryAdapter } from "./adapters/postgres.tenant-directory.adapter";
 export type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -153,4 +158,3 @@ export {
   OrganizationInviteRateLimitPort,
   OrganizationInviteSeatCensusPort,
 } from "./ports/invite.port";
-export { PrismaOrganizationInviteRepository } from "./repositories/prisma/prisma.organization-invite.repository";

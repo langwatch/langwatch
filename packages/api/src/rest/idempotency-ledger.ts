@@ -35,11 +35,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import { fingerprintJson, sha256 } from "./idempotency-fingerprint.js";
-import type {
-  IdempotentHandlerResult,
-  IdempotentOutcome,
-  IdempotentRunner,
-} from "./idempotency.js";
+import type { IdempotentOutcome, IdempotentRunner } from "./idempotency.js";
 
 const logger = createLogger("langwatch:api:idempotency");
 
@@ -211,7 +207,7 @@ export interface IdempotencyResponseCipher {
   decrypt(value: string): string;
 }
 
-export interface WithIdempotencyParams<T> {
+export interface WithIdempotencyParams {
   receipts: IdempotencyReceiptPersistence;
   /** The cipher the stored response body is written and read under. */
   cipher: IdempotencyResponseCipher;
@@ -227,7 +223,11 @@ export interface WithIdempotencyParams<T> {
   key: string | null;
   /** The body as the route's validator produced it, not the raw bytes. */
   validatedBody: unknown;
-  handler: () => Promise<IdempotentHandlerResult<T>>;
+  /**
+   * Runs the create and writes its response. What the receipt stores is that
+   * response's own bytes, so a replay cannot re-derive them differently.
+   */
+  handler: () => Promise<Response>;
 }
 
 /**
@@ -235,7 +235,7 @@ export interface WithIdempotencyParams<T> {
  *
  * With no key it is a pass-through and touches no storage at all.
  */
-export async function withIdempotency<T>({
+export async function withIdempotency({
   receipts,
   cipher,
   operation,
@@ -243,9 +243,10 @@ export async function withIdempotency<T>({
   key,
   validatedBody,
   handler,
-}: WithIdempotencyParams<T>): Promise<IdempotentOutcome<T>> {
+}: WithIdempotencyParams): Promise<IdempotentOutcome> {
   if (key === null) {
-    return { ...(await handler()), isReplayed: false };
+    const response = await handler();
+    return { isReplayed: false, status: response.status, response };
   }
 
   const requestFingerprint = fingerprintRequestBody({
@@ -274,33 +275,45 @@ export async function withIdempotency<T>({
   const heartbeat = startClaimHeartbeat({ receipts, receiptId, claimId });
 
   try {
-    let result: IdempotentHandlerResult<T>;
+    let response: Response;
     try {
-      result = await handler();
+      response = await handler();
     } catch (error) {
       await releaseClaim({ receipts, receiptId, claimId });
       throw error;
     }
 
-    if (result.status >= 200 && result.status < 300) {
+    if (response.status >= 200 && response.status < 300) {
       await finalizeClaim({
         receipts,
         cipher,
         receiptId,
         claimId,
-        status: result.status,
-        // The bytes the route is about to write, not the object behind them,
-        // so a replay reproduces this response rather than re-deriving it.
-        serializedBody: serializeResponseBody(result.body),
+        status: response.status,
+        // The bytes the caller is about to receive, read off the response
+        // itself rather than re-serialised from the value behind it: an output
+        // schema can order keys differently from the handler's object, and a
+        // replay that re-derived the body would answer the same values in
+        // different bytes.
+        serializedBody: await readResponseBytes(response),
       });
     } else {
       await releaseClaim({ receipts, receiptId, claimId });
     }
 
-    return { ...result, isReplayed: false };
+    return { isReplayed: false, status: response.status, response };
   } finally {
     heartbeat.stop();
   }
+}
+
+/**
+ * The response's body as bytes, without consuming the response the route is
+ * about to return: the clone is what is read, the original is answered with.
+ */
+async function readResponseBytes(response: Response): Promise<string> {
+  if (response.body === null) return "";
+  return await response.clone().text();
 }
 
 /** A running claim's liveness reporting, for as long as its handler runs. */
@@ -395,11 +408,9 @@ async function finalizeClaim({
 }
 
 /**
- * The exact bytes a route answers a body with.
- *
- * Must stay in step with how the route writes a fresh response, because the
- * stored copy is what a replay serves in place of re-running the handler.
- * Both are `JSON.stringify`, which is what Hono's `c.json` does.
+ * The bytes `c.json` writes for a body, for a caller that holds the value and
+ * needs the receipt's stored form of it. The ledger itself no longer derives
+ * the stored bytes this way: it reads them off the response the route wrote.
  */
 export function serializeResponseBody(body: unknown): string {
   return JSON.stringify(body);

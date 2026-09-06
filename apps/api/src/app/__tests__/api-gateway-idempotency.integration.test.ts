@@ -131,10 +131,9 @@ describe("the gateway application's Idempotency-Key runner", () => {
     it("executes a keyed create once and replays its stored answer", async () => {
       const receipts = testReceiptStore();
       const { gateway } = composeGatewayWith(composeLedgerOver(receipts));
-      const create = vi.fn(async () => ({
-        status: 201,
-        body: { id: "vk_1", secret: "shown once" },
-      }));
+      const create = vi.fn(async () =>
+        Response.json({ id: "vk_1", secret: "shown once" }, { status: 201 }),
+      );
       const request = {
         operation: "gateway.v1.virtual-keys.create",
         scopeId: PROJECT_ID,
@@ -145,7 +144,9 @@ describe("the gateway application's Idempotency-Key runner", () => {
       const first = await gateway.app.idempotency({ ...request, handler: create });
       const replay = await gateway.app.idempotency({
         ...request,
-        handler: vi.fn(async () => ({ status: 201, body: { id: "vk_2", secret: "another" } })),
+        handler: vi.fn(async () =>
+          Response.json({ id: "vk_2", secret: "another" }, { status: 201 }),
+        ),
       });
 
       expect(first).toMatchObject({ isReplayed: false, status: 201 });
@@ -166,7 +167,7 @@ describe("the gateway application's Idempotency-Key runner", () => {
         scopeId: PROJECT_ID,
         key: KEY,
         validatedBody: { name: "billing" },
-        handler: async () => ({ status: 201, body: { secret: "vk-lw-shown-once" } }),
+        handler: async () => Response.json({ secret: "vk-lw-shown-once" }, { status: 201 }),
       });
 
       const stored = [...receipts.rows.values()][0]?.responseBody;
@@ -197,7 +198,7 @@ describe("the gateway application's Idempotency-Key runner", () => {
         handler: async () => {
           runs++;
           await held;
-          return { status: 201, body: { id: "vk_1" } };
+          return Response.json({ id: "vk_1" }, { status: 201 });
         },
       });
       const refusal = await refusalFrom(() =>
@@ -205,7 +206,7 @@ describe("the gateway application's Idempotency-Key runner", () => {
           ...request,
           handler: async () => {
             runs++;
-            return { status: 201, body: { id: "vk_2" } };
+            return Response.json({ id: "vk_2" }, { status: 201 });
           },
         }),
       );
@@ -221,7 +222,7 @@ describe("the gateway application's Idempotency-Key runner", () => {
   describe("given a process that composed no receipt ledger", () => {
     it("refuses a keyed create by name rather than executing it unguarded", async () => {
       const { gateway } = composeGatewayWith(undefined);
-      const create = vi.fn(async () => ({ status: 201, body: { id: "vk_1" } }));
+      const create = vi.fn(async () => Response.json({ id: "vk_1" }, { status: 201 }));
 
       const refusal = await refusalFrom(() =>
         gateway.app.idempotency({

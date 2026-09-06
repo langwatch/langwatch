@@ -16,6 +16,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./composition/organization-invites": {
+      "types": "./src/repositories/prisma/prisma.organization-invite.repository.ts",
+      "default": "./src/repositories/prisma/prisma.organization-invite.repository.ts"
     }
   },
   "scripts": {
@@ -29,6 +33,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",

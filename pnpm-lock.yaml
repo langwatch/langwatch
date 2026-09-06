@@ -7331,6 +7331,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/clickhouse-client':
+        specifier: workspace:*
+        version: link:../../../clickhouse-client
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract

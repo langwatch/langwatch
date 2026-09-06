@@ -27,15 +27,16 @@ function ledger() {
     asked.push({ operation, scopeId, key });
     const receiptKey = key === null ? null : `${operation}:${scopeId}:${key}`;
     const stored = receiptKey === null ? undefined : receipts.get(receiptKey);
-    if (stored) return { isReplayed: true, ...stored } satisfies IdempotentOutcome<unknown>;
-    const executed = await handler();
+    if (stored) return { isReplayed: true, ...stored } satisfies IdempotentOutcome;
+    const response = await handler();
     if (receiptKey !== null) {
+      // The bytes the route wrote, exactly as the real ledger stores them.
       receipts.set(receiptKey, {
-        status: executed.status,
-        serializedBody: JSON.stringify(executed.body),
+        status: response.status,
+        serializedBody: await response.clone().text(),
       });
     }
-    return { isReplayed: false, ...executed };
+    return { isReplayed: false, status: response.status, response };
   };
   return { asked, runner };
 }
@@ -228,5 +229,58 @@ describe("a replayable create declaring a pre-flight", () => {
     expect(retry.status).toBe(201);
     expect(created).toBe(1);
     expect(preflights).toEqual([{ name: "a" }, { name: "a" }]);
+  });
+});
+
+describe("a replayable create whose schema orders keys differently from its handler", () => {
+  /** @scenario "A replay answers the bytes the first response sent, not the handler's own value" */
+  it("replays the first response byte for byte", async () => {
+    const { runner } = ledger();
+    // Declared destination-first, returned id-first: the output schema decides
+    // the order the bytes are written in, so a receipt holding the handler's
+    // own object would replay the same values in a different order.
+    const app = createService({
+      name: "toy-reordered-creates",
+      logger: false,
+      tracer: false,
+      idempotency: runner,
+    })
+      .registerRoute(
+        "post",
+        "/things",
+        "2026-08-07",
+        async (_c, _input: { name: string }) => ({
+          data: { id: "thing-1", destination_kind: "http" },
+        }),
+        (b) =>
+          b
+            .withInput(z.object({ name: z.string() }))
+            .withOutput(
+              z.object({ data: z.object({ destination_kind: z.string(), id: z.string() }) }),
+            )
+            .withStatus(201)
+            .withIdempotency({
+              operation: "toy.reordered.create",
+              scope: () => "scope-1",
+            }),
+      )
+      .build();
+
+    const first = await app.request(
+      "/api/toy-reordered-creates/2026-08-07/things",
+      post("key-abcdef"),
+    );
+    const retry = await app.request(
+      "/api/toy-reordered-creates/2026-08-07/things",
+      post("key-abcdef"),
+    );
+
+    const firstBytes = await first.text();
+    const retryBytes = await retry.text();
+    // The schema really does re-order, so this is a byte difference the test
+    // can observe rather than a tautology.
+    expect(firstBytes).toBe('{"data":{"destination_kind":"http","id":"thing-1"}}');
+    expect(retryBytes).toBe(firstBytes);
+    expect(retry.headers.get(IDEMPOTENT_REPLAY_HEADER)).toBe("true");
   });
 });

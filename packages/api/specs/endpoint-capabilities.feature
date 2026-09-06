@@ -100,6 +100,17 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     And a key too short to be plausibly unique is refused rather than ignored
 
   @unit
+  Scenario: A replay answers the bytes the first response sent, not the handler's own value
+    Given a replayable create whose output schema orders its keys differently from its handler
+    When the same key is sent twice in one tenancy
+    Then the retry's body is byte-for-byte the first response's body
+    # The receipt holds the bytes the route wrote, not the value behind them.
+    # Storing the handler's own object let the schema re-order the keys on the
+    # way out, so a replay answered the same values as different bytes — which
+    # is exactly what a caller comparing responses, or verifying a signature
+    # over one, is entitled to rely on.
+
+  @unit
   Scenario: A replayable create re-checks the authorization a replay would otherwise skip
     Given a replayable create declares a read-only pre-flight check
     When a retry is answered from the stored bytes

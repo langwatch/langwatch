@@ -198,8 +198,9 @@ export type { RouteResponse } from "./response-types.js";
 export {
   IDEMPOTENCY_KEY_HEADER,
   IDEMPOTENT_REPLAY_HEADER,
-  type IdempotentHandlerResult,
+  type IdempotentExecuted,
   type IdempotentOutcome,
+  type IdempotentReplayed,
   type IdempotentRunner,
   idempotencyKeyParameter,
   idempotentJson,

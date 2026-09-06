@@ -71,18 +71,22 @@ describe.skipIf(!databaseUrl)("given the webhook endpoint create over the receip
       const first = await send(body);
       expect(first.status).toBe(201);
       expect(first.headers.get("X-Idempotent-Replay")).toBeNull();
-      const firstBody = (await first.json()) as { data: { id: string; secret: string } };
+      const firstBytes = await first.text();
+      const firstBody = JSON.parse(firstBytes) as { data: { id: string; secret: string } };
 
       const second = await send(body);
       expect(second.status).toBe(201);
       expect(second.headers.get("X-Idempotent-Replay")).toBe("true");
-      const replayed = (await second.json()) as { data: { id: string; secret: string } };
+      const replayedBytes = await second.text();
+      const replayed = JSON.parse(replayedBytes) as { data: { id: string; secret: string } };
       // Including the signing secret: the endpoint hands that out once, so a
       // replay that withheld it would answer with an endpoint nobody can
       // verify, and a second execution would answer with a different one.
       expect(replayed.data.secret).toBe(firstBody.data.secret);
       expect(replayed.data.id).toBe(firstBody.data.id);
-      expect(replayed).toEqual(firstBody);
+      // Byte-for-byte, not merely equivalent: the receipt holds the bytes the
+      // first response wrote, so a replay cannot differ from it by key order.
+      expect(replayedBytes).toBe(firstBytes);
 
       const receipt = await prisma.idempotencyReceipt.findUnique({
         where: { scopeId_key: { scopeId: ORGANIZATION_ID, key } },

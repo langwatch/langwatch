@@ -152,7 +152,7 @@ function countingHandler(body: unknown) {
     },
     handler: async () => {
       runs++;
-      return { status: 201, body };
+      return Response.json(body, { status: 201 });
     },
   };
 }
@@ -284,7 +284,7 @@ describe("the Idempotency-Key receipt ledger", () => {
         handler: async () => {
           runs++;
           await held;
-          return { status: 201, body: { id: "budget_1" } };
+          return Response.json({ id: "budget_1" }, { status: 201 });
         },
       });
       const retry = refusalFrom(
@@ -292,7 +292,7 @@ describe("the Idempotency-Key receipt ledger", () => {
           ...request,
           handler: async () => {
             runs++;
-            return { status: 201, body: { id: "budget_2" } };
+            return Response.json({ id: "budget_2" }, { status: 201 });
           },
         }),
       );

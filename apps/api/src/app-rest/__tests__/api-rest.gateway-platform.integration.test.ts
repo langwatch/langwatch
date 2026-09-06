@@ -2172,7 +2172,7 @@ describe.skipIf(!databaseUrl || !clickHouseUrl)(
           validatedBody,
           handler: async () => {
             await parked;
-            return { status: 201, body: { id: "from-the-original" } };
+            return Response.json({ id: "from-the-original" }, { status: 201 });
           },
         });
 
@@ -2192,10 +2192,7 @@ describe.skipIf(!databaseUrl || !clickHouseUrl)(
           key,
           validatedBody,
           handler: () =>
-            Promise.resolve({
-              status: 201,
-              body: { id: "from-the-replacement" },
-            }),
+            Promise.resolve(Response.json({ id: "from-the-replacement" }, { status: 201 })),
         });
         expect(replacement.isReplayed).toBe(false);
 

@@ -96,6 +96,15 @@ Feature: Private ClickHouse Routing
     Then the returned client connects to the private ClickHouse
     And no project needs to exist for that id
 
+  @unit
+  Scenario: One directory places tenants for every process
+    Given the directory the API process and the worker process each compose
+    When it is asked for a project, for an organization and for a user
+    Then it answers the project's organization, the organization itself, and the shared instance
+    # One implementation, not one per process: the API resolved a tenant through
+    # the project table alone, so an organization- or user-tenanted read that the
+    # worker routed correctly was refused in the API.
+
   @integration
   Scenario: A tenant that names no project, organization or user is refused
     Given an id that matches no project, no organization and no user

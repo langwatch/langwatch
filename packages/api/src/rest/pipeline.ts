@@ -1,6 +1,5 @@
 import { updateCurrentContext } from "@langwatch/observability/context";
 import type { Context, MiddlewareHandler } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import {
   type DescribeRouteOptions,
@@ -788,26 +787,14 @@ async function replayableResponse({
     scopeId: idempotency.scope(c),
     key: readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER)),
     validatedBody: input,
-    handler: async () => ({
-      status: config.status ?? 200,
-      body: await handler(),
-    }),
+    // The response is written INSIDE the ledger's handler, so what the receipt
+    // stores is the very bytes this request answers with. Serialising after
+    // the ledger had stored the handler's raw value let an output schema
+    // re-order the keys, and a replay then answered the same values in
+    // different bytes.
+    handler: async () => serializeEndpointResult({ c, config, kind, result: await handler() }),
   });
-  if (outcome.isReplayed) return idempotentJson({ c, outcome });
-  // A replayable answer is JSON by construction: the ledger stores serialised
-  // bytes and a replay writes them back as JSON, so a first execution has to
-  // be written the same way even on a route that otherwise answers outside the
-  // JSON contract — otherwise the retry would not match the original.
-  if (config.rawResponse) {
-    return c.json(
-      outcome.body as Record<string, unknown>,
-      (config.status ?? 200) as ContentfulStatusCode,
-    );
-  }
-  // Otherwise the same writer as any other answer, so a first execution is
-  // validated against its declared output exactly as it would be without the
-  // ledger.
-  return serializeEndpointResult({ c, config, kind, result: outcome.body });
+  return idempotentJson({ c, outcome });
 }
 
 function projectInputMiddleware(
