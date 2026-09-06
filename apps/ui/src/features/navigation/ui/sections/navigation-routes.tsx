@@ -12,6 +12,15 @@ import { NavigationHostSection } from "./navigation-host";
 export const navigationPageLoaders: UiPageLoaderRegistry = {
   "pages/index": uiPage({ screen: navigationScreens.landing, host: NavigationHostSection }),
   "pages/not-found": uiPage({ screen: navigationScreens.notFound, host: NavigationHostSection }),
+  /**
+   * The same page, for an address under `/settings` that names nothing. A second key rather
+   * than a second route on the same one, because the route table's `/settings/*` entry sits
+   * inside the settings group so the sidebar and top bar stay drawn around it.
+   */
+  "pages/settings/not-found": uiPage({
+    screen: navigationScreens.notFound,
+    host: NavigationHostSection,
+  }),
   "pages/@project/[...path]/index": uiPage({
     screen: navigationScreens.projectRedirect,
     host: NavigationHostSection,

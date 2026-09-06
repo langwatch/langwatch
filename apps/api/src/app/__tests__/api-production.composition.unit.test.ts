@@ -1261,3 +1261,89 @@ function secretService() {
   });
   return { service, create };
 }
+
+/**
+ * The optional collaborators nothing supplies.
+ *
+ * `api.main.ts` composes with no options at all, so every one of these was declared optional
+ * and then never handed in: the redaction resolver, the reviewer's trace content, the setup
+ * checklist's simulation evidence, the person-shaped messages and the seat allowances behind
+ * `licenseEnforcement.*`. Each has a fallback off this process's own graph now, and this is
+ * what says so.
+ */
+describe("given the optional collaborators no host supplies", () => {
+  afterEach(async () => {
+    await ConnectedAgentRuntimeAdapter.close();
+  });
+
+  async function composeFullDeployment(): Promise<ApiProductionComposition> {
+    databaseMocks.configured.value = true;
+    queueMocks.composed.value = {
+      redis: queueMocks.redis,
+      dependencies: { redis: queueMocks.redis },
+    };
+    // No injected api-key/organization pair on purpose: a host that supplies
+    // that pair holds the whole tenancy graph itself, and this is the shape
+    // `api.main.ts` composes — nothing supplied at all.
+    const composition = ApiProductionComposition.create({
+      agents: new Proxy(AgentService.prototype, {}),
+      secrets: secretService().service,
+      auth: new TestAuthComposition(),
+    });
+    await composition.compose({
+      config: resolveApiConfig({
+        NODE_ENV: "test",
+        API_PORT: "5560",
+        DATABASE_URL: "postgresql://localhost/langwatch",
+        CREDENTIALS_SECRET: ENCRYPTION_KEY,
+        BASE_HOST: "https://langwatch.example.com",
+      }),
+      graph: new TestGraph(),
+      observability: { serviceName: "langwatch-api-test" },
+      resources: new ResourceScope(),
+    });
+    return composition;
+  }
+
+  describe("when the deployment configured the resources each one stands on", () => {
+    /** @scenario Every optional collaborator the API process can build, it builds */
+    it("resolves all five off its own graph rather than leaving them absent", async () => {
+      const ports = (await composeFullDeployment()).optionalPorts();
+
+      // Absent, each of these was not a smaller answer but a refusal:
+      // `project.getFieldRedactionStatus` 500ed on every trace open, the
+      // annotation queue could not resolve a trace, `/settings/members` could
+      // not read a seat limit, the checklist reported simulations as never
+      // started, and no person-shaped message was ever sent.
+      expect(ports.viewerProtections).toBeDefined();
+      expect(ports.traceContent).toBeDefined();
+      expect(ports.simulations).toBeDefined();
+      expect(ports.personMail).toBeDefined();
+      expect(ports.seatAllowances).toBeDefined();
+    });
+  });
+
+  describe("when the deployment configured no database", () => {
+    /** @scenario A collaborator whose graph is genuinely absent stays absent */
+    it("leaves the ones that need one absent, rather than answering from nothing", async () => {
+      databaseMocks.configured.value = false;
+      queueMocks.composed.value = undefined;
+      const composition = ApiProductionComposition.create({
+        agents: new Proxy(AgentService.prototype, {}),
+        secrets: secretService().service,
+        auth: new TestAuthComposition(),
+      });
+      await composition.compose({
+        config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560" }),
+        graph: new TestGraph(),
+        observability: { serviceName: "langwatch-api-test" },
+        resources: new ResourceScope(),
+      });
+
+      const ports = composition.optionalPorts();
+      expect(ports.viewerProtections).toBeUndefined();
+      expect(ports.traceContent).toBeUndefined();
+      expect(ports.seatAllowances).toBeUndefined();
+    });
+  });
+});

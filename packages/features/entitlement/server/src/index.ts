@@ -15,6 +15,7 @@ export { UsageMembershipPort } from "./ports/usage-membership.port";
 export { PrismaUsageMembershipRepository } from "./repositories/prisma/prisma.usage-membership.repository";
 export {
   MESSAGE_LIMIT_WARNING_THRESHOLD,
+  UNCAPPED_MONTHLY_USAGE_LIMIT,
   UsageStatsService,
   type UsageStatsCaller,
 } from "./services/usage-stats.service";

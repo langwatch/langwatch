@@ -19,6 +19,15 @@ import type { UsageMembershipPort } from "../ports/usage-membership.port";
  */
 const UNLIMITED_MESSAGES = 999_999_999;
 
+/**
+ * The monthly usage allowance an organization with no cap is reported against.
+ *
+ * `Number.MAX_SAFE_INTEGER` rather than `Infinity`: the same value
+ * {@link UsageStatsService.getMessageLimitStatus} already reads as "no cap", and the largest
+ * one that survives JSON and the declared `z.number()` on the wire.
+ */
+export const UNCAPPED_MONTHLY_USAGE_LIMIT = Number.MAX_SAFE_INTEGER;
+
 const wholeNumber = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const wholePercent = new Intl.NumberFormat("en-US", {
   style: "percent",
@@ -159,10 +168,14 @@ export class UsageStatsService {
   }
 
   /**
-   * Get the maximum monthly usage limit for the organization. FIXME: This was recently changed
-   * to return Infinity, but still takes the organizationId as a parameter.
+   * Get the maximum monthly usage limit for the organization. FIXME: This still takes the
+   * organizationId as a parameter but answers the same uncapped figure for everybody.
+   *
+   * Finite on purpose. The reading crosses a wire and is declared `z.number()`, and neither
+   * JSON nor Zod carries `Infinity` — returning it made every usage read a 500 rather than an
+   * uncapped allowance.
    */
   private async getMaxMonthlyUsageLimit(_organizationId: string): Promise<number> {
-    return Infinity;
+    return UNCAPPED_MONTHLY_USAGE_LIMIT;
   }
 }

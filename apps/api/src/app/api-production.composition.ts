@@ -138,7 +138,7 @@ import type { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.p
 import { composeShareFeature, refusingShareFeature } from "../features/share/share.composition";
 import { composeTopicFeature, refusingTopicFeature } from "../features/topic/topic.composition";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { UsageService } from "@langwatch/entitlement-server";
+import { PrismaUsageMembershipRepository, type UsageService } from "@langwatch/entitlement-server";
 
 import {
   composeApiModelProviders,
@@ -169,6 +169,7 @@ import {
   refusingStoredObjectFeature,
 } from "../features/stored-object/stored-object.composition";
 import {
+  ApiOrganizationSeatLicense,
   composeOrganizationFeature,
   refusingOrganizationFeature,
   type ApiOrganizationInvitePort,
@@ -189,8 +190,14 @@ import {
   composeEnterpriseFeature,
   refusingEnterpriseFeature,
   type ApiEnterpriseApplicationPort,
+  type ApiSeatAllowancePort,
 } from "../features/enterprise/enterprise.composition";
-import type { ApiViewerProtectionsPort } from "../features/trace/trace-viewer-protections";
+import { ApiEnterpriseSeatAllowance } from "../features/enterprise/enterprise-seat-allowance";
+import {
+  ApiTraceReadViewerProtections,
+  type ApiViewerProtectionsPort,
+} from "../features/trace/trace-viewer-protections";
+import { ApiTraceAnnotationContent } from "../features/annotation/annotation-trace-content";
 import {
   composeApiOrganizationInvites,
   type ApiOrganizationInvites,
@@ -264,6 +271,7 @@ import {
   refusingIntegrationsChecksFeature,
   type ApiSimulationEvidencePort,
 } from "../features/project/integrations-checks.composition";
+import { ApiScenarioSimulationEvidence } from "../features/project/scenario-simulation-evidence";
 import { TraceSpanIngestPort } from "@langwatch/trace-server";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
@@ -293,6 +301,7 @@ import {
 } from "./api-usage.composition";
 import { tryCreateApiMailComposition, type ApiMailComposition } from "./api-mail.composition";
 import { ApiComposedPasswordResetMail } from "./api-better-auth.composition";
+import { ApiComposedPersonMail } from "./api-person-mail.composition";
 import { ApiAuthzAbsenceReportPort, ApiAuthzComposition } from "./api-authz.composition";
 import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "./api-tenancy.composition";
 import {
@@ -645,6 +654,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedExperiment!: ComposedExperimentFeature;
   private composedEvaluation!: ComposedEvaluationFeature;
   private composedTrace!: ComposedTraceFeature;
+  /** The seat gate `licenseEnforcement.*` answers from; see {@link optionalPorts}. */
+  private composedSeatAllowances: ApiSeatAllowancePort | undefined;
   private composedShare!: ComposedShareFeature;
   private composedTopic!: ComposedTopicFeature;
   private composedRole!: ComposedRoleFeature;
@@ -1128,6 +1139,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           ),
         })
       : refusingModelProviderFeature();
+    const simulationEvidence = this.resolveSimulationEvidence();
     this.composedIntegrationsChecks =
       infrastructure && directory
         ? composeIntegrationsChecksFeature({
@@ -1136,7 +1148,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               database: infrastructure.prisma,
               projects: directory.projects,
             }).build(),
-            ...(this.options.simulations ? { simulations: this.options.simulations } : {}),
+            // Whether this project has run a simulation, off the SAME simulation service the
+            // scenario surfaces read. Nothing supplies the option, so the checklist reported
+            // the step as never started on every project that HAD run one.
+            ...(simulationEvidence ? { simulations: simulationEvidence } : {}),
           })
         : refusingIntegrationsChecksFeature();
     // The conversation panel and the egress allow-list beside it. It used to
@@ -1359,6 +1374,30 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   restFeaturePorts(): ApiOwnedRestFeaturePorts | undefined {
     return this.composedFeaturePorts;
+  }
+
+  /**
+   * The optional collaborators this process resolved for itself, once composed.
+   *
+   * Every one of them used to be an option a host supplied and nothing did: `api.main.ts`
+   * composes with no options at all, so an "optional" port with no fallback was a surface that
+   * refused on every deployment. This is the read that says which of them the process now
+   * answers from its own graph — `undefined` where the graph it stands on is genuinely absent.
+   */
+  optionalPorts(): Readonly<{
+    viewerProtections: ApiViewerProtectionsPort | undefined;
+    traceContent: ApiAnnotationTraceContentPort | undefined;
+    simulations: ApiSimulationEvidencePort | undefined;
+    personMail: ApiPersonMailPort | undefined;
+    seatAllowances: ApiSeatAllowancePort | undefined;
+  }> {
+    return {
+      viewerProtections: this.resolveViewerProtections(),
+      traceContent: this.resolveAnnotationTraceContent(),
+      simulations: this.resolveSimulationEvidence(),
+      personMail: this.resolvePersonMail(),
+      seatAllowances: this.composedSeatAllowances,
+    };
   }
 
   /**
@@ -2826,6 +2865,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const database = this.composedDatabase?.connection;
     const projects = this.composedTenancy?.projects;
     const processName = options.config.serviceName;
+    const personMail = this.resolvePersonMail();
     // A host that injected its own api-key and organization pair composed no
     // tenancy here, so it holds the collaborator set whole and hands it in
     // rather than having these features built for it.
@@ -2864,7 +2904,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // cannot be spent twice by asking on two paths.
       rateLimit: (request) => this.rateLimiter.consume(request),
       deployment: this.personDeployment(options),
-      ...(this.options.mail ? { mail: this.options.mail } : {}),
+      ...(personMail ? { mail: personMail } : {}),
       processName,
     });
 
@@ -2882,7 +2922,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       eventing: identityEventing,
       rateLimit: (request) => this.rateLimiter.consume(request),
       deployment: this.personDeployment(options),
-      ...(this.options.mail ? { mail: this.options.mail } : {}),
+      ...(personMail ? { mail: personMail } : {}),
       processName,
     });
 
@@ -2917,11 +2957,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       return refusingAnnotationFeature();
     }
 
+    const traceContent = this.resolveAnnotationTraceContent();
+
     return composeAnnotationFeature({
       infrastructure,
       peers: { projects, organizations, users, traceCommands: this.composedTraceCommands },
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
-      ...(this.options.traceContent ? { traceContent: this.options.traceContent } : {}),
+      // The reviewer's trace content, taken off the trace half this process already composed
+      // rather than left for a host to supply. Nothing supplies it, so the queue read refused
+      // and the annotations screen answered nothing at all.
+      ...(traceContent ? { traceContent } : {}),
     });
   }
 
@@ -3291,6 +3336,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const invites =
       this.options.organizationInvites ?? this.resolveOrganizationInvites(options)?.trpc;
 
+    // The invitation and join-request messages, over the ONE mail graph this process composed.
+    const personMail = this.resolvePersonMail();
+
     // The membership half: the seats, groups, join requests and sign-up
     // ceremony this feature serves over the graph the person-shaped features
     // already composed. All of it or none — a process holding part of it would
@@ -3311,7 +3359,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             // The senders the root registered for the identity ledgers: one
             // registration per definition, whatever composes over it.
             eventing: this.composedIdentityEventing,
-            ...(this.options.mail ? { mail: this.options.mail } : {}),
+            ...(personMail ? { mail: personMail } : {}),
             processName: options.config.serviceName,
           }
         : undefined;
@@ -3335,6 +3383,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       },
     });
 
+    // The caller's read-time redactions, taken off the trace READ stack this process already
+    // composed rather than left for a host to supply. Nothing supplies it — `api.main.ts`
+    // composes with no options at all — so `project.getFieldRedactionStatus` refused on every
+    // trace open and `codingAgents.sessionsList` with it.
+    const viewerProtections = this.resolveViewerProtections();
+
     this.composedProject = composeProjectFeature({
       infrastructure,
       peers: {
@@ -3346,9 +3400,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         share: this.composedShare.service,
         topics: this.composedTopic.service,
         encryption,
-        ...(this.options.viewerProtections
-          ? { viewerProtections: this.options.viewerProtections }
-          : {}),
+        ...(viewerProtections ? { viewerProtections } : {}),
       },
     });
 
@@ -3362,9 +3414,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         // coding-agent session is a projection in that instance, and a second
         // connection would be a second pool.
         clickHouse: this.resolveCodingAgentClickHouse(),
-        ...(this.options.viewerProtections
-          ? { viewerProtections: this.options.viewerProtections }
-          : {}),
+        ...(viewerProtections ? { viewerProtections } : {}),
       },
     });
 
@@ -3384,9 +3434,20 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       processName: options.config.serviceName,
     });
 
+    this.composedSeatAllowances = ApiEnterpriseSeatAllowance.create(
+      ApiOrganizationSeatLicense.create({
+        plans: this.resolvePlanProvider(options),
+        memberships: PrismaUsageMembershipRepository.create(database.client),
+      }),
+    );
     this.composedEnterprise = composeEnterpriseFeature({
       audit: this.options.audit,
       ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
+      // The seat allowances `/settings/members` asks about on every open. Answered whether or
+      // not this deployment composed an Enterprise application, over the SAME plan provider and
+      // membership counts the organization half spends a seat against: a member refused there
+      // and a member counted here cannot be told two different numbers.
+      seats: this.composedSeatAllowances,
     });
   }
 
@@ -3750,6 +3811,54 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       supplied: this.options.identity,
       adminEmails: options.config.deployment.adminEmails,
     });
+  }
+
+  /**
+   * Whether a project has run any simulation: an injected port, else this process's own
+   * simulation reads. Absent only where the scenario half did not compose, and the checklist
+   * then reports the step as not started — which is what it already did.
+   */
+  private resolveSimulationEvidence(): ApiSimulationEvidencePort | undefined {
+    if (this.options.simulations) return this.options.simulations;
+    const simulations = this.composedScenario?.simulations;
+    return simulations ? ApiScenarioSimulationEvidence.create(simulations) : undefined;
+  }
+
+  /**
+   * Every message a person-shaped surface sends: an injected port, else this process's own
+   * mail graph. Absent exactly where the deployment named no BASE_HOST, and then each surface
+   * carries on without its message rather than refusing the write it belongs to.
+   */
+  private resolvePersonMail(): ApiPersonMailPort | undefined {
+    if (this.options.mail) return this.options.mail;
+    return this.composedMail ? ApiComposedPersonMail.create(this.composedMail) : undefined;
+  }
+
+  /**
+   * The reviewer's trace content: an injected port, else the process's own trace application
+   * carried through its own redaction pass. Absent only where the process composed no read
+   * stack, and then the queue read refuses by name.
+   */
+  private resolveAnnotationTraceContent(): ApiAnnotationTraceContentPort | undefined {
+    if (this.options.traceContent) return this.options.traceContent;
+    const reads = this.composedTrace?.traceReads;
+    if (!reads) return undefined;
+    const traces = this.composedTrace.traces;
+    return ApiTraceAnnotationContent.create({
+      getViewerProtections: (ctx, input) => reads.getViewerProtections(ctx, input),
+      readTracesWithSpans: (input) => traces.readTracesWithSpans(input),
+    });
+  }
+
+  /**
+   * The caller's read-time redactions: an injected resolver, else this process's own trace read
+   * stack. Absent only where the process composed no read stack, and then the two surfaces that
+   * ask refuse by name rather than guessing what a reader may see.
+   */
+  private resolveViewerProtections(): ApiViewerProtectionsPort | undefined {
+    if (this.options.viewerProtections) return this.options.viewerProtections;
+    const reads = this.composedTrace?.traceReads;
+    return reads ? ApiTraceReadViewerProtections.create(reads) : undefined;
   }
 
   private resolvePlanProvider(options: ApiRuntimeCompositionOptions): PlanProvider {

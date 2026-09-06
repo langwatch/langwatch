@@ -70,7 +70,6 @@ import {
   type OrganizationPlanUser,
   type OrganizationProvisioningPort,
   type OrganizationRestService,
-  type OrganizationSeatDecision,
   type OrganizationTrpcPorts,
   type TeamRoleValue,
 } from "@langwatch/organization-server";
@@ -899,6 +898,14 @@ function refusingOrganizationApp(): OrganizationApp {
   ) as OrganizationApp;
 }
 
+/** A seat decision with every field answered. */
+export type ApiOrganizationSeatAnswer = Readonly<{
+  allowed: boolean;
+  limitType: "members" | "membersLite";
+  current: number;
+  max: number;
+}>;
+
 /**
  * The seat licence, over the SAME plan provider and the SAME membership counts every
  * other allowance in this process reads.
@@ -920,11 +927,16 @@ export class ApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
     super();
   }
 
+  /**
+   * Narrower than the port on purpose: every field is answered, always. The port leaves
+   * `limitType`, `current` and `max` optional so a deployment with no seat gate can refuse with
+   * `allowed` alone, and the licence-enforcement door needs all four to render a limit.
+   */
   async checkLimit(input: {
     organizationId: string;
     resource: "members" | "membersLite";
     user?: OrganizationPlanUser | undefined;
-  }): Promise<OrganizationSeatDecision> {
+  }): Promise<ApiOrganizationSeatAnswer> {
     const plan = await this.activePlan(input.organizationId, input.user);
     const max = this.allowance(plan, input.resource);
     if (plan.overrideAddingLimitations) {

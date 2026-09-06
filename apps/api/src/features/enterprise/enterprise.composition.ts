@@ -3,6 +3,8 @@
  * licenseEnforcement.*   what this instance is licensed for scimToken.*
  * the directory-sync credentials ssoConnections.*                   the back office's
  */
+import type { LimitCheckResult, LimitType } from "@langwatch/enterprise-licensing-contract";
+import { LicensingApp, type LicensingCaller } from "@langwatch/enterprise-licensing-server";
 import {
   ENTERPRISE_FEATURE_ERRORS,
   assertEnterprisePlanType,
@@ -17,6 +19,20 @@ import {
   createEnterpriseTrpcRouters,
   type EnterpriseTrpcMountPorts,
 } from "./enterprise-trpc.mount";
+
+/**
+ * Whether one seat allowance still admits another member, over the process's OWN plan
+ * provider and membership counts.
+ *
+ * Separate from {@link ApiEnterpriseApplicationPort} because it is not Enterprise-only: an
+ * unlicensed deployment has seat allowances too, and `/settings/members` asks about them on
+ * every open. A deployment with no Enterprise application still answers this.
+ */
+export abstract class ApiSeatAllowancePort {
+  abstract checkLimit(
+    input: Readonly<{ organizationId: string; limitType: LimitType; user: LicensingCaller }>,
+  ): Promise<LimitCheckResult>;
+}
 
 /**
  * The Enterprise application the nineteen Enterprise namespaces read.
@@ -46,9 +62,11 @@ export function composeEnterpriseFeature(options: {
   audit: ApiAuditPort | undefined;
   /** The Enterprise application, where the deployment composed one. */
   enterprise?: ApiEnterpriseApplicationPort | undefined;
+  /** The seat allowances this deployment answers without an Enterprise application. */
+  seats?: ApiSeatAllowancePort | undefined;
 }): ComposedEnterpriseFeature {
   const logger = createLogger("langwatch:api:enterprise");
-  const application = enterpriseApplication(options.enterprise, logger);
+  const application = enterpriseApplication(options.enterprise, options.seats, logger);
   const ports = enterprisePorts(options, logger);
 
   return {
@@ -155,26 +173,80 @@ function unavailableSsoBackoffice(): ReturnType<
  */
 function enterpriseApplication(
   enterprise: ApiEnterpriseApplicationPort | undefined,
+  seats: ApiSeatAllowancePort | undefined,
   logger: Logger,
 ): Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits"> {
   if (enterprise) return enterprise.application;
 
   logger.info(
-    {},
-    "API composed no Enterprise application: the licence, licence-enforcement, SCIM-token and single sign-on surfaces mount and refuse by name",
+    { seatAllowances: Boolean(seats) },
+    "API composed no Enterprise application: the licence, SCIM-token and single sign-on surfaces mount and refuse by name",
   );
 
   return {
-    licensing: refusingApplicationSlice(
-      "Enterprise licence store, so it cannot read or write an instance licence",
-    ),
+    licensing: (seats
+      ? unlicensedLicensing(seats, logger)
+      : refusingApplicationSlice(
+          "Enterprise licence store, so it cannot read or write an instance licence",
+        )) as ApiTrpcFeatureApplication["licensing"],
     scimApp: refusingApplicationSlice(
       "Enterprise SCIM application, so it can neither list nor mint a token",
     ),
-    usageLimits: refusingApplicationSlice(
-      "Enterprise usage-limit store, so it cannot report a limit",
-    ),
+    usageLimits: unreportableUsageLimits(),
   } as Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits">;
+}
+
+/**
+ * The usage-limit notifier a deployment with no Enterprise application has.
+ *
+ * A REJECTED promise rather than a synchronous throw, and the difference is a door.
+ * `licenseEnforcement.reportLimitBlocked` fires the notification and swallows its failure
+ * (`void notify(...).catch(...)`); a synchronous throw escapes that catch and answers the
+ * caller a 500 for a notification it never needed the answer to.
+ */
+function unreportableUsageLimits(): ApiTrpcFeatureApplication["usageLimits"] {
+  return {
+    notifyResourceLimitReached: () =>
+      Promise.reject(
+        new ApiEnterpriseUnavailableError(
+          "Enterprise usage-limit store, so it cannot report a limit",
+        ),
+      ),
+  };
+}
+
+/**
+ * The licensing application an UNLICENSED deployment answers from.
+ *
+ * The seat allowances are real — the same plan provider and membership counts every other
+ * allowance in this process reads — and everything that needs a licence STORE refuses by name.
+ * `/settings/members` asks `checkLimit` on every open, and refusing it left the page blank on a
+ * deployment that has seat allowances whether or not it is licensed.
+ */
+function unlicensedLicensing(seats: ApiSeatAllowancePort, logger: Logger): LicensingApp {
+  const refuse = (capability: string): never => {
+    throw new ApiEnterpriseUnavailableError(capability);
+  };
+
+  return LicensingApp.create({
+    licenses: () =>
+      refuse("Enterprise licence store, so it cannot read or write an instance licence"),
+    cryptography: () => refuse("Enterprise licence signing key, so it cannot mint a licence"),
+    configuredAuthProvider: () =>
+      refuse("Enterprise single sign-on gate, so it cannot say why federation is off"),
+    platformSsoAllowed: () =>
+      Promise.reject(
+        new ApiEnterpriseUnavailableError(
+          "Enterprise licence store, so it cannot say whether single sign-on is licensed",
+        ),
+      ),
+    authProviderIsMounted: () => false,
+    reportSigningFailure: () => {},
+    checkLimit: (input) => seats.checkLimit(input),
+    reportError: (error) => {
+      logger.error({ error }, "a licence-enforcement side effect failed");
+    },
+  });
 }
 
 /** One `ctx.app` slice this deployment did not compose, refusing by name. */

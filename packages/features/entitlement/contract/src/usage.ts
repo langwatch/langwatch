@@ -46,6 +46,11 @@ export const usageStatsSchema = z
     currentMonthMessagesCount: z.number().nullable(),
     currentMonthCost: z.number(),
     activePlan: planSchema,
+    /**
+     * The month's allowance. Finite always: an uncapped organization is reported at
+     * `Number.MAX_SAFE_INTEGER`, because `Infinity` is neither JSON nor a `z.number()`, and
+     * sending it turned every usage read into a 500.
+     */
     maxMonthlyUsageLimit: z.number(),
     membersCount: z.number(),
     membersLiteCount: z.number(),

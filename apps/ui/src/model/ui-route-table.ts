@@ -303,6 +303,15 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/email-suppressions",
           },
           {
+            // An address under /settings that names no page. Inside this group
+            // rather than on the table's own catch-all, so the settings
+            // navigation and the top bar stay drawn around it — `platform/app`
+            // framed its 404 in `DashboardLayout` for the same reason, and a
+            // bare full-viewport 404 leaves a reader with no way back.
+            path: "/settings/*",
+            page: "pages/settings/not-found",
+          },
+          {
             // Governance home (admin oversight dashboard). The whole family
             // lives at the top level: it is org-scoped, not a settings page.
             path: "/governance",

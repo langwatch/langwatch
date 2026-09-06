@@ -25,6 +25,12 @@ Feature: Every settings page keeps the settings chrome
       Given every page that Settings can open
       Then each of them keeps the settings chrome
 
+    @integration
+    Scenario: An address under Settings that names no page keeps it
+      Given I open a settings address that names no page
+      Then the not-found page opens inside the settings chrome
+      And the settings menu is still beside it
+
     @unit
     Scenario: No settings page wraps itself in a second copy of the sidebar
       Given every route file under a settings section

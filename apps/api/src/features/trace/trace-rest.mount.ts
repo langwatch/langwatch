@@ -166,7 +166,7 @@ export function mountTraceLegacyRest(options: {
       // deployed client reads the prose.
       describeValidationError: (error) => fromZodError(error as never).message,
     },
-  }).hono as unknown as MountableRestApp;
+  }).mountable as MountableRestApp;
 }
 
 /** `POST /api/collector`, bound to this process's own ingestion. */
@@ -177,5 +177,5 @@ export function mountCollectorRest(options: {
   return createCollectorRestApp({
     security: options.security,
     ports: options.ports,
-  }).hono as unknown as MountableRestApp;
+  }).mountable as MountableRestApp;
 }

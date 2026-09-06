@@ -40,13 +40,21 @@ export function composeEnterpriseGovernanceApplication(
     "API composed no Enterprise governance application: the governance console, the ingestion, department, AI-tool, activity, anomaly and session surfaces, the personal virtual keys, the routing policies and the webhook endpoints all mount and refuse by name",
   );
 
-  const refuse = (capability: string) =>
-    new Proxy({} as never, {
-      get: () => () => {
+  // Refuses at whatever depth it is reached. A slice is read as
+  // `application.endpoints.list(...)` as well as `application.list(...)`, and a
+  // one-level stand-in answers the deeper reach with "not a function" — the
+  // named refusal replaced by an unknown 500.
+  const refuse = (capability: string) => {
+    const refusal: unknown = new Proxy(function refused() {} as never, {
+      get: (_target, property) =>
+        property === "then" ? undefined : (refusal as Record<string, unknown>),
+      apply: () => {
         throw new ApiCapabilityUnavailableError(capability);
       },
       has: () => true,
     });
+    return refusal as never;
+  };
 
   return {
     governance: refuse(
