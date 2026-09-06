@@ -1,9 +1,9 @@
 # Trace tour — visibility and persistence
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/Toolbar/Toolbar.tsx          ("Show me around" control)
-#   langwatch/src/features/traces-v2/onboarding/store/onboardingStore.ts     (seen flags + localStorage key)
-#   langwatch/src/features/traces-v2/hooks/useIsNewAccount.ts                 (account age)
+#   platform/app/src/features/traces-v2/components/Toolbar/Toolbar.tsx          ("Show me around" control)
+#   platform/app/src/features/traces-v2/onboarding/store/onboardingStore.ts     (seen flags + localStorage key)
+#   platform/app/src/features/traces-v2/hooks/useIsNewAccount.ts                 (account age)
 #
 # Motivation: two tour papercuts.
 #   1. Tour dismissal must follow the authenticated user across projects,

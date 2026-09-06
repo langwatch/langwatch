@@ -4,7 +4,7 @@ description: Configure Google Gemini (AI Studio) as a provider behind the LangWa
 sidebarTitle: Google Gemini
 ---
 
-Gemini via Google AI Studio (the "plain" Google API, distinct from Vertex) is the fastest way to get Gemini models behind the gateway. API-key auth, no GCP project setup.
+Google AI Studio serves Gemini through the "plain" Google API, distinct from Vertex. It uses API-key auth and needs no GCP project setup.
 
 ## Configure the provider credential
 
@@ -42,14 +42,14 @@ Gemini has no `/v1/messages` equivalent; Anthropic-shape clients should use a VK
 
 ## Context caching
 
-Gemini has an implicit context cache for prompts > 32k tokens on most models. The gateway forwards requests untouched; caching behaviour is entirely upstream-managed.
+Gemini has an implicit context cache for prompts > 32k tokens. Support varies by model. The gateway forwards requests untouched; caching behaviour is entirely upstream-managed.
 
 For explicit caching, Gemini offers a separate `caches.create` API that the gateway does not orchestrate in v1, but clients can call Gemini directly to create a cache and reference it in subsequent gateway calls.
 
 ## Known quirks
 
 - **Safety filters on by default.** Gemini applies `safetySettings` thresholds that return `finish_reason: SAFETY` when content crosses the threshold. Bifrost/core surfaces this as `provider_error` with the safety metadata in the OTel trace.
-- **Rate limits.** AI Studio's free tier has aggressive rate limits; paid tier is unlocked via billing-attached Google account. A 429 triggers fallback if configured.
+- **Rate limits.** AI Studio's free tier has aggressive rate limits; the paid tier requires a Google account with billing attached. A 429 triggers fallback if configured.
 - **Tool/function calling.** Gemini has its own function-calling format that bifrost/core translates from OpenAI-shape tools. Tool-call streaming deltas are less mature on Gemini, expect byte-level differences vs OpenAI.
 - **Streaming chunks size.** Gemini's streaming emits larger chunks than OpenAI, fewer, bigger SSE frames. Gateway passes these through unchanged.
 - **No `system` role.** Gemini uses `systemInstruction` at the top level of the request. OpenAI-SDK clients that send a `system` role message get it rewritten by the translator.

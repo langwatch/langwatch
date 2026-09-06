@@ -58,3 +58,34 @@ func TestWithDeploymentSelfMap_HonorsExplicitDeploymentOverBareModel(t *testing.
 		t.Fatalf("explicit deployment ignored: got %q, want %q", got, "my-custom-deploy")
 	}
 }
+
+// The request side and the credential side each used to carry their own
+// spelling table, and they drifted: "vertex_ai" normalized on one side
+// only, so a caller with a working Vertex credential resolved to a
+// provider that matched none of their credentials. Both now share
+// NormalizeProviderID; this pins the spellings that must survive.
+func TestNormalizeProviderID(t *testing.T) {
+	cases := map[string]ProviderID{
+		"azure":         ProviderAzure,
+		"azure_openai":  ProviderAzure,
+		"bedrock":       ProviderBedrock,
+		"aws_bedrock":   ProviderBedrock,
+		"vertex":        ProviderVertex,
+		"vertex_ai":     ProviderVertex,
+		"google_vertex": ProviderVertex,
+		"gemini":        ProviderGemini,
+		"google_gemini": ProviderGemini,
+		"anthropic":     ProviderAnthropic,
+		"openai":        ProviderOpenAI,
+		"openai_codex":  ProviderOpenAICodex,
+		// Unknown providers pass through so a control plane that knows a
+		// provider this build does not can still route on its own ID.
+		"some_new_provider": ProviderID("some_new_provider"),
+		"":                  ProviderID(""),
+	}
+	for raw, want := range cases {
+		if got := NormalizeProviderID(raw); got != want {
+			t.Errorf("NormalizeProviderID(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}

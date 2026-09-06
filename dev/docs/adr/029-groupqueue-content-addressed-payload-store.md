@@ -4,7 +4,7 @@
 
 **Status:** Accepted (WP4 lease lifecycle shipped in #5947; retention amendment below in #6028)
 
-> **Lifecycle amendment (2026-07-18):** WP4 replaced the holder-set eager-reclaim design below with per-holder renewable leases and lazy reclaim. The content-addressed tiers, tenant namespacing, and GQ2 envelope remain unchanged. See the current [GroupQueue architecture](../../../langwatch/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases); the holder-set sections in this ADR are retained as the historical decision being superseded.
+> **Lifecycle amendment (2026-07-18):** WP4 replaced the holder-set eager-reclaim design below with per-holder renewable leases and lazy reclaim. The content-addressed tiers, tenant namespacing, and GQ2 envelope remain unchanged. See the current [GroupQueue architecture](../../../platform/app/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases); the holder-set sections in this ADR are retained as the historical decision being superseded.
 >
 > **Migration (WP4 → leases).** There is no data migration: no schema change, no backfill, no Terraform-managed resource added or removed. The change is confined to in-Redis bookkeeping under the existing queue prefix and hash tag — a `blobholders:` SET becomes a `blobleases:` ZSET. Pre-existing holder sets are left in place and age out on the 4-day `BLOB_LEASE_SET_TTL_SECONDS` that the compatibility-guard write refreshes them to.
 >

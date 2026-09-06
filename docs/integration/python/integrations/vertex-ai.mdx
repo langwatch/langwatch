@@ -1,12 +1,12 @@
 ---
 title: Google Vertex AI Instrumentation
 sidebarTitle: Vertex AI
-description: Learn how to instrument Google Vertex AI API calls with the LangWatch Python SDK using OpenInference
+description: The LangWatch Python SDK instruments Google Vertex AI API calls through OpenInference.
 icon: python
 keywords: google vertex ai, gemini, instrumentation, autotrack, openinference, openllmetry, LangWatch, Python
 ---
 
-LangWatch offers robust integration with Google Vertex AI, allowing you to capture detailed information about your Vertex AI API calls automatically. The recommended approach is to use OpenInference instrumentation, which provides comprehensive tracing for Google Vertex AI API calls and integrates seamlessly with LangWatch.
+LangWatch integrates with Google Vertex AI to capture detailed information about your Vertex AI API calls automatically. The recommended approach is to use OpenInference instrumentation, which provides comprehensive tracing for Google Vertex AI API calls and sends the resulting spans to LangWatch.
 
 ## Using OpenInference Instrumentation
 
@@ -129,7 +129,7 @@ if __name__ == "__main__":
 <Note>
 ### Which Approach to Choose?
 
-- **OpenInference Instrumentation** is recommended for most use cases as it provides comprehensive, automatic instrumentation with minimal setup
+- **OpenInference Instrumentation** is the recommended default, since it provides comprehensive, automatic instrumentation with minimal setup
 - **Direct OpenTelemetry Setup** is useful when you need fine-grained control over the tracing configuration or are already using OpenTelemetry extensively
 
 Both approaches effectively send Vertex AI call data to LangWatch for monitoring and analysis.

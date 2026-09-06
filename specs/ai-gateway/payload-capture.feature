@@ -116,6 +116,28 @@ Feature: Gateway trace payload capture
     And individual stream chunks are NOT traced
 
   # ─────────────────────────────────────────────────────────────────────────
+  # §6b. The captured input carries the whole prompt
+  # ─────────────────────────────────────────────────────────────────────────
+  # Provider dialects place the system prompt in different fields: Anthropic
+  # in a top-level system field beside messages, the Responses API in
+  # instructions beside input. The captured input must include it wherever
+  # the dialect puts it, or the trace shows a conversation with no system
+  # prompt at all.
+
+  @unit
+  Scenario: The captured input includes an Anthropic system prompt
+    Given a /v1/messages request that carries a system prompt beside its messages
+    When the request completes with payload capture enabled
+    Then the captured input starts with a system message carrying that prompt
+    And the conversation messages follow unchanged
+
+  @unit
+  Scenario: The captured input includes Responses API instructions
+    Given a Responses API request that carries instructions beside its input
+    When the request completes with payload capture enabled
+    Then the captured input starts with a system message carrying the instructions
+
+  # ─────────────────────────────────────────────────────────────────────────
   # §7. Size cap
   # ─────────────────────────────────────────────────────────────────────────
 

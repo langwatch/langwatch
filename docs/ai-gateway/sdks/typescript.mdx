@@ -6,7 +6,7 @@ sidebarTitle: TypeScript
 
 Every TypeScript LLM SDK works by overriding its base URL and using a LangWatch virtual key. The gateway handles the rest.
 
-This page shows the standard setup plus how to propagate trace ids so you don't double-count cost.
+This page covers the standard setup and how to propagate trace ids so you don't double-count cost.
 
 ## OpenAI TypeScript SDK
 
@@ -52,7 +52,7 @@ Every gateway response carries these headers so clients can stitch the gateway s
 | `X-LangWatch-Trace-Id` | 32-hex trace id. Equals the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted id |
 | `X-LangWatch-Span-Id` | 16-hex gateway span id |
 | `traceparent` | W3C traceparent re-injected for downstream stitching, forward to any further hop |
-| `X-LangWatch-Request-Id` | ULID, use in support tickets |
+| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, use in support tickets |
 
 ```ts
 const raw = await openai.chat.completions.withResponse().create({
@@ -111,7 +111,7 @@ const resp = await openai.chat.completions.withResponse().create({
   model: "gpt-5-mini",
   messages: [{ role: "user", content: "Hi" }],
 });
-const requestId = resp.response.headers.get("X-LangWatch-Request-Id");
+const requestId = resp.response.headers.get("X-LangWatch-Gateway-Request-Id");
 ```
 
 ## Anthropic TypeScript SDK

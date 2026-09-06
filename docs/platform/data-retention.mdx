@@ -4,9 +4,9 @@ description: Control how long LangWatch keeps your event data before it's delete
 keywords: data retention, retention policy, delete data, ttl, retention period, enterprise, self-hosting
 ---
 
-With LangWatch's Data Retention controls, you decide how long your event data is kept before it's automatically deleted. Retention applies to the events LangWatch ingests — the spans within your traces and your scenario runs — along with their associated data.
+Data retention sets how long LangWatch keeps your event data before deleting it automatically. Retention applies to the events LangWatch ingests (the spans within your traces and your scenario runs) along with their associated data.
 
-You can tighten or extend retention per scope, giving teams that handle sensitive data full control over how long it lives in LangWatch.
+You can tighten or extend retention per scope: the organization, a team, or a single project.
 
 <Note>
   Configuring data retention requires an **Enterprise plan**. On other plans, every project uses the platform default window. See the [pricing page](/pricing) for how extended retention is billed.
@@ -16,16 +16,16 @@ You can tighten or extend retention per scope, giving teams that handle sensitiv
 
 Retention is configured with **retention policies**. Each policy has two parts:
 
-- **Scope** — the level the policy applies to. Policies cascade most-specific-first, so a more specific scope overrides a broader one:
-  - **Organization** — the default that applies to every project in the org.
-  - **Team** — overrides the organization default for projects in that team.
-  - **Project** — overrides both the team and organization defaults for that project only.
-- **Retention period** — how long data is kept before deletion.
+- **Scope**: the level the policy applies to. Policies cascade most-specific-first, so a more specific scope overrides a broader one:
+  - **Organization**: the default that applies to every project in the org.
+  - **Team**: overrides the organization default for projects in that team.
+  - **Project**: overrides both the team and organization defaults for that project only.
+- **Retention period**: how long data is kept before deletion.
 
 Retention periods range from a few weeks up to several years, set in weeks, months, or years. Periods always round to whole weeks, because deletion is partition-aligned (see [How deletion works](#how-deletion-works)).
 
 <Note>
-  When you retain data longer than your plan's included window, the additional storage is billed at **€3 per extra GB** — you only pay for what you actually store.
+  When you retain data longer than your plan's included window, the additional storage is billed at **€3 per extra GB**. You only pay for what you store.
 </Note>
 
 ## Configuration
@@ -53,8 +53,8 @@ To add a scoped policy:
 
 When you create or update a policy, you choose whether it applies only going forward or also to data you've already stored:
 
-- **Off** — the new retention applies to newly ingested data only.
-- **On** (*"Apply this change to existing data"*) — LangWatch rewrites the scope's existing rows so the new retention takes effect immediately, not just for new ingestion. Data that is already older than the new window is removed on the next cleanup.
+- **Off**: the new retention applies to newly ingested data only.
+- **On** (*"Apply this change to existing data"*): LangWatch rewrites the scope's existing rows so the new retention takes effect immediately. Data that is already older than the new window is removed on the next cleanup.
 
 ## How deletion works
 
@@ -66,11 +66,17 @@ A few things to keep in mind:
   **Deletion is permanent.** Once data is removed it cannot be recovered. If you need to keep data beyond your retention window, export it before it expires.
 </Warning>
 
-- **Retention applies to the underlying data, regardless of references.** If another object — for example a dataset or an evaluation — references an event that has since been deleted, that reference will point to data that no longer exists.
+- **Retention applies to the underlying data, regardless of references.** If another object, for example a dataset or an evaluation, references an event that has since been deleted, that reference points to data that no longer exists.
 - **More specific scopes override broader ones.** A project with its own policy ignores the team and organization defaults; a team policy overrides the organization default.
+
+## Billing records are exempt
+
+[Gateway spend records](/ai-gateway/billing-events), the per-request billing events platforms use to rebill their own customers, are deliberately **outside** tenant retention. They keep a **fixed 13-month** lifetime regardless of any policy configured here.
+
+Retention policies are customer-shrinkable to weeks and can rewrite existing data retroactively; billing records are invoiceable evidence and must survive both. Shortening your trace retention never deletes spend records, and no policy can extend or shorten their 13-month window. The practical effect: your billing reconciliation window is always 13 months, even when operational traces are kept for far less, and a spend event remains queryable after its underlying trace has aged out (only the trace drill-through is gone).
 
 ## Self-hosted and hybrid instances
 
 Data Retention works the same way on self-hosted deployments, with deletion running against your own storage. Make sure the LangWatch service has permission to delete objects from the storage bucket it manages.
 
-If you use versioned object storage, removing an object leaves earlier versions and delete markers in place — clean these up manually or with a storage lifecycle rule. See the [self-hosting docs](/self-hosting/overview) for setup details.
+If you use versioned object storage, removing an object leaves earlier versions and delete markers in place. Clean these up manually or with a storage lifecycle rule. See the [self-hosting docs](/self-hosting/overview) for setup details.

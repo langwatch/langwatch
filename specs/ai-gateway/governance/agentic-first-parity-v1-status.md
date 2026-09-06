@@ -22,10 +22,10 @@ Legend: 🟢 shipped + tested · 🟡 shipped tRPC-only (UI-functional, agent-bl
 | `ingestion-sources` | `ee/governance/services/activity-monitor/*` | 🟢 `ee/governance/routers/ingestionSources.ts` | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
 | `cli-sessions` (per-user) | `ee/governance/services/cliSessionInventory.service.ts` | 🟢 `ee/governance/routers/personalSessions.ts` | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
 | `session-policy` (max duration per org) | implied via `personalSessions` shape | 🟢 `ee/governance/routers/sessionPolicy.ts` | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
-| `virtual-keys` | `langwatch/src/server/gateway/virtualKey.service.ts` | 🟢 (existing tRPC) | 🔵 `/api/gateway/v1/virtual-keys` (PR #3168) | 🔵 `langwatch gateway-providers` (existing) | 🟡 — | non-`/api/governance` REST already; MCP gap |
-| `gateway-budgets` | `langwatch/src/server/gateway/budget.service.ts` | 🟢 (existing tRPC) | 🔵 `/api/gateway/v1/budgets` | 🔵 `langwatch gateway-budgets` | 🟡 — | non-`/api/governance` REST already; MCP gap |
-| `role-bindings` | `langwatch/src/server/rbac/role-binding-resolver.ts` | 🟢 (existing) | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
-| `audit-log` (read) | `langwatch/src/server/api/routers/auditLog.ts` (or equivalent) | 🟢 (existing) | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
+| `virtual-keys` | `platform/app/src/server/gateway/virtualKey.service.ts` | 🟢 (existing tRPC) | 🔵 `/api/gateway/v1/virtual-keys` (PR #3168) | 🔵 `langwatch gateway-providers` (existing) | 🟡 — | non-`/api/governance` REST already; MCP gap |
+| `gateway-budgets` | `platform/app/src/server/gateway/budget.service.ts` | 🟢 (existing tRPC) | 🔵 `/api/gateway/v1/budgets` | 🔵 `langwatch gateway-budgets` | 🟡 — | non-`/api/governance` REST already; MCP gap |
+| `role-bindings` | `platform/app/src/server/rbac/role-binding-resolver.ts` | 🟢 (existing) | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
+| `audit-log` (read) | `platform/app/src/server/api/routers/auditLog.ts` (or equivalent) | 🟢 (existing) | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
 
 **Score**: 2/12 governance resources have **FULL** four-surface agentic-first parity in v1. 8/12 are tRPC-only. 2/12 (`virtual-keys` + `gateway-budgets`) live at `/api/gateway/v1/*` rather than `/api/governance/*` and have CLI but no MCP.
 
@@ -119,14 +119,14 @@ For each resource, do these in order before opening the route file:
    populated correctly (the default fallback exists for back-compat
    but explicit-is-better-than-implicit on the hot path).
 
-4. **Hono route file**. Mirror `langwatch/src/app/api/governance/[[...route]]/app.ts`
+4. **Hono route file**. Mirror `platform/app/src/app/api/governance/[[...route]]/app.ts`
    structure: snake_case Zod schemas, snake_case wire, `requireApiKeyPermission`
    per route, `resolveSurfaceFromRequest` for CLI surface attribution
    on Hono mutations, `mapServiceError` helper for service→HTTP code mapping.
 
-5. **CLI commands**. Mirror `typescript-sdk/src/cli/commands/governance/ingestion-templates.ts`
+5. **CLI commands**. Mirror `sdks/typescript/src/cli/commands/governance/ingestion-templates.ts`
    + `user-ingestion-bindings.ts` + add to the subcommand tree in
-   `typescript-sdk/src/cli/index.ts`. Commands are always available
+   `sdks/typescript/src/cli/index.ts`. Commands are always available
    once the CLI is installed; per-account entitlement is enforced
    server-side. Use `requestREST` from `cli/utils/governance/cli-api.ts`
    so `X-LangWatch-Surface: cli` is sent automatically.

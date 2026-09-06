@@ -64,17 +64,16 @@ spec:
                   key: {{ .Values.secrets.jwtSecretPreviousKey }}
             {{- end }}
             {{- /*
-              GATEWAY_REDIS_URL, GATEWAY_ADMIN_AUTH_TOKEN, and
-              GATEWAY_OTEL_DEFAULT_AUTH_TOKEN are intentionally NOT injected.
-              The current Go gateway (services/aigateway/) does not have a
-              Redis client (auth cache is in-process LRU), an admin/pprof
-              listener, or an OTel auth-token field on its config struct.
-              These values.yaml knobs remain as forward-compat surface for
-              v1.1; wiring them at the env-var layer today would silently
-              drop them and mislead operators into thinking they're tuning
-              behavior. OTLP authentication for self-hosters is delivered
-              via OTEL_OTLP_HEADERS (e.g. "Authorization=Bearer …") on the
-              OTel struct in pkg/config/otel.go.
+              GATEWAY_ADMIN_AUTH_TOKEN and GATEWAY_OTEL_DEFAULT_AUTH_TOKEN
+              are intentionally NOT injected. The Go gateway
+              (services/aigateway/) has no admin/pprof listener and no OTel
+              auth-token field on its config struct. These values.yaml knobs
+              remain as forward-compat surface; wiring them at the env-var
+              layer today would silently drop them and mislead operators into
+              thinking they're tuning behavior. OTLP authentication for
+              self-hosters is delivered via OTEL_OTLP_HEADERS (e.g.
+              "Authorization=Bearer …") on the OTel struct in
+              pkg/config/otel.go.
             */}}
           startupProbe:
             httpGet:
@@ -104,7 +103,8 @@ spec:
               mountPath: /tmp
       volumes:
         - name: tmp
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.scratchSizeLimit }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}
       {{- end }}

@@ -1,7 +1,7 @@
 ---
 title: Grok (xAI) Integration
 sidebarTitle: Grok (xAI)
-description: Instrument Grok (xAI) API calls in Go using LangWatch to capture high-speed traces and improve AI agent evaluations.
+description: Instrument Grok (xAI) API calls in Go using LangWatch to capture traces and improve AI agent evaluations.
 keywords: go, golang, grok, xai, instrumentation, langwatch, openai-compatible
 ---
 
@@ -10,7 +10,7 @@ LangWatch supports tracing Grok (xAI) API calls using the same `otelopenai` midd
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -27,8 +27,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"

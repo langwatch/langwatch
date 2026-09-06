@@ -6,11 +6,11 @@ sidebarTitle: Cache control
 
 Modern LLM providers offer prompt caching with different shapes: Anthropic uses explicit `cache_control` blocks, OpenAI auto-caches prompts over 1024 tokens, Gemini has an explicit `cachedContent` API, Azure OpenAI inherits OpenAI's behavior, Bedrock Claude inherits Anthropic's. The LangWatch AI Gateway surfaces a single, unified control plane over all of them.
 
-This is a load-bearing feature: prompt caching cuts input-token costs by up to 90% on hot prefixes, and a gateway that reformats or reorders the payload silently invalidates the cache. The gateway is engineered to preserve provider-native caching byte-for-byte by default, and to let operators compose overrides without breaking the primitives underneath.
+Prompt caching cuts input-token costs by up to 90% on hot prefixes, and a gateway that reformats or reorders the payload silently invalidates the cache. The gateway preserves provider-native caching byte-for-byte by default, and lets operators compose overrides without breaking the primitives underneath.
 
 ## The control surface: four layers (v1)
 
-1. **Gateway default**: `respect` (byte-for-byte passthrough). Always safe, never surprises.
+1. **Gateway default**: `respect` (byte-for-byte passthrough). Never changes the payload.
 2. **Per-VK default**: `respect`, `disable`, `force` configurable in the VK drawer under "Cache control". `ttl=NNN` is deferred to v1.1 at the per-VK level.
 3. **Cache rules**: simple match/action overrides evaluated at auth-resolve time (bundled with VK config → near-zero hot-path cost). See [Cache rules](#cache-rules).
 4. **Per-request header**: `X-LangWatch-Cache: respect|disable|force` on an individual request. Highest precedence when set. `ttl=NNN` header value is parsed but still deferred to v1.1 (returns `400 cache_override_not_implemented` with a `cache_rule_mode_not_implemented` WARN on rules).
@@ -24,7 +24,7 @@ Not every mode makes sense for every provider. The gateway does the right thing 
 | Provider | Native scheme | `respect` behavior | `disable` behavior | `force` behavior | Notes |
 |---|---|---|---|---|---|
 | **Anthropic** (direct + Bedrock + Vertex) | Explicit `cache_control: {type: "ephemeral"\|"persistent"}` on content/system/tool blocks | Bytes forwarded unchanged; provider honours markers (5 min, 1 h TTL) | Recursive JSON-walk drops every `cache_control` key at any nesting depth before dispatch | **v1**: gateway injects `cache_control: {type: "ephemeral"}` on `system[-1]` + `messages[-1].content[-1]` when the caller hasn't already set it (no-double-inject invariant) | `cache_read_input_tokens` and `cache_creation_input_tokens` separately reported in the trace. **Sonnet 4.5, Opus 4.5 caching is GA.** **Haiku 4.5 caching is in beta**: may return `cache_read=0` even with correct markers on accounts not enrolled in the beta. |
-| **OpenAI** (direct + Azure) | Automatic, prefixes ≥1024 tokens cached, no client flag, 50% discount on cached tokens | Bytes forwarded unchanged (nothing to preserve, provider decides) | No-op on wire; gateway can optionally set a salt via a request-id suffix to break the cache key (future) | **v1**: no-op on wire (caching is out of the client's control), but the rule still fires + attribution emits + counter bumps for per-rule observability | `usage.prompt_tokens_details.cached_tokens` reported in response. **Reasoning models (gpt-5 family with `reasoning_effort` set) may not return `cached_tokens` even on identical prefixes**, verified directly against api.openai.com on test accounts. Use a non-reasoning model (gpt-4o-mini, gpt-4o, etc.) when prompt caching is load-bearing. |
+| **OpenAI** (direct + Azure) | Automatic, prefixes ≥1024 tokens cached, no client flag, 50% discount on cached tokens | Bytes forwarded unchanged (nothing to preserve, provider decides) | No-op on wire; gateway can optionally set a salt via a request-id suffix to break the cache key (future) | **v1**: no-op on wire (caching is out of the client's control), but the rule still fires + attribution emits + counter bumps for per-rule observability | `usage.prompt_tokens_details.cached_tokens` reported in response. **Reasoning models (gpt-5 family with `reasoning_effort` set) may not return `cached_tokens` even on identical prefixes**, verified directly against api.openai.com on test accounts. Use a non-reasoning model (gpt-4o-mini, gpt-4o, etc.) when you depend on prompt caching. |
 | **Gemini** (Vertex + direct) | Explicit `cachedContent` resource, client POSTs to `/v1beta/cachedContents` then passes `cachedContent: <name>` on generation. Implicit prefix-caching exists for paid-tier accounts only. | Bytes forwarded unchanged; client holds the cache name | Strips `cachedContent` field from the request → forces cold generation | **v1 shipped**: gateway exposes `POST /v1beta/cachedContents` via the Gemini-native passthrough route + lifts `cached_content` field from `/v1/chat/completions` body onto `Bifrost.ChatParameters.ExtraParams` so cross-shape callers can also reference an existing cache. | `cachedContentTokenCount` reported in `usageMetadata`. Implicit prefix-cache (where Google caches identical >1024-token prefixes automatically) requires a paid-tier Google account; explicit `cachedContents` works on every tier. |
 | **Azure OpenAI** | Inherits OpenAI automatic prefix cache | Same as OpenAI | Same as OpenAI | Same as OpenAI | Configured via Azure's cache-at-deployment toggle, independent of our `force` |
 | **Bedrock Claude** | Inherits Anthropic's `cache_control` shape via converse API | Same as Anthropic | Same as Anthropic | Same as Anthropic (v1) | Bedrock region matters, not all regions support Anthropic cache yet. **/v1/messages → bedrock returns `Unexpected field type` 400** (the Bifrost bedrock adapter is converse-API only); use `/v1/chat/completions` toward a bedrock VK for cache_control round-trip |
@@ -93,7 +93,9 @@ The `/internal/gateway/budget/debit` call forwards all three so budget ledgers r
 
 **Simple match/action rules that let operators set cache behavior for groups of requests without touching client code.** Deliberately narrower than Cloudflare Page Rules, enough to demonstrate enterprise cache governance (force 5-min cache on prod internal-api, disable cache for benchmark VKs, etc.) without the matcher combinatorics that would slow the hot path.
 
-Latency budget: rules are resolved **once per VK bundle refresh** (every 30 s on `/changes`) and baked into the bundle as a pre-sorted array. At request time, the gateway walks the sorted array until a match fires, for the expected low single-digit rule count per VK, this is sub-microsecond. Hot-path total overhead stays at ~700 ns.
+Latency budget: rules are resolved **once per VK bundle refresh** and baked into the bundle as a pre-sorted array. At request time, the gateway walks the sorted array until a match fires, for the expected low single-digit rule count per VK, this is sub-microsecond. Hot-path total overhead stays at ~700 ns.
+
+Editing a rule triggers that refresh rather than waiting for one. Every create, edit and delete appends a change event in the same transaction as the write; the gateway's `/changes` long-poll returns it on the next cycle and drops the organization's cached bundles, so the following request rebuilds against the new rules.
 
 ### Shape
 
@@ -137,7 +139,7 @@ Each matcher is optional; all non-null matchers must match for the rule to apply
 ### Evaluation
 
 - **First-match wins**, sorted by `priority` descending.
-- Rules evaluated once per request, AT auth-resolve time (bundled with VK config), so zero additional upstream latency.
+- Rules are resolved once per VK bundle refresh, not once per request, and baked into the bundle as a pre-sorted array. A request only walks that array to find its match, so evaluation costs no upstream call.
 - Rule hits exposed in observability via `langwatch.cache.rule_id` span attribute + `gateway_cache_rule_hits_total{rule_id, mode_applied}` counter.
 
 ### Concrete example: "force 5-min cache on all prod internal-api calls"
@@ -171,7 +173,7 @@ Order on the request pipeline:
 9. Guardrails (post)
 10. Budget debit
 
-## Why this is load-bearing
+## Cost impact
 
 From a real observed pattern: a 40k-token system prompt with 100 calls a day against an Anthropic model.
 

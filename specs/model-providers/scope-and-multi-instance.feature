@@ -16,11 +16,20 @@ Feature: Model Provider Scope and Multi-Instance
   #   2. Multi-instance per provider type ("OpenAI" + "OpenAI Production"
   #      + "OpenAI Experimental") each with their own scope set.
   #
-  # Wire format for model IDs (see data-model below):
+  # Wire format for model IDs (see data-model below). This is the APPLICATION's
+  # own format, read by `wireFormat.ts` for model pickers, evaluators and the
+  # optimization studio. The AI Gateway does not accept it: a row id is not a
+  # name a caller can be expected to type, and it leaks the id space into
+  # customer request bodies.
   #   - Canonical: "{modelProviderId}/{modelName}" — e.g. "mp_abc123/gpt-5"
   #   - Legacy: "{provider}/{modelName}" — e.g. "openai/gpt-5". Accepted at
   #     read-time when exactly one accessible MP has that provider string.
   #     Errors clearly when 0 or >1 candidates match ("ambiguous provider").
+  #
+  # On the gateway, one instance of a provider type is addressed by its
+  # ROUTING HANDLE instead: an operator-chosen slug, unique in the
+  # organization, written as "{handle}/{modelName}". See
+  # specs/ai-gateway/instance-routing-handle.feature.
 
   Background:
     Given I am logged in

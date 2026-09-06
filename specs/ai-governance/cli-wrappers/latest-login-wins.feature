@@ -118,6 +118,18 @@ Feature: The latest login wins over stale persisted telemetry wiring
       Then no ingest key is minted for the refresh
       And no wiring file is rewritten
 
+    @unit @cli-wrappers @latest-login-wins @project-pin
+    Scenario: A project-pinned tool is not re-pointed by a new login
+      Given codex is pinned to a team project (`tool_project_keys.codex`)
+      And codex's persisted wiring points at the pinned instance,
+        which differs from the instance being logged into
+      When the user completes `langwatch login --device`
+      Then codex's wiring is left exactly as it was
+      And no personal ingest key is minted for codex
+      And the unpinned tools are still refreshed
+      # The pin is deliberate scope, not stale personal wiring: latest
+      # login wins applies to the personal path only.
+
     Scenario: a wiring refresh failure never fails the login
       Given persisted wiring points at a previous instance
       And the new instance cannot mint an ingest key for the user yet

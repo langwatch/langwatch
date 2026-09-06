@@ -82,6 +82,69 @@ func TestProbe_BindsSignatureToPrincipal(t *testing.T) {
 	}
 }
 
+// A cancel is the token-burn half of the user's Stop (ADR-078): fire-and-forget,
+// 204 with no body, handed straight to the pool for the named conversation+turn.
+//
+// @scenario "A stop makes the manager abort the in-flight generation"
+func TestCancel_ValidReturns204AndReachesThePool(t *testing.T) {
+	pool := &stubPool{}
+	router := newTestRouter(pool)
+
+	rec := post(t, router, "/worker/cancel", `{"conversationId":"c1","turnId":"turn-1","projectId":"project-1"}`)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", rec.Code)
+	}
+	if rec.Body.Len() != 0 {
+		t.Errorf("204 must have no body, got %q", rec.Body.String())
+	}
+	if len(pool.canceled) != 1 || pool.canceled[0] != "c1/turn-1" {
+		t.Fatalf("canceled = %v, want exactly c1/turn-1", pool.canceled)
+	}
+}
+
+// A cancel that finds nothing to halt is still a success: the stop is already
+// truthful on the durable record, so a no-op pool answer stays a 204.
+func TestCancel_NoOpStillReturns204(t *testing.T) {
+	router := newTestRouter(&stubPool{})
+	rec := post(t, router, "/worker/cancel", `{"conversationId":"conv-without-worker","turnId":"turn-9"}`)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204 even when nothing was halted", rec.Code)
+	}
+}
+
+// A cancel needs a name on both axes: the conversation that routes it and the
+// turn it is allowed to kill. Missing either is a validation refusal, and a
+// path-escaping conversationId is rejected like everywhere else.
+func TestCancel_ValidationErrors(t *testing.T) {
+	cases := []struct {
+		name     string
+		body     string
+		wantType string
+	}{
+		{"missing turnId", `{"conversationId":"c1"}`, ""},
+		{"missing conversationId", `{"turnId":"turn-1"}`, ""},
+		{"path-escaping conversationId", `{"conversationId":"../etc","turnId":"turn-1"}`, string(domain.ErrInvalidConversationID)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pool := &stubPool{}
+			router := newTestRouter(pool)
+			rec := post(t, router, "/worker/cancel", tc.body)
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("status = %d, want 422", rec.Code)
+			}
+			if tc.wantType != "" {
+				if got := errorType(t, rec.Body.String()); got != tc.wantType {
+					t.Errorf("error type = %q, want %q", got, tc.wantType)
+				}
+			}
+			if len(pool.canceled) != 0 {
+				t.Errorf("an invalid cancel must never reach the pool, got %v", pool.canceled)
+			}
+		})
+	}
+}
+
 func TestProbe_InvalidConversationIDReturns422(t *testing.T) {
 	router := newTestRouter(&stubPool{})
 	rec := post(t, router, "/worker/probe", `{"conversationId":"../etc","projectId":"project-1","actorUserId":"user-a"}`)

@@ -87,7 +87,7 @@ Span query failures are different: they represent infrastructure problems. The s
 
 ## References
 
-- Feature spec: `langwatch/specs/scenarios/otel-trace-context-propagation.feature`
+- Feature spec: `platform/app/specs/scenarios/otel-trace-context-propagation.feature`
 - GitHub issue: #1325
 - Related: #1088 (worker isolation for server-side targets — separate concern)
 - Related: #1264 (original spike issue)

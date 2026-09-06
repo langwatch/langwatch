@@ -1,15 +1,15 @@
 # Directory paths
 DOCS_DIR = api-reference
 API_SPEC_FILE = openapiLangWatch.json
-GITHUB_RAW_URL = https://raw.githubusercontent.com/langwatch/langwatch/main/langwatch/src/app/api/$(API_SPEC_FILE)
+CANONICAL_SPEC = ../platform/app/src/app/api/$(API_SPEC_FILE)
 
 
 .PHONY: sync-api-spec
 sync-api-spec:
-	@echo "Syncing OpenAPI specification from main repository..."
+	@echo "Copying the canonical OpenAPI specification into the docs site..."
 	@mkdir -p $(DOCS_DIR)
-	@curl -s $(GITHUB_RAW_URL) > $(DOCS_DIR)/$(API_SPEC_FILE)
-	@echo "✅ API specification synced successfully to $(DOCS_DIR)/$(API_SPEC_FILE)"
+	@cp $(CANONICAL_SPEC) $(DOCS_DIR)/$(API_SPEC_FILE)
+	@echo "✅ API specification synced to $(DOCS_DIR)/$(API_SPEC_FILE)"
 
 .PHONY: generate-openapi-evals
 generate-openapi-evals:
@@ -20,7 +20,7 @@ generate-openapi-evals:
 .PHONY: generate-api-reference
 generate-api-reference:
 	@echo "Generating API reference pages from OpenAPI spec..."
-	@npx tsx scripts/generate-api-reference-pages.ts
+	@../platform/app/node_modules/.bin/tsx scripts/generate-api-reference-pages.ts
 	@echo "✅ API reference pages generated and docs.json updated"
 
 .PHONY: view-docs

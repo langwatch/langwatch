@@ -35,9 +35,12 @@ func Root(ctx context.Context, _ []string) error {
 		return err
 	}
 
-	// The egress guard (ADR-043): per-worker outbound forward-proxy enforcement
+	// The egress guard (ADR-076): per-worker outbound forward-proxy enforcement
 	// (require-TLS / throttle / floor ∪ allow-list / SNI cross-check), monitor-
-	// first. Stock posture is monitor-only until an operator/customer opts in.
+	// first for *destination* decisions: the floor ∪ allow-list verdict only
+	// observes and flags until an operator/customer opts in. Require-TLS is a
+	// separate, always-on rung — EgressRequireTLS defaults to true, so cleartext
+	// forwards and non-:443 CONNECTs are refused with no opt-in.
 	// The pool consults it around each worker's lifecycle behind this seam.
 	mgr := startEgressAdapter(cfg, deps.Logger)
 
@@ -60,16 +63,16 @@ func Root(ctx context.Context, _ []string) error {
 	// accepting traffic and binds worker subprocesses to the pool-lifetime
 	// context. The egress guard is consulted around each worker's lifecycle.
 	pool, err := workerpool.New(ctx, workerpool.Options{
-		MaxWorkers:         cfg.MaxWorkers,
-		WorkerIdle:         cfg.WorkerIdle(),
-		ReadinessTimeout:   cfg.ReadinessTimeout(),
-		ReaperInterval:     cfg.ReaperInterval(),
-		SessionsRoot:       cfg.SessionsRoot,
-		WorkspaceRoot:      cfg.WorkspaceRoot,
-		OpenCodeBinaryPath: cfg.OpenCodeBinaryPath,
-		Runner:             runner,
-		Telemetry:          deps.Telemetry,
-		Egress:             mgr.EgressGuard(),
+		MaxWorkers:       cfg.MaxWorkers,
+		WorkerIdle:       cfg.WorkerIdle(),
+		ReadinessTimeout: cfg.ReadinessTimeout(),
+		ReaperInterval:   cfg.ReaperInterval(),
+		SessionsRoot:     cfg.SessionsRoot,
+		WorkspaceRoot:    cfg.WorkspaceRoot,
+		PiBinaryPath:     cfg.PiWorkerBinaryPath,
+		Runner:           runner,
+		Telemetry:        deps.Telemetry,
+		Egress:           mgr.EgressGuard(),
 		// Revoke-only. The manager can destroy a session key it was handed; it can
 		// never ask for one to be minted. It reuses the SAME shared secret the
 		// control plane authenticates to us with, so this direction adds no new

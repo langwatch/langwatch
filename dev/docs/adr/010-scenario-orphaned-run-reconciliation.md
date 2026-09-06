@@ -2,7 +2,12 @@
 
 **Date:** 2026-06-23
 
-**Status:** Accepted
+**Status:** Superseded by ADR-094 — the boot sweep described here (and the
+QUEUED sibling sweep in `scenario-orphan-reconciler.ts`) was deleted
+outright. Orphan recovery is now owned by the simulation_run_execution
+process manager's stall watchdog; pre-migration in-flight rows may never
+reach a terminal state, an accepted deployment-window loss. Kept for
+historical context.
 
 ## Context
 
@@ -10,7 +15,7 @@ The scenario execution pool is in-process and per worker pod — it holds no cro
 
 The fix: every scenarios worker reconciles orphaned runs when it boots. It asks ClickHouse for `IN_PROGRESS` runs whose last activity is older than any live worker could still be holding them, and emits a terminal failure event through the existing idempotent finish path so they go terminal for good and downstream reactors fire.
 
-Related: issue [#3195](https://github.com/langwatch/langwatch/issues/3195), PR [#5006](https://github.com/langwatch/langwatch/pull/5006), spec `langwatch/specs/scenarios/orphaned-run-reconciliation.feature`.
+Related: issue [#3195](https://github.com/langwatch/langwatch/issues/3195), PR [#5006](https://github.com/langwatch/langwatch/pull/5006), spec `platform/app/specs/scenarios/orphaned-run-reconciliation.feature`.
 
 ## What we considered
 
@@ -170,12 +175,12 @@ after the `finished` event.
 
 - Issue: [#3195](https://github.com/langwatch/langwatch/issues/3195)
 - PR: [#5006](https://github.com/langwatch/langwatch/pull/5006)
-- Spec: `langwatch/specs/scenarios/orphaned-run-reconciliation.feature`
-- `langwatch/src/server/scenarios/orphaned-run-reconciliation.ts`
-- `langwatch/src/server/scenarios/orphaned-run-reconciliation.clickhouse.ts`
-- `langwatch/src/server/scenarios/stall-detection.ts`
-- `langwatch/src/server/scenarios/scenario.constants.ts`
-- `langwatch/src/server/scenarios/scenario-failure-handler.ts`
-- `langwatch/src/server/scenarios/scenario.processor.ts`
-- `langwatch/src/server/event-sourcing/pipelines/simulation-processing/projections/simulationRunState.foldProjection.ts`
+- Spec: `platform/app/specs/scenarios/orphaned-run-reconciliation.feature`
+- `platform/app/src/server/scenarios/orphaned-run-reconciliation.ts`
+- `platform/app/src/server/scenarios/orphaned-run-reconciliation.clickhouse.ts`
+- `platform/app/src/server/scenarios/stall-detection.ts`
+- `platform/app/src/server/scenarios/scenario.constants.ts`
+- `platform/app/src/server/scenarios/scenario-failure-handler.ts`
+- `platform/app/src/server/scenarios/scenario.processor.ts`
+- `platform/app/src/server/event-sourcing/pipelines/simulation-processing/projections/simulationRunState.foldProjection.ts`
 - Related: [ADR-009: OTEL Trace Context Propagation for HTTP Scenarios](009-otel-trace-context-propagation-for-http-scenarios.md)

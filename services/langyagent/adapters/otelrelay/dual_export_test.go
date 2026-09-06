@@ -148,6 +148,7 @@ func TestDualExport(t *testing.T) {
 			t.Fatalf("relay answered %d", resp.StatusCode)
 		}
 
+		// @scenario "Worker telemetry remains complete for the customer"
 		t.Run("the customer's project receives the content", func(t *testing.T) {
 			body := customer.await(t)
 			for _, content := range []string{workerPrompt, workerCompletion, workerToolOutput} {
@@ -316,6 +317,7 @@ func TestDualExport(t *testing.T) {
 			"the customer forward must not wait on the mirror")
 	})
 
+	// @scenario "Customer telemetry is unaffected when operational recording is unavailable"
 	t.Run("when no internal collector is configured", func(t *testing.T) {
 		customer := startSignallingIngest(t)
 		relay := relayWithInternal(t, "")
@@ -350,6 +352,8 @@ func TestDualExport(t *testing.T) {
 // its OTLP resource, it must not be able to brand its spans with LangWatch's
 // provenance marker in the customer's project — ingest-side enforcement keyed
 // on langwatch.origin must never trust a worker-supplied value.
+//
+// @scenario "A worker cannot claim its telemetry is LangWatch's own"
 func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
 	customer := startSignallingIngest(t)
 	relay := relayWithInternal(t, "")
@@ -365,7 +369,7 @@ func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
 	td := ptrace.NewTraces()
 	rs := td.ResourceSpans().AppendEmpty()
 	rs.Resource().Attributes().PutStr("langwatch.origin", "platform_internal")
-	rs.Resource().Attributes().PutStr("service.name", "opencode")
+	rs.Resource().Attributes().PutStr("service.name", "langy-worker")
 	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	span.SetName("ai.streamText")
 	span.SetTraceID(pcommon.TraceID{7})
@@ -392,7 +396,7 @@ func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
 		"a worker-forged langwatch.origin must be replaced by the platform's stamp, never forwarded")
 	serviceName, ok := attrs.Get("service.name")
 	require.True(t, ok)
-	assert.Equal(t, "opencode", serviceName.Str(), "legitimate worker resource attributes must survive the strip")
+	assert.Equal(t, "langy-worker", serviceName.Str(), "legitimate worker resource attributes must survive the strip")
 }
 
 // The customer-forward allowlist fails closed: a resource attribute outside
@@ -412,7 +416,7 @@ func TestCustomerForwardDropsUnlistedResourceAttributes(t *testing.T) {
 
 	td := ptrace.NewTraces()
 	rs := td.ResourceSpans().AppendEmpty()
-	rs.Resource().Attributes().PutStr("service.name", "opencode")
+	rs.Resource().Attributes().PutStr("service.name", "langy-worker")
 	rs.Resource().Attributes().PutStr("k8s.pod.name", "worker-pod-7")
 	rs.Resource().Attributes().PutStr("telemetry.sdk.name", "opentelemetry")
 	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
@@ -442,14 +446,23 @@ func TestCustomerForwardDropsUnlistedResourceAttributes(t *testing.T) {
 	}
 	serviceName, ok := attrs.Get("service.name")
 	require.True(t, ok)
-	assert.Equal(t, "opencode", serviceName.Str())
+	assert.Equal(t, "langy-worker", serviceName.Str())
 }
 
 func TestInternalExportIsBoundedDuringCollectorOutage(t *testing.T) {
 	started := make(chan struct{}, internalExportWorkers+1)
 	release := make(chan struct{})
 	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		started <- struct{}{}
+		// Never block on this send. Releasing the outage lets the two workers
+		// drain the rest of the queue, and each of those exports arrives here
+		// too, so a blocking send fills the buffer and then wedges a handler
+		// with nobody left to read it. That handler holds its connection open,
+		// `Close` waits on it, and the package times out after ten minutes.
+		// The count past the buffer says nothing the test asks about.
+		select {
+		case started <- struct{}{}:
+		default:
+		}
 		select {
 		case <-release:
 			w.WriteHeader(http.StatusOK)
@@ -640,6 +653,7 @@ func TestMirrorTiersEndToEnd(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 	}
 
+	// @scenario "The mirror receives the turn at the customer's tier"
 	t.Run("content tier mirrors the bodies and the source tenant", func(t *testing.T) {
 		customer := startSignallingIngest(t)
 		mirror := startSignallingIngest(t)
@@ -658,6 +672,7 @@ func TestMirrorTiersEndToEnd(t *testing.T) {
 			"the source project must never ride the customer's own forward")
 	})
 
+	// @scenario "A restricted customer's mirror carries structure and never content"
 	t.Run("structural tier mirrors the shape and tenant but no content", func(t *testing.T) {
 		customer := startSignallingIngest(t)
 		mirror := startSignallingIngest(t)
@@ -672,6 +687,7 @@ func TestMirrorTiersEndToEnd(t *testing.T) {
 		assert.Contains(t, body, "gpt-5-mini", "structural still carries the operational model")
 	})
 
+	// @scenario "A skipped customer produces no mirror at all"
 	t.Run("skip tier mirrors nothing while the customer forward is unaffected", func(t *testing.T) {
 		customer := startSignallingIngest(t)
 		mirror := startSignallingIngest(t)

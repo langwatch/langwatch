@@ -1,7 +1,6 @@
-// Package frameauth is the Langy authenticated frame contract
-// (LANGY_WORKER_REDESIGN_PLAN.md §0a): every frame the worker streams back to
-// the control plane carries a per-frame HMAC proving BOTH who it is and that it
-// really is who it says.
+// Package frameauth is the Langy authenticated frame contract: every frame the
+// worker streams back to the control plane carries a per-frame HMAC proving
+// BOTH who it is and that it really is who it says.
 //
 // This package SIGNS (the worker); the TS Hono relay VERIFIES. The wire contract
 // is pinned cross-language by specs/langy/langy-frame-auth.vectors.json — the
@@ -52,7 +51,7 @@ type Signed struct {
 	// FrameNonce is 16 random bytes, hex — unique per frame; the relay dedups on it.
 	FrameNonce string `json:"frameNonce"`
 	// Payload is the exact string that is signed and transmitted verbatim; the
-	// relay re-signs THESE bytes (it must not re-serialise before checking).
+	// relay re-signs THESE bytes (it must not re-serialize before checking).
 	Payload string `json:"payload"`
 }
 

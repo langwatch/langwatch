@@ -1,0 +1,76 @@
+---
+title: "Overview"
+description: "The SCIM 2.0 endpoints an identity provider calls to provision and deprovision users and groups in LangWatch."
+---
+
+<Note>
+  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every call, not only when a token is minted, so if the plan lapses, tokens that already exist stop verifying and your identity provider's requests are refused with HTTP 403. Minting a token through the [SCIM Tokens](/api-reference/scim-tokens/overview) API without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+These are the endpoints your identity provider calls, not endpoints you normally call yourself. Point Okta, Entra ID, or any other SCIM 2.0 provider at the base URL below with a SCIM token, and it creates, updates and deactivates LangWatch users and groups as people join, move, and leave.
+
+For the setup walkthrough on the provider side, see [SCIM Provisioning](/platform/scim). This reference is the wire contract underneath it.
+
+## Base URL
+
+```
+https://app.langwatch.ai/api/scim/v2
+```
+
+Self-hosted: the same path on your own domain.
+
+## Authentication
+
+A SCIM bearer token, minted through the [SCIM Tokens](/api-reference/scim-tokens/overview) API or under **Settings > SCIM**:
+
+```
+Authorization: Bearer <scim-token>
+```
+
+The token identifies the organization, so there is no organization id anywhere in these paths. Organization API keys do not work here, and SCIM tokens do not work anywhere else.
+
+The three discovery endpoints (`/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`) are served without authentication: a provider reads them before it has anywhere to put a credential.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/ServiceProviderConfig` | What this SCIM implementation supports |
+| `GET` | `/ResourceTypes` | The resource types served here |
+| `GET` | `/Schemas` | The schemas for those resource types |
+| `GET` | `/Users` | List provisioned users |
+| `POST` | `/Users` | Provision a user |
+| `GET` | `/Users/{id}` | Get a provisioned user |
+| `PUT` | `/Users/{id}` | Replace a provisioned user |
+| `PATCH` | `/Users/{id}` | Update a provisioned user |
+| `DELETE` | `/Users/{id}` | Deprovision a user |
+| `GET` | `/Groups` | List provisioned groups |
+| `POST` | `/Groups` | Provision a group |
+| `GET` | `/Groups/{id}` | Get a provisioned group |
+| `PUT` | `/Groups/{id}` | Replace a provisioned group |
+| `PATCH` | `/Groups/{id}` | Update a provisioned group |
+| `DELETE` | `/Groups/{id}` | Deprovision a group |
+
+## How SCIM objects map onto LangWatch
+
+A SCIM **User** is a member of your organization. Deprovisioning one, either by setting `active` to `false` or with `DELETE`, deactivates the account rather than deleting the person, so their history stays intact and setting `active` back to `true` restores them.
+
+A SCIM **Group** is a LangWatch [access group](/api-reference/groups/overview), not a team. Groups carry role bindings, and every member of the group inherits them, which is what makes an identity provider group meaningful here: put someone in the group upstream, and their LangWatch access follows.
+
+A group your identity provider owns is marked with a `scimSource`. It cannot be renamed or have members changed by hand, because the provider is the source of truth for both, but you can still attach and remove its [role bindings](/api-reference/role-bindings/overview) in LangWatch. That is the intended division: the provider decides who is in the group, you decide what the group can reach.
+
+## Errors
+
+Responses follow the SCIM error format (RFC 7644), with `Content-Type: application/scim+json`, because the caller is an identity provider rather than one of our own clients:
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "status": "403",
+  "detail": "SCIM provisioning requires an Enterprise plan"
+}
+```
+
+A missing or unknown token is 401, so the provider retries with the right credential. A real token on an organization whose Enterprise plan has lapsed is 403: the credential is fine, the plan is not, and telling the provider to retry would be a lie.

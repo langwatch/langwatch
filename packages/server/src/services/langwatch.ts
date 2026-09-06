@@ -55,7 +55,7 @@ export async function startLangwatch(
 
   const ready = await pollUntilHealthy({
     // The langwatch app's /api/health returns 204 No Content (see
-    // langwatch/src/server/routes/health.ts) — that's the deliberate
+    // platform/app/src/server/routes/health.ts) — that's the deliberate
     // success signal for the helm chart's liveness probe too.
     check: httpGetCheck(`http://127.0.0.1:${ctx.ports.langwatch}/api/health`, { expectStatus: 204 }),
     timeoutMs: 120_000,

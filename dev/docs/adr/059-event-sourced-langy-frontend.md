@@ -11,8 +11,8 @@ The pin test added in Phase 1 caught a real framework bug on its first run
 (the state-projection cursor comparator tie-broke KSUIDs with localeCompare
 while ClickHouse orders byte-wise), fixed alongside.
 
-**Builds on:** ADR-046 (event-sourced conversations), ADR-048 (dual-stream),
-ADR-049 (Postgres projections), ADR-058 (turn-phase machine — the proof of
+**Builds on:** ADR-046 (event-sourced conversations), ADR-077 (dual-stream),
+ADR-049 (Postgres projections), ADR-078 (turn-phase machine — the proof of
 concept for the pure-reducer pattern this ADR generalises).
 
 **Spec:** [`specs/langy/langy-event-sourced-frontend.feature`](../../../specs/langy/langy-event-sourced-frontend.feature)
@@ -29,10 +29,10 @@ turn out of a pile of ad-hoc, per-render signals — `isBusy`,
 `serverTurnInFlight`, a settled-marker, `isStopping`, `isFoldTurnInFlight` — plus
 a React-Query "signal-then-refetch" that re-downloads the whole projection on
 every change. Two hand-written models of one turn, free to drift, and a data
-layer that fights async timing by hand (ADR-058 already had to consolidate one
+layer that fights async timing by hand (ADR-078 already had to consolidate one
 corner of it into a state machine).
 
-ADR-058's `langyTurnPhase` proved a better shape: a **pure `(state, event) →
+ADR-078's `langyTurnPhase` proved a better shape: a **pure `(state, event) →
 state` reducer** the store wires in a few lines and the UI reads as one value.
 The backend's fold handlers are *already* that shape — they are just wrapped in
 projection plumbing (server-only store + versioning). So the frontend can fold
@@ -82,7 +82,7 @@ Net: no new infrastructure, no schema migration, no CH scaling concern.
 Extract the **pure** projection logic — event schemas (Zod, already portable),
 state types, the cursor type + its comparator, and the fold reducers — into a
 new source-only workspace package `@langwatch/langy` (`packages/langy`, exports
-`./src/index.ts`, no build step), consumed by `langwatch/` via `workspace:*`
+`./src/index.ts`, no build step), consumed by `platform/app/` via `workspace:*`
 exactly like `@langwatch/handled-error`.
 
 > **2026-07-22.** This package has since absorbed the CLI card contract that was
@@ -149,7 +149,7 @@ pushing events over the broadcast:
 3. **It preserves `langy-frontend-realtime.feature`'s invariant** — the
    real-time channel never pushes conversation data.
 
-The token stream (ADR-048 Stream B) stays the ephemeral fast-path for delta
+The token stream (ADR-077 Stream B) stays the ephemeral fast-path for delta
 text / reasoning. The optimistic token text reconciles against the folded
 durable answer — the same length-monotone rule as today, but the "durable" side
 is now a *local fold* rather than a re-fetch.
@@ -189,7 +189,7 @@ Sharpen the seams the later phases build on; no behaviour change.
 - Scaffold `packages/langy` modeled on `packages/handled-error`: `private`,
   `"type": "module"`, `exports → ./src/index.ts`, `incremental` +
   per-package `tsBuildInfoFile`, `zod` as **peer** dependency; add
-  `"@langwatch/langy": "workspace:*"` to `langwatch/package.json`.
+  `"@langwatch/langy": "workspace:*"` to `platform/app/package.json`.
 - Move in, as the seed, `features/langy/stores/langyTurnPhase.ts` + its unit
   test; update the `langyStore` import.
 - Move the event schemas (`pipelines/langy-conversation-processing/schemas/
@@ -242,7 +242,7 @@ Sharpen the seams the later phases build on; no behaviour change.
   drained after snapshot load.
 - `turnPhase` collapses into a **derivation**: recorded turn status ⊕ the
   optimistic pending-command overlay (send clicked, not yet
-  `agent_turn_accepted`) ⊕ stop-requested. The ADR-058 reducer shrinks to the
+  `agent_turn_accepted`) ⊕ stop-requested. The ADR-078 reducer shrinks to the
   overlay; backend truth comes from the fold.
 - Token-stream reconciliation now compares against the folded answer (same
   length-monotone rule); **rejoin-after-refresh** falls out: load snapshot →
@@ -284,7 +284,7 @@ Sharpen the seams the later phases build on; no behaviour change.
 ## Alternatives considered
 
 - **Keep signal-then-refetch, just tidy the booleans.** Rejected as the
-  ceiling: it leaves two models of a turn and re-downloads projections; ADR-058
+  ceiling: it leaves two models of a turn and re-downloads projections; ADR-078
   showed the booleans want to be a fold, and a fold wants the events.
 - **Signal-carries-the-event (this ADR's own first draft).** Rejected after
   the feasibility trace: it fights the subscriber's coalescing (dropped
@@ -292,7 +292,7 @@ Sharpen the seams the later phases build on; no behaviour change.
   then protect, and breaks the realtime spec's no-data-on-the-channel
   invariant. Signal+cursor keeps all three properties and costs one indexed CH
   read per burst.
-- **Ship the reducers from `langwatch/src/shared` instead of a package.**
+- **Ship the reducers from `platform/app/src/shared` instead of a package.**
   Workable, but a package is the existing convention for code both the server
   and client import (`handled-error`, and the card contract now inside this
   same package), enforces the
@@ -304,7 +304,7 @@ Sharpen the seams the later phases build on; no behaviour change.
 ## Consequences
 
 - New `packages/langy` (`@langwatch/langy`), `workspace:*` dep of `langwatch/`.
-- Server fold projections become thin wrappers over shared reducers (ADR-058
+- Server fold projections become thin wrappers over shared reducers (ADR-078
   shape), with no change to storage, versioning, or the event vocabulary.
 - The broadcast signal gains a cursor; a new authorized tail-read query joins
   the langy router (Phase 2), backed by one new event-store read.

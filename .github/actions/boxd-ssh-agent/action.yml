@@ -1,0 +1,44 @@
+# Starts an ssh-agent holding the boxd CI key. Extracted from four verbatim
+# copies of the same block across preview-up, preview-down, refresh-staging
+# and reaper in boxd-pr-preview.yml (#5300).
+#
+# The caller MUST check out the repo first, or neither this action nor the
+# script it runs is on disk. None of the four boxd jobs checked anything out
+# before this, so they take a sparse checkout of `.github` rather than the
+# whole monorepo.
+#
+# The shell lives in .github/scripts/start-boxd-ssh-agent.sh rather than inline
+# here, because a composite action's `run:` block cannot be executed by a test.
+# .github/scripts/__tests__/start-boxd-ssh-agent.test.sh drives that file
+# directly, which is what makes this extraction verifiable rather than just
+# shorter.
+#
+# Usage:
+#   - uses: actions/checkout@...
+#     with:
+#       sparse-checkout: .github
+#   - uses: ./.github/actions/boxd-ssh-agent
+#     with:
+#       ssh-key: ${{ secrets.BOXD_SSH_KEY }}
+#       skipped-steps: preview VM steps
+name: boxd-ssh-agent
+description: Start an ssh-agent holding the boxd CI key, or set BOXD_SKIP when no key is configured.
+inputs:
+  ssh-key:
+    description: Private key for the boxd host. Empty means skip the VM steps rather than fail the job.
+    required: false
+    default: ""
+  skipped-steps:
+    description: What the warning names as skipped when no key is configured, e.g. "preview VM steps".
+    required: false
+    default: preview VM steps
+
+runs:
+  using: composite
+  steps:
+    - name: Start ssh-agent with CI key
+      shell: bash
+      env:
+        BOXD_SSH_KEY: ${{ inputs.ssh-key }}
+        SKIPPED_STEPS: ${{ inputs.skipped-steps }}
+      run: bash "$GITHUB_WORKSPACE/.github/scripts/start-boxd-ssh-agent.sh"

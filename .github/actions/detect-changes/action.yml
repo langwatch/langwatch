@@ -62,10 +62,63 @@ outputs:
   lambda-image:
     description: "'true' if Lambda-image-relevant paths changed, or if the event is neither a PR nor a diff-mode push. Used by langwatch-nlp-ci's LWA-readiness job — covers Go-binary source + Dockerfile + entrypoint, which aren't matched by the Python-only `relevant` filter."
     value: ${{ steps.filter.outputs.lambda-image || steps.force.outputs.lambda-image }}
+  ingest:
+    description: "'true' if the app's HTTP ingest spine changed, or if the event is neither a PR nor a diff-mode push. Used by sdk-javascript-ci's e2e job, which drives real SDK telemetry at a running server and is therefore the only check that sees those routes answer over a socket. Separate from `relevant` because the sibling `ci` job shares that filter and spends LLM budget."
+    value: ${{ steps.filter.outputs.ingest || steps.force.outputs.ingest }}
+  codeql-javascript:
+    description: "'true' if code CodeQL analyses as javascript-typescript changed. Used by codeql.yml to build its language matrix: the single `relevant` filter fires on any of six trees and then runs every analyser, so a TypeScript-only change was paying for the Python one."
+    value: ${{ steps.filter.outputs.codeql-javascript || steps.force.outputs.codeql-javascript }}
+  codeql-python:
+    description: "'true' if code CodeQL analyses as python changed. See codeql-javascript."
+    value: ${{ steps.filter.outputs.codeql-python || steps.force.outputs.codeql-python }}
+  heavy:
+    description: >-
+      "'true' unless this is a draft pull request. Gate expensive jobs on
+      `relevant == 'true' && heavy == 'true'` so a draft keeps the cheap
+      signal and releases the runner slots. Never gate a REQUIRED check on
+      this alone — a skipped required check blocks the merge; pair it with an
+      aggregator that lists the job under allowed-skips, which is what the
+      always-run + aggregator pattern already does."
+    value: ${{ steps.draft.outputs.heavy }}
 
 runs:
   using: composite
   steps:
+    # One PR push fans out to 27 workflow runs and 98 jobs, against a Team-plan
+    # concurrency allowance of the same order — which is why integration shards
+    # were measured waiting 286-590s for a runner while their only dependency
+    # had finished in 8 seconds. Drafts are where that budget is cheapest to
+    # reclaim: the work is in progress, and the full suite is guaranteed to run
+    # again on ready_for_review and in the merge queue.
+    #
+    # Computed here rather than in each workflow because it is the same
+    # expression 25 times over, and the one place every gate job already calls.
+    # A workflow that wants a job on drafts simply does not read this output.
+    #
+    # `ready_for_review` must be in the workflow's `pull_request.types` for the
+    # heavy jobs to get their first run when the PR leaves draft — taking a PR
+    # out of draft fires no other event.
+    - name: Decide whether heavy jobs should run
+      id: draft
+      shell: bash
+      # Both PR event names, not just `pull_request`. `pull_request_target`
+      # carries the identical payload — `draft` included — and several callers
+      # here trigger on it, so checking only the one name let a draft
+      # pull_request_target run everything heavy.
+      run: |
+        case "${{ github.event_name }}" in
+          pull_request | pull_request_target)
+            if [ "${{ github.event.pull_request.draft }}" = "true" ]; then
+              echo "heavy=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "heavy=true" >> "$GITHUB_OUTPUT"
+            fi
+            ;;
+          *)
+            echo "heavy=true" >> "$GITHUB_OUTPUT"
+            ;;
+        esac
+
     - name: Detect relevant changes
       if: >-
         github.event_name == 'pull_request'
@@ -87,3 +140,6 @@ runs:
         echo "relevant=true" >> "$GITHUB_OUTPUT"
         echo "feature-parity=true" >> "$GITHUB_OUTPUT"
         echo "lambda-image=true" >> "$GITHUB_OUTPUT"
+        echo "ingest=true" >> "$GITHUB_OUTPUT"
+        echo "codeql-javascript=true" >> "$GITHUB_OUTPUT"
+        echo "codeql-python=true" >> "$GITHUB_OUTPUT"

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +22,8 @@ type fakePool struct {
 	worker     Worker
 	killed     []string
 	liveWorker bool
+	// canceled records every CancelTurn as "conversationID/turnID".
+	canceled []string
 }
 
 func (f *fakePool) HasLiveWorker(string, domain.CredentialSignature) bool { return f.liveWorker }
@@ -33,8 +34,14 @@ func (f *fakePool) Acquire(_ context.Context, _ string, _ domain.Credentials) (W
 	}
 	return f.worker, nil
 }
-func (f *fakePool) Status() (int, int)                         { return 0, 0 }
-func (f *fakePool) KillSessionVanished(id string)              { f.killed = append(f.killed, id) }
+func (f *fakePool) AcquireWarm(ctx context.Context, id string, creds domain.Credentials) (Worker, error) {
+	return f.Acquire(ctx, id, creds)
+}
+func (f *fakePool) Status() (int, int)            { return 0, 0 }
+func (f *fakePool) KillSessionVanished(id string) { f.killed = append(f.killed, id) }
+func (f *fakePool) CancelTurn(conversationID, turnID string) {
+	f.canceled = append(f.canceled, conversationID+"/"+turnID)
+}
 func (f *fakePool) StartReaper()                               {}
 func (f *fakePool) ShutdownHandoff(context.Context, time.Time) {}
 func (f *fakePool) Shutdown()                                  {}
@@ -60,8 +67,10 @@ type fakeWorker struct {
 	// LLM call failed with, riding the agent_error frame as a reason.
 	llmErr   herr.E
 	llmErrOK bool
-	// servedTurn stubs HasServedTurn — drives the ready-status wording.
+	// servedTurn / prewarmed stub HasServedTurn and Prewarmed — they drive the
+	// ready-status wording.
 	servedTurn bool
+	prewarmed  bool
 	// forwardedFailure / forwardedTurnSpans record the deferred customer
 	// turn-span forward: the failure it carried (nil on success) and that the
 	// forward happened at all.
@@ -82,6 +91,7 @@ func (w *fakeWorker) ClaimTurn(string) ClaimOutcome {
 func (w *fakeWorker) Release()            { w.released++ }
 func (w *fakeWorker) Touch()              { w.touched++ }
 func (w *fakeWorker) HasServedTurn() bool { return w.servedTurn }
+func (w *fakeWorker) Prewarmed() bool     { return w.prewarmed }
 func (w *fakeWorker) ForwardTurnSpan(_ trace.SpanContext, _, _ time.Time, failure *domain.TurnFailure) {
 	w.forwardedFailure = failure
 	w.forwardedTurnSpans++
@@ -158,6 +168,65 @@ func TestApp_WarmRefreshesWorkerIdleDeadline(t *testing.T) {
 	}
 	if worker.touched != 1 {
 		t.Fatalf("warm touches = %d, want 1", worker.touched)
+	}
+}
+
+// A cancel is fire-and-forget by contract: the app hands it to the pool and
+// returns nothing: the durable stopped terminal upstream already made the
+// stop truthful, so there is no error a caller could act on.
+func TestApp_CancelTurn_DelegatesToThePool(t *testing.T) {
+	pool := &fakePool{}
+	a := newTestApp(pool, nil)
+
+	a.CancelTurn(context.Background(), "c1", "turn-1")
+
+	if len(pool.canceled) != 1 || pool.canceled[0] != "c1/turn-1" {
+		t.Fatalf("canceled = %v, want exactly c1/turn-1", pool.canceled)
+	}
+}
+
+// A stop that lands while the worker is still starting finds nothing to abort,
+// so the manager remembers the turn id: the dispatch that follows must not run
+// the turn. The 202 (nil error, no-op runner) is deliberate — the turn is
+// settled on the durable record, so the caller has nothing to re-drive.
+//
+// @scenario A stop before the worker starts still stops the turn
+func TestApp_StartTurn_StoppedBeforeTheWorkerStartedDoesNotRun(t *testing.T) {
+	worker := &fakeWorker{claimOK: true, streamWrites: true}
+	pool := &fakePool{worker: worker}
+	a := newTestApp(pool, &fakeRelay{})
+	stopped := req()
+	stopped.TurnID = "turn-stopped"
+
+	a.CancelTurn(context.Background(), stopped.ConversationID, stopped.TurnID)
+
+	run, err := a.StartTurn(context.Background(), stopped)
+	if err != nil {
+		t.Fatalf("StartTurn: %v", err)
+	}
+	run(context.Background())
+
+	if worker.claimed != 0 {
+		t.Errorf("a stopped turn must claim no worker, claimed %d times", worker.claimed)
+	}
+	if worker.posted != 0 {
+		t.Errorf("a stopped turn must post no prompt, posted %d times", worker.posted)
+	}
+}
+
+// Only the stopped turn is refused: the next question on the same conversation
+// runs normally.
+func TestApp_StartTurn_ADifferentTurnStillRunsAfterAStop(t *testing.T) {
+	worker := &fakeWorker{claimOK: true, streamWrites: true}
+	a := newTestApp(&fakePool{worker: worker}, &fakeRelay{})
+	a.CancelTurn(context.Background(), "c1", "turn-stopped")
+
+	next := req()
+	next.TurnID = "turn-next"
+	runTurn(t, a, next)
+
+	if worker.claimed != 1 {
+		t.Errorf("the following turn must claim the worker once, got %d", worker.claimed)
 	}
 }
 
@@ -314,12 +383,12 @@ func TestApp_Turn_StreamErrorEmitsWorkerStoppedFrame(t *testing.T) {
 }
 
 func TestApp_Turn_AgentErrorFrameCarriesTypedCauseChain(t *testing.T) {
-	// The agent reported its own failure (an opencode error event) and the LLM
+	// The agent reported its own failure (an error terminal) and the LLM
 	// proxy captured the gateway's typed herr for this turn. The wire frame must
 	// be the vetted agent_error herr with the gateway's herr as a REASON — the
 	// full typed chain the control plane deserializes into a DomainError — and
 	// the raw agent prose must stay in the log, never on the wire.
-	rawAgentProse := "AI_APICallError: something opencode made up"
+	rawAgentProse := "AI_APICallError: something the agent made up"
 	worker := &fakeWorker{
 		claimOK:   true,
 		streamErr: herr.NewLight(context.Background(), domain.ErrAgentError, nil, errors.New(rawAgentProse)),
@@ -519,48 +588,56 @@ func statusOf(fs []frames.Frame) string {
 	return ""
 }
 
-// A worker that has never answered says Langy is waking up — one of the
-// wake-flavoured lines, never a warm reaching line.
-func TestApp_Turn_NeverServedWorkerEmitsWakingUpStatus(t *testing.T) {
+// A worker that has never answered says it is starting up — never the
+// connecting line, which would hide that a boot is happening.
+func TestApp_Turn_NeverServedWorkerEmitsStartingUpStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true}
 	relay := &fakeRelay{}
 	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
 
-	got := statusOf(relay.stream.emitted)
-	if !slices.Contains(wakingLangyStatuses, got) {
-		t.Errorf("cold readiness status = %q, want one of %v", got, wakingLangyStatuses)
+	if got := statusOf(relay.stream.emitted); got != statusStartingUp {
+		t.Errorf("cold readiness status = %q, want %q", got, statusStartingUp)
 	}
 }
 
-// A warm worker gets a short reaching-Langy line, chosen from the rotation —
-// never the waking-up line, which would claim a boot that isn't happening.
-func TestApp_Turn_WarmWorkerEmitsReachingLangyStatus(t *testing.T) {
+// A warm worker gets the thinking line — never the starting-up line, which
+// would claim a boot that isn't happening. Its dispatch is a millisecond
+// round-trip, so the window this status fills is the model working.
+func TestApp_Turn_WarmWorkerEmitsThinkingStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true, servedTurn: true}
 	relay := &fakeRelay{}
 	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
 
-	got := statusOf(relay.stream.emitted)
-	if !slices.Contains(reachingLangyStatuses, got) {
-		t.Errorf("warm readiness status = %q, want one of %v", got, reachingLangyStatuses)
+	if got := statusOf(relay.stream.emitted); got != statusThinking {
+		t.Errorf("warm readiness status = %q, want %q", got, statusThinking)
 	}
 }
 
-// The warm rotation is deterministic per turn (a re-drive repeats its line) and
-// actually varies across turn ids.
-func TestApp_ReadyStatus_WarmRotationVariesByTurn(t *testing.T) {
-	worker := &fakeWorker{servedTurn: true}
-	seen := map[string]struct{}{}
-	for _, turnID := range []string{"turn-a", "turn-b", "turn-c", "turn-d", "turn-e", "turn-f"} {
-		r := req()
-		r.TurnID = turnID
-		first := readyStatusFor(r, worker)
-		if again := readyStatusFor(r, worker); again != first {
-			t.Fatalf("ready status for %q not deterministic: %q then %q", turnID, first, again)
-		}
-		seen[first] = struct{}{}
+// A pre-warmed worker's first turn thinks: its boot happened while the panel
+// sat open, so "Starting Langy…" would name a startup the user never waited
+// on.
+func TestApp_Turn_PrewarmedWorkerEmitsThinkingStatus(t *testing.T) {
+	worker := &fakeWorker{claimOK: true, streamWrites: true, prewarmed: true}
+	relay := &fakeRelay{}
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
+
+	if got := statusOf(relay.stream.emitted); got != statusThinking {
+		t.Errorf("prewarmed readiness status = %q, want %q", got, statusThinking)
 	}
-	if len(seen) < 2 {
-		t.Errorf("six turn ids produced %d distinct warm lines, want at least 2", len(seen))
+}
+
+// A follow-up whose worker was reaped respawns on the persisted session — the
+// conversation already has replies (the dispatch carries a history seed), and
+// "Starting Langy…" there reads as the workspace having vanished mid-chat.
+func TestApp_Turn_FollowUpRespawnEmitsThinkingStatus(t *testing.T) {
+	worker := &fakeWorker{claimOK: true, streamWrites: true}
+	relay := &fakeRelay{}
+	r := req()
+	r.HistorySeed = "THE CONVERSATION SO FAR: earlier exchange"
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), r)
+
+	if got := statusOf(relay.stream.emitted); got != statusThinking {
+		t.Errorf("follow-up respawn readiness status = %q, want %q", got, statusThinking)
 	}
 }
 

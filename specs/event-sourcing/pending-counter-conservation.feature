@@ -45,7 +45,7 @@ Feature: Pending counter conservation across job lifecycle
   @integration @counter @block
   Scenario: Counter tracks restage-and-block as a new pending job
     Given a dispatched job (counter was decremented at dispatch)
-    When RESTAGE_AND_BLOCK re-stages with a new ID and blocks the group
+    When RESTAGE_AND_BLOCK re-stages the job and blocks the group
     Then the counter is incremented (job re-enters :jobs ZSET)
 
   @integration @counter @redelivery
@@ -66,3 +66,11 @@ Feature: Pending counter conservation across job lifecycle
     Given a group with several staged jobs (INCR at stage)
     When the coalescing path drains some of them in one call
     Then the counter is decremented once per drained job (same as dispatch)
+
+  # The ops reconcile counts jobs by asking this index which groups to look at,
+  # so a staged job that never reached it would be invisible to the count.
+  @integration
+  Scenario: Staging a job records its group as holding pending work
+    Given a queue whose processor has not finished its first job
+    When further jobs are staged for the same group
+    Then the group is recorded as holding pending work

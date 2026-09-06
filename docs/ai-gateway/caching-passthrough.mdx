@@ -6,7 +6,7 @@ sidebarTitle: Caching Passthrough
 
 Modern LLM providers offer prompt caching, Anthropic (ephemeral + persistent blocks), OpenAI (automatic prefix caching), Gemini (implicit context caches). The discounts are real: **up to 90% off input tokens** on cache hits for Anthropic, comparable for others.
 
-If an AI gateway reformats or reorders a request before forwarding, it invalidates the cache keys the provider uses internally and silently kills those discounts. The LangWatch AI Gateway is engineered to preserve caching byte-for-byte by default.
+If an AI gateway reformats or reorders a request before forwarding, it invalidates the cache keys the provider uses internally and silently kills those discounts. The LangWatch AI Gateway preserves caching byte-for-byte by default.
 
 ## The hard invariant
 
@@ -70,13 +70,13 @@ In v1, sending `X-LangWatch-Cache: force` or `X-LangWatch-Cache: ttl=3600` retur
 ## Provider-specific notes
 
 - **Anthropic Messages API**: `cache_control: {type: "ephemeral"}` or `{type: "persistent"}` on content blocks. Gateway forwards as-is. 5-min, 1-hour TTL respectively.
-- **OpenAI (GPT-4.1, o-series)**: no explicit cache_control field; OpenAI auto-caches prefixes ≥1024 tokens. Gateway simply forwards.
+- **OpenAI (GPT-4.1, o-series)**: no explicit cache_control field; OpenAI auto-caches prefixes ≥1024 tokens. The gateway forwards the request unchanged.
 - **Azure OpenAI**: inherits OpenAI's auto-caching. Same behaviour.
 - **Gemini (1.5, 2.5)**: context caches are a separate API (`caches.create`). Gateway v1 does not orchestrate these on your behalf; the client calls them directly and the gateway forwards the cache reference in subsequent requests.
 - **Bedrock**: Anthropic-on-Bedrock supports prompt caching when using converse API. Gateway forwards cache_control blocks to Bedrock runtime as-is.
 - **Vertex AI**: Anthropic-on-Vertex similar to Bedrock for prompt caching.
 
-## Why this is load-bearing
+## Cost impact
 
 From a real observed pattern: a 40k-token system prompt with 100 calls a day.
 

@@ -9,8 +9,10 @@ Feature: Scenario Input Mapping
   # --- Schema ---
   #
   # Field mappings travel on the *agent config* (scenarioMappings on CodeAgentData
-  # and HttpAgentData) and on the scenario-job payload — not on the suite target
-  # schema itself, which only carries {type, referenceId}.
+  # and HttpAgentData) and on the scenario-job payload. The one exception is
+  # prompt targets: a prompt is authored in the library and pointed at, so its
+  # scenarioMappings sit on the suite target that made the pairing (see the
+  # Prompt Adapter section below). Other target types stay {type, referenceId}.
 
   @unit
   Scenario: Suite target schema accepts all valid target types
@@ -119,14 +121,36 @@ Feature: Scenario Input Mapping
     Then "input" is resolved to the last user message
     And "messages" is resolved to the messages array
 
-  # --- Prompt Adapter ---
+  # --- Prompts as targets ---
+  #
+  # A prompt used to be the exception: it took no mappings at all, so its
+  # declared inputs were never bound under simulation (#6590). It binds them the
+  # same way an agent does now, and only the place the bindings are configured
+  # differs — an agent is configured, so its bindings belong to the agent; a
+  # prompt is authored in the library and pointed at, so its bindings belong to
+  # the run plan that paired it with the simulation. See
+  # specs/scenarios/prompt-agent-input-binding.feature.
 
   @unit
-  Scenario: Prompt adapter does not accept fieldMappings
-    Given a prompt target adapter
-    When its constructor shape is inspected
-    Then the adapter has no "fieldMappings" parameter
-    And conversation messages flow through without any mapping step
+  Scenario: A run plan keeps the bindings configured for its prompt
+    Given a run plan pairing a prompt with a simulation
+    And bindings configured for that prompt's declared inputs
+    When the run plan is saved
+    Then the run uses those bindings
+
+  @unit
+  Scenario: An agent target cannot carry a prompt's bindings
+    Given a run plan pairing an agent with a simulation
+    When bindings for that agent are submitted with the run plan
+    Then the run plan is rejected
+    And the rejection names the bindings
+
+  @unit
+  Scenario: A prompt receives the value its binding names
+    Given a prompt declaring inputs "query" and "context"
+    And "query" is bound to what the simulated user said
+    When the prompt takes a turn in a simulation
+    Then "query" holds what the simulated user said
 
   # --- Default Mappings ---
 

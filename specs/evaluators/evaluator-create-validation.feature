@@ -24,7 +24,6 @@ Feature: Creating an evaluator with an unknown type is recoverable
     When I create an evaluator with type "ragas/answer_relevancy"
     Then the failure's reason carries the accepted evaluator types as data
     And the accepted types include "ragas/response_relevancy"
-    And the accepted types include "legacy/ragas_answer_relevancy"
     And the rejected value is echoed back alongside them
 
   Scenario: The accepted types stay out of the prose message
@@ -96,7 +95,7 @@ Feature: Creating an evaluator with an unknown type is recoverable
   # The ambiguous ask is a question card, not prose
   # ============================================================================
 
-  Scenario: An ambiguous evaluation request is asked as a choices block
+  Scenario: An ambiguous evaluation request is asked with the question tool
     Given a request that names neither a dataset nor live traffic
     Then the router asks with a choices block offering the two options
     And nothing is created before the answer arrives

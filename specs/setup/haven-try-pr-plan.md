@@ -7,8 +7,8 @@ Scoping document (not yet implemented). Citations are `file:line` under
 
 Trying a teammate's PR locally today is a manual chore: `git fetch`, `git
 worktree add`, copy `.env`s, `pnpm install`, regen Prisma/Zod, migrate, seed,
-start — then remember to tear it down. `scripts/worktree.sh` automates the
-*issue→worktree→install* half (`scripts/worktree.sh:84-122`) but stops before
+start — then remember to tear it down. `dev/scripts/worktree.sh` automates the
+*issue→worktree→install* half (`dev/scripts/worktree.sh:84-122`) but stops before
 env-wiring and launch and knows nothing about hostnames, DB isolation, or
 reaping.
 
@@ -67,8 +67,8 @@ provision→codegen→migrate→seed→supervise pipeline with zero refactor.
 
 1. **Resolve the PR** (new). Parse a bare number or `github.com/.../pull/N` URL,
    then `gh pr view <N> --repo langwatch/langwatch --json headRefName,headRefOid,isCrossRepository,...`.
-   `gh` is already a documented prereq, used at `scripts/worktree.sh:86-92` and
-   `scripts/boxd-fork.sh:468-487`. Refuse a non-OPEN PR unless `--force`.
+   `gh` is already a documented prereq, used at `dev/scripts/worktree.sh:86-92` and
+   `dev/scripts/boxd-fork.sh:468-487`. Refuse a non-OPEN PR unless `--force`.
 2. **Create/reuse the worktree** (new). First check `Hygiene.Worktrees(repoRoot)`
    (`adapters/hygiene/hygiene.go:25-51`) — if the branch is already checked out
    (e.g. `worktrees/pr-5015` exists), skip the add and just `up` there. Otherwise
@@ -77,7 +77,7 @@ provision→codegen→migrate→seed→supervise pipeline with zero refactor.
    `pr-<n>` → `app.pr-<n>.langwatch.localhost`. Same-repo: `git fetch origin
    <headRefName>` + `git worktree add`. **Fork/cross-repo**: `git fetch origin
    pull/<N>/head:pr-<N>` then add — no fork remote needed. Copy `.env`s via the
-   drift-aware copier in `scripts/worktree.sh:124-186` (reuse, don't reimplement).
+   drift-aware copier in `dev/scripts/worktree.sh:124-186` (reuse, don't reimplement).
 3. **Install deps** (reuse Supervisor). `pnpm install` in the worktree via
    `Supervisor.RunOnce` (`app/ports.go:56-61`, the one-shot mechanism `Up` already
    uses at `orchestrator.go:214-226`). Skippable with `--no-install`. pnpm's
@@ -124,7 +124,7 @@ dirty** (`Hygiene.Dirty`, `hygiene.go:54-60`) — never delete uncommitted work.
 ## Phased implementation
 
 - **Phase 0 — spec + ADR.** There is NO thuishaven ADR/spec yet (the
-  `dev/haven.mk:1` "ADR-048" ref is a stale/colliding number). Write
+  `dev/haven.mk` no longer cites an ADR number). Write
   `specs/setup/haven-try-pr.feature` (style per
   `specs/setup/quickstart-entry-point.feature`) and the first thuishaven ADR,
   cross-linking ADR-004's worktree-isolation amendments.

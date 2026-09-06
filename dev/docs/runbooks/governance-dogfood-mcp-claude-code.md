@@ -159,10 +159,10 @@ of record (andre 199226d77 + 5fcadd586 + 391cfd989).
 
 ## Cross-references
 
-- `langwatch/scripts/dogfood/governance/mcp-client-probe.ts` — the
+- `platform/app/scripts/dogfood/governance/mcp-client-probe.ts` — the
   fixture-fast-loop equivalent of this runbook (no OAuth, project-apiKey
   Bearer only — read tools + AUTH_REQUIRED negative case).
-- `langwatch/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` —
+- `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` —
   service-layer audit-uniform regression (asserts metadata.surface=mcp
   on create + install).
 - `feedback_fixtures_dont_replace_real_user_dogfood.md` — rchaves nudge

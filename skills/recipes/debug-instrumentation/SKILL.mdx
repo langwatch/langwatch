@@ -20,10 +20,12 @@ This recipe uses the `langwatch` CLI to inspect your production traces and ident
 ## Step 1: Fetch Recent Traces
 
 ```bash
-langwatch trace search --limit 25 --start-date "$(date -u -Iseconds -d '7 days ago')" --format json
+langwatch trace search --limit 25 --start-date "$(( ($(date +%s) - 7*24*3600) * 1000 ))" --format json
 ```
 
-(Widen or narrow the window as needed — the CLI accepts ISO strings for `--start-date`.)
+(Widen or narrow the window as needed. `--start-date` accepts an ISO string or
+epoch milliseconds, and defaults to the last 24 hours. The epoch form above is
+used because `date -d '7 days ago'` is GNU-only and fails on macOS.)
 
 For each trace, ask:
 - How many traces are there?

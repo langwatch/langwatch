@@ -17,7 +17,7 @@ import (
 // was on, so any operator running without the Python sidecar saw
 // perpetual "Connecting…" and a misleading "Bad Gateway child upstream
 // unavailable" toast every tick. Counterpart TS change is in
-// langwatch/src/app/api/workflows/post_event/post-event.ts (added
+// platform/app/src/app/api/workflows/post_event/post-event.ts (added
 // is_alive + stop_execution to GO_ENGINE_EVENT_TYPES).
 //
 // Wire shape contract from the Python sidecar (preserved here):

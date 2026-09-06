@@ -1,6 +1,6 @@
 Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
   As an org admin rolling LangWatch out to my engineering teams
-  I want to publish RoutingPolicies (provider order, model allowlist, strategy)
+  I want to publish RoutingPolicies (provider order, model name mapping, model tiers)
   once at org/team/project scope, then have personal and project VKs reference
   those policies — instead of every developer making a technical "fallback chain"
   decision when they create a key
@@ -37,9 +37,8 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
       | scope                  | ORGANIZATION                                                     |
       | scopeId                | "acme"                                                           |
       | name                   | "developer-default"                                              |
-      | strategy               | "priority"                                                       |
       | providerCredentialIds  | ["mp_anth_prod", "mp_oai_prod", "mp_gem_prod"]                   |
-      | modelAllowlist         | ["claude-*", "gpt-5-mini", "gpt-5", "gemini-2.5-*"]              |
+      | modelAliases           | {"complex": "anthropic/claude-opus-4-5", "fast": "openai/gpt-5-mini"} |
       | isDefault              | true                                                             |
     Then a RoutingPolicy row is created with the above fields
     And exactly one default policy exists per (organizationId, scope, scopeId)
@@ -48,11 +47,12 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
   @bdd @routing-policy @update
   Scenario: Admin updates an existing RoutingPolicy
     Given the policy "developer-default" exists at ORG scope for "acme"
-    When carol calls `routingPolicy.upsert` with the same id and a new modelAllowlist
+    When carol calls `routingPolicy.upsert` with the same id and a new model tier target
     Then the existing row is updated (not duplicated)
     And the change is reflected in any new VK config materialised after the update
     And an audit log row "gateway.routing_policy.updated" is written
-    And existing VKs that reference this policy automatically pick up the new allowlist within 30 seconds (gateway auth-cache TTL)
+    And a ROUTING_POLICY_UPDATED change event is appended in the same transaction
+    And virtual keys already using this policy serve the new mapping without being recreated
 
   @bdd @routing-policy @set-default
   Scenario: Admin can swap the default policy at org scope
@@ -116,9 +116,9 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
   @bdd @ui @routing-policy @admin-page
   Scenario: Admin RoutingPolicies page lists all policies grouped by scope
     Given org "acme" has 3 RoutingPolicies across ORG / TEAM / PROJECT scopes
-    When carol navigates to "/settings/routing-policies"
+    When carol navigates to "/gateway/routing-policies"
     Then she sees a list grouped by scope: "Organization defaults", "Team defaults", "Project defaults"
-    And each group can be expanded to show its policies with name, strategy, allowlist preview, providerCredential count
+    And each group can be expanded to show its policies with name, model tier count, and provider count
     And a "Set as default" button is present for non-default policies in each group
     And a "[ + New routing policy ]" CTA at the top of each group
 
@@ -195,8 +195,70 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
 
   @bdd @routing-policy @cross-ref
   Scenario: Strategy field is enforced at the gateway dispatcher
-    Given a RoutingPolicy with strategy="priority" and providerCredentialIds=[A, B, C]
+    Given a RoutingPolicy with providerCredentialIds=[A, B, C] in that order
     When the gateway resolves a VK that references this policy
     And the request `model` is supported by all three providers
     Then the dispatcher tries A first, then B, then C on retry
     # See provider-routing.feature for full cost/latency/round_robin coverage
+
+  # ---------------------------------------------------------------------------
+  # Model tiers
+  # ---------------------------------------------------------------------------
+
+  Rule: A model tier is a reserved name a policy gives a meaning to
+
+    A client that sends "complex" instead of naming a model keeps working when
+    the organization moves to a newer model, because the policy decides what
+    "complex" means and the client never has to.
+
+    Three names are reserved: complex, reasoning and fast. They are ordinary
+    entries in the policy's model name mapping, so the gateway looks one up
+    exactly the way it looks up any other name and needs no knowledge of tiers
+    at all.
+
+    @unit
+    Scenario: A tier the policy points somewhere reaches that model
+      Given a routing policy whose "complex" tier points at "anthropic/claude-opus-4-5"
+      When the gateway's config for a key on that policy is materialized
+      Then the model name mapping carries "complex" pointing at "anthropic/claude-opus-4-5"
+
+    @unit
+    Scenario: A tier the policy leaves blank falls through to the default model
+      Given a routing policy with a default model of "openai/gpt-5-mini"
+      And the policy points its "complex" tier at "anthropic/claude-opus-4-5"
+      When the gateway's config for a key on that policy is materialized
+      Then "complex" still points at "anthropic/claude-opus-4-5"
+      And "reasoning" and "fast" both point at "openai/gpt-5-mini"
+
+    @unit
+    Scenario: The default model answers the tier names and nothing else
+      Given a routing policy with a default model of "openai/gpt-5-mini"
+      When the gateway's config for a key on that policy is materialized
+      Then a model name the policy never mentions is absent from the mapping
+      And a request naming it is refused rather than served the default model
+
+    @unit
+    Scenario: A policy with no default model leaves its unanswered tiers out
+      Given a routing policy with no default model
+      And the policy points its "fast" tier at "openai/gpt-5-mini"
+      When the gateway's config for a key on that policy is materialized
+      Then the mapping carries "fast" and neither of the other two tiers
+
+  # ---------------------------------------------------------------------------
+  # The editor
+  # ---------------------------------------------------------------------------
+
+  Rule: The routing policy editor opens from its own address
+
+    @integration
+    Scenario: Editing a policy from the list opens the editor for that policy
+      Given the organization has a routing policy
+      When carol picks Edit from the policy's actions
+      Then the routing policy editor opens for that policy
+      And the address carries the policy, so the same link reopens it
+
+    @integration
+    Scenario: A tier name cannot be set twice
+      Given carol is editing a routing policy
+      When she adds a model name mapping whose name is a reserved tier
+      Then the editor says so and refuses to save

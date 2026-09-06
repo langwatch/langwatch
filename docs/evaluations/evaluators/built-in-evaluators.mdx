@@ -219,7 +219,7 @@ experiment.evaluate(
     index=index,
     data={"input": question, "output": response},
     settings={
-        "model": "openai/gpt-4o-mini",
+        "model": "openai/gpt-5-mini",
         "prompt": "Does this response fully answer the question? Reply true or false.",
     },
 )
@@ -230,7 +230,7 @@ await experiment.evaluate("langevals/llm_boolean", {
   index,
   data: { input: question, output: response },
   settings: {
-    model: "openai/gpt-4o-mini",
+    model: "openai/gpt-5-mini",
     prompt: "Does this response fully answer the question? Reply true or false.",
   },
 });

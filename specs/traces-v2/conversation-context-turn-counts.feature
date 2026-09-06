@@ -1,8 +1,8 @@
 # Conversation context — remaining-turn counts
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/TraceDrawer/ConversationContext.tsx
-#   langwatch/src/features/traces-v2/hooks (useConversationContext — position / total)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/ConversationContext.tsx
+#   platform/app/src/features/traces-v2/hooks (useConversationContext — position / total)
 #
 # Motivation (round 5): the Conversation Context pane shows the previous
 # turn, the current turn, and the next turn, with a "Start of

@@ -32,13 +32,13 @@ make worktree 123           # Creates issue123/<slug> from issue title
 make worktree my-feature    # Creates feat/my-feature
 
 # Or directly:
-./scripts/worktree.sh 123
-./scripts/worktree.sh my-feature
+./dev/scripts/worktree.sh 123
+./dev/scripts/worktree.sh my-feature
 ```
 
 The script fetches from origin, derives branch/directory names, creates the worktree, copies `.env*` files, and prints a summary with next steps.
 
-See `langwatch/src/docs/WORKTREES.md` for full details.
+See `platform/app/src/docs/WORKTREES.md` for full details.
 
 ## Issues
 

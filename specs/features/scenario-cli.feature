@@ -60,3 +60,153 @@ Feature: Scenario CLI Commands
     Given LANGWATCH_API_KEY is not set
     When I run "langwatch scenario list"
     Then I see an error prompting me to configure my API key
+
+  # ============================================================================
+  # Test suite membership (Agent Testing v2)
+  # ============================================================================
+  # A scenario belongs to exactly one test suite. The domain rules are
+  # in specs/suites/test-suites.feature and
+  # specs/scenarios/scenario-test-suite-assignment.feature.
+
+  @unit
+  Scenario: Create a scenario inside a test suite
+    Given my project has a test suite "suite_abc"
+    When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --test-suite suite_abc"
+    Then the scenario is created inside that test suite
+    And the confirmation names the test suite
+
+  @unit
+  Scenario: Move a scenario to another test suite
+    Given my project has a scenario and a test suite "suite_xyz"
+    When I run "langwatch scenario update <scenario-id> --test-suite suite_xyz"
+    Then the scenario is moved to that test suite
+    And it no longer belongs to the test suite it was in
+
+  @unit
+  Scenario: Take a scenario out of the test suite it is in
+    Given my project has a scenario inside a test suite
+    When I run "langwatch scenario update <scenario-id> --no-test-suite"
+    Then the request clears the test suite the scenario names
+    And the platform files the scenario into the project's Default suite
+
+  @unit
+  Scenario: Create a scenario with a test suite that does not exist
+    When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --test-suite nonexistent-id"
+    Then I see an error that the test suite was not found
+    And no scenario is created
+
+  @unit
+  Scenario: Combining --test-suite and --no-test-suite is rejected
+    When I run "langwatch scenario update <scenario-id> --test-suite suite_abc --no-test-suite"
+    Then I see an error that the two options cannot be used together
+    And the scenario is unchanged
+
+  @unit
+  Scenario: List scenarios shows the test suite each one belongs to
+    Given my project has scenarios inside and outside test suites
+    When I run "langwatch scenario list"
+    Then the table has a test suite column
+    And a scenario with no test suite reads as unfiled
+
+  # ============================================================================
+  # Running one scenario (Agent Testing v2)
+  # ============================================================================
+  # Running a scenario is sugar over a run plan: one request, scoped to the one
+  # scenario. No test suite is created for it, and none is deleted afterwards. The
+  # platform files the run under a plan named after the scenario and the target
+  # unless a name is sent. See specs/features/run-plan-cli.feature.
+
+  @unit
+  Scenario: Run a scenario against a target
+    Given my project has a scenario "Login Flow" and an HTTP agent
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc"
+    Then one run request is sent, scoped to that one scenario
+    And no test suite is created or deleted
+    And I see the plan name, the job count and the batch run ID
+
+  @unit
+  Scenario: Run a scenario against more than one target
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --target prompt:prompt_xyz"
+    Then the run is scheduled against both targets
+
+  @unit
+  Scenario: Run a scenario against one agent on two models
+    When I run "langwatch scenario run <scenario-id> --target 'http:agent_abc?model=gpt-5' --target 'http:agent_abc?model=gpt-5-mini'"
+    Then the run is scheduled against two targets that name the same agent
+    And each target carries the model value written after its question mark
+
+  @unit
+  Scenario: Run a scenario under a plan name
+    Given my project has a run plan named "Login checks"
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --name 'Login checks'"
+    Then the run joins that plan
+
+  @unit
+  Scenario: Run a scenario more than once
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --repeat 3"
+    Then the configuration carries the repeat count
+
+  @unit
+  Scenario: Run a scenario with no target
+    When I run "langwatch scenario run <scenario-id>"
+    Then I see an error that at least one --target is needed
+    And no run is scheduled
+
+  @unit
+  Scenario: Run a scenario with a note
+    Given my project has a scenario "Login Flow" and an HTTP agent
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --note 'after the timeout fix'"
+    Then the run is scheduled with that note
+    And the note is shown in the confirmation
+
+  @unit
+  Scenario: Run a scenario with a note over two hundred characters
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --note '<201 characters>'"
+    Then I see an error that the note is too long
+    And no run is scheduled
+
+  @unit
+  Scenario: Run a scenario with a note of only spaces
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --note '   '"
+    Then the run is scheduled with no note
+
+  @unit
+  Scenario: Running a scenario declares the command line as its surface
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc"
+    Then the request carries the header "X-LangWatch-Surface: cli"
+
+  @unit
+  Scenario: Wait for a scenario run with machine-readable output
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --wait" asking for JSON output
+    Then exactly one final document carries the per-run results, the tallies and the outcome
+    And no other line is printed on stdout
+
+  # ============================================================================
+  # Versions (Agent Testing v2)
+  # ============================================================================
+  # See specs/scenarios/scenario-versioning.feature.
+
+  @unit
+  Scenario: List the versions of a scenario
+    Given my project has a scenario that was edited twice
+    When I run "langwatch scenario version list <scenario-id>"
+    Then I see the versions newest first with number, author, date, and changed fields
+
+  @unit
+  Scenario: Get one version of a scenario
+    Given my project has a scenario with three versions
+    When I run "langwatch scenario version get <scenario-id> 2"
+    Then I see the name, situation, criteria, and labels as they were at version 2
+
+  @unit
+  Scenario: Get a version that does not exist
+    Given my project has a scenario with three versions
+    When I run "langwatch scenario version get <scenario-id> 9"
+    Then I see an error that the version was not found
+
+  @unit
+  Scenario: Updating a scenario from the command line records a new version
+    Given my project has a scenario at version 1
+    When I run "langwatch scenario update <scenario-id> --name 'Updated Login Flow'"
+    Then the scenario is at version 2
+    And the new version names the command line as its author

@@ -4,7 +4,7 @@ description: How the LangWatch AI Gateway protects secrets, isolates tenants, an
 sidebarTitle: Security & Trust
 ---
 
-The gateway sits on the hot path between your applications and upstream LLM providers. Everything below is what the gateway does NOT do, what it DOES do, and how each guarantee is enforced.
+The gateway sits on the hot path between your applications and upstream LLM providers.
 
 ## Threat model
 
@@ -49,7 +49,7 @@ Signature verification happens **before** the timestamp check to avoid a secret-
 
 Once a VK is resolved, the gateway caches a short-lived JWT (15 min TTL) containing the minimum claims needed to authorize: `{vk_id, project_id, team_id, org_id, principal_id, revision, iat, exp, iss, aud}`. The full VK config is fetched separately with ETag revalidation so cache entries are invalidated atomically on any edit.
 
-**Never** persisted to disk. Every replica's L1 cache is in memory; the optional L2 Redis is also in-memory.
+**Never** persisted to disk, and never shared: the cache is in memory, private to each replica.
 
 ## Tenant isolation
 
@@ -122,13 +122,13 @@ Postgres:
 
 ClickHouse:
 
-- Trace/span data is per-organization, partitioned on `TenantId`. Queries from the UI always include a `TenantId` predicate enforced at middleware. Cross-tenant reads are prevented by the ClickHouse query layer, not just by convention.
+- Trace/span data is per-organization, partitioned on `TenantId`. Queries from the UI always include a `TenantId` predicate enforced at middleware. Every query the application builds carries that predicate, which is what keeps a read inside one organization.
 
 ## Self-hosted deployments
 
 In a self-hosted deployment, the gateway and control plane both run in your infrastructure. Data never leaves your cluster except on outbound calls to LLM providers. You own every secret, every KMS key, every audit log, and every trace.
 
-The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in) that locks lateral traffic, only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, Redis (if configured), OTLP (if configured), and provider upstream IPs. The operator debug surface (pprof) is loopback-bound by default and unreachable over any Service; deployments that need direct access can bind non-loopback with a required bearer token, the gateway refuses to start in the bind-public-without-token configuration. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy) and [Self-Hosting → Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener).
+The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in) that locks lateral traffic, only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, OTLP (if configured), and provider upstream IPs. There is no operator debug surface to lock down: the gateway binary exposes no admin or pprof listener, and the chart's `gateway.admin.*` keys are forward-compat surface that nothing reads. The planned listener is loopback-bound by default, with a required bearer token and a startup refusal for the bind-public-without-token configuration. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy) and [Self-Hosting → Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener).
 
 See [Self-Hosting → Helm](/ai-gateway/self-hosting/helm) for the deployment topology.
 

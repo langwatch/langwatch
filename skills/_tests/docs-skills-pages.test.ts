@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
+import { listNativeSkills, renderSkill } from "../_compiler/native.js";
 import { listPublishedSkills } from "../_lib/feature-skills.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,10 +16,19 @@ const manifest: Record<
   Record<string, { title: string; skill?: string; promptFile: string }[]>
 > = JSON.parse(fs.readFileSync(path.join(skillsPagesDir, "skills-pages-manifest.json"), "utf8"));
 
-const pageFiles = Object.keys(manifest).map((f) => ({
-  name: f,
-  content: fs.readFileSync(path.join(skillsPagesDir, f), "utf8"),
-}));
+// Manifest keys are docs-relative paths (e.g. "skills/directory.mdx",
+// "agent-testing/connect-your-agent.mdx") since the skill card reached
+// pages outside docs/skills/.
+const pageFiles = Object.keys(manifest).map((f) => {
+  // A key carrying `../` still joins to a readable file, so the suite would
+  // validate some unrelated page and report it as a docs page.
+  const resolved = path.resolve(docsRoot, f);
+  const relative = path.relative(docsRoot, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`Manifest key ${f} resolves outside docs/; keys are docs-relative`);
+  }
+  return { name: f, content: fs.readFileSync(resolved, "utf8") };
+});
 
 function extractAll(source: string, re: RegExp): string[] {
   const out: string[] = [];
@@ -26,6 +36,18 @@ function extractAll(source: string, re: RegExp): string[] {
   while ((m = re.exec(source)) !== null) out.push(m[1]!);
   return out;
 }
+
+// The generator renders a card in one of two shapes: the ordinary collapsible
+// accordion, and the static card, which is always open and carries no toggle.
+// Both count as one accordion. The trailing quote keeps this off the nested
+// `lw-accordion-header` / `-body` / `-actions` divs.
+const ACCORDION_OPEN = /<div className="lw-accordion(?: lw-accordion-static)?"/g;
+
+// A static card's header and the attributes it carries, which must stay empty:
+// posthog.js skips `.lw-accordion-static` in its header click handler, so the
+// header does nothing when activated and must not claim button semantics.
+const STATIC_ACCORDION_HEADER =
+  /<div className="lw-accordion lw-accordion-static"[^>]*>\s*<div className="lw-accordion-header"([^>]*)>/g;
 
 // The paths the published langwatch/skills repo actually contains, derived
 // from the same selection the publish sync writes (recipes nest under
@@ -83,7 +105,7 @@ describe("docs skills directory pages", () => {
     it("renders every manifest accordion with its title and a server-rendered prompt block", () => {
       for (const { name, content } of pageFiles) {
         const entries = Object.values(manifest[name]!).flat();
-        const accordions = content.match(/<div className="lw-accordion">/g) ?? [];
+        const accordions = content.match(ACCORDION_OPEN) ?? [];
         expect(accordions.length, `${name} accordion count`).toBe(entries.length);
         const copyActions = content.match(/data-copy-source="prompt"/g) ?? [];
         expect(copyActions.length, `${name} prompt actions`).toBe(entries.length);
@@ -189,10 +211,30 @@ describe("docs skills directory pages", () => {
 
     it("marks every interactive control as a focusable button", () => {
       for (const { name, content } of pageFiles) {
+        // A static card never toggles, so its header is not an interactive
+        // control. The next test pins that it stays inert, which is what keeps
+        // this subtraction from hiding a header that lost its semantics.
+        const inertHeaders = content.match(STATIC_ACCORDION_HEADER)?.length ?? 0;
         for (const cls of ["lw-accordion-header", "lw-accordion-action", "lw-accordion-cmd-box"]) {
           const total = content.match(new RegExp(`className="${cls}[" ]`, "g"))?.length ?? 0;
           const buttons = content.match(new RegExp(`className="${cls}[" ][^>]*role="button" tabIndex=\\{0\\}`, "g"))?.length ?? 0;
-          expect(buttons, `${name}: ${cls} keyboard semantics`).toBe(total);
+          const interactive = cls === "lw-accordion-header" ? total - inertHeaders : total;
+          expect(buttons, `${name}: ${cls} keyboard semantics`).toBe(interactive);
+        }
+      }
+    });
+
+    it("leaves the static card header inert because nothing handles its click", () => {
+      const js = fs.readFileSync(path.join(docsRoot, "posthog.js"), "utf8");
+      expect(js, "the header click handler must skip static cards").toContain(
+        "lw-accordion-static"
+      );
+      for (const { name, content } of pageFiles) {
+        for (const [, attrs] of content.matchAll(STATIC_ACCORDION_HEADER)) {
+          expect(
+            attrs!.trim(),
+            `${name}: a static card header must claim no button semantics`
+          ).toBe("");
         }
       }
     });
@@ -201,6 +243,49 @@ describe("docs skills directory pages", () => {
       const css = fs.readFileSync(path.join(docsRoot, "style.css"), "utf8");
       expect(css).toContain(".lw-accordion[data-open] .lw-accordion-body");
       expect(css).not.toContain(".lw-accordion[open]");
+    });
+  });
+});
+
+// `langwatch docs <path>` fetches https://langwatch.ai/docs/<path>.md, which is
+// docs/<path>.mdx in this tree. The tracing skill offered
+// `integration/python/langgraph` as its example of a framework page; the real
+// pages live one directory deeper, and an agent following the example reached
+// for `integration/python/openai` and read a 404 mid-run.
+describe("the documentation paths the skills tell the agent to fetch", () => {
+  const skillFiles = listNativeSkills(skillsRoot).map((skill) => ({
+    slug: skill.slug,
+    rendered: renderSkill(skill),
+  }));
+
+  /**
+   * The paths, with the placeholders and the index (no path) left out.
+   *
+   * `scenario-docs` fetches the Scenario site, which is not in this tree, so
+   * only `langwatch docs` is checkable here.
+   */
+  function docsPaths(rendered: string): string[] {
+    return extractAll(rendered, /langwatch docs ([a-z0-9/_-]+)/g);
+  }
+
+  describe("given every skill Langy ships with is rendered", () => {
+    /** @scenario "Every documentation page a skill names exists" */
+    it("names only pages that exist in the documentation tree", () => {
+      const missing: string[] = [];
+      let checked = 0;
+      for (const { slug, rendered } of skillFiles) {
+        for (const docsPath of docsPaths(rendered)) {
+          checked += 1;
+          if (!fs.existsSync(path.join(docsRoot, `${docsPath}.mdx`))) {
+            missing.push(`${slug}: ${docsPath}`);
+          }
+        }
+      }
+      expect(checked, "expected the skills to name documentation pages").toBeGreaterThan(5);
+      expect(
+        missing,
+        `these pages would 404 for the agent that fetched them: ${missing.join(", ")}`
+      ).toEqual([]);
     });
   });
 });

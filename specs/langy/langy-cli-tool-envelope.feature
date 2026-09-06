@@ -74,6 +74,16 @@ Feature: Langy recognises its own CLI behind a shell tool call
       When the LangWatch CLI exits with an error
       Then the recorded tool result keeps the error text the CLI printed
 
+    # The CLI documents its --jq flag with the example ".traces[].traceId". The
+    # "[]" in that sentence parses as an empty array, so every usage text and
+    # every --help was recorded as the JSON document []. The agent read a
+    # rejected command as "no results" and reported that as a count.
+    @unit
+    Scenario: A rejected command is never read as an empty result
+      When the LangWatch CLI rejects a flag and prints its usage text
+      Then the recorded tool result is that text, not a fragment of JSON from inside it
+      And the same holds for a command that only printed its help
+
   # A failure the CLI described precisely — what went wrong, why, and what to do
   # about it — used to reach the panel as a bare sentence, because the envelope
   # kept only the message and threw the structure away. The card then had nothing
@@ -104,6 +114,25 @@ Feature: Langy recognises its own CLI behind a shell tool call
       And the card names the missing access in plain words as a detail
       And the card offers the next step the platform recommends
       And the card never shows an internal permission name as its headline
+
+    # The sandbox's `gh` has no login when the GitHub App is not installed, and
+    # it says so in its own words: "To get started with GitHub CLI, please run:
+    # gh auth login". That is a shell the customer cannot reach. The manager's
+    # gate names the same condition, but it reads settled frames, so this card
+    # is already on screen by the time the turn stops.
+    @unit
+    Scenario: The sandbox's own gh never tells the customer to log in
+      When Langy's sandbox tool call fails because gh has no login
+      Then the card says the LangWatch GitHub App is not installed
+      And the card carries the code for a missing GitHub App
+      And the card points at Settings, under Integrations
+      And the card never repeats the instruction to run gh auth login
+
+    @unit
+    Scenario: The developer's own gh keeps its own instruction
+      When a tool call in the shared local folder fails because gh has no login
+      Then the card shows what gh said
+      And the card does not claim the LangWatch GitHub App is missing
 
     # The card draws its conclusions from what the failure IS, never from
     # matching the English it happens to be phrased in — that pins user copy to
@@ -156,6 +185,30 @@ Feature: Langy recognises its own CLI behind a shell tool call
       When Langy's tool call fails
       Then the code is selectable on the card
       And one action copies the whole failure for a support thread
+
+  # A count that hit a malformed response printed a Python traceback, and the
+  # most quotable line of it, the exception class and its message, was lifted
+  # into the card body. A traceback is the engine talking to itself: file paths,
+  # line numbers and class names, none of it written for a reader
+  # (dev/docs/best_practices/error-handling.md).
+  Rule: A failure card never draws a traceback as its body
+
+    @unit
+    Scenario: A traceback is kept out of the card body
+      When Langy's tool call fails with a traceback and no structured failure
+      Then the card says the step couldn't be completed
+      And it adds no detail line taken from the traceback
+
+    @unit
+    Scenario: A one-line failure sentence is still shown as a detail
+      When Langy's tool call fails with a plain sentence and no structured failure
+      Then the card shows that sentence as its detail
+
+    @integration
+    Scenario: The traceback stays reachable behind the disclosure
+      When Langy's tool call fails with a traceback and no structured failure
+      Then the traceback is not in the card body
+      And one action reveals the whole traceback on the card
 
   # The user asked Langy to create a scenario on a free plan that already had
   # three. The card told them their access in the project didn't cover the

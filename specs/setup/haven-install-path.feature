@@ -5,9 +5,9 @@ Feature: haven install offers to put the Go bin dir on PATH
   directly" promise is broken. The install target should notice and offer to
   fix it, instead of leaving the user to diagnose a command-not-found.
 
-  # Behavior lives in scripts/haven-install-path.sh, invoked by the
+  # Behavior lives in dev/scripts/haven-install-path.sh, invoked by the
   # `make haven install` branch in dev/haven.mk after `go install`.
-  # Bound by scripts/__tests__/haven-install-path.unit.bats.
+  # Bound by dev/scripts/__tests__/haven-install-path.unit.bats.
 
   @unit
   Scenario: Go bin dir already on PATH

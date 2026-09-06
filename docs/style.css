@@ -314,6 +314,10 @@ code {
 }
 .lw-accordion[data-open] .lw-accordion-body { display: block; }
 
+/* Static variant: always open, header is a plain title bar. */
+.lw-accordion-static .lw-accordion-header { cursor: default; }
+.lw-accordion-static .lw-accordion-header:hover { background: transparent; }
+
 /* Server-rendered prompt text backing the "Copy Full Prompt" action.
    Kept in the DOM (crawlable, copyable via posthog.js) but never shown. */
 .lw-prompt-source { display: none; }
@@ -435,6 +439,7 @@ code {
 /* Dark mode — accordion */
 .dark .lw-accordion { border-color: #374151; }
 .dark .lw-accordion-header:hover { background: rgba(255, 255, 255, 0.03); }
+.dark .lw-accordion-static .lw-accordion-header:hover { background: transparent; }
 .dark .lw-accordion-body { border-top-color: #374151; }
 .dark .lw-accordion-cmd-box { background: rgba(255, 255, 255, 0.05); border-color: #374151; }
 .dark .lw-accordion-cmd-box:hover { border-color: #6b7280; }
@@ -446,14 +451,45 @@ code {
 .dark .lw-accordion-chevron { color: #6b7280; }
 .dark .lw-slash-command { color: #fe9a00; }
 
-/* Footer link for agents.
-   The theme gives footer links `max-w-36` plus `truncate` from md up, which
-   clips any label longer than about 18 characters mid-word. The single link
-   sits alone in a column several hundred pixels wide, so let it use the room
-   it already has. Keyed on the href, which docs.json owns; the pairing is
-   pinned by scripts/__tests__/bug-report-discovery.unit.test.ts. */
-footer a[href="https://langwatch.ai/docs/support"] {
-  max-width: none;
-  overflow: visible;
-  text-overflow: clip;
+/* Sidebar page icons (nav group marks).
+   The theme aligns the icon img to the top of the row's line box, so a 16px
+   mark floats about 4px above the label's center. Center it in the row like
+   the row's chevron already is. */
+#sidebar-group .group > img {
+  align-self: center;
+}
+
+/* ── Agent report line in the attribution footer ──
+   Injected by docs/posthog.js into the theme's #footer band, above the
+   Powered by row. The band is a flex row; wrap it so the line takes a full
+   row of its own, with the Powered by row below it. */
+#footer {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.lw-agent-report {
+  flex: 0 0 100%;
+  font-size: 14px;
+  color: #9ca3af;
+  padding-bottom: 12px;
+}
+.lw-agent-report a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.lw-agent-report a:hover { color: #6b7280; }
+.lw-agent-report code {
+  font-size: 13px;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.dark .lw-agent-report { color: #6b7280; }
+.dark .lw-agent-report a:hover { color: #9ca3af; }
+.dark .lw-agent-report code {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #374151;
 }

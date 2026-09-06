@@ -1,3 +1,4 @@
+{{- include "gateway.validateShutdownValues" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -26,7 +27,15 @@ data:
   OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
   OTEL_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
   {{- end }}
+  {{/* Rendered on both settings, never omitted: the gateway's own default is
+       on, so an operator who set spend.enabled=false has to see that decision
+       carried into the pod env rather than silently dropped. */}}
+  LW_GATEWAY_SPEND_ENABLED: {{ .Values.spend.enabled | quote }}
   SERVER_MAX_REQUEST_BODY_BYTES: {{ printf "%d" (int64 .Values.security.maxRequestBodyBytes) | quote }}
+  # The drain timing from values.yaml, carried to the two fields serve.go
+  # reads (pkg/config.Server.DrainDelaySeconds / GracefulSeconds).
+  SERVER_DRAIN_DELAY_SECONDS: {{ .Values.shutdown.preDrainWaitSeconds | quote }}
+  SERVER_GRACEFUL_SECONDS: {{ .Values.shutdown.timeoutSeconds | quote }}
   BLOCK_LOCAL_HTTP_CALLS: {{ .Values.security.blockLocalHTTPCalls | quote }}
   REQUIRE_HTTPS_CUSTOM_ENDPOINTS: {{ .Values.security.requireHTTPSCustomEndpoints | quote }}
   ALLOWED_PROXY_HOSTS: {{ join "," .Values.security.allowedProxyHosts | quote }}
