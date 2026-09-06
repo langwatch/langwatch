@@ -22,11 +22,15 @@
     "speed": 2,
     "segments": [
       [
-        8.2,
-        12.6
+        4.8,
+        8.8
       ],
       [
-        17.0,
+        11.2,
+        13.0
+      ],
+      [
+        15.2,
         25.2
       ],
       [
@@ -35,19 +39,28 @@
       ],
       [
         374.3,
-        377.6
+        377.5
       ]
     ]
   },
   "cursor": {
     "start": {
-      "x": 760,
-      "y": 430
+      "x": 700,
+      "y": 500
     }
   },
   "beats": [
     {
-      "tRaw": 8.45,
+      "tRaw": 5.4,
+      "x": 1090,
+      "y": 500,
+      "zoom": 1,
+      "click": false,
+      "arc": 0,
+      "note": "the whole key list at 1x: every key, its scope and what it has spent this month"
+    },
+    {
+      "tRaw": 7.9,
       "x": 1330,
       "y": 97,
       "zoom": 1.9,
@@ -55,50 +68,85 @@
         "x": 1230,
         "y": 130
       },
-      "hold": 0.4,
+      "lead": 0.15,
+      "hold": 0.35,
       "pause": {
-        "before": 0.8,
-        "after": 0.6
+        "before": 0.7,
+        "after": 0.25
       },
-      "note": "New virtual key"
+      "note": "New virtual key, clicked at 1x, the camera zooms in on the corner as the cursor lands"
     },
     {
-      "tRaw": 11.6,
+      "tRaw": 11.9,
       "x": 1176,
       "y": 123,
-      "zoom": 1.7,
-      "zoomAt": {
-        "x": 1170,
-        "y": 260
-      },
-      "hold": 2.0,
-      "note": "name it, the camera holds while it types"
+      "zoom": 1,
+      "click": false,
+      "arc": 0,
+      "note": "the drawer is already in view, so the name is just typed"
     },
     {
-      "tRaw": 18.98,
+      "tRaw": 15.7,
+      "x": 1040,
+      "y": 559,
+      "zoom": 1.7,
+      "zoomAt": {
+        "x": 1285,
+        "y": 575
+      },
+      "hold": 1.2,
+      "pause": {
+        "before": 0.5,
+        "after": 0.3
+      },
+      "note": "the budget field, and $50 typed into it"
+    },
+    {
+      "tRaw": 18.9,
       "x": 1215,
       "y": 559,
       "zoom": 1.7,
       "zoomAt": {
-        "x": 1170,
-        "y": 570
+        "x": 1285,
+        "y": 575
       },
-      "hold": 0.3,
-      "note": "a budget, per month"
+      "hold": 0.6,
+      "pause": {
+        "before": 0.8,
+        "after": 0.6
+      },
+      "note": "per day becomes per month"
     },
     {
-      "tRaw": 20.39,
-      "x": 1100,
-      "y": 595,
+      "tRaw": 21.0,
+      "x": 960,
+      "y": 610,
       "zoom": 1.7,
       "zoomAt": {
-        "x": 1170,
-        "y": 570
+        "x": 1285,
+        "y": 575
       },
-      "hold": 0.7,
+      "hold": 0.2,
       "click": false,
       "arc": 0,
-      "note": "max $50 a month, resets on the 1st"
+      "note": "read the budget back"
+    },
+    {
+      "tRaw": 22.2,
+      "x": 1200,
+      "y": 610,
+      "zoom": 1.7,
+      "zoomAt": {
+        "x": 1285,
+        "y": 575
+      },
+      "hold": 1.4,
+      "click": false,
+      "arc": 0,
+      "pause": {
+        "after": 0.4
+      },
+      "note": "max $50 a month, and it resets on the 1st"
     },
     {
       "tRaw": 23.78,
@@ -106,10 +154,13 @@
       "y": 859,
       "zoom": 1.7,
       "zoomAt": {
-        "x": 1170,
-        "y": 660
+        "x": 1285,
+        "y": 690
       },
       "hold": 0.2,
+      "pause": {
+        "before": 0.35
+      },
       "note": "create it"
     },
     {
@@ -127,7 +178,7 @@
       "note": "the secret, shown once, and the base URL the SDK points at"
     },
     {
-      "tRaw": 374.0,
+      "tRaw": 374.6,
       "x": 1075,
       "y": 253,
       "zoom": 1.35,
@@ -135,13 +186,13 @@
         "x": 820,
         "y": 300
       },
-      "hold": 2.4,
+      "hold": 1.7,
       "click": false,
       "arc": 0,
       "note": "the spend of its first request has already landed on the key"
     },
     {
-      "tRaw": 378.8,
+      "tRaw": 377.2,
       "hide": true
     }
   ]

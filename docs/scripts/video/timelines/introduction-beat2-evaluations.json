@@ -1,5 +1,5 @@
 {
-  "input": "../../../../.claude/tmp/video/raw/experiments/experiments.webm",
+  "input": "../../../../.claude/tmp/video/raw/experiments5/experiments5.webm",
   "output": "../../../../.claude/tmp/video/hero/beat2.webm",
   "fps": 30,
   "page": {
@@ -30,12 +30,12 @@
         28.0
       ],
       [
-        55.0,
+        59.0,
         62.5
       ],
       [
         78.0,
-        83.5
+        82.5
       ]
     ]
   },
@@ -72,20 +72,6 @@
       "note": "both columns fill live, each with its own progress"
     },
     {
-      "tRaw": 57.5,
-      "x": 1000,
-      "y": 191,
-      "zoom": 1.5,
-      "zoomAt": {
-        "x": 880,
-        "y": 240
-      },
-      "hold": 0.6,
-      "click": false,
-      "arc": 0,
-      "note": "the score summary: 60% on each prompt, with its latency"
-    },
-    {
       "tRaw": 61.6,
       "x": 1194,
       "y": 93,
@@ -96,18 +82,14 @@
       "tRaw": 80.5,
       "x": 760,
       "y": 240,
-      "zoom": 1.25,
-      "zoomAt": {
-        "x": 860,
-        "y": 300
-      },
-      "hold": 1.3,
+      "zoom": 1,
+      "hold": 0.8,
       "click": false,
       "arc": 0,
-      "note": "the two prompts side by side: total cost and average latency, and every answer next to the other"
+      "note": "the two prompts side by side at 1x: total cost, average latency and pass rate, and every answer next to the other"
     },
     {
-      "tRaw": 83.1,
+      "tRaw": 82.1,
       "hide": true
     }
   ]

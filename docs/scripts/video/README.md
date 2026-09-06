@@ -69,7 +69,8 @@ Paths are relative to the timeline file, except `cursors/*` and
   "quality": { "crf": 38, "cpuUsed": 2 },
 
   // Optional. Applies the cut list in the same pass, so there is one encode.
-  "cut": { "speed": 2, "segments": [[17.2, 29.6], [31.6, 39.2]] },
+  // A third number on a segment is its own speed, overriding `speed` there.
+  "cut": { "speed": 2, "segments": [[17.2, 29.6], [31.6, 39.2], [96.0, 128.0, 3]] },
 
   "frame": {
     "background": "backgrounds/default.webp",
@@ -190,6 +191,17 @@ pacing: 32.83s -> 34.46s  [5.96+0.08 6.26+0.90 6.61+1.00 8.63-1.25 ...]
 
 Beat times in the timeline are always source seconds, so a pause or a skip
 never means retiming the beats that follow.
+
+### Per-segment speed
+
+`cut.speed` is the speed of the whole take. A third number on a segment
+overrides it for that stretch only, which is what a long live run needs: the
+opening stays at 2x so the clicks read, and the minutes of conversation that
+follow run at 3x. `tRaw` still maps through the cut, so nothing else changes.
+
+```jsonc
+"cut": { "speed": 2, "segments": [[8.0, 16.4], [96.0, 128.0, 3]] }
+```
 
 ### Beats
 

@@ -50,7 +50,7 @@ ffmpeg -y -v error \
   -loop 1 -t "$cd_" -i "$C/card4.png" \
   -i "$H/beat4.webm" \
   -filter_complex "$F" -map "[out]" \
-  -an -c:v libvpx-vp9 -b:v 0 -crf 36 -deadline good -cpu-used 2 -row-mt 1 \
+  -an -c:v libvpx-vp9 -b:v 0 -crf 38 -deadline good -cpu-used 2 -row-mt 1 \
   -pix_fmt yuv420p -r 30 "$OUT"
 
 ffprobe -v error -show_entries format=duration,size -of default=nw=1 "$OUT"

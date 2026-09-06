@@ -1,5 +1,5 @@
 {
-  "input": "../../../../.claude/tmp/video/raw/traces/traces.webm",
+  "input": "../../../../.claude/tmp/video/raw/traces-v3/traces-v3.webm",
   "output": "../../../../.claude/tmp/video/hero/beat1.webm",
   "fps": 30,
   "page": {
@@ -22,16 +22,24 @@
     "speed": 2,
     "segments": [
       [
-        17.6,
-        21.8
+        17.5,
+        24.4
       ],
       [
-        26.6,
-        30.6
+        27.4,
+        31.8
       ],
       [
-        35.0,
-        46.0
+        33.6,
+        35.6
+      ],
+      [
+        38.3,
+        40.2
+      ],
+      [
+        46.0,
+        51.0
       ]
     ]
   },
@@ -43,60 +51,72 @@
   },
   "beats": [
     {
-      "tRaw": 18.6,
+      "tRaw": 19.0,
       "x": 900,
-      "y": 223,
+      "y": 300,
       "zoom": 1,
       "click": false,
       "arc": 0,
-      "note": "every conversation the agent had, with its origin, latency, cost and token count"
+      "note": "every conversation the agent had, with its origin, latency, cost and tokens, and the photo the customer attached"
     },
     {
-      "tRaw": 20.94,
+      "tRaw": 21.01,
       "x": 404,
-      "y": 190,
-      "zoom": 1,
-      "note": "open one of them"
+      "y": 410,
+      "zoom": 1.65,
+      "zoomAt": {
+        "x": 700,
+        "y": 410
+      },
+      "hold": 0.2,
+      "note": "the camera goes in on the row as the cursor lands, so the click is the thing being watched"
     },
     {
-      "tRaw": 27.5,
+      "tRaw": 23.0,
+      "zoom": 1,
+      "cursor": false,
+      "click": false,
+      "note": "and straight back out to 1x, holding on the whole drawer the click opened"
+    },
+    {
+      "tRaw": 29.9,
       "x": 745,
       "y": 66,
       "zoom": 1.9,
       "zoomAt": {
-        "x": 880,
-        "y": 80
+        "x": 810,
+        "y": 175
       },
       "hold": 0.1,
       "click": false,
       "arc": 0,
-      "note": "the cost of the conversation"
+      "note": "only then in again, on the cost of the conversation"
     },
     {
-      "tRaw": 29.2,
-      "x": 1000,
+      "tRaw": 31.2,
+      "x": 880,
       "y": 66,
       "zoom": 1.9,
       "zoomAt": {
-        "x": 880,
-        "y": 80
+        "x": 810,
+        "y": 175
       },
-      "hold": 1.1,
+      "hold": 0.8,
       "click": false,
       "arc": 0,
       "note": "and the tokens it spent, in and out"
     },
     {
-      "tRaw": 31.9,
+      "tRaw": 34.24,
       "x": 657,
-      "y": 161,
+      "y": 131,
       "zoom": 1,
       "note": "the Trace tab"
     },
     {
-      "tRaw": 35.74,
+      "tRaw": 39.05,
       "x": 892,
-      "y": 199,
+      "y": 169,
       "zoom": 1.6,
       "zoomAt": {
         "x": 800,
@@ -104,12 +124,12 @@
       },
       "hold": 0.2,
       "pause": {
-        "before": 0.6
+        "before": 0.5
       },
       "note": "the sequence diagram"
     },
     {
-      "tRaw": 43.0,
+      "tRaw": 48.0,
       "x": 700,
       "y": 500,
       "zoom": 1,
@@ -118,7 +138,7 @@
       "note": "a supervisor hands the case to a refunds specialist, which calls the model, a tool, then the model again"
     },
     {
-      "tRaw": 47.4,
+      "tRaw": 50.5,
       "hide": true
     }
   ]
