@@ -20,6 +20,8 @@ const logger = vi.hoisted(() => ({
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
+  // The ops package index now reaches @langwatch/api/trpc, which pulls the warn throttle in.
+  createWarnThrottle: () => ({ claim: () => 0 }),
 }));
 
 const DAY_MS = 24 * 60 * 60 * 1000;
