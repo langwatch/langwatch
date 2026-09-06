@@ -39,6 +39,12 @@ export NODE_ENV="${NODE_ENV:-development}"
 # writes a value that is missing or empty.
 "$HERE/ensure-ai-gateway-secrets.sh"
 
+# The Langy block a local agent manager needs — the shared secret, the session
+# and workspace roots, the isolation bypass a laptop cannot do without, and the
+# rollout flag that renders the panel. Same guarantees: only a missing value is
+# written, and nothing at all in production.
+"$HERE/ensure-langy-dev-env.sh"
+
 # The port each lane binds, exported so the lane actually gets it. The Node
 # lanes load the workspace env files with `--env-file-if-exists`, which never
 # overwrites a variable already set, so an exported value beats the committed
@@ -180,6 +186,22 @@ if [ "${LANGWATCH_SKIP_NLP:-}" != "1" ]; then
   fi
 fi
 
+# langyagent, the Go agent manager Langy turns run in. Started here for the same
+# reason as the other two: a chat opened in a local app otherwise dispatches to
+# a dead port and says "Langy stopped mid-reply", and nothing in the log names
+# the missing service. The manager itself is about 30 MB and opens no database
+# client; what costs is the per-conversation worker, and the lane caps that pool
+# to a local size. The decision has more branches than the other Go lanes, so it
+# lives in its own planner.
+START_LANGY_COMMAND=""
+# shellcheck source=./lib/plan-langy-lane.sh
+. "$HERE/lib/plan-langy-lane.sh"
+plan_langy_lane "$REPO_ROOT" "$APP_PORT"
+langy_lane_summary
+if [ "$LANGY_LANE_DECISION" = "start" ]; then
+  START_LANGY_COMMAND="$(langy_lane_command "$REPO_ROOT" "$LANGY_LANE_PORT")"
+fi
+
 # --- the lanes -------------------------------------------------------------
 
 COMMANDS=()
@@ -200,6 +222,10 @@ if [ -n "$START_NLP_COMMAND" ]; then
   COMMANDS+=("$START_NLP_COMMAND")
   NAMES+=("nlpgo")
 fi
+if [ -n "$START_LANGY_COMMAND" ]; then
+  COMMANDS+=("$START_LANGY_COMMAND")
+  NAMES+=("langy")
+fi
 
 COMMANDS+=("$RUNTIME_ENV pnpm -s --filter @langwatch/platform-api dev")
 NAMES+=("api")
@@ -215,5 +241,5 @@ NAMES_STR=$(
 exec pnpm -s exec concurrently \
   --kill-others-on-fail \
   --names "$NAMES_STR" \
-  --prefix-colors "green,blue,yellow,magenta,cyan" \
+  --prefix-colors "green,blue,yellow,magenta,cyan,white" \
   "${COMMANDS[@]}"

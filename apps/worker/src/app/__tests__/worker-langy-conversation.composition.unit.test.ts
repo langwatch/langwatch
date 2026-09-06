@@ -255,7 +255,7 @@ describe("given the langy conversation pipeline this process composes for itself
     it("stops reporting it once both variables are configured together", () => {
       reset();
       compose({
-        OPENCODE_AGENT_URL: "https://agent.internal",
+        LANGY_AGENT_URL: "https://agent.internal",
         LANGY_INTERNAL_SECRET: "secret",
       });
 
@@ -265,7 +265,7 @@ describe("given the langy conversation pipeline this process composes for itself
     /** @scenario "A worker without an agent manager says so at boot" */
     it("refuses half a pair rather than dispatching unauthenticated", () => {
       reset();
-      expect(() => compose({ OPENCODE_AGENT_URL: "https://agent.internal" })).toThrow(
+      expect(() => compose({ LANGY_AGENT_URL: "https://agent.internal" })).toThrow(
         /must be configured together/,
       );
     });

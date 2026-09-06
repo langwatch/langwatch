@@ -11,8 +11,9 @@ setup() {
   TEST_DIR="$(mktemp -d)"
   # The script resolves $ENV_FILE two directories above itself, so the fixture
   # tree mirrors the dev/scripts/ layout and .env lands at its root.
-  mkdir -p "$TEST_DIR/dev/scripts"
+  mkdir -p "$TEST_DIR/dev/scripts/lib"
   cp "$SCRIPT" "$TEST_DIR/dev/scripts/ensure-ai-gateway-secrets.sh"
+  cp "$SCRIPT_DIR/lib/env-file-keys.sh" "$TEST_DIR/dev/scripts/lib/env-file-keys.sh"
   ENV_FILE="$TEST_DIR/.env"
 }
 

@@ -88,6 +88,51 @@ durable local record and the live entry, so every tab reads the same thing.
 The skip-all-permissions switch stays on the card alone: the platform gates it
 on the model, and that gate has no counterpart in the terminal.
 
+## Amendment (2026-09-06): Langy runs locally with nothing typed by hand
+
+Local control shares the developer's folder with a Langy conversation, and the
+conversation runs in a manager that `pnpm dev` did not start. Five separate
+things stood between a checkout and a turn that answers, each failing at a
+different distance: the control plane read `OPENCODE_AGENT_URL` while the chart,
+the docs and the launcher all set `LANGY_AGENT_URL` (the rename ADR-047 records
+was never finished in the application's config, so a chart install dispatched
+nowhere either); `dev/scripts/dev-stack.sh` never sourced the lane planner that
+was written for it; the planner skipped unless four settings had been pasted out
+of the dogfood doctor; the panel's rollout flag is off by default; and the pi
+worker binary is built by a command nothing names at the right moment.
+
+The launcher now owns all of it. It writes the Langy block into `.env` on its
+first run — the shared secret, the session and workspace roots, the ADR-033
+isolation bypass, and `release_langy_enabled` added to the forced-flag list
+rather than over it — the same way it already generates the three AI Gateway
+secrets a fresh clone cannot boot without, and only ever for a key that is
+missing or empty. Then it plans the langy lane beside nlpgo and the gateway and
+prints one line naming the harness, the isolation posture, the address the app
+dials and the worker binary the manager will spawn. The manager says the same
+four things in its own startup line, because until now a manager with the
+sandbox off and one with it on logged identically.
+
+**These defaults are development only, and by environment rather than by a flag
+anyone can pass.** The launcher writes nothing when `NODE_ENV` is `production`,
+and `LoadConfig` in `services/langyagent` refuses
+`LANGY_UNSAFE_DEV_DISABLE_ISOLATION` unless `ENVIRONMENT` is one of `local`,
+`dev`, `development` or `test` — an allowlist, so an unknown environment name
+fails closed. Nothing about a deployed install changes: the chart still supplies
+the URL and the secret, the manager still runs the per-worker UID sandbox under
+gVisor, and the rollout flag is still opened one cohort at a time.
+
+The harness needed no switch. `services/langyagent` has one code path, and it
+spawns the pi worker; the `harness` field on the worker credentials contract and
+the `LangyHarnessPort` that would fill it are vestigial — no composition root
+supplies the port, and the manager would ignore the field. They want deleting in
+their own change.
+
+What is deliberately not changed is haven's fail-closed tier: with no container
+runtime it still deselects langy and names `LANGY_UNSAFE_HOST_ACCESS=1` rather
+than dropping to the host runner on its own. Falling back silently is the one
+place where a developer could end up with less isolation than they believe they
+have, and the opt-in is one line.
+
 ## References
 
 - Related ADRs: ADR-060 (model-emitted blocks and the choices card), ADR-078 (user turn controls), ADR-098 (`agent tunnel`), ADR-128 (connected agents)

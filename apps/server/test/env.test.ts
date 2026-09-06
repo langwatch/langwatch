@@ -22,7 +22,7 @@ describe("buildEnv", () => {
       // The gateway process reads the same name to mean the opposite direction
       // and gets its value from services/aigateway.ts, not from here.
       expect(env).toContain("LW_GATEWAY_BASE_URL=http://localhost:5563");
-      expect(env).toContain("OPENCODE_AGENT_URL=http://localhost:5564");
+      expect(env).toContain("LANGY_AGENT_URL=http://localhost:5564");
     });
 
     it("populates every secret with a fresh random value", () => {
@@ -101,7 +101,7 @@ describe("reconcileEnvFile", () => {
       expect(body).toContain("REDIS_URL=redis://localhost:6581/0");
       expect(body).toContain("DATABASE_URL=postgresql://langwatch@localhost:6580");
       expect(body).toContain("BASE_HOST=http://localhost:5580");
-      expect(body).toContain("OPENCODE_AGENT_URL=http://localhost:5584");
+      expect(body).toContain("LANGY_AGENT_URL=http://localhost:5584");
       expect(body).toContain("PORT=5580");
     });
 

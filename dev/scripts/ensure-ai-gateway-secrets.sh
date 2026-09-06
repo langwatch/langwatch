@@ -22,6 +22,9 @@ set -euo pipefail
 # resolved path is printed on every write.
 ENV_FILE="$(cd "$(dirname "$0")/../.." && pwd)/.env"
 
+# The shared key reader/writer, also used by ensure-langy-dev-env.sh.
+. "$(cd "$(dirname "$0")" && pwd)/lib/env-file-keys.sh"
+
 # Skip if .env hasn't been created yet — the env-files check fires first
 # and points the user at .env.example, which is more helpful than this
 # script generating secrets into a file that doesn't exist.
@@ -32,20 +35,6 @@ REQUIRED_SECRETS=(
   LW_GATEWAY_JWT_SECRET
   LW_VIRTUAL_KEY_PEPPER
 )
-
-# is_empty_or_missing KEY — return 0 if KEY is absent OR set to an empty
-# value in $ENV_FILE, 1 if set to a non-empty value. Matches unquoted,
-# single-quoted, and double-quoted forms.
-is_empty_or_missing() {
-  local key="$1"
-  if ! grep -qE "^${key}=" "$ENV_FILE"; then
-    return 0
-  fi
-  if grep -qE "^${key}=([\"']?[\"']?[[:space:]]*)?$" "$ENV_FILE"; then
-    return 0
-  fi
-  return 1
-}
 
 # generate_one — write a 64-hex-char value via openssl (matches the cadence
 # documented in .env.example and CLAUDE.md).
@@ -60,19 +49,12 @@ generate_one() {
 
 generated=0
 for key in "${REQUIRED_SECRETS[@]}"; do
-  if is_empty_or_missing "$key"; then
+  if env_file_key_is_empty_or_missing "$ENV_FILE" "$key"; then
+    # Assigned first, not passed inline: `exit` inside a command substitution
+    # ends only the subshell, so an inline call would write an empty secret
+    # when openssl is missing instead of stopping.
     value=$(generate_one)
-    if grep -qE "^${key}=" "$ENV_FILE"; then
-      # In-place replace empty assignment (handles unquoted, '=""', "=''").
-      # Use a temp file so a partial write can't corrupt .env.
-      tmp=$(mktemp)
-      awk -v k="$key" -v v="$value" '
-        $0 ~ "^"k"=" { print k "=" v; next }
-        { print }
-      ' "$ENV_FILE" > "$tmp" && mv "$tmp" "$ENV_FILE"
-    else
-      printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
-    fi
+    env_file_set_key "$ENV_FILE" "$key" "$value"
     printf '  generated %s (32 random hex bytes)\n' "$key"
     generated=$((generated + 1))
   fi

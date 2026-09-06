@@ -102,6 +102,7 @@ function plan({
   port: string;
   agentUrl: string;
   command: string;
+  summary: string;
   exitCode: number;
 } {
   const exports = Object.entries(env)
@@ -120,6 +121,7 @@ echo "__DECISION=\${LANGY_LANE_DECISION:-}"
 echo "__REASON=\${LANGY_LANE_REASON:-}"
 echo "__PORT=\${LANGY_LANE_PORT:-}"
 echo "__AGENT_URL=\${LANGY_AGENT_URL:-}"
+echo "__SUMMARY=$(langy_lane_summary)"
 echo "__COMMAND=$(echo '')\$(langy_lane_command '../..' "\${LANGY_LANE_PORT:-0}")"
 `;
   let stdout = "";
@@ -148,6 +150,7 @@ echo "__COMMAND=$(echo '')\$(langy_lane_command '../..' "\${LANGY_LANE_PORT:-0}"
     port: read("PORT"),
     agentUrl: read("AGENT_URL"),
     command: read("COMMAND"),
+    summary: read("SUMMARY"),
     exitCode,
   };
 }
@@ -526,6 +529,42 @@ describe("plan-langy-lane.sh", () => {
         });
 
         expect(expanded).toMatch(/LANGY_MAX_WORKERS="8"/);
+      });
+    });
+  });
+
+  describe("given the launcher is about to start the stack", () => {
+    describe("when the lane is summarised", () => {
+      /** @scenario "The launcher names the harness, the address and the worker binary" */
+      it("names the harness, the address the app dials and the worker binary", () => {
+        const appDir = appDirWith({ ".env": FULL_ENV });
+
+        const r = plan({ appDir });
+
+        expect(r.summary).toContain("harness=pi");
+        expect(r.summary).toContain(`url=${r.agentUrl}`);
+        expect(r.summary).toContain("/services/langyworker/out/langy-worker");
+      });
+
+      /** @scenario "The launcher names the harness, the address and the worker binary" */
+      it("says the isolation the manager will boot with", () => {
+        const appDir = appDirWith({
+          ".env": `LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true\n${FULL_ENV}`,
+        });
+
+        const r = plan({ appDir });
+
+        expect(r.summary).toContain("isolation=disabled");
+      });
+
+      /** @scenario "The launcher names the harness, the address and the worker binary" */
+      it("gives the reason instead when the lane is skipped", () => {
+        const appDir = appDirWith({ ".env": FULL_ENV });
+
+        const r = plan({ appDir, hasGo: false });
+
+        expect(r.summary).toContain("skipped (Go toolchain not in PATH)");
+        expect(r.summary).not.toContain("harness=");
       });
     });
   });

@@ -21,43 +21,14 @@
 #   . "$(dirname "$0")/lib/resolve-service-address.sh"
 #   resolve_service_address LANGWATCH_NLP_SERVICE "$repo_root" nlpgo
 
-# Reads one variable out of one env file the way dotenv would: last assignment
-# wins, an optional `export` prefix, single or double quotes, and an inline
-# comment after an unquoted value.
-#
-# Prints the value and returns 0. Returns 1 when the file assigns the variable
-# nowhere, and 2 when it assigns it an empty value, which is a different answer:
-# dotenv gives the app an empty string there, so the file has cleared whatever a
-# lower-precedence file said rather than saying nothing about it.
+# The dotenv key parser, shared with the two ensure scripts.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env-file-keys.sh"
+
+# The three-state read this file's precedence rules are built on: 0 with the
+# value, 1 when the file assigns the variable nowhere, 2 when it assigns it an
+# empty value. Named here because the callers below read addresses, not keys.
 _service_address_from_env_file() {
-  local var="$1"
-  local file="$2"
-  [ -f "$file" ] || return 1
-
-  local assigned raw
-  assigned=$(sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?${var}[[:space:]]*=.*\$/y/p" "$file" | tail -n 1)
-  [ -n "$assigned" ] || return 1
-
-  raw=$(sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?${var}[[:space:]]*=[[:space:]]*(.*)\$/\\2/p" "$file" | tail -n 1)
-  raw="${raw%$'\r'}"
-
-  case "$raw" in
-    \"*)
-      raw="${raw#\"}"
-      raw="${raw%%\"*}"
-      ;;
-    \'*)
-      raw="${raw#\'}"
-      raw="${raw%%\'*}"
-      ;;
-    *)
-      raw="${raw%%#*}"
-      raw="${raw%"${raw##*[![:space:]]}"}"
-      ;;
-  esac
-
-  [ -n "$raw" ] || return 2
-  printf '%s' "$raw"
+  env_file_key_read "$1" "$2"
 }
 
 # Exports `var` with the address the app will read, and says where it came from.

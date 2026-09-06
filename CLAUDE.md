@@ -175,6 +175,31 @@ make service svc=nlpgo       # run once
 make service-watch svc=nlpgo # live reload via air
 ```
 
+### Langy agent manager (Go, services/langyagent/)
+
+`langyagent` is the manager a Langy turn runs in: it spawns one `langy-worker`
+subprocess per conversation, on the **pi** harness — the only one it can spawn.
+`pnpm dev` auto-starts it on `PORT + 4` when the Go toolchain is on PATH; the
+process appears as `langy` in the concurrent output, reuses an existing listener
+on that port, and follows `LANGY_AGENT_URL` instead when an env file pins one
+(external addresses start nothing). Nothing needs configuring first: the
+launcher writes the Langy block into `.env` on its first run — the shared
+secret, the session and workspace roots, `LANGY_UNSAFE_DEV_DISABLE_ISOLATION`
+(the ADR-033 per-worker UID sandbox needs root, which a laptop process has not)
+and `release_langy_enabled` on the forced-flag list — and never overwrites a
+value you set. Those defaults are development only: the launcher writes nothing
+when `NODE_ENV=production`, and the manager refuses the isolation bypass
+whenever `ENVIRONMENT` is not local-like. A chat also needs the worker binary,
+`pnpm --filter @langwatch/langyworker build:binary` (needs bun); the startup
+line says so when it is missing, along with the harness, the isolation posture
+and the address. `LANGWATCH_SKIP_LANGY=1` opts out of the lane; under haven the
+equivalent is `haven up -langy`. To run it standalone:
+
+```bash
+make service svc=langyagent       # run once
+make service-watch svc=langyagent # live reload via air
+```
+
 ## Commands
 
 From the repo root:

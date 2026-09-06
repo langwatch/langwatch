@@ -30,6 +30,12 @@ LANGY_LOCAL_REAPER_INTERVAL_MS=2000
 # free. It is also what the standalone server package defaults to.
 LANGY_PORT_OFFSET=4
 
+# The harness that runs a turn. `pi` is the only one the manager can spawn —
+# services/langyagent has no other code path — so this is a label for the
+# startup line rather than a choice, and the line exists because which harness
+# a local turn runs under was previously only discoverable from the source.
+LANGY_HARNESS=pi
+
 # Overridable so the lane can be planned in a test without a Go toolchain, a
 # live listener, or a particular python on PATH.
 _langy_have_go() { command -v go >/dev/null 2>&1; }
@@ -143,7 +149,28 @@ plan_langy_lane() {
   fi
 
   LANGY_LANE_PYTHON_SHIM="$(_langy_python_shim_dir "$repo" || true)"
+  LANGY_LANE_ISOLATION=uid-sandbox
+  case "$(env_file_key_value "$repo_root/.env" LANGY_UNSAFE_DEV_DISABLE_ISOLATION || true)" in
+    true | 1) LANGY_LANE_ISOLATION=disabled ;;
+  esac
   return 0
+}
+
+# The one line that says what Langy is running with, printed before the stack
+# starts. Three things decide whether a local turn answers — where the manager
+# is, which harness runs the turn, and whether the per-worker isolation a laptop
+# cannot provide has been turned off — and none of them was visible anywhere.
+langy_lane_summary() {
+  if [ "${LANGY_LANE_DECISION:-skip}" != "start" ]; then
+    printf '  ! langyagent: %s\n' "${LANGY_LANE_REASON:-skipped}"
+    return 0
+  fi
+  printf '  ✓ langyagent: harness=%s isolation=%s url=%s worker=%s\n' \
+    "$LANGY_HARNESS" \
+    "$LANGY_LANE_ISOLATION" \
+    "${LANGY_AGENT_URL}" \
+    "${LANGY_LANE_WORKER_BINARY}"
+  printf '  ✓ langyagent: %s\n' "$LANGY_LANE_REASON"
 }
 
 # The command the lane runs. Every cap is applied only when the developer has
@@ -160,5 +187,5 @@ LANGY_PI_WORKER_BINARY_PATH=\"\${LANGY_PI_WORKER_BINARY_PATH:-${LANGY_LANE_WORKE
 LANGY_MAX_WORKERS=\"\${LANGY_MAX_WORKERS:-${LANGY_LOCAL_MAX_WORKERS}}\" \
 LANGY_WORKER_IDLE_MS=\"\${LANGY_WORKER_IDLE_MS:-${LANGY_LOCAL_WORKER_IDLE_MS}}\" \
 LANGY_REAPER_INTERVAL_MS=\"\${LANGY_REAPER_INTERVAL_MS:-${LANGY_LOCAL_REAPER_INTERVAL_MS}}\" \
-make -C ${repo_from_app} service svc=langyagent"
+make -C \"${repo_from_app}\" service svc=langyagent"
 }

@@ -218,7 +218,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * dispatches nowhere. Both absent is a valid "no agent manager" deployment.
    */
   langy: {
-    agentUrl: Config.value(optionalEnvironmentString, { env: "OPENCODE_AGENT_URL" }),
+    agentUrl: Config.value(optionalEnvironmentString, { env: "LANGY_AGENT_URL" }),
     internalSecret: Config.optionalSecret({ env: "LANGY_INTERNAL_SECRET" }),
   },
   /**
@@ -874,7 +874,7 @@ function resolveWorkerLangyConfig(
   const internalSecret = langy.internalSecret?.trim();
   if (!agentUrl && !internalSecret) return undefined;
   if (!agentUrl || !internalSecret) {
-    throw new Error("OPENCODE_AGENT_URL and LANGY_INTERNAL_SECRET must be configured together");
+    throw new Error("LANGY_AGENT_URL and LANGY_INTERNAL_SECRET must be configured together");
   }
 
   return { agentUrl, internalSecret };

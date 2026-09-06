@@ -2043,7 +2043,7 @@ export class LoggedWorkerLangyAbsence extends WorkerLangyAbsenceReportPort {
 
   withoutAgentManager(): void {
     this.logger.warn(
-      "worker composed the langy conversation pipeline without an agent manager: OPENCODE_AGENT_URL and LANGY_INTERNAL_SECRET are unset, so every dispatched turn is answered unavailable and fails rather than running",
+      "worker composed the langy conversation pipeline without an agent manager: LANGY_AGENT_URL and LANGY_INTERNAL_SECRET are unset, so every dispatched turn is answered unavailable and fails rather than running",
     );
   }
 

@@ -222,3 +222,94 @@ Feature: `pnpm dev` starts the Langy agent manager
       Then the worker pool is capped to the local size
       And an idle worker is reaped in minutes rather than the production wait
       And the caps can still be overridden from the environment
+
+  Rule: The launcher fills in the Langy settings rather than asking for them
+
+    # The lane above skips when the Langy block is missing, and the block was a
+    # developer's job: run the dogfood doctor, copy five lines, paste them into
+    # .env. Every one of those lines has exactly one sensible local value, so
+    # the launcher writes them itself, the way it already generates the three
+    # AI Gateway secrets a fresh clone cannot boot without. Only a missing or
+    # empty value is written; a developer's own value is never touched.
+
+    @unit
+    Scenario: A checkout with no Langy block gets one
+      Given .env carries none of the Langy settings
+      When the developer starts the stack
+      Then a shared secret is generated for the manager and the control plane
+      And the session and workspace roots point inside this developer's home
+      And the panel's release flag is force-enabled
+      And the isolation bypass a laptop needs is turned on
+
+    @unit
+    Scenario: Settings the developer already chose are left alone
+      Given .env already carries a Langy secret and its own workspace root
+      When the developer starts the stack
+      Then those values are unchanged
+      And only the settings that were missing are added
+
+    @unit
+    Scenario: The release flag joins the flags already forced on
+      Given .env forces another flag on
+      When the developer starts the stack
+      Then the Langy flag is added beside it
+      And the flag already there is kept
+
+    @unit
+    Scenario: A flag list that already names Langy is not rewritten
+      Given .env already force-enables the Langy flag
+      When the developer starts the stack
+      Then the flag list is unchanged
+
+    @unit
+    Scenario: A checkout with no env file is left to the env-file check
+      Given the developer has not created .env yet
+      When the developer starts the stack
+      Then nothing is written
+      # The env-files check fires first and points at .env.example, which is a
+      # better first message than a settings block appearing in a file the
+      # developer has not made yet.
+
+  Rule: The generated settings are development only
+
+    # Every setting the launcher writes trades isolation or a rollout gate for
+    # convenience on the machine that owns the code. None of them may be
+    # reachable from a deployed environment, so the refusal is by environment
+    # and not by a flag anyone can pass.
+
+    @unit
+    Scenario: A production launcher writes nothing
+      Given the environment is production
+      When the launcher is asked to fill in the Langy settings
+      Then nothing is written
+      And it says the settings are for development only
+
+    @unit
+    Scenario: The manager refuses the isolation bypass outside a local environment
+      Given the manager is configured with the isolation bypass turned on
+      And its environment is production
+      When the manager loads its configuration
+      Then it refuses to start
+      And the refusal names the bypass and the environment
+
+  Rule: The startup line says what Langy is running with
+
+    # Three things decide whether a local turn answers: where the manager is,
+    # which harness runs the turn, and whether the isolation a laptop cannot
+    # provide has been turned off. All three were only discoverable by reading
+    # the manager's config, so the launcher and the manager each say them once.
+
+    @unit
+    Scenario: The launcher names the harness, the address and the worker binary
+      Given the launcher plans the langy lane
+      When the stack starts
+      Then one line names the harness the turn runs under
+      And it names the address the app dials
+      And it names the worker binary the manager will spawn
+
+    @unit
+    Scenario: The manager says which isolation it booted with
+      Given the manager starts with the isolation bypass turned on
+      When it logs its startup line
+      Then the line says isolation is disabled
+      And it names its environment, its worker binary and its sessions root
