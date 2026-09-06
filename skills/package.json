@@ -21,7 +21,7 @@
     "@ai-sdk/anthropic": "^3.0.44",
     "@ai-sdk/google": "^2.0.78",
     "@ai-sdk/openai": "^3.0.41",
-    "@langwatch/scenario": "^0.4.12",
+    "@langwatch/scenario": "^1.6.0",
     "@types/mdast": "^4.0.4",
     "@types/node": "^26.2.0",
     "chalk": "^6.0.0",
