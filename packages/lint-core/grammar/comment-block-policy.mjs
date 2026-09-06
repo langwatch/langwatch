@@ -79,7 +79,12 @@ export function mayContainReviewBlock(source) {
   return false;
 }
 
-function lineStarts(source) {
+/**
+ * The character offset each line starts at, so a caller who already knows a
+ * position can find its line with a binary search instead of re-splitting or
+ * re-slicing the source once per lookup.
+ */
+export function lineIndex(source) {
   const starts = [0];
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index];
@@ -104,8 +109,17 @@ function lineAt(starts, position) {
   return upper;
 }
 
+/**
+ * The 1-based line number containing `position`, the same number
+ * `source.slice(0, position).split(/\r?\n/).length` would give — without the
+ * O(file length) slice-and-split a caller doing that per lookup pays for.
+ */
+export function lineAtOffset(starts, position) {
+  return lineAt(starts, position) + 1;
+}
+
 function commentLines(source, ranges) {
-  const starts = lineStarts(source);
+  const starts = lineIndex(source);
   const lines = Array.from({ length: starts.length }, () => ({
     hasCode: false,
     hasComment: false,

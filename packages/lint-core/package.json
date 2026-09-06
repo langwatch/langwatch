@@ -4,14 +4,15 @@
   "private": true,
   "description": "The shared core of the LangWatch oxlint plugin: the rule definition helper, the one per-file classification every rule gates on, the keyed AST walk, the pure policy grammars, and the fixture-tree test harness. Plain ESM so oxlint loads it with no build step.",
   "license": "MIT",
-  "type": "module",
-  "main": "./src/index.mjs",
   "files": [
     "grammar",
     "src"
   ],
+  "type": "module",
+  "main": "./src/index.mjs",
   "exports": {
     ".": "./src/index.mjs",
+    "./parse": "./src/parse.mjs",
     "./testing": "./src/testing.mjs",
     "./grammar/*": "./grammar/*"
   },
@@ -19,6 +20,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "oxc-parser": "^0.127.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

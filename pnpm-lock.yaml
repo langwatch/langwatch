@@ -10023,6 +10023,10 @@ importers:
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/lint-core:
+    dependencies:
+      oxc-parser:
+        specifier: ^0.127.0
+        version: 0.127.0
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -10070,6 +10074,15 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@chakra-ui/react':
+        specifier: ^3.36.0
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: ^11.14.0
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../design-system
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -10085,6 +10098,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.3
         version: 6.0.3(babel-plugin-react-compiler@1.0.0)(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-dom:
         specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)

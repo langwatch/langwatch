@@ -2,7 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types";
 import { walkFiles } from "./files";
-import { isOverengineeringSource, overengineeringFindings } from "./overengineering-policy.mjs";
+import {
+  isOverengineeringSource,
+  overengineeringFindings,
+} from "@langwatch/lint-core/grammar/overengineering.mjs";
+import { parseProgram } from "@langwatch/lint-core/parse";
 
 /**
  * The three over-abstraction policies — `layer-class`,
@@ -13,6 +17,16 @@ import { isOverengineeringSource, overengineeringFindings } from "./overengineer
  */
 
 const BASELINE_FILE = "overengineering-baseline.json";
+
+/** The 1-based line a byte offset falls on. */
+function lineOf(text: string, offset: number): number {
+  let line = 1;
+  for (let index = 0; index < offset && index < text.length; index += 1) {
+    if (text[index] === "\n") line += 1;
+  }
+
+  return line;
+}
 
 /**
  * The sites that already existed when these three policies landed. The list
@@ -51,11 +65,13 @@ export function collectOverengineering(
       if (linted.has(file)) continue;
 
       linted.add(file);
-      for (const finding of overengineeringFindings({
-        path: file,
-        source: readFileSync(file, "utf8"),
-      })) {
-        violations.push({ ...finding, file });
+      const text = readFileSync(file, "utf8");
+      // The detectors read the ESTree tree oxlint hands its plugins, so the
+      // CLI parses with the same parser rather than a second one that could
+      // disagree with the linter about the same file.
+      const program = parseProgram({ path: file, text });
+      for (const { node, ...finding } of overengineeringFindings({ path: file, program, text })) {
+        violations.push({ ...finding, file, line: lineOf(text, node.start) });
       }
     }
   }

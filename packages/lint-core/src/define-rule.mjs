@@ -66,12 +66,21 @@ function defaultsFor(options) {
  * @param {object} declaration
  * @param {string} declaration.name
  * @param {"problem" | "style" | "layout"} [declaration.kind]
+ * @param {"code" | "whitespace"} [declaration.fixable] Set when a message's `create` supplies a `fix()`.
  * @param {(file: import("./classify.mjs").FileClassification) => boolean} [declaration.applies]
  * @param {Record<string, MessageDefinition>} declaration.messages
  * @param {Record<string, OptionDefinition>} [declaration.options]
  * @param {(context: object, file: object, options: object) => object} declaration.create
  */
-export function defineRule({ applies, create, kind = "problem", messages, name, options }) {
+export function defineRule({
+  applies,
+  create,
+  fixable,
+  kind = "problem",
+  messages,
+  name,
+  options,
+}) {
   const templates = {};
   for (const [id, definition] of Object.entries(messages)) {
     templates[id] = renderTemplate(definition);
@@ -95,6 +104,7 @@ export function defineRule({ applies, create, kind = "problem", messages, name, 
   };
 
   if (schema) rule.meta.schema = schema;
+  if (fixable) rule.meta.fixable = fixable;
 
   return rule;
 }

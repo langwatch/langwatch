@@ -68,8 +68,11 @@ export function runRule(rule, { code, cwd = process.cwd(), filename, options = [
   resetClassificationCache();
   withSilentTestHooks(() => {
     const tester = new RuleTester({ cwd, languageOptions: { sourceType: "module" } });
+    // An empty `options` is not the same as no options: the tester rejects
+    // the key outright on a rule that declares no schema.
+    const testCase = options.length > 0 ? { code, filename, options } : { code, filename };
     tester.run(rule.meta?.docs?.name ?? "rule-under-test", probe, {
-      valid: [{ code, filename, options }],
+      valid: [testCase],
       invalid: [],
     });
   });

@@ -65,12 +65,12 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
     {
       filename: "packages/features/agent/contract/src/example.ts",
       code: 'import React from "react"; export { React };',
-      errors: [{ messageId: "packageRole" }],
+      errors: [{ messageId: "contractRuntime" }],
     },
     {
       filename: "packages/features/agent/server/src/example.ts",
       code: 'import type { ReactNode } from "react"; export type Value = ReactNode;',
-      errors: [{ messageId: "packageRole" }],
+      errors: [{ messageId: "serverImportsBrowser" }],
     },
     {
       filename: "mcp/typescript/src/example.ts",
@@ -763,12 +763,12 @@ tester.run("package-boundaries: portable contracts", plugin.rules["package-bound
     {
       filename: "packages/features/agent/contract/src/agent.service.ts",
       code: 'import React from "react"; export { React };',
-      errors: [{ messageId: "packageRole" }],
+      errors: [{ messageId: "contractRuntime" }],
     },
     {
       filename: "packages/features/agent/contract/src/agent.service.ts",
       code: 'import { readFile } from "node:fs/promises"; export { readFile };',
-      errors: [{ messageId: "packageRole" }],
+      errors: [{ messageId: "contractRuntime" }],
     },
     {
       filename: "packages/features/agent/contract/src/agent.service.ts",
@@ -778,12 +778,12 @@ tester.run("package-boundaries: portable contracts", plugin.rules["package-bound
     {
       filename: "packages/features/agent/contract/src/agent.service.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
-      errors: [{ messageId: "packageRole" }],
+      errors: [{ messageId: "contractRuntime" }],
     },
     {
       filename: "packages/features/agent/contract/src/agent.service.ts",
       code: 'import { AgentCard } from "@langwatch/agent-web/screens/agent-management"; export { AgentCard };',
-      errors: [{ messageId: "packageRole" }],
+      errors: [{ messageId: "contractRuntime" }],
     },
   ],
 });
@@ -805,7 +805,7 @@ tester.run("package-boundaries: transport neutrality", plugin.rules["package-bou
     {
       filename: "packages/features/agent/contract/src/agent.command.ts",
       code: 'import { resolver } from "hono-openapi/zod"; export { resolver };',
-      errors: [{ messageId: "schemaBoundary" }, { messageId: "packageRole" }],
+      errors: [{ messageId: "schemaBoundary" }, { messageId: "contractRuntime" }],
     },
   ],
 });
@@ -822,17 +822,17 @@ tester.run("package-boundaries: server stays headless", plugin.rules["package-bo
     {
       filename: "packages/features/agent/server/src/services/agent.service.ts",
       code: 'import React from "react"; export { React };',
-      errors: [{ messageId: "packageRole" }],
+      errors: [{ messageId: "serverImportsBrowser" }],
     },
     {
       filename: "packages/features/agent/server/src/services/agent.service.ts",
       code: 'import { Box } from "@chakra-ui/react"; export { Box };',
-      errors: [{ messageId: "packageRole" }],
+      errors: [{ messageId: "serverImportsBrowser" }],
     },
     {
       filename: "packages/features/agent/server/src/services/agent.service.ts",
       code: 'import { AgentCard } from "@langwatch/agent-web/screens/agent-management"; export { AgentCard };',
-      errors: [{ messageId: "packageRole" }],
+      errors: [{ messageId: "serverImportsBrowser" }],
     },
   ],
 });
@@ -1534,7 +1534,8 @@ tester.run("layer-class", plugin.rules["layer-class"], {
       errors: [
         {
           message:
-            "ExampleService forwards 5 of its 5 public methods to a method of the same name on `this.inner`.",
+            "ExampleService forwards 5 of its 5 public methods to a method of the same name on `this.inner`." +
+            " Hold the collaborator at the caller and delete the class, or give it the rules that justify it. `app/<feature>.app.ts` and routed repositories are exempt.",
         },
       ],
     },
@@ -1594,7 +1595,13 @@ tester.run("conditional-type-depth", plugin.rules["conditional-type-depth"], {
       : T extends D
         ? 4
         : 5;`,
-      errors: [{ message: "Type Resolve nests 4 conditional types; the maximum is 3." }],
+      errors: [
+        {
+          message:
+            "Type Resolve nests 4 conditional types; the maximum is 3." +
+            " State the shape rather than deriving it. A type this deep is usually re-computing something a plain interface, a discriminated union, or a `satisfies` clause already says.",
+        },
+      ],
     },
   ],
 });
@@ -1621,7 +1628,8 @@ export function configUrl(options?: { env?: string; optional?: boolean }): Leaf<
       errors: [
         {
           message:
-            "configUrl carries overloads that differ only by `optional: true` versus `optional: false`.",
+            "configUrl carries overloads that differ only by `optional: true` versus `optional: false`." +
+            " Give the two behaviours two names, or one signature whose return type already admits the absent case. An overload set the reader has to diff is not documentation.",
         },
       ],
     },
