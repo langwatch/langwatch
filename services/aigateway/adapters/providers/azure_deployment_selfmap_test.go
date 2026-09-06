@@ -191,6 +191,71 @@ func TestDispatch_Azure_ExplicitDeploymentMap_Wins(t *testing.T) {
 		"the provider's own mapping decides the deployment; the default only fills a gap")
 }
 
+// app.dispatch walks the credential chain with retry.Walk and hands the SAME
+// *domain.Request to Dispatch on every attempt, so resolving the deployment
+// must not write back into it. If it did, the first credential's deployment
+// would still be in the body on the second attempt: the guard early-returns
+// when deployment == model, so nothing rewrites it back, and the next Azure
+// resource is asked for a deployment it does not have.
+//
+// @scenario "A deployment resolved for one credential does not leak into the next attempt"
+func TestDispatch_Azure_DeploymentDoesNotLeakAcrossCredentials(t *testing.T) {
+	upstream := newAzureUpstream(t)
+	router := azureRouter(t)
+
+	req := azureChatRequest(false)
+	sent := append([]byte(nil), req.Body...)
+
+	mapped := azureCredNoDeploymentMap(upstream.srv.URL)
+	mapped.DeploymentMap = map[string]string{"gpt-5-mini": "prod-mini-eastus"}
+	_, err := router.Dispatch(context.Background(), req, mapped)
+	require.NoError(t, err)
+
+	// Second attempt, as a failover would run it: same request pointer, a
+	// credential whose resource serves the model under its own name.
+	_, err = router.Dispatch(context.Background(), req, azureCredNoDeploymentMap(upstream.srv.URL))
+	require.NoError(t, err)
+
+	assert.Equal(t, "prod-mini-eastus", upstream.deploymentAddressed(t, 0))
+	assert.Equal(t, "gpt-5-mini", upstream.deploymentAddressed(t, 1),
+		"the second credential names no deployment, so its resource must be asked "+
+			"for gpt-5-mini and not the first credential's prod-mini-eastus")
+	assert.Equal(t, string(sent), string(req.Body),
+		"the caller's request is shared across retry attempts, so resolving the "+
+			"deployment must leave it untouched")
+}
+
+// The other side of the same leak, and the worse one: the non-Azure guard
+// returns before the deployment comparison, so an in-place rewrite would hand
+// a plain OpenAI provider an Azure deployment name as its model.
+func TestDispatch_Azure_DeploymentDoesNotLeakIntoANonAzureFallback(t *testing.T) {
+	upstream := newAzureUpstream(t)
+	router := azureRouter(t)
+
+	req := azureChatRequest(false)
+
+	mapped := azureCredNoDeploymentMap(upstream.srv.URL)
+	mapped.DeploymentMap = map[string]string{"gpt-5-mini": "prod-mini-eastus"}
+	_, err := router.Dispatch(context.Background(), req, mapped)
+	require.NoError(t, err)
+
+	// Failover off Azure entirely, onto a provider that has never heard of
+	// deployments and serves the model under its own name.
+	fallback := domain.Credential{
+		ID:         "mp-openai",
+		ProviderID: domain.ProviderOpenAI,
+		APIKey:     "sk-test",
+		Extra:      map[string]string{"base_url": upstream.srv.URL},
+	}
+	_, err = router.Dispatch(context.Background(), req, fallback)
+	require.NoError(t, err)
+
+	assert.Equal(t, "prod-mini-eastus", upstream.deploymentAddressed(t, 0))
+	assert.Equal(t, "gpt-5-mini", upstream.deploymentAddressed(t, 1),
+		"a non-Azure credential must be sent the model id, never the Azure "+
+			"deployment name left over from the previous attempt")
+}
+
 // The two lanes read the deployment from the same place, so this covers the
 // streaming seam and the other credential shape at once: a deployment named
 // alongside the credential rather than in a mapping, which is what
