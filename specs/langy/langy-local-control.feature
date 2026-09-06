@@ -331,6 +331,14 @@ Feature: Langy works in a folder shared from the developer's machine
       Then the answer is the refusal code, naming the permission, the project and the file
       And the env file is left as it was
 
+    @unit
+    Scenario: The credentials are not written when the terminal has no endpoint
+      Given a shared folder whose command line was started without an endpoint
+      When Langy asks for the project's credentials
+      Then the call fails the way the missing project does, naming the file
+      And the key is never requested and the env file is left as it was
+      And the app is never pointed at the cloud
+
   Rule: The session key is the only credential and it ends with the conversation
 
     @integration

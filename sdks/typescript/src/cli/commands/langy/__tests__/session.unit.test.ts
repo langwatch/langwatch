@@ -158,6 +158,7 @@ describe("given a folder connected to a Langy conversation", () => {
       withoutGit?: boolean;
       approvals?: ApprovalPrompt;
       readProjectApiKey?: (projectId: string) => Promise<string>;
+      withoutEndpoint?: boolean;
     } = {},
   ) => {
     socket = new FakeSocket();
@@ -168,7 +169,9 @@ describe("given a folder connected to a Langy conversation", () => {
       os: "test",
     };
     session = startLangySession({
-      endpoint: "http://localhost:5560",
+      ...(options.withoutEndpoint === true
+        ? {}
+        : { endpoint: "http://localhost:5560" }),
       sessionKey: "sk-lw-langy-session",
       workspace,
       conversation: CONVERSATION,
@@ -816,6 +819,36 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(error.message).toContain("Acme Shop");
       expect(error.message).toContain(".env");
       expect(envFile()).toBe("OPENAI_API_KEY=sk-openai\n");
+    });
+
+    /** @scenario "The credentials are not written when the terminal has no endpoint" */
+    it("fails the call without an endpoint instead of pointing the app at the cloud", async () => {
+      fs.writeFileSync(path.join(root, ".env"), "OPENAI_API_KEY=sk-openai\n");
+      const asked: string[] = [];
+      start({
+        withoutEndpoint: true,
+        readProjectApiKey: async (projectId) => {
+          asked.push(projectId);
+          return "sk-lw-proj-key";
+        },
+      });
+      await settle();
+      register();
+      socket.deliver({ type: "policy", skipPermissions: true });
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the failure to be reported",
+      });
+
+      const [result] = socket.sentOf("result");
+      expect(result!.ok).toBe(false);
+      const error = result!.error as { code: string; message: string };
+      expect(error.code).toBe("exec_failed");
+      expect(error.message).toContain(".env");
+      expect(asked).toEqual([]);
+      expect(envFile()).toBe("OPENAI_API_KEY=sk-openai\n");
+      expect(JSON.stringify(socket.sent)).not.toContain("app.langwatch.ai");
     });
 
     it("asks before it writes, because the env file may hold secrets", async () => {

@@ -207,8 +207,9 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     if (call.tool !== "local_langwatch_env") return "";
     const project = options.project;
     const readProjectApiKey = options.readProjectApiKey;
+    const endpoint = options.endpoint;
     const file = call.params.path ?? ".env";
-    if (!project || !readProjectApiKey) {
+    if (!project || !readProjectApiKey || !endpoint) {
       throw new LocalCallFailure({
         code: "exec_failed",
         message: `This terminal cannot fetch the project's key. Tell the user in one line that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT must be added to ${file} by hand, from the project's settings page, and end your turn.`,
@@ -234,7 +235,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       params: call.params,
       root,
       apiKey,
-      endpoint: options.endpoint ?? "https://app.langwatch.ai",
+      endpoint,
       projectName: project.name,
     });
   };

@@ -142,7 +142,7 @@ langwatch navigate open <the scenariorun_ id the suite run printed>
 
 **If the run failed**, explain in plain words what the judge saw and why the agent did not meet the criteria, keep going with the suite exactly as above, and point at the run so they can replay the conversation. A failing first scenario is a finding, not a blocker. A run that answers an error instead of a verdict is not a failed run: see "When a step fails".
 
-With the suite run open, commit and open the pull request as steps 4 to 6 of `code-changes` say, and report the address. Leave the branch checked out: the agent you started runs on it, and say so in one line.
+With the suite run open, commit and open the pull request as steps 4 to 6 of `code-changes` say, and report the address. A folder with no remote or no `gh` login gets the branch and the commit but no pull request: say so in one line, report the branch name, and go on. Leave the branch checked out: the agent you started runs on it, and say so in one line.
 
 Say, verbatim, as the last line:
 
