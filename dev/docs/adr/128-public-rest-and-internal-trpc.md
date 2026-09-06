@@ -138,6 +138,48 @@ improving the trusted first-party boundary. Defining all handlers in `apps/api`
 or implementing a service per transport was rejected because both scatter
 feature ownership and allow behaviour to diverge.
 
+## Appendix 2026-09-06: the browser's subscription wire
+
+Internal tRPC serves subscriptions over a wire this repository owns, not over
+`@trpc/client`'s stock `httpSubscriptionLink`. That is why the link had to be
+written, and it is recorded here because the shape is part of the internal
+transport contract.
+
+```
+GET  {origin}/api/sse/{procedure.path}?input={superjson.stringify(input)}
+     Content-Type: text/event-stream; charset=utf-8
+     Cache-Control: no-cache, no-transform
+     X-Accel-Buffering: no
+
+data: {superjson frame}     one frame, split across lines on \n and
+                            terminated by a blank line
+: ping                      a keep-alive comment every 25 s
+```
+
+The frames are connected, complete and error. The browser's own abort signal is
+threaded into `createCaller`, so an abandoned subscription's suspended `await`
+is interrupted rather than leaked. `sseErrorFrame` keeps the ADR-045 shape: a
+`HandledError`, directly or as a `TRPCError` cause, rides as
+`{ type: "error", message: <code>, error: <serialized> }`, and everything else
+degrades to the generic unknown.
+
+The link lives at `apps/ui/src/behavior/ui-sse-subscription-link.ts`. The route
+declares `handlerManagedAuth({ credential: "session", permissions: [] })` on the
+same `ApiRestSecurity` every REST family declares on, so the one streaming route
+is a registry entry rather than an unaccounted-for endpoint.
+
+Three properties hold that the plain request path does not need. A tenant-wide
+signal is dropped for a conversation the caller does not own, read off the
+broadcast payload rather than off the input. `onTurnStream` passes its watch
+gate and then completes cleanly on a process with no Redis, so the browser falls
+back to the Postgres read instead of seeing an error. The request's abort signal
+rides the tRPC context as well as the caller's options, so a procedure resolved
+by a v10-shaped caller still learns the browser is gone.
+
+One trap is worth stating: a tRPC caller's namespace is a proxy, and `typeof` a
+proxy over a function is `"function"`, so an object-narrowed walk answers 404 for
+every live view.
+
 ## References
 
 - [ADR-045: Handled errors](./045-domain-errors-handled-boundary.md)

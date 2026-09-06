@@ -41,7 +41,7 @@ import type { WireOf } from "@langwatch/platform-api-client/feature-api";
  * `getResolvedDefault` read lands on, so its DATA refetches. What is missing is
  * only the store's follow, so an open Langy panel keeps the outgoing model in
  * its own local state until it is remounted. Recorded in
- * `dev/docs/plans/core-application-feature-extraction-plan.md`.
+ * `dev/docs/plans/strict-feature-layout.md`.
  */
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";

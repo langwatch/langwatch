@@ -4,7 +4,7 @@ import { Task, TaskHostPort } from "@langwatch/task";
  * What a saas (or other private) plugin module exports: exactly one of a
  * ready-made array, or a factory over this process's own `TaskHostPort` —
  * the same host the built-in catalogue's tasks get. Contract:
- * `dev/docs/plans/tasks-launch-interface-and-saas.md` Part 2.
+ * `dev/docs/adr/102-runtime-composition-roots.md`, amendment 2026-09-06.
  */
 export type TaskModuleExports = {
   tasks?: readonly Task[];

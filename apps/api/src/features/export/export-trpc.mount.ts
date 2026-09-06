@@ -14,7 +14,7 @@
  * rename the wire surface (`export.onExportProgress` is what clients call),
  * and putting both in either package would make that feature own the other
  * feature's permission. See
- * `dev/docs/plans/core-application-exit-decisions-for-review.md`.
+ * `dev/docs/plans/strict-feature-layout.md`.
  */
 import { on } from "node:events";
 import type { EventEmitter } from "node:events";

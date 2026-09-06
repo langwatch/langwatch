@@ -1,6 +1,6 @@
 /**
  * The fluent chain a feature's tRPC surface is defined through, the tRPC twin
- * of `createRestService`. Design: dev/docs/plans/trpc-fluent-chain-2026-09-05.md.
+ * of `createRestService`. Design: packages/api/adrs/006-trpc-fluent-chain.md.
  * Spec: packages/api/specs/trpc-framework.feature.
  */
 

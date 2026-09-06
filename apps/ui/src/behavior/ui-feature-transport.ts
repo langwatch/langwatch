@@ -1,7 +1,8 @@
 /**
  * The browser transport a feature package's hooks run on: one tRPC client
  * per application, HTTP split by `skipBatch`, subscriptions same-origin SSE.
- * Rationale and pins: dev/docs/plans/ui-subscription-transport.md.
+ * Rationale and pins: dev/docs/adr/128-public-rest-and-internal-trpc.md, the
+ * subscription-wire appendix.
  */
 
 import {

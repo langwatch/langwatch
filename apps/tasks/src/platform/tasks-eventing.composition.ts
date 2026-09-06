@@ -19,7 +19,7 @@ export type TasksEventingInfrastructureOptions = {
  * `ApiEventingInfrastructure` builds it (`api-eventing.infrastructure.ts`):
  * `consumersEnabled: false`, {@link EventStoreProducerOnly}, and
  * `processManagerMode: "producer-only"`, over this process's own Redis.
- * Rationale: `dev/docs/plans/tasks-launch-interface-and-saas.md`.
+ * Rationale: `dev/docs/adr/102-runtime-composition-roots.md`, amendment 2026-09-06.
  */
 export class TasksEventingInfrastructure {
   /** Composes the producer only when this process has Redis. */

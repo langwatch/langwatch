@@ -1,7 +1,7 @@
 /**
  * The browser entry: what `index.html` loads, the only module that runs on
  * import. Unfilled slots (command bar, footer) are honest pass-throughs —
- * named in `core-application-feature-extraction-plan.md`.
+ * named in `dev/docs/plans/strict-feature-layout.md`.
  */
 
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.

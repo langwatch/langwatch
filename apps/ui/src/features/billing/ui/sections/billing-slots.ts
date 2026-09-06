@@ -1,6 +1,6 @@
 /**
  * What billing puts in the slot every core screen that hits an Enterprise wall
- * leaves open. Design: dev/docs/plans/ui-slots-2026-09-05.md
+ * leaves open. Design: dev/docs/best_practices/ui-install.md
  */
 
 import { ContactSalesBlock } from "@langwatch/enterprise-billing-web/surfaces/contact-sales";

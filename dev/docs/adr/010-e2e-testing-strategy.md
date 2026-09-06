@@ -71,6 +71,57 @@ We will not generate new E2E tests per feature. Existing tests that are stable c
 - The testing philosophy doc is updated to reflect this two-tier approach.
 - The playwright agent definitions (`playwright-test-planner`, `playwright-test-generator`, `playwright-test-healer`) remain available for ad-hoc use but are not part of the standard workflow.
 
+## Amendment 2026-09-06: four end-to-end suites, and why they exist
+
+The two-tier strategy above held while the product was one application. The
+strict feature layout migration proved it does not hold across four processes.
+A walk on 2026-09-03 found that all three Node applications booted, answered
+their health probes, and could not be used at all: the `/api/auth` REST family
+was mounted by no process, so the browser walk stopped at sign-in. Every moved
+unit and component test was green at the time.
+
+So the strategy gains a tier. Four suites drive a running platform from
+outside: a browser journey, and three outside-in suites over the TypeScript
+SDK, the `langwatch` CLI and the MCP server. Eight decisions fix their shape.
+
+1. **`dev/tests/agentic-e2e` is the browser suite.** It is the one CI runs and
+   its selectors already cover the agent, suite, scenario and run leg. There is
+   no second Playwright tree.
+2. **Every suite reuses a stack when there is one, and boots one otherwise.**
+   The resolution order is `LANGWATCH_E2E_BASE_URL`, then this worktree's haven
+   stack, then a stack already answering at `BASE_URL`, and only then a boot of
+   its own. One shared helper, `dev/tests/e2e-stack/`, owns that. Each suite
+   has its own port slot, so two suites never collide locally.
+3. **The browser journey signs up fresh. The three outside-in suites use the
+   seeded project.** Sign-up is part of the product, so the browser test owns
+   it. The other three need a key before their first call, and the idempotent
+   seed supplies one. The constants are read from the seed file, never retyped.
+4. **"The evaluator was hit" is proven through a monitor, not through a
+   scenario run.** A scenario run is judged by its own criteria and references
+   no project evaluator. A monitor is what runs a project evaluator on incoming
+   traces. So the journey creates a code evaluator, creates a monitor, runs the
+   simulation, and asserts the result appears on the run's trace. That
+   exercises the worker, nlpgo and the trace pipeline together.
+5. **The target agent answers.** The browser lane's global setup starts a tiny
+   local HTTP agent on an ephemeral loopback port and registers it, so the run
+   must complete. A journey does not accept a failed run.
+6. **The model provider is a step, not a precondition.** A fresh self-hosted
+   organization has no provider even with a key in the environment. The journey
+   adds one, and chooses `openai/gpt-5-mini` wherever a model is asked for.
+   Without the key, the run leg and the monitor leg skip with a named reason,
+   and every other leg still runs.
+7. **A known platform gap fails by name.** A test that covers an unmounted
+   route is written as it should pass and marked `test.fail` with a one-line
+   reason naming the gap. It turns red the day the gap closes, and the marker
+   has to go.
+8. **Specs first.** Each suite gets a feature file under `specs/e2e/` with
+   `@e2e` scenarios, and every test carries a verbatim `@scenario` annotation.
+   An error path is a scenario too.
+
+The suites are a gate, not a convenience. Their first runs found eleven product
+defects in a few hours, which measures what the unit and component suites could
+not see. See `dev/docs/plans/strict-feature-layout.md` section 6.
+
 ## References
 
 - Related ADRs: ADR-004 (Docker dev environment — provides the isolated instances for browser verification)

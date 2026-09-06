@@ -1,7 +1,7 @@
 /**
  * A place a core screen leaves for a block it may not name. It asks by name
  * and renders the fallback where nothing filled the slot.
- * Design: dev/docs/plans/ui-slots-2026-09-05.md
+ * Design: dev/docs/best_practices/ui-install.md
  */
 
 import type { ComponentType, ReactNode } from "react";

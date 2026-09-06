@@ -351,3 +351,62 @@ Interactive browser verification (`/browser-test`) replaces per-feature E2E test
 Artifacts are saved to `browser-tests/<feature-name>/<YYYY-MM-DD>/` with screenshots and a report. These are committed to the branch and linked in PR descriptions.
 
 See `.claude/skills/browser-test/SKILL.md` for the full workflow and `browser-tests/proof-of-concept/` for an example run.
+
+## Green pieces do not make a working product
+
+Recorded 2026-09-06, out of the strict feature layout migration.
+
+A move carries its unit and component tests, and each of those tests mocks the
+boundary it sits on: a host adapter test fakes the session port, a route test
+fakes the service, a service test fakes the repository. All of them stay green
+while the product does not work. Measured examples from one day:
+
+- The browser entry never imported the global stylesheet, so fonts, the CSS
+  reset and link underlines were gone. No test reads the entry file.
+- Every settings page wrapped itself in a second settings layout, because the
+  page wrapper and the navigation shell were each tested alone.
+- Twenty-two host adapters rendered a spinner for ever on a refused
+  organization graph, because their tests covered `isLoading` only.
+- A bare `setQuery: route.setQuery` hand-off lost its receiver and threw on the
+  first click. Three more hosts did the same with `feedback.succeeded`.
+- A code evaluator could not be attached to a monitor, and an evaluation
+  recorded on a span came back empty, each because two correct halves disagreed
+  at a seam nothing exercised end to end.
+
+So a feature that spans a process boundary needs a test that crosses it. See
+ADR-010's 2026-09-06 amendment for the four suites that do.
+
+## Test doubles drift, and the check that would catch them is drowned
+
+A double that still spells a method the real interface renamed fails at run
+time with `X is not a function`. Six turned up in one pass, all the same shape.
+
+Do not cite "tests are outside the typecheck" as the reason. `pnpm typecheck`
+uses a project that excludes test files, and that is the one people iterate
+with, but `typecheck:tests` and `typecheck:all` include them and cover every
+drift. The accurate reason is that the check is red for unrelated reasons: at
+1,817 errors across 487 files, a new drift adds one line and is invisible
+whether or not anyone runs it.
+
+Two rules follow. **Drive the count down rather than the individual drifts.**
+Below some threshold the check becomes a finder and the rest fall out in one
+pass. **A "does this exist anywhere" sweep must match declaration forms**, not
+the export keyword. Two members reported as deleted were written as
+`abstract ensureInternal(...)` on a contract class and `async summary(...)` on
+an implementation. Both existed. The tests were reaching through the wrong
+object, which is a far smaller problem than a missing capability.
+
+Count only lines carrying an `error TSxxxx` code. `tsc` also emits indented
+related-information lines naming other files, and counting those inflates both
+the per-file totals and the file count.
+
+## A move that re-authors is not a move
+
+When a move re-authors rather than renames, diff the two files by behaviour, not
+by size. The tell is a constant or a state field that travelled while the
+control that drove it did not: a setter with no caller outside its own unit
+tests, or a grouping constant exported from a component that never groups.
+
+A suite that cannot load hides its own drifts completely. It fails at import and
+never reaches the assertion that would have named the method, so it also stops
+being maintained. Repoint it or delete it. Do not leave it unloadable.

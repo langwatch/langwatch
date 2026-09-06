@@ -8,7 +8,7 @@
 [Frontend feature boundary ADR](../../../packages/architecture-lint/adrs/004-frontend-feature-boundaries.md),
 [Prompt service boundary](../../../packages/features/prompt/adrs/001-prompt-service-boundary.md),
 [ADR-001: UI composition boundary](./001-ui-composition-boundary.md),
-and [the platform exit ledger](../../../dev/docs/plans/core-application-feature-extraction-plan.md).
+and [the one plan](../../../dev/docs/plans/strict-feature-layout.md).
 
 ## Context
 

@@ -10,7 +10,7 @@ import { PrismaAuthzGrantRepository } from "../prisma.authz-grant.repository";
  * Its provenance — the actor and source stamped on the emitted command — is
  * not covered anywhere: the service test asserts the CALL into the repository,
  * and the eventing repository's own tests assert neither. See
- * dev/docs/plans/package-move-capability-gaps.md.
+ * dev/docs/TESTING_PHILOSOPHY.md.
  */
 
 describe("PrismaAuthzGrantRepository", () => {

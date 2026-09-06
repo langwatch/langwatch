@@ -9,7 +9,7 @@
 # langwatch-app-ci.yml. That list reached seventeen packages while the workspace
 # reached a hundred and sixty, because a hand-written list makes a NEW package
 # invisible by DEFAULT rather than by decision. The core-application feature
-# extraction (dev/docs/plans/core-application-feature-extraction-plan.md, F-CI-02)
+# extraction (dev/docs/plans/strict-feature-layout.md, F-CI-02)
 # turns that from a slow leak into an active one: every wave moves behaviour out
 # of the monolith, which CI ran, into packages/features/*, which it did not.
 #

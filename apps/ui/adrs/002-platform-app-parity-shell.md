@@ -7,7 +7,7 @@
 **Related:**
 [ADR-111: physical application workspaces](../../../dev/docs/adr/111-physical-application-workspaces.md),
 [ADR-001: UI composition boundary](./001-ui-composition-boundary.md),
-and [the platform exit ledger](../../../dev/docs/plans/core-application-feature-extraction-plan.md).
+and [the one plan](../../../dev/docs/plans/strict-feature-layout.md).
 
 ## Context
 

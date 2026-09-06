@@ -17,7 +17,7 @@ import { TaskInfrastructureUnavailableError } from "./task.errors";
  *
  * The type parameters default to `unknown` so a plugin can implement `Task`
  * without the generated Prisma client. See
- * `dev/docs/plans/tasks-launch-interface-and-saas.md` Part 2 for the rest.
+ * `dev/docs/adr/102-runtime-composition-roots.md`, amendment 2026-09-06, for the rest.
  */
 export abstract class TaskHostPort<
   Config = unknown,

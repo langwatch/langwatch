@@ -44,7 +44,7 @@ const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
  * `tsgo` child, which is a round trip per file, and this is a synchronous CLI
  * walking 8,700 modules on every `pnpm lint`. Parsing in process against 6,
  * with a cache keyed on path + mtime + size, is the deliberate call recorded
- * in `dev/docs/plans/core-application-feature-extraction-plan.md`. It moves
+ * in `dev/docs/plans/strict-feature-layout.md`. It moves
  * when the unstable API grows a program, a printer and a scanner, or when the
  * rules are restructured to parse the whole tree in one exchange.
  */

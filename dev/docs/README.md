@@ -17,7 +17,7 @@ Cross-cutting principles that apply everywhere:
 ## Architecture
 
 - **adr/** - Architecture Decision Records (RBAC, event sourcing, logging, feature flags, Redis)
-- **[Application feature extraction plan](plans/core-application-feature-extraction-plan.md)** - the path-to-owner map that drained `platform/app`; kept as the record of where each thing went
+- **[Strict feature layout: the one plan](plans/strict-feature-layout.md)** - the live plan for the four-process layout: definition of done, counters, decisions, open items, the gate, and where every retired plan's content went
 
 ## Also See
 

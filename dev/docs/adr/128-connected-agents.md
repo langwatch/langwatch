@@ -84,6 +84,35 @@ The connect-agent flow becomes: install the SDK, decorate the function, start th
 
 ADR-098's transport note is fulfilled by this ADR; `langwatch agent dev` stays for HTTP agents.
 
+### Named absences (2026-09-06)
+
+The restore recorded six absences by name, so that a reader does not read one
+as an oversight.
+
+- **No tRPC over WebSocket.** Main's `trpc-ws.ts` shared the upgrade router.
+  This branch serves subscriptions over `/api/sse`. The upgrade router has one
+  registrant and stays that way.
+- **The legacy alias keeps its own bodies** (`agent-legacy.api.ts`) rather than
+  one declaration on two paths.
+- **`LANGWATCH_APP_REPLICAS` defaults to 1.** Without Redis, and with a replica
+  count above 1, every connect is refused `replica_count_unsupported`. The
+  deployment reads that absence report at boot.
+- **The presence projection and the long-poll singleton stay in the api
+  process.** Neither is a background process on main, so neither moves to the
+  worker.
+- **The worker gets one composition file, not an installer**: Redis into the
+  connected runtime for the experiment orchestrator's `relayDispatch`.
+- **The connected UI stays in `scenario-web`.** The components were lifted
+  there with their bound tests by the UI sprint. Moving them again is not lift
+  and shift. Moving them to `agent-web`, with `ConnectedAgentView` in the agent
+  contract, is a backlog item.
+
+`agent-server` gains two dependency edges, `@langwatch/scenario-contract` and
+`ws`. It does not gain an api-key package: credential resolution is a port that
+`apps/api` satisfies. `agent-server` has no `vitest.config.ts` and therefore no
+datastore lane, so its Postgres-backed and Redis-backed tests live in
+`apps/api/src/features/agent/__tests__`.
+
 ## Contract
 
 Frames are JSON text over the socket, every frame `{ "type": ..., "protocol": 1, ... }`.

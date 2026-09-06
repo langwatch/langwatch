@@ -1,7 +1,8 @@
 /**
  * The tRPC link that carries a subscription over this application's own SSE
  * frame format (not tRPC's wire format) and the same-origin session cookie.
- * See dev/docs/plans/ui-subscription-transport.md.
+ * See dev/docs/adr/128-public-rest-and-internal-trpc.md, the
+ * subscription-wire appendix.
  */
 
 import type { TRPCLink } from "@trpc/client";

@@ -317,3 +317,42 @@ and `RuntimeBoot` were never adopted: both `apps/api` and `apps/worker` compose
 by hand in their `*-production.composition.ts` roots, not through the typed
 feature-installer graph this ADR describes. They were deleted from
 `@langwatch/runtime-composition`, which now holds only `ResourceScope`.
+
+## Amendment 2026-09-06
+
+Two decisions from the strict feature layout migration belong here, because
+both are about what a composition root owns.
+
+### The worker is the only consumer of the eventing jobs
+
+A group-queue consumer is a construction-time side effect:
+`createEventingGroupQueueFactory` instantiates a `GroupQueueConsumer` and calls
+`.handle(...)` when a queue definition is created, but only when
+`consumersEnabled` is set. The producer surface never needs a consumer, and the
+web role has run with `consumersEnabled: false` in production for months. So
+consumer ownership is a parameter of the one booted composition, and a process
+can never hold two consumers or none.
+
+`apps/worker`'s `WorkerProductionComposition` is that one consumer. Every other
+role composes the same pipelines as a producer only. Cross-pipeline dispatch is
+location-independent, because routing metadata is stamped from names at send
+time: a handler on the packaged consumer that dispatches through a producer
+enqueues identical bytes. Two rejected shapes are recorded against this:
+adopting an externally built `EventSourcing` instance into the packaged
+runtime, which buys a process cutover that already happened; and strict
+producer inversion, which forks the producer surface per role for no gain.
+
+### `apps/tasks` runs one-shot programs, and a private task may stay a plugin
+
+`apps/tasks` is the fourth composition root: one root and one CMD for every
+one-shot program. A task lands in whichever package already owns its domain, so
+a billing task lives under `packages/enterprise/features/billing/server/src/tasks/`
+and a user task under `packages/features/user/server/src/tasks/`. Every task is
+registered on `apps/tasks/src/tasks.catalogue.ts` and ships a unit test.
+
+A deployment may keep a task private. `@langwatch/task` is a plugin mechanism,
+and a private repository registers its own task on it rather than moving the
+task into this repository. The line is what the task is, not who runs it: an
+ordinary operation is a job the product keeps needing, such as a price sync or
+a data erase, and it moves in. A one-off repair for a single historical
+incident stays a plugin.

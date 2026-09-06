@@ -14,7 +14,7 @@
  * deliberately NOT an instance of any local class. If someone swaps the
  * structural check for `instanceof`, this is what goes red.
  *
- * @see dev/docs/plans/zod-4-migration-misses.md
+ * @see dev/docs/best_practices/zod.md
  */
 
 import { describe, expect, it } from "vitest";

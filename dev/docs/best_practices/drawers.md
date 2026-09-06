@@ -189,3 +189,28 @@ this application's problem, which is what `fromDrawerAddress`
 (`features/drawers/model/ui-drawer-address.tsx`) is for. Wrap with it, or
 default `open` to `true` and compare with `!== false && !== undefined`
 yourself.
+
+## The drawer registry (2026-09-06)
+
+A screen asks its host to open a drawer, the host writes `?drawer.open=<name>`,
+and the mount resolves the name against a registry. The registry mechanism is
+shared. The drawers stay in the packages that own them.
+
+- `@langwatch/ui-drawer` owns the address vocabulary, the navigation stack, the
+  complex-prop and flow-callback stores, the lazy registry and `CurrentDrawer`.
+- A feature publishes `{ key: lazyDrawer(...) }` from its own package, exactly
+  the way it publishes page loaders. The browser application installs them.
+- `apps/ui/src/features/chrome/ui/sections/ui-app-chrome.tsx` mounts
+  `CurrentDrawer` once, above the outlet and outside the shell branch. A drawer
+  is addressed by the query string and renders through a portal.
+
+Every name a screen, a command-bar entry, a host adapter or an outbound email
+addresses resolves in the installed drawer registry. Four names are deliberate
+exceptions rather than gaps. `traceV2Details` and `traceDetails` are mounted
+directly, below `CurrentDrawer`, because their URL-to-store sync must outlive
+the `?drawer.open=` parameter. `dashboardName`, `seriesFilters` and
+`opsGroupDetail` stay local overlays on their own screens' query keys, because
+nothing outside those screens links to them.
+
+Two features that publish the same drawer name are refused by name at
+composition. See `best_practices/ui-install.md`.

@@ -59,8 +59,8 @@ is the single most important property here and it is explained in full below.
 single shared `trpcReact` built against `apps/api`'s root router type (see
 `secret/web/src/behavior/secret-api.ts`). It is meant to replace the
 per-feature `createFeatureApi<Map>()` maps described below once the api-map
-lane finishes its fan-out (`dev/docs/plans/install-composition-review-2026-09-03.md`
-§5). This section will be rewritten around `trpcReact` at that point.
+lane finishes its fan-out (`dev/docs/plans/strict-feature-layout.md` section 4
+item 11). This section will be rewritten around `trpcReact` at that point.
 
 From its own feature package, never from `~/utils/api` and never from a client
 it builds itself.
