@@ -40,25 +40,16 @@
 {{- if and (eq $isolation "none") (not .Values.acceptWorkerIsolationDisabled) }}
 {{- fail "langyagent.workerIsolation=none removes per-worker identity isolation: every conversation's worker runs as the same user, so workers can read sibling credentials and files, reopen control descriptors through /proc, and read manager secrets including LANGY_INTERNAL_SECRET and any mirror key. The internal secret authenticates manager RPCs and internal turn-result callbacks; every conversation must be trusted with that authority. This is how the agent runs on a cluster that refuses root, and on such a cluster the alternative is no assistant at all — but it is a trade to make deliberately. Set langyagent.acceptWorkerIsolationDisabled=true to accept it. To run without the assistant entirely, set langyagent.chartManaged=false." }}
 {{- end }}
-{{- /* The accident this whole feature exists to prevent, refused by name.
-
-       Forcing the DEFAULT posture non-root is the natural first attempt on a
-       policy-locked cluster, and it is the exact thing the customer in ADR-130
-       did. It does not work, and until this guard it did not say so: Helm
-       merges the capability map rather than replacing it, so the rendered pod
-       still requests all five capabilities; the kernel then clears them on the
-       UID transition. The pod is admitted, both probes go green, and every
-       conversation dies at the first chown in provisioning — which reads as a
-       Langy bug rather than a policy outcome.
-
-       Prose in a values file is not a guard (ADR-047's own lesson, quoted in
-       ADR-130). So this is a render-time refusal that names the supported
-       answer. */ -}}
+{{- /* The supported per-uid configuration is a UID 0 manager with the five
+       chart capabilities for worker file ownership and setuid/setgid. Reject
+       non-root identity overrides here instead of leaving provisioning to
+       discover an unsupported configuration. Helm merges capability maps,
+       so drop: [ALL] alone does not remove the chart's add list (ADR-130). */ -}}
 {{- if eq $isolation "per-uid" }}
 {{- $forcedNonRoot := or (eq (toString (dig "runAsNonRoot" false $podSCVals)) "true") (eq (toString (dig "runAsNonRoot" false $ctrSCVals)) "true") }}
 {{- $forcedUser := or (and (hasKey $podSCVals "runAsUser") (ne (toString $podSCVals.runAsUser) "0")) (and (hasKey $ctrSCVals "runAsUser") (ne (toString $ctrSCVals.runAsUser) "0")) }}
 {{- if or $forcedNonRoot $forcedUser }}
-{{- fail "langyagent.workerIsolation=per-uid cannot run non-root. Giving each conversation's worker its own uid needs CAP_SETUID/SETGID/CHOWN, which only a root-effective-uid process holds in a container, so a non-root securityContext here renders a pod that is admitted and then fails every worker spawn at its first chown. Note that Helm MERGES the capability map, so your own drop:[ALL] does not remove the chart's add: list either. The supported way to run on a cluster that refuses root is langyagent.workerIsolation=none with langyagent.acceptWorkerIsolationDisabled=true, which renders this pod as a non-root, zero-capability, seccomp-RuntimeDefault spec that Pod Security Admission \"restricted\" admits — at the cost of per-worker identity isolation (see ADR-130). To run without the assistant entirely, set langyagent.chartManaged=false." }}
+{{- fail "langyagent.workerIsolation=per-uid requires the chart's supported configuration: a manager running as UID 0 with CHOWN, DAC_OVERRIDE, FOWNER, SETUID and SETGID for worker file ownership and setuid/setgid. Non-root manager overrides are not supported. Note that Helm MERGES the capability map, so your own drop:[ALL] does not remove the chart's add: list either. The supported way to run on a cluster that refuses root is langyagent.workerIsolation=none with langyagent.acceptWorkerIsolationDisabled=true, which renders this pod as a non-root, zero-capability, seccomp-RuntimeDefault spec that Pod Security Admission \"restricted\" admits — at the cost of per-worker identity isolation (see ADR-130). To run without the assistant entirely, set langyagent.chartManaged=false." }}
 {{- end }}
 {{- end }}
 apiVersion: apps/v1

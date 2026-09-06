@@ -253,9 +253,10 @@ kubectl -n langwatch exec deploy/langwatch-langyagent -- cat /proc/version
 
 Pod Security Admission `restricted`, and the common Gatekeeper or Kyverno
 policies, require `runAsNonRoot: true` and `capabilities.drop: [ALL]`. The
-default agent pod cannot satisfy that: handing each worker its own UID needs
-`CAP_SETUID`, `CAP_SETGID` and `CAP_CHOWN`, and only a root-effective-uid
-process holds them inside a container.
+chart supports `per-uid` with a manager running as UID 0 and five capabilities:
+`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID`. That configuration
+provisions worker files with `chown` and applies each worker identity with
+`setuid`/`setgid`, so it does not satisfy those admission policies.
 
 Forcing `runAsNonRoot` or a nonzero `runAsUser` while retaining `per-uid`
 is rejected during Helm rendering. Dropping required capabilities does not
@@ -271,7 +272,7 @@ langyagent:
   acceptWorkerIsolationDisabled: true
 ```
 
-The pod then defaults to UID 1000 with `runAsNonRoot: true`,
+With no identity override, the pod defaults to UID 1000 with `runAsNonRoot: true`,
 `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`.
 This satisfies PSA `restricted` with no exemption, no RuntimeClass and no
 separate namespace. For clusters requiring a different UID, set

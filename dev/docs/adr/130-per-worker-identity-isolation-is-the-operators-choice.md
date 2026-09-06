@@ -29,7 +29,7 @@ The worker config carries environment variable names rather than credential
 values. This avoids writing injected secrets into config files, but does not
 protect live credentials from another process sharing the same UID.
 
-Holding that boundary costs the container **root plus five capabilities**:
+The chart supports that boundary with a **UID 0 manager and five capabilities**:
 `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`
 (`charts/langyagent/values.yaml:157-185`). The chart's own header calls this
 "counter-intuitive but load-bearing" and records the review that produced it
@@ -64,9 +64,11 @@ set those in their values. Two things then happen, and the order matters:
    capabilities. This is specified behaviour —
    `specs/security/helm-strict-admission.feature:129-137` pins it — but it reads
    as though the override did nothing.
-2. **The capabilities are inert anyway.** On a UID transition the kernel clears
-   the effective and permitted sets of a non-root process. A container running
-   as UID 1000 holds `CAP_SETUID` on paper and cannot use it.
+2. **The override leaves the supported configuration.** The chart supports
+   `per-uid` with a UID 0 manager and the five capabilities above for worker
+   file ownership and `setuid`/`setgid`. A nonzero manager UID is not a
+   supported substitute; capabilities in a manifest alone do not establish
+   that the manager can perform those operations.
 
 So the pod is admitted, reports healthy, and dies at the first `Chown` in
 provisioning — a failure that looks like a Langy bug rather than a policy
@@ -153,9 +155,12 @@ existing guard family in `charts/langyagent/templates/deployment.yaml`
 (`replicaCount != 1` at :4-6, blank `runtimeClassName` at :21-23). The failure
 names what is being given up and the value that accepts it.
 
-Under `none` the chart emits `runAsNonRoot: true`, `runAsUser: 1000`, and
-`capabilities.drop: ["ALL"]` with no `add` — a pod spec that satisfies PSA
-`restricted` and the common Gatekeeper/Kyverno rules without an exemption.
+Under `none` the chart defaults to `runAsUser: 1000` and emits
+`runAsNonRoot: true` and `capabilities.drop: ["ALL"]` with no `add`. An operator
+can set `podSecurityContext.runAsUser` to another nonzero UID; the container
+inherits it unless `containerSecurityContext.runAsUser` supplies a nonzero
+override. These settings satisfy PSA `restricted` without an exemption;
+cluster-specific UID policies still determine which nonzero UIDs are allowed.
 
 ### 3. This posture depends on ADR-131 (opencode harness removal)
 
@@ -190,7 +195,7 @@ reconstructed from a values file later.
 
 | | `per-uid` (default) | `none` |
 |---|---|---|
-| Pod runs as | root, 5 capabilities | UID 1000, no capabilities |
+| Manager runs as | UID 0, 5 capabilities | UID 1000 by default; nonzero operator override allowed, no capabilities |
 | Admitted under PSA `restricted` | No | Yes |
 | Sibling reaches sibling's control channel | Kernel refuses access to descriptors | **Possible through `/proc/<pid>/fd`** |
 | Sibling reads sibling's credential file | No such file exists | **No such file exists** |

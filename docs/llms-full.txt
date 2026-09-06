@@ -57150,7 +57150,7 @@ Two conversations in one pod belong to two different people, and a prompt-inject
 
 **Unix identity is the configurable one.** By default each conversation's worker gets a distinct UID; its home, tmp dir and session store are `chown`ed to that UID and `chmod`ed `0700`/`0600`, and the process is `setuid`ed into that UID before `exec`. That is what stops a sibling reading another worker's process environment through `/proc/<pid>/environ` or its conversation content out of the session directory.
 
-Holding that wall costs the container root plus five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`): a UID handoff needs them, and only a root-effective-uid process holds them inside a container. To keep the blast radius small the container drops all capabilities and adds back exactly those five, sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`, omits `fsGroup` (sharing it would reopen the boundary it exists to hold), and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
+The chart supports `per-uid` with a manager running as UID 0 and five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`). This is the supported configuration for provisioning worker files with `chown` and handing each worker its identity with `setuid`/`setgid`. To keep the blast radius small the container drops all capabilities and adds back exactly those five, sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`, omits `fsGroup` (sharing it would reopen the boundary it exists to hold), and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
 
 ### On a cluster that refuses root
 
@@ -57162,7 +57162,7 @@ langyagent:
   acceptWorkerIsolationDisabled: true
 ```
 
-The pod then defaults to UID 1000 with `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`: a spec that satisfies PSA `restricted` with no exemption, no RuntimeClass and no separate namespace. Operator identity overrides can select another nonzero UID; see [the Helm settings](/self-hosting/langy/setup#hardening-clusters-that-refuse-root). The render fails without the acknowledgement, so nobody arrives at the weaker posture by leaving a field blank.
+The pod then defaults to UID 1000 with `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`: a spec that satisfies PSA `restricted` with no exemption, no RuntimeClass and no separate namespace. Set `langyagent.podSecurityContext.runAsUser` to select another nonzero UID; the container inherits it unless `langyagent.containerSecurityContext.runAsUser` supplies a nonzero override. For details, see [the Helm settings](/self-hosting/langy/setup#hardening-clusters-that-refuse-root). The render fails without the acknowledgement, so nobody arrives at the weaker posture by leaving a field blank.
 
 Shared identity removes isolation between workers and the manager. A worker can read sibling credentials and conversation files, reopen control pipes through `/proc/<pid>/fd`, and read manager secrets through `/proc/<pid>/environ`. This includes `LANGY_INTERNAL_SECRET` and any configured mirror key; the internal secret can authenticate manager RPCs and internal turn-result callbacks. Treat every conversation as trusted with that authority.
 
@@ -61308,9 +61308,10 @@ kubectl -n langwatch exec deploy/langwatch-langyagent -- cat /proc/version
 
 Pod Security Admission `restricted`, and the common Gatekeeper or Kyverno
 policies, require `runAsNonRoot: true` and `capabilities.drop: [ALL]`. The
-default agent pod cannot satisfy that: handing each worker its own UID needs
-`CAP_SETUID`, `CAP_SETGID` and `CAP_CHOWN`, and only a root-effective-uid
-process holds them inside a container.
+chart supports `per-uid` with a manager running as UID 0 and five capabilities:
+`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID`. That configuration
+provisions worker files with `chown` and applies each worker identity with
+`setuid`/`setgid`, so it does not satisfy those admission policies.
 
 Forcing `runAsNonRoot` or a nonzero `runAsUser` while retaining `per-uid`
 is rejected during Helm rendering. Dropping required capabilities does not
@@ -61326,7 +61327,7 @@ langyagent:
   acceptWorkerIsolationDisabled: true
 ```
 
-The pod then defaults to UID 1000 with `runAsNonRoot: true`,
+With no identity override, the pod defaults to UID 1000 with `runAsNonRoot: true`,
 `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`.
 This satisfies PSA `restricted` with no exemption, no RuntimeClass and no
 separate namespace. For clusters requiring a different UID, set

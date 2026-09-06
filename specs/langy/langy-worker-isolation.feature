@@ -122,7 +122,8 @@ Feature: Langy worker isolation
     And it can reopen sibling control descriptors through /proc
     And it can read the manager process environment including LANGY_INTERNAL_SECRET
     And the internal secret grants access to manager RPCs and internal turn-result callbacks
-    And the pod sandbox and NetworkPolicy still apply
+    And pod sandboxing still applies when runtimeClassName selects a sandboxed runtime
+    And the NetworkPolicy still applies when networkPolicy.enabled is true
 
   # ===========================================================================
   # Required connectivity is preserved
