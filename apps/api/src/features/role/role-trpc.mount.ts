@@ -1,23 +1,7 @@
 /**
- * App-process transport mounts for the role vertical: custom role definitions
- * and the bindings that hand them out.
- *
- * Behaviour is package-owned (`@langwatch/role-server`); this supplies the
- * process's root, its authenticated procedure and — procedure by procedure —
- * the access decision each one is guarded by. The package deliberately refuses
- * to assemble those itself: role definition is a privilege-escalation surface,
- * because whoever writes a role writes their own permissions, so the check that
- * guards each write is stated where the process's authorization lives.
- *
- * ## Why two checks rather than one
- *
- * Four of the seven `role.*` procedures name a ROLE rather than the
- * organization the check has to run against, and the role's organization is a
- * row loaded by that id. A declared `.permission()` reads its scope id from the
- * validated input and there is none to read, so those four carry a CUSTOM check
- * instead: it loads the role, probes the organization it belongs to, and only
- * then consults the plan. The permission runs BEFORE the plan gate so a denial
- * never reveals which plan the organization is on.
+ * Role definition is a privilege-escalation surface, so the process supplies
+ * each procedure's access decision. A role-scoped CUSTOM check runs before
+ * the plan gate.
  */
 import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import { declareAuthzMiddleware, type AuthzPermission } from "@langwatch/authz-contract";
@@ -59,11 +43,8 @@ export type RoleTrpcPorts = Readonly<{
 type RoleCheckContext = RoleTrpcContext;
 
 /**
- * The role's organization is data loaded by the role id, so the check runs
- * there — one declared middleware rather than four inline copies.
- *
- * `declareAuthzMiddleware` is what keeps it DECLARED: the sweep counts the
- * claim, and the claim is written where the enforcement is.
+ * One declared middleware rather than four inline copies. `declareAuthzMiddleware`
+ * keeps it DECLARED so the sweep counts the claim where the enforcement is.
  */
 function roleOrganizationCheck(
   ports: RoleTrpcPorts,
@@ -100,12 +81,9 @@ function roleOrganizationCheck(
 }
 
 /**
- * The plan gate for a TEAM assignment.
- *
- * The declared check ahead of it already resolved the team's organization for
- * its own decision; this reloads it through the Role service because the plan
- * is read per organization, and a team nobody can name stays a not-found rather
- * than becoming a plan refusal.
+ * The plan gate for a TEAM assignment. Reloads the organization through the
+ * Role service rather than reusing the declared check's resolution, so an
+ * unnamed team stays a not-found instead of a plan refusal.
  */
 function assignmentPlanGate(ports: RoleTrpcPorts) {
   return async ({

@@ -1,15 +1,6 @@
 /**
- * App-process transport mount for real-time evaluation monitors.
- *
- * Behaviour is package-owned (`@langwatch/monitor-server`); this supplies the
- * process's tRPC root, its authenticated procedure and its policy chain.
- *
- * One surface on this root needs something the shared service does not
- * publish: `monitors.getPerformanceForProject` requires `evaluations:view` AND
- * `analytics:view`, and that AND-composition is the only one in the codebase.
- * It is built here from the same `declaredCheck` the policy chain installs, so
- * the second permission is a DECLARED check the router sweep counts rather
- * than an extra middleware nothing records.
+ * `getPerformanceForProject` needs `evaluations:view` AND `analytics:view` —
+ * the only AND-composed permission check in the codebase.
  */
 import { createTrpcApiService, type TrpcApiMount } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";

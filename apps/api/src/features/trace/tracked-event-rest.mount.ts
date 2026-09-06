@@ -1,27 +1,6 @@
 /**
- * `POST /api/track_event`, served from the canonical `POST /api/events/track`.
- *
- * The two URLs are one endpoint. The legacy path predates the canonical one
- * and every SDK release older than the rename still posts to it, so it cannot
- * be retired — but it must not be a SECOND handler either: two handlers over
- * one recorder is two answers to "was this event accepted", and the pair drift
- * the first time one of them gains a validation the other does not. So the
- * request is replayed against the canonical route rather than re-implemented,
- * which is the shape `createOtlpPathAliasRestApp` already uses for the OTLP
- * paths a misconfigured exporter produces.
- *
- * NOT A REDIRECT, for the same reason that one is not: the callers here are
- * SDKs and server-to-server scripts, and a 307 replayed by some HTTP clients
- * and dropped by others would repair part of the fleet and silently lose the
- * rest.
- *
- * Raw Hono rather than a secured app, because this app TERMINATES NOTHING: the
- * canonical route authenticates the forwarded request exactly as it would a
- * direct one, so the legacy URL answers the same 200, 400, 401 and 403 the
- * canonical URL does, from the same chain. It still records a policy — the
- * canonical route's own, copied rather than declared — because a mounted URL
- * missing from the route registry is indistinguishable from one that bypassed
- * the builder, and the endpoint-authorization audit reads that registry.
+ * Replays into the canonical route rather than redirecting (a 307 drops for
+ * some clients), so both answer from the same auth chain.
  */
 import { getRoutePolicy, registerRoutePolicy, type MountableRestApp } from "@langwatch/api/rest";
 import { Hono } from "hono";
@@ -32,13 +11,8 @@ export const TRACKED_EVENT_LEGACY_PATH = "/api/track_event";
 export const TRACKED_EVENT_CANONICAL_PATH = "/api/events/track";
 
 /**
- * Builds the re-dispatcher over the canonical tracked-event app.
- *
- * The canonical app is a parameter rather than an import so the two cannot be
- * mounted out of step: a process that composed no tracked-event ports has
- * nothing to pass here and mounts no alias either, which is the correct
- * outcome — an alias forwarding into a family nobody built would answer 404
- * from a route that looks like it exists.
+ * The canonical app is a parameter, not an import, so the two can't mount out
+ * of step: no tracked-event ports composed means no alias mounted either.
  */
 export function mountTrackedEventLegacyPathRest(options: {
   canonical: MountableRestApp;

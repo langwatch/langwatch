@@ -1,15 +1,6 @@
 /**
- * This process's composition of the packaged prompts REST family
- * (`@langwatch/prompt-server`).
- *
- * The routes, the wire schemas, the OpenAPI declarations and the three refusal
- * mappers live in the feature package (ADR-128). What lives here is everything
- * the family dispatches through that is this process's: the per-route
- * organization resolution, the deep-link builder, and the database client's own
- * unique-constraint decoder.
- *
- * The prompt service arrives as a provider rather than an instance, so a
- * document generator can build this app with none.
+ * Routes/schemas/OpenAPI live in the feature package (ADR-128); this composes
+ * organization resolution, deep-link builder and unique-constraint decoder.
  */
 import { createLogger } from "@langwatch/observability";
 import { createPromptsRestApp, type PromptRestService } from "@langwatch/prompt-server";

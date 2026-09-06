@@ -1,15 +1,6 @@
 /**
- * App-process transport mounts for the dataset vertical's three surfaces.
- *
- * Behaviour is package-owned (`@langwatch/dataset-server`); these supply the
- * process's root, authenticated procedure, policy chain, and the two things
- * the dataset package does not own — a permission probe for the SECOND project
- * a copy reaches, and the batch-evaluation reads, which are the host's because
- * the table is.
- *
- * All three answer from one `ctx.app.dataset`: a project's rows are one set,
- * and a second application over them would be a second answer to what a
- * dataset contains.
+ * Adds only the second-project permission probe for a copy and the
+ * batch-evaluation reads; all three share one `ctx.app.dataset`.
  */
 import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import {
@@ -57,11 +48,8 @@ export function createDatasetRecordTrpcRouter<
 }
 
 /**
- * Mounts `batchRecord.*` on the app process's tRPC root.
- *
- * `TSummaries` and `TRecords` are inferred from the process's own reads rather
- * than fixed here, so the two rollups reach the client with the shape they have
- * always had instead of a narrowed copy of it.
+ * Mounts `batchRecord.*` on the tRPC root. `TSummaries`/`TRecords` are
+ * inferred from the process's own reads so responses keep their real shapes.
  */
 export function createBatchRecordTrpcRouter<
   TContext extends BatchRecordTrpcContext,

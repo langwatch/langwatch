@@ -1,33 +1,8 @@
 /**
- * The receipt ledger behind `Idempotency-Key`: the claim, its heartbeat, its
- * takeover window and the encrypted stored response.
- *
- * A create is the one shape of request where a retry is dangerous. When a
- * caller's connection drops after the write but before the response, it cannot
- * tell a lost request from a lost reply, and the only safe-looking move —
- * retrying — mints a second virtual key, budget, cache rule or webhook
- * endpoint. Sending a key with the first attempt is how the caller says "these
- * two requests are the same request", and this module makes the second one
- * return the first one's answer.
- *
- * Deliberately a function the handler calls rather than middleware wrapping
- * it. Middleware would run before the route's validator and would therefore
- * have to consume and re-expose the raw body to fingerprint it. Called from
- * inside the handler, the fingerprint is taken over the already-validated
- * body, so no key is ever burned on a request the platform refused outright.
- *
- * A pending row is inserted before the handler runs and filled in only if the
- * handler returns 2xx; a throw deletes it and propagates untouched. That is
- * narrower than Stripe, which stores 4xx replies too, and the reason is that
- * Stripe cannot re-run your handler and we can. The hazard idempotency exists
- * to prevent is double creation, which only happens on success: a create that
- * failed left nothing behind. Storing failures would pin a transient error, a
- * rate limit or a moment of database unavailability to the key for 24 hours,
- * so the caller's retry gets the stale failure rather than the success it
- * would now get.
- *
- * How a claim is held, when it may be taken over, and why the stored body is
- * encrypted are each explained beside the code that does them.
+ * The receipt ledger behind `Idempotency-Key`. Called from inside the
+ * handler, not as middleware, so the fingerprint runs over the
+ * already-validated body. A pending row is filled in only on 2xx; a throw
+ * deletes it, since a failed create left nothing behind to double-create.
  */
 import { randomUUID } from "node:crypto";
 
@@ -46,46 +21,16 @@ export const RECEIPT_TTL_MS = 24 * 60 * 60 * 1000;
 export const HEARTBEAT_INTERVAL_MS = 5_000;
 
 /**
- * ── A CLAIM IS HELD BY A LIVE REQUEST ──────────────────────────────────────
- *
- * The unique index on (scopeId, key) serialises two concurrent retries: the
- * second insert loses, finds a pending row, and is told to retry shortly
- * rather than being allowed to create alongside the first.
- *
- * A row is superseded only once its claim stops reporting itself alive —
- * liveness rather than age, because age says nothing about whether the
- * original is still running. A request merely slow past whatever horizon was
- * chosen, waiting on a row lock or a saturated pool, is still going to write
- * its resource, so superseding it mints the second resource the key was sent
- * to prevent, and does it exactly when the system is least able to absorb it.
- * A slow request keeps beating and keeps its claim; a dead one stops beating
- * and its key frees in seconds rather than minutes.
- *
- * ── FENCING ────────────────────────────────────────────────────────────────
- *
- * A takeover rewrites the row's `claimId` rather than deleting the row, so the
- * request that took over owns the claim and the one it replaced stays
- * recognisable. Every write the replaced request goes on to make names the
- * claim it still thinks it holds, so a process that resumes after being
- * declared dead cannot overwrite the receipt of the request that replaced it.
- * The attempt is logged, and that log is the signal that one key may have
- * produced two resources.
- *
- * How long a claim may go quiet before another request may take it over.
- *
- * Four missed beats rather than one, so an interval a garbage collection pause
- * or a momentarily busy database swallowed is not read as a death. It stays a
- * small multiple of the interval all the same: the whole point of measuring
- * liveness is that a claim nobody is holding is released in seconds.
+ * Superseded by LIVENESS, not age: a slow request keeps beating and keeps
+ * its claim. A takeover rewrites `claimId` rather than deleting the row, so
+ * the replaced request's writes are fenced by a claim id it no longer holds.
+ * Four missed beats, not one, so a GC pause isn't read as a death.
  */
 export const TAKEOVER_AFTER_MS = 4 * HEARTBEAT_INTERVAL_MS;
 
 /**
- * How many times the claim will re-attempt after losing its insert.
- *
- * Each loss is followed by a read that either answers the request or clears
- * the row and tries again, so the loop only spins when rows are being cleared
- * underneath it. Bounded so a pathological race cannot spin forever.
+ * Bounded so a pathological race of insert-loss-then-clear cannot spin
+ * forever.
  */
 const CLAIM_ATTEMPTS = 3;
 
@@ -99,11 +44,8 @@ const CONFLICT_MESSAGES = {
 } as const satisfies Record<IdempotencyConflictReason, string>;
 
 /**
- * The key cannot answer this request.
- *
- * A 409 rather than a 400 in both cases: the request is well-formed and would
- * have been accepted under another key, so the caller's fix is to pick a new
- * key or to wait, not to correct a malformed field.
+ * A 409, not 400: the request is well-formed, so the caller's fix is a new
+ * key or a wait, not a corrected field.
  */
 export class IdempotencyConflictError extends HandledError {
   declare readonly code: "idempotency_error";
@@ -120,16 +62,9 @@ export class IdempotencyConflictError extends HandledError {
 }
 
 /**
- * The fingerprint two requests must share to count as the same request.
- *
- * Key order independent, so a caller whose serialiser emits fields in a
- * different order on the retry is not told its body changed.
- *
- * The operation is part of it because the receipt is keyed by tenancy alone:
- * the gateway platform's creates all authenticate at the project, so one key
- * reused across two different creates lands on the same row. Without the
- * operation, two creates that happen to validate to the same body would
- * replay each other's response; with it, they are told the key is taken.
+ * Key order independent. `operation` is included since the receipt is keyed
+ * by tenancy alone — without it, two different creates with the same body
+ * would replay each other's response.
  */
 export function fingerprintRequestBody({
   operation,
@@ -151,14 +86,8 @@ export type IdempotencyReceiptCreateInput = {
 };
 
 /**
- * One stored receipt, as this protocol reads it back.
- *
- * Stated structurally rather than imported from the database client's
- * generated types. The row is the `IdempotencyReceipt` table and the store
- * that satisfies {@link IdempotencyReceiptPersistence} is a real Prisma
- * client in every deployment — but this package is the API framework and may
- * not depend on a schema. Only the columns the protocol actually reads are
- * named here, so a generated model with more of them satisfies it unchanged.
+ * Stated structurally, not imported from generated Prisma types — this
+ * package is the API framework and may not depend on a schema.
  */
 export type IdempotencyReceiptRecord = {
   id: string;
@@ -196,11 +125,8 @@ export interface IdempotencyReceiptPersistence {
 }
 
 /**
- * The cipher the stored response body is written under.
- *
- * A port because the key belongs to the process — `CREDENTIALS_SECRET` — and
- * this package reads no environment. See {@link readStoredBody} for why the
- * body is encrypted at all.
+ * A port, since the key (`CREDENTIALS_SECRET`) belongs to the process and
+ * this package reads no environment.
  */
 export interface IdempotencyResponseCipher {
   encrypt(value: string): string;
@@ -322,15 +248,9 @@ interface ClaimHeartbeat {
 }
 
 /**
- * Report the claim as still running, until told to stop.
- *
- * On its own timer rather than driven by the handler, because the handler is
- * an opaque call that can spend minutes inside one database round trip without
- * emitting anything, and those are precisely the requests a takeover must not
- * declare dead. Unreferenced so it can never be the reason the process stays
- * up, and a beat that fails is logged rather than propagated: the create is
- * what the caller asked for, and losing a beat costs at worst a takeover that
- * fencing then catches.
+ * On its own timer, not driven by the handler, since the handler can spend
+ * minutes silent in one round trip. Unreferenced; a failed beat is logged,
+ * not propagated — fencing catches the worst case.
  */
 function startClaimHeartbeat({
   receipts,
@@ -370,13 +290,9 @@ function startClaimHeartbeat({
 }
 
 /**
- * Store the response this claim produced, if the claim is still ours.
- *
- * The `claimId` predicate is the fence. Affecting no rows means this request
- * was declared dead and replaced while its handler was still running, so the
- * resource it just created is one the replacing request is about to create a
- * second copy of. Nothing here can undo that, and overwriting the new claim's
- * row would only hide it, so it is logged as the loud signal instead.
+ * The `claimId` predicate is the fence. Zero rows affected means this
+ * request was declared dead and replaced mid-handler, so it logs loudly
+ * rather than overwriting the new claim's row.
  */
 async function finalizeClaim({
   receipts,
@@ -421,23 +337,14 @@ type Claim =
   | { kind: "replay"; status: number; serializedBody: string };
 
 /**
- * What a row already under the key resolves to.
- *
- * `claimed` is reachable here as well as from a winning insert, because a row
- * whose claim stopped reporting itself alive is taken over in place rather
- * than deleted: the taking request ends up holding the same row under a new
- * claim id. `retry` means the row was not authoritative, so the key is worth
- * attempting again.
+ * `claimed` also comes from a takeover-in-place, not only a winning insert.
+ * `retry` means the row wasn't authoritative.
  */
 type ExistingVerdict = Claim | { kind: "retry" };
 
 /**
- * Take the key, or read what the row already there says to do.
- *
- * The insert goes first on purpose. A read-then-write would let two concurrent
- * retries both find the key free, and the second create is exactly what the
- * key was sent to prevent. The unique index is the only thing that actually
- * decides, so it is what the outcome is read from.
+ * Insert goes first: a read-then-write would let two concurrent retries
+ * both find the key free.
  */
 async function claimReceipt({
   receipts,
@@ -525,24 +432,15 @@ async function insertPendingReceipt({
 }
 
 /**
- * Whether a pending claim has gone quiet long enough to be taken over.
- *
- * The whole takeover decision, in one place and with no storage behind it, so
- * what it turns on is a matter of record: the last time the holder said it was
- * running, never how long ago the claim was made.
+ * Turns on the last heartbeat, never how long ago the claim was made.
  */
 export function isClaimAbandoned({ heartbeatAt, now }: { heartbeatAt: Date; now: Date }): boolean {
   return now.getTime() - heartbeatAt.getTime() > TAKEOVER_AFTER_MS;
 }
 
 /**
- * Take a silent claim over, or report that someone else got there first.
- *
- * An update rather than a delete and a fresh insert, so the row keeps its
- * identity and the claim that was displaced can be told apart from the one
- * that displaced it. The `claimId` in the predicate is what makes two requests
- * racing to take the same silent claim over resolve to one winner, and the
- * loser is sent back to re-read a row that is now beating again.
+ * An update, not delete-and-insert, so the row keeps its identity. The
+ * `claimId` predicate resolves two racing takeovers to one winner.
  */
 async function takeOverClaim({
   receipts,
@@ -637,28 +535,10 @@ async function readExistingReceipt({
 }
 
 /**
- * The stored response bytes, or null when this row cannot be read back.
- *
- * ── WHY THE STORED BODY IS ENCRYPTED ───────────────────────────────────────
- *
- * Two of the four creates answer with a secret kept nowhere else in readable
- * form: the virtual key's secret and the webhook endpoint's signing secret are
- * both shown once and stored only as a hash. Replaying those responses is the
- * whole point of a key on those routes, which means the secret transits the
- * receipt. So the body is held as ciphertext under the process's own
- * {@link IdempotencyResponseCipher} — AES-256-GCM under `CREDENTIALS_SECRET`
- * in every deployment, the same treatment the automations webhook gives its
- * custom headers — and expiry bounds how long it exists at all.
- *
- * It is stored as the exact bytes the first response carried, which is also
- * what makes a replay byte-identical: a string round trip, so nothing in
- * storage is in a position to reorder or renormalise it.
- *
- * The realistic cause of an unreadable row is `CREDENTIALS_SECRET` having been
- * rotated inside the receipt's 24 hours, which leaves rows that are authentic
- * but no longer decryptable. Dropping them matches how the model provider repository treats
- * customKeys it can no longer read: an unreadable secret is treated as absent
- * rather than as a failure the caller has to understand.
+ * Two of the four creates replay a secret shown only once (virtual key,
+ * webhook signing secret), so the body is held as ciphertext under
+ * {@link IdempotencyResponseCipher}. An unreadable row (secret rotated
+ * mid-TTL) is dropped and treated as absent, not a failure.
  */
 export function readStoredBody({
   receipt,
@@ -681,17 +561,8 @@ export function readStoredBody({
 }
 
 /**
- * Give up the claim this request holds, so the key is usable again.
- *
- * Fenced on `claimId` like every other write a claim holder makes: a request
- * that was declared dead and replaced must not delete the row the replacing
- * request is now working under. Affecting no rows is far less serious here
- * than on the finalize path, since a claim released is a create that failed
- * and left nothing behind, but it is still worth saying that this request no
- * longer had the key it thought it had.
- *
- * `deleteMany` rather than `delete` so a row already cleared by a concurrent
- * attempt is not a second error on top of whatever is being handled.
+ * Fenced on `claimId` like every other write a claim holder makes, so a
+ * dead-and-replaced request can't delete the replacing request's row.
  */
 async function releaseClaim({
   receipts,
@@ -720,12 +591,8 @@ async function releaseClaim({
 }
 
 /**
- * Drop a receipt nobody holds a claim on, by id.
- *
- * Unconditional, unlike {@link releaseClaim}, because the rows this collects
- * are ones no request is working under: a receipt past its expiry, and one
- * whose stored body can no longer be decrypted. Both are read on the way past
- * by whichever request presents the key next.
+ * Unconditional, unlike {@link releaseClaim}: these rows (expired, or
+ * undecryptable) have no request working under them.
  */
 async function discardReceipt({
   receipts,
@@ -742,13 +609,9 @@ async function discardReceipt({
 }
 
 /**
- * Whether the store refused this insert because the key was already taken.
- *
- * Duck-typed on the driver's own code rather than `instanceof`, for the reason
- * the REST port's constraint reader gives: a bundler can produce two copies of
- * the driver's error class, and a class check then answers false for a real
- * unique violation — which here would propagate as a 500 on exactly the retry
- * the key was sent to make safe.
+ * Duck-typed on the driver's own code, not `instanceof`: a bundler can
+ * produce two copies of the error class, and a class check would then miss
+ * a real violation.
  */
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -760,16 +623,8 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
- * The receipt ledger, bound to one process's receipt store and cipher.
- *
- * ONE ledger per process, and that is the whole reason this is a class rather
- * than four families each calling {@link withIdempotency} with their own
- * arguments: the claim, its heartbeat and its takeover window are a protocol
- * between concurrent requests, and two ledgers over the same table would give
- * a deployment two takeover clocks running against each other's claims.
- *
- * It satisfies {@link IdempotentRunner} exactly, which is the port every
- * packaged create takes, so a family needs neither a database nor a key.
+ * ONE ledger per process: two ledgers over the same table would run two
+ * takeover clocks against each other's claims. Satisfies {@link IdempotentRunner}.
  */
 export class IdempotencyLedger {
   static create(options: {

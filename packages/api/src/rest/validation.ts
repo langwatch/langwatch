@@ -1,20 +1,8 @@
 /**
- * The REST boundary's request validator.
- *
- * The Standard Schema validator does not throw when a request fails its
- * schema; without a hook it returns the result directly, and two things
- * follow. The route's `onError` never runs, so the failure answers in a shape
- * no consumer knows how to read — the CLI's reader finds no
- * `error`/`code`/`kind`, falls through to the status, and reports
- * `request_failed`, or `network_error` when the status is lost on the way. An
- * agent told "network_error" retries the identical broken request forever. And
- * the whole ZodError goes on the wire: one wrong enum value produces a
- * paragraph listing every permitted value, which is then truncated on its way
- * to the model, losing the only part worth having.
- *
- * This wrapper installs the hook and throws a typed error, so the ordinary
- * boundary machinery (ADR-045) takes it from there. The two errors it can
- * throw carry the rest of the reasoning, each above its own class.
+ * The Standard Schema validator doesn't throw on failure by default, so the
+ * route's `onError` (ADR-045) never runs and the whole ZodError goes on the
+ * wire, truncating the one actionable field. This wrapper installs the hook
+ * and throws a typed error instead.
  */
 
 import { HandledError, remediation } from "@langwatch/handled-error";
@@ -37,13 +25,9 @@ const TARGET_NOUN: Record<keyof ValidationTargets, string> = {
 const UNRECOGNIZED_KEYS = "unrecognized_keys";
 
 /**
- * One thing wrong with one part of the request.
- *
- * Deliberately not zod's own `ZodIssue`: schema failures are the common source
- * but not the only one. A route that validates a field against something a
- * schema cannot know — that a select path names a real column, that an id
- * belongs to this project — is reporting the same KIND of fact, and a caller
- * should not have to read two shapes to learn it.
+ * Deliberately not zod's own `ZodIssue`: a route validating something a
+ * schema can't know (a column name, a project-owned id) reports the same
+ * kind of fact in this one shape.
  */
 export interface FieldViolation {
   /** Dotted path to the offending value, e.g. `series.0.metric`. */
@@ -58,48 +42,10 @@ export interface FieldViolation {
 }
 
 /**
- * One violation, as a link in the `reasons` chain.
- *
- * A reason is a HandledError like any other, so `serialize()` renders it with
- * the same `code`/`meta`/nested-`reasons` shape as the error it hangs off —
- * there is no second serialisation path to keep in step.
- *
- * Exported so a route can build the identical `reasons` chain for a violation
- * it found itself, without going through `RequestValidationError` — useful
- * when the violation is real but `RequestValidationError`'s own `code` would
- * be misread by a caller that classifies by it.
- */
-/**
- * ── THE SHAPE ──────────────────────────────────────────────────────────────
- *
- * A short sentence, and the detail as structured `reasons` — one per zod
- * issue, modelled on Go's `cher.E`, which HandledError already mirrors
- * field-for-field:
- *
- *     HTTP 422
- *     { "error": "validation_error",
- *       "message": "The request body didn't match the expected shape.",
- *       "target": "json",
- *       "fields": ["series.0.metric"],
- *       "reasons": [
- *         { "code": "schema_failure",
- *           "meta": { "field": "series.0.metric",
- *                     "type": "invalid_enum_value",
- *                     "message": "Invalid enum value",
- *                     "expected": ["metadata.trace_id", "metadata.user_id"] } }
- *       ] }
- *
- * `meta.field` is the thing a caller can act on, and it survives truncation in
- * a way a prose paragraph does not.
- *
- * 422 and not 400: the request PARSED and the schema rejected it. The syntax
- * was fine, the semantics were not, and a caller can fix exactly the fields
- * named in `reasons` and retry.
- *
- * Exported so a route can build the identical `reasons` chain for a violation
- * it found itself, without going through `RequestValidationError` — useful
- * when the violation is real but `RequestValidationError`'s own `code` would
- * be misread by a caller that classifies by it.
+ * A reason is a HandledError like any other, so `serialize()` renders it
+ * with the same shape as the error it hangs off. `meta.field` survives
+ * truncation in a way a prose paragraph does not; 422 not 400 since the
+ * request PARSED and the schema rejected it.
  */
 export class SchemaFailure extends HandledError {
   constructor(violation: FieldViolation) {
@@ -118,11 +64,8 @@ export class SchemaFailure extends HandledError {
 }
 
 /**
- * The request parsed, and validation said no.
- *
- * Exported so a route can raise it for a check its schema could not express —
- * the alternative being an anonymous `HTTPException(400)`, which is what this
- * whole module exists to stop shipping.
+ * Exported so a route can raise this for a check its schema couldn't
+ * express, instead of an anonymous `HTTPException(400)`.
  */
 export class RequestValidationError extends HandledError {
   constructor(args: { target: keyof ValidationTargets; violations: readonly FieldViolation[] }) {
@@ -143,15 +86,8 @@ export class RequestValidationError extends HandledError {
 }
 
 /**
- * The typed refusal for a rejection raised outside {@link validator} — the
- * endpoint pipeline's own validators, and the path-parameter check the
- * date-namespace fallback runs for itself.
- *
- * There is one refusal for a rejected request, whatever raised it. Throwing a
- * bare zod error instead left the status and the code to whichever boundary
- * happened to be installed: `createErrorHandler` promoted it to 422, and a
- * family that had installed an `onError` of its own answered 500 for the same
- * request.
+ * One refusal for a rejected request, whatever raised it — a bare zod error
+ * left the status to whichever boundary happened to be installed.
  */
 export function requestValidationErrorFrom({
   target,
@@ -180,14 +116,9 @@ function violationOf(issue: ZodIssue, input: unknown): FieldViolation {
 }
 
 /**
- * The request never parsed, so no schema ever ran.
- *
- * 400 and not 422: there are no fields to name because there is no document.
- * Hono's own validator already raises this as an `HTTPException` before any
- * schema runs; we only give it a code so it stops arriving anonymous.
- *
- * Both this and a schema failure are the caller's fault (`fault: "customer"`)
- * and neither is retryable unchanged.
+ * 400, not 422: there are no fields to name because there is no document.
+ * Hono raises this as an `HTTPException` before any schema runs; this only
+ * gives it a code.
  */
 class MalformedRequestError extends HandledError {
   constructor(args: { target: keyof ValidationTargets; detail: string }) {
@@ -210,22 +141,14 @@ function fieldOf(issue: ZodIssue): string {
 }
 
 /**
- * What the schema wanted, when the issue knows.
- *
- * This is the part the prose form kept losing: an enum's permitted values are
- * the single most actionable fact in a validation failure, and inlining them in
- * a sentence is exactly what made that sentence long enough to be truncated.
- * As structured data they cost nothing to carry and can be listed by a UI.
+ * An enum's permitted values are the most actionable fact in a validation
+ * failure; as structured data they survive truncation a prose sentence didn't.
  */
 function expectationOf(issue: ZodIssue, input: unknown): Record<string, unknown> {
   if (issue.code === "invalid_value") {
-    // Zod stopped carrying the rejected value on the issue when it renamed
-    // invalid_enum_value, but the caller-facing contract did not: the MCP
-    // client renders `received` next to the permitted values. The raw
-    // candidate is in hand, so the value is read back off it — scalars only,
-    // because an enum's rejected value is one the caller typed, while an
-    // object landing here is a shape mistake whose dump belongs in no
-    // envelope.
+    // Zod stopped carrying the rejected value on this issue; read it back
+    // off the raw input instead — scalars only, an object here is a shape
+    // mistake that belongs in no envelope.
     const received = valueAt(input, issue.path);
     return {
       expected: [...issue.values],
@@ -238,12 +161,8 @@ function expectationOf(issue: ZodIssue, input: unknown): Record<string, unknown>
   if (issue.code === UNRECOGNIZED_KEYS) {
     return { unrecognized: issue.keys };
   }
-  // A refinement is zod's escape hatch, so its issues know nothing about what
-  // the schema wanted — but the schema often does (a catalog lookup no plain
-  // enum can express). A `superRefine` that adds its issue with
-  // `params: { expected, received }` gets the same structured channel enum
-  // failures get for free, so a caller reads ONE shape whichever kind of
-  // schema rejected the field.
+  // A `superRefine` issue with `params: { expected, received }` gets the
+  // same structured channel enum failures get, so a caller reads ONE shape.
   if (issue.code === "custom" && issue.params) {
     const params = issue.params as Record<string, unknown>;
     return {
@@ -361,18 +280,8 @@ function issuesOf(error: ValidationResult["error"]): ZodIssue[] {
 }
 
 /**
- * A request validator that fails the way the rest of the boundary fails.
- *
- * A drop-in for `hono-openapi`'s `validator`: it takes the same arguments,
- * carries the OpenAPI metadata the spec generator reads, and — because it is
- * declared AS that function's own type — preserves its inference exactly, so
- * `c.req.valid("json")` stays typed at every call site. Restating that
- * signature by hand would mean copying hono-openapi's internal `HasUndefined`
- * conditional, which the package does not export; borrowing the type is both
- * shorter and incapable of drifting from it.
- *
- * The single cast is the price of that borrowing: the implementation is written
- * against the loose runtime contract, and the exported binding declares the
- * precise one.
+ * A drop-in for `hono-openapi`'s `validator`, declared AS its own type so
+ * `c.req.valid("json")` stays typed. The cast is the price of borrowing a
+ * type the package doesn't export.
  */
 export const validator = build as unknown as typeof openApiValidator;

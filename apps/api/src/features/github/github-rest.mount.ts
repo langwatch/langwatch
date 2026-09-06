@@ -1,17 +1,6 @@
 /**
- * The API process's GitHub App installation door.
- *
- * Behaviour is package-owned (`@langwatch/github-server`); this supplies the
- * three answers the flow reaches that GitHub does not own — who is signed in,
- * whether that person may manage the organization they are connecting for, and
- * where the connection command is recorded.
- *
- * The pull-request backfill that runs after a successful install is supplied
- * from the SAME coding-agent application the `codingAgents.*` namespace reads,
- * so the branches an organization's own sessions already named are mapped the
- * moment the connection exists. It stays optional: on a process that composed
- * no coding-agent graph the linkage arrives with the periodic branch recheck
- * instead, which is later rather than not at all.
+ * Post-install PR backfill reuses `codingAgents.*`; without it composed,
+ * linkage arrives later via the periodic branch recheck instead.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { CodingAgentApp } from "@langwatch/coding-agent-server";
@@ -24,12 +13,9 @@ export type ApiGithubRestOptions = Readonly<{
   /** The SAME service the `github.*` tRPC namespace reads. */
   github: GithubService | undefined;
   /**
-   * How this process turns a request into a signed-in person.
-   *
-   * `undefined` where the deployment supplied no Better Auth transport, which
-   * is what makes the whole family absent: `/install` and `/setup` are both
-   * bound to a session, and `/webhook` alone is not a family — GitHub delivers
-   * to it only for an installation `/setup` recorded.
+   * `undefined` without a Better Auth transport, which makes the whole family
+   * absent: `/install` and `/setup` need a session, and `/webhook` alone
+   * (GitHub only delivers to it after `/setup`) is not a family.
    */
   session: ((request: Request) => Promise<{ id: string } | null>) | undefined;
   /** The AuthZ graph the organization-tier check runs on. */
@@ -44,13 +30,9 @@ export type ApiGithubRestOptions = Readonly<{
 }>;
 
 /**
- * Composes the GitHub REST ports, or none.
- *
- * `undefined` without the service, the session port or AuthZ. Absent beats
- * mounted at each of them: a `/setup` that cannot resolve a session cannot
- * re-bind the flow to the user who started it, and recording an installation
- * for a caller it cannot identify is the cross-tenant rebind the flow's whole
- * guard chain exists to prevent.
+ * `undefined` without the service, session port or AuthZ: a `/setup` that
+ * can't resolve a session can't re-bind the flow to its caller, which is the
+ * cross-tenant rebind the flow's guard chain exists to prevent.
  */
 export function composeApiGithubRest(options: ApiGithubRestOptions): GithubRestPorts | undefined {
   const { github, session, authz } = options;

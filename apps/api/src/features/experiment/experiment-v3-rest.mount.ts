@@ -1,30 +1,6 @@
 /**
- * This process's composition of the experiment workbench's ten REST doors
- * (`@langwatch/experiment-server`).
- *
- * The family owns the wire; what lives here is the graph it dispatches
- * through, and every part of that graph is one this process ALREADY composed
- * for its tRPC half: the same `ExperimentApp` the `experiments.*` namespace
- * answers from, the same run loop the workbench's own procedures start, the
- * same browser session the other authoring doors resolve a person with, and
- * the same project-credential port every handler-managed family reads a key
- * through.
- *
- * ## Two absences, both named rather than filled
- *
- * **The product-analytics signal.** The route this replaces fired an
- * `evaluation_ran` capture and a feature-adoption nurturing event when a run
- * finished. This process composes no product-analytics sink, so the port is
- * left out and the signal is not sent. Refusing instead would cost somebody
- * the run they just watched succeed — the same judgment the prompt library's
- * nurturing trail already records.
- *
- * **The run loop, where a deployment composed none.** `ApiExperimentRun`
- * already answers `ports: null` / `progress: null` on a process with no
- * progress store or no public origin, and the family turns that into a 503
- * naming the capability on the four run doors while the four workbench doors
- * keep answering. Mounting nothing would take the saved setup's read and write
- * away from a deployment that can serve them perfectly well.
+ * No analytics sink means `evaluation_ran` is intentionally dropped; no
+ * progress store means the run doors answer 503 rather than unregistering.
  */
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -44,12 +20,9 @@ import type {
 import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential";
 
 /**
- * The project credential these doors read.
- *
- * The RICHER of the process's two credential shapes, not the narrowed one the
- * other handler-managed families take: a run addressed by slug answers with a
- * link built from the PROJECT's slug, and a workbench write is attributed to
- * the person the key was minted for. Both come off the resolved token.
+ * The richer of the process's two credential shapes (not the narrowed one
+ * other handler-managed families take): a slug-addressed run needs the
+ * project's slug, and a workbench write needs the minting person.
  */
 export type ApiExperimentV3CredentialPort = (input: {
   request: Request;
@@ -66,12 +39,9 @@ export type ApiExperimentV3RestCollaborators = Readonly<{
 }>;
 
 /**
- * `/api/experiments/*` and its `/api/evaluations/v3/*` alias, bound to one
- * process.
- *
- * TWO apps, returned in the order they must be registered: the alias
- * re-dispatches INTO the canonical family, so it can neither be mounted
- * without it nor before it.
+ * `/api/experiments/*` and its `/api/evaluations/v3/*` alias. Returned in
+ * registration order: the alias re-dispatches into the canonical family, so
+ * it must be mounted after it.
  */
 export function mountExperimentV3Rest(options: {
   security: AppRestSecurity;

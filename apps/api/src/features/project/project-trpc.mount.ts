@@ -1,11 +1,7 @@
 /**
- * App-process transport mounts for the project vertical's two page surfaces.
- *
- * Behaviour is package-owned (`@langwatch/project-server`); these supply the
- * process's root, authenticated procedure, policy chain, and the two readers
- * the project does not own — recent activity, which walks the process's audit
- * trail and hydrates each entity it finds there, and the setup rollup, which
- * fans out across the nine verticals holding the evidence.
+ * Package-owned (`@langwatch/project-server`); adds the two readers it
+ * doesn't own — recent activity (walks the audit trail) and the setup
+ * rollup (fans out across the verticals holding the evidence).
  */
 import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import {
@@ -30,11 +26,8 @@ export function createHomeTrpcRouter<
 }
 
 /**
- * Mounts `integrationsChecks.*` on the app process's tRPC root.
- *
- * The port is forwarded untouched, and `TCheckStatus` is inferred from the
- * process's own reader, so the checklist reaches the client with the shape it
- * has always had rather than a narrowed copy of it.
+ * Mounts `integrationsChecks.*`. `TCheckStatus` is inferred from the
+ * process's own reader so the checklist keeps its real shape.
  */
 export function createIntegrationsChecksTrpcRouter<
   TContext extends IntegrationsChecksTrpcContext,
@@ -49,23 +42,8 @@ export function createIntegrationsChecksTrpcRouter<
 }
 
 /**
- * Mounts `project.*` on the app process's tRPC root.
- *
- * Two of its eight procedures need a policy the shared kit cannot build from a
- * permission alone, so this mount builds them from the process's own declared
- * check rather than from `createTrpcApiService`'s `policy`:
- *
- *  - `create` names two tiers and acts on exactly one, decided by what was
- *    asked for. Creating INTO a team asks that team for `project:create`;
- *    creating a team alongside asks the organization for
- *    `organization:manage`. Neither fixed tier could express it, so the
- *    declaration is `kind: "custom"` and the runtime resolves the tier from
- *    the validated input.
- *  - `update` runs at `project:update`, except that flipping
- *    `traceSharingEnabled` also demands `project:manage` — it changes who
- *    OUTSIDE the project may read its traces. That second demand sits AFTER
- *    the declared check, exactly where the platform router chained it, so a
- *    caller is placed by RBAC first and refused by the sharing rule second.
+ * `create` resolves its permission tier at runtime (team vs org).
+ * `traceSharingEnabled` adds `project:manage` AFTER `project:update`.
  */
 export function createProjectTrpcRouter<
   TContext extends ProjectTrpcContext,
@@ -102,11 +80,9 @@ export function createProjectTrpcRouter<
 type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
 
 /**
- * The two data-dependent gates the project surface needs, already built.
- *
- * Middlewares rather than descriptions, for the reason `declaredCheckFrom`
- * refuses to build a custom check from a description: each one CLAIMS what
- * enforces the scope, and a claim has to be written where the enforcement is.
+ * Middlewares, not descriptions: `declaredCheckFrom` refuses to build a
+ * custom check from one, since the claim of what enforces the scope has to
+ * be written where the enforcement runs.
  */
 export type ProjectTrpcChecks = Readonly<{
   /** `project.create`'s own `kind: "custom"` declaration and its resolution. */

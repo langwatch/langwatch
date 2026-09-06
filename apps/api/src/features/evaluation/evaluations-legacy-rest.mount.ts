@@ -1,38 +1,6 @@
 /**
- * This process's composition of the packaged legacy evaluation REST family
- * (`@langwatch/evaluation-server`).
- *
- * Six routes moved with the family and all six are mounted here, each on the
- * collaborators its own half needs.
- *
- * **The evaluator catalogue serves.** `GET /api/evaluations/list` is the same
- * compiled-in list for every caller with no project data in it, so it needs
- * nothing this process might not have.
- *
- * **The batch result log serves where the run writer is composed.** It
- * resolves the experiment its rows belong to through the SAME
- * `ExperimentFindOrCreateService` `POST /api/experiment/init` resolves one
- * with — one construction on this process, handed to both — which is what
- * stops an SDK's `experiment_slug` naming one experiment on the door that
- * creates it and a second on the door it reports to. Its other two
- * collaborators travel with it because they are one write: the run history is
- * addressed by the experiment the first half resolved, so a process that could
- * resolve one but not record against it would answer 200 to rows nobody can
- * read back.
- *
- * **The four evaluate doors serve where the evaluator RUNTIME is composed.**
- * That is the thing which calls langevals, a workflow or a model and returns a
- * verdict, and it is `api-evaluator-execution.composition.ts` — the SAME engine
- * the gateway's inline guardrail check and the studio's own re-score run on. A
- * process without it leaves all four unregistered rather than authenticating,
- * validating and then failing at the last step, which is a door an SDK retries
- * forever.
- *
- * The two row reads below go to Prisma directly rather than through a service,
- * and that is transcribed rather than chosen: neither `MonitorService` nor
- * `DatasetService` answers a lookup by slug that may miss — the first has no
- * slug lookup at all and the second throws where the row is absent, and these
- * doors answer a 404 body an SDK already parses.
+ * Shares `ExperimentFindOrCreateService` with `POST /api/experiment/init` so
+ * an SDK's `experiment_slug` can't resolve to different experiments.
  */
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import {

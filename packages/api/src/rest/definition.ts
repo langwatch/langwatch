@@ -25,16 +25,8 @@ export type OutputDeclared = { readonly [outputDeclared]: true };
 /** @internal Type-state marker produced only by `.withParams(...)`. */
 export type ParamsDeclared = { readonly [paramsDeclared]: true };
 
-// ---------------------------------------------------------------------------
-// The definition chain (ADR 001 §3)
-//
-// The chain is the only extension point: a new capability is a new chain call
-// and never changes a registration signature. Three facades share one
-// implementation — the facade an author sees depends on the registration
-// method, so an SSE chain does not offer `withInput` and a public REST chain
-// does not offer `withParams`. The asserts in the builder re-check the same
-// rules at registration for callers the types cannot reach.
-// ---------------------------------------------------------------------------
+// The definition chain (ADR 001 §3): the only extension point. Three facades
+// share one implementation, gated by which methods each interface exposes.
 
 /** Chain calls that can also be declared as service or group defaults. */
 export interface DefaultsChain {
@@ -80,10 +72,8 @@ export interface RouteChain extends DefaultsChain {
   /** JSON body schema. */
   withInput(schema: ApiSchema): this & InputDeclared;
   /**
-   * Hand the handler the request body unparsed, as `input.body`. For the
-   * surfaces whose body IS the evidence — a webhook signature is computed over
-   * exact bytes, a protobuf payload is not JSON — where parsing first and
-   * re-serialising later cannot reproduce what was signed.
+   * Hands the handler the raw body as `input.body`, for surfaces whose body
+   * IS the evidence (a webhook signature, a protobuf payload).
    */
   withRawBody(as: "bytes" | "text", options?: { contentType?: string }): this & InputDeclared;
   /**
@@ -126,17 +116,9 @@ export interface RestEndpointDefaults extends Omit<
 }
 
 /**
- * Whether an endpoint has declared everything the framework must know.
- *
- * Input and output are deliberately NOT required. What they gate is the shape
- * of the handler (see {@link RestEndpointHandler}): declaring neither is a
- * complete declaration for an endpoint that takes nothing and answers nothing,
- * and it used to force a pair of schemas that said exactly that at length.
- *
- * What remains mandatory is every decision a reader would otherwise have to
- * infer from the handler body: the access policy, the rate limit and the
- * resource limit, each with an explicit opt-out that has to be justified in
- * writing.
+ * Input/output are NOT required — declaring neither is complete for an
+ * endpoint taking and answering nothing. Access policy, rate limit and
+ * resource limit are mandatory, each with a justified opt-out.
  */
 type RestReady<
   TPermission extends boolean,
@@ -151,13 +133,9 @@ type RestReady<
   : false;
 
 /**
- * Whether the permission is anchored to the scope the input names.
- *
- * True when the input declares no scope id — the credential's own scope is
- * then the only thing the request is about — or when `.withPermission()` bound
- * one explicitly. An endpoint that names a `projectId` and never says the
- * permission is about THAT project is the cross-tenant case, and it does not
- * compile.
+ * True when input declares no scope id, or `.withPermission()` bound one
+ * explicitly. An endpoint naming a `projectId` with no scoped permission is
+ * the cross-tenant case — it does not compile.
  */
 type ScopeBound<TInput extends z.ZodObject | undefined, TScopeBound extends boolean> = [
   ScopeIdsIn<TInput>,
@@ -166,24 +144,16 @@ type ScopeBound<TInput extends z.ZodObject | undefined, TScopeBound extends bool
   : TScopeBound;
 
 /**
- * What a handler may answer with.
- *
- * No declared output means the endpoint answers nothing, so returning a value
- * is a compile error rather than a value silently dropped before
- * serialization. Stated from the other side: returning something REQUIRES
- * `.withOutput()`, because the schema is what validates and documents it.
+ * No declared output means returning a value is a compile error, not a
+ * value silently dropped before serialization.
  */
 export type RestHandlerResult<TOutput extends z.ZodType | undefined> = TOutput extends z.ZodType
   ? z.input<TOutput> | Promise<z.input<TOutput>>
   : void | Promise<void>;
 
 /**
- * The handler an endpoint's declarations imply.
- *
- * A handler is given input only when input was declared, so it cannot read
- * something that was never validated — and an endpoint that takes nothing
- * stops needing a schema to say so. The result follows `.withOutput()` the
- * same way.
+ * A handler gets input only when input was declared, so it can't read
+ * something that was never validated.
  */
 export type RestEndpointHandler<
   TApp,
@@ -197,12 +167,8 @@ export type RestEndpointHandler<
   : (context: ServiceContext<Record<string, unknown>, TApp>) => RestHandlerResult<TOutput>;
 
 /**
- * The input fields that name a tenant scope.
- *
- * An endpoint carrying one of these is answering about a scope the REQUEST
- * named, which is not necessarily the scope the CREDENTIAL resolved to. When
- * they differ and nothing compares them, a caller reads another tenant's data
- * holding a permission they genuinely have.
+ * A REQUEST-named scope, not necessarily the CREDENTIAL's scope. Unchecked,
+ * a caller reads another tenant's data with a permission they genuinely hold.
  */
 export type ScopeIdKey = "projectId" | "teamId" | "organizationId" | "userId";
 
@@ -266,25 +232,17 @@ export interface RestEndpoint<
   /** HTTP status code for successful responses (default: 200, or 204 with no body). */
   withStatus(status: ContentfulStatusCode): this;
   /**
-   * The permission the framework enforces, and the scope it is about.
-   *
-   * When the input names a tenant scope (`projectId`, `teamId`,
-   * `organizationId`, `userId`), the second argument is REQUIRED and must name
-   * one of those fields: the check then reads the scope from validated input
-   * rather than assuming the credential's own. Endpoints whose input names no
-   * scope take the one-argument form and are checked against the credential.
+   * When input names a tenant scope, the second argument is REQUIRED and
+   * must name that field. No scope in the input means the one-argument form,
+   * checked against the credential.
    */
   withPermission(
     permission: AuthzPermission,
     ...anchor: [ScopeIdsIn<TInput>] extends [never] ? [] : [scope: PermissionScope<TInput>]
   ): RestEndpoint<TApp, TInput, TOutput, true, TRateLimit, TResourceLimit, THandled, true>;
   /**
-   * Anchors an INHERITED permission to the scope this endpoint's input names.
-   *
-   * A service may declare the permission once as a default, in which case the
-   * endpoint never calls `.withPermission()` and has nowhere to say which of
-   * its own input fields the check is about. This is that seam. An endpoint
-   * declaring its own permission binds the scope there instead.
+   * Anchors an INHERITED (service-default) permission to this endpoint's
+   * own scope, since it never calls `.withPermission()` itself.
    */
   withPermissionScope(
     scope: ScopeIdsIn<TInput>,
@@ -524,10 +482,8 @@ export function collectDef<TChain = ChainBuilder>(
 // ---------------------------------------------------------------------------
 
 /**
- * Merges definition levels into the effective endpoint definition. A
- * re-declaration closer to the endpoint wins; middleware stacks service first,
- * group second, endpoint last; `withoutCache` / `withoutRateLimit` opt-outs are
- * resolved here, so the result only carries capabilities that actually apply.
+ * A re-declaration closer to the endpoint wins; middleware stacks service,
+ * group, endpoint; opt-outs are resolved here.
  */
 export function mergeDefs(...levels: RawEndpointDef[]): EndpointDef {
   const middleware: MiddlewareHandler[] = [];
@@ -558,11 +514,7 @@ export function mergeDefs(...levels: RawEndpointDef[]): EndpointDef {
 
 const DATE_VERSION_SEGMENT_RE = /^20\d{2}-\d{2}-\d{2}$/;
 
-/**
- * A REST route path starts with "/" and cannot squat on the version namespace.
- * SSE names never reach this assert — their grammar is checked by
- * `assertSseName` on the full dotted name.
- */
+/** A REST route path starts with "/" and cannot squat on the version namespace. */
 export function assertRoutePath(path: string): void {
   if (path !== "" && !path.startsWith("/")) {
     throw new Error(`Endpoint path must start with "/"; received "${path}"`);
@@ -578,12 +530,7 @@ export function assertRoutePath(path: string): void {
   }
 }
 
-/**
- * An SSE stream is named, not pathed: dotted lower-camelCase segments, at
- * least one dot, no leading slash and no path parameters. The name becomes the
- * mounted path verbatim, so the grammar is checked here rather than by
- * `assertRoutePath`, which only ever sees a REST path.
- */
+/** An SSE stream is named, not pathed: dotted lower-camelCase, at least one dot. */
 const SSE_NAME_RE = /^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/;
 
 export function assertSseName(name: string): void {
@@ -730,19 +677,10 @@ export function routeParameterNames(path: string): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * An endpoint answers ONE success status, fixed here rather than per request.
- *
- * `serializeEndpointResult` used to read the handler's return value to choose:
- * a declared `output` that parsed `undefined` answered 204 while a value
- * answered 200, so one operation could return either depending on what it
- * found — and callers, the published document and the SDKs all have to pick
- * one. An `output` schema that accepts `undefined` is what makes that
- * reachable, so it is refused at registration.
- *
- * The honest shapes remain: declare a required `output` and always answer
- * `status ?? 200`, or declare `z.void()` and always answer `status ?? 204`.
- * Every route declares an output — `assertRouteDef` refuses one that does
- * not — so neither shape can be opted out of.
+ * An endpoint answers ONE success status, fixed here rather than per
+ * request. An `output` schema that accepts `undefined` alongside a value
+ * would let the status depend on what the handler returned, so it's refused
+ * at registration.
  */
 export function assertStatusInvariant({
   method,
@@ -761,12 +699,8 @@ export function assertStatusInvariant({
   // A schema that rejects `undefined`: the body is always present and the
   // endpoint always answers 200.
   if (!parsed.success) return;
-  // A schema that ACCEPTS `undefined` and parses it into a value —
-  // `.default(...)`, `.catch(...)`. The status still cannot move, because
-  // `serializeEndpointResult` branches on what the schema produced, not on what
-  // it accepted, and it never produces `undefined` here. Testing acceptance
-  // instead of the parsed value refused these at registration for a status
-  // ambiguity they do not have.
+  // Accepts `undefined` but parses it into a value (`.default()`, `.catch()`)
+  // — the status still can't move, since it never produces `undefined` here.
   if (parsed.data !== undefined) return;
 
   // What is left accepts `undefined` AND a value, and yields `undefined` for
@@ -782,16 +716,9 @@ export function assertStatusInvariant({
 }
 
 /**
- * True for the schemas whose ONLY accepted value is `undefined`, which declare
- * an endpoint that never sends a body.
- *
- * Read off zod's internal type tag deliberately: probing with sample values
- * cannot tell `z.undefined()` from `z.object({ id: z.string() }).optional()`,
- * since both reject every probe a caller could think to try — `{}` included.
- *
- * Zod 4 exposes the exact type tag as `_def.type`. Reading the tag is necessary
- * because probing cannot distinguish `z.void()` from an optional value schema:
- * both accept `undefined`, but only the former declares a bodyless endpoint.
+ * Reads zod's internal type tag rather than probing sample values, which
+ * can't tell `z.undefined()` from an optional object schema — both reject
+ * every probe.
  */
 export function isNoBodySchema(output: ApiSchema): boolean {
   const def = (output as { _def?: { type?: string } })._def;

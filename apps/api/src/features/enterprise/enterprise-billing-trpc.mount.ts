@@ -1,22 +1,6 @@
 /**
- * App-process transport mount for the two Enterprise billing tRPC surfaces.
- *
- *   subscription.*  the paid plan an organization is on, and the checkout and
- *                   quote behind changing it
- *   currency.*      the currency a visitor is quoted in
- *
- * Both are SaaS-only, and both are MOUNTED either way. That is the difference
- * from serving nothing: a client asking what this deployment charges has to be
- * able to tell "this installation does not bill" from "the call failed", and a
- * namespace that simply is not there tells it neither. `saasBilling` false
- * yields an empty router of the served type — the same construction
- * `EnterpriseTrpcComposition` uses, restated here because this process mounts
- * these two and not the four that composition also builds.
- *
- * A self-hosted installation therefore answers "no such procedure" for each
- * verb while still carrying the namespace, rather than guessing a currency from
- * CDN headers only the hosted edge injects, or pretending to hold a Stripe
- * customer it never created.
+ * SaaS-only, but always mounted (empty router when `saasBilling` is false)
+ * so self-hosted answers "no such procedure" rather than 404.
  */
 import {
   CurrencyTrpcApi,

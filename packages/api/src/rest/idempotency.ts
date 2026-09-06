@@ -1,18 +1,7 @@
 /**
- * The wire half of `Idempotency-Key`: the header names, the key bounds, how a
- * key is read off a request, and how an outcome is written back.
- *
- * The ledger itself — the receipt table, the claim heartbeat, the encrypted
- * stored body — stays in the process that owns a database and an encryption
- * key, and reaches a packaged REST family as an injected port. What lives here
- * is everything a family needs to DECLARE the behaviour: the OpenAPI parameter
- * and response header a create documents, which the spec generator has to be
- * able to build with no process at all, and the response writer that marks a
- * replay.
- *
- * One definition, because the two halves have to agree: the sentence the
- * document publishes quotes the same bounds the reader enforces, so a caller
- * cannot be told 8-255 and refused at 8.
+ * The wire half of `Idempotency-Key`. The ledger itself stays in the owning
+ * process and reaches a family as an injected port; this is what a family
+ * needs to DECLARE the behaviour without one.
  */
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -25,23 +14,13 @@ export const IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 /** Set on a response that was served from a receipt rather than re-executed. */
 export const IDEMPOTENT_REPLAY_HEADER = "X-Idempotent-Replay";
 
-/**
- * The key length bounds. The floor is there because a short key is not
- * plausibly unique, and a caller who reuses one across genuinely different
- * requests gets 409s instead of the creates they wanted. The ceiling is the
- * usual header-value hygiene.
- */
+/** The key length bounds: floor guards against implausibly short reused keys. */
 export const MIN_KEY_LENGTH = 8;
 export const MAX_KEY_LENGTH = 255;
 
 /**
- * Reads the key a caller sent, or null when they sent none.
- *
- * A missing header is not an error: the routes behave exactly as they did
- * before this module existed, and write no receipt at all. A header that IS
- * present but unusable is refused rather than ignored, including when it trims
- * to nothing, because a caller who sent one believes their retry is protected
- * and would otherwise find out from a duplicate row.
+ * A missing header writes no receipt. A present-but-unusable one is refused,
+ * not ignored — a caller who sent one believes their retry is protected.
  */
 export function readIdempotencyKey(raw: string | undefined | null): string | null {
   if (raw === undefined || raw === null) return null;
@@ -66,10 +45,8 @@ export function readIdempotencyKey(raw: string | undefined | null): string | nul
 }
 
 /**
- * The handler ran: the response it wrote, and the status that response carries.
- *
- * The whole `Response` travels back so the route answers with the very bytes
- * the ledger stored, rather than serialising the same value a second time.
+ * The whole `Response` travels back so the route answers with the exact
+ * bytes the ledger stored, not a re-serialization.
  */
 export interface IdempotentExecuted {
   isReplayed: false;
@@ -78,10 +55,8 @@ export interface IdempotentExecuted {
 }
 
 /**
- * The handler did not run: the exact bytes the first execution answered with.
- *
- * Carried as a string rather than a parsed object so the replay cannot differ
- * from the original by so much as a key order.
+ * A string, not a parsed object, so a replay can't differ from the original
+ * by so much as a key order.
  */
 export interface IdempotentReplayed {
   isReplayed: true;
@@ -92,11 +67,8 @@ export interface IdempotentReplayed {
 export type IdempotentOutcome = IdempotentExecuted | IdempotentReplayed;
 
 /**
- * The ledger a packaged create dispatches through.
- *
- * `withIdempotency` in the application supplies this, already bound to the
- * process's receipt store; a family takes it as a port so the family itself
- * needs neither a database nor an encryption key.
+ * A family takes this as a port so it needs neither a database nor an
+ * encryption key itself.
  */
 export type IdempotentRunner = (input: {
   /**
@@ -119,10 +91,8 @@ export type IdempotentRunner = (input: {
 }) => Promise<IdempotentOutcome>;
 
 /**
- * The `Idempotency-Key` request header, as the creates document it.
- *
- * Spelled once so the docs cannot drift from the behaviour: the bounds come
- * from the same constants the validator enforces.
+ * Spelled once so the docs can't drift from the same bounds the validator
+ * enforces.
  */
 export const idempotencyKeyParameter = {
   name: IDEMPOTENCY_KEY_HEADER,
@@ -154,13 +124,9 @@ export const idempotentReplayHeaders = {
 } as const;
 
 /**
- * Write the outcome, flagging the ones that were replayed.
- *
- * That header is the only thing telling a replay apart from the original: the
- * status and the body are identical by design, so without it a caller cannot
- * know whether its retry created the resource or found it already made. It is
- * absent rather than `false` on a first execution, so its presence alone is
- * the signal.
+ * The replay header is the only thing telling a replay apart from the
+ * original (status/body are identical by design). Absent, not `false`, on
+ * a first execution — presence alone is the signal.
  */
 export function idempotentJson({
   c,

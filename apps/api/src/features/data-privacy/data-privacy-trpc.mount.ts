@@ -1,19 +1,6 @@
 /**
- * App-process transport mount for the scoped privacy rules.
- *
- * Behaviour is package-owned (`@langwatch/data-privacy-server`); this supplies
- * the process's root, authenticated procedure, policy chain, the readers and
- * writers the feature does not own, and the two resolver-authorized checks the
- * writes are declared with.
- *
- * Those two checks are passed as MIDDLEWARES rather than as declarations this
- * file restates. What each one claims is which assertion enforces the project
- * id, and both assertions are the application's — they resolve the scope's
- * owning organization out of the process's own tables and probe the permission
- * that tier demands. A declaration is a claim the sweep counts as coverage, so
- * it has to be written where the enforcement is; `createTrpcApiService`'s
- * `custom` exists for exactly this, wrapping a check the caller hands over
- * already built.
+ * The two project-id checks pass as MIDDLEWARES, not declarations, so the
+ * sweep counts coverage where enforcement actually runs.
  */
 import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import {
@@ -35,11 +22,8 @@ export type DataPrivacyTrpcChecks = Readonly<{
 }>;
 
 /**
- * Mounts `dataPrivacy.*` on the app process's tRPC root.
- *
- * `TSnapshot` and `TPolicy` are inferred from the process's own readers, so
- * the settings snapshot and the written rule reach the client with the shapes
- * they have always had rather than narrowed copies of them.
+ * Mounts `dataPrivacy.*` on the tRPC root. `TSnapshot`/`TPolicy` are inferred
+ * from the process's own readers so responses keep their real shapes.
  */
 export function createDataPrivacyTrpcRouter<
   TContext extends DataPrivacyTrpcContext,

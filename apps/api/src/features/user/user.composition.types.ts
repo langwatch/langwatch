@@ -1,11 +1,4 @@
-/**
- * ComposedUserFeature, apart from the composition that builds it.
- *
- * The record type names this feature's application and its router; the
- * composition beside it opens repositories, adapters and byte stores. Every
- * program that only names `AppRouter` reaches this record, so the two live in
- * separate modules and the type's module imports no adapter.
- */
+/** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { UserApp, IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";

@@ -1,37 +1,9 @@
 /**
- * The one place a process's tRPC feature mount is composed.
- *
- * A feature package owns its procedure names, input parsers and delegation,
- * and states each procedure's access decision as an `AuthzDeclaration`. It
- * does NOT own tracing, logging, error translation, scope-lineage, the
- * authorization check or the audit trail — those are the process's, and this
- * is where the process's concrete middlewares are put in the one order that
- * works.
- *
- * The mount that joins the two is the same three things in every vertical: the
- * process's one tRPC root, the procedure a feature builds on, and the policy
- * chain applied around it. `createTrpcApiService` builds that chain once, so a
- * vertical's mount is the feature's `create` call and nothing else — the same
- * shape as `createRestService` on the REST side.
- *
- * ## The ordering rule that fails silently
- *
- * tRPC appends middleware at the point it is added, and runs them in that
- * order. A check installed BEFORE `.input()` sees `input === undefined`. So
- * the policy is a function a feature applies to an ALREADY-parsed procedure:
- *
- *     policy(declaration)(procedure.input(schema)).mutation(...)
- *
- * Composed the other way round the authorization check reads no scope id, the
- * scope-lineage guard compares nothing, and the audit row lands with no
- * arguments, no project and no organization. Nothing reports an error, which
- * is exactly why the composition lives in one module instead of being
- * repeated per mount.
- *
- * The scope-lineage guard sits AHEAD of the check on purpose: a request that
- * mixes scope ids across organizations is refused before any declaration —
- * declared, custom, or opted out — can pass on one id while the handler acts
- * on another.
+ * A feature owns procedure names, input parsers and its `AuthzDeclaration`;
+ * the process owns tracing, auth, scope-lineage and audit middlewares in one
+ * fixed order. The policy MUST apply to an already-parsed procedure —
+ * `policy(declaration)(procedure.input(schema))` — since a check installed
+ * before `.input()` sees `input === undefined` with no error reported.
  */
 import {
   authzDeclarationOf,
@@ -41,17 +13,12 @@ import {
 } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-/**
- * The `.use()` surface every tRPC procedure builder shares. Named at the one
- * seam that applies process middlewares to a builder whose input generics
- * belong to a feature package, so nothing here needs `any`.
- */
+/** The `.use()` surface every tRPC procedure builder shares, so nothing here needs `any`. */
 type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
 
 /**
- * The app's own middlewares, passed in rather than imported: they are built on
- * the app's tRPC root and typed against the app's request context, neither of
- * which this package owns.
+ * Passed in, not imported: built on the app's tRPC root and request context,
+ * neither of which this package owns.
  */
 export type AppTrpcPolicyMiddlewares = Readonly<{
   tracer: unknown;
@@ -59,11 +26,7 @@ export type AppTrpcPolicyMiddlewares = Readonly<{
   handledError: unknown;
   /** Refuses a request whose scope ids do not share one organization. */
   scopeLineageGuard(declaration: AuthzDeclaration): unknown;
-  /**
-   * The declared access check for one declaration. Carries the machine
-   * readable declaration the router sweep reads, which is what keeps a
-   * package-owned procedure DECLARED rather than merely unchecked.
-   */
+  /** Carries the machine-readable declaration the router sweep reads. */
   declaredCheck(declaration: AuthzDeclaration): unknown;
   /** The fail-closed backstop: refuses a procedure no check ever ran on. */
   enforceCheck: unknown;
@@ -71,10 +34,7 @@ export type AppTrpcPolicyMiddlewares = Readonly<{
   auditMutations: unknown;
 }>;
 
-/**
- * One declaration's policy, as the feature packages consume it. Applied by the
- * feature AFTER its own input parser — see the ordering rule above.
- */
+/** Applied by the feature AFTER its own input parser — see the ordering rule above. */
 export type AppTrpcPolicy = (
   declaration: AuthzDeclaration,
 ) => <TProcedure>(procedure: TProcedure) => TProcedure;
@@ -113,14 +73,9 @@ export function appTrpcPolicyAny(middlewares: AppTrpcPolicyMiddlewares) {
 }
 
 /**
- * The `noPermission({ reason, allow })` shape: authenticated and deliberately
- * unchecked, with every scope id the input accepts allowed by name and reason.
- *
- * For a surface where no permission exists to check — a personal API key
- * belongs to its owner — and the handler proves the caller's standing itself.
- * The declaration is what keeps such a procedure reviewable rather than merely
- * unchecked, and the app's `declaredCheck` still refuses any scope id the
- * declaration does not name.
+ * Authenticated and deliberately unchecked, for a surface with no permission
+ * to check — the handler proves standing itself. `declaredCheck` still
+ * refuses any scope id not named by the declaration.
  */
 export function appTrpcNoPermissionPolicy(middlewares: AppTrpcPolicyMiddlewares) {
   const policy = declaredPolicy(middlewares);
@@ -133,18 +88,9 @@ export function appTrpcNoPermissionPolicy(middlewares: AppTrpcPolicyMiddlewares)
 }
 
 /**
- * The `serviceAuthorized({ reason, permissions, enforces })` shape: the scope is
- * data the handler or resolver loads at runtime, so it performs the real
- * authorization and the declaration records why plus which permissions it
- * enforces.
- *
- * This only moves WHERE the check happens, never whether one does — the
- * process's fail-closed backstop still refuses a procedure no check ran on.
- *
- * `enforces` names, per scope field, WHAT in the resolver enforces it. It has
- * to travel: the sweep counts a claimed field as covered, so a procedure whose
- * input carries a required scope id and whose claims were dropped on the way
- * through reads as unchecked and fails CI.
+ * For a scope the resolver loads at runtime; the fail-closed backstop still
+ * refuses a procedure no check ran on. `enforces` must travel — the sweep
+ * counts a claimed field as covered, so a dropped claim fails CI.
  */
 export function appTrpcServiceAuthorizedPolicy(middlewares: AppTrpcPolicyMiddlewares) {
   const policy = declaredPolicy(middlewares);
@@ -162,13 +108,9 @@ export function appTrpcServiceAuthorizedPolicy(middlewares: AppTrpcPolicyMiddlew
 }
 
 /**
- * The same chain around a check the feature hands over ALREADY BUILT.
- *
- * `declaredCheckFrom` deliberately refuses `kind: "custom"`: a custom check IS
- * its own middleware, written where the rule lives, so the process passes the
- * middleware rather than a description of it. The lineage guard still reads
- * that middleware's own declaration, so a custom check is wrapped exactly like
- * a declared one and is never quietly unguarded.
+ * `declaredCheckFrom` refuses `kind: "custom"` — a custom check IS its own
+ * middleware — but the lineage guard still reads its declaration, so it's
+ * never quietly unguarded.
  */
 export function appTrpcCustomPolicy(middlewares: AppTrpcPolicyMiddlewares) {
   return (check: unknown) =>
@@ -216,10 +158,8 @@ export type TrpcApiMount<
 }>;
 
 /**
- * The process's PUBLIC procedure, for the handful of surfaces that are
- * deliberately reachable without a session. Intersected onto a mount rather
- * than made optional on it, so a feature that requires one cannot be mounted
- * from a process that never supplied it.
+ * Intersected onto a mount, not made optional, so a feature requiring the
+ * public procedure can't be mounted from a process that never supplied one.
  */
 export type TrpcApiPublicMount<
   TContext extends object,
@@ -229,24 +169,15 @@ export type TrpcApiPublicMount<
   publicProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
 }>;
 
-/**
- * The capabilities a feature package does not own, forwarded untouched. Kept
- * as its own intersection so a vertical generic over its port types — the
- * concrete return types are what the client sees — states them once.
- */
+/** Capabilities a feature doesn't own, forwarded untouched. */
 export type TrpcApiPorts<TPorts> = Readonly<{ ports: TPorts }>;
 
 /** One procedure, wrapped in the process's policy chain. */
 type TrpcApiPolicyDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
 
 /**
- * Everything the process supplies to a feature's `<Feature>TrpcApi.create`,
- * built once from a mount.
- *
- * Every policy shape is present whether or not a given feature asks for one:
- * the value is not an object literal, so the extra keys are invisible to the
- * feature's own procedures type, and the alternative is a mount having to know
- * which shape its package declared.
+ * Every policy shape is present whether or not a feature asks for one — the
+ * alternative is a mount having to know which shape its package declared.
  */
 export type TrpcApiService<
   TContext extends object,
@@ -256,11 +187,8 @@ export type TrpcApiService<
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
-   * The policy for one procedure, applied AFTER the feature's input parser.
-   *
-   * Takes a permission or a whole declaration, because that is what the
-   * feature contracts ask for: most name one permission, and the ones whose
-   * access rule is not a single permission state the declaration outright.
+   * Applied AFTER the feature's input parser. Takes a permission or a whole
+   * declaration, matching what feature contracts ask for.
    */
   policy(access: AuthzPermission | AuthzDeclaration): TrpcApiPolicyDecorator;
   /** Any one of the permissions is enough; the denial names the first. */
@@ -285,10 +213,8 @@ export type TrpcApiService<
 }>;
 
 /**
- * The same service, for a mount that also supplies the process's PUBLIC
- * procedure. The two are one factory with two overloads rather than two
- * functions: a mount author writes `createTrpcApiService(mount)` and gets back
- * exactly what its mount declared.
+ * One factory with two overloads, not two functions: a mount author writes
+ * `createTrpcApiService(mount)` and gets back what its mount declared.
  */
 export type TrpcApiPublicService<
   TContext extends object,
@@ -298,19 +224,8 @@ export type TrpcApiPublicService<
   Readonly<{ public: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"] }>;
 
 /**
- * Builds the process side of a feature mount: the procedures the feature may
- * build on and every policy shape, composed from the process's middlewares in
- * the one order that works.
- *
- * A vertical's whole mount becomes the feature's own `create` call:
- *
- *     export function createShareTrpcRouter<
- *       TContext extends ShareTrpcContext,
- *       TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
- *       TRoot extends AnyTRPCRootTypes,
- *     >(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
- *       return ShareTrpcApi.create(mount.root, createTrpcApiService(mount));
- *     }
+ * Builds the process side of a feature mount, so a vertical's whole mount
+ * becomes the feature's own `create` call.
  */
 export function createTrpcApiService<
   TContext extends object,

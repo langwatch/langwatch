@@ -1,28 +1,6 @@
 /**
- * App-process transport mounts for the model-provider vertical: the stored
- * provider credentials a project executes against, and the custom cost rules
- * that price the spans those providers produce.
- *
- * Behaviour is package-owned (`@langwatch/model-provider-server`); these supply
- * the process's tRPC root, its authenticated procedure, its policy chain, and
- * the capabilities the feature does not own — the outbound credential probes,
- * the Codex device flow, the audit trail, and the cost rule's live span
- * preview.
- *
- * Both surfaces carry authorization shapes a single permission cannot express,
- * and both arrive here as already-built middlewares rather than as
- * descriptions:
- *
- *  - a provider write may name EITHER a project or an organization, so the
- *    tenant anchor is data-dependent;
- *  - the credential probe goes straight out to the vendor with caller-supplied
- *    keys, so whatever gate sits on it IS the authorization rather than a
- *    coarse pre-filter;
- *  - a cost-rule write authorizes against a scope the resolver loads.
- *
- * `declaredCheckFrom` deliberately refuses `kind: "custom"` — a custom check IS
- * its own middleware, written where the rule lives — which is why the first two
- * ride the process's `custom` chain and the third its `serviceAuthorized` one.
+ * Provider writes and the credential probe have data-dependent tenant
+ * anchors, so both arrive as middlewares on the `custom` chain.
  */
 import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import type { EnforcedScopeFields } from "@langwatch/authz-contract";
@@ -43,10 +21,8 @@ import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
  */
 export type ModelProviderTrpcChecks = Readonly<{
   /**
-   * The gate for a provider write that may arrive with either handle: the
-   * project permission when a project is named, organization membership
-   * otherwise. What the caller may actually write is then decided per scope
-   * inside the service.
+   * Project permission when a project is named, org membership otherwise;
+   * the service decides what the caller may write per scope.
    */
   tenantWrite(permission: "project:update" | "project:delete"): unknown;
   /**

@@ -1,31 +1,6 @@
 /**
- * App-process transport mount for the four Enterprise tRPC surfaces this
- * process serves.
- *
- *   license.*             the signed instance licence and its single sign-on gate
- *   licenseEnforcement.*  the seat and resource limits that licence carries
- *   scimToken.*           the directory-sync credentials an organization mints
- *   ssoConnections.*      the back office's single sign-on connection ledger
- *
- * Behaviour is package-owned and reached through ONE seam:
- * `EnterpriseTrpcComposition` in `@langwatch/enterprise-api`. A core process may
- * not depend on an Enterprise feature package, so this mount imports the
- * composition and nothing below it — which is also why the four routers arrive
- * together rather than one mount per feature.
- *
- * ## Why `subscription` and `currency` are not returned HERE
- *
- * The composition builds all six and this mount forwards four. The two billing
- * surfaces belong to the gateway group, which mounts them directly from
- * `@langwatch/enterprise-billing-server` beside the twenty-one gateway and
- * governance namespaces — see `enterprise-billing-trpc.mount.ts`. They are on
- * the record: a client asking what this deployment charges has to be able to
- * tell "this installation does not bill" from "the call failed", and a
- * namespace that is not there tells it neither.
- *
- * `saasBilling` is passed as `false` here because this mount returns neither of
- * them, so the two routers the composition would build are never read. The
- * deployment's real answer reaches the billing mount instead.
+ * Forwards four of the composition's six routers; `subscription`/`currency`
+ * mount separately in `enterprise-billing-trpc.mount.ts`.
  */
 import {
   BACK_OFFICE_NO_PERMISSION,

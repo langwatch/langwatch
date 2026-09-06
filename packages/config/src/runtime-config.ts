@@ -25,20 +25,9 @@ export const environmentNotExactOneSchema = z
   .transform((value) => value !== "1");
 
 /**
- * Preserves the deployment switches that opt in for `1` or a case-insensitive
- * `true`, and for nothing else.
- *
- * Frozen twin of the App's own reading of `IS_SAAS`
- * (`source.IS_SAAS === "1" || source.IS_SAAS?.toLowerCase() === "true"`,
- * `platform/app/src/env-create.mjs`). Two processes deriving one deployment
- * fact from one variable have to agree on every spelling of it: a worker that
- * accepted `yes` where the App does not would meter a self-hosted install, and
- * one that rejected `TRUE` where the App accepts it would leave a SaaS
- * install's billable events counted by nobody. Neither shows up as an error.
- *
- * The boolean arm is the same value after the App's env schema has already
- * parsed it, so a caller reading a validated configuration and one reading raw
- * environment strings resolve to the same leaf.
+ * Frozen twin of the App's `IS_SAAS` reading (`platform/app/src/env-create.mjs`):
+ * two processes deriving one fact from one variable must agree on every
+ * spelling, or a SaaS install's billable events go uncounted with no error.
  */
 export const environmentOneOrTrueSchema = z
   .union([z.string(), z.boolean()])
@@ -70,25 +59,16 @@ export type RuntimeConfigIssue = {
   path: string;
   code: string;
   /**
-   * The environment variable that leaf reads, where a definition binds one.
-   *
-   * Absent when a runtime hands `RuntimeConfig` a bare Zod schema: nothing then
-   * knows which variable a field came from, and inventing one would name a
-   * variable the deployment may not have.
+   * Absent when a runtime hands `RuntimeConfig` a bare Zod schema — inventing
+   * one would name a variable the deployment may not have.
    */
   env?: string;
 };
 
 /**
- * The refusal a runtime raises before it constructs anything, addressed to the
- * operator who has to fix it.
- *
- * It identifies each rejected value by its LEAF PATH rather than by the
- * environment variable behind it. The path is what the service consumes and
- * what its declaration is written in, so it survives a variable being renamed
- * or read under a compatibility alias, and it matches what a reader finds in
- * the definition. The variable is still what an operator has to set, so it
- * rides along in parentheses whenever the definition knows it.
+ * Identifies each rejected value by its LEAF PATH, not the env variable —
+ * survives a rename or compatibility alias. The variable still rides along
+ * in parentheses when known.
  */
 export class InvalidRuntimeConfigError extends Error {
   override readonly name = "InvalidRuntimeConfigError";
@@ -196,12 +176,8 @@ export class RuntimeConfig<Value extends Record<string, unknown>> {
   }
 
   /**
-   * The definition, unchanged.
-   *
-   * It exists for the `const` inference: without it a caller would have to
-   * write `as const` on every definition to keep its literal types, and those
-   * literals are what `ConfigValue` reads to give the resolved config its
-   * shape.
+   * Exists for the `const` inference: without it a caller would write
+   * `as const` on every definition to keep its literal types.
    */
   static define<const Definition extends RuntimeConfigDefinition>(
     definition: Definition,
@@ -209,12 +185,8 @@ export class RuntimeConfig<Value extends Record<string, unknown>> {
     return definition;
   }
 
-  // Written as declarations plus assignments rather than constructor parameter
-  // properties, which are the one TypeScript construct Node's built-in
-  // type-stripping refuses. This module is imported by name from a Vite config,
-  // and Vite externalises every bare specifier when it bundles one — so Node
-  // loads this file itself, and a parameter property here fails the whole
-  // browser build with `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`.
+  // Declarations plus assignments, not constructor parameter properties —
+  // Node's type-stripping refuses those, and this module loads under Node too.
   readonly value: Readonly<Value>;
   readonly schema: z.ZodType<Value>;
 
@@ -305,11 +277,8 @@ function primitiveSchema(value: boolean | number | string): z.ZodTypeAny {
 }
 
 /**
- * The definition read against one source, plus the map a refusal is written
- * from: leaf path to the environment variable that leaf was read under.
- *
- * Collected on the same walk that reads the values, so the two can never
- * disagree about which variable a leaf binds.
+ * Collected on the same walk that reads the values, so bindings can never
+ * disagree with which variable a leaf reads.
  */
 type ResolvedDefinition = {
   value: Record<string, unknown>;

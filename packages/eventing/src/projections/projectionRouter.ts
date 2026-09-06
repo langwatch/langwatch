@@ -47,58 +47,36 @@ import type { StateProjectionDefinition } from "./stateProjection.types";
 import { StateProjectionExecutor } from "./stateProjectionExecutor";
 
 /**
- * Default cap on how many same-aggregate fold events are coalesced into one
- * load/apply/store cycle. Bounds the per-cycle drain + apply loop (and the
- * re-stage loop on failure) while collapsing a backed-up group from O(n²) to
- * O(n). A fold can opt out by setting options.coalesceMaxBatch = 1, or raise it
- * further for folds with small event payloads.
- *
- * Set to 500 (was 100): a backed-up group drains 5× fewer dispatch cycles, so a
- * large backlog (e.g. a hot trace with tens of thousands of staged fold jobs)
- * clears far faster. The cap still bounds per-cycle memory — at most this many
- * events + one fold state are held at once, unlike the full-history re-fold
- * (which the trace/experiment folds now avoid via refoldOnOutOfOrder: false).
- * Coalescing is a pure left-fold: the final state is identical to applying the
- * events one at a time (see initializeFoldQueues below), so raising it changes
- * throughput only, never correctness.
+ * Default cap on same-aggregate fold events coalesced into one cycle — a pure
+ * left-fold, so raising this changes throughput only, never correctness.
+ * Opt out via options.coalesceMaxBatch = 1.
  */
 export const DEFAULT_FOLD_COALESCE_MAX_BATCH = 500;
 const SLOW_PROJECTION_OPERATION_MS = 5_000;
 
 /**
- * Event ids carried in a post-store-failure log line. A coalesced batch holds
- * up to DEFAULT_FOLD_COALESCE_MAX_BATCH events and the whole line would be
- * unreadable; the ids exist to locate the affected aggregate for reconciliation,
- * and the aggregate id already narrows it. eventCount reports the true size.
+ * Caps event ids in a post-store-failure log line — a coalesced batch can
+ * hold up to DEFAULT_FOLD_COALESCE_MAX_BATCH. `eventCount` reports true size.
  */
 const MAX_LOGGED_EVENT_IDS = 10;
 
 /**
- * The router only ever dispatches subscribers on the live event path — the
- * replay service (`replay/replayService.ts`) rebuilds fold projections and
- * never invokes subscribers, so no subscriber context here can be a replay.
- * Named constant so the `isReplay` plumbing in `SubscriberDispatchContext` is honestly
- * "always false on this path" rather than looking like a forgotten TODO. If a
- * replay path that reaches subscribers is ever added, it must thread a real
- * flag instead of this constant.
+ * The router only dispatches subscribers on the live event path — the replay
+ * service never invokes them. Named so `SubscriberDispatchContext.isReplay`
+ * reads as "always false here" rather than a forgotten TODO.
  */
 const LIVE_DISPATCH_IS_REPLAY = false;
 
 /**
- * One event paired with the projection state a subscriber should see for it.
- *
- * A fold repeats the same accumulated state across a batch; a map produces a
- * distinct record per event. Pairing them here lets both dispatch through one
- * path without a map batch having to pick a single record to stand for all of
- * its events. It is also exactly the queue job's payload shape.
+ * One event paired with the state a subscriber should see for it — lets fold
+ * (same state per batch) and map (distinct record per event) dispatch through
+ * one path.
  */
 type SubscriberDelivery<E extends Event> = { event: E; foldState: unknown };
 
 /**
- * Central router that registers fold and map projections and dispatches events.
- *
- * - FoldProjections: enqueued to GroupQueue (per-aggregate ordering), incremental only
- * - MapProjections: enqueued to SimpleQueue (per-event, no ordering)
+ * Registers fold and map projections and dispatches events. Folds enqueue to
+ * GroupQueue (per-aggregate ordering); maps enqueue to SimpleQueue (per-event).
  */
 export class ProjectionRouter<
   EventType extends Event = Event,
@@ -155,18 +133,8 @@ export class ProjectionRouter<
   }
 
   /**
-   * Rejects a fold that trusts a WINDOWED absence on an aggregate whose rows
-   * can outlive the window.
-   *
-   * `trustAbsentMiss` retires the unwindowed retry: an absent windowed read is
-   * taken as proof nothing was ever committed, and the fold restarts from
-   * `init()`. That is only true while every row of the aggregate stays inside
-   * the window, which is a bet on the aggregate's LIFETIME, the same one
-   * `rehydrationLowerBoundMs` makes when it bounds an event scan. A long-lived
-   * aggregate (a session spanning weeks) may declare a `readWindow` for
-   * partition pruning, but trusting its misses would silently overwrite live
-   * state with an empty one. Unwindowed folds are untouched: with no window
-   * there is nothing an absence could be hiding behind.
+   * `trustAbsentMiss` treats an absent windowed read as proof nothing was
+   * committed — only true for aggregate types whose rows never outlive the window.
    */
   private assertTrustedAbsenceIsTimeLocal(
     projection: FoldProjectionDefinition<any, EventType>,
@@ -186,17 +154,9 @@ export class ProjectionRouter<
   }
 
   /**
-   * Rejects the one config combination that silently breaks redelivery dedup.
-   *
-   * A store that exposes `getWithApplied` carries a durable (ClickHouse)
-   * applied-event-id watermark that is NOT trimmed, while its Redis cache trims
-   * the applied set to `MAX_APPLIED_EVENT_IDS`. If such a fold coalesces a batch
-   * at or above that cap, a single fresh batch can leave ids that survive only
-   * in ClickHouse: a cache-hit retry deduping against the trimmed Redis set
-   * re-applies them and double-counts. Cache-only folds trim identically in both
-   * places and have no such window, so the guard binds only durable-watermark
-   * folds. The effective batch mirrors `initializeFoldQueues`' resolution
-   * (`coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH`).
+   * A durable-watermark store's Redis cache trims to `MAX_APPLIED_EVENT_IDS`
+   * while ClickHouse doesn't — coalescing at or above that cap lets a
+   * cache-hit retry double-count ids surviving only in ClickHouse.
    */
   private assertCoalesceWithinAppliedIdCap(
     projection: FoldProjectionDefinition<any, EventType>,
@@ -460,11 +420,8 @@ export class ProjectionRouter<
   }
 
   /**
-   * Initialize the default operational state projection lane.
-   *
-   * It shares the fold executor's pure load/apply/store mechanics, but the
-   * runtime never wires history loaders and never dispatches subscribers from the
-   * resulting state.
+   * Shares the fold executor's pure load/apply/store mechanics, but never
+   * wires history loaders or dispatches subscribers from the resulting state.
    */
   initializeStateProjectionQueues(): void {
     if (this.stateProjections.size === 0) return;
@@ -484,13 +441,9 @@ export class ProjectionRouter<
       projectionDefs[name] = {
         name,
         groupKeyFn: projection.key,
-        // Dispatch in log-accept order, ALWAYS: the state executor's cursor
-        // is (createdAt, id), so a group ordered by business time can hand a
-        // late-appended event to an early drain, commit a cursor past the
-        // rest of the backlog, and silently drop every earlier-appended
-        // event still queued behind it - with no refold lane to heal the
-        // loss. Scoring by createdAt makes delivery order agree with the
-        // cursor, so the staleness guard only ever drops true redeliveries.
+        // Score by createdAt so delivery order agrees with the state
+        // executor's (createdAt, id) cursor — otherwise the staleness guard
+        // can drop an earlier-appended event still queued behind a later one.
         scoreFn: (event) => event.createdAt,
         coalesceMaxBatch: projection.options?.coalesceMaxBatch ?? 1,
         options: projection.options,
@@ -548,19 +501,10 @@ export class ProjectionRouter<
         groupKeyFn: fold.key,
         scoreFn:
           fold.options?.eventOrdering === "acceptedAt" ? (event) => event.createdAt : undefined,
-        // Coalesce a backed-up group's events into one fold load/apply/store
-        // cycle. On for every fold (harmless at batch size 1 when the queue
-        // keeps up). Safe for all folds because: the final folded state is
-        // identical to applying events one at a time (pure left-fold, the
-        // intermediate stores never affect the result); processFoldProjectionBatch
-        // still dispatches subscribers per event, so event-sensitive subscribers
-        // (per-span eval sync, evaluation/scenario triggers keyed on event type)
-        // see every event; and out-of-order is handled identically to the
-        // single-event path (executeBatch uses the fold's declared ordering and
-        // the same checkpoint policy). The only difference is subscribers observe the final
-        // batch fold-state, which is the correct "current state" for a
-        // react-after-fold side effect. A fold can opt out via
-        // options.coalesceMaxBatch = 1.
+        // Coalesces a backed-up group into one load/apply/store cycle — safe
+        // since a pure left-fold gives the same result either way, and
+        // subscribers still fire per event, just observing the final batch
+        // state. Opt out via options.coalesceMaxBatch = 1.
         coalesceMaxBatch: fold.options?.coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH,
         options: fold.options,
       };
@@ -735,14 +679,9 @@ export class ProjectionRouter<
 
             const mapSubscribers = this.subscribersForMap.get(name);
             if (mapSubscribers && mapSubscribers.length > 0) {
-              // One dispatch for the whole batch, not one per mapped event.
-              // Dispatching per event put each send in its own call, so the
-              // per-subscriber collapse only ever saw a single event and could
-              // never fire — a drained batch sent one job per event for
-              // subscribers keyed on the aggregate, and the queue then squashed
-              // all but the last. Each delivery keeps its own record, so a
-              // subscriber that reads one still sees the record its event
-              // produced.
+              // One dispatch for the whole batch: per-event dispatch would put
+              // each send in its own call, so the collapse-by-job-id above
+              // never saw more than one event to collapse.
               await this.dispatchToSubscribers({
                 projectionName: name,
                 subscribers: mapSubscribers,
@@ -1178,18 +1117,9 @@ export class ProjectionRouter<
   }
 
   /**
-   * The map projection's enqueue-time gate (ADR-069 invariant 4): `false`
-   * means no job is ever minted for this event.
-   *
-   * Fail-OPEN on a throw, and deliberately the opposite of the subscriber
-   * seam's rule. There, a thrown filter is reported as a dispatch failure
-   * because a subscriber's job is the only carrier of its side effect and
-   * silently reading the throw as "not relevant" would hide a permanent loss.
-   * Here the filter is a pure restatement of what `map()` already decides, so
-   * admitting the event on a throw costs one job that maps to nothing —
-   * exactly the pre-filter behavior — while declining it would drop a row the
-   * projection was going to write. Between "cost of a job" and "silent hole in
-   * a fact table", the gate opens. It is still a bug: it is logged.
+   * The map projection's enqueue-time gate (ADR-069 invariant 4). Fail-OPEN
+   * on a throw, unlike the subscriber seam — admitting costs one wasted job,
+   * declining would drop a row.
    */
   private mapEnqueueAccepts({
     mapProj,
@@ -1232,11 +1162,8 @@ export class ProjectionRouter<
 
       const enqueue = subscriber.options?.enqueue;
 
-      // The seam that DISCARDS events irreversibly needs an off switch as much
-      // as any dispatch path: subscriber fan-out is never replayed, so a bad
-      // filter loses those events for good. Resolved once per distinct tenant
-      // because the answer cannot change within one batch, and the busiest
-      // subscribers match every event.
+      // Subscriber fan-out is never replayed, so this kill-switch check is
+      // resolved once per distinct tenant rather than per event.
       const killedByTenant = new Map<string, boolean>();
       const isKilledFor = async (tenantId: string): Promise<boolean> => {
         const cached = killedByTenant.get(tenantId);
@@ -1268,12 +1195,9 @@ export class ProjectionRouter<
             continue;
           }
 
-          // Enqueue-time filter (ADR-069 invariant 4): a declined event never
-          // mints a job. A throw here is deliberately NOT caught as `false` —
-          // it falls through to the catch below, so the failure is reported
-          // rather than silently read as "not relevant". The routing path has
-          // no retry (see EnqueueDispatchOptions), so the hook must be total:
-          // if it throws, this subscriber loses its job for this event.
+          // Enqueue-time filter (ADR-069 invariant 4): a throw is NOT caught
+          // as `false` — it falls to the catch below and is reported, since
+          // this routing path has no retry (see `EnqueueDispatchOptions`).
           if (enqueue?.filter && !enqueue.filter(event)) {
             incrementEsSubscriberEnqueueTotal({
               pipelineName: this.pipelineName,
@@ -1283,18 +1207,10 @@ export class ProjectionRouter<
             continue;
           }
 
-          // Claim-check staging (ADR-069): the subscriber may swap the staged
-          // payload for a small reference event mirroring the source event's
-          // scheduling identity. Total field-picks only — like the filter's, a
-          // throw here is reported and counted `failed`, and permanently loses
-          // this subscriber's job for this event. There is no routing retry:
-          // eventSourcingService catches and logs the dispatch AggregateError
-          // without rethrowing.
-          //
-          // Note the deploy-order dependency this creates: a reference is a
-          // different event type, and a worker running the previous build
-          // silently COMPLETES a job it cannot decode. See
-          // `EnqueueDispatchOptions.stage` and ADR-069.
+          // Claim-check staging (ADR-069): a throw here is reported and counted
+          // `failed`, permanently losing this job — no routing retry exists.
+          // Deploy-order matters: a worker on the previous build silently
+          // completes a reference job it can't decode. See `EnqueueDispatchOptions.stage`.
           const staged = enqueue?.stage ? (enqueue.stage(event) as EventType) : event;
 
           const queue = queued ? this.queueManager.getSubscriberQueue(name) : undefined;
@@ -1304,13 +1220,9 @@ export class ProjectionRouter<
             await this.handleSubscriber(subscriber, staged);
           }
 
-          // Counted only once the handoff succeeded. A failed send throws to
-          // the catch below, so a queue outage never inflates `staged` or
-          // `referenced` — the outcome split stays an honest picture of what
-          // the seam did.
-          // A reference is a DIFFERENT event type by construction, which is
-          // what the split means to an operator. Reference identity would count
-          // a `stage` that rebuilt the same event as "referenced".
+          // Counted only once the handoff succeeded, so a queue outage never
+          // inflates `staged`/`referenced`. Split is by event-type identity:
+          // a `stage` that rebuilds the same type still counts as "staged".
           incrementEsSubscriberEnqueueTotal({
             pipelineName: this.pipelineName,
             subscriberName: name,
@@ -1640,12 +1552,9 @@ export class ProjectionRouter<
   }
 
   /**
-   * Dispatches a fold's subscribers once its state is already durable.
-   *
-   * Anything that throws from here fails the job without un-writing the state,
-   * so the queue redelivers events the store already holds — see
-   * {@link recordPostStoreFailure}. Shared by the single-event and batch paths
-   * so the two cannot drift on the exact path this counter measures.
+   * A throw here fails the job without un-writing the state, so the queue
+   * redelivers events the store already holds — see {@link recordPostStoreFailure}.
+   * Shared by the single-event and batch paths.
    */
   private async dispatchSubscribersAfterStore({
     projectionName,
@@ -1677,16 +1586,9 @@ export class ProjectionRouter<
   }
 
   /**
-   * Records a failure that happened after the fold's state was durably stored.
-   *
-   * Distinct from a plain fold failure: the store already holds this batch, so
-   * the retry re-applies it. Accumulating folds (spanCount + 1, cost sums, id
-   * appends) double-count as a result — nothing on this path deduplicates by
-   * event id.
-   *
-   * Logged at warn with the aggregate and event ids so the affected traces can
-   * be identified and reconciled after an incident — the metric says how often,
-   * the log says which.
+   * Distinct from a plain fold failure: the store already holds this batch,
+   * so the retry re-applies it — accumulating folds double-count as a result.
+   * Warn-logged with aggregate/event ids for post-incident reconciliation.
    */
   private recordPostStoreFailure({
     projectionName,
@@ -1716,13 +1618,9 @@ export class ProjectionRouter<
   }
 
   /**
-   * Processes a batch of same-aggregate events for a fold projection in a single
-   * load/apply/store cycle (see FoldProjectionExecutor.executeBatch). Used by the
-   * GroupQueue's coalescing path when a group is backed up. All events share the
-   * aggregate (and tenant), so kill-switch and store key are resolved once.
-   *
-   * Subscribers fire once with the final folded state (using the last event), which
-   * is the correct coalesced behavior for the trace's debounced subscribers.
+   * A single load/apply/store cycle for same-aggregate events (see
+   * `FoldProjectionExecutor.executeBatch`), used by the GroupQueue's coalescing
+   * path. Subscribers fire once with the final folded state.
    */
   private async processFoldProjectionBatch(
     projectionName: string,
@@ -1818,18 +1716,10 @@ export class ProjectionRouter<
           },
         });
 
-        // Dispatch subscribers for the whole batch, with the final fold state.
-        // Per-span subscribers must see every event: customEvaluationSync reads
-        // event.data.span to extract embedded SDK evals, and its makeJobId
-        // carries the event id, so it is dispatched once per event. Subscribers
-        // keyed on the aggregate (broadcast, metadata, alerts) would be squashed
-        // to one job by the queue's dedup anyway, so dispatchToSubscribers collapses
-        // them here instead of paying N serialize+gzip+blob round-trips to reach
-        // the same state. See ProjectionRouter.collapseByJobId.
-        //
-        // A post-store failure is worse here than on the single-event path: the
-        // whole coalesced batch is re-applied, so one failure can double-count
-        // up to DEFAULT_FOLD_COALESCE_MAX_BATCH events against one aggregate.
+        // See ProjectionRouter.collapseByJobId for why aggregate-keyed
+        // subscribers collapse here. A post-store failure re-applies the
+        // whole batch, so one failure can double-count up to
+        // DEFAULT_FOLD_COALESCE_MAX_BATCH events against one aggregate.
         await this.dispatchSubscribersAfterStore({
           projectionName,
           events: toApply,
@@ -1891,28 +1781,8 @@ export class ProjectionRouter<
   }
 
   /**
-   * The events a subscriber must actually be sent for, out of a coalesced batch.
-   *
-   * A subscriber's `makeJobId` IS its collapse key: the queue dedups on it, so N
-   * sends carrying the same job id leave exactly one job behind — the last one,
-   * since staging replaces a squashed duplicate. Subscribers keyed on the aggregate
-   * (`eval-trigger:${tenantId}:${aggregateId}`, `trace-update:…`) therefore
-   * produce one job no matter how many events a backed-up group drains.
-   *
-   * Sending all N anyway is not free: each send serializes `{event, foldState}`,
-   * gzips it, and — once past the envelope's inline ceiling — writes a
-   * content-addressed blob into Redis that the ensuing dedup squash immediately
-   * reclaims. On a 10k-span trace that was ~99 discarded round-trips per drained
-   * batch, per subscriber. Collapsing here reaches the same queue state by the same
-   * rule the queue itself would have applied, without the churn.
-   *
-   * Subscribers keyed per event (`…:${event.id}`) collapse to nothing and are
-   * dispatched for every event, as are subscribers with no job id at all.
-   *
-   * Each delivery carries its own state because a map batch has no single one:
-   * a fold hands the same accumulated state to every event, but a map produces
-   * a separate record per event, and the survivor must keep the record it was
-   * actually paired with.
+   * Pre-collapses to what the queue's dedup-by-`makeJobId` would leave behind
+   * anyway, sparing an aggregate-keyed subscriber N redundant round-trips.
    */
   private collapseByJobId({
     subscriber,
@@ -1925,15 +1795,9 @@ export class ProjectionRouter<
     if (!makeJobId || deliveries.length < 2) return deliveries;
 
     try {
-      // Keep the LAST delivery per job id — the one the queue's dedup squash
-      // would have left behind (STAGE_LUA overwrites the stored value when
-      // `shouldReplace`, which every subscriber here defaults to).
-      //
-      // A Map alone would order the survivors by each job id's FIRST
-      // occurrence while holding its last value, so a batch carrying two job
-      // ids could dispatch a later event before an earlier one. Re-sort by the
-      // surviving delivery's position so dispatch really is in occurredAt
-      // order — deliveries arrive sorted, so the index IS that order.
+      // Keep the LAST delivery per job id (matches the queue's dedup squash),
+      // then re-sort survivors by original index so dispatch stays in
+      // occurredAt order — a bare Map would order by each key's FIRST occurrence.
       const lastIndexPerJobId = new Map<string, number>();
       deliveries.forEach((delivery, index) => {
         lastIndexPerJobId.set(makeJobId(delivery), index);
@@ -1963,13 +1827,9 @@ export class ProjectionRouter<
   }
 
   /**
-   * Dispatches a coalesced batch of same-aggregate events to subscribers registered
-   * on a fold projection. In queued mode, sends to subscriber queues. In inline
-   * mode, calls directly. A single event is just a batch of one.
-   *
-   * Events are filtered by `shouldDispatch` BEFORE they are collapsed, so a subscriber
-   * keyed on the aggregate receives the last event it actually cared about
-   * rather than the last event in the batch.
+   * Dispatches a coalesced batch to a fold's subscribers. Filters by
+   * `shouldDispatch` BEFORE collapsing, so an aggregate-keyed subscriber gets
+   * the last event it cared about, not the last event in the batch.
    */
   private async dispatchToSubscribers({
     projectionName,
@@ -2213,12 +2073,7 @@ export class ProjectionRouter<
     return this.retentionPolicyResolver.resolve(String(tenantId));
   }
 
-  /**
-   * Build the per-event ProjectionStoreContext shared by all projection
-   * executors (map handler, fold processFoldProjectionEvent, fold batch).
-   * Centralising it ensures every store sees the same shape — and any new
-   * context field (e.g. process role, trace correlation) lands in one place.
-   */
+  /** Shared per-event context so every projection executor sees the same shape. */
   private async buildStoreContext({
     event,
     key,

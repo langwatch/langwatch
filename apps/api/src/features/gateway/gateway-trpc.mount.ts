@@ -1,20 +1,6 @@
 /**
- * App-process transport mounts for the AI Gateway vertical.
- *
- * Behaviour is package-owned (`@langwatch/gateway-server`); this supplies the
- * process's root, authenticated procedure, policy chain and the collaborators
- * the transports need that are neither the gateway's own services nor readable
- * from the request.
- *
- * The six routers are mounted together because they share one policy chain and
- * one ports bag, and because the ports are a single named seam: everything in
- * `GatewayTrpcPorts` is a capability still living in the application being
- * retired. When `server/gateway/*` moves into the feature package, this bag
- * shrinks to nothing and the mount collapses to root, procedure and policy.
- *
- * Personal virtual keys, routing policies and webhook endpoints are NOT here.
- * They answer from Enterprise services, and a core package may not depend on an
- * Enterprise one, so their composition lives in `@langwatch/enterprise-api`.
+ * The six routers share one policy chain and one `GatewayTrpcPorts` seam.
+ * Personal keys/routing/webhooks answer from `@langwatch/enterprise-api`.
  */
 import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import {
@@ -43,30 +29,17 @@ export type GatewayTrpcContext = GatewayBudgetTrpcContext &
   VirtualKeyTrpcContext;
 
 /**
- * The one seam back into the application being retired.
- *
- * Each entry fronts a module under `platform/app/src/server/gateway/**` or a
- * persistence read the transports used to make directly. Nothing here is a new
- * abstraction: the names are the names of the functions the routers called.
- */
-/**
- * What is left of the seam after the App.
- *
- * A tRPC input parser is fixed when the router is BUILT, and the application
- * is a per-request value, so the budget parser cannot come off it. Everything
- * else these ports carried now lives on `GatewayApp`.
+ * A tRPC input parser is fixed when the router is built, and the application
+ * is a per-request value, so the virtual-key schemas can't come off it.
+ * Everything else this seam carried now lives on `GatewayApp`.
  */
 export type GatewayTrpcPorts = Readonly<{
   virtualKeys: VirtualKeyTrpcSchemas;
 }>;
 
 /**
- * Mounts `virtualKeys.*`, `gatewayUsage.*`, `gatewayBudgets.*`,
- * `gatewayCacheRules.*`, `gatewayGuardrails.*` and `gatewaySpendEvents.*` on the
- * app process's tRPC root, under the keys the clients already call.
- *
- * Two of the six authorize in their resolver rather than from the input, and
- * take the same chain under the name their package declares it by.
+ * Mounts the six gateway namespaces under the keys clients already call. Two
+ * of the six authorize in their resolver rather than from the input.
  */
 export function createGatewayTrpcRouters<
   TContext extends GatewayTrpcContext,
