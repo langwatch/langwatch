@@ -240,6 +240,7 @@ export class AnalyticsService {
       groupBy: input.groupBy,
       traceIds: input.traceIds,
       negateFilters: input.negateFilters,
+      excludeOrigins: input.excludeOrigins,
     });
   }
 
@@ -277,6 +278,7 @@ export class AnalyticsService {
       groupByKey: input.groupByKey,
       timeScale: adjustedTimeScale,
       timeZone: input.timeZone,
+      excludeOrigins: input.excludeOrigins,
     };
 
     if (table === "trace_analytics_rollup") {

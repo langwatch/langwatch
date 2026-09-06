@@ -692,5 +692,41 @@ describe("createProjectMetadataHandler()", () => {
         expect(isRealFirstIngest(state)).toBe(false);
       });
     });
+
+    describe("when the trace is one of Langy's own turns", () => {
+      /** @scenario "Langy's own turn is not the project's first trace" */
+      it("returns false", () => {
+        const state = createFoldState({
+          attributes: { "langwatch.origin": "langy" },
+        });
+
+        expect(isRealFirstIngest(state)).toBe(false);
+      });
+    });
+  });
+
+  describe("when the first trace to arrive is one of Langy's own turns", () => {
+    beforeEach(() => {
+      mockProjects.getById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: false,
+        integrated: false,
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
+    });
+
+    /** @scenario "Langy's own turn is not the project's first trace" */
+    it("leaves firstMessage unset and tracks no milestone", async () => {
+      const subscriber = createProjectMetadataHandler(deps);
+      const context = createContext(
+        tenantId,
+        createFoldState({ attributes: { "langwatch.origin": "langy" } }),
+      );
+
+      await subscriber(createEvent(tenantId), context);
+
+      expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
+      expect(mockTrackServerEvent).not.toHaveBeenCalled();
+    });
   });
 });

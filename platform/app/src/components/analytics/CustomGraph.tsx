@@ -86,6 +86,8 @@ export type CustomGraphInput = {
   endDate?: number;
   graphId: string;
   filters?: Record<FilterField, string[] | Record<string, string[]>>;
+  /** Trace origins the graph leaves out, whatever filters the page carries. */
+  excludeOrigins?: string[];
   graphType:
     | "line"
     | "bar"

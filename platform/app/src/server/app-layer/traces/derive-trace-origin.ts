@@ -13,6 +13,14 @@
  */
 export const DEFAULT_TRACE_ORIGIN = "application";
 
+/**
+ * The origin the Langy relay stamps on every turn of the in-product
+ * assistant. Those traces live in the customer's project on purpose
+ * (ADR-061), but the customer never sent them: nothing that answers "has this
+ * project received its first trace" and no home figure may count them.
+ */
+export const LANGY_TRACE_ORIGIN = "langy";
+
 /** ClickHouse expression producing the same value `deriveTraceOrigin` does. */
 export const TRACE_ORIGIN_CLICKHOUSE_EXPRESSION = `if(Attributes['langwatch.origin'] = '', '${DEFAULT_TRACE_ORIGIN}', Attributes['langwatch.origin'])`;
 

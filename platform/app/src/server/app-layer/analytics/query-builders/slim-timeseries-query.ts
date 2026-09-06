@@ -426,6 +426,8 @@ export function buildSlimTimeseriesQuery(
 
   const { whereClause: filterWhere, params: filterParams } =
     buildSlimFilterClauses(input.filters);
+  const { whereClause: excludeWhere, params: excludeParams } =
+    buildSlimOriginExclusion(input.excludeOrigins);
 
   // Mirror the legacy builder's `handlesUnknown` contract
   // (`aggregation-builder.ts` → `buildGroupKeyHavingClause`): a group-by whose
@@ -448,6 +450,7 @@ export function buildSlimTimeseriesQuery(
         (${ta}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ta}.OccurredAt < {previousEnd:DateTime64(3)})
       )
       ${filterWhere}
+      ${excludeWhere}
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
     ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
@@ -462,6 +465,23 @@ export function buildSlimTimeseriesQuery(
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
       ...filterParams,
+      ...excludeParams,
     },
+  };
+}
+
+/**
+ * The caller's own origin exclusion, ANDed after the user's filters. It is
+ * not one of them: a negated filter selection never inverts it.
+ */
+function buildSlimOriginExclusion(
+  excludeOrigins: AnalyticsTimeseriesBuilderInput["excludeOrigins"],
+): { whereClause: string; params: Record<string, unknown> } {
+  if (!excludeOrigins || excludeOrigins.length === 0) {
+    return { whereClause: "", params: {} };
+  }
+  return {
+    whereClause: `AND ${ta}.Origin NOT IN ({slim_excludeOrigins:Array(String)})`,
+    params: { slim_excludeOrigins: excludeOrigins },
   };
 }

@@ -165,6 +165,27 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     });
   });
 
+  describe("given a query that leaves out trace origins", () => {
+    // The rollup is keyed by bucket, so it has no origin to leave out; slim
+    // keeps the origin on every trace row.
+    /** @scenario Leaving out an origin stays accurate on optimized analytics storage */
+    it("routes a trace-source query to the slim table", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        excludeOrigins: ["langy"],
+      });
+      expect(table).toBe("trace_analytics");
+    });
+
+    it("still routes to the rollup when the exclusion is empty", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        excludeOrigins: [],
+      });
+      expect(table).toBe("trace_analytics_rollup");
+    });
+  });
+
   describe("given a query scoped to explicit trace ids", () => {
     // The fast-path builders do not implement the TraceId narrowing — the
     // result would silently cover ALL traces instead of the requested set.
