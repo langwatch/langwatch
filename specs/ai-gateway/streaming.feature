@@ -156,6 +156,33 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
       And gen_ai.usage.output_tokens > 0
       And the gateway does NOT emit the success_no_usage soft warning for this request
 
+  Rule: Trailing diagnostics never ride a data: frame on OpenAI-compatible streams
+
+    # When the upstream provider reports no usage, the gateway notes it for
+    # operators. Strict OpenAI-compatible clients (Vercel AI SDK family)
+    # schema-validate every data: payload against chunk | error and crash
+    # the whole process on anything else. An SSE comment line is ignored by
+    # every spec client but still visible to curl -N and log scrapers.
+
+    @unit
+    Scenario: provider reported no usage -> diagnostics go out as an SSE comment, not a data frame
+      Given a chat completion stream whose upstream reported no usage block
+      When the gateway emits the stream
+      Then the response carries the "provider_did_not_report_usage_on_stream" note as an SSE comment line
+      And no data: frame other than the forwarded chunks and [DONE] exists in the stream
+
+    @unit
+    Scenario: provider reported usage -> no trailing diagnostics frame at all
+      Given a chat completion stream whose upstream reported a non-zero usage block
+      When the gateway emits the stream
+      Then the response contains no usage-warning comment or frame
+
+    @unit
+    Scenario: raw passthrough streams (Gemini) are never appended to
+      Given a raw-framed passthrough stream whose upstream reported no usage block
+      When the gateway emits the stream
+      Then the bytes are exactly what upstream sent, with nothing appended
+
   Rule: Chat completion streams open with a role-carrying delta, matching OpenAI's contract
 
     # api.openai.com opens every streamed choice with
