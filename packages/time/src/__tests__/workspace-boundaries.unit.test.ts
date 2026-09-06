@@ -1,9 +1,7 @@
 /**
- * The retired library cannot come back. Nothing in the workspace imports it,
- * no package manifest declares it, and the architecture lint refuses a new
- * import naming this package as the remedy. Each process and the browser
- * install this package's Temporal polyfill exactly once, as their first
- * import, before anything else runs.
+ * The retired library cannot come back: nothing in the workspace imports it,
+ * no manifest declares it, and the lint refuses a new import. Each process
+ * and the browser install this package's polyfill once, as their first import.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -13,9 +11,12 @@ import { describe, expect, it } from "vitest";
 function findRepoRoot(start: string): string {
   let dir = start;
   for (;;) {
-    if (existsSync(join(dir, "pnpm-workspace.yaml"))) return dir;
+    const isRepoRoot = existsSync(join(dir, "pnpm-workspace.yaml"));
+    if (isRepoRoot) return dir;
+
     const parent = dirname(dir);
-    if (parent === dir) {
+    const reachedFilesystemRoot = parent === dir;
+    if (reachedFilesystemRoot) {
       throw new Error(`pnpm-workspace.yaml not found above ${start}`);
     }
     dir = parent;
@@ -54,7 +55,7 @@ describe("the retired library cannot come back", () => {
     // Walks every first-party source file and package manifest in the
     // workspace (apps, packages, sdks, mcp, services): thousands of files,
     // slower than the default 10s under vitest's fork pool.
-    const WORKSPACE_SCAN_TIMEOUT_MS = 30_000;
+    const WORKSPACE_SCAN_TIMEOUT_MS = 60_000;
 
     /** @scenario "No production file imports the retired date library" */
     it(

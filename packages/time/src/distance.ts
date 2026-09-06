@@ -1,8 +1,7 @@
 /**
- * Relative time in words, in the three shapes the product prints: the rounded
- * wording ("about 3 hours ago"), the strict one ("3 hours ago") and the
- * compact one a table row prints ("3h ago"). The tests pin every rung of each
- * ladder against the wording the screens showed.
+ * Relative time in words: rounded ("about 3 hours ago"), strict ("3 hours
+ * ago") and compact, the shape a table row prints ("3h ago"). The tests pin
+ * every rung of each ladder against the wording the screens showed.
  */
 
 import {
@@ -134,7 +133,8 @@ export function formatDistanceStrict(
 /**
  * The compact wording a table row prints: one abbreviated unit and always
  * "ago" — "now", "5m ago", "3h ago", "2d ago", "1w ago", "3mo ago". There is
- * no future form because a table row never shows one.
+ * no future form because a table row never shows one. Months are simple
+ * 30-day months (not calendar months), matching the product's own ladder.
  */
 export function formatDistanceCompact(
   later: TimeInput,
@@ -152,8 +152,7 @@ export function formatDistanceCompact(
   if (days < 7) return `${days}d ago`;
 
   const weeks = Math.abs(differenceInWeeks(later, earlier, options));
-  if (weeks < 4) return `${weeks}w ago`;
+  if (days < 30) return `${weeks}w ago`;
 
-  const months = Math.abs(differenceInMonths(later, earlier, options));
-  return `${months}mo ago`;
+  return `${Math.floor(days / 30)}mo ago`;
 }
