@@ -107,31 +107,38 @@ describe("useDrawer URL fragment", () => {
   });
 
   describe("given the browser and the router agree on the fragment", () => {
-    it("keeps that fragment", () => {
+    beforeEach(() => {
       staleRouterHash = "#conversations";
       window.history.replaceState({}, "", "/acme/traces#conversations");
-      const { result } = renderHook(() => useDrawer());
+    });
 
-      act(() => {
-        result.current.openDrawer("traceV2Details", { traceId: "trace-1" });
+    describe("when a drawer is opened", () => {
+      it("keeps that fragment", () => {
+        const { result } = renderHook(() => useDrawer());
+
+        act(() => {
+          result.current.openDrawer("traceV2Details", { traceId: "trace-1" });
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        expect(pushed).toContain("#conversations");
+        expect(pushed).not.toContain("preset");
       });
-
-      const pushed = mockPush.mock.calls[0]?.[0] as string;
-      expect(pushed).toContain("#conversations");
-      expect(pushed).not.toContain("preset");
     });
   });
 
   describe("given no fragment at all", () => {
-    it("pushes a URL without one", () => {
-      const { result } = renderHook(() => useDrawer());
+    describe("when a drawer is opened", () => {
+      it("pushes a URL without one", () => {
+        const { result } = renderHook(() => useDrawer());
 
-      act(() => {
-        result.current.openDrawer("traceV2Details", { traceId: "trace-1" });
+        act(() => {
+          result.current.openDrawer("traceV2Details", { traceId: "trace-1" });
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        expect(pushed).not.toContain("#");
       });
-
-      const pushed = mockPush.mock.calls[0]?.[0] as string;
-      expect(pushed).not.toContain("#");
     });
   });
 
@@ -200,6 +207,51 @@ describe("useDrawer URL fragment", () => {
         expect(pushed).toContain("#conversations");
         const afterHash = pushed.slice(pushed.indexOf("#"));
         expect(afterHash).toBe("#conversations");
+      });
+    });
+  });
+
+  describe("given the fragment carries both bar state and a parked drawer param", () => {
+    beforeEach(() => {
+      // The realistic version of the malformed shape: the user has already
+      // narrowed the window, so the bar's `preset` is sitting in the fragment
+      // when a `drawer.` param gets parked alongside it.
+      staleRouterHash = "#conversations?preset=24h&drawer.open=traceV2Details";
+      window.history.replaceState(
+        {},
+        "",
+        "/acme/traces#conversations?preset=24h&drawer.open=traceV2Details",
+      );
+    });
+
+    describe("when drawer params are updated", () => {
+      it("lifts only the drawer param into the real query string", () => {
+        const { result } = renderHook(() => useUpdateDrawerParams());
+
+        act(() => {
+          result.current({ mode: "conversation" });
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        const [beforeHash] = pushed.split("#");
+        expect(beforeHash).toContain("drawer.open=traceV2Details");
+        expect(beforeHash).toContain("drawer.mode=conversation");
+        expect(beforeHash).not.toContain("preset");
+      });
+
+      it("leaves the bar state in the fragment", () => {
+        // Carrying `preset` out of the fragment is the bug this whole file
+        // exists to fix — the traces bar reads the time range from there, and
+        // loses it the moment something else takes it away.
+        const { result } = renderHook(() => useUpdateDrawerParams());
+
+        act(() => {
+          result.current({ mode: "conversation" });
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        const afterHash = pushed.slice(pushed.indexOf("#"));
+        expect(afterHash).toBe("#conversations?preset=24h");
       });
     });
   });

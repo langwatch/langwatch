@@ -399,7 +399,22 @@ function rescueFragmentQuery(hash: string): {
   if (q === -1) return { queryString: "", hash };
   const fragmentQuery = hash.slice(q + 1);
   if (!/(^|&)drawer\./.test(fragmentQuery)) return { queryString: "", hash };
-  return { queryString: fragmentQuery, hash: hash.slice(0, q) };
+
+  // Only the `drawer.` pairs move. A fragment query can hold both — the bar
+  // sets `preset` and something then parks `drawer.open` alongside it — and
+  // lifting the whole thing would carry `preset` out of the fragment its owner
+  // reads, resetting the time range: the very bug this file is fixing.
+  const lifted: string[] = [];
+  const kept: string[] = [];
+  for (const pair of fragmentQuery.split("&")) {
+    if (!pair) continue;
+    (pair.startsWith("drawer.") ? lifted : kept).push(pair);
+  }
+  const fragment = hash.slice(0, q);
+  return {
+    queryString: lifted.join("&"),
+    hash: kept.length > 0 ? `${fragment}?${kept.join("&")}` : fragment,
+  };
 }
 
 /**
