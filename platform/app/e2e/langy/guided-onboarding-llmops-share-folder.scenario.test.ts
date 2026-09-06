@@ -131,7 +131,7 @@ describe("Langy sets up the llmops path through the shared folder", () => {
                 model,
                 criteria: [
                   `Langy opens with, word for word: "${GUIDED_LINES.llmopsOpener}"`,
-                  "Langy asks for code access before anything else and lets the turn end on the code access card.",
+                  "Langy asks for code access through the code access card in its first step; the opener line and the card in that same step are the expected shape. Fail only if Langy writes more text or takes another action after the card and before the user answers it.",
                   "When the developer types an unrelated question while the card is up, Langy answers in one warm line that keeps the setup going and never drops the path it was on.",
                   "After the folder connects, Langy reads the code, reports the framework it found, and wires tracing and the connect call into the developer's own code.",
                   `Langy proposes the first scenario with a question that starts "${GUIDED_LINES.proposalStart}" and ends "${GUIDED_LINES.proposalEnd}", and creates nothing before the developer picks "${GUIDED_OPTIONS.goAhead}".`,
