@@ -540,6 +540,23 @@ type RateLimits struct {
 // BudgetConfig holds spending controls.
 type BudgetConfig struct {
 	Scopes []BudgetScope
+
+	// ValidUntil is the earliest instant at which one of Scopes leaves the
+	// period its SpentMicroUSD was read in — the earliest `resets_at` the
+	// control plane stamped on a scope that can block. Zero when no scope
+	// carries a usable boundary (no budgets, or none with a limit).
+	//
+	// Past this instant every spend figure here describes a period that has
+	// ended, so the cache holding this config must re-read it rather than
+	// revalidate it. Revalidating is not enough: the config ETag is built
+	// from the key's revision and its provider set, neither of which moves
+	// when a period rolls, so a conditional refresh comes back 304 and the
+	// figures never change. A budget that reached its limit in the old
+	// period would then keep rejecting every request in the new one, and
+	// the change event that would otherwise evict this entry is emitted by
+	// the debit of a request that got through — which, once the block is
+	// in force, no request ever does.
+	ValidUntil time.Time
 }
 
 // BudgetScope is a single budget limit with its current spend (microdollars).

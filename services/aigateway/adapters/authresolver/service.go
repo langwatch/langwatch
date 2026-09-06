@@ -163,15 +163,56 @@ func (e *entry) currentConfigETag() string {
 	return e.configETag
 }
 
-// configStale reports whether the entry's config is older than ttl.
-// ttl <= 0 disables staleness (never stale).
+// refreshConfigETag is the If-None-Match a staleness refresh of this entry
+// should send: the carried token normally, and none once the budget period has
+// rolled.
+//
+// Dropping the token there is the whole point of the roll. The token is built
+// from the key's revision and its provider set, and a period ending moves
+// neither, so a conditional refresh of a bundle whose spend figures expired at
+// midnight comes back 304 and leaves those figures in place. Unconditional
+// costs one materialisation per key per period.
+func (e *entry) refreshConfigETag() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.budgetPeriodRolled() {
+		return ""
+	}
+	return e.configETag
+}
+
+// configStale reports whether the entry's config needs refreshing: its budget
+// period has rolled, or it is older than ttl. ttl <= 0 disables the age half
+// only — a rolled period is stale whatever the ttl, because the figures it
+// leaves behind are not merely old, they belong to a period that has ended.
 func (e *entry) configStale(ttl time.Duration) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.budgetPeriodRolled() {
+		return true
+	}
 	if ttl <= 0 {
 		return false
 	}
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	return time.Since(e.configFetchedAt) > ttl
+}
+
+// budgetPeriodRolled reports whether this entry's spend figures were read in a
+// budget period that has since ended. Caller holds e.mu.
+//
+// The `configFetchedAt` comparison is what keeps this a one-shot: it asks
+// whether the config was fetched BEFORE the boundary, so the refresh it
+// triggers clears it whether or not the control plane could be reached
+// (endConfigRefresh stamps configFetchedAt on every outcome). Without it a
+// bundle whose boundary is permanently in the past — a MANUAL budget carrying
+// an old stored instant, a clock skewed forward — would ask for a fresh fetch
+// on every request for as long as it lived.
+func (e *entry) budgetPeriodRolled() bool {
+	validUntil := e.bundle.Config.Budget.ValidUntil
+	if validUntil.IsZero() {
+		return false
+	}
+	return !time.Now().Before(validUntil) && e.configFetchedAt.Before(validUntil)
 }
 
 // tryBeginConfigRefresh claims the per-entry config-refresh slot.
@@ -977,6 +1018,10 @@ func (s *Service) bumpEntryAfterTransportFailure(h [64]byte, cause error) {
 // changed, and the conditional request turns a full config materialization
 // into a 304 the control plane answers from the key's revision.
 //
+// The exception is a rolled budget period, where refreshConfigETag drops the
+// token so the fetch cannot come back 304 — nothing the token is built from
+// moves when a period ends, and the spend figures have to move.
+//
 // It bounds the staleness of the key's own expiration date by the same TTL. The
 // date arrives on the config response as well as on the token, so an admin who
 // shortens it is followed within one TTL even while the change feed is
@@ -991,7 +1036,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer cancel()
 
 	stale, _, _ := e.snapshot()
-	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.currentConfigETag())
+	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.refreshConfigETag())
 	if err != nil {
 		s.logger.Warn("config_ttl_refresh_failed",
 			zap.String("vk_id", stale.VirtualKeyID),

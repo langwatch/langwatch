@@ -497,6 +497,54 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And an explicit null is a key that never expires
       And a missing field says nothing about expiry, so the caller keeps what it holds
 
+  Rule: A budget period that ends invalidates the spend the gateway is holding
+
+    # The bundle carries each budget's spend for the period it was read in, and
+    # the config version token is built from the key's revision and its
+    # provider set. Neither of those moves when a period ends, so a conditional
+    # revalidation confirms figures that describe a period that is over.
+    #
+    # For a budget that reached its limit, that is a block with no way out. The
+    # change event that would evict the entry is emitted by the debit of a
+    # request that got through, and once the block is in force no request gets
+    # through. The key stays rejected on yesterday's money until someone edits
+    # it or the gateway restarts.
+
+    @unit
+    Scenario: a bundle knows when its spend figures stop describing the current period
+      Given a config response carrying budgets that reset at different instants
+      When the gateway decodes it
+      Then the bundle is valid until the earliest of those instants
+      And a budget with no limit does not shorten that, because it can never block
+      And a budget the control plane sent no boundary for does not shorten it either
+
+    @unit
+    Scenario: the refresh at a period boundary asks for the config instead of confirming it
+      Given a cached key whose budget period ended after its config was read
+      When the next request arrives
+      Then the config refresh carries no version token
+      And the new period's spend replaces the old period's
+
+    @unit
+    Scenario: a period still running is revalidated the ordinary way
+      Given a cached key whose budget is exhausted inside its own period
+      When the next request arrives
+      Then no config refresh is triggered
+      And the request is judged against the spend the gateway holds
+
+    @unit
+    Scenario: a boundary that is already behind the gateway is asked about once
+      Given a cached key carrying a budget boundary that never moves
+      When request after request arrives
+      Then only the first triggers a config re-read
+      And the rest fall back to the ordinary staleness clock
+
+    @unit
+    Scenario: a bundle with no budgets keeps the ordinary staleness clock
+      Given a cached key with no budgets
+      When its config passes the staleness TTL
+      Then the refresh revalidates against the version token as before
+
   Rule: Bootstrap-pull enables gateway to serve when control plane is cold
 
     # The flag is named the way contract.md §6 and §9 name it. Nothing reads
