@@ -102,6 +102,21 @@ const abortError = (signal: AbortSignal): Error => {
 };
 
 /**
+ * Releases the unread copy of a request body.
+ *
+ * `Request.clone` tees the body stream, and a branch nobody reads holds every
+ * chunk the other branch consumes in memory. Cancelling the copy the replay
+ * never needs keeps a streamed upload from being buffered whole.
+ *
+ * The cancellation is never awaited: a tee only settles the promise its
+ * `cancel` returns once both branches are cancelled, so waiting on the copy
+ * while the sent branch is still live would never return.
+ */
+const discard = (spare: Request | null): void => {
+  void spare?.body?.cancel().catch(() => undefined);
+};
+
+/**
  * The body bytes to replay, read under the caller's signal.
  *
  * A `Request` built from a stream hands its copy over as a stream too, and
@@ -128,7 +143,7 @@ const replayBody = async ({
   try {
     return await Promise.race([spare.arrayBuffer(), aborted]);
   } catch (error) {
-    await spare.body?.cancel().catch(() => undefined);
+    discard(spare);
     throw error;
   }
 };
@@ -308,9 +323,11 @@ const upgrade = async ({
 }: Hop & { spare: Request | null }): Promise<Response> => {
   const location = first.headers.get("location");
   const refused = refusalOf({ url, response: first });
-  if (location === null || first.status === 303) throw refused;
-  const target = schemeUpgradeTarget({ url, location });
-  if (target === null || isStream(init?.body)) throw refused;
+  const target = location === null ? null : schemeUpgradeTarget({ url, location });
+  if (location === null || first.status === 303 || target === null || isStream(init?.body)) {
+    discard(spare);
+    throw refused;
+  }
 
   warnOnce({ url, logger: log });
 
@@ -354,12 +371,16 @@ export const createLangWatchFetch = ({
     const first = effective
       ? await send(effective)
       : await send(input, { ...init, redirect: "manual" });
-    if (!isRedirect(first)) return first;
+    if (!isRedirect(first)) {
+      discard(spare);
+      return first;
+    }
 
     const hop = { send, log, effective, init, url, first };
-    return FOLLOWING_METHODS.has(method)
-      ? follow({ ...hop, method })
-      : upgrade({ ...hop, spare });
+    if (!FOLLOWING_METHODS.has(method)) return upgrade({ ...hop, spare });
+
+    discard(spare);
+    return follow({ ...hop, method });
   };
 };
 

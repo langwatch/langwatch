@@ -241,7 +241,18 @@ describe("langwatchFetch", () => {
         expect(calls).toHaveLength(1);
       });
 
-      /** @scenario refuses to replay a streaming body */
+      /** @scenario a body that is never replayed is released without waiting */
+      it("returns the answer to a Request with a body that is not a redirect", async () => {
+        const { fetchImpl } = scripted(ok("done"));
+        const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
+        const request = new Request(HTTPS_URL, { method: "POST", body: "{}" });
+
+        const response = await fetchLangWatch(request);
+
+        expect(await response.text()).toBe("done");
+      });
+
+      /** @scenario an aborted call settles while a streamed body is replayed */
       it("settles when the caller aborts while a Request's streamed body is replayed", async () => {
         const { fetchImpl, calls } = scripted(redirect({ status: 307, location: HTTPS_URL }), ok());
         const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });

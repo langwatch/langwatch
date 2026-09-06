@@ -148,6 +148,21 @@ Feature: TypeScript SDK HTTP client redirects
     Then the request fails with a LangWatchRedirectError
     And no second request is sent
 
+  @unit
+  Scenario: a body that is never replayed is released without waiting
+    Given a POST Request carrying a body
+    And the platform answers it without a redirect
+    When the SDK sends the request
+    Then the caller receives the answer
+
+  @unit
+  Scenario: an aborted call settles while a streamed body is replayed
+    Given a POST Request whose streamed body never ends
+    And the platform answers with a 307 to the same URL over https
+    When the caller aborts the request while the body is replayed
+    Then the request fails with an AbortError
+    And no second request is sent
+
   # --- Every request goes through the shared client ---
 
   @unit
