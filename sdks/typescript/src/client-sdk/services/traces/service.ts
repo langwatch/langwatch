@@ -40,10 +40,10 @@ export class TracesService {
    * @returns The trace response object.
    */
   async get(traceId: string, params?: GetTraceParams): Promise<GetTraceResponse> {
-    const { data, error } = await this.config.langwatchApiClient.GET("/api/v1/trace/{id}", {
+    const { data, error } = await this.config.langwatchApiClient.GET("/api/v1/traces/{traceId}", {
       params: {
         path: {
-          id: traceId,
+          traceId,
         },
       },
       query: params,
@@ -53,6 +53,6 @@ export class TracesService {
       this.handleApiError("get trace", error);
     }
 
-    return data;
+    return data as GetTraceResponse;
   }
 }

@@ -349,7 +349,10 @@ export class ExperimentsApiService {
     const body = toRunStartRequest({ parameters: options.parameters });
     const { data, error, response } = await this.apiClient.POST("/api/v1/experiments/{slug}/run", {
       params: { path: { slug } },
-      ...(body !== undefined ? { body } : {}),
+      // The served description gives this operation a required body with no
+      // schema, so the key is always present; `undefined` sends no body and no
+      // Content-Type, exactly as omitting it did.
+      body,
     });
     return unwrapApiResult({
       operation: `start experiment run for "${slug}"`,
@@ -470,9 +473,11 @@ export class ExperimentsApiService {
       {
         params: {
           path: { slug },
+          // Both are described as string query parameters; the serialised
+          // query string is the same either way.
           query: {
-            ...(limit !== undefined ? { limit } : {}),
-            ...(cursor !== undefined ? { cursor } : {}),
+            ...(limit !== undefined ? { limit: String(limit) } : {}),
+            ...(cursor !== undefined ? { cursor: String(cursor) } : {}),
           },
         },
       },
@@ -499,7 +504,7 @@ export class ExperimentsApiService {
   }): Promise<ExperimentRestoreVersionResponse> {
     const { data, error, response } = await this.apiClient.POST(
       "/api/v1/experiments/{slug}/versions/{version}/restore",
-      { params: { path: { slug, version } } },
+      { params: { path: { slug, version: String(version) } } },
     );
     return unwrapApiResult({
       operation: `restore version ${version} of experiment "${slug}"`,
