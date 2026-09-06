@@ -24,6 +24,7 @@ import {
 } from "../app-rest.packaged-families";
 import { createApiProcessRestFeatures } from "../app-rest.process-features";
 import { createApiDualCredentialAuth } from "../../app/api-dual-credential-auth";
+import { unavailableIdempotentRunner } from "../../app/api-idempotency.composition";
 import { createApiTrackedEventPorts } from "../../features/trace/tracked-event-ports.adapter";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
@@ -673,6 +674,10 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeRouteProjectPermission: () => noop,
     authenticateOrganizationThrowing: asOrganization,
     authorizeOrganizationPermissionThrowing: () => noop,
+    // The port the keyed creates are built against. This world composes no
+    // receipt store, so it takes the runner a process with no ledger takes:
+    // an unkeyed create runs, and a key would be refused by name.
+    idempotency: unavailableIdempotentRunner,
   } as never);
 }
 

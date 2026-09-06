@@ -200,6 +200,7 @@ import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.
 import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition";
 import {
   composeApiIdempotency,
+  unavailableIdempotentRunner,
   type ApiIdempotencyComposition,
 } from "./api-idempotency.composition";
 import { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
@@ -1479,8 +1480,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       observability: ApiRestObservabilityComposition.create(),
       // The one ledger every keyed create on this process dispatches through,
       // supplied here so a family declares `withIdempotency(...)` and wires
-      // nothing. Absent on a process with no database or no cipher.
-      ...(this.composedIdempotency ? { idempotency: this.composedIdempotency.run } : {}),
+      // nothing. A process with no database or no cipher composed no ledger and
+      // takes the runner that refuses a key by name: omitting the port instead
+      // fails the BUILD of every family declaring it, and so the whole process.
+      idempotency: this.composedIdempotency?.run ?? unavailableIdempotentRunner,
     });
     const projectRestPolicy: ApiRestProjectPolicy = ApiRestSecurity.projectPolicy(credentials);
     // The process-owned families FIRST, and specifically before anything that

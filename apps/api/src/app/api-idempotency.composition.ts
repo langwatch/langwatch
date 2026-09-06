@@ -30,6 +30,7 @@ import {
   type IdempotencyResponseCipher,
   type IdempotentRunner,
 } from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
@@ -57,6 +58,34 @@ export type ApiIdempotencyComposition = Readonly<{
   /** The same runner, as the gateway composition's port declares it. */
   gateway: ApiGatewayIdempotencyPort;
 }>;
+
+/** A key this deployment cannot honour, refused by name. */
+class ApiIdempotencyUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super(
+      "service_unavailable",
+      "This deployment has no idempotency receipt ledger, so it cannot accept a create that carries an Idempotency-Key.",
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "ApiIdempotencyUnavailableError";
+  }
+}
+
+/**
+ * The runner a process hands its keyed creates when it composed NO ledger.
+ *
+ * A family declaring `withIdempotency(...)` fails to BUILD without a runner,
+ * so omitting one takes the whole process down over a capability only a keyed
+ * request needs. This one keeps those routes served: an unkeyed create runs as
+ * it always did, and only a request that sent a key is refused by name.
+ */
+export const unavailableIdempotentRunner: IdempotentRunner = async ({ key, handler }) => {
+  if (key !== null) throw new ApiIdempotencyUnavailableError();
+  const response = await handler();
+  return { isReplayed: false, status: response.status, response };
+};
 
 /** The gateway composition's port, over this process's one ledger. */
 class ApiGatewayIdempotencyLedger extends ApiGatewayIdempotencyPort {

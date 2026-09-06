@@ -193,9 +193,11 @@ export class ApiRestSecurity {
     logger?: Pick<Logger, "error">;
     /**
      * The `Idempotency-Key` receipt ledger this process composed, backing
-     * every family that declares `withIdempotency(...)`. Absent on a process
-     * with no database or no cipher, and then such a family fails to build
-     * rather than accepting a key it cannot honour.
+     * every family that declares `withIdempotency(...)`. A process with no
+     * database or no cipher composed no ledger and passes the runner that
+     * refuses a key by name instead; omitting it altogether is what makes
+     * such a family fail to BUILD, so only a caller that composes no keyed
+     * family may leave it out.
      */
     idempotency?: IdempotentRunner;
   }): AppRestSecurity {
