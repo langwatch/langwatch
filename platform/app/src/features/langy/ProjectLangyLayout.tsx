@@ -4,6 +4,7 @@ import { Outlet } from "react-router";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { LangySidecar } from "./components/LangyPanel";
+import { useLangyConversationDeepLink } from "./hooks/useLangyConversationDeepLink";
 import { useLangyScopeReset } from "./hooks/useLangyScopeReset";
 import { useShowLangy } from "./hooks/useShowLangy";
 import { LangyProvider, useLangy } from "./LangyContext";
@@ -43,6 +44,7 @@ export default function ProjectLangyLayout() {
     redirectToProjectOnboarding: false,
   });
   useLangyScopeReset();
+  useLangyConversationDeepLink();
 
   return (
     <ProjectLangySubtree

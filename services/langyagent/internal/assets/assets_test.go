@@ -79,7 +79,7 @@ func TestAgentsTemplate_FitsSizeBudget(t *testing.T) {
 }
 
 // MaterializeSkills writes the embedded skills tree to disk (a subprocess cannot
-// read embed.FS), preserving the <name>/SKILL.md layout opencode discovers.
+// read embed.FS), preserving the <name>/SKILL.md layout the worker discovers.
 func TestMaterializeSkills_WritesTreeToDisk(t *testing.T) {
 	dest := t.TempDir()
 	if err := MaterializeSkills(dest); err != nil {

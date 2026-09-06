@@ -285,7 +285,7 @@ export function LangyChoicesCard({
 
         {superseded ? (
           <Text textStyle="2xs" color="fg.subtle" paddingX={2} paddingTop={0.5}>
-            The conversation moved on — this question is closed.
+            The conversation moved on. This question is closed.
           </Text>
         ) : null}
       </VStack>

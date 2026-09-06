@@ -36,10 +36,17 @@ import {
 } from "./protocol";
 import { AgentParameterError, type ParameterReader } from "./schema";
 import {
+  describeError,
+  NoWebSocketError,
+  openTransportSocket,
+  RECONNECT_BASE_MS,
+  RECONNECT_MAX_MS,
+  reconnectDelayMs,
+  watchdogDelayMs,
+} from "./reconnect";
+import {
   type AgentTransport,
   defaultSocketFactory,
-  HttpLongPollSocket,
-  NoWebSocketError,
   resolveTransport,
   type SocketFactory,
   type SocketLike,
@@ -72,27 +79,8 @@ export interface AgentClientConfig {
   failureNoticeIntervalMs?: number;
 }
 
-export const RECONNECT_BASE_MS = 1_000;
-export const RECONNECT_MAX_MS = 30_000;
 /** The unreachable-endpoint warning repeats at most this often. */
 export const FAILURE_NOTICE_INTERVAL_MS = 5 * 60_000;
-
-/** The delay before reconnect attempt `attempt` (0-based), with jitter, in the 1 s to 30 s window. */
-export function reconnectDelayMs({
-  attempt,
-  baseMs = RECONNECT_BASE_MS,
-  maxMs = RECONNECT_MAX_MS,
-  random = Math.random,
-}: {
-  attempt: number;
-  baseMs?: number;
-  maxMs?: number;
-  random?: () => number;
-}): number {
-  const exponential = Math.min(maxMs, baseMs * 2 ** Math.min(attempt, 16));
-  const jittered = exponential * (0.75 + random() * 0.5);
-  return Math.round(Math.min(maxMs, Math.max(baseMs, jittered)));
-}
 
 const NOT_CONNECTED = "not connected to LangWatch";
 
@@ -141,9 +129,6 @@ const SHUTDOWN_SIGNALS = ["SIGINT", "SIGTERM"] as const;
 type ShutdownSignal = (typeof SHUTDOWN_SIGNALS)[number];
 
 const CLOSE_GRACE_MS = 500;
-
-const describeError = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 export class AgentClient {
   private readonly agents: AgentRuntime[] = [];
@@ -342,10 +327,13 @@ export class AgentClient {
     if (this.stopped || this.socket) return;
     let socket: SocketLike;
     try {
-      socket =
-        this.activeTransport === "http"
-          ? new HttpLongPollSocket({ url: this.httpUrl, headers: this.headers })
-          : this.openSocket({ url: this.url, headers: this.headers });
+      socket = openTransportSocket({
+        transport: this.activeTransport,
+        websocketUrl: this.url,
+        httpUrl: this.httpUrl,
+        headers: this.headers,
+        socketFactory: this.openSocket,
+      });
     } catch (error) {
       if (error instanceof NoWebSocketError) {
         this.giveUp(
@@ -440,7 +428,7 @@ export class AgentClient {
       } catch {
         // The close event follows either way.
       }
-    }, Math.max(15_000, this.heartbeatIntervalMs * 3));
+    }, watchdogDelayMs(this.heartbeatIntervalMs));
   }
 
   private registerFrame(): ClientFrame {

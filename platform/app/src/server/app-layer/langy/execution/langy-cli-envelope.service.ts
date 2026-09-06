@@ -2,7 +2,7 @@
  * The CLI envelope: re-typing a shell tool call as the LangWatch capability it
  * really was.
  *
- * Langy runs on opencode and reaches LangWatch through the `langwatch` CLI, so
+ * Langy reaches LangWatch through the `langwatch` CLI, so
  * every tool call arrives named `bash` with the intent buried in a command
  * string. Left alone that flattens the product: the durable event log records
  * "the agent ran bash" instead of "the agent searched traces", and the browser
@@ -44,7 +44,7 @@ import {
 } from "./langwatchCommand";
 
 /**
- * A tool-call lifecycle frame the manager forwards from opencode (`langy.tool`).
+ * A tool-call lifecycle frame the manager forwards from the worker (`langy.tool`).
  * `phase:"start"` carries the tool name + input; `phase:"end"` carries the
  * result (`output`, a string) and whether it errored. Paired by `id`.
  *
@@ -65,10 +65,10 @@ export interface LangyToolFrame {
   result?: CliToolResult;
 }
 
-/** opencode's shell tools — any of these may be carrying a `langwatch` call. */
+/** The worker's shell tools — any of these may be carrying a `langwatch` call. */
 const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute"]);
 
-/** Keys a shell tool may pass its command under. opencode's bash uses `command`. */
+/** Keys a shell tool may pass its command under. The bash tool uses `command`. */
 const COMMAND_KEYS = ["command", "cmd", "script"];
 
 export class LangyCliEnvelopeService {
@@ -208,7 +208,7 @@ export class LangyCliEnvelopeService {
 
   /**
    * The command string behind a shell tool call, or null when the frame is not a
-   * shell call at all. opencode's bash tool passes `{ command: "…" }`, but the
+   * shell call at all. The bash tool passes `{ command: "…" }`, but the
    * input is whatever the model produced, so a bare string is tolerated too.
    */
   /**
