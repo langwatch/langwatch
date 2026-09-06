@@ -103,7 +103,12 @@ base_pages = page_paths(os.environ["BASE_FILES"])
 branch_pages = page_paths(os.environ["BRANCH_FILES"])
 
 # Report one line per removed page, in canonical (index -> directory) form.
-removed = sorted({canonical(p) for p in base_pages - branch_pages})
+# Both sides are canonicalised before the subtraction, so a page that only
+# moves between `foo/index.mdx` and `foo.mdx` keeps the same URL and does not
+# count as removed.
+removed = sorted(
+    {canonical(p) for p in base_pages} - {canonical(p) for p in branch_pages}
+)
 
 if docs_json_text.strip():
     try:
@@ -231,7 +236,7 @@ def destination_problem(destination, source, captures):
     if "#" in destination:
         return f"destination '{destination}' carries an #anchor"
     if destination.startswith("https://"):
-        if not urlsplit(destination).netloc:
+        if not urlsplit(destination).hostname:
             return f"destination '{destination}' has no host"
         return None
     if destination.startswith("http://"):
