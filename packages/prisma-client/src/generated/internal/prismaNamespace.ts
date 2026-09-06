@@ -9903,6 +9903,7 @@ export const UserScalarFieldEnum = {
   deactivatedAt: 'deactivatedAt',
   lastHomePath: 'lastHomePath',
   tracesExplorerTourDismissedAt: 'tracesExplorerTourDismissedAt',
+  langyCodeAccessPreference: 'langyCodeAccessPreference',
   passkeyNudgeDismissedAt: 'passkeyNudgeDismissedAt'
 } as const
 
@@ -10604,6 +10605,7 @@ export const ModelProviderScalarFieldEnum = {
   rotationPolicy: 'rotationPolicy',
   providerConfig: 'providerConfig',
   fallbackPriorityGlobal: 'fallbackPriorityGlobal',
+  langySkipPermissionsModels: 'langySkipPermissionsModels',
   healthStatus: 'healthStatus',
   circuitOpenedAt: 'circuitOpenedAt',
   lastHealthCheckAt: 'lastHealthCheckAt',
@@ -11443,6 +11445,7 @@ export const ApiKeyScalarFieldEnum = {
   expiresAt: 'expiresAt',
   lastUsedAt: 'lastUsedAt',
   revokedAt: 'revokedAt',
+  revocationCause: 'revocationCause',
   ingestSourceType: 'ingestSourceType',
   ingestionTemplateId: 'ingestionTemplateId',
   createdByDeviceLabel: 'createdByDeviceLabel',

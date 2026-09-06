@@ -28,7 +28,7 @@ const REPO_ROOT = path.resolve(__dirname, "../../../../..");
 const SKILLS_DIR = path.join(REPO_ROOT, "skills/_compiled/native");
 const OUT = path.join(
   REPO_ROOT,
-  "packages/features/langy/server/src/services/setup-skill-bodies.generated.ts",
+  "packages/features/langy/server/src/rules/setup-skill-bodies.rules.ts",
 );
 
 /** The docblock the generated module carries, so its provenance is on the file. */

@@ -8,7 +8,7 @@ import { Check, Code, Globe, Plug, Workflow } from "lucide-react";
 import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
 import type { TargetValue } from "../../../../model/scenario-target";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design";
-import { ownerOnlyCopy } from "../../../../behavior/scenarios/use-filtered-scenario-targets";
+import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 

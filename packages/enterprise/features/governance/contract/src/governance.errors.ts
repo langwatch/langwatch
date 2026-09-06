@@ -51,3 +51,15 @@ export class PersonalWorkspaceMissingError extends Error {
     this.name = "PersonalWorkspaceMissingError";
   }
 }
+
+/**
+ * The personal mint was asked for a source type no wrapped tool stamps. Named
+ * so the route can answer with the request as the cause and keep every other
+ * failure a server fault.
+ */
+export class PersonalSourceTypeNotAllowedError extends Error {
+  constructor(sourceType: string) {
+    super(`No personal ingestion key is minted for source type ${sourceType}.`);
+    this.name = "PersonalSourceTypeNotAllowedError";
+  }
+}

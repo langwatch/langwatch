@@ -303,6 +303,46 @@ Feature: Authorization grants
     Then the orphaned binding's revocation is issued before the edit commits
     And a failure to revoke fails the edit
 
+
+  # ═══ Read-your-writes ═════════════════════════════════════════════════
+
+  # An attach and a role definition hold, bounded, for the projection to make
+  # their rows readable. Timing out is normally not a failure: the append is
+  # durable and the fold converges. It IS a failure for a caller whose next
+  # step hands out access these rows decide, which is what `requireProjection`
+  # states.
+
+  @unit
+  Scenario: A write that nobody reads next passes when the projection lags
+    Given an attach whose caller does not require the projection
+    When the read-your-writes window passes with the rows not readable
+    Then the write is reported as done
+    And the lag is logged
+
+  @unit
+  Scenario: A write whose caller requires the projection fails when it lags
+    Given an attach whose caller requires the projection
+    When the read-your-writes window passes with the rows not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: A role definition whose caller requires the projection fails when it lags
+    Given a role definition whose caller requires the projection
+    When the read-your-writes window passes with the row not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: A required write that lands inside the window passes
+    Given an attach whose caller requires the projection
+    When the rows become readable inside the window
+    Then the write is reported as done
+
+  @unit
+  Scenario: Requiring the projection waits for it even when the wait is switched off
+    Given an attach whose caller requires the projection and asks not to wait
+    When the read-your-writes window passes with the rows not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
   # ═══ The projection ═══════════════════════════════════════════════════
 
   @unit @unimplemented

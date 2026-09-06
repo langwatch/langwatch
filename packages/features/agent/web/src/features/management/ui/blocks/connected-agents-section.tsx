@@ -8,7 +8,7 @@ import { Bot, ExternalLink, Laptop, Play, Trash2, User } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AgentCardIcon, AgentCardMenuTrigger, AgentCardShell } from "./agent-card";
-import type { ConnectedAgentView } from "@langwatch/agent-contract";
+import { ownerOnlyCopy, type ConnectedAgentView } from "@langwatch/agent-contract";
 import {
   environmentTone,
   instanceCountLabel,
@@ -94,27 +94,41 @@ function EnvironmentLabel({ environment }: { environment: string }) {
   );
 }
 
-/** The chip that names the person or the machine a card belongs to. */
+/**
+ * The chip that names the person or the machine a card belongs to.
+ *
+ * Two cards of one name and one environment are told apart by this chip
+ * alone, so a card the reader cannot run carries it too and says why on
+ * hover, in the words the refused run itself uses.
+ */
 function ScopeChip({ agent }: { agent: ConnectedAgentView }) {
   const scope = scopeOf(agent);
   if (!scope) return null;
   return (
-    <HStack
-      gap={1}
-      display="inline-flex"
-      paddingX={1.5}
-      paddingY={0.5}
-      borderRadius="full"
-      background="bg.muted"
-      minWidth={0}
-      flexShrink={0}
-      maxWidth="50%"
-    >
-      {scope.kind === "owner" ? <User size={10} /> : <Laptop size={10} />}
-      <Text fontSize="11px" truncate>
-        {scope.label}
-      </Text>
-    </HStack>
+    <Tooltip content={ownerOnlyCopy(agent.owner?.name)} disabled={agent.selectable}>
+      <HStack
+        gap={1}
+        display="inline-flex"
+        paddingX={1.5}
+        paddingY={0.5}
+        borderRadius="full"
+        background="bg.muted"
+        minWidth={0}
+        flexShrink={0}
+        maxWidth="50%"
+        data-testid="connected-agent-scope-chip"
+        // The chip is the only place a card says why it cannot be run, so on
+        // the cards that carry that reason it takes the tab order too: the
+        // tooltip opens on focus, not on hover alone.
+        tabIndex={agent.selectable ? undefined : 0}
+        aria-label={agent.selectable ? undefined : ownerOnlyCopy(agent.owner?.name)}
+      >
+        {scope.kind === "owner" ? <User size={10} /> : <Laptop size={10} />}
+        <Text fontSize="11px" truncate>
+          {scope.label}
+        </Text>
+      </HStack>
+    </Tooltip>
   );
 }
 

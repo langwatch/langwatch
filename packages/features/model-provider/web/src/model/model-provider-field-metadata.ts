@@ -85,13 +85,19 @@ export const MODEL_PROVIDER_FIELD_METADATA: Record<
       description:
         "Your Azure OpenAI resource endpoint URL (e.g., https://your-resource.openai.azure.com)",
     },
+    AZURE_OPENAI_API_VERSION: {
+      label: "API Version",
+      description:
+        "Optional: used when calling your Azure OpenAI resource directly. It is ignored when your traffic routes through the LangWatch AI Gateway, which sets its own version.",
+    },
     AZURE_API_GATEWAY_BASE_URL: {
       label: "Base URL",
       description: "Optional: Base URL for Azure API Management gateway if routing through APIM",
     },
     AZURE_API_GATEWAY_VERSION: {
       label: "Version",
-      description: "Optional: API version for Azure API Management gateway",
+      description:
+        "Optional: used when calling through your Azure API Management gateway. It is ignored when your traffic routes through the LangWatch AI Gateway, which sets its own version.",
     },
   },
   bedrock: {

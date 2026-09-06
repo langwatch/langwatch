@@ -18,6 +18,7 @@
  *   GET  /governance/ingestion-templates         the org's ingestion templates
  *   POST /governance/ingestion-key               mint a write-only OTLP key
  *   GET  /governance/ingestion-keys              the live personal keys
+ *   GET  /governance/ingestion-keys/:lookup_id   what became of one of them
  *
  * ## Why these sit under an auth path
  *
@@ -58,6 +59,7 @@ import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "@langwatch/ente
 import {
   NoEligibleProvidersError,
   PersonalVirtualKeyAlreadyExistsError,
+  PersonalSourceTypeNotAllowedError,
   PersonalWorkspaceMissingError,
   PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
   RoutingPolicyHasNoProvidersError,
@@ -1107,15 +1109,16 @@ export function createGovernanceCliRestApp(options: {
 
   /**
    * The personal-project branch of the ingestion-key mint: the caller's own
-   * workspace, rotating in place so one person never accumulates keys for one
-   * tool.
+   * workspace, one key per device. Create-only, because the caller is a device
+   * session and the other devices under this login are still exporting with
+   * theirs; the service's cap is what keeps the list bounded.
    */
   async function mintPersonalIngestionKey(
     c: Context,
     input: { caller: GovernanceCliCaller; sourceType: string },
   ): Promise<Response> {
     try {
-      const result = await ports.governance().ingestionKeyEnsureForPersonalProject({
+      const result = await ports.governance().ingestionKeyIssueForPersonalProject({
         userId: input.caller.user_id,
         organizationId: input.caller.organization_id,
         sourceType: input.sourceType,
@@ -1134,10 +1137,20 @@ export function createGovernanceCliRestApp(options: {
         201,
       );
     } catch (err) {
-      // Only the missing workspace is a precondition the caller can fix, so it
-      // is the only failure that reports as one. Everything else is a server
-      // fault: logged, with a fixed message, rather than a prompt the person
-      // cannot act on and an internal error string on the wire.
+      // A source type no wrapped tool stamps and a missing workspace are the
+      // two failures the caller can act on, so they are the only ones that
+      // report as such. Everything else is a server fault: logged, with a fixed
+      // message, rather than a prompt the person cannot act on and an internal
+      // error string on the wire.
+      if (err instanceof PersonalSourceTypeNotAllowedError) {
+        return c.json(
+          {
+            error: "invalid_request",
+            error_description: `No personal ingestion key is minted for source type ${input.sourceType}. Personal keys are minted for the tools the LangWatch CLI wraps.`,
+          },
+          400,
+        );
+      }
       if (err instanceof PersonalWorkspaceMissingError) {
         return c.json(
           {
@@ -1189,6 +1202,51 @@ export function createGovernanceCliRestApp(options: {
       );
     },
     (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
+
+  // ---------- GET /api/auth/cli/governance/ingestion-keys/:lookup_id ----------
+  // What became of one of the caller's own personal ingestion keys. The session
+  // context hook asks this when the collector rejects the key the device
+  // exports with, before it re-mints: a key the cap retired or a rotation
+  // replaced is the platform's own doing and the device may repair itself, a
+  // key a person revoked stays dead until that person instruments again.
+  //
+  // `unknown` is a 200, not a 404, so a CLI can tell "no such key of yours"
+  // from "a server too old to have this route".
+  service.registerRoute(
+    "get",
+    "/governance/ingestion-keys/:lookup_id",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      const lookupId = c.req.param("lookup_id");
+      if (!lookupId) {
+        return c.json(
+          { error: "invalid_request", error_description: "lookup_id is required" },
+          400,
+        );
+      }
+      const key = await ports.governance().ingestionKeyDescribePersonal({
+        userId: caller.user_id,
+        organizationId: caller.organization_id,
+        lookupId,
+      });
+      if (!key) return c.json({ lookup_id: lookupId, status: "unknown" }, 200);
+      return c.json(
+        {
+          lookup_id: lookupId,
+          status: key.live ? "live" : "revoked",
+          source_type: key.sourceType,
+          revocation_cause: key.revocationCause,
+        },
+        200,
+      );
+    },
+    (b) =>
+      policy(cliPolicy)(b)
+        .withParams(z.object({ lookup_id: z.string().min(1) }))
+        .withRawResponse(CLI_ANSWER),
   );
 
   return service.build();

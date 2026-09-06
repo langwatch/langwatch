@@ -68,8 +68,11 @@ export class TestGovernanceService extends GovernanceService {
     unsupported<GovernanceService["ingestionKeyEnsureForPersonalProject"]>();
   ingestionKeyEnsureForProject = unsupported<GovernanceService["ingestionKeyEnsureForProject"]>();
   ingestionKeyIssueForProject = unsupported<GovernanceService["ingestionKeyIssueForProject"]>();
+  ingestionKeyIssueForPersonalProject =
+    unsupported<GovernanceService["ingestionKeyIssueForPersonalProject"]>();
   ingestionKeyListForPersonalProject =
     unsupported<GovernanceService["ingestionKeyListForPersonalProject"]>();
+  ingestionKeyDescribePersonal = unsupported<GovernanceService["ingestionKeyDescribePersonal"]>();
   ingestionRecordRunCompleted = unsupported<GovernanceService["ingestionRecordRunCompleted"]>();
   ingestionRecordRunFailed = unsupported<GovernanceService["ingestionRecordRunFailed"]>();
   ingestionSourceArchive = unsupported<GovernanceService["ingestionSourceArchive"]>();

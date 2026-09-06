@@ -1,3 +1,4 @@
+import { API_KEY_REVOCATION_CAUSES } from "@langwatch/api-key-contract";
 import { z } from "zod";
 
 export const ingestionKeyMintCommandSchema = z
@@ -32,3 +33,38 @@ export const personalIngestionKeySchema = z
   })
   .strict();
 export type PersonalIngestionKey = z.infer<typeof personalIngestionKeySchema>;
+
+/**
+ * The source types a personal key may be minted for: the tools the CLI wraps
+ * or captures, each stamped as `langwatch.source`. The personal mint is capped
+ * per source type, so an open set would make the cap meaningless — a device
+ * session could hold the cap again under every value it invents. A new tool
+ * joins here when the CLI learns to wrap it.
+ */
+export const PERSONAL_INGEST_SOURCE_TYPES = [
+  "claude_code",
+  "codex",
+  "gemini",
+  "opencode",
+  "copilot_cli",
+  "copilot_vscode",
+  "copilot_app",
+] as const;
+
+/**
+ * Live personal ingest keys one workspace may hold per (sourceType, template).
+ * Sized for a person's real machines with room to spare: a few laptops, a few
+ * cloud machines, and the forks of a golden image that share their parent's
+ * key rather than minting their own.
+ */
+export const PERSONAL_INGEST_KEYS_PER_TOOL_CAP = 32;
+
+/** What became of one of the caller's own personal ingest keys. */
+export const personalIngestionKeyStateSchema = z
+  .object({
+    sourceType: z.string().min(1),
+    live: z.boolean(),
+    revocationCause: z.enum(API_KEY_REVOCATION_CAUSES).nullable(),
+  })
+  .strict();
+export type PersonalIngestionKeyState = z.infer<typeof personalIngestionKeyStateSchema>;

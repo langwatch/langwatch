@@ -19,6 +19,17 @@ import { PANEL_ROOT_ATTR } from "../../../../model/composer-morph-geometry";
 import { shouldRehydrateEngineFromDurable } from "../../../../model/foreign-turn-rehydration";
 import { resolveLangyActivityOwnership } from "../../../../model/langy-activity-ownership";
 import { langyChoicesTimeline } from "../../../../model/langy-choices-timeline";
+import { latestCodeAccessCallId } from "../../../../model/langy-code-access-tool";
+import { resolveComposerModel } from "../../../../model/langy-composer-model";
+import { langyDraftToRestore } from "../../../../model/langy-draft-recovery";
+import { isLangyTranscriptMessage } from "../../../../model/langy-transcript";
+import { isLangyHiddenLocalNotice } from "@langwatch/langy-contract";
+import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store";
+import { useLangyLocalRecord } from "../../behavior/data/use-langy-local-record";
+import { LANGY_CODE_ACCESS_ASK_AGAIN } from "../../../../ui/sections/derived-cards/langy-code-access-card";
+import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view";
+import { LangyLocalPermissionCard } from "./langy-local-permission-card";
+import { LangyLocalWorkspaceChip } from "./langy-local-workspace-chip";
 import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup";
 import {
   APP_HEADER_HEIGHT,
@@ -40,6 +51,11 @@ import {
 import { langyPlan } from "../../../../model/langy-plan";
 import { resolveLangyStopTarget } from "../../../../model/langy-stop-target";
 import {
+  questionToolCallIdsIn,
+  questionWaitCardParts,
+} from "../../../../model/langy-question-tool";
+import { langyTurnActivityKey } from "../../../../model/langy-thinking-line";
+import {
   currentTurnAssistant,
   hasTokens,
   runningTool,
@@ -60,6 +76,7 @@ import { LangyMark, LangyMarkGradientDefs } from "../../../../ui/sections/langy-
 import { LangyThinkingLine } from "../../../../ui/sections/langy-thinking-line";
 import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line";
 import {
+  isSendUnanswered,
   LANGY_CHOICE_SELECTION_PART_TYPE,
   type LangyChoiceSelection,
   type LangyDerivedCard,
@@ -86,9 +103,21 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  Profiler,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useProjectReach } from "../../../../behavior/home/use-project-reach";
-import { allModelOptions } from "@langwatch/model-provider-web/surfaces/model-selector";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "@langwatch/model-provider-web/surfaces/model-selector";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { IsolatedErrorBoundary } from "@langwatch/workflow-web/surfaces/isolated-error-boundary";
 import { Menu } from "@langwatch/design-system/menu";
@@ -97,6 +126,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { showErrorToast } from "@langwatch/ui-host/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { LangyModelProviderSetup } from "../../../../ui/sections/model-provider-setup";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag";
@@ -123,15 +153,24 @@ import { syncLangyAfterDefaultModelWrite } from "../../behavior/logic/coding-def
 import {
   createLangyChatTransport,
   type LangyTurnRequestContext,
+  type LangyTurnSignalEntry,
 } from "../../behavior/logic/langy-chat-transport";
 import { catchUpConversationFold } from "../../behavior/logic/langy-durable-catch-up";
 import {
   explainLangyError,
+  isLangyConversationPending,
   isStaleLangyHistoryRead,
+  LANGY_CONVERSATION_PENDING_GRACE_MS,
   readLangyStreamError,
   readLangyTrpcError,
   resolveLiveTurnError,
 } from "../../behavior/logic/langy-error-explainer";
+import {
+  langyPermissionCards,
+  langyQuestionCards,
+  langyQuestionWaitsByToolCall,
+  routeLangyChoiceAnswer,
+} from "../../../../model/langy-local-waits";
 import {
   type MakeDefaultWritePlan,
   makeDefaultOffer,
@@ -317,6 +356,16 @@ interface LangySidecarProps {
   actionHandlersRef?: React.RefObject<LangyUiActionHandlers>;
 }
 
+/** How one send behaves beyond its text. */
+interface LangySendOptions {
+  /**
+   * Give the text back to the composer if the send fails. True for anything
+   * the reader typed, false for a message the panel sends on their behalf:
+   * they never wrote it, so they must not be left holding it.
+   */
+  keepOnFailure?: boolean;
+}
+
 export function LangySidecar({ proposalHandlersRef, actionHandlersRef }: LangySidecarProps) {
   const isOpen = useLangyStore((s) => s.isOpen);
   const toggle = useLangyStore((s) => s.togglePanel);
@@ -440,6 +489,61 @@ function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () => void
       </chakra.button>
     </Tooltip>
   );
+}
+
+/**
+ * A live turn signal, onto the store the panel reads.
+ *
+ * Status, progress, reasoning and plan are the four the panel renders;
+ * milestone entries carry no numeric rollup and have no consumer yet.
+ */
+function applyTurnSignal(signal: LangyTurnSignalEntry): void {
+  const store = useLangyStore.getState();
+  if (signal.type === "status") {
+    if (signal.readiness) store.setTurnReadinessStatus(signal.status);
+    else store.setTurnStatus(signal.status);
+    return;
+  }
+  if (signal.type === "progress") {
+    applyProgressSignal(signal);
+    return;
+  }
+  if (signal.type === "reasoning") {
+    // Ephemeral thinking — accumulate the run onto the live reasoning so it
+    // reads as one flowing block while it streams.
+    store.appendTurnReasoning(signal.text);
+    return;
+  }
+  if (signal.type === "plan") {
+    // The manager's typed plan snapshot — the checklist the plan card prefers
+    // over parsing the raw todowrite part on the live turn.
+    store.setTurnPlan(signal.items);
+  }
+}
+
+/** The progress half of {@link applyTurnSignal}. */
+function applyProgressSignal(signal: Extract<LangyTurnSignalEntry, { type: "progress" }>): void {
+  const store = useLangyStore.getState();
+  if (signal.message?.trim()) store.setTurnStatus(signal.message);
+  if (signal.progress !== undefined) store.setTurnProgress(signal.progress);
+
+  const { current, total } = signal;
+  const counted =
+    typeof current === "number" &&
+    Number.isFinite(current) &&
+    current >= 0 &&
+    typeof total === "number" &&
+    Number.isFinite(total) &&
+    total > 0;
+  if (!counted) return;
+
+  store.setTurnProgressSample({
+    current,
+    total,
+    ...(signal.batchItems !== undefined ? { batchItems: signal.batchItems } : {}),
+    ...(signal.batchDurationMs !== undefined ? { batchDurationMs: signal.batchDurationMs } : {}),
+    receivedAtMs: Date.now(),
+  });
 }
 
 function LangyPanel({
@@ -645,6 +749,8 @@ function LangyPanel({
   const turnContextRef = useRef<LangyTurnRequestContext | null>(null);
   // The text of the send in flight, held so a failure can hand it back.
   const lastSentTextRef = useRef<string | null>(null);
+  // Cleared the moment the turn is dispatched (see `onIds`): from then on the
+  // text is a bubble in the transcript, not a draft anybody is owed.
 
   // Navigate instructions already acted on, keyed by turnId+href
   // (`navigateDedupKey`) — `onTurnStream` yields bare entries with no id, so a
@@ -690,6 +796,11 @@ function LangyPanel({
           // The turn was dispatched: adopt the conversation + turn and enter the
           // `active` phase (which also clears the previous turn's live signals).
           useLangyStore.getState().beginTurn({ conversationId, turnId });
+          // The words are a bubble on screen now, so they are no longer a
+          // draft to hand back. Without this, a failure LATER in the turn put
+          // the question the reader had already asked back in the composer,
+          // where it read as unsent.
+          lastSentTextRef.current = null;
           // A fresh turn — clear the previous turn's navigate dedup too.
           navigatedInstructionsRef.current = new Set();
           uiActionSeenRef.current = new Set();
@@ -719,47 +830,31 @@ function LangyPanel({
             handlers: actionHandlersRef?.current ?? {},
           });
         },
-        onSignal: (signal) => {
-          const store = useLangyStore.getState();
-          if (signal.type === "status") {
-            if (signal.readiness) store.setTurnReadinessStatus(signal.status);
-            else store.setTurnStatus(signal.status);
-          } else if (signal.type === "progress") {
-            if (signal.message?.trim()) {
-              store.setTurnStatus(signal.message);
-            }
-            if (signal.progress !== undefined) {
-              store.setTurnProgress(signal.progress);
-            }
-            if (
-              typeof signal.current === "number" &&
-              Number.isFinite(signal.current) &&
-              typeof signal.total === "number" &&
-              Number.isFinite(signal.total) &&
-              signal.current >= 0 &&
-              signal.total > 0
-            ) {
-              store.setTurnProgressSample({
-                current: signal.current,
-                total: signal.total,
-                ...(signal.batchItems !== undefined ? { batchItems: signal.batchItems } : {}),
-                ...(signal.batchDurationMs !== undefined
-                  ? { batchDurationMs: signal.batchDurationMs }
-                  : {}),
-                receivedAtMs: Date.now(),
-              });
-            }
-          } else if (signal.type === "reasoning") {
-            // Ephemeral thinking — accumulate the run onto the live reasoning so
-            // it reads as one flowing block while it streams.
-            store.appendTurnReasoning(signal.text);
-          } else if (signal.type === "plan") {
-            // The manager's typed plan snapshot — the checklist the plan card
-            // prefers over parsing the raw todowrite part on the live turn.
-            store.setTurnPlan(signal.items);
-          }
-          // milestone entries carry no numeric rollup and have no consumer yet.
+        // ADR-129. A card the turn is waiting on. The durable event is the
+        // truth (the tail folds it onto the tool call); this is the fast path
+        // that puts the card up before the tail lands.
+        onLocalWait: (entry) => {
+          useLangyLocalControlStore.getState().recordWait({
+            conversationId: useLangyStore.getState().activeConversationId,
+            wait:
+              entry.type === "local_permission"
+                ? { ...entry, kind: "permission" }
+                : { ...entry, kind: "question" },
+          });
         },
+        onLocalWorkspace: (entry) => {
+          useLangyLocalControlStore.getState().recordWorkspace({
+            conversationId: useLangyStore.getState().activeConversationId,
+            workspace: {
+              state: entry.state,
+              name: entry.name,
+              root: entry.root,
+              hostname: entry.hostname,
+              ...(entry.gitBranch ? { gitBranch: entry.gitBranch } : {}),
+            },
+          });
+        },
+        onSignal: applyTurnSignal,
         // Developer mode's tape (see LangyDevDrawer). A no-op unless the
         // inspector is open and has armed recording, so a normal session pays
         // one boolean per entry.
@@ -814,31 +909,40 @@ function LangyPanel({
   const langyModelsAllowed = modelsAllowedQuery.data?.modelsAllowed ?? null;
 
   const modelOptions = useMemo(() => langyModelsAllowed ?? allModelOptions, [langyModelsAllowed]);
-  const langyDefaultModel = modelOptions.includes(resolvedDefaultQuery.data?.model ?? "")
+
+  // The models the project can actually serve: the same hook the picker's menu
+  // is built from, so the panel and the menu read one list. It narrows
+  // `modelOptions` to the providers connected at this project, its team or its
+  // organization (ADR-021), which is the ladder the turn's virtual key walks
+  // too. The query underneath is shared with the picker, so it costs no extra
+  // request.
+  const { selectOptions: reachableOptions } = useModelSelectionOptions(
+    modelOptions,
+    modelOverride,
+    "chat",
+    { featureKey: LANGY_GATE_FEATURE_KEY },
+  );
+  const reachableModels = useMemo(
+    () => reachableOptions.map((option) => option.value),
+    [reachableOptions],
+  );
+
+  const langyDefaultModel = reachableModels.includes(resolvedDefaultQuery.data?.model ?? "")
     ? resolvedDefaultQuery.data?.model
     : null;
 
-  // Seed the picker with the model the gate resolves to — but keep it inside
-  // the allowlist. If the resolved default isn't allowed, start on the first
-  // allowed model instead.
+  // Seed the picker with the model the gate resolves to, and snap away from one
+  // no connected provider serves. Both rules read the reachable list, so the
+  // composer never holds a model its own menu does not offer and the turn
+  // cannot run.
   useEffect(() => {
-    if (modelOverride) return;
-    const resolved = resolvedDefaultQuery.data?.model;
-    if (resolved && (!langyModelsAllowed || langyModelsAllowed.includes(resolved))) {
-      setModelOverride(resolved);
-    } else if (langyModelsAllowed) {
-      setModelOverride(langyModelsAllowed[0]!);
-    }
-  }, [resolvedDefaultQuery.data?.model, modelOverride, langyModelsAllowed, setModelOverride]);
-
-  // Race fix: if the allowlist lands AFTER we seeded an out-of-list model, snap
-  // to the first allowed model.
-  useEffect(() => {
-    if (!langyModelsAllowed) return;
-    if (modelOverride && !langyModelsAllowed.includes(modelOverride)) {
-      setModelOverride(langyModelsAllowed[0]!);
-    }
-  }, [langyModelsAllowed, modelOverride, setModelOverride]);
+    const next = resolveComposerModel({
+      current: modelOverride,
+      resolvedDefault: resolvedDefaultQuery.data?.model,
+      reachable: reachableModels,
+    });
+    if (next) setModelOverride(next);
+  }, [resolvedDefaultQuery.data?.model, modelOverride, reachableModels, setModelOverride]);
 
   // ── "Make it the default?" — the ask that follows a model pick ──────────
   // The pick took effect for this conversation the moment it happened; the
@@ -983,18 +1087,18 @@ function LangyPanel({
 
   // A conversation keeps the model it was last used with: when its history
   // lands, the picker follows the model of its latest turn — unless the user
-  // already picked one since opening it, and never a model the allowlist
-  // refuses (the snap effect above owns that rule).
+  // already picked one since opening it, and never a model the project can no
+  // longer serve (the seed effect above owns that rule).
   useEffect(() => {
     if (!activeConversationId || !conversationLastModel) return;
-    if (langyModelsAllowed && !langyModelsAllowed.includes(conversationLastModel)) {
+    if (reachableModels.length > 0 && !reachableModels.includes(conversationLastModel)) {
       return;
     }
     useLangyStore.getState().followConversationModel({
       conversationId: activeConversationId,
       model: conversationLastModel,
     });
-  }, [activeConversationId, conversationLastModel, langyModelsAllowed]);
+  }, [activeConversationId, conversationLastModel, reachableModels]);
 
   /**
    * The conversation's own history failed to load.
@@ -1004,14 +1108,35 @@ function LangyPanel({
   );
   const suppressedNotFoundRef = useRef(false);
 
+  // How long a not-found read is read as the projection lagging the create
+  // (see `isLangyConversationPending`).
+  const [notFoundGraceIsOver, setNotFoundGraceIsOver] = useState(false);
+  useEffect(() => {
+    setNotFoundGraceIsOver(false);
+    if (!hasHistoryError || !isActiveConversationUnconfirmed) return;
+    const timer = setTimeout(
+      () => setNotFoundGraceIsOver(true),
+      LANGY_CONVERSATION_PENDING_GRACE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [hasHistoryError, isActiveConversationUnconfirmed, activeConversationId]);
+
   const historyErrorPresentation = useMemo(() => {
     if (!hasHistoryError) return null;
     const domain = readLangyTrpcError(historyError);
     // Not-found for a conversation THIS tab just minted is the projection
-    // lagging the accepted create — "not yet", never an error. The card would
+    // lagging the accepted create: "not yet", never an error. The card would
     // claim a conversation doesn't exist moments before its turn is accepted;
-    // render nothing and let the confirmation drive the refetch below.
-    if (domain?.code === "langy_conversation_not_found" && isActiveConversationUnconfirmed) {
+    // render nothing and let the confirmation drive the refetch below. Only
+    // while the grace holds, though: a conversation that stays unreadable is
+    // one the reader has to be told about.
+    if (
+      isLangyConversationPending({
+        code: domain?.code,
+        unconfirmed: isActiveConversationUnconfirmed,
+        graceIsOver: notFoundGraceIsOver,
+      })
+    ) {
       suppressedNotFoundRef.current = true;
       return null;
     }
@@ -1023,7 +1148,7 @@ function LangyPanel({
       render: "card" as const,
       action: { label: "Try again", kind: "retry" as const },
     };
-  }, [hasHistoryError, historyError, isActiveConversationUnconfirmed]);
+  }, [hasHistoryError, historyError, isActiveConversationUnconfirmed, notFoundGraceIsOver]);
 
   // Confirmation arrived (a signal named the conversation, or a read
   // succeeded) while the history query still holds the suppressed not-found —
@@ -1051,65 +1176,100 @@ function LangyPanel({
   // long before the backend has actually stopped.
   const stopTurn = api.langy.stopTurn.useMutation();
 
-  const handleStop = useCallback(() => {
-    // WHICH turn to stop is resolved first, and everything else hangs off it:
-    // this tab's own live turn if it has one, otherwise the turn the durable
-    // record names (`inFlightTurnId`) — which is the only way a tab that did not
-    // start the turn, or that rejoined it after a refresh, can stop it at all.
-    // Read the live ids at click time from the store to dodge a stale closure.
+  // Which turn a stop would name right now: this tab's own live turn if it has
+  // one, otherwise the turn the durable record names (`inFlightTurnId`) — the
+  // only way a tab that did not start the turn, or that rejoined it after a
+  // reload, can stop it at all. Read from the store at call time to dodge a
+  // stale closure.
+  const resolveStopTarget = useCallback(() => {
     const store = useLangyStore.getState();
-    const target = resolveLangyStopTarget({
+    return resolveLangyStopTarget({
       projectId,
       conversationId: store.activeConversationId,
       localTurnId: store.activeTurnId,
       localSettledTurnId: store.settledTurnId,
+      localSendPending: isSendUnanswered(store),
       durableTurnId: foldInFlightTurnId,
     });
+  }, [projectId, foldInFlightTurnId]);
 
-    // Tape the ask itself, dispatched or not — the inspector's outbound lane
-    // shows what this client TRIED, and a refused stop is exactly the kind of
-    // moment it exists for.
-    const targetTurnId = target.kind === "dispatch" ? target.turnId : store.activeTurnId;
-    useLangyDevLog.getState().recordOutbound("stop", `stop turn ${targetTurnId ?? "?"}`, {
-      conversationId: store.activeConversationId,
-      turnId: targetTurnId,
-      resolution: target.kind === "dispatch" ? "dispatch" : target.reason,
-    });
+  const dispatchStop = useCallback(
+    (target: { projectId: string; conversationId: string; turnId: string }) => {
+      // Abort this browser's own subscription (snappy) alongside the real
+      // backend stop. Only ONCE THE TURN IS NAMED, never during the send: the
+      // abort would kill the very request that is about to answer with the ids
+      // this stop needs, and the admitted turn would run on with nothing left
+      // to stop it.
+      void stop();
+      useLangyDevLog.getState().recordOutbound("stop", `stop turn ${target.turnId}`, {
+        conversationId: target.conversationId,
+        turnId: target.turnId,
+        resolution: "dispatch",
+      });
+      void stopTurn
+        .mutateAsync({
+          projectId: target.projectId,
+          conversationId: target.conversationId,
+          turnId: target.turnId,
+        })
+        .catch(() => {
+          // The request did not land, so the promise the spinner makes is not
+          // one we can keep: hand the control back. If the turn really did end
+          // (a stop a beat too late), the fold settles it to idle on its next
+          // read.
+          useLangyStore.getState().abandonStop();
+        });
+    },
+    [stop, stopTurn],
+  );
+
+  const handleStop = useCallback(() => {
+    const store = useLangyStore.getState();
+    const target = resolveStopTarget();
 
     if (target.kind !== "dispatch") {
-      // Nothing to dispatch — so nothing may claim to be stopping. The old code
-      // moved the phase to `stopping` BEFORE this check, which is exactly how
-      // Stop became a lie: a disabled spinner, no request, an agent still
-      // burning tokens. Say the true thing instead and leave Stop clickable.
-      toaster.create({
-        title: "Langy",
-        description:
-          target.reason === "no-conversation"
-            ? "There's no answer in progress to stop."
-            : "This answer is still starting up — try stopping it again in a moment.",
-        type: "info",
-        duration: 5000,
+      // Tape the ask that could not go out yet — the inspector's outbound lane
+      // shows what this client TRIED, and a kept stop is exactly the kind of
+      // moment it exists for.
+      useLangyDevLog.getState().recordOutbound("stop", `stop turn ${store.activeTurnId ?? "?"}`, {
+        conversationId: store.activeConversationId,
+        turnId: store.activeTurnId,
+        resolution: target.reason,
       });
+      if (store.turnPhase === "idle") {
+        // Nothing was sent and nothing is running: a stale click.
+        toaster.create({
+          title: "Langy",
+          description: "There's no answer in progress to stop.",
+          type: "info",
+          duration: 5000,
+        });
+        return;
+      }
+      // The message is on its way and the server has not named the turn yet.
+      // The stop is KEPT: the phase moves to `stopping` and the effect below
+      // sends it the moment an id exists. Nothing is claimed that will not
+      // happen — a send that fails before any id hands the control back
+      // (`abandonSend`).
+      store.requestStop({ dispatched: false });
       return;
     }
 
-    // Only now: abort this browser's own subscription (snappy), enter the
-    // stopping phase, and stop the turn on the backend for real.
-    void stop();
-    store.requestStop();
-    void stopTurn
-      .mutateAsync({
-        projectId: target.projectId,
-        conversationId: target.conversationId,
-        turnId: target.turnId,
-      })
-      .catch(() => {
-        // The request did not land, so the promise the spinner makes is not one
-        // we can keep: hand the control back. If the turn really did end (a stop
-        // a beat too late), the fold settles it to idle on its next read.
-        useLangyStore.getState().abandonStop();
-      });
-  }, [stop, projectId, stopTurn, foldInFlightTurnId]);
+    store.requestStop({ dispatched: true });
+    dispatchStop(target);
+  }, [resolveStopTarget, dispatchStop]);
+
+  // The kept stop, sent as soon as the turn has a name: from this tab's own
+  // send (the transport's `onIds`) or from the durable record catching up.
+  const stopPending = useLangyStore((s) => s.stopPending);
+  const localTurnId = useLangyStore((s) => s.activeTurnId);
+  useEffect(() => {
+    if (!stopPending) return;
+    const target = resolveStopTarget();
+    if (target.kind !== "dispatch") return;
+    useLangyStore.getState().stopDispatched();
+    dispatchStop(target);
+  }, [stopPending, localTurnId, resolveStopTarget, dispatchStop]);
 
   // Seed the LOCAL turn projection from the snapshot (ADR-059): its cursor is where the
   // durable-tail fold starts, and an in-flight turn id is what a refreshed tab adopts
@@ -1180,9 +1340,7 @@ function LangyPanel({
 
   // Foreign-turn re-hydration.
   useEffect(() => {
-    const durableCount = historyMessages.filter(
-      (m) => m.role === "user" || m.role === "assistant",
-    ).length;
+    const durableCount = historyMessages.filter(isLangyTranscriptMessage).length;
     if (
       !shouldRehydrateEngineFromDurable({
         isHistoryLoadPending: historyLoadConversationId !== null,
@@ -1223,7 +1381,7 @@ function LangyPanel({
       kind: "langy_conversations_unavailable",
       title: "Recent conversations aren't loading",
       description:
-        "Chatting still works — your past conversations will be back once they can be reached again.",
+        "Chatting still works. Your past conversations will be back once they can be reached again.",
       render: "card" as const,
       action: { label: "Try again", kind: "retry" as const },
     };
@@ -1399,9 +1557,17 @@ function LangyPanel({
   // The transport needs current context and recovery state, but the composer
   // must not receive a new callback on every streamed token. Keep its public
   // callback stable and refresh only the implementation it delegates to.
-  const sendImplementationRef = useRef<(text: string) => Promise<void>>(async () => undefined);
-  const send = useCallback((text: string) => sendImplementationRef.current(text), []);
-  sendImplementationRef.current = async (text: string) => {
+  const sendImplementationRef = useRef<(text: string, options?: LangySendOptions) => Promise<void>>(
+    async () => undefined,
+  );
+  const send = useCallback(
+    (text: string, options?: LangySendOptions) => sendImplementationRef.current(text, options),
+    [],
+  );
+  sendImplementationRef.current = async (
+    text: string,
+    { keepOnFailure = true }: LangySendOptions = {},
+  ) => {
     if (!text.trim() || !projectId || isBusy) return;
     // `/feedback` is a client command, not a message: it summons the rating card under
     // the latest answer (bypassing the backend cadence — the user asking to rate is
@@ -1425,7 +1591,17 @@ function LangyPanel({
     // routes failures to useChat's `error` channel — so the catch below can
     // never be the only thing that gives the text back. The effect watching
     // `error` restores from here (see restoreDraftOnFailure).
-    lastSentTextRef.current = text;
+    //
+    // Only what the READER typed is remembered. A message the panel sends on
+    // their behalf (the code access re-ask) is not theirs to get back, and
+    // restoring it left them staring at a sentence they never wrote.
+    lastSentTextRef.current = keepOnFailure ? text : null;
+    // The turn is in flight from HERE, not from the ids the mutation answers
+    // with: on a cold worker those are seconds away, and the composer showing
+    // Send for that whole window is what left a message sent by accident with
+    // nothing to click. Stop is available at once; a click before the turn is
+    // named is kept and dispatched as soon as it is.
+    useLangyStore.getState().beginSend();
     try {
       // No per-send body: the custom transport sources projectId + conversation
       // + model + page-context + skills from `turnContextRef` (getContext) at
@@ -1447,10 +1623,16 @@ function LangyPanel({
    * Give the user their words back when a send fails.
    */
   const restoreDraftOnFailure = useCallback(() => {
-    const text = lastSentTextRef.current;
-    if (!text) return;
+    const text = langyDraftToRestore({
+      sentText: lastSentTextRef.current,
+      draft: useLangyStore.getState().draft,
+    });
     lastSentTextRef.current = null;
-    if (!useLangyStore.getState().draft.trim()) setDraft(text);
+    if (text) setDraft(text);
+    // A send that never reached a turn id leaves nothing running, so the
+    // composer goes back to Send along with the words. A failure after the
+    // turn was named is left alone: that turn's own terminal settles it.
+    useLangyStore.getState().abandonSend();
   }, [setDraft]);
   /**
    * Walking away from the current conversation — New chat, switching, deleting the
@@ -1686,9 +1868,19 @@ function LangyPanel({
       }),
     [devRecords, devScrubSeq, historyMessages, activeConversationId],
   );
-  const displayMessages = timeTravel
-    ? (timeTravel.messages as unknown as typeof messages)
-    : messages;
+  // The transcript, without the platform's own connect notice (ADR-129). That
+  // notice is a user message because it is what starts the next turn and what
+  // the model reads, but the developer did not write it and the header chip and
+  // the code access card above it already say the folder is connected: as a
+  // bubble it said the same thing a third time, and again on every reconnect.
+  const shownMessages = useMemo(
+    () =>
+      (timeTravel ? (timeTravel.messages as unknown as typeof messages) : messages).filter(
+        (message) => !isLangyHiddenLocalNotice(message),
+      ),
+    [timeTravel, messages],
+  );
+  const displayMessages = shownMessages;
 
   // The ordered timeline the choices lock state derives from (ADR-060 §6) — built from
   // whatever is being DISPLAYED, so time travel shows a question open before its answer
@@ -1706,9 +1898,224 @@ function LangyPanel({
     return choicesTimelineRef.current.value;
   }, [displayMessages]);
 
-  // Answer a choices card: the selection is the NEXT USER MESSAGE — a typed part the
-  // record binds by blockId, plus the readable "Chose: X" the model acts on (ADR-060
-  // §6). Rides the ordinary send path; the turn lifecycle is untouched.
+  // The one `code_access` call the conversation is asking on. Langy can ask
+  // again (the reader clicked Change, or the folder went away), and every state
+  // the card shows is read from the workspace query rather than from the call,
+  // so the older card would render the same live question twice.
+  const liveCodeAccessCallId = useMemo(
+    () => latestCodeAccessCallId(displayMessages),
+    [displayMessages],
+  );
+
+  // ── The developer's own machine (ADR-129) ───────────────────────────────
+  //
+  // Everything the local cards read comes from three places and no more: the
+  // conversation's durable record (`langy.localRecord`, every card of every
+  // turn), the folded turn document (the current turn, which a tab that
+  // adopted a running turn has without ever seeing the live stream) and the
+  // live wait entries this browser's own stream delivered. `langyLocalWaits`
+  // merges them with a rule that only ever moves a card forward.
+  //
+  // The record is what the other two cannot give: the local fold starts at
+  // the snapshot's cursor, so a card raised before this tab opened is not in
+  // it, and a reopened conversation has no fold at all — every card the
+  // developer answered used to vanish with the reload.
+  const turnToolCalls = useLangyStore((s) => s.turnProjection.turn?.ToolCalls ?? null);
+  const liveWaits = useLangyLocalControlStore((s) => s.waits);
+  const localRecord = useLangyLocalRecord({
+    projectId,
+    conversationId: activeConversationId,
+    // The messages poll moves this while a turn runs, so the record follows a
+    // turn at the poll's own pace rather than one of its own.
+    cursor: snapshotEventCursor,
+  });
+  const recordWaits = localRecord.waits;
+
+  /**
+   * The conversation's record could not be read.
+   *
+   * This is the read the cards come from, and it is the read that fails when
+   * the event store is unavailable: a permission card raised for a turn this
+   * browser was not watching then never reaches the screen. Silence made the
+   * panel say the only other thing it knew, which was that Langy had not
+   * answered yet, so a platform failure was reported to the reader as Langy
+   * being slow. The words come from the shared registry keyed on the code the
+   * failure carries, and the action is the read again.
+   */
+  const recordFailed = localRecord.isError;
+  const recordError = localRecord.error;
+  const recordErrorPresentation = useMemo(() => {
+    if (!recordFailed) return null;
+    const domain = readLangyTrpcError(recordError);
+    if (domain) return explainLangyError(domain);
+    return {
+      kind: "langy_record_unavailable",
+      title: "This conversation could not be loaded",
+      description:
+        "Anything it is waiting for you to answer is not on screen. Try again in a moment.",
+      render: "card" as const,
+      action: { label: "Try again", kind: "retry" as const },
+    };
+  }, [recordFailed, recordError]);
+
+  const permissionCards = useMemo(
+    () =>
+      langyPermissionCards({
+        record: recordWaits,
+        toolCalls: turnToolCalls,
+        live: liveWaits,
+      }),
+    [recordWaits, turnToolCalls, liveWaits],
+  );
+  const questionWaits = useMemo(
+    () =>
+      langyQuestionWaitsByToolCall({
+        record: recordWaits,
+        toolCalls: turnToolCalls,
+        live: liveWaits,
+      }),
+    [recordWaits, turnToolCalls, liveWaits],
+  );
+  // The same waits, whole, keyed by the tool call that asked. A settled
+  // question is settled in the WAIT and nowhere else: answering one writes no
+  // selection into the transcript, so the card would read back unanswered and
+  // a click on it would start a second turn for a question already decided.
+  const questionCards = useMemo(
+    () =>
+      langyQuestionCards({
+        record: recordWaits,
+        toolCalls: turnToolCalls,
+        live: liveWaits,
+      }),
+    [recordWaits, turnToolCalls, liveWaits],
+  );
+  const questionCardsByToolCall = useMemo(
+    () =>
+      new Map(
+        questionCards.flatMap((card) =>
+          card.toolCallId ? [[card.toolCallId, card] as const] : [],
+        ),
+      ),
+    [questionCards],
+  );
+
+  // A card is holding the turn for the developer's answer. What the panel
+  // says while that is true is not what it says while Langy is working: the
+  // waiting line points at the card, and the composer stops claiming Langy is
+  // busy (ADR-129).
+  const awaitingAnswer =
+    permissionCards.some((card) => card.status === "pending") ||
+    [...questionWaits.values()].some((wait) => wait.status === "pending");
+
+  // The live entries belong to one conversation; opening another drops them.
+  useEffect(() => {
+    useLangyLocalControlStore.getState().reset(activeConversationId);
+  }, [activeConversationId]);
+
+  const localWorkspace = api.langy.getLocalWorkspace.useQuery(
+    { projectId: projectId ?? "", conversationId: activeConversationId ?? "" },
+    { enabled: !!projectId && !!activeConversationId },
+  );
+
+  // The folder is shared from a terminal, so the ask that is holding the turn
+  // is open there as well. The waiting line and the composer then name both
+  // places: the developer is looking at the terminal, and sending them to the
+  // browser costs them the flow they came for (ADR-129).
+  const terminalConnected = localWorkspace.data?.connected === true;
+
+  const answerQuestion = api.langy.answerQuestion.useMutation();
+
+  /**
+   * Answer a question card the waiting tool asked. A wait the server no longer
+   * holds refuses with `langy_wait_expired`, which is exactly the signal to
+   * send the answer as the next message instead — the late-answer path the
+   * choices card has always had.
+   */
+  const answerQuestionWait = ({
+    conversationId,
+    waitId,
+    selection,
+    card,
+  }: {
+    conversationId: string;
+    waitId: string;
+    selection: LangyChoiceSelection;
+    card: LangyDerivedChoicesCard;
+  }) => {
+    if (!projectId) return;
+    const labelById = new Map(card.options.map((option) => [option.id, option.label]));
+    answerQuestion.mutate(
+      {
+        projectId,
+        conversationId,
+        waitId,
+        answers: [
+          {
+            question: card.question,
+            selected: selection.optionIds.flatMap((id) => {
+              const label = labelById.get(id);
+              return label ? [label] : [];
+            }),
+            ...(selection.otherText !== undefined ? { other: selection.otherText } : {}),
+          },
+        ],
+      },
+      {
+        onSuccess: () =>
+          useLangyLocalControlStore
+            .getState()
+            .settleWait({ waitId, kind: "question", status: "answered" }),
+        onError: (error) => {
+          // Only an expired wait falls back to a message. Anything else is a
+          // real failure, and the toast says what it was.
+          if (readHandledError(error)?.code === "langy_wait_expired") {
+            useLangyLocalControlStore
+              .getState()
+              .settleWait({ waitId, kind: "question", status: "expired" });
+            selectChoiceImplementationRef.current({ selection, card });
+            return;
+          }
+          showErrorToast({
+            error,
+            fallbackTitle: "Could not send your answer",
+          });
+        },
+      },
+    );
+  };
+
+  /**
+   * Change the code access choice: stop the turn that is running on the old
+   * answer (ADR-078 turn controls) and ask the question again. The send waits
+   * for the stop to land, because `send` refuses while a turn is in flight.
+   */
+  const [reAskCodeAccess, setReAskCodeAccess] = useState(false);
+  const askCodeAccessAgain = useCallback(() => {
+    setReAskCodeAccess(true);
+    // The DURABLE phase decides, not this browser's stream: `isBusy` goes
+    // false the moment a silent worker stops pushing frames, and sending then
+    // was refused with "Langy is still replying" while the turn ran on. Stop
+    // it first, and the effect below waits for the stop to land.
+    if (isBusy || turnActive) handleStop();
+  }, [isBusy, turnActive, handleStop]);
+  useEffect(() => {
+    if (!reAskCodeAccess || isBusy || turnActive) return;
+    setReAskCodeAccess(false);
+    // Nobody typed this, so a failed send must not put it in the composer.
+    void send(LANGY_CODE_ACCESS_ASK_AGAIN, { keepOnFailure: false });
+  }, [reAskCodeAccess, isBusy, turnActive, send]);
+
+  // Answer a choices card: the selection is the NEXT USER MESSAGE — a typed
+  // part the record binds by blockId, plus the readable "Chose: X" the model
+  // acts on (ADR-060 §6). Rides the ordinary send path; the turn lifecycle
+  // is untouched.
+  //
+  // STABLE, the same way `send` is (see `sendImplementationRef`), and for a
+  // sharper reason: this goes to every `memo(MessageContent)` in the column as
+  // `onChoiceSelect`, so a callback that changed identity per render made memo
+  // buy nothing — a 40-message conversation re-ran every message's tool-part
+  // scan on every streamed token. `isBusy` and `sendMessage` both move under a
+  // live turn, so the deps come off a ref rather than out of the dep array.
   const selectChoiceImplementationRef = useRef<
     (args: { selection: LangyChoiceSelection; card: LangyDerivedChoicesCard }) => void
   >(() => undefined);
@@ -1718,7 +2125,26 @@ function LangyPanel({
     [],
   );
   selectChoiceImplementationRef.current = ({ selection, card }) => {
-    if (!projectId || isBusy) return;
+    if (!projectId) return;
+    // A question asked MID-TURN is waiting on a tool, not on the next message
+    // (ADR-129). The answer goes back to the wait, the turn keeps the plan it
+    // had, and nothing is sent. A wait that already ended (`langy_wait_expired`)
+    // falls through to the message path below, which is the late-answer route.
+    const conversationId = useLangyStore.getState().activeConversationId;
+    const route = routeLangyChoiceAnswer({
+      blockId: selection.blockId,
+      waits: questionWaits,
+    });
+    if (conversationId && route.kind === "wait") {
+      answerQuestionWait({
+        conversationId,
+        waitId: route.waitId,
+        selection,
+        card,
+      });
+      return;
+    }
+    if (isBusy) return;
     const text = renderLangyChoiceSelectionText({
       selection,
       optionLabelById: new Map(card.options.map((option) => [option.id, option.label])),
@@ -1795,13 +2221,125 @@ function LangyPanel({
   // held above the composer while the turn works, back inside the message the
   // moment it settles, fails, or the reader stops it.
   const turnPlanItems = useLangyStore((s) => s.turnPlan);
+  // The same plan, off the turn's durable record. The live snapshot above only
+  // exists in the tab that watched the stream, so a reload mid-turn used to
+  // lose the checklist entirely until the turn finished and its `todowrite`
+  // parts landed on the message.
+  const recordedPlanItems = useLangyStore((s) => s.turnProjection.turn?.Plan ?? null);
+  const livePlanItems = turnPlanItems ?? recordedPlanItems;
   const streamingMessage =
     displayBusy && displayMessages.at(-1)?.role === "assistant"
       ? displayMessages.at(-1)
       : undefined;
-  const pinnedPlan = streamingMessage
-    ? langyPlan(streamingMessage, { overrideItems: turnPlanItems })
+  const pinnedPlan = displayBusy
+    ? langyPlan(streamingMessage ?? { parts: [] }, {
+        overrideItems: livePlanItems,
+      })
     : null;
+  // Everything the running turn has produced, as one value that changes when
+  // it produces more. The thinking line restarts its clock on it, so its
+  // escalation measures silence and not turn length: a local command running
+  // on the developer's machine, a card they just answered, a plan step ticking
+  // over: none of that reaches the message parts, and all of it is the turn
+  // working.
+  const turnActivityKey = useMemo(
+    () =>
+      langyTurnActivityKey({
+        messages: displayMessages,
+        toolCalls: turnToolCalls,
+        waits: permissionCards,
+        planItems: livePlanItems,
+        reasoning: displaySignals.reasoning,
+        status: displaySignals.status,
+      }),
+    [
+      displayMessages,
+      turnToolCalls,
+      permissionCards,
+      livePlanItems,
+      displaySignals.reasoning,
+      displaySignals.status,
+    ],
+  );
+  // What Langy is waiting for on the developer's own machine (ADR-129). Read
+  // from the durable record and the folded turn document, so a tab that
+  // adopted a running turn renders the cards without the live stream.
+  //
+  // A question the tool is waiting on is one of them, and its card comes off
+  // the wait rather than off the transcript: a tab that adopted a running turn
+  // reads no live stream, and the `question` tool part only lands when the
+  // turn ends, so the question was invisible for the whole wait while the
+  // composer asked the reader to answer it. Once the part has arrived the
+  // transcript draws the card and this one stands down, so it is never drawn
+  // twice.
+  const openQuestionParts = useMemo(() => {
+    const inTranscript = questionToolCallIdsIn(displayMessages);
+    return questionCards
+      .filter(
+        (card) =>
+          card.status === "pending" &&
+          card.toolCallId !== null &&
+          !inTranscript.has(card.toolCallId),
+      )
+      .flatMap((card) =>
+        questionWaitCardParts({
+          toolCallId: card.toolCallId,
+          questions: card.questions,
+        }),
+      );
+  }, [questionCards, displayMessages]);
+
+  const localCards =
+    !timeTravel && projectId && activeConversationId
+      ? permissionCards.map((card) => (
+          <IsolatedErrorBoundary
+            key={card.waitId}
+            scope="This permission card failed to render"
+            resetKeys={[card.waitId]}
+          >
+            <LangyLocalPermissionCard
+              projectId={projectId}
+              conversationId={activeConversationId}
+              card={card}
+              skipAllowed={localWorkspace.data?.skipAllowed ?? false}
+              skipPermissions={localWorkspace.data?.skipPermissions ?? false}
+            />
+          </IsolatedErrorBoundary>
+        ))
+      : null;
+
+  const openQuestionCards =
+    !timeTravel && projectId && activeConversationId
+      ? openQuestionParts.map((part) => (
+          <IsolatedErrorBoundary
+            key={part.blockId}
+            scope="This question failed to render"
+            resetKeys={[part.blockId]}
+          >
+            <LangyDerivedCardView
+              card={part.card}
+              projectSlug={project?.slug ?? null}
+              choicesLockState={{ status: "open" }}
+              onChoiceSelect={selectChoice}
+            />
+          </IsolatedErrorBoundary>
+        ))
+      : null;
+
+  const waitingCards =
+    localCards || openQuestionCards ? [...(localCards ?? []), ...(openQuestionCards ?? [])] : null;
+
+  // Where those cards sit in the column.
+  //
+  // While the turn runs they belong at the live edge, beside the working line:
+  // a card waiting for an answer is the thing to answer now. Once the turn
+  // settles they belong inside it, above the message that closed it. Appended
+  // below the whole transcript, they made a finished run end on a settled
+  // permission card, so a reader who came back to it read a command rather
+  // than the answer the turn had already given.
+  const cardAnchorIndex =
+    turnInFlight || displayMessages.at(-1)?.role !== "assistant" ? -1 : displayMessages.length - 1;
+
   const turnHasVisibleOutput =
     !!runningTool(currentTurnMessage) ||
     hasTokens(currentTurnMessage) ||
@@ -2172,6 +2710,14 @@ function LangyPanel({
           <IsolatedErrorBoundary scope="Langy hit a snag" resetKeys={[activeConversationId]}>
             <PanelHeader
               conversationTitle={conversationTitle}
+              workspaceChip={
+                projectId && activeConversationId ? (
+                  <LangyLocalWorkspaceChip
+                    projectId={projectId}
+                    conversationId={activeConversationId}
+                  />
+                ) : null
+              }
               onNewChat={handleNewChat}
               onClose={() => {
                 setReconnectCodex(false);
@@ -2363,6 +2909,26 @@ function LangyPanel({
                           )}
                         </HStack>
                       ) : null}
+                      {/* The conversation's own record could not be read, so a
+                          card it is waiting on is not on screen. It sits above
+                          the transcript rather than over it: the messages are
+                          real, and the reader has to know a question may be
+                          missing from them. Suppressed while a failed history
+                          read already owns the column, which says the same
+                          thing louder. */}
+                      {recordErrorPresentation && !blockingHistoryError ? (
+                        <VStack
+                          data-testid="langy-record-unavailable"
+                          align="stretch"
+                          paddingX={floating ? "19px" : "14px"}
+                          paddingTop={floating ? "19px" : "14px"}
+                        >
+                          <LangyError
+                            presentation={recordErrorPresentation}
+                            onAction={() => localRecord.refetch()}
+                          />
+                        </VStack>
+                      ) : null}
                       {showCardGallery ? (
                         <LangyCardGallery />
                       ) : langyNeedsModel || reconnectCodex ? (
@@ -2442,64 +3008,85 @@ function LangyPanel({
                           // bottom and made history jump as it grew.
                         >
                           {displayMessages.map((message, index) => (
-                            // One message's render crash stays that message's:
-                            // a malformed tool part or card payload draws an
-                            // inline error where the message would have been,
-                            // and the rest of the conversation stands.
-                            <IsolatedErrorBoundary
-                              key={message.id}
-                              scope="This message failed to render"
-                              resetKeys={[message.id]}
-                            >
-                              <MessageContent
-                                message={message}
-                                organizationId={organizationId}
-                                appliedOutcomes={appliedOutcomes}
-                                discardedProposals={discardedProposalIds}
-                                applyingProposals={applyingProposalIds}
-                                onApply={applyProposal}
-                                onDiscard={discardProposalInStore}
-                                conversationId={activeConversationId}
-                                isStreaming={
-                                  displayBusy &&
-                                  index === displayMessages.length - 1 &&
-                                  message.role === "assistant"
-                                }
-                                interrupted={
-                                  interruptedConversationId != null &&
-                                  interruptedConversationId === activeConversationId &&
-                                  index === displayMessages.length - 1 &&
-                                  message.role === "assistant"
-                                }
-                                // Only ever on a turn that COMPLETED. We were asking
-                                // "How did Langy do?" above a timeout card — rating an
-                                // answer that never arrived.
-                                showFeedback={
-                                  !isBusy &&
-                                  // The durable phase too — never ask "How did Langy
-                                  // do?" while a turn is still in flight. And never
-                                  // while time-travelling: you cannot rate the past.
-                                  !timeTravel &&
-                                  !turnActive &&
-                                  !turnError &&
-                                  !recovery.isRecovering &&
-                                  message.role === "assistant" &&
-                                  index === displayMessages.length - 1
-                                }
-                                shouldAskFeedback={shouldAskFeedback}
-                                isFeedbackPinned={pinnedFeedbackMessageId === message.id}
-                                // The block channel (ADR-060). Interaction is
-                                // live-only: while time-travelling the cards
-                                // render read-only from the replayed record.
-                                choicesTimeline={choicesTimeline}
-                                onChoiceSelect={timeTravel ? undefined : selectChoice}
-                                onVerifyDerivedCard={timeTravel ? undefined : verifyDerivedCard}
-                                // (No connect-card prop: MessageContent no longer sniffs
-                                // the prose for `[langy:connect-github]`. The connect card
-                                // is driven by the structured `langy_github_not_connected`
-                                // error below — one road, not two.)
-                              />
-                            </IsolatedErrorBoundary>
+                            <Fragment key={message.id}>
+                              {/* The cards the settled turn raised, above the
+                                  message that closed it, so the answer is the
+                                  last thing in the turn. */}
+                              {index === cardAnchorIndex ? waitingCards : null}
+                              {/* One message's render crash stays that
+                                  message's: a malformed tool part or card
+                                  payload draws an inline error where the
+                                  message would have been, and the rest of the
+                                  conversation stands. */}
+                              <IsolatedErrorBoundary
+                                scope="This message failed to render"
+                                resetKeys={[message.id]}
+                              >
+                                <MessageContent
+                                  message={message}
+                                  organizationId={organizationId}
+                                  appliedOutcomes={appliedOutcomes}
+                                  discardedProposals={discardedProposalIds}
+                                  applyingProposals={applyingProposalIds}
+                                  onApply={applyProposal}
+                                  onDiscard={discardProposalInStore}
+                                  conversationId={activeConversationId}
+                                  isStreaming={
+                                    displayBusy &&
+                                    index === displayMessages.length - 1 &&
+                                    message.role === "assistant"
+                                  }
+                                  interrupted={
+                                    interruptedConversationId != null &&
+                                    interruptedConversationId === activeConversationId &&
+                                    index === displayMessages.length - 1 &&
+                                    message.role === "assistant"
+                                  }
+                                  // Only ever on a turn that COMPLETED. We were asking
+                                  // "How did Langy do?" above a timeout card — rating an
+                                  // answer that never arrived. The failure IS the feedback;
+                                  // asking the user to score it as well is insulting, and
+                                  // whatever they clicked would be noise in the data.
+                                  //
+                                  // `!turnError` covers the failure; `!recovery.isRecovering`
+                                  // covers the turn that is still being re-driven and might
+                                  // yet succeed. This is only the position + settled gate:
+                                  // whether a card actually shows is `shouldAskFeedback` (the
+                                  // backend cadence), the directive, or the pin.
+                                  showFeedback={
+                                    !isBusy &&
+                                    // The durable phase too — never ask "How did Langy
+                                    // do?" while a turn is still in flight. And never
+                                    // while time-travelling: you cannot rate the past.
+                                    !timeTravel &&
+                                    !turnActive &&
+                                    !turnError &&
+                                    !recovery.isRecovering &&
+                                    message.role === "assistant" &&
+                                    index === displayMessages.length - 1
+                                  }
+                                  shouldAskFeedback={shouldAskFeedback}
+                                  isFeedbackPinned={pinnedFeedbackMessageId === message.id}
+                                  // The block channel (ADR-060). Interaction is
+                                  // live-only: while time-travelling the cards
+                                  // render read-only from the replayed record.
+                                  choicesTimeline={choicesTimeline}
+                                  // A question answered back to its wait
+                                  // writes no selection into the transcript,
+                                  // so the wait is what tells the card it is
+                                  // settled and which option closed it.
+                                  questionWaits={questionCardsByToolCall}
+                                  onChoiceSelect={timeTravel ? undefined : selectChoice}
+                                  onVerifyDerivedCard={timeTravel ? undefined : verifyDerivedCard}
+                                  onAskCodeAccessAgain={timeTravel ? undefined : askCodeAccessAgain}
+                                  liveCodeAccessCallId={liveCodeAccessCallId}
+                                  // (No connect-card prop: MessageContent no longer sniffs
+                                  // the prose for `[langy:connect-github]`. The connect card
+                                  // is driven by the structured `langy_github_not_connected`
+                                  // error below — one road, not two.)
+                                />
+                              </IsolatedErrorBoundary>
+                            </Fragment>
                           ))}
                           {/* The question the reader has already asked but which
                             has not become a message yet.
@@ -2514,6 +3101,11 @@ function LangyPanel({
                             That is not a polish gap, it is input that looks
                             lost. Drawn as the real bubble, in the place the
                             real bubble will appear, so the swap is invisible. */}
+                          {/* The cards of a turn that is still running, at the
+                              live edge where the answer they want is given.
+                              A settled turn's cards render inside it instead,
+                              above the message that closed it. */}
+                          {cardAnchorIndex === -1 ? waitingCards : null}
                           {!timeTravel && pendingPrompt ? (
                             <QueuedPrompt prompt={pendingPrompt} reduceMotion={reduceMotion} />
                           ) : null}
@@ -2538,6 +3130,21 @@ function LangyPanel({
                                 <LangyThinkingLine
                                   messages={displayMessages}
                                   hasLiveReasoning={!!displaySignals.reasoning}
+                                  // A card is holding the turn: the line says
+                                  // so and points at it, rather than
+                                  // escalating toward "Langy may be stuck"
+                                  // about a turn that is waiting on the
+                                  // reader (ADR-129).
+                                  awaitingAnswer={awaitingAnswer}
+                                  // The ask is open in the terminal that
+                                  // shares the folder too, so the line names
+                                  // both places rather than only the card.
+                                  terminalConnected={terminalConnected}
+                                  // Everything the turn has produced so far.
+                                  // The line's escalation clock restarts on
+                                  // it, so it measures silence rather than
+                                  // how long the turn has been running.
+                                  activityKey={turnActivityKey}
                                   toolNarrator={langyToolNarrator}
                                   // The panel-open warm proved this
                                   // conversation's worker alive, so the first
@@ -2706,6 +3313,8 @@ function LangyPanel({
                     onRemoveChip={onRemoveContextChip}
                     addableChips={addableChips}
                     onAddChip={chooseChip}
+                    awaitingAnswer={awaitingAnswer}
+                    terminalConnected={terminalConnected}
                   />
                 </Box>
               </>
@@ -2803,6 +3412,7 @@ function JumpToLatest({ visible, onClick }: { visible: boolean; onClick: () => v
 
 function PanelHeader({
   conversationTitle,
+  workspaceChip,
   onNewChat,
   onClose,
   hideClose,
@@ -2814,6 +3424,8 @@ function PanelHeader({
 }: {
   /** The conversation's GENERATED title, or null while it has none yet. */
   conversationTitle: string | null;
+  /** The shared folder chip (ADR-129), which renders nothing while none is. */
+  workspaceChip?: ReactNode;
   onNewChat: () => void;
   onClose: () => void;
   /** Hide the Minimise control (drawer companion: the drawer owns the only X). */
@@ -2860,6 +3472,8 @@ function PanelHeader({
         >
           {conversationTitle ? <AnimatedConversationTitle title={conversationTitle} /> : "Langy"}
         </Box>
+
+        {workspaceChip}
 
         <HStack gap={0.5} flexShrink={0}>
           <Tooltip content="New chat" positioning={{ placement: "bottom" }}>

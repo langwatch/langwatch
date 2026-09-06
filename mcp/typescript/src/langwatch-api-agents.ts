@@ -52,6 +52,10 @@ export interface AgentSummary {
   lastSeenAt?: string | null;
   owner?: { userId: string; name: string } | null;
   hostLabel?: string | null;
+  /** Whether this key can run the agent. */
+  selectable?: boolean;
+  /** Why the agent cannot be run with this key; null when it can. */
+  notSelectableReason?: "owned_by_another_person" | null;
   parameters?: AgentParameterSpec[];
 }
 

@@ -275,6 +275,7 @@ export class ApiKeyGrantPolicyService {
         permissions: [...input.permissions].sort(),
         kind: "system_api_key",
         actor: input.actor,
+        requireProjection: true,
       });
       bindings = bindings.map((binding) =>
         binding.role === "CUSTOM" ? { ...binding, customRoleId: roleId } : binding,
@@ -294,6 +295,11 @@ export class ApiKeyGrantPolicyService {
       actor: input.actor,
       source: "grants-service",
       onDuplicate: "skip",
+      // Both callers act on these rows next: a create activates the credential,
+      // and a replace revokes whatever the attach did not keep. A durable
+      // append that is not yet readable would hand out a token the resolver
+      // refuses, or drop the grants the key already had.
+      requireProjection: true,
     });
     if (input.replace) {
       // A duplicate is an existing binding the caller asked for again, so it is

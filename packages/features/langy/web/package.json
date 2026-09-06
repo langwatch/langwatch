@@ -46,6 +46,10 @@
     "./surfaces/langy-ui-actions": {
       "types": "./src/surfaces/langy-ui-actions/index.ts",
       "default": "./src/surfaces/langy-ui-actions/index.ts"
+    },
+    "./surfaces/langy-code-access-preference": {
+      "types": "./src/ui/sections/langy-code-access-preference.tsx",
+      "default": "./src/ui/sections/langy-code-access-preference.tsx"
     }
   },
   "scripts": {

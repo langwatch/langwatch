@@ -27,7 +27,12 @@ import {
   langyConversationStatusSchema,
   LangyConversationNotFoundError,
   langyMessageRoleSchema,
+  LangyLocalSkipModelNotAllowedError,
+  langyCodeAccessPreferenceSchema,
+  langyLocalRecordSchema,
+  langyLocalWorkspaceStatusSchema,
   LangyRateLimitedError,
+  LangyWaitExpiredError,
   langyTurnContextSchema,
   type LangyConversationDetail as ConversationDetail,
   type LangyConversationDetailDto,
@@ -46,6 +51,12 @@ import type { LangyChatMessageInput } from "../../services/langy-turn-shared.ser
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
 import type { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter";
 import { LangySessionRequiredError, type LangyApp } from "#app/langy.app";
+import type { LocalControlRuntime } from "../../adapters/langy-local-control-runtime.adapter";
+import { workspaceChannel } from "../../rules/langy-local-control-keys.rules";
+import { reconcileSkipPolicy } from "../../rules/langy-local-skip-policy.rules";
+import { toControlRequestWire } from "../../services/langy-local-control-request.service";
+import type { SkipPermissionsProviderRows } from "../../services/langy-skip-permissions.service";
+import type { SkipPermissionsDecision } from "../../services/langy-skip-permissions.service";
 
 const logger = createLogger("langwatch:langy:router");
 
@@ -136,6 +147,42 @@ export type LangyTrpcPorts = Readonly<{
     properties: Record<string, unknown>;
   }): void;
   uiActions: LangyUiActionPort;
+  /**
+   * The developer's own machine, where this process composed it (ADR-129). The
+   * SAME runtime the worker's REST door reads: two over process memory would
+   * answer two different folders for one conversation.
+   */
+  local: LangyLocalTrpcPorts;
+}>;
+
+/** What the panel's own local-control procedures reach outside Langy. */
+export type LangyLocalTrpcPorts = Readonly<{
+  runtime: LocalControlRuntime;
+  /** The durable record of a policy change and of a closed folder. */
+  commands: Readonly<{
+    changeLocalPolicy(input: {
+      tenantId: string;
+      occurredAt: number;
+      conversationId: string;
+      userId: string;
+      skipPermissions: boolean;
+      model?: string;
+    }): Promise<unknown>;
+    disconnectLocalWorkspace(input: {
+      tenantId: string;
+      occurredAt: number;
+      conversationId: string;
+      instanceId: string;
+      reason: string;
+    }): Promise<unknown>;
+  }>;
+  /** Whether the conversation's model may skip permission cards. */
+  skipGate(input: { projectId: string; model: string }): Promise<SkipPermissionsDecision>;
+  /** The person's own remembered code access choice. */
+  codeAccess: Readonly<{
+    tryRead(userId: string): Promise<string | null>;
+    write(input: { userId: string; preference: "github" | null }): Promise<void>;
+  }>;
 }>;
 
 /** One chat message on the wire — role + opaque parts (bounded downstream). */
@@ -1063,10 +1110,312 @@ export class LangyTrpcApi {
       )
       .build();
 
+    /**
+     * The developer's own machine, as the panel drives it (ADR-129): the cards
+     * it raised, the folder's state, and the two answers a person gives.
+     */
+    const requireOwn = async (
+      ctx: { app: { langy: LangyApp }; actor(): { id: string } },
+      input: { projectId: string; conversationId: string },
+    ): Promise<ConversationDetail> => {
+      const conversation = await ctx.app.langy.tryFindVisible({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId: ctx.actor().id,
+      });
+      if (!conversation) throw new LangyConversationNotFoundError(input.conversationId);
+      return conversation;
+    };
+
+    /**
+     * The card, when it belongs to a conversation this caller can act on. The
+     * wait names its own conversation and project, so answering with an id from
+     * another chat refuses before the answer reaches the folder.
+     */
+    const requireOwnWait = async (
+      ctx: { app: { langy: LangyApp }; actor(): { id: string } },
+      input: { projectId: string; conversationId: string; waitId: string },
+    ): Promise<void> => {
+      await requireOwn(ctx, input);
+      const wait = await ports.local.runtime.waits.read(input.waitId);
+      if (
+        !wait ||
+        wait.projectId !== input.projectId ||
+        wait.conversationId !== input.conversationId
+      ) {
+        throw new LangyWaitExpiredError({ waitId: input.waitId });
+      }
+    };
+
+    const recordPolicy = (input: {
+      projectId: string;
+      conversationId: string;
+      userId: string;
+      skipPermissions: boolean;
+      model: string;
+    }) =>
+      ports.local.commands.changeLocalPolicy({
+        tenantId: input.projectId,
+        occurredAt: Date.now(),
+        conversationId: input.conversationId,
+        userId: input.userId,
+        skipPermissions: input.skipPermissions,
+        ...(input.model ? { model: input.model } : {}),
+      });
+
+    const local = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("localRecord", (p) =>
+        p
+          .withInput(langyInput({ conversationId: z.string() }))
+          .withOutput(langyLocalRecordSchema)
+          .withPermission("langy:view")
+          .handle(({ input, ctx }) =>
+            ctx.app.langy.getLocalRecord({
+              projectId: input.projectId,
+              conversationId: input.conversationId,
+              userId: ctx.actor().id,
+            }),
+          ),
+      )
+
+      .query("getLocalWorkspace", (p) =>
+        p
+          .withInput(langyInput({ conversationId: z.string() }))
+          .withOutput(langyLocalWorkspaceStatusSchema)
+          .withPermission("langy:view")
+          .handle(async ({ input, ctx }) => {
+            const userId = ctx.actor().id;
+            const conversation = await requireOwn(ctx, input);
+            const runtime = ports.local.runtime;
+            const connected = await runtime.presence.read(input.conversationId);
+            const pendingRequest = await runtime.requests.findOpenForConversation({
+              projectId: input.projectId,
+              userId,
+              conversationId: input.conversationId,
+            });
+            const preference = await ports.local.codeAccess.tryRead(userId);
+            // The card offers the skip switch only when the model behind the
+            // conversation is on its provider's list, so the panel reads the
+            // same answer the permission card was built with.
+            const skipAllowed = conversation.lastModel
+              ? (
+                  await ports.local.skipGate({
+                    projectId: input.projectId,
+                    model: conversation.lastModel,
+                  })
+                ).allowed
+              : false;
+            return {
+              connected: connected !== null,
+              workspace: connected
+                ? { ...connected.workspace, hostname: connected.hostname }
+                : null,
+              skipAllowed,
+              skipPermissions: await reconcileSkipPolicy({
+                runtime,
+                projectId: input.projectId,
+                conversationId: input.conversationId,
+                model: conversation.lastModel,
+                skipGate: ports.local.skipGate,
+                changePolicy: (args) =>
+                  recordPolicy({ ...args, projectId: input.projectId }).then(() => undefined),
+              }),
+              pendingRequest: pendingRequest ? toControlRequestWire(pendingRequest) : null,
+              codeAccessPreference: preference === "github" ? ("github" as const) : null,
+            };
+          }),
+      )
+
+      .query("getCodeAccessPreference", (p) =>
+        p
+          .withInput(langyInput({}))
+          .withOutput(langyCodeAccessPreferenceSchema)
+          .withPermission("langy:view")
+          .handle(async ({ ctx }) => ({
+            preference:
+              (await ports.local.codeAccess.tryRead(ctx.actor().id)) === "github"
+                ? ("github" as const)
+                : null,
+          })),
+      )
+
+      .mutation("answerLocalPermission", (p) =>
+        p
+          .withInput(
+            langyInput({
+              conversationId: z.string(),
+              waitId: z.string(),
+              decision: z.enum(["allow_once", "allow_pattern", "deny"]),
+            }),
+          )
+          .withOutput(z.object({ answered: z.literal(true) }))
+          .withPermission("langy:create")
+          .handle(async ({ input, ctx }) => {
+            await requireOwnWait(ctx, input);
+            await ports.local.runtime.waits.answer({
+              waitId: input.waitId,
+              userId: ctx.actor().id,
+              decision: input.decision,
+            });
+            return { answered: true as const };
+          }),
+      )
+
+      .mutation("answerQuestion", (p) =>
+        p
+          .withInput(
+            langyInput({
+              conversationId: z.string(),
+              waitId: z.string(),
+              answers: z
+                .array(
+                  z.object({
+                    question: z.string(),
+                    selected: z.array(z.string()),
+                    other: z.string().max(4000).optional(),
+                  }),
+                )
+                .min(1)
+                .max(4),
+            }),
+          )
+          .withOutput(z.object({ answered: z.literal(true) }))
+          .withPermission("langy:create")
+          .handle(async ({ input, ctx }) => {
+            await requireOwnWait(ctx, input);
+            await ports.local.runtime.waits.answer({
+              waitId: input.waitId,
+              userId: ctx.actor().id,
+              answers: input.answers.map((answer) => ({
+                question: answer.question,
+                selected: answer.selected,
+                ...(answer.other !== undefined ? { other: answer.other } : {}),
+              })),
+            });
+            return { answered: true as const };
+          }),
+      )
+
+      /**
+       * Turn the permission cards off for this conversation, or back on.
+       *
+       * The server owns one half of this and one half only: whether the model
+       * running the conversation is on its provider's allowed list. The command
+       * line keeps the folder boundary and the privilege rule whatever the
+       * answer is, so nothing here can widen what may run on the machine.
+       */
+      .mutation("setLocalPolicy", (p) =>
+        p
+          .withInput(langyInput({ conversationId: z.string(), skipPermissions: z.boolean() }))
+          .withOutput(z.object({ skipPermissions: z.boolean() }))
+          .withPermission("langy:create")
+          .handle(async ({ input, ctx }) => {
+            const conversation = await requireOwn(ctx, input);
+            const runtime = ports.local.runtime;
+            let model = conversation.lastModel ?? "";
+            if (input.skipPermissions) {
+              const decision = await ports.local.skipGate({
+                projectId: input.projectId,
+                model,
+              });
+              if (!decision.allowed) {
+                throw new LangyLocalSkipModelNotAllowedError({
+                  model: decision.modelId || model,
+                  provider: decision.provider,
+                });
+              }
+              model = `${decision.provider}/${decision.modelId}`;
+            }
+            await runtime.presence.writePolicy({
+              conversationId: input.conversationId,
+              skipPermissions: input.skipPermissions,
+            });
+            await recordPolicy({
+              projectId: input.projectId,
+              conversationId: input.conversationId,
+              userId: ctx.actor().id,
+              skipPermissions: input.skipPermissions,
+              model,
+            });
+            await runtime.store.publish(
+              workspaceChannel(input.conversationId),
+              JSON.stringify({ policy: { skipPermissions: input.skipPermissions } }),
+            );
+            return { skipPermissions: input.skipPermissions };
+          }),
+      )
+
+      /** Close the shared folder from the panel header chip. */
+      .mutation("disconnectLocalWorkspace", (p) =>
+        p
+          .withInput(langyInput({ conversationId: z.string() }))
+          .withOutput(z.object({ disconnected: z.boolean() }))
+          .withPermission("langy:create")
+          .handle(async ({ input, ctx }) => {
+            await requireOwn(ctx, input);
+            const runtime = ports.local.runtime;
+            const workspace = await runtime.presence.read(input.conversationId);
+
+            // The credential goes first, and it goes whether or not a folder is
+            // there to be told. The frame below is best effort: a command line
+            // that lost the network a second before this never receives it, and
+            // its own reconnect would otherwise pass authentication on a binding
+            // that lives six hours, restoring the folder the reader had just
+            // disconnected.
+            await runtime.requests.revokeConversationBindings(input.conversationId);
+            await runtime.store.publish(
+              workspaceChannel(input.conversationId),
+              JSON.stringify({
+                disconnect: { reason: "Disconnected from the LangWatch panel." },
+              }),
+            );
+            await runtime.presence.deregister({ conversationId: input.conversationId });
+            for (const call of await runtime.dispatcher.listPendingForConversation(
+              input.conversationId,
+            )) {
+              await runtime.dispatcher.cancel({
+                callId: call.callId,
+                message: "The shared folder was disconnected, so the command did not finish.",
+              });
+            }
+            // The durable line belongs to a folder that was there. With no
+            // record to name, the revoke above is the whole of what this did.
+            if (!workspace) return { disconnected: false };
+            await ports.local.commands.disconnectLocalWorkspace({
+              tenantId: input.projectId,
+              occurredAt: Date.now(),
+              conversationId: input.conversationId,
+              instanceId: workspace.instanceId,
+              reason: "panel",
+            });
+            return { disconnected: true };
+          }),
+      )
+
+      /** Remember, or forget, how Langy should reach this person's code. */
+      .mutation("setCodeAccessPreference", (p) =>
+        p
+          .withInput(langyInput({ preference: z.enum(["github"]).nullable() }))
+          .withOutput(langyCodeAccessPreferenceSchema)
+          .withPermission("langy:update")
+          .handle(async ({ input, ctx }) => {
+            await ports.local.codeAccess.write({
+              userId: ctx.actor().id,
+              preference: input.preference,
+            });
+            return { preference: input.preference };
+          }),
+      )
+      .build();
+
     // One surface, defined in the groups the panel is laid out in. Several
     // chains rather than one because a single eighteen-procedure chain exceeds
     // TypeScript's instantiation depth, and `mergeRouters` puts them back on
     // the one `langy.*` name the client has always called.
-    return trpc.mergeRouters(conversations, turns, feedback);
+    return trpc.mergeRouters(conversations, turns, feedback, local);
   }
 }

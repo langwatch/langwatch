@@ -301,3 +301,66 @@ export {
   LANGY_BLOCKS_METRIC_NAME,
   OtelLangyBlockMetricsAdapter,
 } from "./adapters/otel.langy-block-metrics.adapter";
+
+// ADR-129 local control: the developer's own folder, and the cards that wait
+// for the developer. One runtime per process, two transports over it, and the
+// worker's REST door onto both.
+export {
+  cancelLocalWorkForTurn,
+  createLocalControlRuntime,
+  createLocalControlStore,
+  nullLocalControlBuffer,
+  type LocalControlRedis,
+  type LocalControlRuntime,
+} from "./adapters/langy-local-control-runtime.adapter";
+export {
+  ControlRequestService,
+  toControlRequestWire,
+  type ControlRequestKeyMinter,
+  type ControlRequestProjects,
+  type StoredControlRequest,
+} from "./services/langy-local-control-request.service";
+export {
+  conversationTitle,
+  conversationUrl,
+  langyLocalTurnStarter,
+  LocalControlSessionCore,
+  type ControlConversations,
+  type ControlCredentialReader,
+  type ControlEvents,
+  type ControlSkipGate,
+  type ControlTurnStarter,
+  type LangyLocalConversationTurns,
+  type LocalControlSessionCoreOptions,
+} from "./services/langy-local-session.service";
+export { LocalCallDispatcher } from "./services/langy-local-call-dispatcher.service";
+export { UserWaitService, type UserWaitEvents } from "./services/langy-local-user-wait.service";
+export { LocalWorkspacePresence } from "./adapters/redis.langy-local-presence.adapter";
+export { reconcileSkipPolicy, type SkipGate } from "./rules/langy-local-skip-policy.rules";
+export type { LangyLocalTrpcPorts } from "./transport/api-trpc/langy.api";
+export {
+  canModelSkipPermissions,
+  type SkipPermissionsDecision,
+  type SkipPermissionsProviderRow,
+  type SkipPermissionsProviderRows,
+} from "./services/langy-skip-permissions.service";
+export {
+  createLangyLocalRestApp,
+  type LangyCodeAccessPreferenceReader,
+  type LangyGithubInstallationReader,
+  type LangyLocalRestCommands,
+  type LangyLocalRestPorts,
+} from "./transport/api-rest/langy-local.api";
+export {
+  createLangyLocalControlRestApp,
+  type LangyLocalControlRestPorts,
+} from "./transport/api-rest/langy-local-control.api";
+export {
+  LocalControlLongPoll,
+  type LocalControlLongPollOptions,
+} from "./transport/api-rest/langy-local-control-long-poll";
+export {
+  CONTROL_CONNECT_PATH,
+  LocalControlGateway,
+  type ControlGatewayOptions,
+} from "./transport/api-ws/langy-local-control.api";

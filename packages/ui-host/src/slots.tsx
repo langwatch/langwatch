@@ -17,6 +17,11 @@ export type UiSlotProps = {
   contactSales: Record<never, never>;
   /** One line of "how much of this you may have, and how much you use". */
   resourceLimits: { label: string; current: number; max?: number };
+  /**
+   * The remembered answer to "how should Langy reach my code", on the Integrations screen. Empty
+   * until a choice was stored, so a screen that fills nothing renders nothing.
+   */
+  langyCodeAccessPreference: Record<never, never>;
   /** Said above a provider's credentials when the credentials are not the customer's. */
   managedModelProviderAlert: { provider: string; error?: string };
   /** The store-driven upgrade/limit dialog, mounted once at the app root. */

@@ -39,6 +39,7 @@ export type UserMinAggregateOutputType = {
   deactivatedAt: Date | null
   lastHomePath: string | null
   tracesExplorerTourDismissedAt: Date | null
+  langyCodeAccessPreference: string | null
   passkeyNudgeDismissedAt: Date | null
 }
 
@@ -57,6 +58,7 @@ export type UserMaxAggregateOutputType = {
   deactivatedAt: Date | null
   lastHomePath: string | null
   tracesExplorerTourDismissedAt: Date | null
+  langyCodeAccessPreference: string | null
   passkeyNudgeDismissedAt: Date | null
 }
 
@@ -75,6 +77,7 @@ export type UserCountAggregateOutputType = {
   deactivatedAt: number
   lastHomePath: number
   tracesExplorerTourDismissedAt: number
+  langyCodeAccessPreference: number
   passkeyNudgeDismissedAt: number
   _all: number
 }
@@ -95,6 +98,7 @@ export type UserMinAggregateInputType = {
   deactivatedAt?: true
   lastHomePath?: true
   tracesExplorerTourDismissedAt?: true
+  langyCodeAccessPreference?: true
   passkeyNudgeDismissedAt?: true
 }
 
@@ -113,6 +117,7 @@ export type UserMaxAggregateInputType = {
   deactivatedAt?: true
   lastHomePath?: true
   tracesExplorerTourDismissedAt?: true
+  langyCodeAccessPreference?: true
   passkeyNudgeDismissedAt?: true
 }
 
@@ -131,6 +136,7 @@ export type UserCountAggregateInputType = {
   deactivatedAt?: true
   lastHomePath?: true
   tracesExplorerTourDismissedAt?: true
+  langyCodeAccessPreference?: true
   passkeyNudgeDismissedAt?: true
   _all?: true
 }
@@ -222,6 +228,7 @@ export type UserGroupByOutputType = {
   deactivatedAt: Date | null
   lastHomePath: string | null
   tracesExplorerTourDismissedAt: Date | null
+  langyCodeAccessPreference: string | null
   passkeyNudgeDismissedAt: Date | null
   _count: UserCountAggregateOutputType | null
   _min: UserMinAggregateOutputType | null
@@ -261,6 +268,7 @@ export type UserWhereInput = {
   deactivatedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   lastHomePath?: Prisma.StringNullableFilter<"User"> | string | null
   tracesExplorerTourDismissedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  langyCodeAccessPreference?: Prisma.StringNullableFilter<"User"> | string | null
   passkeyNudgeDismissedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   accounts?: Prisma.AccountListRelationFilter
   accountCredentials?: Prisma.AccountCredentialListRelationFilter
@@ -320,6 +328,7 @@ export type UserOrderByWithRelationInput = {
   deactivatedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastHomePath?: Prisma.SortOrderInput | Prisma.SortOrder
   tracesExplorerTourDismissedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  langyCodeAccessPreference?: Prisma.SortOrderInput | Prisma.SortOrder
   passkeyNudgeDismissedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   accounts?: Prisma.AccountOrderByRelationAggregateInput
   accountCredentials?: Prisma.AccountCredentialOrderByRelationAggregateInput
@@ -382,6 +391,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   deactivatedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   lastHomePath?: Prisma.StringNullableFilter<"User"> | string | null
   tracesExplorerTourDismissedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  langyCodeAccessPreference?: Prisma.StringNullableFilter<"User"> | string | null
   passkeyNudgeDismissedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   accounts?: Prisma.AccountListRelationFilter
   accountCredentials?: Prisma.AccountCredentialListRelationFilter
@@ -441,6 +451,7 @@ export type UserOrderByWithAggregationInput = {
   deactivatedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastHomePath?: Prisma.SortOrderInput | Prisma.SortOrder
   tracesExplorerTourDismissedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  langyCodeAccessPreference?: Prisma.SortOrderInput | Prisma.SortOrder
   passkeyNudgeDismissedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
   _max?: Prisma.UserMaxOrderByAggregateInput
@@ -465,6 +476,7 @@ export type UserScalarWhereWithAggregatesInput = {
   deactivatedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
   lastHomePath?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   tracesExplorerTourDismissedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  langyCodeAccessPreference?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   passkeyNudgeDismissedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
 }
 
@@ -483,6 +495,7 @@ export type UserCreateInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -542,6 +555,7 @@ export type UserUncheckedCreateInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -601,6 +615,7 @@ export type UserUpdateInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -660,6 +675,7 @@ export type UserUncheckedUpdateInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -719,6 +735,7 @@ export type UserCreateManyInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
 }
 
@@ -737,6 +754,7 @@ export type UserUpdateManyMutationInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
@@ -755,6 +773,7 @@ export type UserUncheckedUpdateManyInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
@@ -778,6 +797,7 @@ export type UserCountOrderByAggregateInput = {
   deactivatedAt?: Prisma.SortOrder
   lastHomePath?: Prisma.SortOrder
   tracesExplorerTourDismissedAt?: Prisma.SortOrder
+  langyCodeAccessPreference?: Prisma.SortOrder
   passkeyNudgeDismissedAt?: Prisma.SortOrder
 }
 
@@ -796,6 +816,7 @@ export type UserMaxOrderByAggregateInput = {
   deactivatedAt?: Prisma.SortOrder
   lastHomePath?: Prisma.SortOrder
   tracesExplorerTourDismissedAt?: Prisma.SortOrder
+  langyCodeAccessPreference?: Prisma.SortOrder
   passkeyNudgeDismissedAt?: Prisma.SortOrder
 }
 
@@ -814,6 +835,7 @@ export type UserMinOrderByAggregateInput = {
   deactivatedAt?: Prisma.SortOrder
   lastHomePath?: Prisma.SortOrder
   tracesExplorerTourDismissedAt?: Prisma.SortOrder
+  langyCodeAccessPreference?: Prisma.SortOrder
   passkeyNudgeDismissedAt?: Prisma.SortOrder
 }
 
@@ -1469,6 +1491,7 @@ export type UserCreateWithoutAccountsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
@@ -1527,6 +1550,7 @@ export type UserUncheckedCreateWithoutAccountsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
@@ -1601,6 +1625,7 @@ export type UserUpdateWithoutAccountsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
@@ -1659,6 +1684,7 @@ export type UserUncheckedUpdateWithoutAccountsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -1717,6 +1743,7 @@ export type UserCreateWithoutAccountCredentialsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
@@ -1775,6 +1802,7 @@ export type UserUncheckedCreateWithoutAccountCredentialsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
@@ -1849,6 +1877,7 @@ export type UserUpdateWithoutAccountCredentialsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
@@ -1907,6 +1936,7 @@ export type UserUncheckedUpdateWithoutAccountCredentialsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -1965,6 +1995,7 @@ export type UserCreateWithoutSessionsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -2023,6 +2054,7 @@ export type UserUncheckedCreateWithoutSessionsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -2097,6 +2129,7 @@ export type UserUpdateWithoutSessionsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -2155,6 +2188,7 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -2213,6 +2247,7 @@ export type UserCreateWithoutTwoFactorsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -2271,6 +2306,7 @@ export type UserUncheckedCreateWithoutTwoFactorsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -2345,6 +2381,7 @@ export type UserUpdateWithoutTwoFactorsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -2403,6 +2440,7 @@ export type UserUncheckedUpdateWithoutTwoFactorsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -2461,6 +2499,7 @@ export type UserCreateWithoutPasskeysInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -2519,6 +2558,7 @@ export type UserUncheckedCreateWithoutPasskeysInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -2593,6 +2633,7 @@ export type UserUpdateWithoutPasskeysInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -2651,6 +2692,7 @@ export type UserUncheckedUpdateWithoutPasskeysInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -2709,6 +2751,7 @@ export type UserCreateWithoutTeamMembershipsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -2767,6 +2810,7 @@ export type UserUncheckedCreateWithoutTeamMembershipsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -2841,6 +2885,7 @@ export type UserUpdateWithoutTeamMembershipsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -2899,6 +2944,7 @@ export type UserUncheckedUpdateWithoutTeamMembershipsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -2957,6 +3003,7 @@ export type UserCreateWithoutOrgMembershipsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -3015,6 +3062,7 @@ export type UserUncheckedCreateWithoutOrgMembershipsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -3089,6 +3137,7 @@ export type UserUpdateWithoutOrgMembershipsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -3147,6 +3196,7 @@ export type UserUncheckedUpdateWithoutOrgMembershipsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -3205,6 +3255,7 @@ export type UserCreateWithoutPersonalTeamsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -3263,6 +3314,7 @@ export type UserUncheckedCreateWithoutPersonalTeamsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -3337,6 +3389,7 @@ export type UserUpdateWithoutPersonalTeamsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -3395,6 +3448,7 @@ export type UserUncheckedUpdateWithoutPersonalTeamsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -3453,6 +3507,7 @@ export type UserCreateWithoutScimExternalIdsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -3511,6 +3566,7 @@ export type UserUncheckedCreateWithoutScimExternalIdsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -3585,6 +3641,7 @@ export type UserUpdateWithoutScimExternalIdsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -3643,6 +3700,7 @@ export type UserUncheckedUpdateWithoutScimExternalIdsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -3701,6 +3759,7 @@ export type UserCreateWithoutPersonalProjectsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -3759,6 +3818,7 @@ export type UserUncheckedCreateWithoutPersonalProjectsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -3833,6 +3893,7 @@ export type UserUpdateWithoutPersonalProjectsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -3891,6 +3952,7 @@ export type UserUncheckedUpdateWithoutPersonalProjectsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -3949,6 +4011,7 @@ export type UserCreateWithoutInviteRequestsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -4007,6 +4070,7 @@ export type UserUncheckedCreateWithoutInviteRequestsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -4081,6 +4145,7 @@ export type UserUpdateWithoutInviteRequestsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -4139,6 +4204,7 @@ export type UserUncheckedUpdateWithoutInviteRequestsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -4197,6 +4263,7 @@ export type UserCreateWithoutSavedViewsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -4255,6 +4322,7 @@ export type UserUncheckedCreateWithoutSavedViewsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -4329,6 +4397,7 @@ export type UserUpdateWithoutSavedViewsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -4387,6 +4456,7 @@ export type UserUncheckedUpdateWithoutSavedViewsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -4445,6 +4515,7 @@ export type UserCreateWithoutAnnotationInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -4503,6 +4574,7 @@ export type UserUncheckedCreateWithoutAnnotationInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -4577,6 +4649,7 @@ export type UserUpdateWithoutAnnotationInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -4635,6 +4708,7 @@ export type UserUncheckedUpdateWithoutAnnotationInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -4693,6 +4767,7 @@ export type UserCreateWithoutSecretsCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -4751,6 +4826,7 @@ export type UserUncheckedCreateWithoutSecretsCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -4814,6 +4890,7 @@ export type UserCreateWithoutSecretsUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -4872,6 +4949,7 @@ export type UserUncheckedCreateWithoutSecretsUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -4946,6 +5024,7 @@ export type UserUpdateWithoutSecretsCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -5004,6 +5083,7 @@ export type UserUncheckedUpdateWithoutSecretsCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -5073,6 +5153,7 @@ export type UserUpdateWithoutSecretsUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -5131,6 +5212,7 @@ export type UserUncheckedUpdateWithoutSecretsUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -5189,6 +5271,7 @@ export type UserCreateWithoutAnnotationQueuesInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -5247,6 +5330,7 @@ export type UserUncheckedCreateWithoutAnnotationQueuesInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -5321,6 +5405,7 @@ export type UserUpdateWithoutAnnotationQueuesInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -5379,6 +5464,7 @@ export type UserUncheckedUpdateWithoutAnnotationQueuesInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -5437,6 +5523,7 @@ export type UserCreateWithoutAssignedQueueItemsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -5495,6 +5582,7 @@ export type UserUncheckedCreateWithoutAssignedQueueItemsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -5558,6 +5646,7 @@ export type UserCreateWithoutCreatedQueueItemsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -5616,6 +5705,7 @@ export type UserUncheckedCreateWithoutCreatedQueueItemsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -5690,6 +5780,7 @@ export type UserUpdateWithoutAssignedQueueItemsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -5748,6 +5839,7 @@ export type UserUncheckedUpdateWithoutAssignedQueueItemsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -5817,6 +5909,7 @@ export type UserUpdateWithoutCreatedQueueItemsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -5875,6 +5968,7 @@ export type UserUncheckedUpdateWithoutCreatedQueueItemsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -5933,6 +6027,7 @@ export type UserCreateWithoutShareLinksInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -5991,6 +6086,7 @@ export type UserUncheckedCreateWithoutShareLinksInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -6065,6 +6161,7 @@ export type UserUpdateWithoutShareLinksInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -6123,6 +6220,7 @@ export type UserUncheckedUpdateWithoutShareLinksInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -6181,6 +6279,7 @@ export type UserCreateWithoutPinnedTracesInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -6239,6 +6338,7 @@ export type UserUncheckedCreateWithoutPinnedTracesInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -6313,6 +6413,7 @@ export type UserUpdateWithoutPinnedTracesInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -6371,6 +6472,7 @@ export type UserUncheckedUpdateWithoutPinnedTracesInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -6429,6 +6531,7 @@ export type UserCreateWithoutTraceEditOverlaysCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -6487,6 +6590,7 @@ export type UserUncheckedCreateWithoutTraceEditOverlaysCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -6550,6 +6654,7 @@ export type UserCreateWithoutTraceEditOverlaysUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -6608,6 +6713,7 @@ export type UserUncheckedCreateWithoutTraceEditOverlaysUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -6682,6 +6788,7 @@ export type UserUpdateWithoutTraceEditOverlaysCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -6740,6 +6847,7 @@ export type UserUncheckedUpdateWithoutTraceEditOverlaysCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -6809,6 +6917,7 @@ export type UserUpdateWithoutTraceEditOverlaysUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -6867,6 +6976,7 @@ export type UserUncheckedUpdateWithoutTraceEditOverlaysUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -6925,6 +7035,7 @@ export type UserCreateWithoutWorkflowInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -6983,6 +7094,7 @@ export type UserUncheckedCreateWithoutWorkflowInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -7057,6 +7169,7 @@ export type UserUpdateWithoutWorkflowInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -7115,6 +7228,7 @@ export type UserUncheckedUpdateWithoutWorkflowInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -7173,6 +7287,7 @@ export type UserCreateWithoutWorkflowVersionInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -7231,6 +7346,7 @@ export type UserUncheckedCreateWithoutWorkflowVersionInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -7305,6 +7421,7 @@ export type UserUpdateWithoutWorkflowVersionInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -7363,6 +7480,7 @@ export type UserUncheckedUpdateWithoutWorkflowVersionInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -7421,6 +7539,7 @@ export type UserCreateWithoutLlmPromptConfigVersionsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -7479,6 +7598,7 @@ export type UserUncheckedCreateWithoutLlmPromptConfigVersionsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -7553,6 +7673,7 @@ export type UserUpdateWithoutLlmPromptConfigVersionsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -7611,6 +7732,7 @@ export type UserUncheckedUpdateWithoutLlmPromptConfigVersionsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -7669,6 +7791,7 @@ export type UserCreateWithoutVersionTagsCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -7727,6 +7850,7 @@ export type UserUncheckedCreateWithoutVersionTagsCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -7790,6 +7914,7 @@ export type UserCreateWithoutVersionTagsUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -7848,6 +7973,7 @@ export type UserUncheckedCreateWithoutVersionTagsUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -7922,6 +8048,7 @@ export type UserUpdateWithoutVersionTagsCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -7980,6 +8107,7 @@ export type UserUncheckedUpdateWithoutVersionTagsCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -8049,6 +8177,7 @@ export type UserUpdateWithoutVersionTagsUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -8107,6 +8236,7 @@ export type UserUncheckedUpdateWithoutVersionTagsUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -8165,6 +8295,7 @@ export type UserCreateWithoutPromptTagsCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -8223,6 +8354,7 @@ export type UserUncheckedCreateWithoutPromptTagsCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -8286,6 +8418,7 @@ export type UserCreateWithoutPromptTagsUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -8344,6 +8477,7 @@ export type UserUncheckedCreateWithoutPromptTagsUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -8418,6 +8552,7 @@ export type UserUpdateWithoutPromptTagsCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -8476,6 +8611,7 @@ export type UserUncheckedUpdateWithoutPromptTagsCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -8545,6 +8681,7 @@ export type UserUpdateWithoutPromptTagsUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -8603,6 +8740,7 @@ export type UserUncheckedUpdateWithoutPromptTagsUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -8661,6 +8799,7 @@ export type UserCreateWithoutScenariosInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -8719,6 +8858,7 @@ export type UserUncheckedCreateWithoutScenariosInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -8793,6 +8933,7 @@ export type UserUpdateWithoutScenariosInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -8851,6 +8992,7 @@ export type UserUncheckedUpdateWithoutScenariosInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -8909,6 +9051,7 @@ export type UserCreateWithoutGroupMembershipsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -8967,6 +9110,7 @@ export type UserUncheckedCreateWithoutGroupMembershipsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -9041,6 +9185,7 @@ export type UserUpdateWithoutGroupMembershipsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -9099,6 +9244,7 @@ export type UserUncheckedUpdateWithoutGroupMembershipsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -9157,6 +9303,7 @@ export type UserCreateWithoutRoleBindingsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -9215,6 +9362,7 @@ export type UserUncheckedCreateWithoutRoleBindingsInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -9289,6 +9437,7 @@ export type UserUpdateWithoutRoleBindingsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -9347,6 +9496,7 @@ export type UserUncheckedUpdateWithoutRoleBindingsInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -9405,6 +9555,7 @@ export type UserCreateWithoutApiKeysInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -9463,6 +9614,7 @@ export type UserUncheckedCreateWithoutApiKeysInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -9537,6 +9689,7 @@ export type UserUpdateWithoutApiKeysInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -9595,6 +9748,7 @@ export type UserUncheckedUpdateWithoutApiKeysInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -9653,6 +9807,7 @@ export type UserCreateWithoutPrincipalVirtualKeysInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -9711,6 +9866,7 @@ export type UserUncheckedCreateWithoutPrincipalVirtualKeysInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -9785,6 +9941,7 @@ export type UserUpdateWithoutPrincipalVirtualKeysInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -9843,6 +10000,7 @@ export type UserUncheckedUpdateWithoutPrincipalVirtualKeysInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -9901,6 +10059,7 @@ export type UserCreateWithoutRoutingPoliciesCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -9959,6 +10118,7 @@ export type UserUncheckedCreateWithoutRoutingPoliciesCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -10022,6 +10182,7 @@ export type UserCreateWithoutRoutingPoliciesUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -10080,6 +10241,7 @@ export type UserUncheckedCreateWithoutRoutingPoliciesUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -10154,6 +10316,7 @@ export type UserUpdateWithoutRoutingPoliciesCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -10212,6 +10375,7 @@ export type UserUncheckedUpdateWithoutRoutingPoliciesCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -10281,6 +10445,7 @@ export type UserUpdateWithoutRoutingPoliciesUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -10339,6 +10504,7 @@ export type UserUncheckedUpdateWithoutRoutingPoliciesUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -10397,6 +10563,7 @@ export type UserCreateWithoutGatewayGuardrailsCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -10455,6 +10622,7 @@ export type UserUncheckedCreateWithoutGatewayGuardrailsCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -10518,6 +10686,7 @@ export type UserCreateWithoutGatewayGuardrailsUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -10576,6 +10745,7 @@ export type UserUncheckedCreateWithoutGatewayGuardrailsUpdatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -10650,6 +10820,7 @@ export type UserUpdateWithoutGatewayGuardrailsCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -10708,6 +10879,7 @@ export type UserUncheckedUpdateWithoutGatewayGuardrailsCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -10777,6 +10949,7 @@ export type UserUpdateWithoutGatewayGuardrailsUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -10835,6 +11008,7 @@ export type UserUncheckedUpdateWithoutGatewayGuardrailsUpdatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -10893,6 +11067,7 @@ export type UserCreateWithoutIngestionSourcesCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -10951,6 +11126,7 @@ export type UserUncheckedCreateWithoutIngestionSourcesCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -11025,6 +11201,7 @@ export type UserUpdateWithoutIngestionSourcesCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -11083,6 +11260,7 @@ export type UserUncheckedUpdateWithoutIngestionSourcesCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -11141,6 +11319,7 @@ export type UserCreateWithoutAnomalyRulesCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -11199,6 +11378,7 @@ export type UserUncheckedCreateWithoutAnomalyRulesCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -11273,6 +11453,7 @@ export type UserUpdateWithoutAnomalyRulesCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -11331,6 +11512,7 @@ export type UserUncheckedUpdateWithoutAnomalyRulesCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -11389,6 +11571,7 @@ export type UserCreateWithoutGatewayBudgetsCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialCreateNestedManyWithoutUserInput
@@ -11447,6 +11630,7 @@ export type UserUncheckedCreateWithoutGatewayBudgetsCreatedInput = {
   deactivatedAt?: Date | string | null
   lastHomePath?: string | null
   tracesExplorerTourDismissedAt?: Date | string | null
+  langyCodeAccessPreference?: string | null
   passkeyNudgeDismissedAt?: Date | string | null
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   accountCredentials?: Prisma.AccountCredentialUncheckedCreateNestedManyWithoutUserInput
@@ -11521,6 +11705,7 @@ export type UserUpdateWithoutGatewayBudgetsCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUpdateManyWithoutUserNestedInput
@@ -11579,6 +11764,7 @@ export type UserUncheckedUpdateWithoutGatewayBudgetsCreatedInput = {
   deactivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHomePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tracesExplorerTourDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  langyCodeAccessPreference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   passkeyNudgeDismissedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   accountCredentials?: Prisma.AccountCredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -12028,6 +12214,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   deactivatedAt?: boolean
   lastHomePath?: boolean
   tracesExplorerTourDismissedAt?: boolean
+  langyCodeAccessPreference?: boolean
   passkeyNudgeDismissedAt?: boolean
   accounts?: boolean | Prisma.User$accountsArgs<ExtArgs>
   accountCredentials?: boolean | Prisma.User$accountCredentialsArgs<ExtArgs>
@@ -12088,6 +12275,7 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   deactivatedAt?: boolean
   lastHomePath?: boolean
   tracesExplorerTourDismissedAt?: boolean
+  langyCodeAccessPreference?: boolean
   passkeyNudgeDismissedAt?: boolean
 }, ExtArgs["result"]["user"]>
 
@@ -12106,6 +12294,7 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   deactivatedAt?: boolean
   lastHomePath?: boolean
   tracesExplorerTourDismissedAt?: boolean
+  langyCodeAccessPreference?: boolean
   passkeyNudgeDismissedAt?: boolean
 }, ExtArgs["result"]["user"]>
 
@@ -12124,10 +12313,11 @@ export type UserSelectScalar = {
   deactivatedAt?: boolean
   lastHomePath?: boolean
   tracesExplorerTourDismissedAt?: boolean
+  langyCodeAccessPreference?: boolean
   passkeyNudgeDismissedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "email" | "emailVerified" | "image" | "pendingSsoSetup" | "userHashKey" | "twoFactorEnabled" | "createdAt" | "updatedAt" | "lastLoginAt" | "deactivatedAt" | "lastHomePath" | "tracesExplorerTourDismissedAt" | "passkeyNudgeDismissedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "email" | "emailVerified" | "image" | "pendingSsoSetup" | "userHashKey" | "twoFactorEnabled" | "createdAt" | "updatedAt" | "lastLoginAt" | "deactivatedAt" | "lastHomePath" | "tracesExplorerTourDismissedAt" | "langyCodeAccessPreference" | "passkeyNudgeDismissedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   accounts?: boolean | Prisma.User$accountsArgs<ExtArgs>
   accountCredentials?: boolean | Prisma.User$accountCredentialsArgs<ExtArgs>
@@ -12241,6 +12431,14 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     deactivatedAt: Date | null
     lastHomePath: string | null
     tracesExplorerTourDismissedAt: Date | null
+    /**
+     * How Langy should reach this person's code when a task needs a change
+     * (ADR-129). "github" means they chose the pull request path and asked to
+     * be remembered; NULL means ask. A shared local folder is never stored
+     * here, because a folder has to be shared again each time.
+     * Spec: specs/langy/langy-code-access.feature
+     */
+    langyCodeAccessPreference: string | null
     /**
      * When this person last said "not now" to being offered a passkey
      * (ADR-120). On the account rather than in browser storage for two
@@ -12727,6 +12925,7 @@ export interface UserFieldRefs {
   readonly deactivatedAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly lastHomePath: Prisma.FieldRef<"User", 'String'>
   readonly tracesExplorerTourDismissedAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly langyCodeAccessPreference: Prisma.FieldRef<"User", 'String'>
   readonly passkeyNudgeDismissedAt: Prisma.FieldRef<"User", 'DateTime'>
 }
     

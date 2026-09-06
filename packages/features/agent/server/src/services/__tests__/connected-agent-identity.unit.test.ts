@@ -136,6 +136,9 @@ class MemoryIdentityRepository extends AgentRepository {
     );
   }
 
+  async findConnectedByName(): Promise<Agent[]> {
+    return [];
+  }
   async findConnectedByNameAndEnvironment(): Promise<Agent[]> {
     return [];
   }

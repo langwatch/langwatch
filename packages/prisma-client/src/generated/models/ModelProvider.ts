@@ -97,6 +97,7 @@ export type ModelProviderCountAggregateOutputType = {
   rotationPolicy: number
   providerConfig: number
   fallbackPriorityGlobal: number
+  langySkipPermissionsModels: number
   healthStatus: number
   circuitOpenedAt: number
   lastHealthCheckAt: number
@@ -179,6 +180,7 @@ export type ModelProviderCountAggregateInputType = {
   rotationPolicy?: true
   providerConfig?: true
   fallbackPriorityGlobal?: true
+  langySkipPermissionsModels?: true
   healthStatus?: true
   circuitOpenedAt?: true
   lastHealthCheckAt?: true
@@ -292,6 +294,7 @@ export type ModelProviderGroupByOutputType = {
   rotationPolicy: $Enums.GatewayProviderRotationPolicy
   providerConfig: runtime.JsonValue | null
   fallbackPriorityGlobal: number | null
+  langySkipPermissionsModels: runtime.JsonValue | null
   healthStatus: $Enums.GatewayProviderHealthStatus
   circuitOpenedAt: Date | null
   lastHealthCheckAt: Date | null
@@ -341,6 +344,7 @@ export type ModelProviderWhereInput = {
   rotationPolicy?: Prisma.EnumGatewayProviderRotationPolicyFilter<"ModelProvider"> | $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.JsonNullableFilter<"ModelProvider">
   fallbackPriorityGlobal?: Prisma.IntNullableFilter<"ModelProvider"> | number | null
+  langySkipPermissionsModels?: Prisma.JsonNullableFilter<"ModelProvider">
   healthStatus?: Prisma.EnumGatewayProviderHealthStatusFilter<"ModelProvider"> | $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Prisma.DateTimeNullableFilter<"ModelProvider"> | Date | string | null
   lastHealthCheckAt?: Prisma.DateTimeNullableFilter<"ModelProvider"> | Date | string | null
@@ -368,6 +372,7 @@ export type ModelProviderOrderByWithRelationInput = {
   rotationPolicy?: Prisma.SortOrder
   providerConfig?: Prisma.SortOrderInput | Prisma.SortOrder
   fallbackPriorityGlobal?: Prisma.SortOrderInput | Prisma.SortOrder
+  langySkipPermissionsModels?: Prisma.SortOrderInput | Prisma.SortOrder
   healthStatus?: Prisma.SortOrder
   circuitOpenedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastHealthCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -399,6 +404,7 @@ export type ModelProviderWhereUniqueInput = Prisma.AtLeast<{
   rotationPolicy?: Prisma.EnumGatewayProviderRotationPolicyFilter<"ModelProvider"> | $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.JsonNullableFilter<"ModelProvider">
   fallbackPriorityGlobal?: Prisma.IntNullableFilter<"ModelProvider"> | number | null
+  langySkipPermissionsModels?: Prisma.JsonNullableFilter<"ModelProvider">
   healthStatus?: Prisma.EnumGatewayProviderHealthStatusFilter<"ModelProvider"> | $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Prisma.DateTimeNullableFilter<"ModelProvider"> | Date | string | null
   lastHealthCheckAt?: Prisma.DateTimeNullableFilter<"ModelProvider"> | Date | string | null
@@ -426,6 +432,7 @@ export type ModelProviderOrderByWithAggregationInput = {
   rotationPolicy?: Prisma.SortOrder
   providerConfig?: Prisma.SortOrderInput | Prisma.SortOrder
   fallbackPriorityGlobal?: Prisma.SortOrderInput | Prisma.SortOrder
+  langySkipPermissionsModels?: Prisma.SortOrderInput | Prisma.SortOrder
   healthStatus?: Prisma.SortOrder
   circuitOpenedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastHealthCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -460,6 +467,7 @@ export type ModelProviderScalarWhereWithAggregatesInput = {
   rotationPolicy?: Prisma.EnumGatewayProviderRotationPolicyWithAggregatesFilter<"ModelProvider"> | $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.JsonNullableWithAggregatesFilter<"ModelProvider">
   fallbackPriorityGlobal?: Prisma.IntNullableWithAggregatesFilter<"ModelProvider"> | number | null
+  langySkipPermissionsModels?: Prisma.JsonNullableWithAggregatesFilter<"ModelProvider">
   healthStatus?: Prisma.EnumGatewayProviderHealthStatusWithAggregatesFilter<"ModelProvider"> | $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ModelProvider"> | Date | string | null
   lastHealthCheckAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ModelProvider"> | Date | string | null
@@ -486,6 +494,7 @@ export type ModelProviderCreateInput = {
   rotationPolicy?: $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Date | string | null
   lastHealthCheckAt?: Date | string | null
@@ -513,6 +522,7 @@ export type ModelProviderUncheckedCreateInput = {
   rotationPolicy?: $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Date | string | null
   lastHealthCheckAt?: Date | string | null
@@ -540,6 +550,7 @@ export type ModelProviderUpdateInput = {
   rotationPolicy?: Prisma.EnumGatewayProviderRotationPolicyFieldUpdateOperationsInput | $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: Prisma.EnumGatewayProviderHealthStatusFieldUpdateOperationsInput | $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -567,6 +578,7 @@ export type ModelProviderUncheckedUpdateInput = {
   rotationPolicy?: Prisma.EnumGatewayProviderRotationPolicyFieldUpdateOperationsInput | $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: Prisma.EnumGatewayProviderHealthStatusFieldUpdateOperationsInput | $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -594,6 +606,7 @@ export type ModelProviderCreateManyInput = {
   rotationPolicy?: $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Date | string | null
   lastHealthCheckAt?: Date | string | null
@@ -620,6 +633,7 @@ export type ModelProviderUpdateManyMutationInput = {
   rotationPolicy?: Prisma.EnumGatewayProviderRotationPolicyFieldUpdateOperationsInput | $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: Prisma.EnumGatewayProviderHealthStatusFieldUpdateOperationsInput | $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -646,6 +660,7 @@ export type ModelProviderUncheckedUpdateManyInput = {
   rotationPolicy?: Prisma.EnumGatewayProviderRotationPolicyFieldUpdateOperationsInput | $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: Prisma.EnumGatewayProviderHealthStatusFieldUpdateOperationsInput | $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -677,6 +692,7 @@ export type ModelProviderCountOrderByAggregateInput = {
   rotationPolicy?: Prisma.SortOrder
   providerConfig?: Prisma.SortOrder
   fallbackPriorityGlobal?: Prisma.SortOrder
+  langySkipPermissionsModels?: Prisma.SortOrder
   healthStatus?: Prisma.SortOrder
   circuitOpenedAt?: Prisma.SortOrder
   lastHealthCheckAt?: Prisma.SortOrder
@@ -784,6 +800,7 @@ export type ModelProviderCreateWithoutScopesInput = {
   rotationPolicy?: $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Date | string | null
   lastHealthCheckAt?: Date | string | null
@@ -810,6 +827,7 @@ export type ModelProviderUncheckedCreateWithoutScopesInput = {
   rotationPolicy?: $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Date | string | null
   lastHealthCheckAt?: Date | string | null
@@ -852,6 +870,7 @@ export type ModelProviderUpdateWithoutScopesInput = {
   rotationPolicy?: Prisma.EnumGatewayProviderRotationPolicyFieldUpdateOperationsInput | $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: Prisma.EnumGatewayProviderHealthStatusFieldUpdateOperationsInput | $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -878,6 +897,7 @@ export type ModelProviderUncheckedUpdateWithoutScopesInput = {
   rotationPolicy?: Prisma.EnumGatewayProviderRotationPolicyFieldUpdateOperationsInput | $Enums.GatewayProviderRotationPolicy
   providerConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fallbackPriorityGlobal?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  langySkipPermissionsModels?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   healthStatus?: Prisma.EnumGatewayProviderHealthStatusFieldUpdateOperationsInput | $Enums.GatewayProviderHealthStatus
   circuitOpenedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -935,6 +955,7 @@ export type ModelProviderSelect<ExtArgs extends runtime.Types.Extensions.Interna
   rotationPolicy?: boolean
   providerConfig?: boolean
   fallbackPriorityGlobal?: boolean
+  langySkipPermissionsModels?: boolean
   healthStatus?: boolean
   circuitOpenedAt?: boolean
   lastHealthCheckAt?: boolean
@@ -963,6 +984,7 @@ export type ModelProviderSelectCreateManyAndReturn<ExtArgs extends runtime.Types
   rotationPolicy?: boolean
   providerConfig?: boolean
   fallbackPriorityGlobal?: boolean
+  langySkipPermissionsModels?: boolean
   healthStatus?: boolean
   circuitOpenedAt?: boolean
   lastHealthCheckAt?: boolean
@@ -989,6 +1011,7 @@ export type ModelProviderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types
   rotationPolicy?: boolean
   providerConfig?: boolean
   fallbackPriorityGlobal?: boolean
+  langySkipPermissionsModels?: boolean
   healthStatus?: boolean
   circuitOpenedAt?: boolean
   lastHealthCheckAt?: boolean
@@ -1015,6 +1038,7 @@ export type ModelProviderSelectScalar = {
   rotationPolicy?: boolean
   providerConfig?: boolean
   fallbackPriorityGlobal?: boolean
+  langySkipPermissionsModels?: boolean
   healthStatus?: boolean
   circuitOpenedAt?: boolean
   lastHealthCheckAt?: boolean
@@ -1024,7 +1048,7 @@ export type ModelProviderSelectScalar = {
   organizationId?: boolean
 }
 
-export type ModelProviderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "provider" | "routingHandle" | "enabled" | "customKeys" | "extraHeaders" | "customModels" | "customEmbeddingsModels" | "deploymentMapping" | "rateLimitRpm" | "rateLimitTpm" | "rateLimitRpd" | "rotationPolicy" | "providerConfig" | "fallbackPriorityGlobal" | "healthStatus" | "circuitOpenedAt" | "lastHealthCheckAt" | "disabledAt" | "createdAt" | "updatedAt" | "organizationId", ExtArgs["result"]["modelProvider"]>
+export type ModelProviderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "provider" | "routingHandle" | "enabled" | "customKeys" | "extraHeaders" | "customModels" | "customEmbeddingsModels" | "deploymentMapping" | "rateLimitRpm" | "rateLimitTpm" | "rateLimitRpd" | "rotationPolicy" | "providerConfig" | "fallbackPriorityGlobal" | "langySkipPermissionsModels" | "healthStatus" | "circuitOpenedAt" | "lastHealthCheckAt" | "disabledAt" | "createdAt" | "updatedAt" | "organizationId", ExtArgs["result"]["modelProvider"]>
 export type ModelProviderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   scopes?: boolean | Prisma.ModelProvider$scopesArgs<ExtArgs>
   _count?: boolean | Prisma.ModelProviderCountOutputTypeDefaultArgs<ExtArgs>
@@ -1054,6 +1078,7 @@ export type $ModelProviderPayload<ExtArgs extends runtime.Types.Extensions.Inter
     rotationPolicy: $Enums.GatewayProviderRotationPolicy
     providerConfig: runtime.JsonValue | null
     fallbackPriorityGlobal: number | null
+    langySkipPermissionsModels: runtime.JsonValue | null
     healthStatus: $Enums.GatewayProviderHealthStatus
     circuitOpenedAt: Date | null
     lastHealthCheckAt: Date | null
@@ -1501,6 +1526,7 @@ export interface ModelProviderFieldRefs {
   readonly rotationPolicy: Prisma.FieldRef<"ModelProvider", 'GatewayProviderRotationPolicy'>
   readonly providerConfig: Prisma.FieldRef<"ModelProvider", 'Json'>
   readonly fallbackPriorityGlobal: Prisma.FieldRef<"ModelProvider", 'Int'>
+  readonly langySkipPermissionsModels: Prisma.FieldRef<"ModelProvider", 'Json'>
   readonly healthStatus: Prisma.FieldRef<"ModelProvider", 'GatewayProviderHealthStatus'>
   readonly circuitOpenedAt: Prisma.FieldRef<"ModelProvider", 'DateTime'>
   readonly lastHealthCheckAt: Prisma.FieldRef<"ModelProvider", 'DateTime'>

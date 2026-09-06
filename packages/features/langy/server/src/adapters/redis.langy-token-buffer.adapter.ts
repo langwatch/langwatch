@@ -11,7 +11,7 @@ import {
 } from "../rules/langy-streaming-constants.rules";
 import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatch/langy-contract";
 import {
-  LANGY_EMPTY_TURN_FALLBACK,
+  langyEmptyTurnLine,
   type LangyStreamRead,
   type LangyStreamRedis,
   LangyTokenBufferPort,
@@ -185,9 +185,64 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   }
 
   /**
-   * Ephemeral run of the model's reasoning (thinking): live-edge only, never
-   * flushed to the durable final and never surviving a reload. Providers emit
-   * it one token at a time, so coalesce it on the same cadence as answer text.
+   * Push the permission card of one local call onto the live edge. Flushes the
+   * buffered tokens first, like every other card append, so the line that
+   * announces the command lands before the card that asks about it.
+   */
+  async appendLocalPermission({
+    conversationId,
+    turnId,
+    entry,
+  }: {
+    conversationId: string;
+    turnId: string;
+    entry: Omit<Extract<LangyStreamEntry, { type: "local_permission" }>, "type">;
+  }): Promise<void> {
+    await this.flush({ conversationId, turnId });
+    await this.append(conversationId, turnId, {
+      type: "local_permission",
+      ...entry,
+    });
+  }
+
+  /** Push a question card onto the live edge. */
+  async appendQuestion({
+    conversationId,
+    turnId,
+    entry,
+  }: {
+    conversationId: string;
+    turnId: string;
+    entry: Omit<Extract<LangyStreamEntry, { type: "question" }>, "type">;
+  }): Promise<void> {
+    await this.flush({ conversationId, turnId });
+    await this.append(conversationId, turnId, { type: "question", ...entry });
+  }
+
+  /** Push the shared folder's connect or disconnect onto the live edge. */
+  async appendLocalWorkspace({
+    conversationId,
+    turnId,
+    entry,
+  }: {
+    conversationId: string;
+    turnId: string;
+    entry: Omit<Extract<LangyStreamEntry, { type: "local_workspace" }>, "type">;
+  }): Promise<void> {
+    await this.flush({ conversationId, turnId });
+    await this.append(conversationId, turnId, {
+      type: "local_workspace",
+      ...entry,
+    });
+  }
+
+  /**
+   * Ephemeral run of the model's reasoning (thinking). Live edge ONLY — it is
+   * never flushed to the durable final and never survives a reload; the browser
+   * shows it while it streams and drops it when the turn settles. Providers can
+   * emit reasoning one token at a time, so coalesce it on the same short cadence
+   * as visible answer text. That avoids rerendering the entire panel per token
+   * without making the thinking indicator feel delayed.
    */
   async appendReasoning({
     conversationId,
@@ -405,7 +460,7 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
     conversationId: string;
     turnId: string;
     backstopSilentTurn?: boolean;
-  }): Promise<{ backstopped: boolean }> {
+  }): Promise<{ backstopped: boolean; text?: string }> {
     await this.flush({ conversationId, turnId });
     await this.flushReasoning({ conversationId, turnId });
     // A turn that completes without a text delta leaves a finished spinner and
@@ -413,36 +468,31 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
     // the turn succeeded. The agent is told to always end with visible text;
     // this is the backstop. Pure whitespace reads the same as nothing, so it
     // takes the fallback too.
-    const backstopped =
-      backstopSilentTurn &&
-      !this.sawVisibleText.has(this.pendingKey(conversationId, turnId)) &&
-      !(await this.streamCarriesVisibleText({ conversationId, turnId }));
-    if (backstopped) {
-      await this.append(conversationId, turnId, {
-        type: "delta",
-        text: LANGY_EMPTY_TURN_FALLBACK,
-      });
+    //
+    // The stream also decides WHICH line: a turn holding on a card is waiting
+    // for the reader, not failing to answer them.
+    //
+    // The tail is what decides both, not `sawVisibleText`: that map is in
+    // memory and a buffer is built per relay request, so a worker that
+    // reconnected mid-turn ends the stream on an instance that never saw the
+    // earlier deltas. Only read when instance memory says nothing was written,
+    // which is the rare case, so the normal path pays no read.
+    let backstopped = false;
+    let text: string | undefined;
+    if (backstopSilentTurn && !this.sawVisibleText.has(this.pendingKey(conversationId, turnId))) {
+      const { reads } = await this.readTail({ conversationId, turnId });
+      const entries = reads.map((read) => read.entry);
+      const visible = entries.some((entry) => entry.type === "delta" && entry.text.trim() !== "");
+      if (!visible) {
+        backstopped = true;
+        text = langyEmptyTurnLine(entries);
+        await this.append(conversationId, turnId, { type: "delta", text });
+      }
     }
     this.firstFlushDone.delete(this.pendingKey(conversationId, turnId));
     this.sawVisibleText.delete(this.pendingKey(conversationId, turnId));
     await this.append(conversationId, turnId, { type: "end" });
-    return { backstopped };
-  }
-
-  /**
-   * Did this turn already write something the user can read?
-   * `sawVisibleText` is in-memory per relay request, so a reconnecting
-   * worker may never have seen earlier deltas; the durable stream decides.
-   */
-  private async streamCarriesVisibleText({
-    conversationId,
-    turnId,
-  }: {
-    conversationId: string;
-    turnId: string;
-  }): Promise<boolean> {
-    const { reads } = await this.readTail({ conversationId, turnId });
-    return reads.some(({ entry }) => entry.type === "delta" && entry.text.trim() !== "");
+    return { backstopped, ...(text !== undefined ? { text } : {}) };
   }
 
   /** Terminal marker: the turn errored. Flushes buffered tokens first. */

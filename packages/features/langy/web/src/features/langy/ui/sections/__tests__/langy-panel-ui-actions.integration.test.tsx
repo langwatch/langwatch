@@ -25,6 +25,16 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+  api: {
+    modelProvider: {
+      listAllForProjectForFrontend: {
+        useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+  },
+}));
+
 vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({
     currentDrawer: undefined,
@@ -106,6 +116,20 @@ vi.mock("../../../../../behavior/langy-api", async () => {
           isFetching: false,
           isError: false,
         }),
+      },
+      warmWorker: {
+        useMutation: () => ({ mutate: () => undefined }),
+      },
+      // ADR-129: the panel reads the shared folder and answers a question card's wait;
+      // neither is what these tests drive.
+      getLocalWorkspace: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      localRecord: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      answerQuestion: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false }),
       },
       stopTurn: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },
       onConversationUpdate: { useSubscription: () => undefined },

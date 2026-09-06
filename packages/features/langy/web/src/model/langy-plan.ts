@@ -27,7 +27,6 @@ export interface LangyPlan {
   itemParts: unknown[][];
 }
 
-const planStatusSchema = z.enum(["pending", "in_progress", "completed", "cancelled"]);
 const toolPartSchema = z
   .object({
     type: z.string(),
@@ -103,6 +102,70 @@ function tryReadPartInput(part: unknown): unknown {
  * the todos can arrive (`{ todos: [...] }` or a bare array) and of a status the tool
  * never promised.
  */
+/**
+ * Every status word that means one of the four the tool promised. `todowrite` documents
+ * `pending | in_progress | completed | cancelled` and the status crosses the wire as a free
+ * string, so a model that writes "done" or "in-progress" used to land every step on `pending`.
+ * Kept identical to `normalizeTodoStatus` in the worker's own `todowrite` tool.
+ */
+const PLAN_STATUS_BY_WORD: Record<string, LangyPlanItemStatus> = {
+  pending: "pending",
+  todo: "pending",
+  not_started: "pending",
+  in_progress: "in_progress",
+  active: "in_progress",
+  doing: "in_progress",
+  completed: "completed",
+  complete: "completed",
+  done: "completed",
+  finished: "completed",
+  cancelled: "cancelled",
+  canceled: "cancelled",
+  skipped: "cancelled",
+  wont_do: "cancelled",
+};
+
+/**
+ * The plan status a wire value means. An unknown word stays `pending`: a step is only ever
+ * ticked from a status the agent actually wrote.
+ */
+export function normalisePlanStatus(status: unknown): LangyPlanItemStatus {
+  if (typeof status !== "string") return "pending";
+  const word = status
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, "_");
+  return PLAN_STATUS_BY_WORD[word] ?? "pending";
+}
+
+/**
+ * The fresher of the two snapshots.
+ *
+ * The override is the live store's copy of the plan, and it is not always the
+ * newer one: if the stream dropped, or this tab adopted the turn late, it can
+ * still hold the all-pending list from the first `todowrite` call while the
+ * message's own parts already carry the finished steps. `todowrite` rewrites
+ * the whole list every call and a step never un-finishes, so more completed
+ * steps can only come from a later snapshot, which makes the completed count
+ * the one comparison that cannot invent progress.
+ */
+function fresherSnapshot({
+  override,
+  derived,
+}: {
+  override: LangyPlanItem[] | null;
+  derived: LangyPlanItem[] | null;
+}): LangyPlanItem[] | null {
+  if (!override || override.length === 0) return derived;
+  if (!derived || derived.length === 0) return override;
+  return completedCountOf(derived) > completedCountOf(override) ? derived : override;
+}
+
+/** How many steps of one snapshot are finished. */
+function completedCountOf(items: LangyPlanItem[]): number {
+  return items.filter((item) => item.status === "completed").length;
+}
+
 export function parseTodoList(input: unknown): LangyPlanItem[] | null {
   const parsedContainer = todoContainerSchema.safeParse(input);
   if (!parsedContainer.success) return null;
@@ -114,9 +177,7 @@ export function parseTodoList(input: unknown): LangyPlanItem[] | null {
 
     const content = cleanPlanContent(parsedItem.data.content);
     if (!content) continue;
-    const parsedStatus = planStatusSchema.safeParse(parsedItem.data.status);
-    const status = parsedStatus.success ? parsedStatus.data : "pending";
-    items.push({ content, status });
+    items.push({ content, status: normalisePlanStatus(parsedItem.data.status) });
   }
   return items;
 }
@@ -128,9 +189,7 @@ function inProgressIndex(items: LangyPlanItem[]): number {
 
 /** Normalise a wire item (permissive `status` string) into a plan item. */
 function normaliseItem(item: { content: string; status: string }): LangyPlanItem {
-  const parsedStatus = planStatusSchema.safeParse(item.status);
-  const status = parsedStatus.success ? parsedStatus.data : "pending";
-  return { content: cleanPlanContent(item.content), status };
+  return { content: cleanPlanContent(item.content), status: normalisePlanStatus(item.status) };
 }
 
 /**
@@ -164,7 +223,7 @@ export function langyPlan(
       ? opts.overrideItems.map(normaliseItem).filter((it) => it.content)
       : null;
 
-  const items = override ?? derived;
+  const items = fresherSnapshot({ override, derived });
   if (!items || items.length === 0) return null;
 
   const itemParts: unknown[][] = items.map(() => []);

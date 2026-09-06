@@ -19,7 +19,7 @@ import { AgentService } from "../../../services/agent.service";
 import { createAgentLegacyRestApp } from "../agent-legacy.api";
 import { createAgentV1RestApp } from "../agent-v1.api";
 
-const PROJECT_ID = "project_agents";
+export const PROJECT_ID = "project_agents";
 const PROJECT_SLUG = "agents-project";
 
 /** Renders both the flat legacy envelope and a `HandledError` at its own status. */
@@ -35,9 +35,10 @@ const renderHandled: ErrorHandler = (error, c) => {
   return c.json({ error: String(error) }, 500);
 };
 
-export function testSecurity(): AppRestSecurity {
+export function testSecurity(viewerUserId: string | null = null): AppRestSecurity {
   const pass: MiddlewareHandler = async (_c, next) => next();
   const asProject: MiddlewareHandler = async (c, next) => {
+    c.set("apiKeyUserId", viewerUserId);
     c.set("project", {
       id: PROJECT_ID,
       name: "Agents Project",
@@ -69,8 +70,8 @@ export function testSecurity(): AppRestSecurity {
 }
 
 /** An `AgentRepository` on a plain array, enough for the REST family's own routes. */
-export function inMemoryAgentRepository(): AgentRepository {
-  const rows: Agent[] = [];
+export function inMemoryAgentRepository(seed: readonly Agent[] = []): AgentRepository {
+  const rows: Agent[] = [...seed];
   let clock = 0;
 
   return {
@@ -131,12 +132,14 @@ export function inMemoryAgentRepository(): AgentRepository {
     findCopies: async () => [],
     updateNameAndConfig: async () => {},
     tryFindByIdentityKey: async () => null,
+    findConnectedByName: async () => [],
     findConnectedByNameAndEnvironment: async () => [],
     reregisterConnected: async () => {
       throw new Error("not used by these tests");
     },
     touchLastSeenAt: async () => {},
-    findUserNamesByIds: async () => new Map(),
+    findUserNamesByIds: async (ids: readonly string[]) =>
+      new Map(ids.map((id) => [id, `Person ${id}`])),
   };
 }
 
@@ -156,20 +159,22 @@ export const auditLog: AgentsAuditLogPort = {
   history: async () => [],
 };
 
-export function buildAgentApps() {
-  const repository = inMemoryAgentRepository();
+export function buildAgentApps(
+  options: { seed?: readonly Agent[]; viewerUserId?: string | null } = {},
+) {
+  const repository = inMemoryAgentRepository(options.seed ?? []);
   const agentService = AgentService.create({ repository, workflows, auditLog });
   const app = AgentApp.create({ agents: agentService });
   const agentPlatformUrl = ({ projectSlug, agentId }: { projectSlug: string; agentId: string }) =>
     `https://app.test/${projectSlug}/agents/${agentId}`;
 
   const v1 = createAgentV1RestApp({
-    security: testSecurity(),
+    security: testSecurity(options.viewerUserId ?? null),
     agents: () => app,
     agentPlatformUrl,
   });
   const legacy = createAgentLegacyRestApp({
-    security: testSecurity(),
+    security: testSecurity(options.viewerUserId ?? null),
     agents: () => app,
     agentPlatformUrl,
   });

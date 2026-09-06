@@ -28,6 +28,15 @@ function harness() {
       checkMessageRateLimit: async () => ({ allowed: true }),
       checkWarmRateLimit: async () => ({ allowed: true }),
       recordProductEvent: () => {},
+      local: {
+        runtime: null as never,
+        commands: {
+          changeLocalPolicy: async () => undefined,
+          disconnectLocalWorkspace: async () => undefined,
+        },
+        skipGate: async () => ({ allowed: false, provider: "", modelId: "" }),
+        codeAccess: { tryRead: async () => null, write: async () => undefined },
+      },
       uiActions: {
         claim: async () => ({ isClaimed: true }),
         complete: async () => ({ isAccepted: true }),

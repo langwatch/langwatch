@@ -189,8 +189,10 @@ export class AgentTrpcApi {
             .withOutput(agentWithLegacyCopyCountSchema.array())
             .withPermission("evaluations:view")
             .handle(async ({ ctx, input }) => {
-              ctx.actor();
-              const agents = await withAgentErrors(() => ctx.app.agents.getAll(input));
+              const viewer = ctx.actor();
+              const agents = await withAgentErrors(() =>
+                ctx.app.agents.getAll({ ...input, viewerUserId: viewer.id }),
+              );
               return agents.map(withLegacyCopyCount);
             }),
         )
@@ -200,8 +202,10 @@ export class AgentTrpcApi {
             .withOutput(agentWithLegacyCopyCountSchema)
             .withPermission("evaluations:view")
             .handle(async ({ ctx, input }) => {
-              ctx.actor();
-              const agent = await withAgentErrors(() => ctx.app.agents.getById(input));
+              const viewer = ctx.actor();
+              const agent = await withAgentErrors(() =>
+                ctx.app.agents.getById({ ...input, viewerUserId: viewer.id }),
+              );
               return withLegacyCopyCount(agent);
             }),
         )

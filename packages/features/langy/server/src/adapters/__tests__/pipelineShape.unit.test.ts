@@ -86,6 +86,12 @@ const EXPECTED_COMMANDS = [
   "recordTurnHandoff",
   "consumeTurnHandoff",
   "generateConversationTitle",
+  "requestLocalControl",
+  "connectLocalWorkspace",
+  "disconnectLocalWorkspace",
+  "changeLocalPolicy",
+  "startUserWait",
+  "endUserWait",
 ] as const;
 
 describe("langy-conversation-processing pipeline shape", () => {

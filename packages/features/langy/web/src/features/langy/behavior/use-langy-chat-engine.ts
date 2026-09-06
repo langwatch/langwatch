@@ -5,6 +5,7 @@ import { useCallback, useRef } from "react";
 import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 
 import type { LangyMessageDto } from "@langwatch/langy-contract";
+import { isLangyTranscriptMessage } from "../../../model/langy-transcript";
 import type { createLangyChatTransport } from "./logic/langy-chat-transport";
 
 /**
@@ -41,7 +42,7 @@ export function useLangyChatEngine({
 
   const applyHistoryToEngine = useCallback((history: LangyMessageDto[]) => {
     const uiMessages = history
-      .filter((m) => m.role === "user" || m.role === "assistant")
+      .filter(isLangyTranscriptMessage)
       // `recorded` marks a message that came from the durable fold rather than
       // from this browser's own stream. The relay stamped its card fences into
       // typed parts already, so a fence still sitting in its TEXT is one the

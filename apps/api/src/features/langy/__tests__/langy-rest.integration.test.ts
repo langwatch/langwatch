@@ -265,6 +265,7 @@ describe("given a process composing the Langy doors", () => {
         internalSecret: SECRET,
         metrics: apiLangyRestMetrics(),
         workbench: undefined,
+        local: undefined,
       });
 
       expect(composed?.turns).toBeDefined();
@@ -288,6 +289,7 @@ describe("given a process composing the Langy doors", () => {
           internalSecret: SECRET,
           metrics: apiLangyRestMetrics(),
           workbench: undefined,
+          local: undefined,
         }),
       ).toBeUndefined();
     });
@@ -441,6 +443,7 @@ function mountUiActions(world: ReturnType<typeof langyWorld>) {
     // No workbench: the catalogue still names every kind, and an away page is
     // refused by name rather than run against a stack this world has not built.
     workbench: () => null,
+    local: undefined,
   });
   if (!composed?.uiActions) throw new Error("the UI-action door did not compose");
   const hono = new Hono().route(

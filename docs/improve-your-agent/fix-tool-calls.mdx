@@ -23,29 +23,29 @@ To make the second case fail on its own, add a criterion on the process as well 
 Run the suite once, then paste this into Langy or into your coding agent:
 
 ```text
-Use the langwatch CLI to read the last run of the test suite I ran last; ask me which one if it is
+Use the langwatch CLI to read the last run of the last test suite I ran; ask me which one if it is
 not clear from our conversation. Find every tool call that a tool rejected or that my agent retried,
 tell me what the model saw as the error, and fix the tool descriptions, the parameter schemas and
 the error messages so the first call succeeds. Tell me what you found before you change anything.
 ```
 
-What comes back is a change to the tool contract, and it helps to know what a good one looks like when you review it. In order of yield:
+The agent comes back with a change to the tool contract. When you review it, these are the properties of a good contract, the most effective first:
 
-1. **The accepted values are in the parameter description, or better, in the schema.** An enum in the schema removes the guess altogether; a description that lists the values is the next best thing.
-2. **The error message spells out the parameter and the accepted values**, so the model can act on it.
-3. **The call is validated at the boundary**, so it is rejected with that same message before it reaches your service.
-4. **One tool per job.** A tool that needs three calls to return one answer either gets merged into one call, or gets a second tool next to it that returns the answer in one step.
-5. **The retries are capped in the harness**, so after the second failure on the same tool the agent escalates or asks the user instead of trying a third time.
+1. **The accepted values are in the parameter description, or better, in the schema.** With an enum in the schema the model does not guess at all; a description that lists the values is the next best thing.
+2. **A more detailed error message**, which says which parameter was rejected and which values it accepts, so the model can fix the call instead of guessing again.
+3. **The tool validates the call at its boundary** and rejects it with that same message before the call reaches your service.
+4. **One tool per job.** Merge a tool that needs three calls to return one answer into one call, or add a second tool next to it that returns the answer in one step.
+5. **The harness caps the retries**, so after the second failure on the same tool the agent escalates or asks the user instead of trying a third time.
 
-For example, the difference in the tool itself:
+For example, the same tool before and after the first three changes on the list, which put the accepted values in the description, return a more detailed error message and validate at the boundary:
 
-```python
+```python title="Before"
 def check_return_eligibility(order_id: str, reason: str) -> str:
     """Check if an order can be returned."""
     ...
 ```
 
-```python
+```python title="After"
 REASONS = ("defective", "incorrect_item", "not_as_expected", "remorse")
 
 def check_return_eligibility(order_id: str, reason: str) -> str:
@@ -59,7 +59,7 @@ def check_return_eligibility(order_id: str, reason: str) -> str:
     ...
 ```
 
-The model reads the docstring as the tool description, so the first version makes it guess the value of `reason` while the second makes the first call succeed. Every closed parameter needs the same treatment: in the example, `refund_method` on `create_return` was rejected as often as `reason` was.
+The model reads the docstring as the tool description, so the first version makes it guess the value of `reason` while the second makes the first call succeed. Every closed parameter needs the same treatment: in the example, the tool rejected `refund_method` on `create_return` as often as `reason`.
 
 ## Step 2: Assert on the tool calls
 
@@ -119,7 +119,7 @@ langwatch test-suite run "Returns" \
   --wait
 ```
 
-The changed side passes the new criteria, and each reply has fewer model calls behind it: in the example, three instead of five for the damaged blender return. Keep the criteria, because they are now the regression test for this tool. As on the other guides, the **Total cost** and **Average reply latency** charts move more between two runs of the same agent than the removed retries move them, so read those two from a run with `--repeat 3`.
+The changed side passes the new criteria, and each reply has fewer model calls behind it: in the example, three instead of five for the damaged blender return. Keep the criteria, because they are now the regression test for this tool. The **Total cost** and **Average reply latency** charts move more between two runs of the same agent than the removed retries move them, so read those two from a run with `--repeat 3`.
 
 ## Common failures
 

@@ -14,9 +14,13 @@ import {
   type LangyEventCursor,
   type LangyMessageRow,
   type LangyService,
+  type LangyLocalRecord,
+  type LangyMessagePart,
+  type LangyMessageRole,
   type LangyStreamEntry,
 } from "@langwatch/langy-contract";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service";
+
 import { LangyTokenBufferAdapter } from "../adapters/redis.langy-token-buffer.adapter";
 import { LangyTurnAccessAdapter } from "../adapters/redis.langy-turn-access.adapter";
 import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules";
@@ -142,6 +146,31 @@ export class LangyApp {
     userId: string;
   }): Promise<LangyConversationDetail | null> {
     return this.dependencies.langy.tryFindByIdVisible(input);
+  }
+
+  /**
+   * Every card the developer's machine raised in one conversation, and whether
+   * the folder is connected, off the durable record (ADR-129). The live stream
+   * cannot answer either: a tab that adopted a running turn never subscribed
+   * to it.
+   */
+  /** Writes one line into the transcript without starting a turn (ADR-129). */
+  recordUserMessage(input: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+    parts: LangyMessagePart[];
+    role?: LangyMessageRole;
+  }): Promise<{ messageId: string }> {
+    return this.dependencies.langy.recordUserMessage(input);
+  }
+
+  getLocalRecord(input: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<LangyLocalRecord> {
+    return this.dependencies.langy.getLocalRecord(input);
   }
 
   /**

@@ -23,6 +23,8 @@ function agent(overrides: Partial<ConnectedAgentView> = {}): ConnectedAgentView 
     status: "online",
     instances: [],
     owner: null,
+    selectable: true,
+    notSelectableReason: null,
     parameters: [],
     config: {},
     ...overrides,

@@ -9,6 +9,16 @@ import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { langyChoicesTimeline } from "../../../../../model/langy-choices-timeline";
 
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+  api: {
+    modelProvider: {
+      listAllForProjectForFrontend: {
+        useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+  },
+}));
+
 vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
@@ -116,19 +126,20 @@ describe("given a question the browser streamed and nothing stamped", () => {
     text: 'One thing I need from you:\n\n```langy-card\n{"kind":"choices","blockId":"q1","question":"Which agent should this scenario run against?","options":[{"id":"staging","label":"Staging agent"},{"id":"prod","label":"Production agent"}]}\n```',
   };
 
-  /** @scenario "A settled turn's cards reach the reader who watched it stream" */
-  it("is answerable, because the timeline reads the same fences the panel draws", () => {
+  /**
+   * A choices card is answerable only where it was RECORDED as one: a stamped
+   * card part, or the agent's `question` tool. A fence the model happened to
+   * write in prose reads as prose, so a quoted example can never present
+   * itself as a live question.
+   */
+  it("draws it, but does not offer it as a question", () => {
     const message = assistantMessage({ parts: [FENCED_QUESTION] });
-    const onChoiceSelect = vi.fn();
     renderMessage(message, {
       choicesTimeline: langyChoicesTimeline([message]),
-      onChoiceSelect,
+      onChoiceSelect: vi.fn(),
     });
 
-    fireEvent.click(screen.getByText("Staging agent"));
-    expect(onChoiceSelect.mock.calls[0]?.[0]).toMatchObject({
-      selection: { blockId: "q1", optionIds: ["staging"] },
-    });
+    expect(screen.queryByText("Staging agent")).toBeNull();
   });
 
   it("stays closed once the message is the durable record's", () => {

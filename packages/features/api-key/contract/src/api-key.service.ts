@@ -85,6 +85,8 @@ export abstract class ApiKeyService {
     organizationId: string;
     projectId: string;
   }): Promise<ApiKey[]>;
+  /** One key by the lookup id embedded in its token, revoked or live. */
+  abstract tryGetByLookupId(input: { lookupId: string }): Promise<ApiKey | null>;
   abstract validateCliSelection(input: {
     userId: string;
     organizationId: string;

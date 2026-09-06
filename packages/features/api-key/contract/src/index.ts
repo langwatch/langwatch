@@ -6,6 +6,7 @@ export * from "./api-key.tokens";
 export * from "./api-key.visibility";
 export * from "./api-key.names";
 export * from "./api-key.responses";
+export * from "./api-key.revocation-cause";
 export * from "./api-key.permissions";
 export * from "./api-key.rest";
 export { apiKeyPermissionSchema as apiKeyPermissionFormatSchema } from "./api-key";

@@ -6,6 +6,7 @@
 import {
   AgentNotFoundError,
   AgentRegisterOnlyError,
+  CONNECTED_AGENT_NOT_SELECTABLE_REASONS,
   agentTypeSchema,
   InvalidAgentConfigError,
   createAgentRequestSchema,
@@ -124,6 +125,15 @@ export const agentResponseSchema = z.object({
     .describe(
       "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind.",
     ),
+  selectable: z
+    .boolean()
+    .describe(
+      "Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name.",
+    ),
+  notSelectableReason: z
+    .enum(CONNECTED_AGENT_NOT_SELECTABLE_REASONS)
+    .nullable()
+    .describe("Why the agent cannot be run by this credential. Null when it can."),
   createdAt: z.date(),
   updatedAt: z.date(),
   platformUrl: z.string().url(),
@@ -192,17 +202,29 @@ async function presenceOf({
   return ConnectedAgentPresenceService.readAgentPresence({ projectId, agents: rows, runtime });
 }
 
+/**
+ * The person the request's key belongs to, or nothing for a project or service
+ * key. It decides only what each row says about itself: a personal agent of
+ * somebody else is listed either way, marked as not selectable.
+ */
+function viewerUserIdOf(c: AgentsV1Context): string | null {
+  return (c.get("apiKeyUserId") as string | null) ?? null;
+}
+
 /** The rows as every read answers them: presence, owner and link added. */
 async function rowsWire({
   deps,
   projectId,
   projectSlug,
   rows,
+  viewerUserId,
 }: {
   deps: AgentsV1Deps;
   projectId: string;
   projectSlug: string;
   rows: AgentListRow[];
+  /** The person the key belongs to; nothing for a project or service key. */
+  viewerUserId: string | null;
 }): Promise<AgentWire[]> {
   const [owners, presence] = await Promise.all([
     deps.agents().ownersOf(rows),
@@ -211,7 +233,12 @@ async function rowsWire({
   return rows.map((row) => ({
     ...row,
     type: agentTypeSchema.parse(row.type),
-    ...ConnectedAgentPresenceService.agentPresenceView({ agent: row, owners, presence }),
+    ...ConnectedAgentPresenceService.agentPresenceView({
+      agent: row,
+      owners,
+      presence,
+      viewerUserId,
+    }),
     platformUrl: deps.agentPlatformUrl({
       projectSlug,
       agentId: row.id,
@@ -225,17 +252,20 @@ async function agentWire({
   projectId,
   projectSlug,
   agent,
+  viewerUserId,
 }: {
   deps: AgentsV1Deps;
   projectId: string;
   projectSlug: string;
   agent: Parameters<typeof agentListRowOf>[0];
+  viewerUserId: string | null;
 }): Promise<AgentWire> {
   const [wire] = await rowsWire({
     deps,
     projectId,
     projectSlug,
     rows: [agentListRowOf(agent)],
+    viewerUserId,
   });
   return wire!;
 }
@@ -306,10 +336,7 @@ function registerCollectionEndpoints({
   family: RestApiVersionedFamily;
   deps: AgentsV1Deps;
 }): void {
-  const listHandler = async (
-    c: AgentsV1Context,
-    input: z.infer<typeof paginationQuerySchema>,
-  ) => {
+  const listHandler = async (c: AgentsV1Context, input: z.infer<typeof paginationQuerySchema>) => {
     const project = projectOf(c);
     const result = await deps.agents().list({
       projectId: project.id,
@@ -324,6 +351,7 @@ function registerCollectionEndpoints({
         projectId: project.id,
         projectSlug: project.slug,
         rows: result.data.map(agentListRowOf),
+        viewerUserId: viewerUserIdOf(c),
       }),
     };
   };
@@ -349,6 +377,7 @@ function registerCollectionEndpoints({
       projectId: project.id,
       projectSlug: project.slug,
       agent,
+      viewerUserId: viewerUserIdOf(c),
     });
   };
 
@@ -407,6 +436,7 @@ function registerItemEndpoints({
       projectId: project.id,
       projectSlug: project.slug,
       agent,
+      viewerUserId: viewerUserIdOf(c),
     });
   };
 
@@ -422,6 +452,7 @@ function registerItemEndpoints({
       projectId: project.id,
       projectSlug: project.slug,
       agent,
+      viewerUserId: viewerUserIdOf(c),
     });
   };
 

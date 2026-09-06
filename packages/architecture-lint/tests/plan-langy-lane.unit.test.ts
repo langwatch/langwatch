@@ -119,7 +119,7 @@ plan_langy_lane "${appDir}" "${appPort}"
 echo "__DECISION=\${LANGY_LANE_DECISION:-}"
 echo "__REASON=\${LANGY_LANE_REASON:-}"
 echo "__PORT=\${LANGY_LANE_PORT:-}"
-echo "__AGENT_URL=\${OPENCODE_AGENT_URL:-}"
+echo "__AGENT_URL=\${LANGY_AGENT_URL:-}"
 echo "__COMMAND=$(echo '')\$(langy_lane_command '../..' "\${LANGY_LANE_PORT:-0}")"
 `;
   let stdout = "";
@@ -130,7 +130,7 @@ echo "__COMMAND=$(echo '')\$(langy_lane_command '../..' "\${LANGY_LANE_PORT:-0}"
       input: script,
       stdio: ["pipe", "pipe", "pipe"],
       // Isolate the subprocess env: a developer's own shell often carries
-      // OPENCODE_AGENT_URL and the Langy block, and inheriting them would make
+      // LANGY_AGENT_URL and the Langy block, and inheriting them would make
       // these assertions depend on the machine.
       env: { PATH: process.env.PATH ?? "" },
     });
@@ -158,7 +158,7 @@ describe("plan-langy-lane.sh", () => {
       /** @scenario "The manager follows the address pinned in the app's env file" */
       it("resolves the pinned address rather than this worktree's port slot", () => {
         const appDir = appDirWith({
-          ".env": `OPENCODE_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
+          ".env": `LANGY_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
         });
 
         const r = plan({ appDir, appPort: "5590" });
@@ -171,7 +171,7 @@ describe("plan-langy-lane.sh", () => {
       /** @scenario "The manager follows the address pinned in the app's env file" */
       it("names the file it read the address from", () => {
         const appDir = appDirWith({
-          ".env": `OPENCODE_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
+          ".env": `LANGY_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
         });
 
         const r = plan({ appDir });
@@ -182,7 +182,7 @@ describe("plan-langy-lane.sh", () => {
       /** @scenario "A pinned address decides the port the lane sets" */
       it("sets the manager's port to the pinned one", () => {
         const appDir = appDirWith({
-          ".env": `OPENCODE_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
+          ".env": `LANGY_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
         });
 
         const r = plan({ appDir, appPort: "5570" });
@@ -194,12 +194,12 @@ describe("plan-langy-lane.sh", () => {
       /** @scenario "An agent address pinned in a file beats one exported for a single run" */
       it("keeps the pinned address over one exported into the shell", () => {
         const appDir = appDirWith({
-          ".env": `OPENCODE_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
+          ".env": `LANGY_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
         });
 
         const r = plan({
           appDir,
-          env: { OPENCODE_AGENT_URL: "http://localhost:9999" },
+          env: { LANGY_AGENT_URL: "http://localhost:9999" },
         });
 
         expect(r.agentUrl).toBe("http://localhost:8080");
@@ -208,7 +208,7 @@ describe("plan-langy-lane.sh", () => {
       /** @scenario "A commented-out pin is not an agent address" */
       it("treats a commented-out pin as nothing pinned", () => {
         const appDir = appDirWith({
-          ".env": `# OPENCODE_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
+          ".env": `# LANGY_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
         });
 
         const r = plan({ appDir, appPort: "5570" });
@@ -223,8 +223,8 @@ describe("plan-langy-lane.sh", () => {
       /** @scenario "The haven overlay wins over the plain env file for the agent address" */
       it("resolves the overlay's address, the one the app loads last", () => {
         const appDir = appDirWith({
-          ".env": `OPENCODE_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
-          ".env.portless": 'OPENCODE_AGENT_URL="http://127.0.0.1:41234"\n',
+          ".env": `LANGY_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
+          ".env.portless": 'LANGY_AGENT_URL="http://127.0.0.1:41234"\n',
         });
 
         const r = plan({ appDir });
@@ -236,8 +236,8 @@ describe("plan-langy-lane.sh", () => {
       /** @scenario "An overlay that clears the agent address is not read past" */
       it("derives the port when the overlay clears the address", () => {
         const appDir = appDirWith({
-          ".env": `OPENCODE_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
-          ".env.portless": "OPENCODE_AGENT_URL=\n",
+          ".env": `LANGY_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
+          ".env.portless": "LANGY_AGENT_URL=\n",
         });
 
         const r = plan({ appDir, appPort: "5570" });
@@ -250,13 +250,13 @@ describe("plan-langy-lane.sh", () => {
       it("derives the port when the overlay clears an exported address", () => {
         const appDir = appDirWith({
           ".env": FULL_ENV,
-          ".env.portless": "OPENCODE_AGENT_URL=\n",
+          ".env.portless": "LANGY_AGENT_URL=\n",
         });
 
         const r = plan({
           appDir,
           appPort: "5570",
-          env: { OPENCODE_AGENT_URL: "http://localhost:8080" },
+          env: { LANGY_AGENT_URL: "http://localhost:8080" },
         });
 
         expect(r.port).toBe("5574");
@@ -385,7 +385,7 @@ describe("plan-langy-lane.sh", () => {
       /** @scenario "An external agent URL leaves the manager alone" */
       it("skips rather than starting a local manager nothing dials", () => {
         const appDir = appDirWith({
-          ".env": `OPENCODE_AGENT_URL="https://langy.example.com"\n${FULL_ENV}`,
+          ".env": `LANGY_AGENT_URL="https://langy.example.com"\n${FULL_ENV}`,
         });
 
         const r = plan({ appDir });

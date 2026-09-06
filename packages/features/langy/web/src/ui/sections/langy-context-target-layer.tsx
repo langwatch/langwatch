@@ -476,7 +476,7 @@ function TargetAffordance({ targetId }: { targetId: string }) {
       // (the chips, the "+ context" control), so the pair reads on first
       // sight. The title carries the reverse, which the label alone can't.
       title={
-        isAdded ? `Langy has ${target.label} — click to release it` : `Give Langy ${target.label}`
+        isAdded ? `Langy has ${target.label}. Click to release it` : `Give Langy ${target.label}`
       }
       position="fixed"
       top={`${box.top + AFFORDANCE_INSET_PX}px`}

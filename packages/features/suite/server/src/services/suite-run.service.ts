@@ -368,6 +368,7 @@ export class SuiteRunService {
       projectId,
       actor,
       agents,
+      ...(this.options.connectedPresence ? { presence: this.options.connectedPresence } : {}),
     });
     const targetResolution = await this.scope.resolveTargetReferences({
       targets: sortTargets ? sortSuiteTargets(namedTargets) : namedTargets,

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyRevocationCause, ApiKeyService } from "@langwatch/api-key-contract";
 import {
   IngestionKeyIssuerPort,
   IngestionKeyRepository,
   type StoredIngestionKey,
+  type StoredIngestionKeyOwnership,
 } from "@langwatch/enterprise-governance-server";
 
 type IngestionKeyCreateInput = {
@@ -23,9 +24,10 @@ type IngestionKeyCreateInput = {
 type IngestionKeyRevokeInput = {
   id: string;
   callerUserId: string;
-  callerIsAdmin: true;
+  callerIsAdmin: boolean;
   organizationId: string;
   awaitProjection: false;
+  cause?: ApiKeyRevocationCause;
 };
 
 export class AppIngestionKeyRepository extends IngestionKeyRepository {
@@ -50,6 +52,13 @@ export class AppIngestionKeyRepository extends IngestionKeyRepository {
     projectId: string;
   }): Promise<StoredIngestionKey[]> {
     return this.apiKeys.listIngestionKeysForProject(input);
+  }
+
+  async tryFindByLookupId(input: {
+    lookupId: string;
+  }): Promise<StoredIngestionKeyOwnership | null> {
+    const key = await this.apiKeys.tryGetByLookupId(input);
+    return key ? { ...key, revocationCause: key.revocationCause ?? null } : null;
   }
 }
 

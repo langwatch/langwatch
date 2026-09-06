@@ -12,6 +12,7 @@ export * from "./connected-agent.dispatch";
 export * from "./connected-agent.errors";
 export * from "./connected-agent.identity";
 export * from "./connected-agent.protocol";
+export * from "./connected-agent.selectable";
 export * from "./connected-agent.transport";
 export * from "./connected-agent.view";
 export * from "./connected-agent.visibility";

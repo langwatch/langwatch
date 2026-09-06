@@ -6,11 +6,12 @@ import type {
   LangyCredentials,
   LangyMirrorTier,
 } from "./langy";
-import type { LangyMessagePart } from "./json";
+import type { LangyMessagePart, LangyMessageRole } from "./json";
 import type { CliResultDigest } from "./cards/digest";
 import type { CliToolResult } from "./cards/tool-result";
 import type { LangyConversationTurnWireEvent } from "./event-sourcing/contracts/turn-wire";
 import type { LangyEventCursor } from "./event-sourcing/contracts/cursor";
+import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold";
 
 export type LangyConversationListItem = {
   id: string;
@@ -238,6 +239,25 @@ export abstract class LangyService {
     userId: string;
     after: LangyEventCursor;
   }): Promise<LangyConversationEventPage>;
+  /**
+   * Every card the developer's machine raised in one conversation, and whether
+   * the folder is connected, off the durable record (ADR-129).
+   */
+  /** Writes one line into the transcript without starting a turn (ADR-129). */
+  abstract recordUserMessage(input: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+    parts: LangyMessagePart[];
+    title?: string | null;
+    role?: LangyMessageRole;
+    messageId?: string;
+  }): Promise<{ messageId: string }>;
+  abstract getLocalRecord(input: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<LangyLocalRecord>;
   abstract tryFindByIdVisible(input: {
     id: string;
     projectId: string;

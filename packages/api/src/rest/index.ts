@@ -38,6 +38,7 @@ export {
 // attached the route metadata. Re-export it so hosts cannot accidentally use
 // a peer-resolved copy with a different metadata symbol.
 export { generateSpecs as generateApiSpecs } from "hono-openapi";
+export { normalizeExclusiveBounds } from "./openapi-exclusive-bounds.js";
 
 import type { Hono } from "hono";
 import { handle } from "hono/vercel";

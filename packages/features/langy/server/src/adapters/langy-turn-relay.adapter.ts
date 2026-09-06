@@ -154,7 +154,8 @@ export interface LangyRelayBuffer {
     conversationId: string;
     turnId: string;
     backstopSilentTurn?: boolean;
-  }): Promise<{ backstopped: boolean }>;
+    /** The line the backstop wrote, when it wrote one. */
+  }): Promise<{ backstopped: boolean; text?: string }>;
   markError(a: { conversationId: string; turnId: string; error: string }): Promise<void>;
   heartbeat(a: { conversationId: string; turnId: string }): Promise<void>;
   appendNavigate(a: { conversationId: string; turnId: string; href: string }): Promise<void>;
@@ -610,16 +611,18 @@ export class LangyTurnRelayAdapter {
       }
 
       case "final": {
-        // The one terminal that means the turn finished. Stop and handoff also end the stream, and
-        // neither may claim the turn wrote no reply. The durable message is built from the frame,
-        // the live stream from the deltas, so this is the one place that sees both. Whether the
-        // backstop fired decides both, or the fallback would show live and the turn would render
-        // blank again the moment history reloads.
-        const { backstopped } = await this.deps.buffer.markEnd({
+        // The one terminal that means the turn finished. Stop and handoff also
+        // end the stream, and neither may claim the turn wrote no reply.
+        //
+        // The durable message is built from the frame, the live stream from the
+        // deltas, so this is the one place that sees both. Whether the backstop
+        // fired decides both, or the fallback would show live and the turn
+        // would render blank again the moment history reloads.
+        const { backstopped, text: backstopText } = await this.deps.buffer.markEnd({
           ...at,
           backstopSilentTurn: (frame.text ?? "").trim() === "",
         });
-        const text = backstopped ? LANGY_EMPTY_TURN_FALLBACK : frame.text;
+        const text = backstopped ? (backstopText ?? LANGY_EMPTY_TURN_FALLBACK) : frame.text;
         // markEnd first: it flushes the last tokens, so the turn's own account
         // of what happened when is complete on the stream before the ingest
         // reads it back to record the parts in that order.

@@ -23,27 +23,31 @@
  * on, made visible).
  */
 import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { useLangyStore } from "../../../../behavior/langy.store";
-import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card";
-import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
 import { LangyCard } from "../../../../ui/sections/langy-card";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,
 } from "../../behavior/logic/langy-error-explainer";
+import type { LangyPermissionCardData } from "../../../../model/langy-local-waits";
+import { useLangyStore } from "../../../../behavior/langy.store";
 import { LangyCapabilityPendingCard } from "./capabilities/langy-capability-pending-card";
 import { LangyCapabilityRenderer } from "./capabilities/langy-capability-renderer";
+import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card";
 import { LangyDerivedCardsTestingGround } from "./derived-cards/langy-derived-cards-testing-ground";
 import { LangyGitHubConnectCard } from "./github/langy-git-hub-connect-card";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card";
+import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card";
 import { LangyError } from "./langy-error";
 import { LangyFeedback } from "./langy-feedback";
+import { LangyLocalPermissionCard } from "./langy-local-permission-card";
 import { LangyPlanLimitCard } from "./langy-plan-limit-card";
 import { LangyRecoveringLine } from "./langy-recovering-line";
 import { LangyToolActivity } from "./langy-tool-activity";
 import { type LangyProposal, ProposalCard } from "./message-content";
+import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line";
 
 /** A settled tool call, shaped exactly as the stream delivers one. */
 function call(name: string, output: unknown, input: unknown = {}) {
@@ -162,7 +166,7 @@ export function LangyCardGallery() {
           CARD_TAXONOMY): every card Langy renders is one of these five weights,
           and the ramp is the point — warmth is earned, spent only on `ask` and
           `spotlight`, so the low-weight receipts never shout. */}
-      <Section title="Card taxonomy — by intent, quietest to loudest">
+      <Section title="Card taxonomy, by intent, quietest to loudest">
         <LangyCard
           intent="activity"
           overline="Working"
@@ -228,11 +232,11 @@ export function LangyCardGallery() {
           A gallery is only worth anything if it renders what the stream actually
           sends. These used to be tidied-up frames of our own invention, and they
           were more flattering than reality: the live stream sends a bare `bash`
-          carrying a LangWatch command (which rendered "Coding") and opencode's
+          carrying a LangWatch command (which rendered "Coding") and the worker's
           `skill` tool (which rendered "Skill"), and neither shape appeared here,
           so the gallery showed a kit that looked fine while the product did not.
           Every frame below is now one the agent genuinely emits. */}
-      <Section title="Activity — real frames from the live stream">
+      <Section title="Activity, real frames from the live stream">
         <LangyToolActivity
           message={toolMessage([
             {
@@ -271,17 +275,25 @@ export function LangyCardGallery() {
       {/* ADR-060: the model-emitted block channel — every derived kind, the
           failed disclosure, and every choices state, all interactive. The
           streaming playground feeds the REAL preview reducer chunk by chunk. */}
-      <Section title="Model-emitted blocks — derived cards and choices (ADR-060)">
+      <Section title="Model-emitted blocks: derived cards and choices (ADR-060)">
         <LangyDerivedCardsTestingGround />
       </Section>
 
-      <Section title="Capabilities — reads">
+      {/* ADR-129: the cards that stand between Langy and the developer's own
+          machine. The permission card is fed fixtures in each of its states;
+          the code access card is the REAL card on the open conversation, so it
+          reads whatever the folder and the remembered choice actually are. */}
+      <Section title="The developer's own machine (ADR-129)">
+        <LangyLocalControlGallery />
+      </Section>
+
+      <Section title="Capabilities that read">
         {/* The trace-sample card, fed the REAL search-result shape the CLI's
             `--format json` emits: `{ traces: [...Trace], pagination: {
             totalHits } }`, where a Trace carries `timestamps.started_at`,
             `input.value`, `metrics.total_time_ms` / `total_cost` and `error`.
             34 hits, 3 shown — the honesty rule the card exists to hold.
-            The input is opencode's raw shell payload, because that is exactly
+            The input is the raw shell payload, because that is exactly
             what the CLI envelope forwards, and it is what the "View in Trace
             Explorer" link parses the agent's query back out of. */}
         <LangyCapabilityRenderer
@@ -417,7 +429,7 @@ export function LangyCardGallery() {
         />
       </Section>
 
-      <Section title="Capabilities — writes">
+      <Section title="Capabilities that write">
         <LangyCapabilityRenderer
           call={call("langwatch.evaluator.create", {
             id: "eval_new",
@@ -459,12 +471,13 @@ export function LangyCardGallery() {
           metrics={[{ label: "Traces", value: 1204 }]}
           segment={{ index: 7, total: 11 }}
         />
-        <LangyRecoveringLine message="Langy restarted — picking your reply back up…" />
+        <LangyRecoveringLine message="Langy restarted. Picking your reply back up…" />
       </Section>
 
       <Section title="GitHub">
         <LangyGitHubConnectCard organizationId="gallery" />
         <LangyGitHubProgressCard
+          live
           events={[
             { stage: "cloning", detail: "acme/checkout" },
             { stage: "branched", detail: "langy/fix-retriever" },
@@ -603,6 +616,67 @@ export function LangyCardGallery() {
           onAction={() => undefined}
         />
       </Section>
+    </VStack>
+  );
+}
+
+/** The local-control cards: one permission card per state, plus the ask. */
+function LangyLocalControlGallery() {
+  const { project } = useOrganizationTeamProject();
+  const conversationId = useLangyStore((state) => state.activeConversationId);
+  const permission: LangyPermissionCardData = {
+    waitId: "gallery-wait",
+    status: "pending",
+    decision: null,
+    source: null,
+    command: "pnpm typecheck",
+    pattern: "pnpm *",
+    patterns: ["pnpm *"],
+    reason: "Runs the project's own type check before I commit",
+    timeoutSeconds: 300,
+    skipOffered: true,
+    workspaceName: "acme-app",
+    hostname: "rogerio-mbp",
+  };
+  const shared = {
+    projectId: project?.id ?? "",
+    conversationId: conversationId ?? "",
+    skipPermissions: false,
+  };
+
+  return (
+    <VStack align="stretch" gap={3}>
+      <LangyLocalPermissionCard {...shared} card={permission} skipAllowed />
+      <LangyLocalPermissionCard {...shared} card={permission} skipAllowed={false} />
+      <LangyLocalPermissionCard
+        {...shared}
+        card={{ ...permission, status: "answered", decision: "allow_pattern" }}
+        skipAllowed
+      />
+      <LangyLocalPermissionCard
+        {...shared}
+        card={{
+          ...permission,
+          status: "answered",
+          decision: "allow_pattern",
+          source: "terminal",
+        }}
+        skipAllowed
+      />
+      <LangyLocalPermissionCard
+        {...shared}
+        card={{ ...permission, status: "expired" }}
+        skipAllowed
+      />
+      {project?.id && conversationId ? (
+        <LangyCodeAccessCard
+          projectId={project.id}
+          conversationId={conversationId}
+          callId="gallery-code-access"
+          onChoiceSelect={() => undefined}
+          onAskAgain={() => undefined}
+        />
+      ) : null}
     </VStack>
   );
 }

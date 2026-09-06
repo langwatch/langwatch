@@ -73,4 +73,6 @@ export abstract class AgentService {
     name: string;
     environment: string;
   }): Promise<Agent[]>;
+  /** Every environment a connected agent of this name is registered in. */
+  abstract getConnectedByName(input: { projectId: string; name: string }): Promise<Agent[]>;
 }

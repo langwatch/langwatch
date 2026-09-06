@@ -7,6 +7,7 @@ import {
 import { z } from "zod";
 import {
   modelProviderSchema,
+  readStoredSkipList,
   type Model,
   type ModelDefaultScope,
   type ModelProvider,
@@ -232,6 +233,9 @@ export class PrismaModelProviderRepository extends ModelProviderRepository {
       providerConfig: input.providerConfig
         ? PrismaModelProviderRepository.toPrismaInputJson(input.providerConfig)
         : Prisma.JsonNull,
+      langySkipPermissionsModels: input.langySkipPermissionsModels
+        ? PrismaModelProviderRepository.toPrismaInputJson(input.langySkipPermissionsModels)
+        : Prisma.JsonNull,
       scopes: { create: input.scopes },
     } satisfies Prisma.ModelProviderCreateInput;
   }
@@ -260,6 +264,9 @@ export class PrismaModelProviderRepository extends ModelProviderRepository {
       fallbackPriorityGlobal: input.fallbackPriorityGlobal,
       providerConfig: input.providerConfig
         ? PrismaModelProviderRepository.toPrismaInputJson(input.providerConfig)
+        : Prisma.JsonNull,
+      langySkipPermissionsModels: input.langySkipPermissionsModels
+        ? PrismaModelProviderRepository.toPrismaInputJson(input.langySkipPermissionsModels)
         : Prisma.JsonNull,
       scopes: { deleteMany: {}, create: input.scopes },
     } satisfies Prisma.ModelProviderUpdateInput;
@@ -317,6 +324,9 @@ export class PrismaModelProviderRepository extends ModelProviderRepository {
       fallbackPriorityGlobal: row.fallbackPriorityGlobal ?? null,
       rotationPolicy: row.rotationPolicy,
       providerConfig: PrismaModelProviderRepository.asRecord(row.providerConfig),
+      langySkipPermissionsModels: readStoredSkipList(row.langySkipPermissionsModels).length
+        ? readStoredSkipList(row.langySkipPermissionsModels)
+        : null,
       deploymentMapping: PrismaModelProviderRepository.asStringRecord(row.deploymentMapping),
       healthStatus: row.healthStatus,
       circuitOpenedAt: row.circuitOpenedAt ?? null,

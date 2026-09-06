@@ -5,8 +5,10 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
+import type { Agent } from "@langwatch/agent-contract";
+
 import { AGENTS_ALIAS_SUCCESSOR } from "../agent-legacy.api";
-import { buildAgentApps } from "./agent-rest.test-harness";
+import { buildAgentApps, PROJECT_ID } from "./agent-rest.test-harness";
 
 describe("given a project with a valid API key", () => {
   let api: ReturnType<typeof buildAgentApps>;
@@ -317,5 +319,56 @@ describe("given the deprecated /api/agents alias", () => {
       expect(call.status).toBe(404);
       expect(poll.status).toBe(404);
     });
+  });
+});
+
+describe("given one name and one environment holding a personal row and a host-scoped row", () => {
+  /** One connected agent row as the repository stores it. */
+  function connectedRow(overrides: Partial<Agent> & { id: string }): Agent {
+    return {
+      projectId: PROJECT_ID,
+      name: "support-agent",
+      type: "connected",
+      config: { environment: "development", parameters: [] },
+      environment: "development",
+      workflowId: null,
+      copiedFromAgentId: null,
+      archivedAt: null,
+      createdAt: new Date(1),
+      updatedAt: new Date(1),
+      ...overrides,
+    } as unknown as Agent;
+  }
+
+  /** @scenario "A listed connected agent carries its owner and whether the caller can choose it" */
+  it("lists both rows and marks the personal one as not selectable", async () => {
+    const api = buildAgentApps({
+      viewerUserId: "user_reader",
+      seed: [
+        connectedRow({ id: "agent_personal", ownerUserId: "user_ana" }),
+        connectedRow({ id: "agent_hosted", hostLabel: "acme-laptop" }),
+      ],
+    });
+
+    const response = await api.v1("/api/v1/agents?limit=100");
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      data: {
+        id: string;
+        owner: { userId: string; name: string | null } | null;
+        selectable: boolean;
+        notSelectableReason: string | null;
+      }[];
+    };
+    const personal = body.data.find((row) => row.id === "agent_personal");
+    const hosted = body.data.find((row) => row.id === "agent_hosted");
+
+    expect(personal?.owner?.userId).toBe("user_ana");
+    expect(personal?.selectable).toBe(false);
+    expect(personal?.notSelectableReason).toBe("owned_by_another_person");
+    expect(hosted?.owner).toBeNull();
+    expect(hosted?.selectable).toBe(true);
+    expect(hosted?.notSelectableReason).toBeNull();
   });
 });

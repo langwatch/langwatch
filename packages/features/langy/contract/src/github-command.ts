@@ -1,3 +1,5 @@
+import { firstPullRequestUrlIn } from "./langy.github-pr-url";
+
 export type GithubProgressStage =
   | "cloning"
   | "cloned"
@@ -10,6 +12,11 @@ export type GithubProgressStage =
 export type GithubProgressEvent = {
   stage: GithubProgressStage;
   detail?: string;
+  /**
+   * The pull request's own URL, on the `opened` stage. It is not in the command, it is in the
+   * command's OUTPUT, which is why it is read separately from `detail`.
+   */
+  url?: string;
 };
 
 export type GithubStep = {
@@ -24,44 +31,68 @@ export function needsGithubAuth(command: string): boolean {
   return commandSegments(command).some((segment) => isGhCli(segment) || isNetworkGit(segment));
 }
 
-export function githubStepOf(command: string): GithubStep | null {
+/**
+ * Every step of the PR flow this shell command performs, in the order it runs them. A chain is
+ * normal, not an edge case: an agent working in a developer's own folder runs
+ * `git add … && git commit … && git push … && gh pr create …` as one call.
+ */
+export function githubStepsOf(command: string): GithubStep[] {
+  const steps: GithubStep[] = [];
   for (const tokens of commandSegments(command)) {
     const step = stepOfSegment(tokens);
-    if (step) return step;
+    if (step) steps.push(step);
   }
+  return steps;
+}
 
-  return null;
+/** The FIRST step of the PR flow this command performs, if any. */
+export function githubStepOf(command: string): GithubStep | null {
+  return githubStepsOf(command)[0] ?? null;
 }
 
 export function githubProgressFromToolParts(
-  parts: readonly { type?: unknown; input?: unknown; state?: unknown }[],
+  parts: readonly { type?: unknown; input?: unknown; state?: unknown; output?: unknown }[],
 ): GithubProgressEvent[] {
-  const events: GithubProgressEvent[] = [];
-
-  for (const part of parts) {
-    if (typeof part.type !== "string" || !part.type.startsWith("tool-")) {
-      continue;
-    }
-
-    const command = commandOf(part.input);
-    if (!command) continue;
-
-    const step = githubStepOf(command);
-    if (!step || part.state === "output-error") continue;
-
-    if (part.state === "output-available") {
-      events.push(eventOf(step.end, step.detail));
-      continue;
-    }
-
-    if (step.begin) events.push(eventOf(step.begin, step.detail));
-  }
-
-  return events;
+  return parts.flatMap((part) => progressForPart(part));
 }
 
-function eventOf(stage: GithubProgressStage, detail: string | undefined): GithubProgressEvent {
-  return detail ? { stage, detail } : { stage };
+/** The events one tool part contributes. Empty for a call that ran no step. */
+function progressForPart(part: {
+  type?: unknown;
+  input?: unknown;
+  state?: unknown;
+  output?: unknown;
+}): GithubProgressEvent[] {
+  if (typeof part.type !== "string" || !part.type.startsWith("tool-")) return [];
+  const command = commandOf(part.input);
+  if (!command) return [];
+  // An errored command completed no step — a rejected push has not pushed.
+  if (part.state === "output-error") return [];
+
+  const steps = githubStepsOf(command);
+  if (steps.length === 0) return [];
+
+  if (part.state === "output-available") {
+    // `gh pr create` prints the pull request's URL on stdout, so the opened step can link to
+    // it. Only a settled, successful call has that output.
+    const prUrl = firstPullRequestUrlIn(part.output);
+    return steps.map((step) =>
+      eventOf(step.end, step.detail, step.end === "opened" ? prUrl : undefined),
+    );
+  }
+
+  // Still running: the card shows the FIRST step of the chain as under way. The rest have not
+  // started, and a chain is run left to right.
+  const first = steps[0]!;
+  return first.begin ? [eventOf(first.begin, first.detail)] : [];
+}
+
+function eventOf(
+  stage: GithubProgressStage,
+  detail: string | undefined,
+  url?: string,
+): GithubProgressEvent {
+  return { stage, ...(detail ? { detail } : {}), ...(url ? { url } : {}) };
 }
 
 function stepOfSegment(tokens: string[]): GithubStep | null {

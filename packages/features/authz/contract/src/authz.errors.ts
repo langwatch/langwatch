@@ -315,6 +315,27 @@ export class AuthzLedgerUnavailableError extends HandledError {
 }
 
 /**
+ * The grant append is durable, but the projection did not make the rows
+ * readable inside the read-your-writes window, and the caller asked to be told
+ * (`requireProjection`). Only a caller whose NEXT step hands out access those
+ * rows decide asks for it: minting an API key activates the key last, and
+ * activating it on an unconfirmed grant produced a live token every route
+ * then refused. `fault: "platform"` — a lagging fold is ours.
+ */
+export class AuthzGrantNotConfirmedError extends HandledError {
+  declare readonly code: "authz_grant_not_confirmed";
+
+  constructor() {
+    super(
+      "authz_grant_not_confirmed",
+      "We could not confirm the access change in time. Nothing was granted. Try again in a moment.",
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "AuthzGrantNotConfirmedError";
+  }
+}
+
+/**
  * The membership itself is switched off, so nothing in the organization is
  * reachable — distinct from a permission the caller merely lacks.
  */

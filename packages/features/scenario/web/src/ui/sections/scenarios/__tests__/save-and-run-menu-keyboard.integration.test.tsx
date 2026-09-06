@@ -22,9 +22,12 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
+vi.mock("@langwatch/agent-contract", () => ({
+  ownerOnlyCopy: () => "Only the owner of this agent can run it.",
+}));
+
 vi.mock("../../../../behavior/scenarios/use-filtered-scenario-targets", () => ({
   isAgentTarget: () => false,
-  ownerOnlyCopy: () => "Only the owner of this agent can run it.",
   useFilteredAgents: () => [
     {
       id: "agent-1",

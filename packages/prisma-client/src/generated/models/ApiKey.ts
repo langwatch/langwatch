@@ -37,6 +37,7 @@ export type ApiKeyMinAggregateOutputType = {
   expiresAt: Date | null
   lastUsedAt: Date | null
   revokedAt: Date | null
+  revocationCause: string | null
   ingestSourceType: string | null
   ingestionTemplateId: string | null
   createdByDeviceLabel: string | null
@@ -57,6 +58,7 @@ export type ApiKeyMaxAggregateOutputType = {
   expiresAt: Date | null
   lastUsedAt: Date | null
   revokedAt: Date | null
+  revocationCause: string | null
   ingestSourceType: string | null
   ingestionTemplateId: string | null
   createdByDeviceLabel: string | null
@@ -77,6 +79,7 @@ export type ApiKeyCountAggregateOutputType = {
   expiresAt: number
   lastUsedAt: number
   revokedAt: number
+  revocationCause: number
   ingestSourceType: number
   ingestionTemplateId: number
   createdByDeviceLabel: number
@@ -99,6 +102,7 @@ export type ApiKeyMinAggregateInputType = {
   expiresAt?: true
   lastUsedAt?: true
   revokedAt?: true
+  revocationCause?: true
   ingestSourceType?: true
   ingestionTemplateId?: true
   createdByDeviceLabel?: true
@@ -119,6 +123,7 @@ export type ApiKeyMaxAggregateInputType = {
   expiresAt?: true
   lastUsedAt?: true
   revokedAt?: true
+  revocationCause?: true
   ingestSourceType?: true
   ingestionTemplateId?: true
   createdByDeviceLabel?: true
@@ -139,6 +144,7 @@ export type ApiKeyCountAggregateInputType = {
   expiresAt?: true
   lastUsedAt?: true
   revokedAt?: true
+  revocationCause?: true
   ingestSourceType?: true
   ingestionTemplateId?: true
   createdByDeviceLabel?: true
@@ -232,6 +238,7 @@ export type ApiKeyGroupByOutputType = {
   expiresAt: Date | null
   lastUsedAt: Date | null
   revokedAt: Date | null
+  revocationCause: string | null
   ingestSourceType: string | null
   ingestionTemplateId: string | null
   createdByDeviceLabel: string | null
@@ -273,6 +280,7 @@ export type ApiKeyWhereInput = {
   expiresAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
   lastUsedAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
   revokedAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
+  revocationCause?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   ingestSourceType?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   ingestionTemplateId?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   createdByDeviceLabel?: Prisma.StringNullableFilter<"ApiKey"> | string | null
@@ -296,6 +304,7 @@ export type ApiKeyOrderByWithRelationInput = {
   expiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastUsedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   revokedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revocationCause?: Prisma.SortOrderInput | Prisma.SortOrder
   ingestSourceType?: Prisma.SortOrderInput | Prisma.SortOrder
   ingestionTemplateId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdByDeviceLabel?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -322,6 +331,7 @@ export type ApiKeyWhereUniqueInput = Prisma.AtLeast<{
   expiresAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
   lastUsedAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
   revokedAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
+  revocationCause?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   ingestSourceType?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   ingestionTemplateId?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   createdByDeviceLabel?: Prisma.StringNullableFilter<"ApiKey"> | string | null
@@ -345,6 +355,7 @@ export type ApiKeyOrderByWithAggregationInput = {
   expiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastUsedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   revokedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revocationCause?: Prisma.SortOrderInput | Prisma.SortOrder
   ingestSourceType?: Prisma.SortOrderInput | Prisma.SortOrder
   ingestionTemplateId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdByDeviceLabel?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -371,6 +382,7 @@ export type ApiKeyScalarWhereWithAggregatesInput = {
   expiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ApiKey"> | Date | string | null
   lastUsedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ApiKey"> | Date | string | null
   revokedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ApiKey"> | Date | string | null
+  revocationCause?: Prisma.StringNullableWithAggregatesFilter<"ApiKey"> | string | null
   ingestSourceType?: Prisma.StringNullableWithAggregatesFilter<"ApiKey"> | string | null
   ingestionTemplateId?: Prisma.StringNullableWithAggregatesFilter<"ApiKey"> | string | null
   createdByDeviceLabel?: Prisma.StringNullableWithAggregatesFilter<"ApiKey"> | string | null
@@ -389,6 +401,7 @@ export type ApiKeyCreateInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -412,6 +425,7 @@ export type ApiKeyUncheckedCreateInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -431,6 +445,7 @@ export type ApiKeyUpdateInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -454,6 +469,7 @@ export type ApiKeyUncheckedUpdateInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -475,6 +491,7 @@ export type ApiKeyCreateManyInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -493,6 +510,7 @@ export type ApiKeyUpdateManyMutationInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -513,6 +531,7 @@ export type ApiKeyUncheckedUpdateManyInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -548,6 +567,7 @@ export type ApiKeyCountOrderByAggregateInput = {
   expiresAt?: Prisma.SortOrder
   lastUsedAt?: Prisma.SortOrder
   revokedAt?: Prisma.SortOrder
+  revocationCause?: Prisma.SortOrder
   ingestSourceType?: Prisma.SortOrder
   ingestionTemplateId?: Prisma.SortOrder
   createdByDeviceLabel?: Prisma.SortOrder
@@ -568,6 +588,7 @@ export type ApiKeyMaxOrderByAggregateInput = {
   expiresAt?: Prisma.SortOrder
   lastUsedAt?: Prisma.SortOrder
   revokedAt?: Prisma.SortOrder
+  revocationCause?: Prisma.SortOrder
   ingestSourceType?: Prisma.SortOrder
   ingestionTemplateId?: Prisma.SortOrder
   createdByDeviceLabel?: Prisma.SortOrder
@@ -588,6 +609,7 @@ export type ApiKeyMinOrderByAggregateInput = {
   expiresAt?: Prisma.SortOrder
   lastUsedAt?: Prisma.SortOrder
   revokedAt?: Prisma.SortOrder
+  revocationCause?: Prisma.SortOrder
   ingestSourceType?: Prisma.SortOrder
   ingestionTemplateId?: Prisma.SortOrder
   createdByDeviceLabel?: Prisma.SortOrder
@@ -706,6 +728,7 @@ export type ApiKeyCreateWithoutUserInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -727,6 +750,7 @@ export type ApiKeyUncheckedCreateWithoutUserInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -777,6 +801,7 @@ export type ApiKeyScalarWhereInput = {
   expiresAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
   lastUsedAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
   revokedAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
+  revocationCause?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   ingestSourceType?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   ingestionTemplateId?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   createdByDeviceLabel?: Prisma.StringNullableFilter<"ApiKey"> | string | null
@@ -795,6 +820,7 @@ export type ApiKeyCreateWithoutOrganizationInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -816,6 +842,7 @@ export type ApiKeyUncheckedCreateWithoutOrganizationInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -861,6 +888,7 @@ export type ApiKeyCreateWithoutRoleBindingsInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -883,6 +911,7 @@ export type ApiKeyUncheckedCreateWithoutRoleBindingsInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -917,6 +946,7 @@ export type ApiKeyUpdateWithoutRoleBindingsInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -939,6 +969,7 @@ export type ApiKeyUncheckedUpdateWithoutRoleBindingsInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -958,6 +989,7 @@ export type ApiKeyCreateManyUserInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -976,6 +1008,7 @@ export type ApiKeyUpdateWithoutUserInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -997,6 +1030,7 @@ export type ApiKeyUncheckedUpdateWithoutUserInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1017,6 +1051,7 @@ export type ApiKeyUncheckedUpdateManyWithoutUserInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1036,6 +1071,7 @@ export type ApiKeyCreateManyOrganizationInput = {
   expiresAt?: Date | string | null
   lastUsedAt?: Date | string | null
   revokedAt?: Date | string | null
+  revocationCause?: string | null
   ingestSourceType?: string | null
   ingestionTemplateId?: string | null
   createdByDeviceLabel?: string | null
@@ -1054,6 +1090,7 @@ export type ApiKeyUpdateWithoutOrganizationInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1075,6 +1112,7 @@ export type ApiKeyUncheckedUpdateWithoutOrganizationInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1095,6 +1133,7 @@ export type ApiKeyUncheckedUpdateManyWithoutOrganizationInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revocationCause?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestSourceType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ingestionTemplateId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdByDeviceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1146,6 +1185,7 @@ export type ApiKeySelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   expiresAt?: boolean
   lastUsedAt?: boolean
   revokedAt?: boolean
+  revocationCause?: boolean
   ingestSourceType?: boolean
   ingestionTemplateId?: boolean
   createdByDeviceLabel?: boolean
@@ -1170,6 +1210,7 @@ export type ApiKeySelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   expiresAt?: boolean
   lastUsedAt?: boolean
   revokedAt?: boolean
+  revocationCause?: boolean
   ingestSourceType?: boolean
   ingestionTemplateId?: boolean
   createdByDeviceLabel?: boolean
@@ -1192,6 +1233,7 @@ export type ApiKeySelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   expiresAt?: boolean
   lastUsedAt?: boolean
   revokedAt?: boolean
+  revocationCause?: boolean
   ingestSourceType?: boolean
   ingestionTemplateId?: boolean
   createdByDeviceLabel?: boolean
@@ -1214,6 +1256,7 @@ export type ApiKeySelectScalar = {
   expiresAt?: boolean
   lastUsedAt?: boolean
   revokedAt?: boolean
+  revocationCause?: boolean
   ingestSourceType?: boolean
   ingestionTemplateId?: boolean
   createdByDeviceLabel?: boolean
@@ -1221,7 +1264,7 @@ export type ApiKeySelectScalar = {
   updatedAt?: boolean
 }
 
-export type ApiKeyOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "description" | "lookupId" | "hashedSecret" | "permissionMode" | "userId" | "createdByUserId" | "organizationId" | "expiresAt" | "lastUsedAt" | "revokedAt" | "ingestSourceType" | "ingestionTemplateId" | "createdByDeviceLabel" | "createdAt" | "updatedAt", ExtArgs["result"]["apiKey"]>
+export type ApiKeyOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "description" | "lookupId" | "hashedSecret" | "permissionMode" | "userId" | "createdByUserId" | "organizationId" | "expiresAt" | "lastUsedAt" | "revokedAt" | "revocationCause" | "ingestSourceType" | "ingestionTemplateId" | "createdByDeviceLabel" | "createdAt" | "updatedAt", ExtArgs["result"]["apiKey"]>
 export type ApiKeyInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.ApiKey$userArgs<ExtArgs>
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
@@ -1257,6 +1300,15 @@ export type $ApiKeyPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     expiresAt: Date | null
     lastUsedAt: Date | null
     revokedAt: Date | null
+    /**
+     * Why the key was revoked, set with `revokedAt`: "user" when a person
+     * revoked it (the API-keys page, the REST API), "rotation" when a hard-cut
+     * mint replaced it, "cap" when the personal ingest-key cap retired it. The
+     * CLI reads it to decide whether a dead ingest key may be re-minted: a key
+     * a person revoked stays dead. NULL for live keys and for keys revoked
+     * before the cause was recorded.
+     */
+    revocationCause: string | null
     /**
      * Non-null marks this key as an "ingestion key": a project-scoped,
      * ingest-only ApiKey the unified `langwatch <tool>` CLI (and template
@@ -1722,6 +1774,7 @@ export interface ApiKeyFieldRefs {
   readonly expiresAt: Prisma.FieldRef<"ApiKey", 'DateTime'>
   readonly lastUsedAt: Prisma.FieldRef<"ApiKey", 'DateTime'>
   readonly revokedAt: Prisma.FieldRef<"ApiKey", 'DateTime'>
+  readonly revocationCause: Prisma.FieldRef<"ApiKey", 'String'>
   readonly ingestSourceType: Prisma.FieldRef<"ApiKey", 'String'>
   readonly ingestionTemplateId: Prisma.FieldRef<"ApiKey", 'String'>
   readonly createdByDeviceLabel: Prisma.FieldRef<"ApiKey", 'String'>

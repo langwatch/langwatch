@@ -56,27 +56,30 @@ export class AgentApp {
 
   /**
    * Every non-archived agent in one project, each carrying what ADR-128
-   * added: the parameters a connected agent declares, the owner of a personal one, and its
-   * presence. Other kinds read as offline with no instances and no owner.
+   * added: the parameters a connected agent declares, the owner of a personal one, its
+   * presence, and whether the reader may choose it. Other kinds read as offline with no
+   * instances and no owner.
    */
-  async getAll(input: Parameters<AgentService["getAll"]>[0]) {
-    const agents = await this.dependencies.agents.getAll(input);
+  async getAll(input: Parameters<AgentService["getAll"]>[0] & { viewerUserId?: string | null }) {
+    const agents = await this.dependencies.agents.getAll({ projectId: input.projectId });
     const owned = agents.map(withOwnerUserId);
     const [owners, presence] = await this.readOwnersAndPresence({
       agents: owned,
       projectId: input.projectId,
     });
-    return owned.map((agent) => this.toConnectedView(agent, owners, presence));
+    return owned.map((agent) => this.toConnectedView(agent, owners, presence, input.viewerUserId));
   }
 
   /** One agent, by id, inside one project, carrying the same connected view. */
-  async getById(input: Parameters<AgentService["getById"]>[0]) {
-    const agent = withOwnerUserId(await this.dependencies.agents.getById(input));
+  async getById(input: Parameters<AgentService["getById"]>[0] & { viewerUserId?: string | null }) {
+    const agent = withOwnerUserId(
+      await this.dependencies.agents.getById({ id: input.id, projectId: input.projectId }),
+    );
     const [owners, presence] = await this.readOwnersAndPresence({
       agents: [agent],
       projectId: input.projectId,
     });
-    return this.toConnectedView(agent, owners, presence);
+    return this.toConnectedView(agent, owners, presence, input.viewerUserId);
   }
 
   /** The declared parameters, owner and presence one agent row carries. */
@@ -84,11 +87,17 @@ export class AgentApp {
     agent: T,
     owners: Map<string, { userId: string; name: string | null }>,
     presence: Map<string, AgentPresence>,
+    viewerUserId?: string | null,
   ) {
     return {
       ...agent,
       parameters: declaredAgentParameters(agent),
-      ...ConnectedAgentPresenceService.agentPresenceView({ agent, owners, presence }),
+      ...ConnectedAgentPresenceService.agentPresenceView({
+        agent,
+        owners,
+        presence,
+        viewerUserId,
+      }),
     };
   }
 

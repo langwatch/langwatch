@@ -1,4 +1,4 @@
-import type { ApiKey, ApiKeyScope } from "@langwatch/api-key-contract";
+import type { ApiKey, ApiKeyRevocationCause, ApiKeyScope } from "@langwatch/api-key-contract";
 
 export type StoredApiKey = ApiKey & { hashedSecret: string };
 export type ApiKeyCreateRecord = {
@@ -41,7 +41,14 @@ export abstract class ApiKeyRepository {
   abstract listForUser(input: { organizationId: string; userId: string }): Promise<StoredApiKey[]>;
   abstract listForOrganization(input: { organizationId: string }): Promise<StoredApiKey[]>;
   abstract update(input: ApiKeyUpdateRecord): Promise<StoredApiKey>;
-  abstract revoke(input: { id: string }): Promise<StoredApiKey>;
+  /**
+   * Marks a key revoked, recording why, and never overwrites a cause already
+   * on the row. The fence on `revokedAt` makes the cause the FIRST
+   * revocation's: a person revoking a key and the personal ingest-key cap
+   * retiring it can both read a live row, and a `"cap"` written over a
+   * `"user"` would let the CLI re-mint a key a person meant to kill.
+   */
+  abstract revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<StoredApiKey>;
   abstract updateLastUsedAt(input: { id: string }): Promise<void>;
   abstract upgradeHash(input: { id: string; hashedSecret: string }): Promise<void>;
   abstract tryFindIngestKey(input: {

@@ -1,7 +1,9 @@
 import { Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { skipListToInput } from "@langwatch/model-provider-contract";
 import {
   findModelProviderById,
   isResolvableProviderId,
@@ -14,6 +16,7 @@ import { useModelProviderApiKeyValidation } from "../../behavior/use-model-provi
 import { useModelProviderForm } from "../../behavior/use-model-provider-form";
 import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
+import type { AdvancedGatewayPayload } from "../../behavior/use-provider-form-submit";
 import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys";
 import {
   type ModelProviderEditorValue,
@@ -31,11 +34,13 @@ import { useModelProviderToaster } from "../../behavior/model-provider-feedback"
 import { useCodexCodingDefaultsAskStore } from "./codex-coding-defaults-ask";
 import { CodexSignIn } from "./codex-sign-in";
 import {
+  ADVANCED_ACCORDION_VALUE,
   draftFromProvider,
   EMPTY_ADVANCED_DRAFT,
   type ModelProviderAdvancedDraft,
   ModelProviderAdvancedSection,
   parseAdvancedDraft,
+  parseSkipPermissionsDraft,
 } from "./model-provider-advanced-section";
 import { CredentialsSection } from "./model-provider-credentials-section";
 import { CustomModelInputSection } from "./model-provider-custom-model-input";
@@ -45,6 +50,18 @@ import { CustomModelInputSection } from "./model-provider-custom-model-input";
 import { ExtraHeadersSection } from "./model-provider-extra-headers-section";
 import { ModelProviderRoutingSection } from "./model-provider-routing-section";
 import { ProviderScopeSection } from "./model-provider-scope-section";
+
+/**
+ * The message the server attached to the skip-permissions field, or null when
+ * the failure was about something else. `meta.fieldErrors` comes off the wire,
+ * so nothing about its shape is trusted.
+ */
+function readSkipPermissionsFieldError(fieldErrors: unknown): string | null {
+  if (!fieldErrors || typeof fieldErrors !== "object") return null;
+  const entry = (fieldErrors as Record<string, unknown>).langySkipPermissionsModels;
+  const message = Array.isArray(entry) ? entry[0] : entry;
+  return typeof message === "string" && message !== "" ? message : null;
+}
 
 export type EditModelProviderFormProps = {
   projectId?: string | undefined;
@@ -108,6 +125,9 @@ export const EditModelProviderForm = ({
   const [advancedDraft, setAdvancedDraft] =
     useState<ModelProviderAdvancedDraft>(EMPTY_ADVANCED_DRAFT);
   const [advancedJsonError, setAdvancedJsonError] = useState<string | null>(null);
+  // The server's refusal for the skip-permissions list, rendered on the field
+  // it names rather than in a toast.
+  const [skipPermissionsError, setSkipPermissionsError] = useState<string | null>(null);
 
   // Find the row this form is editing. Three inputs to the lookup: - `modelProviderId ===
   // "new"` → always blank, never pre-fill from an existing row. The Add Model Provider menu
@@ -168,42 +188,53 @@ export const EditModelProviderForm = ({
   // this effect and would overwrite the user's in-progress draft + clear their JSON error with
   // no warning. Keying on the row id + the flag preserves typed values across silent refetches.
   const providerId = (provider as { id?: string }).id;
-  useEffect(() => {
-    if (!gatewayMenuEnabled) {
-      setAdvancedDraft(EMPTY_ADVANCED_DRAFT);
-      setAdvancedJsonError(null);
-      return;
-    }
-    setAdvancedDraft(
-      draftFromProvider({
-        rateLimitRpm: (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
-        rateLimitTpm: (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
-        rateLimitRpd: (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
-        fallbackPriorityGlobal:
-          (provider as { fallbackPriorityGlobal?: number | null }).fallbackPriorityGlobal ?? null,
-        providerConfig: (provider as { providerConfig?: unknown }).providerConfig,
-      }),
-    );
-    setAdvancedJsonError(null);
-    setAdvancedAccordionValue([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gatewayMenuEnabled, providerId]);
 
-  // The same expression the reset effect above uses — extracted so the
-  // Save button's dirty check has something to diff the live draft
-  // against. When the gateway flag is off we never render the section,
-  // so the empty draft is the only valid initial.
+  const providerDefinition =
+    modelProvidersRegistry[provider.provider as keyof typeof modelProvidersRegistry];
+
+  const isLlmProvider = providerDefinition?.type === "llm";
+
+  // Only an LLM provider serves the models a Langy conversation can run on,
+  // so a credential container for a safety service has nothing to allow.
+  const showSkipPermissionsField = isLlmProvider;
+
+  // The provider's own default list, shown as placeholder text so an empty
+  // field says what it falls back to rather than looking unset.
+  const skipPermissionsPlaceholder = skipListToInput(
+    providerDefinition?.langySkipPermissionsModels ?? [],
+  );
+
+  // The draft the drawer opens with. The skip-permissions list is always
+  // seeded, because that field does not belong to the gateway; the gateway
+  // knobs are seeded only when their section is rendered, so toggling the
+  // flag has no payload-shape side effects.
   const initialAdvancedDraft = useMemo<ModelProviderAdvancedDraft>(() => {
-    if (!gatewayMenuEnabled) return EMPTY_ADVANCED_DRAFT;
-    return draftFromProvider({
+    const seeded = draftFromProvider({
       rateLimitRpm: (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
       rateLimitTpm: (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
       rateLimitRpd: (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
       fallbackPriorityGlobal:
         (provider as { fallbackPriorityGlobal?: number | null }).fallbackPriorityGlobal ?? null,
       providerConfig: (provider as { providerConfig?: unknown }).providerConfig,
+      langySkipPermissionsModels:
+        (provider as { langySkipPermissionsModels?: string[] | null }).langySkipPermissionsModels ??
+        null,
     });
+    if (gatewayMenuEnabled) return seeded;
+    return {
+      ...EMPTY_ADVANCED_DRAFT,
+      skipPermissionsModels: seeded.skipPermissionsModels,
+    };
   }, [gatewayMenuEnabled, provider]);
+
+  useEffect(() => {
+    setAdvancedDraft(initialAdvancedDraft);
+    setAdvancedJsonError(null);
+    setSkipPermissionsError(null);
+    setAdvancedAccordionValue([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gatewayMenuEnabled, providerId]);
+
   const isAdvancedDirty = JSON.stringify(advancedDraft) !== JSON.stringify(initialAdvancedDraft);
 
   // Controlled accordion state: collapsed by default, but expands
@@ -211,22 +242,43 @@ export const EditModelProviderForm = ({
   // inline error is actually visible.
   const [advancedAccordionValue, setAdvancedAccordionValue] = useState<string[]>([]);
 
-  const getAdvancedPayload = useCallback(() => {
-    if (!gatewayMenuEnabled) return null;
+  // Auto-expand the accordion so the inline error is visible. Save would
+  // otherwise stop spinning + the drawer stay open with no visible feedback
+  // if the user collapsed the section before save.
+  const reportAdvancedJsonError = useCallback((e: unknown) => {
+    setAdvancedJsonError(e instanceof Error ? e.message : "Invalid JSON");
+    setAdvancedAccordionValue([ADVANCED_ACCORDION_VALUE]);
+  }, []);
+
+  const getAdvancedPayload = useCallback((): AdvancedGatewayPayload | null => {
+    const langySkipPermissionsModels = showSkipPermissionsField
+      ? parseSkipPermissionsDraft(advancedDraft)
+      : undefined;
+    if (!gatewayMenuEnabled) {
+      return langySkipPermissionsModels === undefined
+        ? null
+        : { gateway: null, langySkipPermissionsModels };
+    }
     try {
-      const parsed = parseAdvancedDraft(advancedDraft);
+      const gateway = parseAdvancedDraft(advancedDraft);
       setAdvancedJsonError(null);
-      return parsed;
+      return { gateway, langySkipPermissionsModels };
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Invalid JSON";
-      setAdvancedJsonError(message);
-      // Auto-expand the accordion so the inline error is visible. Save
-      // would otherwise stop spinning + the drawer stay open with no
-      // visible feedback if the user collapsed the section before save.
-      setAdvancedAccordionValue(["advanced-gateway"]);
+      reportAdvancedJsonError(e);
       throw e;
     }
-  }, [gatewayMenuEnabled, advancedDraft]);
+  }, [gatewayMenuEnabled, showSkipPermissionsField, advancedDraft, reportAdvancedJsonError]);
+
+  // The server refuses a pattern that does not compile and names the field it
+  // came from, so the refusal lands on the textarea and the accordion opens
+  // to show it. Everything else keeps the toast.
+  const handleSubmitError = useCallback((error: unknown) => {
+    const handled = readHandledError(error);
+    const message = readSkipPermissionsFieldError(handled?.meta.fieldErrors);
+    if (!message) return;
+    setSkipPermissionsError(message);
+    setAdvancedAccordionValue([ADVANCED_ACCORDION_VALUE]);
+  }, []);
 
   // Use project data as primary source (auto-updates when organization.getAll is invalidated)
   // Effective defaults (project values with fallbacks) are computed inside the hook
@@ -240,6 +292,7 @@ export const EditModelProviderForm = ({
     canManageOrganization,
     canManageTeam,
     getAdvancedPayload,
+    onError: handleSubmitError,
     onSuccess: () => {
       if (onSaved) {
         onSaved();
@@ -248,11 +301,6 @@ export const EditModelProviderForm = ({
       closeDrawer();
     },
   });
-
-  const providerDefinition =
-    modelProvidersRegistry[provider.provider as keyof typeof modelProvidersRegistry];
-
-  const isLlmProvider = providerDefinition?.type === "llm";
 
   // Same answer the credential fields render their required markers from.
   const requiredKeys = useRequiredCredentialKeys({
@@ -489,15 +537,20 @@ export const EditModelProviderForm = ({
           <CustomModelInputSection state={state} actions={actions} provider={provider} />
         )}
 
-        {gatewayMenuEnabled && (
+        {(gatewayMenuEnabled || showSkipPermissionsField) && (
           <ModelProviderAdvancedSection
             modelProviderId={(provider as { id?: string }).id}
             draft={advancedDraft}
             onDraftChange={(next) => {
               setAdvancedDraft(next);
               setAdvancedJsonError(null);
+              setSkipPermissionsError(null);
             }}
             jsonError={advancedJsonError}
+            skipPermissionsError={skipPermissionsError}
+            skipPermissionsPlaceholder={skipPermissionsPlaceholder}
+            showGatewayFields={gatewayMenuEnabled}
+            showSkipPermissionsField={showSkipPermissionsField}
             accordionValue={advancedAccordionValue}
             onAccordionValueChange={setAdvancedAccordionValue}
             initial={{

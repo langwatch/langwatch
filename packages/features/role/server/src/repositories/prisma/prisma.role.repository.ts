@@ -188,7 +188,11 @@ export class PrismaRoleRepository extends RoleRepository {
     if (row && row.id !== exceptRoleId) throw new RoleDuplicateNameError();
   }
 
-  async create(input: { role: RoleCreate; actor: LedgerActor }): Promise<Role> {
+  async create(input: {
+    role: RoleCreate;
+    actor: LedgerActor;
+    requireProjection?: boolean;
+  }): Promise<Role> {
     await this.assertNameFree(input.role.organizationId, input.role.name, null);
     const roleId = nanoid();
     await this.writer.defineRole({
@@ -199,6 +203,7 @@ export class PrismaRoleRepository extends RoleRepository {
       permissions: input.role.permissions,
       kind: ROLE_KIND.CUSTOM,
       actor: input.actor,
+      requireProjection: input.requireProjection ?? false,
     });
     const now = new Date();
     return {

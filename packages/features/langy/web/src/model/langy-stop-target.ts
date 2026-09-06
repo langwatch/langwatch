@@ -24,6 +24,7 @@ export function resolveLangyStopTarget({
   conversationId,
   localTurnId,
   localSettledTurnId,
+  localSendPending = false,
   durableTurnId,
 }: {
   projectId: string | null | undefined;
@@ -32,6 +33,8 @@ export function resolveLangyStopTarget({
   localTurnId: string | null;
   /** The turn a genuine end-of-turn frame settled (`settledTurnId`). */
   localSettledTurnId: string | null;
+  /** Whether this tab sent a message the server has not answered with ids yet. */
+  localSendPending?: boolean;
   /** The turn the durable record has in flight, or null if it names none. */
   durableTurnId: string | null;
 }): LangyStopTarget {
@@ -39,7 +42,10 @@ export function resolveLangyStopTarget({
     return { kind: "unavailable", reason: "no-conversation" };
   }
   const ownsLiveTurn = localTurnId !== null && localTurnId !== localSettledTurnId;
-  const turnId = ownsLiveTurn ? localTurnId : durableTurnId;
+  // A send this tab made but the server has not answered is newer than the durable id, and its
+  // turn has no id here. The durable id may then name a turn that already ended, so it is not
+  // offered: the caller keeps the stop and sends it when the ids land (`stopPending`).
+  const turnId = ownsLiveTurn ? localTurnId : localSendPending ? null : durableTurnId;
   if (!turnId) {
     return { kind: "unavailable", reason: "turn-not-identified" };
   }

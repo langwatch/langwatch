@@ -1,6 +1,7 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
+.PHONY: dogfood-langy-local
 .PHONY: herrgen herrgen-check
 .PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-changed
 .PHONY: _dev-up-deprecation-warning
@@ -60,12 +61,20 @@ help:
 	@echo "    make boxd-preview-down BRANCH=<n>   destroy preview VM"
 	@echo "    make boxd-preview-status BRANCH=<n> VM status + stack state"
 	@echo ""
+	@echo "  Dogfood applications (the customer application Langy works on):"
+	@echo "    make dogfood-langy-local lang=python      boot the ACME support demo (FastAPI)"
+	@echo "    make dogfood-langy-local lang=typescript  boot the ACME support demo (Hono)"
+	@echo ""
 	@echo "  Per-worktree isolated stacks (for AI agents / parallel work):"
 	@echo "    make dev-up [PROFILE=full]            start isolated containers"
 	@echo "    make dev-down                          stop isolated containers"
 	@echo "    make dev-logs                          tail isolated logs"
 	@echo ""
 	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
+
+# The demo applications keep their own Makefile; this only forwards `lang`.
+dogfood-langy-local:
+	@$(MAKE) -C dev/dogfood/acme-support dogfood-langy-local $(if $(lang),lang=$(lang))
 
 include dev/boxd.mk
 # dev/haven.mk is included at the BOTTOM of this file: its `make haven <sub>`

@@ -49,7 +49,7 @@ import type { TraceService } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SuiteService } from "@langwatch/suite-contract";
-import type { SuiteClickHouseClient } from "@langwatch/suite-server";
+import type { ConnectedPresenceReader, SuiteClickHouseClient } from "@langwatch/suite-server";
 import {
   PostgresSuiteAdapter,
   SuiteApp,
@@ -148,6 +148,13 @@ export type ScenarioFeatureCollaborators = Readonly<{
   authz: AuthzService;
   /** The agent directory a suite's cases are run against. */
   agents: AgentService;
+  /**
+   * Which connected agents have a process attached. A target that names a
+   * connected agent without an environment is settled by presence, so a
+   * process that composed no connected-agent runtime supplies none and such a
+   * target is refused rather than guessed at.
+   */
+  connectedPresence?: ConnectedPresenceReader;
   /**
    * The four other verticals a scenario RUN is prepared against, and the two
    * values its child is booted with.
@@ -250,6 +257,7 @@ export function composeScenarioFeature(
   const suites = PostgresSuiteAdapter.create({
     database: options.prisma,
     agents: options.agents,
+    ...(options.connectedPresence ? { connectedPresence: options.connectedPresence } : {}),
     prompts,
     scenarios,
     resolveClickHouseClient: options.resolveClickHouseClient,

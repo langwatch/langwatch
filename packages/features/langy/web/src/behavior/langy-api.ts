@@ -60,6 +60,24 @@ export type LangyApiMap = {
     onConversationUpdate: S;
     /** The durable fold, from a cursor — what a reconnecting tab catches up on. */
     conversationEventsAfter: Q;
+    /** One conversation, for the follow-along deep link. */
+    detail: Q;
+    /** Every card the developer's machine raised in one conversation (ADR-129). */
+    localRecord: Q;
+    /** Whether a folder is shared with this conversation right now. */
+    getLocalWorkspace: Q;
+    /** The developer's answer to one permission card. */
+    answerLocalPermission: M;
+    /** A session grant for the pattern the card named. */
+    setLocalPolicy: M;
+    /** The developer's answer to a question card. */
+    answerQuestion: M;
+    /** Release the shared folder from the panel. */
+    disconnectLocalWorkspace: M;
+    /** Remember the pull-request path for this person, so Langy stops asking. */
+    setCodeAccessPreference: M;
+    /** The answer already remembered, for the Integrations screen. */
+    getCodeAccessPreference: Q;
   };
 
   /**

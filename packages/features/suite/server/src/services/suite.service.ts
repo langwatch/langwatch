@@ -1,3 +1,4 @@
+import type { ConnectedPresenceReader } from "./connected-target.service";
 import {
   createSuiteCommandSchema,
   suiteArchivedNamesInputSchema,
@@ -47,6 +48,13 @@ export type SuiteServiceOptions = {
   prompts: PromptService;
   execution: SuiteExecutionPort;
   runRepository: SuiteRunReadRepository;
+  /**
+   * Which connected agents have a process attached, so a target that names an
+   * agent without an environment can be settled. Absent on a process that
+   * composed no connected-agent runtime: every agent then reads as offline and
+   * such a target is refused rather than guessed at.
+   */
+  connectedPresence?: ConnectedPresenceReader;
   generateId?: () => string;
   now?: () => Date;
 };

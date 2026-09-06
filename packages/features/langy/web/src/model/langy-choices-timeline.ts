@@ -1,6 +1,21 @@
 /**
- * Flatten the rendered conversation into the ordered timeline the choices lock
- * derivation reads (ADR-060 §6) — event order and NOTHING else.
+ * Flatten the rendered conversation into the ordered timeline the choices
+ * lock derivation reads (ADR-060 §6) — event order and NOTHING else. Because
+ * it derives from whatever message list is being displayed, time travel gets
+ * the right answer for free: scrub before the selection and the question is
+ * open, scrub past it and the card is locked.
+ *
+ * A choices card reaches the panel two ways, and both are message PARTS: the
+ * `question` tool call the agent makes mid-turn, and a stamped card part read
+ * back from the durable record. Prose is never one of them, so the timeline
+ * reads parts only.
+ *
+ * Per message, in conversation order:
+ *   - an assistant message contributes a `question` entry per choices card
+ *     it carries (its OWN prose never supersedes its own question);
+ *   - a user message carrying selection parts contributes those selections
+ *     (its "Chose: X" text is part of the answer, not a second exchange);
+ *   - any other message contributes one `message` entry.
  */
 import {
   type LangyChoicesTimelineEntry,
@@ -8,7 +23,6 @@ import {
   parseLangyChoiceSelectionPart,
 } from "@langwatch/langy-contract";
 
-import { langyAnswerSegmentsFromText } from "./langy-answer-segments";
 import { isQuestionToolPart, questionToolCardParts } from "./langy-question-tool";
 
 interface MessageLike {
@@ -19,7 +33,7 @@ interface MessageLike {
 }
 
 /**
- * The choices blocks an UNSTAMPED assistant message renders — the copy this browser streamed, whose fences the relay never got to stamp for it (see `langyAnswerSegmentsFromText`).
+ * Every choices card one `question` tool call carries, pushed in the order it holds them.
  */
 function pushQuestionToolCards(part: unknown, timeline: LangyChoicesTimelineEntry[]): boolean {
   let pushedAny = false;
@@ -28,20 +42,6 @@ function pushQuestionToolCards(part: unknown, timeline: LangyChoicesTimelineEntr
     pushedAny = true;
   }
   return pushedAny;
-}
-
-function streamedChoicesBlockIds(message: MessageLike): string[] {
-  const recorded = (message.metadata as { recorded?: boolean } | undefined)?.recorded === true;
-  if (recorded) return [];
-  const text = (message.parts ?? [])
-    .filter(
-      (part): part is { type: "text"; text: string } => (part as { type?: string }).type === "text",
-    )
-    .map((part) => part.text)
-    .join("\n\n");
-  return (langyAnswerSegmentsFromText(text) ?? []).flatMap((segment) =>
-    segment.type === "card" && segment.part.card.kind === "choices" ? [segment.part.blockId] : [],
-  );
 }
 
 export function langyChoicesTimeline(
@@ -66,12 +66,6 @@ export function langyChoicesTimeline(
         // or the lock derivation would call them "never recorded" and render
         // every one permanently closed.
         if (isQuestionToolPart(part) && pushQuestionToolCards(part, timeline)) {
-          sawQuestion = true;
-        }
-      }
-      if (!sawQuestion) {
-        for (const blockId of streamedChoicesBlockIds(message)) {
-          timeline.push({ kind: "question", blockId });
           sawQuestion = true;
         }
       }

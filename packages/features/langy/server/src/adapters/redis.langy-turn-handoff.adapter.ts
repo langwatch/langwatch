@@ -41,6 +41,21 @@ export class LangyTurnHandoffAdapter extends LangyTurnHandoffPort {
     }
   }
 
+  async markStopped(input: { conversationId: string; turnId: string }): Promise<void> {
+    await this.redis.set(
+      `langy:stopped:{${input.conversationId}}:${input.turnId}`,
+      "1",
+      "EX",
+      LANGY_HANDOFF_TTL_SECONDS,
+    );
+  }
+
+  async isStopped(input: { conversationId: string; turnId: string }): Promise<boolean> {
+    return (
+      (await this.redis.get(`langy:stopped:{${input.conversationId}}:${input.turnId}`)) !== null
+    );
+  }
+
   async refresh(input: { conversationId: string; turnId: string }): Promise<boolean> {
     const refreshed = await this.redis.expire(
       `langy:handoff:{${input.conversationId}}:${input.turnId}`,

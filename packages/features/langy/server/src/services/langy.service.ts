@@ -13,6 +13,7 @@ import {
   type LangyStartConversationTurnInput,
   type LangyStopTurnInput,
   type LangyTurnResultInput,
+  type LangyLocalRecord,
 } from "@langwatch/langy-contract";
 import {
   LangyConversationService,
@@ -118,6 +119,20 @@ export class LangyService extends LangyServiceContract {
     after: { acceptedAt: number; eventId: string };
   }): Promise<LangyConversationEventPage> {
     return this.conversations.getEventsAfter(input);
+  }
+
+  /** Writes one line into the transcript without starting a turn (ADR-129). */
+  recordUserMessage(input: Parameters<LangyConversationService["recordUserMessage"]>[0]) {
+    return this.conversations.recordUserMessage(input);
+  }
+
+  /** Every card the developer's machine raised in one conversation (ADR-129). */
+  getLocalRecord(input: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<LangyLocalRecord> {
+    return this.conversations.getLocalRecord(input);
   }
 
   tryFindByIdVisible(input: {

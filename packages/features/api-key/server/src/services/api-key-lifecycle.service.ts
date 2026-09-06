@@ -226,7 +226,9 @@ export class ApiKeyLifecycleService {
       });
     }
 
-    return publicApiKey(await this.repository.revoke({ id: input.id }));
+    return publicApiKey(
+      await this.repository.revoke({ id: input.id, cause: input.cause ?? "user" }),
+    );
   }
 
   private async getInOrganization(id: string, organizationId: string): Promise<StoredApiKey> {

@@ -4,6 +4,8 @@ import { langyApi } from "@langwatch/langy-web/screens/langy";
 import { uiFeature } from "../../behavior/ui-feature";
 import { langyPageLoaders } from "./ui/sections/langy-routes";
 
+export { langyUiSlots } from "./ui/sections/langy-slots";
+
 export const langyFeature = uiFeature({
   name: "@langwatch/langy-web",
   api: langyApi,

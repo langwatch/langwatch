@@ -119,7 +119,10 @@ function mockScenarioService(methods: object): ScenarioService {
 }
 
 function mockAgentService(methods: object): AgentService {
-  return Object.assign(Object.create(AgentService.prototype), methods);
+  return Object.assign(Object.create(AgentService.prototype), {
+    getConnectedByName: vi.fn(async () => []),
+    ...methods,
+  });
 }
 
 function mockPromptService(methods: object): PromptService {
@@ -1153,9 +1156,7 @@ describe("SuiteService", () => {
       });
 
       expect(result.scope).toEqual({ mode: "all" });
-      expect(repo.update).toHaveBeenCalledWith(
-        expect.objectContaining({ scope: { mode: "all" } }),
-      );
+      expect(repo.update).toHaveBeenCalledWith(expect.objectContaining({ scope: { mode: "all" } }));
     });
   });
 
@@ -1176,12 +1177,10 @@ describe("SuiteService", () => {
           resolveDynamicRunMembership,
         }),
         scenarios: mockScenarioService({
-          getReferenceStates: vi
-            .fn()
-            .mockResolvedValue([
-              { id: "scenario_1", archivedAt: null },
-              { id: "scenario_2", archivedAt: null },
-            ]),
+          getReferenceStates: vi.fn().mockResolvedValue([
+            { id: "scenario_1", archivedAt: null },
+            { id: "scenario_2", archivedAt: null },
+          ]),
           getRunConfigs: vi.fn().mockResolvedValue([
             { id: "scenario_1", name: "s1", situation: "", criteria: [], parameters: null },
             { id: "scenario_2", name: "s2", situation: "", criteria: [], parameters: null },
@@ -1408,12 +1407,20 @@ describe("SuiteService", () => {
       const execution = new CapturingExecutionPort();
       const resolveDynamicRunMembership = vi
         .fn()
-        .mockResolvedValue(["scenario_refunds_1", "scenario_refunds_2", "scenario_checkout_1", "scenario_checkout_2"]);
+        .mockResolvedValue([
+          "scenario_refunds_1",
+          "scenario_refunds_2",
+          "scenario_checkout_1",
+          "scenario_checkout_2",
+        ]);
       const repo = repository({
         tryFindById: vi.fn().mockResolvedValue(
           suite({
             kind: "run_plan",
-            scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds", "test_suite_checkout"] },
+            scope: {
+              mode: "test_suites",
+              testSuiteIds: ["test_suite_refunds", "test_suite_checkout"],
+            },
             scenarioIds: [],
             targets: [{ type: "prompt", referenceId: "prompt_1" }],
           }),
@@ -1424,15 +1431,23 @@ describe("SuiteService", () => {
         getReferenceStates: vi
           .fn()
           .mockResolvedValue(
-            ["scenario_refunds_1", "scenario_refunds_2", "scenario_checkout_1", "scenario_checkout_2"].map(
-              (id) => ({ id, archivedAt: null }),
-            ),
+            [
+              "scenario_refunds_1",
+              "scenario_refunds_2",
+              "scenario_checkout_1",
+              "scenario_checkout_2",
+            ].map((id) => ({ id, archivedAt: null })),
           ),
-        getRunConfigs: vi.fn().mockResolvedValue(
-          ["scenario_refunds_1", "scenario_refunds_2", "scenario_checkout_1", "scenario_checkout_2"].map(
-            (id) => ({ id, name: id, situation: "", criteria: [], parameters: null }),
+        getRunConfigs: vi
+          .fn()
+          .mockResolvedValue(
+            [
+              "scenario_refunds_1",
+              "scenario_refunds_2",
+              "scenario_checkout_1",
+              "scenario_checkout_2",
+            ].map((id) => ({ id, name: id, situation: "", criteria: [], parameters: null })),
           ),
-        ),
       });
       const service = SuiteService.create({
         ...serviceOptions(repo, { scenarios, execution }),

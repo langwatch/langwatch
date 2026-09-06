@@ -23,6 +23,8 @@ import {
   createLangyRelayRestApp,
   createLangyTurnsRestApp,
   createLangyUiActionsRestApp,
+  createLangyLocalControlRestApp,
+  createLangyLocalRestApp,
 } from "@langwatch/langy-server";
 import { createGithubRestApp, type GithubRestPorts } from "@langwatch/github-server";
 import {
@@ -558,6 +560,12 @@ export function createApiProcessRestFeatures(options: {
     features.push(createLangyTurnsRestApp({ security, ports: langy.turns }));
     if (langy.uiActions) {
       features.push(createLangyUiActionsRestApp({ security, ports: langy.uiActions }));
+    }
+    if (langy.local) {
+      features.push(createLangyLocalRestApp({ security, ports: langy.local }));
+    }
+    if (langy.localControl) {
+      features.push(createLangyLocalControlRestApp({ security, ports: langy.localControl }));
     }
     features.push(createLangyInternalRestApp({ security, ports: langy.internal }));
     if (langy.relay) {

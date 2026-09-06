@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from "react";
-import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { connectedAgentSelectability } from "@langwatch/agent-contract";
 import { targetLabelOf } from "@langwatch/suite-contract";
 import type { TargetValue } from "../../model/scenario-target";
 
@@ -54,7 +54,12 @@ export function agentTargetLabel(agent: AgentLike): string {
   });
 }
 
-/** True when this agent is a personal development agent of another person. */
+/**
+ * True when this agent is a personal development agent of another person.
+ *
+ * The same rule the listings mark their rows with and the run refuses on, so
+ * the picker never offers a target the run would refuse.
+ */
 export function isTeammateOwned({
   agent,
   viewerUserId,
@@ -62,9 +67,10 @@ export function isTeammateOwned({
   agent: AgentLike;
   viewerUserId?: string | null;
 }): boolean {
-  const ownerId = agent.owner?.userId;
-  if (!ownerId) return false;
-  return ownerId !== viewerUserId;
+  return !connectedAgentSelectability({
+    ownerUserId: agent.owner?.userId ?? null,
+    viewerUserId,
+  }).selectable;
 }
 
 /** The agents of the project as targets, newest first, filtered by the search. */
@@ -119,23 +125,4 @@ export function isAgentTarget(
   target: TargetValue,
 ): target is NonNullable<TargetValue> & { type: ScenarioAgentType } {
   return target !== null && SCENARIO_AGENT_TYPES.has(target.type);
-}
-
-/**
- * Why a teammate's development agent cannot be picked, in the words the product already
- * uses for that refusal.
- */
-export function ownerOnlyCopy(ownerName?: string | null): string {
-  const explanation = explainHandledError({
-    code: "agent_owner_only",
-    meta: ownerName ? { ownerName } : {},
-    httpStatus: 403,
-    fault: "customer",
-    retryable: false,
-    tips: [],
-    docsUrl: undefined,
-    traceId: undefined,
-    reasons: [],
-  });
-  return explanation.description || explanation.title;
 }

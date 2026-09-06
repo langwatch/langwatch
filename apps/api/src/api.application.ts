@@ -271,6 +271,10 @@ export class MissingAgentService extends AgentService {
   getConnectedByNameAndEnvironment() {
     return this.unavailable();
   }
+
+  getConnectedByName() {
+    return this.unavailable();
+  }
 }
 
 /**

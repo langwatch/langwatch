@@ -3,6 +3,10 @@
  * connected agent is online, and which instances hold it (ADR-128).
  */
 
+import {
+  connectedAgentSelectability,
+  type ConnectedAgentSelectability,
+} from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ConnectedAgentRuntime, LiveInstance } from "../ports/connected-agent-runtime.port";
 
@@ -38,7 +42,10 @@ export interface AgentOwnerView {
 }
 
 /**
- * The owner and the presence of one agent, as the response schemas declare them.
+ * The owner, the presence and the selectability of one agent, as the response
+ * schemas declare them. A row a caller may read but may not choose is answered
+ * all the same, marked with the reason, so the client can show it and say why
+ * it is not on offer.
  */
 export class ConnectedAgentPresenceService {
   static create(): ConnectedAgentPresenceService {
@@ -49,11 +56,14 @@ export class ConnectedAgentPresenceService {
     agent,
     owners,
     presence,
+    viewerUserId,
   }: {
     agent: { id: string; ownerUserId: string | null };
     owners: Map<string, AgentOwnerView>;
     presence: Map<string, AgentPresence>;
-  }): { owner: AgentOwnerView | null } & AgentPresence {
+    /** The person behind the caller; nothing for a key that names none. */
+    viewerUserId?: string | null;
+  }): { owner: AgentOwnerView | null } & AgentPresence & ConnectedAgentSelectability {
     const { status, instances } = presence.get(agent.id) ?? NO_PRESENCE;
 
     return {
@@ -65,6 +75,10 @@ export class ConnectedAgentPresenceService {
         : null,
       status,
       instances,
+      ...connectedAgentSelectability({
+        ownerUserId: agent.ownerUserId,
+        viewerUserId,
+      }),
     };
   }
 

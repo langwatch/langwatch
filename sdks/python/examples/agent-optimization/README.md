@@ -67,8 +67,11 @@ Lower `GEPA_MAX_METRIC_CALLS` or `num_trials` to shorten a run.
 
 ## Where to look in LangWatch
 
-- **Experiments**, under `returns-agent-scenarios`: the optimizer run, one step
-  per candidate evaluation, with the score and the candidate instructions.
+- **Experiments**, under `returns-agent-scenarios`: the optimizer run, which
+  both scripts register with `langwatch.dspy.init`. MIPROv2 logs one step per
+  trial, GEPA one step for the seed program and one per candidate evaluated on
+  the validation set, each with the score, the candidate instructions and the
+  six scenario results.
 - **Agent Testing**, set `dspy-optimization`: every scenario run. The two suite
   evaluations arrive as their own runs of six, the batches `<run_id>-baseline`
   and `<run_id>-best`, so the same six scenarios can be read side by side before

@@ -240,6 +240,8 @@ export function AgentManagementScreen() {
           status: agent.status,
           instances: agent.instances,
           owner: agent.owner,
+          selectable: agent.selectable,
+          notSelectableReason: agent.notSelectableReason,
           parameters: agent.parameters,
           // `.filter()` above is a plain predicate, not a type guard, so
           // `agent.config` is still every agent kind's config here; `satisfies`

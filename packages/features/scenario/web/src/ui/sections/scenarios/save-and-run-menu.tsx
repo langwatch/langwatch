@@ -8,9 +8,9 @@ import { Popover } from "@langwatch/design-system/popover";
 import type { TargetValue } from "../../../model/scenario-target";
 import { useSession } from "../../../behavior/auth-session";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import {
   isAgentTarget,
-  ownerOnlyCopy,
   type ScenarioAgent,
   useFilteredAgents,
 } from "../../../behavior/scenarios/use-filtered-scenario-targets";

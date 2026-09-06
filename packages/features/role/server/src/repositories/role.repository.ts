@@ -31,7 +31,18 @@ export abstract class RoleRepository {
   ): Promise<Array<{ id: string; permissions: string[] }>>;
   abstract countRoleBindings(input: { roleId: string; organizationId: string }): Promise<number>;
   abstract countAssignedUsers(roleId: string): Promise<number>;
-  abstract create(input: { role: RoleCreate; actor: LedgerActor }): Promise<Role>;
+  abstract create(input: {
+    role: RoleCreate;
+    actor: LedgerActor;
+    /**
+     * Whether a definition that did not become readable inside the
+     * read-your-writes window is an error. The API-key mint turns it on: it
+     * binds a grant to this role and then activates the credential, so an
+     * unconfirmed definition would hand out a key whose permissions nothing
+     * can resolve.
+     */
+    requireProjection?: boolean;
+  }): Promise<Role>;
   abstract update(input: {
     roleId: string;
     changes: RoleUpdate;

@@ -77,6 +77,11 @@ export abstract class AgentRepository {
     environment: string;
   }): Promise<Agent[]>;
   /**
+   * The same rows for every environment the name is registered in, so a
+   * reference that names no environment can be resolved by presence.
+   */
+  abstract findConnectedByName(input: { projectId: string; name: string }): Promise<Agent[]>;
+  /**
    * Re-registers a connected agent on its existing row: the name and config
    * the SDK sent now, and the presence projection fresh.
    */

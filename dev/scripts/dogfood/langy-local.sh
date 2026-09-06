@@ -47,7 +47,7 @@ echo "Langy local dogfood doctor ($ENV_FILE)"
 # --- env block -------------------------------------------------------------
 echo "env:"
 missing_env=()
-for key in OPENCODE_AGENT_URL LANGY_INTERNAL_SECRET SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
+for key in LANGY_AGENT_URL LANGY_INTERNAL_SECRET SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
   if [[ -n "$(env_value "$key")" ]]; then ok "$key"; else bad "$key missing"; missing_env+=("$key"); fi
 done
 # The isolation flag must literally be true: set-but-false still spawns the
@@ -75,7 +75,7 @@ if [[ ${#missing_env[@]} -gt 0 ]]; then
     BLOCK=$(cat <<BLOCK
 
 # Langy local dev (agent runs without gVisor via the unsafe-dev runner)
-OPENCODE_AGENT_URL="http://localhost:${AGENT_PORT}"
+LANGY_AGENT_URL="http://localhost:${AGENT_PORT}"
 LANGY_INTERNAL_SECRET="${SECRET}"
 LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
 SESSIONS_ROOT="\$HOME/.langwatch-langy/sessions"
@@ -108,12 +108,6 @@ fi
 
 # --- binaries --------------------------------------------------------------
 echo "binaries:"
-if command -v opencode >/dev/null 2>&1; then
-  ok "opencode ($(command -v opencode))"
-else
-  bad "opencode not on PATH (the langyagent spawns it per conversation)"
-  hint "npm install -g opencode-ai"
-fi
 if command -v go >/dev/null 2>&1; then
   ok "go toolchain"
 else

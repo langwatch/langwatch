@@ -779,19 +779,26 @@ describe("given rows are deleted from a paginated dataset", () => {
     // Regression: count refresh must fire on batch settle via the error path
     // too — not a feature scenario.
     it("still refreshes the total — a committed delete must not be masked by an update error", async () => {
-      // Force the bug-triggering interleave: both ops are dispatched, the delete commits, and
-      // the update fails LAST — so the batch only reaches zero pending ops via the error path.
-      // The count refresh must fire from there too, or a committed delete leaves the pager
-      // count stale. (Settling the delete synchronously would hide the bug, since ops would hit
-      // zero on the delete's own success.)
-      let resolveDelete: (() => void) | undefined;
-      let rejectUpdate: ((e: { message: string }) => void) | undefined;
+      // Force the bug-triggering interleave: both ops are dispatched, the delete
+      // commits, and the update fails LAST — so the batch only reaches zero
+      // pending ops via the error path. The count refresh must fire from there
+      // too, or a committed delete leaves the pager count stale. (Settling the
+      // delete synchronously would hide the bug, since ops would hit zero on the
+      // delete's own success.)
+      //
+      // Every dispatched callback is collected, not just the most recent one. A
+      // stall longer than the 500ms sync debounce splits the typing across two
+      // flushes, so the edit can reach the server as two updates. Keeping only
+      // the last one leaves a pending op outstanding, the batch never drains,
+      // and the assertion below fails for a reason this test is not about.
+      const resolveDeletes: (() => void)[] = [];
+      const rejectUpdates: ((e: { message: string }) => void)[] = [];
       deleteManyMutate.mockImplementation((_args: unknown, opts?: { onSuccess?: () => void }) => {
-        resolveDelete = opts?.onSuccess;
+        if (opts?.onSuccess) resolveDeletes.push(opts.onSuccess);
       });
       updateMutate.mockImplementation(
         (_args: unknown, opts?: { onError?: (e: { message: string }) => void }) => {
-          rejectUpdate = opts?.onError;
+          if (opts?.onError) rejectUpdates.push(opts.onError);
         },
       );
       const refetchSpy = vi.fn();
@@ -818,8 +825,8 @@ describe("given rows are deleted from a paginated dataset", () => {
       render(<DatasetEditorTable datasetId="dp" />, { wrapper: Wrapper });
       await screen.findByText("a");
 
-      // Queue a delete (row 1) and an edit (row 2, now at index 0) into the same
-      // debounce batch.
+      // Queue a delete (row 1) and an edit (row 2, now at index 0). The debounce
+      // normally carries them in one batch.
       await user.click(screen.getByLabelText("Select row 1"));
       await user.click(await screen.findByTestId("delete-selected-rows"));
       await user.dblClick(screen.getByTestId("cell-0-input_0"));
@@ -830,12 +837,16 @@ describe("given rows are deleted from a paginated dataset", () => {
       // Both mutations dispatched; settle them delete-then-update so ops reaches
       // zero through the error path.
       await waitFor(() => {
-        expect(resolveDelete).toBeDefined();
-        expect(rejectUpdate).toBeDefined();
+        expect(resolveDeletes.length).toBeGreaterThan(0);
+        expect(rejectUpdates.length).toBeGreaterThan(0);
       });
+      // Deletes first, updates after, so the batch can only reach zero pending
+      // ops through the error path however many flushes the debounce produced.
       await act(async () => {
-        resolveDelete?.();
-        rejectUpdate?.({ message: "boom" });
+        for (const resolveDelete of resolveDeletes) resolveDelete();
+        for (const rejectUpdate of rejectUpdates) {
+          rejectUpdate({ message: "boom" });
+        }
       });
 
       expect(refetchSpy).toHaveBeenCalled();

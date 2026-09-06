@@ -133,6 +133,27 @@ describe("given the REST surface the API process mounts", () => {
       }
     });
 
+    /** @scenario "The published document carries no boolean exclusive bound" */
+    it("spells every exclusive bound the 3.1 way", () => {
+      const booleanBounds: string[] = [];
+      const walk = (node: unknown, path: string): void => {
+        if (Array.isArray(node)) {
+          node.forEach((child, index) => walk(child, `${path}[${index}]`));
+          return;
+        }
+        if (typeof node !== "object" || node === null) return;
+        for (const [key, value] of Object.entries(node)) {
+          const isBound = key === "exclusiveMinimum" || key === "exclusiveMaximum";
+          if (isBound && typeof value === "boolean") booleanBounds.push(`${path}.${key}`);
+          walk(value, `${path}.${key}`);
+        }
+      };
+
+      walk(generated.document, "$");
+
+      expect(booleanBounds).toEqual([]);
+    });
+
     /** @scenario "A described route is published at its canonical v1 address" */
     it("publishes a bare-mounted family under its /api/v1 address only", () => {
       const described = Object.keys(generated.document.paths ?? {});

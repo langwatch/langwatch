@@ -387,7 +387,7 @@ function LogTab({ records, live }: { records: LangyDevLogRecord[]; live: boolean
     <Box padding={2}>
       {dropped > 0 ? (
         <Text textStyle="2xs" color="orange.fg" paddingX={1} paddingBottom={2}>
-          {dropped.toLocaleString()} earlier entries dropped — the tape keeps the most recent{" "}
+          {dropped.toLocaleString()} earlier entries dropped. The tape keeps the most recent{" "}
           {DEV_LOG_CAPACITY.toLocaleString()}.
         </Text>
       ) : null}
@@ -497,7 +497,7 @@ function TapeEmpty() {
   return (
     <VStack align="stretch" gap={3} paddingX="12px" paddingY="10px">
       <Text textStyle="xs" color="fg.muted">
-        Armed. Send a message — everything that crosses the wire lands here in arrival order.
+        Armed. Send a message. Everything that crosses the wire lands here in arrival order.
       </Text>
       <VStack align="stretch" gap={1}>
         {LANE_LEGEND.map(({ lane, label, detail }) => (
@@ -598,7 +598,7 @@ function EphemeralTab({ records, live }: { records: LangyDevLogRecord[]; live: b
   if (signals.length === 0) {
     return (
       <Empty>
-        No signals yet — status, progress, reasoning and plan frames land here as they arrive.
+        No signals yet. Status, progress, reasoning and plan frames land here as they arrive.
       </Empty>
     );
   }
@@ -615,7 +615,7 @@ function EphemeralTab({ records, live }: { records: LangyDevLogRecord[]; live: b
         // Say so. A silently-truncated tape reads as a complete one, and that
         // is exactly how you end up debugging the wrong half of a turn.
         <Text textStyle="2xs" color="orange.fg" paddingX={1} paddingBottom={2}>
-          {dropped.toLocaleString()} earlier entries dropped — the tape keeps the most recent{" "}
+          {dropped.toLocaleString()} earlier entries dropped. The tape keeps the most recent{" "}
           {DEV_LOG_CAPACITY.toLocaleString()}.
         </Text>
       ) : null}
@@ -788,7 +788,7 @@ function EventRow({ call }: { call: DevToolCall }) {
           </HStack>
         ) : (
           <Text textStyle="2xs" color="fg.muted">
-            No capability — not a CLI call, so it renders as a plain activity line.
+            No capability. Not a CLI call, so it renders as a plain activity line.
           </Text>
         )}
       </Box>

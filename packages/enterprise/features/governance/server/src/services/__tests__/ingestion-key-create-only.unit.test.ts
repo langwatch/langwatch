@@ -72,6 +72,10 @@ class LedgerRepository extends IngestionKeyRepository {
   findIngestKeysForProject(): Promise<StoredIngestionKey[]> {
     return Promise.resolve([]);
   }
+
+  tryFindByLookupId(): Promise<null> {
+    return Promise.resolve(null);
+  }
 }
 
 class LedgerIssuer extends IngestionKeyIssuerPort {
@@ -90,7 +94,10 @@ class LedgerIssuer extends IngestionKeyIssuerPort {
     return Promise.resolve({ token: `ik-lw-${id}-token`, apiKey: { id } });
   }
 
-  revoke(input: { id: string }): Promise<void> {
+  readonly revokedWith: Array<{ id: string; cause: string | undefined }> = [];
+
+  revoke(input: { id: string; cause?: string }): Promise<void> {
+    this.revokedWith.push({ id: input.id, cause: input.cause });
     this.ledger.revoke(input.id);
     return Promise.resolve();
   }
@@ -147,6 +154,30 @@ describe("given a machine already holds an ingestion key for a project and tool"
 
       expect(ledger.isLive(first.apiKeyId)).toBe(false);
       expect(ledger.isLive(second.apiKeyId)).toBe(true);
+    });
+
+    /** @scenario "A hard-cut rotation names itself as the cause" */
+    it("names the rotation as the cause of the prior key's death", async () => {
+      const ledger = new KeyLedger();
+      const issuer = new LedgerIssuer(ledger);
+      const service = IngestionKeyService.create({
+        repository: new LedgerRepository(ledger),
+        issuer,
+        organizations: new TestOrganizationService(),
+      });
+      const rotate = () =>
+        service.ensureForProject({
+          callerUserId: "user-1",
+          ownerUserId: "user-1",
+          organizationId: ORGANIZATION_ID,
+          projectId: PROJECT_ID,
+          sourceType: SOURCE_TYPE,
+        });
+
+      const first = await rotate();
+      await rotate();
+
+      expect(issuer.revokedWith).toEqual([{ id: first.apiKeyId, cause: "rotation" }]);
     });
   });
 });

@@ -48,51 +48,24 @@ export interface LangySessionState {
    * order. The github-gate scenario asserts on these: the command card that
    * tripped the gate must reach the stream before the gate cancels it. */
   toolCommands: string[];
-}
-
-let cachedCookie: Promise<string> | null = null;
-
-/**
- * Sign in once (per test process) and cache the better-auth session cookie.
- */
-function getSessionCookie(): Promise<string> {
-  cachedCookie ??= (async () => {
-    try {
-      let res: Response;
-      for (let attempt = 1; ; attempt++) {
-        res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Origin: APP_BASE },
-          body: JSON.stringify({
-            email: ADMIN_EMAIL,
-            password: ADMIN_PASSWORD,
-          }),
-          signal: AbortSignal.timeout(15_000),
-        });
-        // Every vitest run signs in once, so a burst of runs (a suite driven
-        // in chunks) can land on the auth rate limiter. That is the runner
-        // being throttled, not a scenario failing: wait out the window.
-        if (res.status !== 429 || attempt >= 6) break;
-        console.log(`[scenario] sign-in rate-limited (429), waiting 20s (attempt ${attempt})`);
-        await new Promise((resolve) => setTimeout(resolve, 20_000));
-      }
-      if (!res.ok) {
-        throw new Error(`Langy test sign-in failed: ${res.status} ${await res.text()}`);
-      }
-      const setCookie = res.headers.get("set-cookie") ?? "";
-      // better-auth only applies the __Secure- prefix on HTTPS origins, so a
-      // plain-http local stack sets the bare cookie name. Accept both.
-      const match = /(?:__Secure-)?better-auth\.session_token=[^;]+/.exec(setCookie);
-      if (!match) {
-        throw new Error("Langy test sign-in: no better-auth session cookie in response");
-      }
-      return match[0];
-    } catch (error) {
-      cachedCookie = null;
-      throw error;
-    }
-  })();
-  return cachedCookie;
+  /**
+   * Every settled tool card's NAME, in order.
+   *
+   * A scenario that has to prove a tool did NOT run reads this: the negative
+   * is on no reply, and a judge asked "did it call code_access" is guessing
+   * from prose.
+   */
+  toolNames: string[];
+  /**
+   * Every settled tool card's OUTPUT, in order.
+   *
+   * The CLI prints the platform's own bytes unchanged, so a dispatched UI
+   * action's `"executedVia":"browser"` or `"backend"` marker reaches the test
+   * process here and nowhere else: it is on no durable turn record and on no
+   * field of this state. This is the product-truth handle for which leg
+   * carried an action.
+   */
+  toolOutputs: string[];
 }
 
 /** Mirror langyChatTransport.ts's message shape: {role, parts: [{type, text}]}. */
@@ -542,6 +515,7 @@ export function makeLangyAdapter(
     currentTurnId: null,
     navigateHrefs: [],
     toolCommands: [],
+    toolNames: [],
     toolOutputs: [],
   };
   const adapter: AgentAdapter = {
@@ -589,6 +563,7 @@ export function makeLangyAdapter(
           if (typeof command === "string" && command) {
             state.toolCommands.push(command);
           }
+          state.toolNames.push(call.name);
           state.toolOutputs.push(call.output);
         },
         // Read at fire time, not captured: a tab attaches and detaches around
@@ -609,6 +584,7 @@ export function makeLangyAdapter(
       state.currentTurnId = null;
       state.navigateHrefs.length = 0;
       state.toolCommands.length = 0;
+      state.toolNames.length = 0;
       state.toolOutputs.length = 0;
     },
   });

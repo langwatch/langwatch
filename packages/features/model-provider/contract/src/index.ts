@@ -15,6 +15,7 @@ export * from "./custom-model";
 export * from "./codex-account";
 export * from "./catalog/codex-refusal-message";
 export * from "./catalog/codex-restrictions";
+export * from "./catalog/langy-skip-permissions";
 export * from "./catalog/latest-aliases";
 export * from "./catalog/latest-flagship";
 export * from "./catalog/model-catalog";

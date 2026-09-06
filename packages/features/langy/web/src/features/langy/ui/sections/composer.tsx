@@ -30,6 +30,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
 import type { LangySkill } from "../../../../model/shared/langy/langy-skills";
 import { describeChipContext } from "../../../../behavior/langy-chip-context";
+import { LANGY_ANSWER_HERE_OR_TERMINAL } from "../../../../model/langy-local-waits";
 import { useLangyContextTargetStore } from "../../../../behavior/langy-context-target.store";
 import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store";
 import { LangyComposerPalette, type PaletteMode } from "../elements/langy-composer-palette";
@@ -82,6 +83,19 @@ const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
 // stays out of the way of what the person is trying to type.
 const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
 
+/** While a turn runs and nothing is waiting on the reader. */
+export const MID_TURN_PLACEHOLDER = "Langy is working. You can send when it stops.";
+
+/** While a card is holding the turn for the reader's answer (ADR-129). */
+export const AWAITING_ANSWER_PLACEHOLDER = "Answer the card above to keep going.";
+
+/**
+ * The same, while a folder is shared from a terminal: the ask is open there
+ * too, and either place answers it. One sentence for the composer and the
+ * waiting line alike (`LANGY_ANSWER_HERE_OR_TERMINAL`).
+ */
+export const AWAITING_ANSWER_TERMINAL_PLACEHOLDER = LANGY_ANSWER_HERE_OR_TERMINAL;
+
 // Shown under every composer, in every variant and at every viewport height. A
 // notice about what happens to what you type only does its job where you type,
 // so it is not gated on the layout the way the tagline below it is.
@@ -104,6 +118,8 @@ function ComposerImpl({
   addableChips = [],
   onAddChip,
   placeholder = COMPOSER_PLACEHOLDER,
+  awaitingAnswer = false,
+  terminalConnected = false,
   cardRef,
 }: {
   /** The model Langy will use for the next send. "" = let the server pick. */
@@ -135,6 +151,16 @@ function ComposerImpl({
   addableChips?: LangyContextChip[];
   onAddChip?: (id: string) => void;
   placeholder?: string;
+  /**
+   * A card is holding the turn for the reader's answer (ADR-129). The mid-turn
+   * line must not say Langy is working: it is not, it is waiting for them.
+   */
+  awaitingAnswer?: boolean;
+  /**
+   * A folder is shared from a terminal, so the ask that holds the turn is open
+   * there too and the placeholder names both places.
+   */
+  terminalConnected?: boolean;
 }) {
   const floating = variant === "floating";
   const hero = variant === "hero";
@@ -335,6 +361,8 @@ function ComposerImpl({
             hero={hero}
             disabled={disabled}
             placeholder={placeholder}
+            awaitingAnswer={awaitingAnswer}
+            terminalConnected={terminalConnected}
             onSend={onSend}
             onStop={onStop}
             openPalette={openPalette}
@@ -478,10 +506,40 @@ function composerKeyHandler({
   };
 }
 
+/**
+ * What the empty field says, in the state the composer is actually in.
+ *
+ * There is no queue (see composerKeyHandler), so the mid-turn line must not
+ * read as a promise to send: it said "Write your next message…", the user
+ * wrote one, pressed Enter, and nothing happened, with no sign it had been
+ * refused. And while a card is open the turn is waiting for the READER, so the
+ * line points at the card rather than blaming Langy for the wait, and names
+ * the terminal as well when the folder is shared from one (ADR-129).
+ */
+export function composerPlaceholder({
+  awaitingAnswer,
+  terminalConnected,
+  turnActive,
+  idle,
+}: {
+  awaitingAnswer: boolean;
+  terminalConnected: boolean;
+  turnActive: boolean;
+  /** What it says when nothing is running and nothing is waiting. */
+  idle: string;
+}): string {
+  if (awaitingAnswer) {
+    return terminalConnected ? AWAITING_ANSWER_TERMINAL_PLACEHOLDER : AWAITING_ANSWER_PLACEHOLDER;
+  }
+  return turnActive ? MID_TURN_PLACEHOLDER : idle;
+}
+
 const ComposerInputRow = memo(function ComposerInputRow({
   hero,
   disabled,
   placeholder,
+  awaitingAnswer,
+  terminalConnected,
   onSend,
   onStop,
   openPalette,
@@ -490,6 +548,8 @@ const ComposerInputRow = memo(function ComposerInputRow({
   hero: boolean;
   disabled: boolean;
   placeholder: string;
+  awaitingAnswer: boolean;
+  terminalConnected: boolean;
   onSend: (input: string) => void;
   onStop: () => void;
   openPalette: (mode: PaletteMode) => void;
@@ -534,12 +594,12 @@ const ComposerInputRow = memo(function ComposerInputRow({
           if (hero) setMultiline(e.target.scrollHeight > 30);
         }}
         onKeyDown={onTextareaKeyDown}
-        // There is no queue (see composerKeyHandler), so the mid-turn
-        // placeholder must not read as a promise to send. It said "Write your
-        // next message…", the user wrote one, pressed Enter, and nothing
-        // happened: the text sat in the field with no sign it had been
-        // refused.
-        placeholder={turnActive ? "Langy is working. You can send when it stops." : placeholder}
+        placeholder={composerPlaceholder({
+          awaitingAnswer,
+          terminalConnected,
+          turnActive,
+          idle: placeholder,
+        })}
         disabled={disabled}
         rows={1}
         autoresize

@@ -25,7 +25,36 @@ export type ModelProviderDefinition = {
   authFlow?: "api-key" | "oauth-device";
   restrictedToFeatureKeys?: readonly string[];
   deprecated?: { replacedBy: string };
+  /**
+   * Regular expression sources naming the models of this provider that may run a Langy
+   * conversation with the permission checks skipped on the developer's machine (ADR-129).
+   * The list is the provider's default; an operator can replace it on the provider row.
+   * Matched against the BARE model id, anchored at the start by every entry below.
+   */
+  langySkipPermissionsModels: readonly string[];
 };
+
+/**
+ * OpenAI's frontier models and everything that follows them. Three sources, because the naming
+ * has three shapes: the two named 5.6 releases, the 5.x line from 5.7 up, and the whole-number
+ * lines from 6 up. The lookahead drops the small and cheap variants of a trusted line.
+ */
+const OPENAI_SKIP_PERMISSIONS_MODELS = [
+  String.raw`^gpt-5\.6-(terra|sol)$`,
+  String.raw`^gpt-5\.([7-9]|\d{2,})(?!.*-(luna|mini|nano))`,
+  String.raw`^gpt-([6-9]|\d{2,})(?!.*-(luna|mini|nano))`,
+] as const;
+
+/** Anthropic's Opus and Fable lines from version five on. */
+const ANTHROPIC_SKIP_PERMISSIONS_MODELS = [
+  String.raw`^claude-(opus|fable)-([5-9]|\d{2,})`,
+] as const;
+
+/**
+ * The default for a provider whose models are not vouched for. Every provider other than OpenAI
+ * and Anthropic carries this, so the skip toggle stays off until an operator names the models.
+ */
+const NO_SKIP_PERMISSIONS_MODELS: readonly string[] = [];
 
 /** The portable value rendered by the Model Provider settings editor. */
 export type ModelProviderEditorValue = {
@@ -46,6 +75,11 @@ export type ModelProviderEditorValue = {
   rotationPolicy?: "MANUAL";
   providerConfig?: unknown;
   fallbackPriorityGlobal?: number | null;
+  /**
+   * The operator's own list of models allowed to skip Langy's permission checks, as regular
+   * expression sources. Null or absent means the provider's registry default applies.
+   */
+  langySkipPermissionsModels?: string[] | null;
   // Nullable like every other stored column on this row: the wire always
   // carries the key, and null is "no health check has recorded a verdict".
   healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN" | null;
@@ -82,6 +116,7 @@ export const modelProviders = {
   custom: {
     name: "Custom (OpenAI-compatible)",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "CUSTOM_API_KEY",
     endpointKey: "CUSTOM_BASE_URL",
     keysSchema: z.object({
@@ -96,6 +131,7 @@ export const modelProviders = {
   openai_codex: {
     name: "Codex (OpenAI account)",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "CODEX_ACCESS_TOKEN",
     keysSchema: codexTokenKeysSchema,
     authFlow: "oauth-device",
@@ -107,6 +143,7 @@ export const modelProviders = {
   openai: {
     name: "OpenAI",
     type: "llm",
+    langySkipPermissionsModels: OPENAI_SKIP_PERMISSIONS_MODELS,
     apiKey: "OPENAI_API_KEY",
     endpointKey: "OPENAI_BASE_URL",
     keysSchema: z
@@ -130,6 +167,7 @@ export const modelProviders = {
   anthropic: {
     name: "Anthropic",
     type: "llm",
+    langySkipPermissionsModels: ANTHROPIC_SKIP_PERMISSIONS_MODELS,
     apiKey: "ANTHROPIC_API_KEY",
     endpointKey: "ANTHROPIC_BASE_URL",
     keysSchema: z
@@ -154,6 +192,7 @@ export const modelProviders = {
   gemini: {
     name: "Gemini",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "GEMINI_API_KEY",
     keysSchema: z
       .object({
@@ -179,6 +218,7 @@ export const modelProviders = {
   google_agent_platform: {
     name: "Google Agent Platform",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "GOOGLE_AGENT_PLATFORM_API_KEY",
     keysSchema: z.object({
       GOOGLE_AGENT_PLATFORM_API_KEY: z.string().min(1),
@@ -191,6 +231,7 @@ export const modelProviders = {
   elevenlabs: {
     name: "ElevenLabs",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "ELEVENLABS_API_KEY",
     endpointKey: "ELEVENLABS_BASE_URL",
     keysSchema: z.object({
@@ -208,6 +249,7 @@ export const modelProviders = {
   azure: {
     name: "Azure OpenAI",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "AZURE_OPENAI_API_KEY",
     endpointKey: "AZURE_OPENAI_ENDPOINT",
     keysSchema: z
@@ -225,6 +267,7 @@ export const modelProviders = {
   bedrock: {
     name: "Bedrock",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "AWS_ACCESS_KEY_ID",
     keysSchema: z.object({
       AWS_ACCESS_KEY_ID: z.string().nullable().optional(),
@@ -237,6 +280,7 @@ export const modelProviders = {
   vertex_ai: {
     name: "Vertex AI",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "GOOGLE_APPLICATION_CREDENTIALS",
     keysSchema: z.object({
       GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).refine(isValidJson),
@@ -248,6 +292,7 @@ export const modelProviders = {
   deepseek: {
     name: "DeepSeek",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "DEEPSEEK_API_KEY",
     keysSchema: z.object({ DEEPSEEK_API_KEY: z.string().min(1) }),
     enabledSince: new Date("2023-01-01"),
@@ -255,6 +300,7 @@ export const modelProviders = {
   xai: {
     name: "xAI",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "XAI_API_KEY",
     keysSchema: z.object({ XAI_API_KEY: z.string().min(1) }),
     enabledSince: new Date("2024-11-01"),
@@ -262,6 +308,7 @@ export const modelProviders = {
   cerebras: {
     name: "Cerebras",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "CEREBRAS_API_KEY",
     keysSchema: z.object({ CEREBRAS_API_KEY: z.string().min(1) }),
     enabledSince: new Date("2024-06-01"),
@@ -269,6 +316,7 @@ export const modelProviders = {
   groq: {
     name: "Groq",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "GROQ_API_KEY",
     keysSchema: z.object({ GROQ_API_KEY: z.string().min(1) }),
     enabledSince: new Date("2023-01-01"),
@@ -276,6 +324,7 @@ export const modelProviders = {
   voyage: {
     name: "Voyage AI",
     type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "VOYAGE_API_KEY",
     keysSchema: z.object({ VOYAGE_API_KEY: z.string().min(1) }),
     enabledSince: new Date("2026-05-18"),
@@ -283,6 +332,7 @@ export const modelProviders = {
   azure_safety: {
     name: "Azure Safety",
     type: "safety",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "AZURE_CONTENT_SAFETY_KEY",
     endpointKey: "AZURE_CONTENT_SAFETY_ENDPOINT",
     keysSchema: z.object({

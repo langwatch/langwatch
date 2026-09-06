@@ -72,8 +72,15 @@ export class GovernanceIngestionOperationsService {
   readonly ingestionKeyEnsureForPersonalProject: GovernanceService["ingestionKeyEnsureForPersonalProject"] =
     (...args) => this.ingestionKeys.ensureForPersonalProject(...args);
 
+  readonly ingestionKeyIssueForPersonalProject: GovernanceService["ingestionKeyIssueForPersonalProject"] =
+    (...args) => this.ingestionKeys.issueForPersonalProject(...args);
+
   readonly ingestionKeyListForPersonalProject: GovernanceService["ingestionKeyListForPersonalProject"] =
     (...args) => this.ingestionKeys.listForPersonalProject(...args);
+
+  readonly ingestionKeyDescribePersonal: GovernanceService["ingestionKeyDescribePersonal"] = (
+    ...args
+  ) => this.ingestionKeys.describePersonalKey(...args);
 
   readonly ingestionSourceList: GovernanceService["ingestionSourceList"] = (...args) =>
     this.ingestionSources.list(...args);

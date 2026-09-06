@@ -73,6 +73,53 @@ export const langyStreamEntrySchema = z.discriminatedUnion("type", [
     kind: z.string(),
     payload: z.unknown(),
   }),
+  /**
+   * ADR-129. A card the developer has to answer while the turn is in flight: a permission ask
+   * for one command on their machine, or a question Langy needs settled before it goes on. The
+   * durable `user_wait_started` event is the source of truth, because a tab that adopted a
+   * running turn never subscribes to this stream; these entries are the fast path for the tab
+   * that sent the message, and the wake-up that says the card is there now.
+   */
+  z.object({
+    type: z.literal("local_permission"),
+    waitId: z.string(),
+    callId: z.string(),
+    toolCallId: z.string().optional(),
+    summary: z.string(),
+    pattern: z.string(),
+    /** Every pattern one session grant covers, first one first. */
+    patterns: z.array(z.string()),
+    reason: z.string(),
+    /** The seconds after which the command is stopped, when it has a limit. */
+    timeoutSeconds: z.number().optional(),
+    skipOffered: z.boolean(),
+    workspaceName: z.string(),
+    hostname: z.string(),
+    status: z.enum(["pending", "answered", "expired", "cancelled"]),
+    decision: z.string().optional(),
+    /** Where the answer was given. Absent means the card in the panel. */
+    source: z.enum(["panel", "terminal"]).optional(),
+  }),
+  z.object({
+    type: z.literal("question"),
+    waitId: z.string(),
+    toolCallId: z.string().optional(),
+    questions: z.unknown(),
+    status: z.enum(["pending", "answered", "expired", "cancelled"]),
+    answers: z.unknown().optional(),
+  }),
+  /**
+   * The developer's folder came or went while the turn was running, so the chip and the code
+   * access card change without a reload.
+   */
+  z.object({
+    type: z.literal("local_workspace"),
+    state: z.enum(["connected", "disconnected"]),
+    name: z.string(),
+    root: z.string(),
+    hostname: z.string(),
+    gitBranch: z.string().optional(),
+  }),
   z.object({ type: z.literal("end") }),
   z.object({ type: z.literal("error"), error: z.string() }),
 ]);

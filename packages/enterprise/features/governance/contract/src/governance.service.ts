@@ -27,6 +27,7 @@ import type {
   IngestionKeyMintCommand,
   IssuedIngestionKey,
   PersonalIngestionKey,
+  PersonalIngestionKeyState,
 } from "./ingestion-source-key.commands";
 import type {
   CreatedGovernanceIngestionSource,
@@ -202,10 +203,22 @@ export abstract class GovernanceService {
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
   }): Promise<IssuedIngestionKey>;
+  abstract ingestionKeyIssueForPersonalProject(input: {
+    userId: string;
+    organizationId: string;
+    sourceType: string;
+    ingestionTemplateId?: string | null;
+    createdByDeviceLabel?: string | null;
+  }): Promise<IssuedIngestionKey>;
   abstract ingestionKeyListForPersonalProject(input: {
     userId: string;
     organizationId: string;
   }): Promise<PersonalIngestionKey[]>;
+  abstract ingestionKeyDescribePersonal(input: {
+    userId: string;
+    organizationId: string;
+    lookupId: string;
+  }): Promise<PersonalIngestionKeyState | null>;
 
   abstract ingestionSourceList(organizationId: string): Promise<GovernanceIngestionSource[]>;
   abstract tryFindIngestionSourceById(input: {

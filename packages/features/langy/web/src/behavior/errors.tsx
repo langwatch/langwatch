@@ -6,6 +6,24 @@ import { Alert, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import { explainAnyError } from "@langwatch/handled-error/presentation";
+export { readHandledError } from "@langwatch/handled-error/read-handled-error";
+
+/**
+ * The whole explanation as one string, for the slots that can only take text — a toast title a
+ * card composes, or a chip's tooltip. Reads the same registry the rendered surfaces below do,
+ * so a code with copy never degrades to the generic line.
+ */
+export function describeError({
+  error,
+  fallbackTitle,
+}: {
+  error: unknown;
+  fallbackTitle?: string;
+}): string {
+  const explanation = explainAnyError(error);
+  const title = explanation.isRegistered ? explanation.title : (fallbackTitle ?? explanation.title);
+  return `${title}. ${explanation.description}`;
+}
 
 /**
  * As much of a react-hook-form as {@link FormServerError} reads — the whole-form

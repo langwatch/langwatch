@@ -94,6 +94,7 @@
     "generate:setup-skill-bodies": "node --experimental-strip-types scripts/generate-setup-skill-bodies.ts"
   },
   "dependencies": {
+    "@langwatch/agent-server": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
@@ -102,6 +103,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
@@ -110,14 +112,17 @@
     "hono": "^4.12.27",
     "langwatch": "workspace:*",
     "nanoid": "^5.1.5",
+    "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@langwatch/feature-flag-server": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
     "@opentelemetry/sdk-trace-base": "2.10.0",
     "@opentelemetry/sdk-trace-node": "2.10.0",
     "@testcontainers/redis": "^12.0.4",
     "@types/node": "^26.0.1",
+    "@types/ws": "^8.18.1",
     "ioredis": "^5.9.3",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"

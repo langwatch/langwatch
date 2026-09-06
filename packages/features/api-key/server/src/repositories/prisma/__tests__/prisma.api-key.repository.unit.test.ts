@@ -134,3 +134,52 @@ describe("PrismaApiKeyRepository", () => {
     });
   });
 });
+
+describe("when a key is revoked", () => {
+  /** The revoke's two calls: the fenced write, then the read-back. */
+  function revokingRepository(row: { revokedAt: Date | null; revocationCause: string | null }) {
+    const updateMany = vi.fn(
+      async (update: { where: { revokedAt: null }; data: Record<string, unknown> }) => {
+        if (row.revokedAt) return { count: 0 };
+        row.revokedAt = update.data.revokedAt as Date;
+        row.revocationCause = update.data.revocationCause as string;
+        return { count: 1 };
+      },
+    );
+    const findUniqueOrThrow = vi.fn(async () => row);
+    const database = {
+      apiKey: { updateMany, findUniqueOrThrow },
+    } as unknown as PrismaApiKeyDatabase;
+    return { repository: PrismaApiKeyRepository.create(database), updateMany, row };
+  }
+
+  /** @scenario "A revoke from the API keys page records a person as its cause" */
+  it("records the cause the caller named, fenced on the row still being live", async () => {
+    const { repository, updateMany, row } = revokingRepository({
+      revokedAt: null,
+      revocationCause: null,
+    });
+
+    await repository.revoke({ id: "key-1", cause: "user" });
+
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "key-1", revokedAt: null } }),
+    );
+    expect(row.revocationCause).toBe("user");
+  });
+
+  /** @scenario "The first revocation decides the recorded cause" */
+  it("leaves the first revocation's cause and moment in place", async () => {
+    const { repository, row } = revokingRepository({
+      revokedAt: null,
+      revocationCause: null,
+    });
+
+    await repository.revoke({ id: "key-1", cause: "user" });
+    const first = row.revokedAt;
+    await repository.revoke({ id: "key-1", cause: "cap" });
+
+    expect(row.revocationCause).toBe("user");
+    expect(row.revokedAt).toBe(first);
+  });
+});

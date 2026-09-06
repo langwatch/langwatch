@@ -8,6 +8,7 @@ class FakeIngestionKeyRepository extends IngestionKeyRepository {
   prior: Awaited<ReturnType<IngestionKeyRepository["tryFindIngestKey"]>> = null;
   tryFindIngestKey = vi.fn(async () => this.prior);
   findIngestKeysForProject = vi.fn(async () => []);
+  tryFindByLookupId = vi.fn(async () => null);
 }
 
 class FakeIngestionKeyIssuer extends IngestionKeyIssuerPort {

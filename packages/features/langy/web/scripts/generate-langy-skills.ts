@@ -27,7 +27,7 @@ function normalizeDest(dest: string): string {
 }
 
 export interface GeneratedSkill {
-  /** The opencode skill name — the directory, and what the agent loads. */
+  /** The skill name — the directory, and what the agent loads. */
   id: string;
   /** Human label. Typography only: derived from the id, never a claim. */
   label: string;

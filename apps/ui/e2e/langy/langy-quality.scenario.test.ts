@@ -1,6 +1,47 @@
 /**
- * Quality regression set for Langy — one scenario per measured production defect, so
- * each one fails today and turns green only when the underlying issue is fixed.
+ * Quality regression set for Langy — one scenario per measured production
+ * defect, so each one fails today and turns green only when the underlying
+ * issue is fixed.
+ *
+ * Every scenario here was derived from prod Postgres
+ * (`LangyConversationTurnProjection`, all-time: 260 completed, 140 failed, 8
+ * stopped turns) rather than from a hunch. The mapping is one-to-one:
+ *
+ *   #1097  10% of successful turns render no answer at all       -> "never ends a turn blank"
+ *   #1098  40% zero-tool, 58% under 120 characters               -> "answers from the project, not from memory"
+ *   #1099  AGENTS.md:149 calls the working langwatch.* tools     -> "owns the tools it actually has"
+ *          hallucinations
+ *   #1100  a stock coding-agent persona bleeding through          -> "does not narrate a checkout it never obtained"
+ *   #1101  langwatch.monitor.create fails on 48% of calls        -> "a monitor it says it made really exists"
+ *   #1102  p90 380s, p99 31min                                   -> "answers a simple question inside the budget"
+ *
+ * These complement langy-dogfood.scenario.test.ts (named user flows) and
+ * langy.scenario.test.ts (broad surface coverage). Kept separate so the
+ * quality bar can be run on its own and watched over time.
+ *
+ * RUN (local haven — all LANGY_* vars already default to the seed identity):
+ *
+ *   cd apps/ui/e2e/langy
+ *   npx vitest run langy-quality.scenario.test.ts --reporter=verbose
+ *
+ * RUN (against Langy's own production project — the measurements above came
+ * from prod, so this is where the set is meant to live):
+ *
+ *   LANGY_APP_URL=https://app.langwatch.ai \
+ *   LANGY_PROJECT_ID=<Langy's prod project id> \
+ *   LANGY_ADMIN_EMAIL=<a real user on that project> \
+ *   LANGY_ADMIN_PASSWORD=<that user's password> \
+ *   LW_BASE_URL=https://app.langwatch.ai \
+ *   LANGWATCH_API_KEY=<that project's API key> \
+ *   OPENAI_API_KEY=<key or gateway virtual key> \
+ *   npx vitest run langy-quality.scenario.test.ts --reporter=verbose
+ *
+ * SIDE EFFECTS: the monitor scenario performs a real create against whichever
+ * project is configured, and expects it to SUCCEED — a monitor and an evaluator
+ * both appear. Everything this suite creates is named with an `e2e-quality-`
+ * prefix. Monitors are deleted afterwards, because a monitor that survives the
+ * run keeps evaluating the project's live traffic and costs real money; the
+ * evaluator it hangs off is inert and is left behind as the evidence trail.
  */
 
 import { randomUUID } from "node:crypto";
@@ -206,8 +247,15 @@ describe("Langy quality bar", () => {
   });
 
   /**
-   * #1100 — the base system prompt is opencode's coding agent with one word rewritten,
-   * while AGENTS.md rule 24 restricts bash to the `langwatch` CLI.
+   * #1100 — the stock coding-agent persona leaks back in through the model's
+   * priors, while AGENTS.md rule 24 restricts bash to the `langwatch` CLI.
+   * Prod shows the coding persona winning sometimes: 144 `read` calls across 7
+   * projects, 68 `edit` calls — against a workspace that was never cloned.
+   *
+   * Source work itself is in scope: AGENTS.md routes "open a PR"/"fix and
+   * submit" to the `github` skill, which clones the repository and works there.
+   * What must not happen is the narration without the clone — reading a file
+   * Langy never obtained, or asking the user to paste it.
    */
   describe("when the user asks Langy to edit source it has not cloned", () => {
     it("does not narrate a checkout it never obtained", async () => {

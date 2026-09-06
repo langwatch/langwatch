@@ -30,6 +30,18 @@ Feature: The agent commands show connected agents and run them through the relay
       Then the first row names the user
       And the second row names the host label
 
+    Scenario: A row the key cannot choose reads as not selectable
+      Given a personal development agent owned by another person
+      When I run "langwatch agent list"
+      Then the row is listed
+      And its owner cell is marked "owner only"
+
+    Scenario: The detail says whether the key can choose the agent
+      Given a personal development agent owned by another person
+      When I run "langwatch agent get <id>"
+      Then the detail names the owner
+      And it says only its owner can run it
+
   Rule: The detail shows the parameters an agent declared and its instances
 
     Scenario: The detail lists parameters with type, options, default and required
@@ -72,11 +84,12 @@ Feature: The agent commands show connected agents and run them through the relay
 
   Rule: The help says which command serves which agent type
 
-    Scenario: The dev command help points code agents to connectAgent
-      When I read the help of "langwatch agent dev"
+    Scenario: The tunnel command help points code agents to connectAgent
+      When I read the help of "langwatch agent tunnel"
       Then it says the tunnel is for HTTP agents
       And it names connectAgent and connect_agent for agents written in code
 
     Scenario: The target help names the connected forms
       When I read the help of the --target flag
-      Then it names connected:<id> and connected:<name>@<environment>
+      Then it names connected:<name> first, as the agent in development
+      And connected:<name>@<environment> and connected:<id> after it

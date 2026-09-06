@@ -1435,6 +1435,7 @@ describe("ModelProviderService", () => {
       '"openai_codex/gpt-5.6-terra" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.',
     );
   });
+  /** @scenario "Direct-mode Azure dispatch uses the customer's configured api-version" */
   it("uses the canonical Azure endpoint, version, deployment, and headers", async () => {
     const providers = new Providers();
     providers.rows = [
@@ -1485,6 +1486,7 @@ describe("ModelProviderService", () => {
       api_version: DEFAULT_AZURE_API_VERSION,
     });
   });
+  /** @scenario "Azure API Management gateway mode defaults its own api-version" */
   it("uses Azure gateway mode when its base URL is configured", async () => {
     const providers = new Providers();
     providers.rows = [

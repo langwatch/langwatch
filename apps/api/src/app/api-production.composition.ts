@@ -401,11 +401,29 @@ import {
   type BugReportRestPorts,
 } from "@langwatch/ops-server";
 import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
+import { HandledError } from "@langwatch/handled-error";
+import {
+  canModelSkipPermissions,
+  createLocalControlRuntime,
+  createLocalControlStore,
+  LangyTokenBufferAdapter,
+  nullLocalControlBuffer,
+  type LangyConversationCommands,
+  langyLocalTurnStarter,
+  LocalControlGateway,
+  LocalControlLongPoll,
+  LocalControlSessionCore,
+  type LangyLocalTrpcPorts,
+  type LocalControlRuntime,
+  type SkipPermissionsProviderRows,
+} from "@langwatch/langy-server";
 import {
   apiLangyRestMetrics,
   composeApiLangyRest,
+  type ApiLangyLocalOptions,
   type ApiLangyRestComposition,
 } from "../features/langy/langy-rest.mount";
+
 import { composeApiGithubRest } from "../features/github/github-rest.mount";
 import { refusingGithubService } from "../features/github/github.composition";
 import { composeApiAdminRest } from "../features/ops/admin-rest.mount";
@@ -740,6 +758,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * which is handed a request policy rather than a configuration.
    */
   private composedLangyInternalSecret: string | undefined;
+  private composedLangyLocalRuntime: LocalControlRuntime | undefined;
+  private composedLangyPublicBaseUrl: string | undefined;
+  private composedLangyLocalSessionCore: LocalControlSessionCore | undefined;
+  private composedLangyLocalLongPoll: LocalControlLongPoll | undefined;
   /** The shared bearer the internal cron family authenticates its caller with, or none. */
   private composedCronApiKey: string | undefined;
   /** The studio-Lambda sweep the destructive cron route runs, where one is configured. */
@@ -1262,9 +1284,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // own docblock). Built only when the transport composed, so a deployment
     // with no connected-agent capability answers every upgrade 404 through
     // the plain listener rather than mounting a router with nothing on it.
-    const connectedAgentsUpgradeRouter = this.composedConnectedAgents
-      ? ApiUpgradeRouter.create()
-      : undefined;
+    const langyLocalGateway = this.composeLangyLocalGateway();
+    const connectedAgentsUpgradeRouter =
+      this.composedConnectedAgents || langyLocalGateway ? ApiUpgradeRouter.create() : undefined;
+    // The shared folder's own socket (ADR-129), on the SAME router: one
+    // `upgrade` listener per process, two registered paths.
+    if (langyLocalGateway && connectedAgentsUpgradeRouter) {
+      langyLocalGateway.mount(connectedAgentsUpgradeRouter);
+      options.resources?.own("api langy local control gateway", () => langyLocalGateway.close());
+    }
     if (this.composedConnectedAgents && connectedAgentsUpgradeRouter) {
       this.composedConnectedAgents.mount(connectedAgentsUpgradeRouter);
       // Drain order (ADR-128): the listener stops taking new upgrades first
@@ -1583,7 +1611,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const bugReports = this.composeBugReports(tenancy);
     const unsubscribe = this.composeUnsubscribe();
     const cron = this.composeCron();
-    const langyRest = this.composeLangyRest();
+    const langyRest = this.composeLangyRest(publicBaseUrl);
     const githubRest = this.composeGithubRest(authz);
     // The back office. Both halves are already open at this line: the operator
     // application the `ops.*` namespace answers from, and the one session pair
@@ -2413,7 +2441,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * The Langy REST doors' collaborators, or none.
    */
-  private composeLangyRest(): ApiLangyRestComposition | undefined {
+  private composeLangyRest(publicBaseUrl: string | undefined): ApiLangyRestComposition | undefined {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
     const authz = this.composedAuthz?.permissions ?? this.options.authz;
@@ -2447,7 +2475,131 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             (await tenancy.projects.tryGetSummaryById(projectId))?.slug ?? null,
         };
       },
+      local: this.composeLangyLocal(database.client, publicBaseUrl),
     });
+  }
+
+  /**
+   * The worker's door onto the developer's own folder (ADR-129), over this
+   * process's guarded client and the SAME conversation writer every other
+   * Langy write goes through.
+   */
+  private composeLangyLocal(
+    prisma: NonNullable<ApiProductionComposition["composedDatabase"]>["connection"]["client"],
+    publicBaseUrl: string | undefined,
+  ): ApiLangyLocalOptions | undefined {
+    const commands = this.composedAgentPipelines?.langyConversations;
+    const longPoll = this.composeLangyLocalLongPoll();
+    if (!commands || !longPoll) return undefined;
+    const github = this.composedGithub;
+    return {
+      runtime: this.composeLangyLocalRuntime(prisma, commands),
+      longPoll: longPoll,
+      commands,
+      users: {
+        tryReadPreference: async (userId) =>
+          (
+            await prisma.user.findUnique({
+              where: { id: userId },
+              select: { langyCodeAccessPreference: true },
+            })
+          )?.langyCodeAccessPreference ?? null,
+      },
+      // A deployment with no GitHub App answers "not installed", which is the
+      // state the code access card should show anyway.
+      github: {
+        readInstallation: async (projectId) => {
+          const organizationId = (
+            await prisma.project.findUnique({
+              where: { id: projectId },
+              select: { team: { select: { organizationId: true } } },
+            })
+          )?.team?.organizationId;
+          if (!organizationId || !github) return { installed: false };
+          const usable = (await github.getAllForOrganization(organizationId)).filter(
+            (row) => row.suspendedAt == null,
+          );
+          const first = usable[0];
+          return first
+            ? { installed: true, accountLogin: first.accountLogin }
+            : { installed: false };
+        },
+      },
+      providerRows: this.composeLangyProviderRows(prisma),
+      baseHost: publicBaseUrl,
+    };
+  }
+
+  /**
+   * Every provider row whose scope set reaches one project: the organization's,
+   * its team's and its own, which is the chain the model-provider listing
+   * resolves. What the skip gate reads its allowed models off.
+   */
+  private composeLangyProviderRows(
+    prisma: NonNullable<ApiProductionComposition["composedDatabase"]>["connection"]["client"],
+  ): SkipPermissionsProviderRows {
+    return {
+      findAllAccessibleForProject: async (projectId) => {
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+          select: { teamId: true, team: { select: { organizationId: true } } },
+        });
+        if (!project) return [];
+        return prisma.modelProvider.findMany({
+          where: {
+            scopes: {
+              some: {
+                OR: [
+                  { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
+                  { scopeType: "TEAM", scopeId: project.teamId },
+                  { scopeType: "PROJECT", scopeId: projectId },
+                ],
+              },
+            },
+          },
+          select: {
+            id: true,
+            provider: true,
+            routingHandle: true,
+            createdAt: true,
+            langySkipPermissionsModels: true,
+          },
+        });
+      },
+    };
+  }
+
+  /**
+   * ONE local-control runtime for this process, shared by the worker's REST
+   * door and the panel's own procedures. The store is the shared Redis when
+   * there is one and process memory otherwise, which is the rule connected
+   * agents follow (ADR-093, ADR-128).
+   */
+  private composeLangyLocalRuntime(
+    prisma: NonNullable<ApiProductionComposition["composedDatabase"]>["connection"]["client"],
+    commands: LangyConversationCommands,
+  ): LocalControlRuntime {
+    if (this.composedLangyLocalRuntime) return this.composedLangyLocalRuntime;
+    const redis = this.composedQueueRedis;
+    this.composedLangyLocalRuntime = createLocalControlRuntime({
+      store: createLocalControlStore(redis ?? null),
+      projects: {
+        tryReadOrganizationId: async (projectId) =>
+          (
+            await prisma.project.findUnique({
+              where: { id: projectId },
+              select: { team: { select: { organizationId: true } } },
+            })
+          )?.team?.organizationId ?? null,
+      },
+      // This process mints no Langy session keys — that is the worker's, and
+      // every other Langy credential port here refuses for the same reason.
+      // The request is still recorded; the refusal names the cause.
+      mintSessionKey: () => Promise.reject(new ApiLangySessionKeyUnavailableError()),
+      events: commands,
+      buffer: redis ? LangyTokenBufferAdapter.create({ redis }) : nullLocalControlBuffer(),
+    });
+    return this.composedLangyLocalRuntime;
   }
 
   /**
@@ -2624,6 +2776,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const instanceAdminKey = ApiInstanceAdminKeyAdapter.create({ config: options.config });
     this.composedQueueRedis = queueInfrastructure?.redis;
     this.composedLangyInternalSecret = options.config.langyInternalSecret;
+    this.composedLangyPublicBaseUrl = options.config.infrastructure.execution.publicBaseUrl;
     this.composedCronApiKey = options.config.cronApiKey;
     this.composedNlpLambdaCleanup = composeNlpLambdaCleanup(options.config.nlpLambdaFleet);
     return {
@@ -2892,6 +3045,22 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       prisma: database.client,
       authz,
       agents,
+      // The SAME presence read the agents page answers with, so a target that
+      // names an agent without an environment settles on the row the listing
+      // shows as online.
+      ...(this.composedConnectedAgents
+        ? {
+            connectedPresence: (input: {
+              projectId: string;
+              agents: readonly { id: string; type: string }[];
+            }) =>
+              ConnectedAgentPresenceService.readAgentPresence({
+                projectId: input.projectId,
+                agents: input.agents,
+                runtime: this.composedConnectedAgents!.runtime,
+              }),
+          }
+        : {}),
       // Preparing a run reaches four other verticals and three deployment facts. Every one of
       // them is the object the rest of this process already serves: the workflow a workflow
       // target hydrates from, the ONE gateway its three model roles resolve on, the project
@@ -3272,7 +3441,141 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         agents: this.composedAgents?.agents,
         simulations: this.composedScenario.simulations,
       })),
+      // The SAME local-control runtime the worker's REST door reads, so the
+      // panel and the command line see one folder per conversation.
+      ...(infrastructure.prisma
+        ? {
+            local: this.composeLangyLocalTrpc(
+              infrastructure.prisma,
+              this.composedAgentPipelines.langyConversations,
+            ),
+          }
+        : {}),
     });
+  }
+
+  /**
+   * The shared folder's WebSocket door, where this process composed a runtime
+   * for it. Absent means the command line falls back to the long-poll routes,
+   * which is the same recovery a dropped socket takes.
+   */
+  private composeLangyLocalGateway(): LocalControlGateway | undefined {
+    const core = this.composeLangyLocalSessionCore();
+    return core ? new LocalControlGateway({ core }) : undefined;
+  }
+
+  /** This process's long-poll sessions, over the same session core. */
+  private composeLangyLocalLongPoll(): LocalControlLongPoll | undefined {
+    if (this.composedLangyLocalLongPoll) return this.composedLangyLocalLongPoll;
+    const core = this.composeLangyLocalSessionCore();
+    if (!core) return undefined;
+    this.composedLangyLocalLongPoll = new LocalControlLongPoll({ core });
+    return this.composedLangyLocalLongPoll;
+  }
+
+  /**
+   * What a shared folder MEANS to this process, independent of the transport
+   * that carries it (ADR-129). One core, read by the socket and the long poll.
+   */
+  private composeLangyLocalSessionCore(): LocalControlSessionCore | undefined {
+    if (this.composedLangyLocalSessionCore) return this.composedLangyLocalSessionCore;
+    const prisma = this.composedDatabase?.connection.client;
+    const apiKeys = this.composedTenancy?.apiKeys;
+    const commands = this.composedAgentPipelines?.langyConversations;
+    if (!prisma || !apiKeys || !commands) return undefined;
+
+    const langy = this.composedLangy.app;
+    const core = LocalControlSessionCore.create({
+      apiKeys,
+      readCredential: (header: (name: string) => string | undefined) =>
+        extractApiKeyRequestCredentials(
+          new Request("http://local/", {
+            headers: Object.fromEntries(
+              (["authorization", "x-project-id"] as const).flatMap((name) => {
+                const value = header(name);
+                return value ? [[name, value] as [string, string]] : [];
+              }),
+            ),
+          }),
+        ),
+      actors: prisma,
+      baseHost: this.composedLangyPublicBaseUrl,
+      ...this.composeLangyLocalRuntime(prisma, commands),
+      conversations: {
+        findByIdVisible: (args: { id: string; projectId: string; userId: string }) =>
+          langy.tryFindVisible(args),
+        recordUserMessage: (args) => langy.recordUserMessage(args),
+      },
+      events: commands,
+      buffer: LangyTokenBufferAdapter.create({
+        redis: this.composedQueueRedis as NonNullable<typeof this.composedQueueRedis>,
+      }),
+      turns: langyLocalTurnStarter({
+        actors: prisma,
+        turns: {
+          startConversationTurn: ({
+            projectId,
+            session,
+            requestedConversationId,
+            messages,
+            idempotencyKey,
+          }) =>
+            langy.startTurn(
+              {
+                projectId,
+                idempotencyKey,
+                conversationId: requestedConversationId,
+                messages: messages.map((message) => ({
+                  role: message.role,
+                  parts: [...message.parts],
+                })),
+                turnContext: {},
+              },
+              session,
+            ),
+        },
+      }),
+      skipGate: ({ projectId, model }) =>
+        canModelSkipPermissions({
+          projectId,
+          model,
+          providerRows: this.composeLangyProviderRows(prisma),
+        }),
+    });
+    this.composedLangyLocalSessionCore = core;
+    return core;
+  }
+
+  /** The panel's own half of local control, over the process's one runtime. */
+  private composeLangyLocalTrpc(
+    prisma: NonNullable<ApiProductionComposition["composedDatabase"]>["connection"]["client"],
+    commands: LangyConversationCommands,
+  ): LangyLocalTrpcPorts {
+    return {
+      runtime: this.composeLangyLocalRuntime(prisma, commands),
+      commands,
+      skipGate: ({ projectId, model }) =>
+        canModelSkipPermissions({
+          projectId,
+          model,
+          providerRows: this.composeLangyProviderRows(prisma),
+        }),
+      codeAccess: {
+        tryRead: async (userId) =>
+          (
+            await prisma.user.findUnique({
+              where: { id: userId },
+              select: { langyCodeAccessPreference: true },
+            })
+          )?.langyCodeAccessPreference ?? null,
+        write: async ({ userId, preference }) => {
+          await prisma.user.update({
+            where: { id: userId },
+            data: { langyCodeAccessPreference: preference },
+          });
+        },
+      },
+    };
   }
 
   /**
@@ -4173,5 +4476,26 @@ class ApiTraceSpanIngestAdapter extends TraceSpanIngestPort {
 
   recordSpan(data: RecordSpanCommandData): Promise<void> {
     return this.commands.recordSpan(data);
+  }
+}
+
+/**
+ * This process mints no Langy session keys: minting is the worker's, and every
+ * other Langy credential port here refuses for the same reason. Named so the
+ * command line reads the cause rather than a generic failure.
+ */
+class ApiLangySessionKeyUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super(
+      "service_unavailable",
+      "Minting a Langy session key is not available on this deployment",
+      {
+        httpStatus: 503,
+        fault: "platform",
+      },
+    );
+    this.name = "ApiLangySessionKeyUnavailableError";
   }
 }

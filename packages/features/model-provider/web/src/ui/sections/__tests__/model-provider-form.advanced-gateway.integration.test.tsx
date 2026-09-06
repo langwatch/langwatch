@@ -10,9 +10,11 @@
  *   /** @scenario Advanced (Gateway) renders as a collapsed accordion when the flag is on
  *   /** @scenario Single Save persists basic credentials and advanced gateway fields together
  *
- * The drawer renders Advanced as a collapsible accordion gated on the
- * `release_ui_ai_gateway_menu_enabled` flag for the caller's org. A single
- * Save funnels basic + advanced to one `modelProvider.update` mutation.
+ * The drawer renders the gateway fields inside a collapsible "Advanced"
+ * accordion, gated on the `release_ui_ai_gateway_menu_enabled` flag for the
+ * caller's org. The accordion also holds fields that are not the gateway's,
+ * so the flag gates the fields rather than the accordion. There is one Save:
+ * it funnels basic + advanced to one `modelProvider.update` mutation.
  */
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -120,8 +122,13 @@ describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => 
       });
 
       /** @scenario Advanced (Gateway) is hidden when the AI gateway feature flag is off */
-      it("does not render the Advanced (Gateway) accordion trigger", () => {
-        expect(screen.queryByText(/advanced \(gateway\)/i)).toBeNull();
+      it("renders no gateway field under the Advanced accordion", () => {
+        // The accordion itself stays, because it also holds the models
+        // allowed to skip Langy permission checks. What the flag gates is
+        // the gateway's own fields, so those are what this asserts on.
+        expect(screen.queryByPlaceholderText(/no cap/i)).toBeNull();
+        expect(screen.queryByText(/fallback priority/i)).toBeNull();
+        expect(screen.queryByText(/provider config \(json\)/i)).toBeNull();
       });
 
       it("does not render any rate-limit input", () => {
@@ -142,12 +149,12 @@ describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => 
       });
 
       /** @scenario Advanced (Gateway) renders as a collapsed accordion when the flag is on */
-      it("renders the Advanced (Gateway) accordion trigger", async () => {
-        expect(await screen.findByText(/advanced \(gateway\)/i)).toBeTruthy();
+      it("renders the Advanced accordion trigger", async () => {
+        expect(await screen.findByText("Advanced")).toBeTruthy();
       });
 
       it("keeps the rate-limit inputs hidden until the accordion is expanded", async () => {
-        await screen.findByText(/advanced \(gateway\)/i);
+        await screen.findByText("Advanced");
         // Collapsed-by-default: the accordion content is in the DOM but
         // hidden from accessibility queries via `hidden` attribute. We
         // assert no rate-limit input is exposed.
@@ -161,7 +168,7 @@ describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => 
       // together) lives in use-provider-form-submit.integration.test.tsx
       // and binds the same scenario name.
       it("renders only one Save button (no separate Save Advanced)", async () => {
-        await screen.findByText(/advanced \(gateway\)/i);
+        await screen.findByText("Advanced");
         expect(screen.queryByText(/save advanced/i)).toBeNull();
         const saveButtons = screen.getAllByRole("button", {
           name: /^save$/i,

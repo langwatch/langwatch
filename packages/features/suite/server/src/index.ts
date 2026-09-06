@@ -25,6 +25,7 @@ export {
 export {
   ConnectedTargetService,
   type AgentOwnerNameReader,
+  type ConnectedPresenceReader,
   type ConnectedTargetAgent,
   type ConnectedTargetReferenceReader,
 } from "./services/connected-target.service";

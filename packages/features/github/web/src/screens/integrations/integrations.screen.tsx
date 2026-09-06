@@ -29,6 +29,7 @@
 import { Badge, Button, Card, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
+import { UiSlot } from "@langwatch/ui-host/slots";
 import { githubApi } from "../../behavior/github-api";
 import { GITHUB_ERROR_QUERY_KEY, githubInstallAddress } from "../../model/github-install-address";
 import { useGithubHost } from "../../model/github-host";
@@ -164,6 +165,9 @@ function GithubConnectionCard({ organizationId }: { organizationId: string }) {
               </Button>
             </VStack>
           )}
+
+          {/* How Langy reaches this person's code, once they chose (ADR-129). */}
+          <UiSlot name="langyCodeAccessPreference" props={{}} />
         </VStack>
       </Card.Body>
     </Card.Root>

@@ -58,7 +58,7 @@ export interface EventingLangyConversationAdapterOptions {
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   admissions: Pick<LangyTurnAdmissionCapability, "confirmAccepted" | "release">;
   buffer: Pick<LangyTokenBufferAdapter, "liveness" | "appendStatus" | "markError">;
-  handoffStore: Pick<LangyTurnHandoffAdapter, "read" | "stash">;
+  handoffStore: Pick<LangyTurnHandoffAdapter, "read" | "stash" | "isStopped">;
   worker: LangyWorkerPort;
   titleGenerator: LangyTitleGenerator;
   sessionKeys: Pick<LangySessionKeyService, "mintForUser" | "revoke">;

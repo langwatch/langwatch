@@ -1,7 +1,7 @@
 /**
  * The API process's four Langy REST doors, and what it can and cannot put behind each of them.
  */
-import { LangyTokenBufferAdapter } from "@langwatch/langy-server";
+import { canModelSkipPermissions, LangyTokenBufferAdapter } from "@langwatch/langy-server";
 import { LangyUiNoBrowserError } from "@langwatch/langy-contract";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
@@ -16,6 +16,14 @@ import {
   type LangyTurnsRestPorts,
   type LangyUiActionsRestPorts,
   type LangyApp,
+  type LangyCodeAccessPreferenceReader,
+  type LangyGithubInstallationReader,
+  type LangyLocalRestCommands,
+  type LangyLocalControlRestPorts,
+  type LangyLocalRestPorts,
+  type SkipPermissionsProviderRows,
+  type LocalControlLongPoll,
+  type LocalControlRuntime,
 } from "@langwatch/langy-server";
 import type { UiActionRedis } from "@langwatch/langy-server";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -36,6 +44,34 @@ export type ApiLangyRestComposition = Readonly<{
   internal: LangyInternalRestPorts;
   /** Absent for the same reason `uiActions` is. */
   relay?: LangyRelayRestPorts | undefined;
+  /**
+   * The worker's door onto the developer's folder (ADR-129). Absent where this
+   * process composed none of what local control needs.
+   */
+  local?: LangyLocalRestPorts | undefined;
+  /** The command line's own door: the control requests and the long poll. */
+  localControl?: LangyLocalControlRestPorts | undefined;
+}>;
+
+/**
+ * What the local-control door needs beyond what every Langy door shares. Absent
+ * means the family is not mounted at all, rather than mounted onto refusals.
+ */
+export type ApiLangyLocalOptions = Readonly<{
+  /** ONE runtime for this process, shared with the panel's own procedures. */
+  runtime: LocalControlRuntime;
+  /** This process's long-poll sessions, over that same runtime. */
+  longPoll: LocalControlLongPoll;
+  /** All sixteen conversation writes, as this process produces them. */
+  commands: LangyLocalRestCommands;
+  /** The person's own code access choice. */
+  users: LangyCodeAccessPreferenceReader;
+  /** Whether the organization installed the GitHub App. */
+  github: LangyGithubInstallationReader;
+  /** The provider rows the skip gate reads the allowed models off. */
+  providerRows: SkipPermissionsProviderRows;
+  /** This deployment's own origin, for the follow-along link. */
+  baseHost: string | undefined;
 }>;
 
 export type ApiLangyRestOptions = Readonly<{
@@ -56,6 +92,8 @@ export type ApiLangyRestOptions = Readonly<{
    * for a process that holds no workbench execution stack.
    */
   workbench: (() => ApiLangyWorkbenchPeer | null) | undefined;
+  /** Local control, where this process composed it. */
+  local: ApiLangyLocalOptions | undefined;
 }>;
 
 /** The counters the internal doors publish, as this process registers them. */
@@ -89,7 +127,19 @@ export function composeApiLangyRest(
     metrics: options.metrics.internal,
   };
 
+  const local = composeLocal({ options, credentials, langy });
+
   return {
+    ...(local ? { local } : {}),
+    ...(options.local
+      ? {
+          localControl: {
+            runtime: () => options.local!.runtime,
+            longPoll: () => options.local!.longPoll,
+            baseHost: options.local!.baseHost,
+          },
+        }
+      : {}),
     turns: {
       ...credentials,
       langy: () => langy,
@@ -129,6 +179,32 @@ export function composeApiLangyRest(
           },
         }
       : {}),
+  };
+}
+
+/**
+ * The local-control door, over the ONE runtime this process composed. The
+ * panel's own procedures read the same one: two runtimes over process memory
+ * would answer two different folders for one conversation.
+ */
+function composeLocal(input: {
+  options: ApiLangyRestOptions;
+  credentials: LangyRestCredentialPorts;
+  langy: LangyApp;
+}): LangyLocalRestPorts | undefined {
+  const local = input.options.local;
+  if (!local) return undefined;
+
+  return {
+    ...input.credentials,
+    langy: () => input.langy,
+    runtime: () => local.runtime,
+    commands: () => local.commands,
+    users: () => local.users,
+    github: () => local.github,
+    baseHost: local.baseHost,
+    skipGate: ({ projectId, model }) =>
+      canModelSkipPermissions({ projectId, model, providerRows: local.providerRows }),
   };
 }
 

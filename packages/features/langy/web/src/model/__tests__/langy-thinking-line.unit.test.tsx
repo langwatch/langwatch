@@ -6,6 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThinkingMessage } from "../langy-thinking-line";
+import { THINKING_STUCK_MS } from "../langy-thinking-line";
 import { LangyThinkingLine } from "../../ui/sections/langy-thinking-line";
 
 const REASONING_TEXT =
@@ -18,6 +19,12 @@ function renderLine({ hasLiveReasoning }: { hasLiveReasoning: boolean }) {
     </ChakraProvider>,
   );
 }
+
+/**
+ * Whether the leading orb is claiming the turn is alive. A stuck turn keeps
+ * the slot but drops the glow, which is the one state that must not claim it.
+ */
+const orbState = () => document.querySelector("[data-status-orb]")?.getAttribute("data-status-orb");
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -101,6 +108,60 @@ describe("LangyThinkingLine", () => {
         toolInput: { name: "github" },
       });
       expect(screen.queryByRole("button")).toBeNull();
+    });
+  });
+
+  describe("given a turn that has been running a long time", () => {
+    // The line's clock reads `Date.now()`, which the suite's default fake
+    // timers leave alone, so the wall clock has to be faked as well for the
+    // escalation to be reachable at all.
+    beforeEach(() => {
+      vi.useFakeTimers({
+        toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+      });
+    });
+
+    /**
+     * The clock the escalation reads is silence, not turn length. It used to
+     * run from the moment the line mounted, so a turn that had answered a
+     * permission card and was running a local command, with output arriving
+     * in the terminal, was told it may be stuck while nothing was wrong.
+     *
+     * @scenario "The escalation measures silence, not how long the turn has run" */
+    it("drops the stuck line as soon as the turn produces something", () => {
+      const line = (activityKey: string) => (
+        <ChakraProvider value={defaultSystem}>
+          <LangyThinkingLine messages={[]} activityKey={activityKey} />
+        </ChakraProvider>
+      );
+      const { rerender } = render(line("calls:0"));
+
+      act(() => {
+        vi.advanceTimersByTime(THINKING_STUCK_MS + 2_000);
+      });
+      // The orb reads the tone directly, so it says what the line has decided
+      // without waiting on the text's crossfade.
+      expect(orbState()).toBe("idle");
+
+      // One tool call landed. The turn is working, so it may not read as
+      // stuck any more.
+      rerender(line("calls:1"));
+      expect(orbState()).toBe("active");
+    });
+
+    /** @scenario "A turn that really is silent still ends up looking stuck" */
+    it("keeps escalating while nothing at all happens", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <LangyThinkingLine messages={[]} activityKey="quiet" />
+        </ChakraProvider>,
+      );
+      expect(orbState()).toBe("active");
+
+      act(() => {
+        vi.advanceTimersByTime(THINKING_STUCK_MS + 2_000);
+      });
+      expect(orbState()).toBe("idle");
     });
   });
 

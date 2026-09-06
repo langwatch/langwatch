@@ -4,10 +4,10 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BookText, ChevronDown, Code, Globe, Plug, Plus, Workflow } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import {
   agentTargetLabel,
   isAgentTarget,
-  ownerOnlyCopy,
   scenarioAgentsOf,
   type ScenarioAgent,
 } from "../../behavior/scenarios/use-filtered-scenario-targets";

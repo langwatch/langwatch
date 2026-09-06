@@ -5,7 +5,10 @@
  */
 
 import {
+  AgentEnvironmentUnresolvedError,
   AgentOwnerOnlyError,
+  connectedAgentSelectability,
+  DEVELOPMENT_ENVIRONMENT,
   isConnectedAgentStale,
   parseConnectedReference,
 } from "@langwatch/agent-contract";
@@ -26,10 +29,31 @@ export type ConnectedTargetAgent = {
 };
 
 /** The row a name-and-environment reference is resolved against. */
-type ConnectedAgentRow = { id: string; ownerUserId?: string | null };
+type ConnectedAgentRow = {
+  id: string;
+  ownerUserId?: string | null;
+  environment?: string | null;
+};
 
 /** The read `resolveConnectedReferences` needs, and nothing more. */
-export type ConnectedTargetReferenceReader = Pick<AgentService, "getConnectedByNameAndEnvironment">;
+export type ConnectedTargetReferenceReader = Pick<
+  AgentService,
+  "getConnectedByNameAndEnvironment" | "getConnectedByName"
+>;
+
+/**
+ * Which of the given agents has a process connected right now. A name with no
+ * environment is answered by presence, so the reader is required to resolve
+ * one; a process that composed no connected-agent runtime reads every agent as
+ * offline, which refuses such a reference rather than guessing.
+ */
+export type ConnectedPresenceReader = (input: {
+  projectId: string;
+  agents: readonly { id: string; type: string }[];
+}) => Promise<Map<string, { status: "online" | "offline" }>>;
+
+/** Presence for a process that composed no connected-agent runtime. */
+const NO_PRESENCE_READER: ConnectedPresenceReader = async () => new Map();
 
 /**
  * The display names of the owners of the personal agents among these.
@@ -50,7 +74,9 @@ export class ConnectedTargetService {
 
   /**
    * Refuses the run when one of its agents is a personal development agent of someone other
-   * than the actor.
+   * than the actor. The same predicate the listings mark their rows with, so a row a client
+   * was told it could choose is never refused here, and one it was told it could not is never
+   * accepted.
    */
   static async assertConnectedAgentsRunnable({
     agents,
@@ -64,7 +90,11 @@ export class ConnectedTargetService {
   }): Promise<void> {
     const foreign = agents.find(
       (agent) =>
-        agent.type === "connected" && agent.ownerUserId != null && agent.ownerUserId !== actor?.id,
+        agent.type === "connected" &&
+        !connectedAgentSelectability({
+          ownerUserId: agent.ownerUserId,
+          viewerUserId: actor?.id ?? null,
+        }).selectable,
     );
     const ownerUserId = foreign?.ownerUserId;
     if (!foreign || !ownerUserId) {
@@ -97,22 +127,30 @@ export class ConnectedTargetService {
   }
 
   /**
-   * The targets with every `<name>@<environment>` reference replaced by the id of the agent
-   * it names.
+   * The targets with every `<name>@<environment>` and every bare `<name>`
+   * reference replaced by the id of the agent it names.
+   *
+   * A name with no environment means the agent in development, where the
+   * person improving it runs it. When no process is connected there but one
+   * other environment has one, that environment is the one.
    */
   static async resolveConnectedReferences({
     targets,
     projectId,
     actor,
     agents,
+    presence = NO_PRESENCE_READER,
   }: {
     targets: readonly SuiteTarget[];
     projectId: string;
     actor: RunActor | undefined;
     agents: ConnectedTargetReferenceReader;
+    presence?: ConnectedPresenceReader;
   }): Promise<SuiteTarget[]> {
     return Promise.all(
-      targets.map((target) => resolveConnectedReference({ target, projectId, actor, agents })),
+      targets.map((target) =>
+        resolveConnectedReference({ target, projectId, actor, agents, presence }),
+      ),
     );
   }
 
@@ -153,29 +191,100 @@ async function resolveConnectedReference({
   projectId,
   actor,
   agents,
+  presence,
 }: {
   target: SuiteTarget;
   projectId: string;
   actor: RunActor | undefined;
   agents: ConnectedTargetReferenceReader;
+  presence: ConnectedPresenceReader;
 }): Promise<SuiteTarget> {
   if (target.type !== "connected") {
     return target;
   }
 
   const reference = parseConnectedReference(target.referenceId);
-  if (!reference) {
+  if (reference) {
+    const rows = await agents.getConnectedByNameAndEnvironment({
+      projectId,
+      name: reference.name,
+      environment: reference.environment,
+    });
+    const picked = pickReferencedAgent({ rows, actor });
+
+    return picked ? { ...target, referenceId: picked.id } : target;
+  }
+
+  if (target.referenceId.includes("@")) {
     return target;
   }
 
-  const rows = await agents.getConnectedByNameAndEnvironment({
+  const picked = await pickAgentByNameAlone({
+    name: target.referenceId,
     projectId,
-    name: reference.name,
-    environment: reference.environment,
+    actor,
+    agents,
+    presence,
   });
-  const picked = pickReferencedAgent({ rows, actor });
 
   return picked ? { ...target, referenceId: picked.id } : target;
+}
+
+/**
+ * The agent a name with no environment addresses, or nothing when the name is
+ * not a connected agent's and is read as an id.
+ *
+ * @throws {AgentEnvironmentUnresolvedError} when no process is connected
+ *   anywhere, or when more than one environment besides development has one
+ */
+async function pickAgentByNameAlone({
+  name,
+  projectId,
+  actor,
+  agents,
+  presence,
+}: {
+  name: string;
+  projectId: string;
+  actor: RunActor | undefined;
+  agents: ConnectedTargetReferenceReader;
+  presence: ConnectedPresenceReader;
+}): Promise<ConnectedAgentRow | undefined> {
+  const rows = await agents.getConnectedByName({ projectId, name });
+  if (rows.length === 0) {
+    return undefined;
+  }
+
+  const environmentOf = (row: ConnectedAgentRow): string =>
+    row.environment ?? DEVELOPMENT_ENVIRONMENT;
+  const registeredEnvironments = [...new Set(rows.map(environmentOf))];
+  const candidates = registeredEnvironments.flatMap((environment) => {
+    const picked = pickReferencedAgent({
+      rows: rows.filter((row) => environmentOf(row) === environment),
+      actor,
+    });
+
+    return picked ? [{ environment, row: picked }] : [];
+  });
+
+  const presences = await presence({
+    projectId,
+    agents: candidates.map(({ row }) => ({ id: row.id, type: "connected" })),
+  });
+  const online = candidates.filter(({ row }) => presences.get(row.id)?.status === "online");
+  const development = online.find(({ environment }) => environment === DEVELOPMENT_ENVIRONMENT);
+  if (development) {
+    return development.row;
+  }
+  if (online.length === 1) {
+    return online[0]?.row;
+  }
+
+  throw new AgentEnvironmentUnresolvedError({
+    agentName: name,
+    registeredEnvironments,
+    onlineEnvironments: online.map(({ environment }) => environment),
+  });
 }
 
 /**

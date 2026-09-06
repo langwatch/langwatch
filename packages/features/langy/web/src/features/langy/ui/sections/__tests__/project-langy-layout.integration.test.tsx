@@ -41,6 +41,12 @@ vi.mock("../langy-panel", () => ({
   LangySidecar: () => <LangySidecarStub />,
 }));
 
+// The follow-along deep link reads a tRPC query, and this suite renders the layout with no
+// tRPC provider. Its own behaviour is pinned by langy-conversation-deep-link.unit.test.tsx.
+vi.mock("../../../../../behavior/use-langy-conversation-deep-link", () => ({
+  useLangyConversationDeepLink: () => undefined,
+}));
+
 import ProjectLangyLayout from "../project-langy-layout";
 import { useLangyStore } from "../../../../../behavior/langy.store";
 import {

@@ -15,6 +15,7 @@
  */
 import type { AgentWithFields } from "./agent";
 import type { ConnectedAgentConfig } from "./config/connected";
+import type { ConnectedAgentSelectability } from "./connected-agent.selectable";
 
 /** The SDK that registered an agent, as the card prints it. */
 export interface ConnectedAgentSdk {
@@ -43,7 +44,7 @@ export interface ConnectedAgentOwner {
 }
 
 /** A connected agent as every screen of this family reads it. */
-export interface ConnectedAgentView {
+export interface ConnectedAgentView extends ConnectedAgentSelectability {
   id: string;
   name: string;
   environment: string | null;
@@ -57,9 +58,10 @@ export interface ConnectedAgentView {
 }
 
 /** One row of `agents.getAll`/`getById`, as `AgentApp` actually answers it. */
-export type AgentListView = AgentWithFields & {
-  owner: ConnectedAgentOwner | null;
-  status: "online" | "offline";
-  instances: ConnectedAgentInstance[];
-  parameters: ConnectedAgentConfig["parameters"];
-};
+export type AgentListView = AgentWithFields &
+  ConnectedAgentSelectability & {
+    owner: ConnectedAgentOwner | null;
+    status: "online" | "offline";
+    instances: ConnectedAgentInstance[];
+    parameters: ConnectedAgentConfig["parameters"];
+  };

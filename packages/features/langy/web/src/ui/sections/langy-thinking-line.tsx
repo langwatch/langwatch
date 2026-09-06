@@ -30,6 +30,9 @@ export function LangyThinkingLine({
   messages,
   hasLiveReasoning = false,
   workerReady = false,
+  awaitingAnswer = false,
+  terminalConnected = false,
+  activityKey = "",
   toolNarrator,
   pageActivity = null,
 }: {
@@ -46,6 +49,19 @@ export function LangyThinkingLine({
    * `logic/langyThinkingLine`.
    */
   workerReady?: boolean;
+  /**
+   * A fingerprint of everything the turn has produced so far. The clock below restarts whenever
+   * it changes, so the escalation measures how long the turn has been SILENT rather than how
+   * long it has been running.
+   */
+  activityKey?: string;
+  /**
+   * A card is holding the turn for the developer's answer (ADR-129), so the line says that
+   * instead of escalating toward "Langy may be stuck".
+   */
+  awaitingAnswer?: boolean;
+  /** A folder is shared from a terminal, so the ask is open there too and the line says both. */
+  terminalConnected?: boolean;
   toolNarrator?: LangyToolNarrator;
   pageActivity?: string | null;
 }) {
@@ -56,9 +72,10 @@ export function LangyThinkingLine({
   const [elapsedMs, setElapsedMs] = useState(0);
   useEffect(() => {
     const startedAt = Date.now();
+    setElapsedMs(0);
     const id = setInterval(() => setElapsedMs(Date.now() - startedAt), ELAPSED_TICK_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [activityKey, pageActivity]);
 
   const line = langyThinkingLine({
     messages,
@@ -67,6 +84,8 @@ export function LangyThinkingLine({
     workerReady,
     toolNarrator,
     pageActivity,
+    awaitingAnswer,
+    terminalConnected,
   });
 
   // Whimsy ONLY where the truth signal permits it — i.e. the model is genuinely

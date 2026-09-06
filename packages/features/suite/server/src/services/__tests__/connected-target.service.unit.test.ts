@@ -3,6 +3,7 @@
  * @see specs/agents/connected-agents.feature
  */
 import { describe, expect, it, vi } from "vitest";
+import { connectedAgentSelectability } from "@langwatch/agent-contract";
 import type { Agent, AgentReferenceState, AgentService } from "@langwatch/agent-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
@@ -12,6 +13,7 @@ import {
   type Suite,
 } from "@langwatch/suite-contract";
 
+import { ConnectedTargetService } from "../connected-target.service";
 import { SuiteService } from "../suite.service";
 import type { SuiteExecutionPort } from "../../ports/suite-execution.port";
 import type { SuiteRepository } from "../../repositories/suite.repository";
@@ -66,6 +68,21 @@ function connectedAgentService(agents: ConnectedAgentFixture[]): AgentService {
           ownerUserId: agent.ownerUserId,
           lastSeenAt: agent.lastSeenAt ?? new Date(),
         })),
+    ),
+    getConnectedByName: vi.fn(async (input: { name: string }): Promise<Agent[]> =>
+      agents
+        .filter((agent) => agent.name === input.name)
+        .map(
+          (agent) =>
+            ({
+              id: agent.id,
+              projectId,
+              name: agent.name,
+              type: "connected",
+              environment: agent.environment,
+              ownerUserId: agent.ownerUserId,
+            }) as unknown as Agent,
+        ),
     ),
     getConnectedByNameAndEnvironment: vi.fn(
       async (input: { name: string; environment: string }): Promise<Agent[]> =>
@@ -328,7 +345,7 @@ describe("given a connected target unseen for thirty one days", () => {
         },
         {
           id: "agent_unseen",
-          name: "agent_unseen",
+          name: "unseen-agent",
           environment: "production",
           ownerUserId: null,
           lastSeenAt: unseenAt,
@@ -363,5 +380,35 @@ describe("given a connected target unseen for thirty one days", () => {
         }),
       );
     });
+  });
+});
+
+describe("given the listing mark and the run refusal read the same agents", () => {
+  /** @scenario "The listing mark and the run refusal read one rule" */
+  it("refuses exactly the agents the listing marks as not selectable", async () => {
+    const agents = [
+      { id: "a_1", name: "shared", type: "connected", ownerUserId: null },
+      { id: "a_2", name: "mine", type: "connected", ownerUserId: "u_1" },
+      { id: "a_3", name: "theirs", type: "connected", ownerUserId: "u_2" },
+    ];
+    const owners = { findNamesByIds: async () => new Map([["u_2", "Ana"]]) };
+    const actor: RunActor = { id: "u_1", label: "user" };
+
+    for (const agent of agents) {
+      const marked = connectedAgentSelectability({
+        ownerUserId: agent.ownerUserId,
+        viewerUserId: actor.id,
+      }).selectable;
+      const refused = await ConnectedTargetService.assertConnectedAgentsRunnable({
+        agents: [agent],
+        actor,
+        owners,
+      }).then(
+        () => false,
+        () => true,
+      );
+
+      expect(refused).toBe(!marked);
+    }
   });
 });

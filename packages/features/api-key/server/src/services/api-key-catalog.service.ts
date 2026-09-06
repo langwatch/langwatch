@@ -152,6 +152,12 @@ export class ApiKeyCatalogService {
     return row ? publicApiKey(row) : null;
   }
 
+  async tryGetByLookupId(input: { lookupId: string }): Promise<ApiKey | null> {
+    const row = await this.repository.tryFindByLookupId(input);
+
+    return row ? publicApiKey(row) : null;
+  }
+
   async listIngestionKeysForProject(input: {
     organizationId: string;
     projectId: string;

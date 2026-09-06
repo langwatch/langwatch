@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("ai", () => ({ generateText: vi.fn() }));
 
 import { generateText } from "ai";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { LangyTitleModelPort } from "../../ports/langy-title-model.port";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service";
 import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service";
@@ -45,6 +46,13 @@ class RecordingTitleModel extends LangyTitleModelPort {
 class RefusingTitleModel extends LangyTitleModelPort {
   resolveTitleModel(): Promise<never> {
     return Promise.reject(new Error("no model gateway on this deployment"));
+  }
+}
+
+/** A project with no cheap model configured: nothing to retry. */
+class UnconfiguredTitleModel extends LangyTitleModelPort {
+  resolveTitleModel(): Promise<never> {
+    return Promise.reject(new ModelNotConfiguredError("langy_title", "FAST", "Langy titles", PROJECT_ID));
   }
 }
 
@@ -80,14 +88,14 @@ describe("given a conversation the customer never named", () => {
 
   describe("when the model answers with a usable title", () => {
     it("returns it with the model that wrote it", async () => {
-      mockGenerateText.mockResolvedValue({ text: "Debugging A Failing Evaluation" } as never);
+      mockGenerateText.mockResolvedValue({ text: "Debugging a failing evaluation" } as never);
       const { service } = generatorOver({
         records: [{ role: "user", content: "why did my evaluation fail" }],
       });
 
       await expect(
         service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toEqual({ title: "Debugging A Failing Evaluation", model: "openai/gpt-5-mini" });
+      ).resolves.toEqual({ title: "Debugging a failing evaluation", model: "openai/gpt-5-mini" });
     });
 
     it("asks the cascade for the conversation-title key, naming the fallback", async () => {
@@ -136,10 +144,10 @@ describe("given a conversation the customer never named", () => {
 
   describe("when the model dresses its answer up", () => {
     it.each([
-      ['"Quoted Title"', "Quoted Title"],
-      ["Title: Prefixed Answer", "Prefixed Answer"],
-      ["```\nFenced Answer\n```", "Fenced Answer"],
-      ["Trailing Punctuation.", "Trailing Punctuation"],
+      ['"Quoted Title"', "Quoted title"],
+      ["Title: Prefixed Answer", "Prefixed answer"],
+      ["```\nFenced Answer\n```", "Fenced answer"],
+      ["Trailing Punctuation.", "Trailing punctuation"],
     ])("reduces %j to the title itself", async (raw, expected) => {
       mockGenerateText.mockResolvedValue({ text: raw } as never);
       const { service } = generatorOver({ records: [{ role: "user", content: "hello" }] });
@@ -175,12 +183,30 @@ describe("given a conversation the customer never named", () => {
     });
   });
 
-  describe("when the model call cannot be made", () => {
+  describe("when the project has no model to ask", () => {
     /**
-     * The whole error contract, in one assertion: a title is a convenience and
-     * a failed title call must never fail the turn that asked for one.
+     * Half the error contract: there is nothing to retry, so the title stays
+     * unchanged and the turn that asked for one is unaffected.
      */
     it("leaves the title unchanged rather than failing the turn", async () => {
+      const { service } = generatorOver({
+        records: [{ role: "user", content: "hello" }],
+        models: new UnconfiguredTitleModel(),
+      });
+
+      await expect(
+        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+      ).resolves.toBeNull();
+    });
+  });
+
+  describe("when the model call fails for any other reason", () => {
+    /**
+     * The other half: this attempt's own blip throws, so the process outbox
+     * retries it. Swallowed, it left the conversation on its raw first message
+     * for ever.
+     */
+    it("throws, so the outbox tries again", async () => {
       const { service } = generatorOver({
         records: [{ role: "user", content: "hello" }],
         models: new RefusingTitleModel(),
@@ -188,7 +214,7 @@ describe("given a conversation the customer never named", () => {
 
       await expect(
         service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toBeNull();
+      ).rejects.toThrow("no model gateway on this deployment");
     });
 
     it("does the same when the model answers with nothing usable", async () => {

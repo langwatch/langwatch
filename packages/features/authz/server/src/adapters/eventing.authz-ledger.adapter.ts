@@ -5,6 +5,7 @@
  */
 import type { LedgerActor } from "@langwatch/actor";
 import {
+  AuthzGrantNotConfirmedError,
   type DefineRoleCommandData,
   type GrantEventSource,
   type RevokeGrantCommandData,
@@ -221,6 +222,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     commandId,
     occurredAtMs: occurredAtOverrideMs,
     awaitProjection = true,
+    requireProjection = false,
   }: {
     organizationId: string;
     bindings: LedgerBindingAttach[];
@@ -244,6 +246,14 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
      * wrote usually reads next.
      */
     awaitProjection?: boolean;
+    /**
+     * Whether an unlanded projection is an error. Off by default, because for
+     * most callers the append is the write and the fold converging later is
+     * the correct outcome. A caller about to hand out access these rows decide
+     * — minting an API key — turns it on and gets an
+     * {@link AuthzGrantNotConfirmedError}. It implies the wait.
+     */
+    requireProjection?: boolean;
   }): Promise<AttachOutcome> {
     if (bindings.length === 0) return { attached: [], duplicates: [] };
 
@@ -290,8 +300,8 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     );
 
     const wanted = fresh.map((binding) => binding.bindingId);
-    if (awaitProjection) {
-      await this.awaitProjection({
+    if (awaitProjection || requireProjection) {
+      const landed = await this.awaitProjection({
         what: `attach of ${wanted.length} binding(s)`,
         organizationId,
         check: async () => {
@@ -301,6 +311,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
           return present === wanted.length;
         },
       });
+      if (!landed && requireProjection) throw new AuthzGrantNotConfirmedError();
     }
     await this.options.epoch.bump({ organizationId });
     return { attached: wanted, duplicates };
@@ -1086,6 +1097,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     permissions,
     kind,
     actor,
+    requireProjection = false,
   }: {
     organizationId: string;
     roleId: string;
@@ -1094,6 +1106,13 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     permissions: string[];
     kind: "custom" | "system_api_key";
     actor: LedgerActor;
+    /**
+     * Whether an unlanded projection is an error. Same contract as
+     * {@link EventingAuthzLedgerAdapter.attachBindings}: a caller about to bind
+     * a grant to this role and hand the credential out turns it on, so a role
+     * definition that never became readable refuses the mint.
+     */
+    requireProjection?: boolean;
   }): Promise<void> {
     const occurredAtMs = this.now();
     if (!(await this.onLedger(organizationId))) {
@@ -1130,7 +1149,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     // that write fails if the role row is not there yet. Commands are queued
     // per command name, not per organization, so `attachGrants` can be picked
     // up before `defineRoles` and cannot stand in for this hold.
-    await this.awaitProjection({
+    const landed = await this.awaitProjection({
       what: `definition of role ${roleId}`,
       organizationId,
       // The COMPAT head, like every other read-your-writes check here: that
@@ -1153,6 +1172,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
         );
       },
     });
+    if (!landed && requireProjection) throw new AuthzGrantNotConfirmedError();
     await this.options.epoch.bump({ organizationId });
   }
 
@@ -1282,9 +1302,12 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * Bounded read-your-writes: poll until the projection reflects the write.
-   * Timing out is NOT a failure — the append landed and the fold will drain
-   * (Redis-down doctrine); the caller's write is durable either way.
+   * Bounded read-your-writes: poll until the projection reflects the write, and
+   * answer whether the rows landed inside the window.
+   *
+   * Timing out is not in itself a failure — the append landed and the fold will
+   * drain (Redis-down doctrine). It IS one for a caller whose next step only
+   * makes sense once the rows are readable, which `requireProjection` states.
    */
   private async awaitProjection({
     what,
@@ -1294,7 +1317,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     what: string;
     organizationId: string;
     check: () => Promise<boolean>;
-  }): Promise<void> {
+  }): Promise<boolean> {
     const poll = this.options.poll ?? {
       intervalMs: CONVERGENCE_POLL_MS,
       timeoutMs: CONVERGENCE_TIMEOUT_MS,
@@ -1305,13 +1328,13 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     // ever time out.
     const deadline = Date.now() + poll.timeoutMs;
     for (;;) {
-      if (await check()) return;
+      if (await check()) return true;
       if (Date.now() >= deadline) {
         logger.warn(
           { organizationId, what },
           "grants projection did not land a write within the read-your-writes window; the append is durable and the fold will converge",
         );
-        return;
+        return false;
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
     }

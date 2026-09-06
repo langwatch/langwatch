@@ -365,6 +365,13 @@ export class AgentService extends AgentServiceContract {
     return this.repository.findConnectedByNameAndEnvironment(input);
   }
 
+  getConnectedByName(input: {
+    projectId: string;
+    name: string;
+  }): ReturnType<AgentServiceContract["getConnectedByName"]> {
+    return this.repository.findConnectedByName(input);
+  }
+
   private async getAgent(input: { id: string; projectId: string }): Promise<Agent> {
     const agent = await this.repository.tryFindById(input);
     if (!agent) {

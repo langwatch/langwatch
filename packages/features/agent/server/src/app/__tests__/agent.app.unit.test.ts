@@ -99,3 +99,32 @@ describe("AgentApp connected views", () => {
     });
   });
 });
+
+describe("given one name and one environment holding two rows", () => {
+  describe("when a project key lists the project's agents", () => {
+    /** @scenario "A listing carries every row of a name, whoever holds it" */
+    it("answers both rows, marking the personal one as not selectable", async () => {
+      const personal = {
+        ...connectedAgent,
+        id: "agent_personal",
+        environment: "development",
+        ownerUserId: "u_1",
+      };
+      const hosted = {
+        ...connectedAgent,
+        id: "agent_hosted",
+        environment: "development",
+        hostLabel: "acme-laptop",
+      };
+      const app = AgentApp.create({
+        agents: fakeAgents({ getAll: vi.fn().mockResolvedValue([personal, hosted]) }),
+      });
+
+      const rows = await app.getAll({ projectId: "project_1", viewerUserId: null });
+
+      expect(rows.map((row) => row.id)).toEqual(["agent_personal", "agent_hosted"]);
+      expect(rows[0]?.selectable).toBe(false);
+      expect(rows[1]?.selectable).toBe(true);
+    });
+  });
+});

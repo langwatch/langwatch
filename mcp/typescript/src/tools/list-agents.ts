@@ -29,6 +29,9 @@ export async function handleListAgents(): Promise<string> {
     if (a.instances) lines.push(`**Instances**: ${a.instances.length}`);
     const owner = agentOwnerLabel(a);
     if (owner) lines.push(`**Owner**: ${owner}`);
+    if (a.selectable === false) {
+      lines.push("**Run**: only its owner can run this agent");
+    }
     lines.push(`**Updated**: ${a.updatedAt}`);
     lines.push("");
   }

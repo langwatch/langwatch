@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
+import { HIDDEN_SYSTEM_KEY_NAMES, type ApiKeyRevocationCause } from "@langwatch/api-key-contract";
 import {
   ApiKeyRepository,
   type ApiKeyCreateRecord,
@@ -90,8 +90,18 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
       include: { roleBindings: true },
     });
   }
-  revoke(input: { id: string }): Promise<StoredApiKey> {
-    return this.update({ id: input.id, revokedAt: new Date() });
+  async revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<StoredApiKey> {
+    // `updateMany` fenced on a live row, so a key already revoked keeps the
+    // cause the first revocation recorded. Losing the race still returns a
+    // dead key, which is all the caller needs.
+    await this.database.apiKey.updateMany({
+      where: { id: input.id, revokedAt: null },
+      data: { revokedAt: new Date(), revocationCause: input.cause },
+    });
+    return this.database.apiKey.findUniqueOrThrow({
+      where: { id: input.id },
+      include: { roleBindings: true },
+    });
   }
   async updateLastUsedAt(input: { id: string }): Promise<void> {
     await this.update({ id: input.id, lastUsedAt: new Date() });

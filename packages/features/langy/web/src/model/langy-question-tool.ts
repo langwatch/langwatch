@@ -139,3 +139,48 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
   });
   return cards;
 }
+
+/**
+ * The same cards, built from the WAIT rather than from the message part. The wait is on the
+ * record from the moment the tool raises it, and the part only lands when the turn ends, so a
+ * tab that adopted a running turn had nothing to render. Both paths mint the same block ids.
+ */
+export function questionWaitCardParts({
+  toolCallId,
+  questions,
+}: {
+  toolCallId: string | null;
+  questions: unknown;
+}): LangyCardPart[] {
+  if (!toolCallId) return [];
+  return questionToolCardParts({
+    type: "tool-question",
+    state: "input-available",
+    toolCallId,
+    input: { questions },
+  });
+}
+
+/**
+ * The tool calls whose question cards the rendered transcript already carries. The wait and the
+ * message part are two readings of one ask, so exactly one of them draws the card.
+ */
+export function questionToolCallIdsIn(
+  messages: readonly { parts?: readonly unknown[] }[],
+): Set<string> {
+  return new Set(
+    messages.flatMap((message) =>
+      (message.parts ?? []).flatMap((part) => {
+        const toolCallId = questionToolCallIdOf(part);
+        return toolCallId ? [toolCallId] : [];
+      }),
+    ),
+  );
+}
+
+/** The tool call one `question` part names, or null when it names none. */
+function questionToolCallIdOf(part: unknown): string | null {
+  if (!isQuestionToolPart(part)) return null;
+  const toolCallId = (part as { toolCallId?: unknown }).toolCallId;
+  return typeof toolCallId === "string" && toolCallId !== "" ? toolCallId : null;
+}

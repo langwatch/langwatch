@@ -6,7 +6,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { generateApiSpecs } from "@langwatch/api/rest";
+import { generateApiSpecs, normalizeExclusiveBounds } from "@langwatch/api/rest";
 import { ORGANIZATIONS_SPEC_OPTIONS } from "@langwatch/organization-server";
 
 import {
@@ -159,7 +159,9 @@ export async function generateOpenApiDocument({
     documentation: documentEnvelope() as never,
   })) as unknown as OpenApiDocument;
 
-  const stamped = withoutEmbeddedJsonSchemaDefinitions(withoutEmptyPaths(generated));
+  const stamped = normalizeExclusiveBounds(
+    withoutEmbeddedJsonSchemaDefinitions(withoutEmptyPaths(generated)),
+  );
   const unpublishable = stampSecurityFromRegistry(stamped);
   const document = atCanonicalPaths(withoutEmptyPaths(stamped));
 

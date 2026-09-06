@@ -212,6 +212,11 @@ export const authzAttachBindingsInputSchema = z
     commandId: z.string().min(1).optional(),
     occurredAtMs: z.number().int().nonnegative().optional(),
     awaitProjection: z.boolean().optional(),
+    /**
+     * Whether an unlanded projection is an error rather than a pass. Only a
+     * caller about to hand out access these rows decide asks for it.
+     */
+    requireProjection: z.boolean().optional(),
   })
   .strict();
 export type AuthzAttachBindingsInput = z.infer<typeof authzAttachBindingsInputSchema>;
@@ -368,6 +373,8 @@ export const authzDefineRoleInputSchema = z
     permissions: z.array(z.string().min(1)),
     kind: authzRoleKindSchema,
     actor: grantsLedgerActorSchema,
+    /** Same contract as `authzAttachBindingsInputSchema.requireProjection`. */
+    requireProjection: z.boolean().optional(),
   })
   .strict();
 export type AuthzDefineRoleInput = z.infer<typeof authzDefineRoleInputSchema>;

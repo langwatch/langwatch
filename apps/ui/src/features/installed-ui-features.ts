@@ -32,7 +32,7 @@ import { gatewayFeature } from "./gateway";
 import { githubFeature } from "./github";
 import { governanceFeature } from "./governance";
 import { homeFeature } from "./home";
-import { langyFeature } from "./langy";
+import { langyFeature, langyUiSlots } from "./langy";
 import { licensingFeature, licensingSeatTypeCopy, licensingUiSlots } from "./licensing";
 import { modelProviderFeature, modelProviderUiSlots } from "./model-provider";
 import { monitorFeature } from "./monitor";
@@ -101,7 +101,12 @@ export const installedUiFeatures = installUiFeatures({
     feedback: BrowserUiFeedback.create(),
     // The blocks core screens leave open, filled by whoever owns the words.
     slots: uiSlots({
-      components: { ...billingUiSlots, ...licensingUiSlots, ...modelProviderUiSlots },
+      components: {
+        ...billingUiSlots,
+        ...langyUiSlots,
+        ...licensingUiSlots,
+        ...modelProviderUiSlots,
+      },
       seatTypeCopy: licensingSeatTypeCopy,
     }),
   },

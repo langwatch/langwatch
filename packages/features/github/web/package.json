@@ -31,6 +31,7 @@
   "dependencies": {
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "react": "^19.2.7",
     "react-feather": "^2.0.10",
     "zod": "^4.4.3"

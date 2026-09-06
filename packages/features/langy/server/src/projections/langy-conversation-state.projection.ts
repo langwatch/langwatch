@@ -25,12 +25,18 @@ import {
   langyConversationMetadataUpdatedEventDataSchema,
   langyConversationStartedEventDataSchema,
   langyConversationTitleGeneratedEventDataSchema,
+  langyLocalControlRequestedEventDataSchema,
+  langyLocalPolicyChangedEventDataSchema,
+  langyLocalWorkspaceConnectedEventDataSchema,
+  langyLocalWorkspaceDisconnectedEventDataSchema,
   langyMessageImportedEventDataSchema,
   langyMessageRecordedEventDataSchema,
   langyPlanUpdatedEventDataSchema,
   langyToolCallFailedEventDataSchema,
   langyToolCallInitiatedEventDataSchema,
   langyToolCallSucceededEventDataSchema,
+  langyUserWaitEndedEventDataSchema,
+  langyUserWaitStartedEventDataSchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -160,6 +166,52 @@ export type LangyConversationTitleGeneratedEvent = z.infer<
   typeof LangyConversationTitleGeneratedEventSchema
 >;
 
+export const LangyLocalControlRequestedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_CONTROL_REQUESTED),
+  data: langyLocalControlRequestedEventDataSchema,
+});
+export type LangyLocalControlRequestedEvent = z.infer<typeof LangyLocalControlRequestedEventSchema>;
+
+export const LangyLocalWorkspaceConnectedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_WORKSPACE_CONNECTED),
+  data: langyLocalWorkspaceConnectedEventDataSchema,
+});
+export type LangyLocalWorkspaceConnectedEvent = z.infer<
+  typeof LangyLocalWorkspaceConnectedEventSchema
+>;
+
+export const LangyLocalWorkspaceDisconnectedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_WORKSPACE_DISCONNECTED),
+  data: langyLocalWorkspaceDisconnectedEventDataSchema,
+});
+export type LangyLocalWorkspaceDisconnectedEvent = z.infer<
+  typeof LangyLocalWorkspaceDisconnectedEventSchema
+>;
+
+export const LangyLocalPolicyChangedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_POLICY_CHANGED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_POLICY_CHANGED),
+  data: langyLocalPolicyChangedEventDataSchema,
+});
+export type LangyLocalPolicyChangedEvent = z.infer<typeof LangyLocalPolicyChangedEventSchema>;
+
+export const LangyUserWaitStartedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.USER_WAIT_STARTED),
+  data: langyUserWaitStartedEventDataSchema,
+});
+export type LangyUserWaitStartedEvent = z.infer<typeof LangyUserWaitStartedEventSchema>;
+
+export const LangyUserWaitEndedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.USER_WAIT_ENDED),
+  data: langyUserWaitEndedEventDataSchema,
+});
+export type LangyUserWaitEndedEvent = z.infer<typeof LangyUserWaitEndedEventSchema>;
+
 /**
  * Union of all langy-conversation-processing event types.
  */
@@ -179,7 +231,13 @@ export type LangyConversationProcessingEvent =
   | LangyConversationMetadataUpdatedEvent
   | LangyConversationHandoffPendingEvent
   | LangyConversationHandoffConsumedEvent
-  | LangyConversationTitleGeneratedEvent;
+  | LangyConversationTitleGeneratedEvent
+  | LangyLocalControlRequestedEvent
+  | LangyLocalWorkspaceConnectedEvent
+  | LangyLocalWorkspaceDisconnectedEvent
+  | LangyLocalPolicyChangedEvent
+  | LangyUserWaitStartedEvent
+  | LangyUserWaitEndedEvent;
 
 export interface LangyConversationState extends Projection<LangyConversationStateData> {
   data: LangyConversationStateData;
@@ -201,6 +259,18 @@ const langyConversationEvents = [
   LangyConversationHandoffPendingEventSchema,
   LangyConversationHandoffConsumedEventSchema,
   LangyConversationTitleGeneratedEventSchema,
+  // The events below change nothing in this projection, and it reads them all the same: the
+  // cursor on this row is the conversation's position in its own event log, and the freshness
+  // signal is published only once that cursor has reached the event that raised it. An event
+  // this projection did not read was an event the cursor could never reach, so its signal was
+  // retried until it was dropped and the panel heard nothing about it.
+  LangyPlanUpdatedEventSchema,
+  LangyLocalControlRequestedEventSchema,
+  LangyLocalWorkspaceConnectedEventSchema,
+  LangyLocalWorkspaceDisconnectedEventSchema,
+  LangyLocalPolicyChangedEventSchema,
+  LangyUserWaitStartedEventSchema,
+  LangyUserWaitEndedEventSchema,
 ] as const;
 
 /**
@@ -343,5 +413,59 @@ export class LangyConversationStateFoldProjection
     state: LangyConversationStateData,
   ): LangyConversationStateData {
     return foldLangyConversationState(state, event);
+  }
+
+  // Read, and folded into nothing. The turn document holds what these events say (the plan, the
+  // folder, the cards) and the conversation row holds none of it. They are read here so the
+  // cursor moves over them, which is what lets the freshness signal reach the panel while a
+  // command is still running.
+
+  handleLangyConversationPlanUpdated(
+    _event: LangyPlanUpdatedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationLocalControlRequested(
+    _event: LangyLocalControlRequestedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationLocalWorkspaceConnected(
+    _event: LangyLocalWorkspaceConnectedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationLocalWorkspaceDisconnected(
+    _event: LangyLocalWorkspaceDisconnectedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationLocalPolicyChanged(
+    _event: LangyLocalPolicyChangedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationUserWaitStarted(
+    _event: LangyUserWaitStartedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationUserWaitEnded(
+    _event: LangyUserWaitEndedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
   }
 }

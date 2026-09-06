@@ -11,6 +11,7 @@ import type { SuiteExecutionPort } from "../ports/suite-execution.port";
 import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
 import type { SuiteRunReadRepository } from "../repositories/suite-run.repository";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository";
+import type { ConnectedPresenceReader } from "../services/connected-target.service";
 import { SuiteService } from "../services/suite.service";
 import type { SuiteEventingCapabilities, SuiteRuntimePort } from "../ports/suite-runtime.port";
 
@@ -20,6 +21,8 @@ export type PostgresSuiteAdapterOptions = {
   agents: AgentService;
   prompts: PromptService;
   execution: SuiteExecutionPort;
+  /** Which connected agents have a process attached; absent when none is composed. */
+  connectedPresence?: ConnectedPresenceReader;
   resolveClickHouseClient: ((projectId: string) => Promise<SuiteClickHouseClient>) | null;
   defaultRetentionDays: number;
   generateId?: () => string;
@@ -48,6 +51,7 @@ export class PostgresSuiteAdapter implements SuiteRuntimePort {
       agents: options.agents,
       prompts: options.prompts,
       execution: options.execution,
+      ...(options.connectedPresence ? { connectedPresence: options.connectedPresence } : {}),
       generateId: options.generateId,
       now: options.now,
     });

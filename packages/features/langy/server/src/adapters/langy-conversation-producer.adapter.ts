@@ -76,9 +76,10 @@ function buildLangyConversationProducerPipeline(input: { processName: string }) 
     appendStatus: refuse("append a turn status frame"),
     markError: refuse("mark a turn errored"),
   };
-  const handoffStore: Pick<LangyTurnHandoffAdapter, "read" | "stash"> = {
+  const handoffStore: Pick<LangyTurnHandoffAdapter, "read" | "stash" | "isStopped"> = {
     read: refuse("read a turn handoff"),
     stash: refuse("stash a turn handoff"),
+    isStopped: refuse("read a turn's stop marker"),
   };
   const sessionKeys: Pick<LangySessionKeyService, "mintForUser" | "revoke"> = {
     mintForUser: refuse("mint a session key"),

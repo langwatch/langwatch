@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { API_KEY_REVOCATION_CAUSES } from "./api-key.revocation-cause";
+
 export const apiKeyRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type ApiKeyRole = z.infer<typeof apiKeyRoleSchema>;
 export const apiKeyScopeTypeSchema = z.enum(["ORGANIZATION", "TEAM", "PROJECT"]);
@@ -34,6 +36,13 @@ export const apiKeySchema = z
     permissionMode: z.string(),
     expiresAt: z.date().nullable(),
     revokedAt: z.date().nullable(),
+    /**
+     * Why the key was revoked; nothing while it is live or for a row revoked
+     * before the cause was recorded. A plain string, because the stored value
+     * is whatever the build that wrote it knew: readers narrow it with
+     * {@link isApiKeyRevocationCause} rather than trusting it.
+     */
+    revocationCause: z.string().nullable().optional(),
     lastUsedAt: z.date().nullable(),
     ingestSourceType: z.string().nullable(),
     ingestionTemplateId: z.string().nullable(),
@@ -82,6 +91,13 @@ export const revokeApiKeyInputSchema = z
     callerUserId: z.string().min(1).nullable(),
     callerIsAdmin: z.boolean(),
     awaitProjection: z.boolean().optional(),
+    /**
+     * Why the key dies, recorded on the row. Defaults to a person's decision,
+     * which every user-facing path is; the platform's own revocations name
+     * themselves so the CLI can tell a key it may re-mint from one it must
+     * leave dead.
+     */
+    cause: z.enum(API_KEY_REVOCATION_CAUSES).optional(),
   })
   .strict();
 export type RevokeApiKeyInput = z.infer<typeof revokeApiKeyInputSchema>;

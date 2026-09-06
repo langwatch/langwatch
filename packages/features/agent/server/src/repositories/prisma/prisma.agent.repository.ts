@@ -265,6 +265,19 @@ export class PrismaAgentRepository extends AgentRepository {
     return rows.map((row) => mapAgentRow(row as AgentRow));
   }
 
+  async findConnectedByName(input: { projectId: string; name: string }): Promise<Agent[]> {
+    const rows = await this.database.agent.findMany({
+      where: {
+        projectId: input.projectId,
+        type: "connected",
+        name: input.name,
+        archivedAt: null,
+        ...connectedAgentVisibleWhere(),
+      },
+    });
+    return rows.map((row) => mapAgentRow(row as AgentRow));
+  }
+
   async reregisterConnected(input: {
     id: string;
     projectId: string;

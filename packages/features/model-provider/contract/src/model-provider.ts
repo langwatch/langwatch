@@ -50,6 +50,11 @@ export const modelProviderSchema = z
     fallbackPriorityGlobal: z.number().int().nullable(),
     rotationPolicy: z.literal("MANUAL").optional(),
     providerConfig: z.record(z.string(), z.unknown()).nullable(),
+    /**
+     * The operator's own list of models allowed to skip Langy's permission checks, as regular
+     * expression sources. Null means the provider's registry default applies (ADR-129).
+     */
+    langySkipPermissionsModels: z.array(z.string()).nullable().optional(),
     deploymentMapping: z.record(z.string(), z.string()).nullable().optional(),
     healthStatus: z.enum(["UNKNOWN", "HEALTHY", "DEGRADED", "CIRCUIT_OPEN"]).optional(),
     circuitOpenedAt: z.date().nullable().optional(),

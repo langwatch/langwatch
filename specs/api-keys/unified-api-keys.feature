@@ -430,3 +430,48 @@ Feature: Unified API Keys
     Given the API Key frontend feature
     When its page loaders are read
     Then it registers the settings key and the CLI authorize key, and nothing else
+  # ── The grants have to land before the key is handed out ───────
+
+  # A key row is a plain insert and its grants are ledger commands, so the two
+  # cannot share a transaction. The key is written revoked and un-revoked last,
+  # once its grants are readable. "Readable" is the part that was missing: a
+  # durable append whose projection had not landed yet counted as a grant, and
+  # the mutation answered with a live key that every route then refused.
+
+  @unit
+  Scenario: A key whose grants did not become readable is never activated
+    Given the grant write is durable but its projection has not landed
+    When I create an API key
+    Then the create fails with "authz_grant_not_confirmed"
+    And the key row is left revoked
+    And no token is returned
+
+  @unit
+  Scenario: A key whose custom role did not become readable is never activated
+    Given a restricted key whose role definition has not landed in the projection
+    When I create the API key
+    Then the create fails with "authz_grant_not_confirmed"
+    And the key row is left revoked
+
+  @unit
+  Scenario: A key whose grants are readable is activated and returned
+    Given the grant write lands in the projection
+    When I create an API key
+    Then the key row is activated
+    And the token is returned
+
+  @unit
+  Scenario: Replacing a key's grants keeps the old ones when the new ones do not land
+    Given an API key with grants
+    And the grant write is durable but its projection has not landed
+    When I replace its grants
+    Then the update fails with "authz_grant_not_confirmed"
+    And nothing the key already held is revoked
+
+  @unit
+  Scenario: Replacing a key's grants leaves its metadata alone when the new ones do not land
+    Given an API key with grants
+    And the grant write is durable but its projection has not landed
+    When I replace its grants and its permission mode in one edit
+    Then the update fails with "authz_grant_not_confirmed"
+    And the key still reads with the name and permission mode it had

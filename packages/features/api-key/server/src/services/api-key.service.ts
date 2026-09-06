@@ -199,6 +199,10 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.catalog.listIngestionKeysForProject(input);
   }
 
+  async tryGetByLookupId(input: { lookupId: string }): Promise<ApiKey | null> {
+    return this.catalog.tryGetByLookupId(input);
+  }
+
   async validateCliSelection(input: {
     userId: string;
     organizationId: string;

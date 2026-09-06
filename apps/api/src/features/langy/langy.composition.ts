@@ -18,6 +18,7 @@ import {
   PostgresLangyAdapter,
   type LangyEgressTrpcPorts,
   type LangyRelayCompositionOptions,
+  type LangyLocalTrpcPorts,
   type LangyTrpcPorts,
   type LangyTurnTechnicalPorts,
   type LangyUiActionDefinition,
@@ -78,6 +79,12 @@ export type LangyFeatureCollaborators = Readonly<{
    * eight directories a resource id names.
    */
   navigateResources: LangyNavigateResourcePort | undefined;
+  /**
+   * The developer's own machine (ADR-129). The SAME runtime the worker's REST
+   * door reads — two over process memory would answer two different folders
+   * for one conversation. Absent means every local procedure refuses by name.
+   */
+  local: LangyLocalTrpcPorts | undefined;
 }>;
 
 /** The Langy application and the two routers built over it. */
@@ -103,6 +110,7 @@ export function composeLangyFeature(options: {
   rateLimit: LangyFeatureCollaborators["rateLimit"];
   processName: string;
   navigateResources?: LangyNavigateResourcePort | undefined;
+  local?: LangyLocalTrpcPorts | undefined;
 }): ComposedLangyFeature {
   const collaborators: LangyFeatureCollaborators = {
     prisma: options.infrastructure.prisma,
@@ -117,6 +125,7 @@ export function composeLangyFeature(options: {
     rateLimit: options.rateLimit,
     processName: options.processName,
     navigateResources: options.navigateResources,
+    local: options.local,
   };
   const app = composeLangy(collaborators);
   const gates = composeLangyGates(collaborators);
@@ -179,6 +188,7 @@ function refusingLangyPorts(): LangyTrpcPorts {
     checkWarmRateLimit: refuse,
     recordProductEvent: refuse,
     uiActions: { claim: refuse, complete: refuse },
+    local: refusingLangyLocalPorts(),
   };
 }
 
@@ -333,6 +343,26 @@ function composeLangyPorts(options: LangyFeatureCollaborators, langy: LangyApp):
       claim: (input) => uiActions().claim(input),
       complete: (input) => uiActions().complete(input),
     },
+    local: options.local ?? refusingLangyLocalPorts(),
+  };
+}
+
+/**
+ * The developer's own machine, absent. A process that composed no local-control
+ * runtime refuses every one of its procedures by name rather than answering an
+ * empty folder, which would read as "nothing is connected".
+ */
+function refusingLangyLocalPorts(): LangyLocalTrpcPorts {
+  const refuse = (): never => {
+    throw new ApiLangyUnavailableError("Langy local control");
+  };
+  return {
+    get runtime(): never {
+      return refuse();
+    },
+    commands: { changeLocalPolicy: refuse, disconnectLocalWorkspace: refuse },
+    skipGate: refuse,
+    codeAccess: { tryRead: refuse, write: refuse },
   };
 }
 

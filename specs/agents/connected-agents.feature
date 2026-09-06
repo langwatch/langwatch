@@ -125,6 +125,87 @@ Feature: Connected agents
     When a run targets "connected:ghost@production"
     Then the run is refused as an invalid target reference
 
+  @unit
+  Scenario: A name with no environment means the agent in development
+    Given "support-agent" registered in development and in production, with a process connected in both
+    When a run targets "connected:support-agent"
+    Then the target resolves to the development agent's id
+
+  @unit
+  Scenario: A name with no environment falls back to the one other environment with a process connected
+    Given "support-agent" registered in development and in production, with a process connected in production only
+    When a run targets "connected:support-agent"
+    Then the target resolves to the production agent's id
+
+  @unit
+  Scenario: A name with no environment is refused when no process is connected anywhere
+    Given "support-agent" registered in development and in production, with no process connected
+    When a run targets "connected:support-agent"
+    Then the run is refused with "agent_environment_unresolved"
+    And the refusal names the agent and the environments it is registered in
+
+  @unit
+  Scenario: A name with no environment is refused when several other environments have a process connected
+    Given "support-agent" registered in staging and in production, with a process connected in both
+    When a run targets "connected:support-agent"
+    Then the run is refused with "agent_environment_unresolved"
+    And the refusal names the environments that are online
+
+  @unit
+  Scenario: A name with no environment that matches no connected agent is read as an id
+    Given no connected agent named "agent_1"
+    When a run targets "connected:agent_1"
+    Then the reference is left as written
+
+  # ---------------------------------------------------------------------------
+  # What a listing shows
+  # ---------------------------------------------------------------------------
+
+  # One name and one environment can hold more than one row: the person who
+  # ran it from their laptop with their own key, and the machine that ran it
+  # with the project key. A listing shows every row the caller is allowed to
+  # read, and says of each whether the caller can choose it. Hiding a row the
+  # caller may read leaves two agents of one name with no way to tell them
+  # apart.
+
+  @unit
+  Scenario: A listing carries every row of a name, whoever holds it
+    Given "support-agent" in "development" has a row owned by user "u_1" and a row scoped to a host
+    When a project key lists the project's agents
+    Then both rows are in the answer
+
+  @unit
+  Scenario: A row the caller cannot choose is listed and marked
+    Given a personal development agent owned by user "u_1"
+    When user "u_2" lists the project's agents
+    Then the row is in the answer
+    And it is marked as not selectable
+    And the mark reads "owned_by_another_person"
+
+  @unit
+  Scenario: A row the caller can choose is marked selectable
+    Given a personal development agent owned by user "u_1"
+    When user "u_1" lists the project's agents
+    Then the row is marked as selectable
+
+  @unit
+  Scenario: A host-scoped row is selectable by anybody in the project
+    Given a development agent scoped to a host and owned by no person
+    When a project key lists the project's agents
+    Then the row is marked as selectable
+
+  @unit
+  Scenario: A personal row is not selectable by a key that names no person
+    Given a personal development agent owned by user "u_1"
+    When a project key lists the project's agents
+    Then the row is marked as not selectable
+
+  @unit
+  Scenario: The listing mark and the run refusal read one rule
+    Given a set of connected agents and a caller
+    When each agent is read for the listing mark and for the run refusal
+    Then an agent marked not selectable is exactly one the run refuses with "agent_owner_only"
+
   # ---------------------------------------------------------------------------
   # Presence
   # ---------------------------------------------------------------------------

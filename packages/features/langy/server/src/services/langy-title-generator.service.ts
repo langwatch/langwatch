@@ -8,6 +8,8 @@ import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
 import type { LangyTitleGenerator } from "../ports/langy-effect.port";
 import type { LangyTitleModelPort } from "../ports/langy-title-model.port";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules";
 import type { LangyTrustedMessageReader } from "./langy-message.service";
 
 const logger = createLogger("langwatch:langy:title-generator");
@@ -18,8 +20,10 @@ export const LANGY_TITLE_FEATURE_KEY = "langy.conversation_title";
 const TITLE_SYSTEM_PROMPT = [
   "You write a very short, specific title for a chat between the user and the",
   "LangWatch assistant. Summarize what the user is trying to do.",
-  `Rules: at most ${LANGY_TITLE_GENERATION.MAX_TITLE_CHARS} characters; no`,
-  "surrounding quotes; no trailing punctuation; Title Case; no prefix like",
+  `Rules: at most ${LANGY_TITLE_GENERATION.MAX_TITLE_CHARS} characters;`,
+  "sentence case, so only the first word starts with a capital, apart from",
+  "product and proper names such as LangWatch, GitHub or Python; no",
+  "surrounding quotes; no trailing period; no prefix like",
   '"Title:". Output ONLY the title, nothing else.',
 ].join(" ");
 
@@ -50,74 +54,53 @@ export class LangyTitleGeneratorService {
     conversationId: string;
   }): Promise<{ title: string; model: string } | null> {
     const { projectId, conversationId } = input;
-    try {
-      const records = await this.deps.messages.getRecordsByConversation({
-        conversationId,
-        projectId,
-      });
-      const transcript = buildTranscript(records);
-      if (!transcript) {
-        return null;
-      }
+    const records = await this.deps.messages.getRecordsByConversation({
+      conversationId,
+      projectId,
+    });
+    const transcript = buildTranscript(records);
+    if (!transcript) {
+      return null;
+    }
 
-      const model = await this.deps.models.resolveTitleModel({
+    let model: Awaited<ReturnType<LangyTitleModelPort["resolveTitleModel"]>>;
+    try {
+      model = await this.deps.models.resolveTitleModel({
         projectId,
         featureKey: LANGY_TITLE_FEATURE_KEY,
         fallbackModel: LANGY_TITLE_GENERATION.MODEL,
       });
-      const { text } = await generateText({
-        model,
-        system: TITLE_SYSTEM_PROMPT,
-        prompt: `Conversation so far:\n\n${transcript}\n\nTitle:`,
-        temperature: 0.2,
-        maxRetries: 1,
-      });
-
-      const title = sanitizeTitle(text);
-      // The AI SDK's handle is either a model object or the bare id string a
-      // provider registry resolves later, and the fact recorded on the
-      // conversation is which model wrote the title — so both shapes answer it
-      // rather than one of them recording `undefined`.
-      const modelId = typeof model === "string" ? model : model.modelId;
-
-      return title ? { title, model: modelId } : null;
     } catch (error) {
-      logger.warn(
-        {
-          projectId,
-          conversationId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Langy title model call failed — leaving title unchanged",
-      );
-
-      return null;
+      // Nothing to retry: this project has no model to ask. Every other failure
+      // is this attempt's alone, and it throws so the process outbox retries it
+      // — a swallowed blip left the conversation on its raw first message for
+      // ever.
+      if (error instanceof ModelNotConfiguredError) {
+        logger.warn(
+          { projectId, conversationId },
+          "no cheap model configured for Langy titles — leaving title unchanged",
+        );
+        return null;
+      }
+      throw error;
     }
+
+    const { text } = await generateText({
+      model,
+      system: TITLE_SYSTEM_PROMPT,
+      prompt: `Conversation so far:\n\n${transcript}\n\nTitle:`,
+      temperature: 0.2,
+      maxRetries: 1,
+    });
+
+    const title = normalizeLangyConversationTitle(text);
+    // The AI SDK's handle is either a model object or the bare id string a
+    // provider registry resolves later, and the fact recorded on the
+    // conversation is which model wrote the title.
+    const modelId = typeof model === "string" ? model : model.modelId;
+
+    return title ? { title, model: modelId } : null;
   }
-}
-
-/**
- * What a model actually returns, reduced to a title. Every rule here answers something a model has
- * been seen to do: fence the answer, prefix it with "Title:", quote it, or end it with a full stop.
- */
-function sanitizeTitle(raw: string): string {
-  let title = raw.trim();
-  title = title.replace(/^```[a-zA-Z]*\n?/, "").replace(/\n?```$/, "");
-  title = title.replace(/^(?:title|chat|conversation)\s*[:=]\s*/i, "");
-
-  if (
-    (title.startsWith('"') && title.endsWith('"')) ||
-    (title.startsWith("'") && title.endsWith("'"))
-  ) {
-    title = title.slice(1, -1);
-  }
-
-  title = title.replace(/[.\s]+$/, "").trim();
-  if (title.length > LANGY_TITLE_GENERATION.MAX_TITLE_CHARS) {
-    title = title.slice(0, LANGY_TITLE_GENERATION.MAX_TITLE_CHARS).trim();
-  }
-
-  return title;
 }
 
 /**
