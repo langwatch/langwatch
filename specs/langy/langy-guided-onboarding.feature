@@ -68,7 +68,7 @@ Feature: Langy guides the first setup after sign-up
       And the brief names the provider and the model
       And the brief names the organization and the person's first name
       And the brief says whether the tour was completed or skipped
-      And the brief tells the model to follow the guided-onboarding skill
+      And the brief opens by telling the model to load the guided-onboarding skill with the skill tool before any other tool call
 
     @unit
     Scenario: The panel sends the kickoff exactly once

@@ -115,9 +115,15 @@ func TestAgentsTemplate_RoutesGuidedKickoffToTheSkill(t *testing.T) {
 	if row == "" {
 		t.Fatal("AGENTS.md has no routing row for the guided onboarding kickoff")
 	}
-	for _, want := range []string{"`guided-onboarding`", "Let's set up", "complete-path"} {
+	for _, want := range []string{"`guided-onboarding`", "Let's set up", "`skill` tool"} {
 		if !strings.Contains(row, want) {
 			t.Errorf("the kickoff routing row lacks %q: %s", want, row)
 		}
+	}
+	// The row sends the model to the skill and names no command of its own:
+	// a command listed here gets run straight from the row, before the script
+	// is ever read.
+	if strings.Contains(row, "complete-path") {
+		t.Errorf("the kickoff routing row names a command the model then runs instead of loading the skill: %s", row)
 	}
 }

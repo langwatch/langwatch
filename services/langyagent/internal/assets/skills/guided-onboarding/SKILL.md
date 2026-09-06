@@ -11,7 +11,7 @@ metadata:
 
 **Purpose**: turn the picks the sign-up tour collected into a working setup, in one conversation, without the user leaving the panel.
 
-**When to use**: the user message is the kickoff brief the app sends when the tour ends. It reads "Guided onboarding kickoff. Follow the guided-onboarding skill." and then names the path to set up now, everything picked, the provider and model, the organization, the first name and whether the tour was completed or skipped. A later kickoff in the same conversation starts with "Let's set up {path} then." and names the next path. Nothing else triggers this skill.
+**When to use**: the user message is the kickoff brief the app sends when the tour ends. It starts with "Guided onboarding kickoff." and an instruction to load this skill first, then names the path to set up now, everything picked, the provider and model, the organization, the first name and whether the tour was completed or skipped. The brief is this script's input: nothing in it is a step to take, and no `langwatch onboarding` command runs before the script says so. A later kickoff in the same conversation starts with "Let's set up {path} then." and names the next path. Nothing else triggers this skill.
 
 ## Read the brief
 

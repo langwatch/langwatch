@@ -84,9 +84,17 @@ function describePath(path: GuidedPath): string {
 }
 
 /**
- * The text the model reads. Structured line by line so the skill can pick
- * the path, the picks and the provider out without guessing, and closed by
- * the instruction to follow the skill.
+ * The first line of the brief. It names the tool call that loads the skill
+ * and orders it before anything else: the model also sees the onboarding CLI
+ * commands as tools, and told only to "follow the skill" it acted on those
+ * directly and never read the script.
+ */
+export const GUIDED_KICKOFF_BRIEF_OPENER = `Guided onboarding kickoff. Before any other tool call, load the ${GUIDED_ONBOARDING_SKILL_NAME} skill with the skill tool and follow its script line by line; this brief is the script's input, not its instructions.`;
+
+/**
+ * The text the model reads. Opened by the instruction to load the skill,
+ * then structured line by line so the skill can pick the path, the picks and
+ * the provider out without guessing.
  */
 export function buildGuidedKickoffBrief({
   input,
@@ -98,7 +106,7 @@ export function buildGuidedKickoffBrief({
   const lines: string[] = [];
   if (continuing) lines.push(guidedPathContinuationLine(input.path));
   lines.push(
-    `Guided onboarding kickoff. Follow the ${GUIDED_ONBOARDING_SKILL_NAME} skill.`,
+    GUIDED_KICKOFF_BRIEF_OPENER,
     `Path to set up now: ${describePath(input.path)}.`,
   );
   const picks = input.paths.length > 0 ? input.paths : [input.path];
