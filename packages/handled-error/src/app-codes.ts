@@ -183,6 +183,7 @@ export const APP_ERROR_CODES = [
   "identity_verification_invalid",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",
+  "ingestion_template_not_found",
   "insufficient_permissions",
   // Also a Go code, with copy already written under the shared/transport
   // heading — the REST boundary in `packages/api` puts it on the wire as the
@@ -193,6 +194,7 @@ export const APP_ERROR_CODES = [
   "invalid_cursor",
   "invalid_email_recipient",
   "invalid_experiment_configuration",
+  "invalid_source_type",
   "invite_expired",
   "invite_not_found",
   "invite_throttled",
@@ -343,6 +345,7 @@ export const APP_ERROR_CODES = [
   "personal_virtual_key_label_taken",
   "personal_workspace_boundary",
   "personal_workspace_not_managed_here",
+  "platform_template_immutable",
   "project_cannot_archive_current",
   "project_destination_team_not_found",
   "project_not_found",
@@ -478,6 +481,7 @@ export const APP_ERROR_CODES = [
   "usage_report_failed",
   "user_not_in_organization",
   "user_to_impersonate_not_found",
+  "user_token_required",
   // Raised by the shared package rather than an app-level subclass:
   // `ValidationError` (and `ValidationError.fromZodError`, which the tRPC
   // boundary uses to promote input ZodErrors onto the handled channel).

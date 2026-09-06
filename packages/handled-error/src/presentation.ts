@@ -524,10 +524,7 @@ const presentations = {
       if (online.length > 1) {
         return `${name} is online in ${online.join(", ")}. Name one of them, as connected:${name}@${online[0]}.`;
       }
-      const where =
-        registered.length > 0
-          ? ` It is registered in ${registered.join(", ")}.`
-          : "";
+      const where = registered.length > 0 ? ` It is registered in ${registered.join(", ")}.` : "";
       return `No process running ${name} is connected.${where} Start the process, or name the environment as connected:${name}@<environment>.`;
     },
   },
@@ -968,8 +965,7 @@ const presentations = {
     title: "One of the allowed model patterns can't be read",
     describe: (error) => {
       const line = error.meta.line;
-      const where =
-        typeof line === "number" && line > 0 ? `Line ${line}` : "One line";
+      const where = typeof line === "number" && line > 0 ? `Line ${line}` : "One line";
       return `${where} of the allowed models list is not a valid pattern. Correct it and save again. Nothing was saved.`;
     },
   },
@@ -2342,6 +2338,25 @@ const presentations = {
     title: "You've hit the limit for ingestion sources",
     describe: () => "Archive one you no longer use, or upgrade your plan to raise the limit.",
   },
+  ingestion_template_not_found: {
+    title: "Ingestion template not found",
+    describe: () => "It may have been archived or removed. Reload to see the current list.",
+  },
+  platform_template_immutable: {
+    title: "This template can't be edited directly",
+    describe: () =>
+      "Platform-default templates are read-only. Fork it into your organization to add or edit its rules.",
+  },
+  invalid_source_type: {
+    title: "Enter a valid source type",
+    describe: () =>
+      "A source type can only use lowercase letters, digits, and underscores, up to 40 characters. Update it and try again.",
+  },
+  user_token_required: {
+    title: "Sign in to do this",
+    describe: () =>
+      "This action requires a personal, user-bound API key. Project API keys can't administer organization governance templates — sign in and use a personal key instead.",
+  },
   personal_virtual_key_label_taken: {
     // Scoped to the reader's own keys: two people in one organization may both
     // have a "default", so the sentence says "you", not "someone".
@@ -2778,8 +2793,7 @@ const presentations = {
   },
   langy_local_permission_timeout: {
     title: "Nobody answered the permission card",
-    describe: () =>
-      "The command did not run. Send Langy a message and it will ask again.",
+    describe: () => "The command did not run. Send Langy a message and it will ask again.",
   },
   langy_local_skip_model_not_allowed: {
     title: "This model cannot skip permission checks",
