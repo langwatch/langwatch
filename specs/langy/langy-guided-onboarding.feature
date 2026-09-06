@@ -408,7 +408,7 @@ Feature: Langy guides the first setup after sign-up
 
   Rule: Langy opens each path with its own words
 
-    @e2e @unimplemented
+    @e2e
     Scenario: The llmops path asks for code access first
       Given the kickoff for the llmops path
       When Langy starts
@@ -416,7 +416,7 @@ Feature: Langy guides the first setup after sign-up
       And the code access card offers "Share local folder" and "Connect to GitHub" and the quiet "I'd rather describe it"
       And the turn settles on the card
 
-    @e2e @unimplemented
+    @e2e
     Scenario: The gateway path prints the key and the snippet
       Given the kickoff for the gateway path
       And the tour minted the virtual key production-app
@@ -428,7 +428,7 @@ Feature: Langy guides the first setup after sign-up
       And Langy says "That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with."
       And the gateway path is recorded as complete
 
-    @e2e @unimplemented
+    @e2e
     Scenario: The gateway path mints the key when the tour did not
       Given the kickoff for the gateway path
       And no production-app key exists
@@ -436,7 +436,7 @@ Feature: Langy guides the first setup after sign-up
       Then Langy mints the virtual key production-app
       And Langy prints the environment snippet with it
 
-    @e2e @unimplemented
+    @e2e
     Scenario: The governance path asks where to start
       Given the kickoff for the governance path
       When Langy starts
@@ -446,7 +446,7 @@ Feature: Langy guides the first setup after sign-up
       Then Langy opens the governance sources page
       And the governance path is recorded as complete
 
-    @e2e @unimplemented
+    @e2e
     Scenario: The coding path hands over the one command
       Given the kickoff for the coding path
       When Langy starts
@@ -455,7 +455,7 @@ Feature: Langy guides the first setup after sign-up
       And Langy says "Then I can show you around once your first traces are flying through."
       And the coding path is recorded as complete
 
-    @e2e @unimplemented
+    @e2e
     Scenario: A skipped tour gets the no-worries line
       Given the kickoff records that the tour was skipped
       When Langy starts
@@ -464,7 +464,7 @@ Feature: Langy guides the first setup after sign-up
 
   Rule: The llmops path reaches the code, proposes, and only then acts
 
-    @e2e @unimplemented
+    @e2e
     Scenario: The describe fallback still reaches the code
       Given the code access card is open on the llmops path
       When I pick "I'd rather describe it"
@@ -473,7 +473,7 @@ Feature: Langy guides the first setup after sign-up
       Then Langy says "Perfect. To write a scenario for that and run it against your real agent, and wire tracing in while I'm at it, I still need to reach the code. How should I connect?"
       And the code access card offers the folder and GitHub actions again
 
-    @e2e @unimplemented
+    @e2e
     Scenario: Sharing the folder leads to a proposal, not a creation
       Given the code access card is open on the llmops path
       When I share the ACME checkout folder through share-control
@@ -484,7 +484,7 @@ Feature: Langy guides the first setup after sign-up
       And the question offers "Sure, go ahead!" and the quiet "Chat about this"
       And no scenario exists yet
 
-    @e2e @unimplemented
+    @e2e
     Scenario: Chat about this hands the scenario back to the conversation
       Given Langy proposed the first scenario
       When I pick "Chat about this"
@@ -492,7 +492,7 @@ Feature: Langy guides the first setup after sign-up
       And the composer takes the cursor
       And no scenario exists yet
 
-    @e2e @unimplemented
+    @e2e
     Scenario: Going ahead creates the scenario in the drawer beside the panel
       Given Langy proposed the first scenario
       When I pick "Sure, go ahead!"
@@ -503,7 +503,7 @@ Feature: Langy guides the first setup after sign-up
       And Langy says "Running it against your agent now."
       And Langy runs the scenario against the connected agent
 
-    @e2e @unimplemented
+    @e2e
     Scenario: The first run proves testing and tracing, then the suite follows
       Given the first scenario passed
       Then Langy says "That one run just proved two things: your agent answers scenarios, and traces are flowing in. Let me add a few more scenarios so every change you ship gets checked against real conversations."
@@ -513,7 +513,7 @@ Feature: Langy guides the first setup after sign-up
       And Langy says "All ready! Let me know if there is anything I can help with."
       And the llmops path is recorded as complete
 
-    @e2e @unimplemented
+    @e2e
     Scenario: A scenario that fails keeps the suite
       Given the first scenario run failed
       When Langy reads the result
@@ -521,7 +521,7 @@ Feature: Langy guides the first setup after sign-up
       And Langy keeps the suite and points at the run to replay the conversation
       And the llmops path is still recorded as complete
 
-    @e2e @unimplemented
+    @e2e
     Scenario: A folder that never connects gets the GitHub offer
       Given the code access card is waiting for the share-control command
       When the request expires with no folder connected
@@ -530,14 +530,14 @@ Feature: Langy guides the first setup after sign-up
 
   Rule: The conversation stays in character
 
-    @e2e @unimplemented
+    @e2e
     Scenario: A typed message mid-setup keeps the tone
       Given Langy is in the middle of the llmops setup
       When I type an unrelated question
       Then Langy keeps the setup going in the same tone
       And Langy never drops the path it was on
 
-    @e2e @unimplemented
+    @e2e
     Scenario: The Home offer continues the same conversation
       Given the llmops path is complete in the attached conversation
       When I start the gateway path from the Home offer
@@ -545,7 +545,7 @@ Feature: Langy guides the first setup after sign-up
       And the tour card for the gateway path renders in the same conversation
       And Langy opens the gateway path with its own opener
 
-    @e2e @unimplemented
+    @e2e
     Scenario: Every path ends by recording its completion
       When Langy reaches the end of any path
       Then Langy runs "langwatch onboarding complete-path <path>"

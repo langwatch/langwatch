@@ -351,7 +351,7 @@ Feature: Guided onboarding tour
     And a replay emits "replayed tour"
 
   # ============================================================================
-  # End to end, in a real browser (platform/app/e2e/guided-onboarding.spec.ts)
+  # End to end, in a real browser (platform/app/e2e/guided-onboarding.e2e.test.ts)
   # ============================================================================
 
   @e2e

@@ -339,7 +339,7 @@ Feature: Guided welcome flow and takeover screens
     And no event carries the API key
 
   # ============================================================================
-  # End to end, in a real browser (platform/app/e2e/guided-onboarding.spec.ts)
+  # End to end, in a real browser (platform/app/e2e/guided-onboarding.e2e.test.ts)
   # ============================================================================
 
   @e2e
@@ -353,19 +353,20 @@ Feature: Guided welcome flow and takeover screens
     And I land on my project's traces page with the Langy panel already open
 
   @e2e
-  Scenario: Skipping the guided tour on the provider screen lands on the personal home with the offer
+  Scenario: Skipping the guided tour on the provider screen lands on the personal home with the panel asking for a model
     Given the guided variant is on for my browser
     And I signed up, created my organization and picked Coding Agent Tracking
     When I choose "Skip Guided Tour" on the provider screen
     Then I am asked "Are you sure sure?"
     When I confirm with "Skip anyway"
-    Then I land on my personal home
-    And the "Start guided onboarding" offer is shown there
+    Then I land on my personal home with the Langy panel open
+    And the panel asks for the model the provider step would have connected
+    And no offer is shown there, because the coding path is the one being guided
+    And the skip is recorded on my organization
 
   @e2e
   Scenario: With the flag off the classic wizard is unchanged
     Given the guided variant is off for my browser
     When I sign up with a new account and create my organization
-    And I answer the tailor step
     Then the classic "What do you want to do?" step follows
     And no Langy takeover screen is shown

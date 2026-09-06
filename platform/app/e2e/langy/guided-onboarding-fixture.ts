@@ -460,9 +460,12 @@ export async function listVirtualKeys(
 /** Mint the key the gateway tour mints, so Langy finds it already there. */
 export async function mintVirtualKey({
   organizationId,
+  projectId,
   name,
 }: {
   organizationId: string;
+  /** The project the key's traffic is traced into, which every key names. */
+  projectId: string;
   name: string;
 }): Promise<{ id: string }> {
   const cookie = await getSessionCookie();
@@ -472,6 +475,7 @@ export async function mintVirtualKey({
     input: {
       organizationId,
       name,
+      traceProjectId: projectId,
       scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
     },
   });

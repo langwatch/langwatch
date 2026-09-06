@@ -57,6 +57,7 @@ describe("Langy sets up the gateway from the kickoff", () => {
       });
       await mintVirtualKey({
         organizationId: org.organizationId,
+        projectId: org.projectId,
         name: KEY_NAME,
       });
 

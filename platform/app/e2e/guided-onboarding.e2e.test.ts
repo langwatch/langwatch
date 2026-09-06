@@ -70,12 +70,39 @@ async function organizationAndTailor({
   page: Page;
   organizationName: string;
 }): Promise<void> {
-  await page.getByLabel("Organization name").fill(organizationName);
-  await page.getByRole("checkbox").click();
+  await organizationStep({ page, organizationName });
+  await tailorStep(page);
+}
+
+/** The first screen: the organization name and the terms. */
+async function organizationStep({
+  page,
+  organizationName,
+}: {
+  page: Page;
+  organizationName: string;
+}): Promise<void> {
+  // The welcome flow settles after the sign-in redirect: a value typed into
+  // the first render is lost when the screen re-renders with the session.
+  await page.waitForLoadState("networkidle");
+  const organizationInput = page.getByLabel("Organization name");
+  await expect(organizationInput).toBeVisible();
+  await organizationInput.fill(organizationName);
+  await expect(organizationInput).toHaveValue(organizationName);
+  // The checkbox input is visually hidden; its control is what a person
+  // clicks.
+  await page
+    .locator('[data-scope="checkbox"][data-part="control"]')
+    .first()
+    .click();
+  await expect(page.getByRole("checkbox")).toBeChecked();
   const next = page.getByRole("button", { name: "Next" });
   await expect(next).toBeEnabled();
   await next.click();
+}
 
+/** The tailor step, answered as a company of 11-50 deploying to the cloud. */
+async function tailorStep(page: Page): Promise<void> {
   const company = page.getByRole("radio", { name: "Company" });
   await expect(company).toBeVisible();
   for (const name of ["Company", "Clients", "Myself"]) {
@@ -240,8 +267,8 @@ test.describe("guided onboarding", () => {
       .toBeTruthy();
   });
 
-  /** @scenario Skipping the guided tour on the provider screen lands on the personal home with the offer */
-  test("skipping the guided tour on the provider screen lands on the personal home with the offer", async ({
+  /** @scenario Skipping the guided tour on the provider screen lands on the personal home with the panel asking for a model */
+  test("skipping the guided tour on the provider screen lands on the personal home with the panel asking for a model", async ({
     page,
   }) => {
     const account = await signUp({ page, label: "skip", flag: "on" });
@@ -267,15 +294,19 @@ test.describe("guided onboarding", () => {
     ).toBeVisible();
     await dialog.getByRole("button", { name: "Skip anyway" }).click();
 
+    // The personal home, with the panel open and asking for the model the
+    // provider step would have connected; the coding path is the one being
+    // guided, so its space shows no offer.
     await page.waitForURL(/\/me(\/|\?|$)/, { timeout: 90_000 });
-    await expect(page.getByTestId("guided-onboarding-offer")).toBeVisible({
+    const panel = page.locator('[data-tour="langy-panel"]');
+    await expect(panel).toBeVisible({ timeout: 60_000 });
+    await expect(panel).toContainText("Langy needs a model to get started", {
       timeout: 60_000,
     });
-    await expect(page.getByTestId("guided-onboarding-offer")).toContainText(
-      "Start guided onboarding",
-    );
+    await expect(page.getByTestId("guided-onboarding-offer")).toHaveCount(0);
     const state = await readGuidedState({ page, organizationName });
     expect(state.providerSkippedAt).toBeTruthy();
+    expect(state.currentPath).toBe("coding");
   });
 
   /** @scenario With the flag off the classic wizard is unchanged */
@@ -283,10 +314,12 @@ test.describe("guided onboarding", () => {
     page,
   }) => {
     const account = await signUp({ page, label: "classic", flag: "off" });
-    await organizationAndTailor({
+    await organizationStep({
       page,
       organizationName: `ACME ${account.name}`,
     });
+    // The classic wizard asks what you want to do right after the
+    // organization; the guided variant never shows that screen.
     await expect(
       page.getByRole("radiogroup", { name: "What do you want to do?" }),
     ).toBeVisible({ timeout: 30_000 });

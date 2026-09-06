@@ -17,7 +17,7 @@ import path from "path";
  */
 export default defineConfig({
   testDir: "./",
-  testMatch: ["**/guided-onboarding.spec.ts"],
+  testMatch: ["**/guided-onboarding.e2e.test.ts"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
