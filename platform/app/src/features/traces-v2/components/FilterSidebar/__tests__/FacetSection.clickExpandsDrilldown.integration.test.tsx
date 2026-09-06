@@ -60,36 +60,38 @@ const renderActiveRowExtras = (item: FacetItem) => (
 );
 
 /**
- * Holds the filter state the way the sidebar does, so a second click on the
- * same row is a genuine undo rather than a no-op against a frozen prop.
+ * Holds the filter state the way the real sidebar does, including the part
+ * that matters here: a row click cycles neutral → include → exclude → neutral,
+ * it is NOT a two-state on/off. Modelling it as on/off would let this suite
+ * pass while the second click actually lands on "exclude" — an assertion that
+ * the drilldown had closed would then be reading the wrong transition.
+ *
+ * The escape hatch mirrors reality too: the same filter can be dropped from
+ * the query bar or a saved view, without the row being touched at all.
  */
 const Harness = ({
-  initiallyIncluded = [],
   withDrilldown = true,
   onToggleSpy,
 }: {
-  initiallyIncluded?: string[];
   withDrilldown?: boolean;
   onToggleSpy?: (field: string, value: string) => void;
 }) => {
-  const [included, setIncluded] = useState<ReadonlySet<string>>(
-    () => new Set(initiallyIncluded),
+  const [states, setStates] = useState<ReadonlyMap<string, FacetValueState>>(
+    () => new Map(),
   );
   const getValueState = useCallback(
-    (value: string): FacetValueState =>
-      included.has(value) ? "include" : "neutral",
-    [included],
+    (value: string): FacetValueState => states.get(value) ?? "neutral",
+    [states],
   );
   const onToggle = useCallback(
     (field: string, value: string) => {
       onToggleSpy?.(field, value);
-      setIncluded((prev) => {
-        const next = new Set(prev);
-        if (next.has(value)) {
-          next.delete(value);
-        } else {
-          next.add(value);
-        }
+      setStates((prev) => {
+        const next = new Map(prev);
+        const current = prev.get(value) ?? "neutral";
+        if (current === "neutral") next.set(value, "include");
+        else if (current === "include") next.set(value, "exclude");
+        else next.delete(value);
         return next;
       });
     },
@@ -97,6 +99,11 @@ const Harness = ({
   );
   return (
     <ChakraProvider value={defaultSystem}>
+      {/* Stands in for the query bar: drops every filter without the sidebar
+          row being involved. */}
+      <button type="button" onClick={() => setStates(new Map())}>
+        clear all filters
+      </button>
       <FacetSection
         title="EVALUATOR"
         icon={Activity}
@@ -175,8 +182,8 @@ describe("<FacetSection /> click-to-expand", () => {
 
   describe("given a row whose drilldown the user opened by clicking it", () => {
     describe("when the user clicks the row a second time", () => {
-      /** @scenario "Clicking the same row again closes the drilldown it opened" */
-      it("collapses the drilldown along with the filter", async () => {
+      /** @scenario "The drilldown stays open while the row is excluded" */
+      it("keeps the drilldown open, because the row still carries a filter", async () => {
         const user = userEvent.setup();
         render(<Harness />);
         await openSection(user);
@@ -185,6 +192,42 @@ describe("<FacetSection /> click-to-expand", () => {
         expect(screen.getByTestId("drilldown-eval-a")).toBeInTheDocument();
 
         await user.click(screen.getByText("Faithfulness"));
+
+        expect(screen.getByTestId("drilldown-eval-a")).toBeInTheDocument();
+      });
+    });
+
+    describe("when the row's filter is cycled all the way off", () => {
+      /** @scenario "Dropping the filter closes the drilldown" */
+      it("collapses the drilldown along with the filter", async () => {
+        const user = userEvent.setup();
+        render(<Harness />);
+        await openSection(user);
+
+        // neutral → include → exclude → neutral
+        await user.click(screen.getByText("Faithfulness"));
+        await user.click(screen.getByText("Faithfulness"));
+        expect(screen.getByTestId("drilldown-eval-a")).toBeInTheDocument();
+
+        await user.click(screen.getByText("Faithfulness"));
+
+        expect(
+          screen.queryByTestId("drilldown-eval-a"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the filter is cleared from outside the sidebar", () => {
+      /** @scenario "Clearing the filter elsewhere closes the drilldown" */
+      it("collapses the drilldown even though the row was never clicked again", async () => {
+        const user = userEvent.setup();
+        render(<Harness />);
+        await openSection(user);
+
+        await user.click(screen.getByText("Faithfulness"));
+        expect(screen.getByTestId("drilldown-eval-a")).toBeInTheDocument();
+
+        await user.click(screen.getByText("clear all filters"));
 
         expect(
           screen.queryByTestId("drilldown-eval-a"),

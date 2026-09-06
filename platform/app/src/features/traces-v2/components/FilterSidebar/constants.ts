@@ -83,6 +83,24 @@ export const NORMAL_CASE_FIELDS = new Set([
 ]);
 
 /**
+ * Evaluator Verdict is a traffic light like Status, and must read as the
+ * SAME traffic light the evaluator drilldown already paints — green Passed,
+ * red Failed, yellow Errored (see `buildVerdictSpecs` in EvaluatorDrilldown).
+ * Without an entry here the field fell through to `hashColor`, which hashes
+ * the literal strings "pass"/"fail" into arbitrary palette slots: the two
+ * sections ended up showing the same words in opposite colours on the same
+ * screen. `skipped` / `unknown` are non-verdicts and stay neutral grey so
+ * they don't compete with the three that carry meaning.
+ */
+const EVALUATOR_VERDICT_COLORS: Record<string, Tokens["colors"]> = {
+  pass: "green.solid",
+  fail: "red.solid",
+  error: "yellow.solid",
+  skipped: "gray.solid",
+  unknown: "gray.solid",
+};
+
+/**
  * Status keeps a fixed traffic-light mapping. Origin derives its dot
  * colours from the shared `ORIGIN_DISPLAY` table — the same one the
  * Origin column badge consumes — so "evaluation" is always green,
@@ -91,6 +109,7 @@ export const NORMAL_CASE_FIELDS = new Set([
  */
 export const FACET_COLORS: Record<string, Record<string, Tokens["colors"]>> = {
   status: STATUS_COLORS,
+  evaluatorVerdict: EVALUATOR_VERDICT_COLORS,
   origin: Object.fromEntries(
     Object.entries(ORIGIN_DISPLAY).map(([value, { colorPalette }]) => [
       value,
@@ -130,6 +149,13 @@ export const FACET_DEFAULTS: Record<string, string[]> = {
   conversation: [],
   errorMessage: [],
   evaluator: [],
+  // Fixed traffic-light order, matching the evaluator drilldown's
+  // Passed / Failed / Errored rows. Left to the count-sorted fallback, the
+  // section listed Fail above Pass whenever failures happened to outnumber
+  // passes — the same two rows swapping places between projects, for no
+  // reason a reader could see. `skipped` / `unknown` trail behind and only
+  // appear once they have traces.
+  evaluatorVerdict: ["pass", "fail", "error"],
 };
 
 /**
@@ -144,7 +170,15 @@ export const RANGE_DEFAULTS: readonly string[] = ["duration", "cost", "tokens"];
  * Fields whose colour palette is curated. Other categoricals get hashed
  * colours rendered at reduced opacity to keep the sidebar visually calm.
  */
-export const VIBRANT_FIELDS = new Set(["status", "origin", "spanType"]);
+export const VIBRANT_FIELDS = new Set([
+  "status",
+  "origin",
+  "spanType",
+  // Curated traffic light — dimming it would leave pass and fail as two
+  // washed-out dots a reader has to squint at to tell apart, while the
+  // drilldown right above paints the same verdicts at full strength.
+  "evaluatorVerdict",
+]);
 
 export const FACET_ICONS: Record<string, LucideIcon> = {
   origin: Compass,

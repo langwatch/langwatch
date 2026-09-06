@@ -48,12 +48,29 @@ Rule: Picking a row opens its drilldown
     Then the verdict/score drilldown expands below the row
     And the evaluator is added to the filter
 
-  # Latching the open state would leave a row displaying verdict controls
-  # for a filter it no longer contributes to.
+  # Open-ness follows the filter rather than latching on click. A latch would
+  # leave a row displaying verdict controls for a filter it no longer carries,
+  # and it would disagree with the pinned copy of the same row, which shows its
+  # drilldown for as long as the filter stands.
   @integration
-  Scenario: Clicking the same row again closes the drilldown it opened
+  Scenario: The drilldown stays open while the row is excluded
     Given an evaluator row whose drilldown was opened by clicking the row
-    When the user clicks the row a second time to drop the filter
+    When the user clicks the row a second time to exclude the evaluator
+    Then the drilldown stays open
+    And the evaluator is excluded from the filter
+
+  @integration
+  Scenario: Dropping the filter closes the drilldown
+    Given an evaluator row whose drilldown was opened by clicking the row
+    When the evaluator stops contributing to the filter
+    Then the drilldown collapses with it
+
+  # The filter can be dropped from outside the row entirely — the query bar,
+  # the pinned copy of the row, a saved view. The drilldown must not outlive it.
+  @integration
+  Scenario: Clearing the filter elsewhere closes the drilldown
+    Given an evaluator row whose drilldown was opened by clicking the row
+    When the evaluator filter is cleared without touching the row
     Then the drilldown collapses with it
 
   @integration
