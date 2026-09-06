@@ -341,6 +341,11 @@ function PendingAnswers({
             variant="outline"
             loading={answer.isPending}
             onClick={() => decide("allow_pattern")}
+            maxWidth="100%"
+            height="auto"
+            whiteSpace="normal"
+            textAlign="left"
+            paddingY={1}
           >
             Allow {langyPatternList(card.patterns)} this session
           </Button>
