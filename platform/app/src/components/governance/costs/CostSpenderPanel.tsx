@@ -67,63 +67,74 @@ export function spenderDisplayRows(rows: SpenderRow[]): SpenderDisplayRow[] {
   }));
 }
 
+function SpenderName({ row }: { row: SpenderDisplayRow }) {
+  return (
+    <HStack flex="0 0 40%" gap={2} minWidth={0}>
+      <Text
+        truncate
+        title={row.notNamed ? undefined : row.label}
+        color={row.notNamed ? "fg.muted" : undefined}
+      >
+        {row.label}
+      </Text>
+      {row.agentId !== "" && (
+        <Badge size="xs" variant="subtle" colorPalette="gray" title="agent">
+          {row.agentId}
+        </Badge>
+      )}
+    </HStack>
+  );
+}
+
+function SpenderBar({ row }: { row: SpenderDisplayRow }) {
+  return (
+    <Box
+      flex="1"
+      height="14px"
+      borderRadius="sm"
+      backgroundColor="bg.muted"
+      overflow="hidden"
+    >
+      <Box
+        height="100%"
+        borderRadius="sm"
+        width={`${row.widthPct}%`}
+        data-width-pct={row.widthPct}
+        backgroundColor={
+          row.notNamed ? "border.emphasized" : getHexColorForString(row.label)
+        }
+      />
+    </Box>
+  );
+}
+
+function SpenderFigure({ row }: { row: SpenderDisplayRow }) {
+  return (
+    <Text
+      flex="0 0 18%"
+      textAlign="right"
+      fontVariantNumeric="tabular-nums"
+      title={
+        row.amountUsd === null
+          ? `${row.cellsWithoutAmount} of this spender's rows hold no US-dollar figure, so no total is shown`
+          : undefined
+      }
+      color={row.amountUsd === null ? "fg.muted" : undefined}
+    >
+      {row.amountUsd === null ? "—" : fmtMoney(row.amountUsd)}
+    </Text>
+  );
+}
+
 export function CostSpenderList({ rows }: { rows: SpenderRow[] }) {
   const shown = spenderDisplayRows(rows);
   return (
     <VStack align="stretch" gap={2}>
       {shown.map((row) => (
         <HStack key={row.key} gap={3} fontSize="sm">
-          <HStack flex="0 0 40%" gap={2} minWidth={0}>
-            <Text
-              truncate
-              title={row.notNamed ? undefined : row.label}
-              color={row.notNamed ? "fg.muted" : undefined}
-            >
-              {row.label}
-            </Text>
-            {row.agentId !== "" && (
-              <Badge
-                size="xs"
-                variant="subtle"
-                colorPalette="gray"
-                title="agent"
-              >
-                {row.agentId}
-              </Badge>
-            )}
-          </HStack>
-          <Box
-            flex="1"
-            height="14px"
-            borderRadius="sm"
-            backgroundColor="bg.muted"
-            overflow="hidden"
-          >
-            <Box
-              height="100%"
-              borderRadius="sm"
-              width={`${row.widthPct}%`}
-              data-width-pct={row.widthPct}
-              backgroundColor={
-                row.notNamed
-                  ? "border.emphasized"
-                  : getHexColorForString(row.label)
-              }
-            />
-          </Box>
-          <Text
-            flex="0 0 18%"
-            textAlign="right"
-            fontVariantNumeric="tabular-nums"
-            title={
-              row.amountUsd === null
-                ? `${row.cellsWithoutAmount} of this spender's rows hold no US-dollar figure, so no total is shown`
-                : undefined
-            }
-            color={row.amountUsd === null ? "fg.muted" : undefined}
-          >
-            {row.amountUsd === null ? "—" : fmtMoney(row.amountUsd)}
-          </Text>
+          <SpenderName row={row} />
+          <SpenderBar row={row} />
+          <SpenderFigure row={row} />
         </HStack>
       ))}
     </VStack>

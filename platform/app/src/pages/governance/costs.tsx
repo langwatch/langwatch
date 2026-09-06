@@ -152,6 +152,56 @@ function useDepartmentSelectionReset({
   }, [selected, departmentRows, departments, setFilters]);
 }
 
+/**
+ * The pulled lane's spender breakdown. Split-grant rule as the breakdowns
+ * above: the spender labels are the People screen's data, so the read is
+ * gated on that screen's permission — the server refuses it anyway, this
+ * just spares the failed query.
+ */
+function useSpenderRows({
+  organizationId,
+  windowDays,
+  enabled,
+}: {
+  organizationId: string;
+  windowDays: number;
+  enabled: boolean;
+}) {
+  const spenders = api.governanceCost.spenders.useQuery(
+    { organizationId, windowDays },
+    { enabled, refetchOnWindowFocus: false },
+  );
+  return spenders.data?.rows ?? null;
+}
+
+/**
+ * Whether the invented sample panels are on. `optIn` stays `null` until the
+ * reader picks a side, which is what lets the default follow the data.
+ * Deliberately not persisted: the same rule the trace explorer applies to its
+ * sample traces — opting in is a decision about this sitting, not a
+ * preference that follows you back tomorrow.
+ *
+ * Adoption counts as real data even with no spend behind it yet: showing a
+ * measured headcount beside invented money is the confusion this toggle
+ * exists to prevent.
+ */
+function useSampleMode(breakdowns: ReturnType<typeof useBreakdownQueries>) {
+  const [optIn, setOptIn] = useState<boolean | null>(null);
+  const showSample = sampleModeActive({
+    optIn,
+    realData: useSettledRealDataState([
+      breakdowns.departmentRows,
+      breakdowns.userRows,
+      breakdowns.overTime,
+      breakdowns.modelOverTime,
+      breakdowns.activeUsers === null
+        ? null
+        : { length: breakdowns.activeUsers },
+    ]),
+  });
+  return { showSample, toggleSample: () => setOptIn(!showSample) };
+}
+
 function CostsPage() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -181,49 +231,22 @@ function CostsPage() {
     // the other gets the lanes and no failed queries underneath them.
     enabled: !!organizationId && hasAnyPermission("activityMonitor:view"),
   });
-  // Same split-grant rule as above: the spender labels are the People
-  // screen's data, so the read is gated on that screen's permission — the
-  // server refuses it anyway, this just spares the failed query.
-  const spenders = api.governanceCost.spenders.useQuery(
-    { organizationId, windowDays: filters.windowDays },
-    {
-      enabled: !!organizationId && hasAnyPermission("governance:view"),
-      refetchOnWindowFocus: false,
-    },
-  );
+  const spenderRows = useSpenderRows({
+    organizationId,
+    windowDays: filters.windowDays,
+    enabled: !!organizationId && hasAnyPermission("governance:view"),
+  });
 
   useDepartmentSelectionReset({ filters, breakdowns, setFilters });
 
-  // `null` until the reader picks a side, which is what lets the default below
-  // follow the data. Deliberately not persisted: the same rule the trace
-  // explorer applies to its sample traces — opting in is a decision about this
-  // sitting, not a preference that follows you back tomorrow.
-  const [sampleOptIn, setSampleOptIn] = useState<boolean | null>(null);
-  // Adoption counts as real data even with no spend behind it yet: showing a
-  // measured headcount beside invented money is the confusion this toggle
-  // exists to prevent.
-  const showSample = sampleModeActive({
-    optIn: sampleOptIn,
-    realData: useSettledRealDataState([
-      breakdowns.departmentRows,
-      breakdowns.userRows,
-      breakdowns.overTime,
-      breakdowns.modelOverTime,
-      breakdowns.activeUsers === null
-        ? null
-        : { length: breakdowns.activeUsers },
-    ]),
-  });
+  const { showSample, toggleSample } = useSampleMode(breakdowns);
 
   return (
     <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
       <VStack align="stretch" gap={5} width="full">
         <HStack justify="space-between" align="center">
           <Heading size="md">Costs</Heading>
-          <CostSampleToggle
-            active={showSample}
-            onToggle={() => setSampleOptIn(!showSample)}
-          />
+          <CostSampleToggle active={showSample} onToggle={toggleSample} />
         </HStack>
         {showSample && <CostSampleBanner />}
         <CostFilterBar
@@ -250,7 +273,7 @@ function CostsPage() {
           filters={filters}
           breakdowns={breakdowns}
           showSample={showSample}
-          spenderRows={spenders.data?.rows ?? null}
+          spenderRows={spenderRows}
         />
       </VStack>
     </GovernanceLayout>

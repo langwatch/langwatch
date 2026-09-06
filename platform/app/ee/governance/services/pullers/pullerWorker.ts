@@ -491,34 +491,15 @@ async function writePulledEvents({
     actorOf: (event) => event.actor,
     suppression,
   });
-  // The periods this run had a price for, split by whether it was allowed to
-  // store it. Both are needed: the dropped ones become the source's unpriced
-  // window, and the recorded ones are what later closes that window again.
-  const droppedPeriodsMs: number[] = [];
-  const recordedPeriodsMs: number[] = [];
-  for (const event of kept) {
-    await ocsfRepo.insertEvent(
-      mapToOcsfRow({
-        event,
-        tenantId: govProject.id,
-        ingestionSourceId: source.id,
-        sourceType: source.sourceType,
-      }),
-    );
-    const { pricedPeriodMs } = await recordPulledUsageFor({
-      event,
-      source,
-      govProjectId: govProject.id,
-      observedAt,
-      pulledUsage,
-      costRecordingEnabled,
-    });
-    if (pricedPeriodMs !== null) {
-      (costRecordingEnabled ? recordedPeriodsMs : droppedPeriodsMs).push(
-        pricedPeriodMs,
-      );
-    }
-  }
+  const { droppedPeriodsMs, recordedPeriodsMs } = await writeAuditAndUsageRows({
+    kept,
+    source,
+    govProjectId: govProject.id,
+    observedAt,
+    ocsfRepo,
+    pulledUsage,
+    costRecordingEnabled,
+  });
   await recordUnpricedUsageWindow({
     source,
     droppedPeriodsMs,
@@ -554,6 +535,57 @@ async function writePulledEvents({
       );
     }
   }
+}
+
+/**
+ * The per-event writes of one run: each kept event's OCSF audit row, and its
+ * usage record beside it. Returns the priced periods split by whether the
+ * cost flag let them be stored — the dropped ones become the source's
+ * unpriced window, and the recorded ones are what later closes that window.
+ */
+async function writeAuditAndUsageRows({
+  kept,
+  source,
+  govProjectId,
+  observedAt,
+  ocsfRepo,
+  pulledUsage,
+  costRecordingEnabled,
+}: {
+  kept: NormalizedPullEvent[];
+  source: PullingSource;
+  govProjectId: string;
+  observedAt: Date;
+  ocsfRepo: NonNullable<ReturnType<typeof getApp>["governance"]["ocsfEvents"]>;
+  pulledUsage?: PulledUsageDispatcher;
+  costRecordingEnabled: boolean;
+}): Promise<{ droppedPeriodsMs: number[]; recordedPeriodsMs: number[] }> {
+  const droppedPeriodsMs: number[] = [];
+  const recordedPeriodsMs: number[] = [];
+  for (const event of kept) {
+    await ocsfRepo.insertEvent(
+      mapToOcsfRow({
+        event,
+        tenantId: govProjectId,
+        ingestionSourceId: source.id,
+        sourceType: source.sourceType,
+      }),
+    );
+    const { pricedPeriodMs } = await recordPulledUsageFor({
+      event,
+      source,
+      govProjectId,
+      observedAt,
+      pulledUsage,
+      costRecordingEnabled,
+    });
+    if (pricedPeriodMs !== null) {
+      (costRecordingEnabled ? recordedPeriodsMs : droppedPeriodsMs).push(
+        pricedPeriodMs,
+      );
+    }
+  }
+  return { droppedPeriodsMs, recordedPeriodsMs };
 }
 
 /**
