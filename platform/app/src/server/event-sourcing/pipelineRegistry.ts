@@ -102,6 +102,8 @@ import { TraceReadDerivationService } from "../app-layer/traces/trace-read-deriv
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
 import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
+import type { EvaluatorTypes } from "../evaluations/evaluators.generated";
+import { runEvaluation } from "../evaluations/runEvaluation";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
@@ -111,7 +113,20 @@ import type {
   TopicClusteringRunPort,
 } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import { publishCancellation } from "../scenarios/cancellation-channel";
+import { SCENARIO_EVALUATIONS_JOB } from "../scenarios/evaluations/constants";
+import {
+  loadRunAttachments,
+  type RunScenarioEvaluationsDeps,
+  runScenarioEvaluations,
+} from "../scenarios/evaluations/runScenarioEvaluations";
+import {
+  createScenarioEvaluationsJobHandler,
+  scenarioEvaluationsJobId,
+} from "../scenarios/evaluations/scenarioEvaluations.job";
+import type { ScenarioEvaluationsJobPayload } from "../scenarios/evaluations/types";
 import type { ScenarioExecutionPool } from "../scenarios/execution/execution-pool";
+import { ScenarioService } from "../scenarios/scenario.service";
+import { SuiteService } from "../suites/suite.service";
 import { type CommandDispatcher, Deferred } from "./deferred";
 import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
@@ -154,6 +169,7 @@ import type { EvaluationAnalyticsData } from "./pipelines/evaluation-processing/
 import { EvaluationAnalyticsStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
 import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
+import type { ReportEvaluationCommandData } from "./pipelines/evaluation-processing/schemas/commands";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
@@ -197,6 +213,8 @@ import {
   ComputeRunMetricsCommand,
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
 import { FinishRunCommand } from "./pipelines/simulation-processing/commands/finishRun.command";
+import { QueueRunCommand } from "./pipelines/simulation-processing/commands/queueRun.command";
+import { RecordEvaluationsCommand } from "./pipelines/simulation-processing/commands/recordEvaluations.command";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunExecutionCommands } from "./pipelines/simulation-processing/process-manager";
 import type { SimulationRunMetricsProjectionRecord } from "./pipelines/simulation-processing/projections/simulationRunMetrics.mapProjection";
@@ -712,6 +730,7 @@ export class PipelineRegistry {
         suiteRunPipeline,
         traceSummaryStore,
         simComputeRunMetrics,
+        reportEvaluation: mapCommands(evalPipeline.commands).reportEvaluation,
       });
 
     const experimentRunPipeline = this.registerExperimentRunPipeline({
@@ -1586,12 +1605,15 @@ export class PipelineRegistry {
     suiteRunPipeline,
     traceSummaryStore,
     simComputeRunMetrics,
+    reportEvaluation,
   }: {
     suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     simComputeRunMetrics: Deferred<
       CommandDispatcher<ComputeRunMetricsCommandData>
     >;
+    /** Writes a scenario evaluation on the run's trace (evaluation pipeline). */
+    reportEvaluation: CommandDispatcher<ReportEvaluationCommandData>;
   }) {
     const simulationRunStore = this.cached<SimulationRunStateData>(
       new SimulationRunStateFoldStore({
@@ -1630,29 +1652,106 @@ export class PipelineRegistry {
         traceReadDerivation.deriveScenarioRoleMetrics(params),
     });
 
-    // ECST backfill: FinishRunCommand loads the run's prior events straight
-    // from the canonical event store (aggregateType "simulation_run").
-    const finishRunCommand = new FinishRunCommand({
-      loadPriorEvents: async ({ tenantId, scenarioRunId }) => {
-        const eventStore =
-          this.deps.eventSourcing.getEventStore<SimulationProcessingEvent>();
-        if (!eventStore) return [];
-        return eventStore.getEvents(
-          scenarioRunId,
-          { tenantId: createTenantId(tenantId) },
-          "simulation_run",
-        );
-      },
+    // ECST backfill: FinishRunCommand and RecordEvaluationsCommand load the
+    // run's prior events straight from the canonical event store
+    // (aggregateType "simulation_run").
+    const loadSimulationRunEvents = async ({
+      tenantId,
+      scenarioRunId,
+    }: {
+      tenantId: string;
+      scenarioRunId: string;
+    }): Promise<readonly SimulationProcessingEvent[]> => {
+      const eventStore =
+        this.deps.eventSourcing.getEventStore<SimulationProcessingEvent>();
+      if (!eventStore) return [];
+      return eventStore.getEvents(
+        scenarioRunId,
+        { tenantId: createTenantId(tenantId) },
+        "simulation_run",
+      );
+    };
+    // Resolves the evaluators a run is graded with. Read when the run is
+    // queued, so an edit to the suite or the plan mid-batch cannot change what
+    // an already scheduled run is graded against, and again when a run that
+    // never passed through the queue command finishes.
+    const loadRunEvaluators = (params: {
+      projectId: string;
+      scenarioId: string;
+      planId: string | null;
+    }) => loadRunAttachments({ deps: scenarioEvaluationDeps, ...params });
+    const queueRunCommand = new QueueRunCommand({
+      loadRunAttachments: loadRunEvaluators,
     });
+    const finishRunCommand = new FinishRunCommand({
+      loadPriorEvents: loadSimulationRunEvents,
+      loadRunAttachments: loadRunEvaluators,
+    });
+    const recordEvaluationsCommand = new RecordEvaluationsCommand({
+      loadPriorEvents: loadSimulationRunEvents,
+    });
+
+    // Scenario evaluations: the subscriber queues one job per finished run,
+    // the job grades the run with the evaluators its suite and plan attach.
+    // The suite service needs the app's suite run service, which exists only
+    // after the app is built, so it is created on first use.
+    const scenarioService = ScenarioService.create(this.deps.prisma);
+    let suiteService: SuiteService | undefined;
+    const suites = (): SuiteService => {
+      suiteService ??= SuiteService.create({
+        prisma: this.deps.prisma,
+        suiteRunService: getApp().suiteRuns.runs,
+      });
+      return suiteService;
+    };
+    const enqueueScenarioEvaluations = new Deferred<
+      CommandDispatcher<ScenarioEvaluationsJobPayload>
+    >("enqueueScenarioEvaluations");
+    const scenarioEvaluationDeps: RunScenarioEvaluationsDeps = {
+      scenarios: scenarioService,
+      suites: {
+        getRunAttachments: (params) => suites().getRunAttachments(params),
+        getAttachedEvaluators: (params) =>
+          suites().getAttachedEvaluators(params),
+      },
+      runs: {
+        getRunState: async ({ tenantId, scenarioRunId }) => {
+          const state = await simulationRunStore.get(scenarioRunId, {
+            tenantId: createTenantId(tenantId),
+            aggregateId: scenarioRunId,
+          });
+          if (!state) return null;
+          return {
+            messages: state.Messages.map((row) => ({
+              role: row.Role,
+              content: row.Content,
+            })),
+            traceIds: state.TraceIds,
+          };
+        },
+      },
+      spans: this.deps.traces.spans,
+      runEvaluation: (params) =>
+        runEvaluation({
+          ...params,
+          evaluatorType: params.evaluatorType as EvaluatorTypes,
+        }),
+      reportEvaluation: (report) => reportEvaluation(report),
+      recordEvaluations: (data) => simCommands.recordEvaluations(data),
+    };
 
     const simulationPipeline = this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
         simulationRunMetricsStore:
           this.deps.repositories.simulationRunMetricsStore,
+        queueRunCommand,
         finishRunCommand,
+        recordEvaluationsCommand,
         computeRunMetricsCommand,
         simulationRunExecution: {
+          getAttachedEvaluators: (params) =>
+            scenarioEvaluationDeps.suites.getAttachedEvaluators(params),
           getPool: () => scenarioExecutionPool.get(),
           publishCancellation: async ({ projectId, scenarioRunId }) => {
             const publisher = this.deps.eventSourcing.redisConnection ?? null;
@@ -1677,9 +1776,14 @@ export class PipelineRegistry {
         suiteRunSync: {
           recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
           completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
+          regradeSuiteRunItem: suiteRunCommands.regradeSuiteRunItem,
         },
         traceMetricsSync: {
           computeRunMetrics: selfComputeRunMetrics.fn,
+        },
+        scenarioEvaluations: {
+          loadRunAttachments: loadRunEvaluators,
+          enqueue: enqueueScenarioEvaluations.fn,
         },
       }),
     );
@@ -1688,6 +1792,55 @@ export class PipelineRegistry {
     const simCommands = mapCommands(simulationPipeline.commands);
     selfComputeRunMetrics.resolve(simCommands.computeRunMetrics);
     selfExecutionCommands.resolve(() => simCommands);
+
+    // The scenario evaluations job. One group per run; a repeat of the same
+    // attempt inside the window is dropped, a retry carries the next attempt.
+    const scenarioEvaluationsHandler = createScenarioEvaluationsJobHandler({
+      run: (params) =>
+        runScenarioEvaluations({ deps: scenarioEvaluationDeps, ...params }),
+      reschedule: ({ payload, delayMs }) =>
+        enqueueScenarioEvaluations.fn(payload, { delay: delayMs }),
+    });
+    const scenarioEvaluationsQueue =
+      simulationPipeline.service.registerJob<ScenarioEvaluationsJobPayload>({
+        name: SCENARIO_EVALUATIONS_JOB.NAME,
+        process: scenarioEvaluationsHandler,
+        groupKeyFn: (payload) => payload.scenarioRunId,
+        deduplication: {
+          makeId: scenarioEvaluationsJobId,
+          ttlMs: SCENARIO_EVALUATIONS_JOB.DEDUP_TTL_MS,
+          extend: false,
+          replace: false,
+          shouldSurviveDispatch: true,
+        },
+        spanAttributes: (payload) => ({
+          "scenario_evaluations.tenant_id": payload.tenantId,
+          "scenario_evaluations.scenario_run_id": payload.scenarioRunId,
+          "scenario_evaluations.attempt": payload.attempt,
+        }),
+      });
+    if (scenarioEvaluationsQueue) {
+      enqueueScenarioEvaluations.resolve((payload, options) =>
+        scenarioEvaluationsQueue.send(payload, options),
+      );
+    } else {
+      // Event sourcing disabled: run in-process after the requested delay.
+      enqueueScenarioEvaluations.resolve(async (payload, options) => {
+        const timer = setTimeout(() => {
+          scenarioEvaluationsHandler(payload).catch((error: unknown) => {
+            logger.error(
+              {
+                tenantId: payload.tenantId,
+                scenarioRunId: payload.scenarioRunId,
+                error,
+              },
+              "Scenario evaluations failed",
+            );
+          });
+        }, options?.delay ?? 0);
+        if (typeof timer === "object" && "unref" in timer) timer.unref();
+      });
+    }
 
     // Resolve cross-pipeline deferred (trace → simulation)
     simComputeRunMetrics.resolve(simCommands.computeRunMetrics);

@@ -73,6 +73,7 @@ import {
   type ResolvedSession,
   resolveSession,
 } from "./context-session";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface ContextCommandOptions {
   /** Declare for this session instead of resolving the live one. */
@@ -107,7 +108,7 @@ export async function contextCommand({
   env = process.env,
   cwd = process.cwd(),
   runGit = runGitCommand,
-  fetchImpl = fetch,
+  fetchImpl = langwatchFetch,
   now = Date.now,
   stateDir = defaultStateDir(),
   claudeRegistryDir,

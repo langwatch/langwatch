@@ -84,6 +84,12 @@ export const SCENARIO_RUN_STATUS_CONFIG: Record<
     isComplete: false,
     fgColor: "blue.fg",
   },
+  [ScenarioRunStatus.PENDING_EVALUATION]: {
+    colorPalette: "blue",
+    label: "evaluating",
+    isComplete: false,
+    fgColor: "blue.fg",
+  },
 };
 
 export const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> =
@@ -97,4 +103,5 @@ export const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> =
     [ScenarioRunStatus.PENDING]: Clock,
     [ScenarioRunStatus.QUEUED]: Clock,
     [ScenarioRunStatus.RUNNING]: Clock,
+    [ScenarioRunStatus.PENDING_EVALUATION]: Clock,
   };

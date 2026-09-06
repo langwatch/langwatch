@@ -8,6 +8,9 @@
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 
+import type { EvaluatorAttachment } from "~/server/scenarios/evaluator-attachments";
+import type { SuiteFieldDefinition } from "~/server/scenarios/suite-fields";
+
 /** A scenario as the table reads it. */
 export type TestCase = {
   id: string;
@@ -27,6 +30,10 @@ export type TestSuiteEntry = {
   name: string;
   slug: string;
   caseCount: number;
+  /** The fields every scenario of the suite carries. */
+  fields: SuiteFieldDefinition[];
+  /** The evaluators every run of the suite gets. */
+  evaluators: EvaluatorAttachment[];
 };
 
 /** A set that a code run writes into. It is read-only in the platform. */

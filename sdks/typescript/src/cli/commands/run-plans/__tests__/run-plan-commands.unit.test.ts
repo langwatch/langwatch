@@ -143,6 +143,100 @@ afterEach(() => {
   process.exitCode = undefined;
 });
 
+describe("runRunPlanCommand() with --evaluators-json", () => {
+  /** @scenario "Run with a plan evaluator" */
+  it("sends the plan's own evaluators inside the configuration", async () => {
+    await runRunPlanCommand({
+      all: true,
+      target: ["http:agent_abc"],
+      evaluatorsJson: JSON.stringify([
+        {
+          evaluatorId: "evaluator_pii",
+          required: false,
+          mappings: {
+            input: {
+              type: "source",
+              sourceId: "conversation",
+              path: ["first_user_message"],
+            },
+          },
+        },
+      ]),
+    });
+
+    expect(runSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          evaluators: [
+            expect.objectContaining({
+              evaluatorId: "evaluator_pii",
+              required: false,
+            }),
+          ],
+        }),
+      }),
+    );
+  });
+
+  /** @scenario "Run with a plan evaluator" */
+  it("refuses a mapping to a scenario field, which a plan never reads", async () => {
+    await expect(
+      runRunPlanCommand({
+        all: true,
+        target: ["http:agent_abc"],
+        evaluatorsJson: JSON.stringify([
+          {
+            evaluatorId: "evaluator_sql",
+            mappings: {
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+            },
+          },
+        ]),
+      }),
+    ).rejects.toThrow(ProcessExitError);
+    expect(runSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("getRunPlanCommand() with evaluators", () => {
+  /** @scenario "Read a run plan shows its evaluators" */
+  it("shows each evaluator with its gate and its mappings", async () => {
+    getSpy.mockResolvedValue(
+      makePlan({
+        evaluators: [
+          {
+            id: "att_pii",
+            evaluatorId: "evaluator_pii",
+            required: false,
+            mappings: {
+              input: {
+                type: "source",
+                sourceId: "conversation",
+                path: ["transcript"],
+              },
+            },
+          },
+        ],
+      }),
+    );
+
+    const result = await getRunPlanCommand("plan_abc");
+    result?.table();
+
+    const printed = vi
+      .mocked(console.log)
+      .mock.calls.map((call) => String(call[0]))
+      .join("\n");
+    expect(printed).toContain("evaluator_pii");
+    expect(printed).toContain("reports only");
+    expect(printed).toContain("conversation.transcript");
+  });
+});
+
 /**
  * A fresh response per call. A `Response` body can be read once, so handing the
  * same object to every poll turns the second read into a poll FAILURE.

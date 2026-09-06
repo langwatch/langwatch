@@ -13,6 +13,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { OFFLINE_AGENT_TEST_COPY } from "~/components/agents/offlineAgentCopy";
 
 const agentRow = {
   id: "agent_1",
@@ -188,7 +189,7 @@ describe("<ConnectedAgentDrawer />", () => {
       await user.hover(test);
 
       expect(await screen.findByRole("tooltip")).toHaveTextContent(
-        "This agent is offline",
+        OFFLINE_AGENT_TEST_COPY,
       );
     });
   });
