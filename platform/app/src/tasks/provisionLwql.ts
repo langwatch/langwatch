@@ -251,10 +251,11 @@ async function selfProvisionAll({
           schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
         }),
         // After the views: the reader role's grants name them.
-        ...selfHostedPostgresReaderStatements({
+        ...postgresReaderStatementsFor({
+          mode: "manage-role",
           schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
           readerPassword: selfProvision.postgresReaderPassword,
-        }),
+        }).statements,
       ]);
 
       await withAdminClickHouseClient(async (client) => {
