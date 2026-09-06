@@ -35,11 +35,15 @@ class SilentMetrics extends ScenarioProcessorServiceMetricsPort {
 }
 
 describe("ScenarioProcessorService.handleSucceeded", () => {
-  let recordAgentInstance: ReturnType<typeof vi.fn>;
+  let recordAgentInstance: ReturnType<
+    typeof vi.fn<ScenarioExecutionService["recordAgentInstance"]>
+  >;
   let processor: ScenarioProcessorService;
 
   beforeEach(() => {
-    recordAgentInstance = vi.fn().mockResolvedValue(undefined);
+    recordAgentInstance = vi
+      .fn<ScenarioExecutionService["recordAgentInstance"]>()
+      .mockResolvedValue(undefined);
     const execution = Object.create(ScenarioExecutionService.prototype) as ScenarioExecutionService;
     execution.recordAgentInstance = recordAgentInstance;
     processor = ScenarioProcessorService.create({

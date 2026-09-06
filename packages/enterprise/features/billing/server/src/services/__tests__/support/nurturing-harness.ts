@@ -26,7 +26,7 @@ export type NurturingHarness = {
 
 /** Registers a working sink and answers what it sent. */
 export function registerNurturingSink({ failing = false, hanging = false } = {}): NurturingHarness {
-  const fetchFn = vi.fn(async () => {
+  const fetchFn = vi.fn(async (_url: string | URL | Request, _options?: RequestInit) => {
     if (hanging) return new Promise<Response>(() => undefined);
     if (failing) throw new Error("customer.io unreachable");
     return new Response(null, { status: 200 });

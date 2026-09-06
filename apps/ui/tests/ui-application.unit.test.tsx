@@ -7,11 +7,8 @@ import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../src/behavior/ui-p
 import type { UiFeatureApiTransport } from "../src/behavior/ui-feature-transport";
 import type { PublicEnvironment } from "../src/model/public-environment";
 import { uiRouteTable } from "../src/model/ui-route-table";
-import {
-  createUiApplication,
-  type UiApplicationInstall,
-  type UiFeatureInstall,
-} from "../src/ui/sections/ui-application";
+import type { UiFeatureInstall } from "../src/behavior/ui-feature";
+import { createUiApplication, type UiApplicationInstall } from "../src/ui/sections/ui-application";
 
 const publicEnvironment: PublicEnvironment = {
   BASE_HOST: "http://localhost",

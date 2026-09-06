@@ -142,17 +142,20 @@ describe("DatasetService", () => {
       it("names the offending column and the columns that are valid", async () => {
         const { service: subject } = service();
 
-        const error = await subject
-          .batchCreateRecords({
+        let error: unknown;
+        try {
+          await subject.batchCreateRecords({
             slugOrId: "feedback",
             projectId: PROJECT_ID,
             entries: [{ input: "hi", notes: "dropped on the floor" }],
-          })
-          .catch((thrown: unknown) => thrown as InvalidColumnError);
+          });
+        } catch (thrown) {
+          error = thrown;
+        }
 
         expect(error).toBeInstanceOf(InvalidColumnError);
-        expect(error.columnName).toBe("notes");
-        expect(error.validColumns).toEqual(["input", "output"]);
+        expect((error as InvalidColumnError).columnName).toBe("notes");
+        expect((error as InvalidColumnError).validColumns).toEqual(["input", "output"]);
       });
 
       /** @scenario "An entry naming a column the dataset does not define is refused" */

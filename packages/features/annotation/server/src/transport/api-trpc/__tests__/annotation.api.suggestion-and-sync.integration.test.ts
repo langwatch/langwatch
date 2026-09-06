@@ -164,32 +164,28 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
     /** @scenario "A queue item carries every comment about its trace" */
     it("resolves the assigned queue item's annotations from real storage", async () => {
       const queueTraceId = `test-trace-annotation-queue-enrich-${nanoid()}`;
-      await annotationService.create(
-        {
-          id: nanoid(),
-          projectId,
-          traceId: queueTraceId,
-          comment: "the whole trace is off",
-          isThumbsUp: null,
-          scoreOptions: {},
-          expectedOutput: null,
-        },
-        { id: "test-user-annotation-suggestion" },
-      );
-      await annotationService.create(
-        {
-          id: nanoid(),
-          projectId,
-          traceId: queueTraceId,
-          comment: "about span-1",
-          isThumbsUp: null,
-          scoreOptions: {},
-          expectedOutput: null,
-          anchorKind: "span",
-          anchorId: "span-1",
-        },
-        { id: "test-user-annotation-suggestion" },
-      );
+      await annotationService.create({
+        id: nanoid(),
+        projectId,
+        traceId: queueTraceId,
+        userId: "test-user-annotation-suggestion",
+        comment: "the whole trace is off",
+        isThumbsUp: null,
+        scoreOptions: {},
+        expectedOutput: null,
+      });
+      await annotationService.create({
+        id: nanoid(),
+        projectId,
+        traceId: queueTraceId,
+        userId: "test-user-annotation-suggestion",
+        comment: "about span-1",
+        isThumbsUp: null,
+        scoreOptions: {},
+        expectedOutput: null,
+        anchorKind: "span",
+        anchorId: "span-1",
+      });
 
       const queueItemId = "queue-item-1";
       const fakeQueues = {

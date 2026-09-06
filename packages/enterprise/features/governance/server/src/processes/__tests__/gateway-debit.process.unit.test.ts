@@ -12,6 +12,7 @@
 import {
   buildProcessDefinition,
   buildProcessManager,
+  type JsonValue,
   type ProcessDefinition,
   type ProcessEventEnvelope,
 } from "@langwatch/eventing";
@@ -129,8 +130,8 @@ const ref = {
 /** Admit, then hand the outcome to the process, returning the intents committed. */
 function admitThenOutcome(
   eventType: string,
-  outcome: Record<string, unknown>,
-  admitOverrides: Record<string, unknown> = {},
+  outcome: Record<string, JsonValue>,
+  admitOverrides: Record<string, JsonValue> = {},
 ) {
   const def = definition();
   const admitted = def.evolve({

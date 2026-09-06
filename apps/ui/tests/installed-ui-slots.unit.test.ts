@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import { installedUiFeatures } from "../src/features/installed-ui-features";
 
-const installedUiSlots = installedUiFeatures.capabilities.slots!;
+const installedUiSlots = installedUiFeatures.capabilities!.slots!;
 
 describe("the slots this application fills", () => {
   describe("when the installed slots are read", () => {
@@ -50,7 +50,7 @@ describe("the slots this application fills", () => {
   describe("when the shell publishes its capabilities", () => {
     /** @scenario The application fills the slot with the enterprise component */
     it("publishes them as a capability, so every routed screen reads them", () => {
-      expect(installedUiFeatures.capabilities.slots).toBeDefined();
+      expect(installedUiFeatures.capabilities!.slots).toBeDefined();
     });
   });
 });

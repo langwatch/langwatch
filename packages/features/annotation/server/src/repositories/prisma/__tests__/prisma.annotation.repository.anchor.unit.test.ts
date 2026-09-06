@@ -35,9 +35,9 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
   describe("given a comment left on a span", () => {
     /** @scenario Commenting on a span records the span it was left on */
     it("stores the span anchor and copies nothing the span held", async () => {
-      const create = vi.fn().mockResolvedValue(
-        baseRow({ anchorKind: "span", anchorId: "span-search" }),
-      );
+      const create = vi
+        .fn()
+        .mockResolvedValue(baseRow({ anchorKind: "span", anchorId: "span-search" }));
       const repository = PrismaAnnotationRepository.create(fakeDatabase(create));
 
       const result = await repository.create({
@@ -47,6 +47,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
         userId: "user-1",
         comment: "this search returned nothing",
         isThumbsUp: null,
+        scoreOptions: {},
         expectedOutput: null,
         anchorKind: "span",
         anchorId: "span-search",
@@ -70,9 +71,11 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
   describe("given a comment left on a span's field", () => {
     /** @scenario Commenting on a span's output records the field it was left on */
     it("stores the field separately for input and output", async () => {
-      const create = vi.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-        Promise.resolve(baseRow({ ...data, email: null })),
-      );
+      const create = vi
+        .fn()
+        .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve(baseRow({ ...data, email: null })),
+        );
       const repository = PrismaAnnotationRepository.create(fakeDatabase(create));
 
       const onOutput = await repository.create({
@@ -82,6 +85,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
         userId: "user-1",
         comment: "the output is wrong",
         isThumbsUp: null,
+        scoreOptions: {},
         expectedOutput: null,
         anchorKind: "field",
         anchorId: "span-search",
@@ -94,6 +98,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
         userId: "user-1",
         comment: "the query is wrong",
         isThumbsUp: null,
+        scoreOptions: {},
         expectedOutput: null,
         anchorKind: "field",
         anchorId: "span-search",
@@ -108,9 +113,11 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
   describe("given a comment left on the trace's own input, output or metadata", () => {
     /** @scenario Commenting on the trace's own input, output or metadata records which one */
     it("records which of the trace's own fields the comment is on", async () => {
-      const create = vi.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-        Promise.resolve(baseRow({ ...data, email: null })),
-      );
+      const create = vi
+        .fn()
+        .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve(baseRow({ ...data, email: null })),
+        );
       const repository = PrismaAnnotationRepository.create(fakeDatabase(create));
 
       const results = await Promise.all(
@@ -122,6 +129,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
             userId: "user-1",
             comment: `about ${path}`,
             isThumbsUp: null,
+            scoreOptions: {},
             expectedOutput: null,
             anchorKind: "field",
             anchorId: "trace-1",
@@ -186,7 +194,11 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
       const database = { annotation: { findMany } } as unknown as AnnotationDatabase;
       const repository = PrismaAnnotationRepository.create(database);
 
-      const all = await repository.list({ projectId: "project-1", traceIds: ["trace-1"] });
+      const all = await repository.list({
+        projectId: "project-1",
+        traceIds: ["trace-1"],
+        anchor: "all",
+      });
 
       expect(all.map((a) => a.id)).toEqual(["a-trace", "a-span-1", "a-span-2", "a-span-3"]);
       // No anchor filter narrowed the read; "all" is the unfiltered default.
@@ -194,9 +206,11 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
     });
 
     it("narrows to the trace-level comment only when asked", async () => {
-      const findMany = vi.fn().mockResolvedValue([
-        baseRow({ id: "a-trace", anchorKind: null, anchorId: null, anchorPath: null }),
-      ]);
+      const findMany = vi
+        .fn()
+        .mockResolvedValue([
+          baseRow({ id: "a-trace", anchorKind: null, anchorId: null, anchorPath: null }),
+        ]);
       const database = { annotation: { findMany } } as unknown as AnnotationDatabase;
       const repository = PrismaAnnotationRepository.create(database);
 

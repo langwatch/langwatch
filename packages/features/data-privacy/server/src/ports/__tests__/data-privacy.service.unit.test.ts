@@ -32,7 +32,13 @@ class MemoryDataPrivacyRepository extends DataPrivacyPolicyRepository {
     this.policies.push(policy);
     return policy;
   }
-  async deleteForScope() {}
+  async deleteForScope(input: {
+    organizationId: string;
+    scope: DataPrivacyScope;
+    personalOnly: boolean;
+  }) {
+    void input;
+  }
   async tryFindById() {
     return null;
   }

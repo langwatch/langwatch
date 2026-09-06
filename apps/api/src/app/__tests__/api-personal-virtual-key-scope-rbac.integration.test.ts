@@ -197,6 +197,7 @@ function buildRouter() {
     protected: trpc.procedure,
     policy: () => (procedure) => procedure,
     resolverAuthorizedPolicy: () => (procedure) => procedure,
+    validateOutput: false,
   });
 }
 

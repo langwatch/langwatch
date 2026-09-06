@@ -293,6 +293,7 @@ function testStorageConfig(): ApiStoredObjectsConfigResolution {
     // FACTORY, so an unconfigured deployment never resolves these — which is
     // exactly what this stub proves by being empty and still composing.
     azure: emptyAzureConfig(),
+    azureSpoolRetentionConfirmed: false,
     routes: new Map(),
   };
 }
@@ -334,6 +335,7 @@ function azureStorageConfig(): ApiStoredObjectsConfigResolution {
       container: AZURE_CONTAINER,
       endpoint: AZURE_ENDPOINT,
     },
+    azureSpoolRetentionConfirmed: true,
     routes: new Map(),
   };
 }

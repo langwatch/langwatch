@@ -9,7 +9,7 @@ import { PrismaProcessStore } from "../prisma-process-store";
  */
 function fakePrismaClient() {
   const calls: string[] = [];
-  const queryRaw = vi.fn(async () => {
+  const queryRaw = vi.fn(async (_sql: unknown) => {
     calls.push("$queryRaw");
     return [];
   });
