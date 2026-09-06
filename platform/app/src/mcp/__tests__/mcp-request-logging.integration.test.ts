@@ -195,39 +195,43 @@ describe("Feature: MCP request logging", () => {
     });
   });
 
-  it.each([
-    "POST",
-    "GET",
-    "DELETE",
-  ])("attributes an established session's %s without another project lookup", async (method) => {
-    const sessionId = await initializeSession();
-    const abort = new AbortController();
-    try {
-      const response = await fetch(`${baseUrl}/mcp`, {
-        method,
-        headers: { ...requestHeaders, "mcp-session-id": sessionId },
-        signal: abort.signal,
-        ...(method === "POST"
-          ? {
-              body: JSON.stringify({
-                jsonrpc: "2.0",
-                id: 2,
-                method: "tools/list",
-                params: {},
-              }),
-            }
-          : {}),
+  describe("given an established streamable session", () => {
+    describe("when the client makes another session request", () => {
+      it.each([
+        "POST",
+        "GET",
+        "DELETE",
+      ])("attributes its %s without another project lookup", async (method) => {
+        const sessionId = await initializeSession();
+        const abort = new AbortController();
+        try {
+          const response = await fetch(`${baseUrl}/mcp`, {
+            method,
+            headers: { ...requestHeaders, "mcp-session-id": sessionId },
+            signal: abort.signal,
+            ...(method === "POST"
+              ? {
+                  body: JSON.stringify({
+                    jsonrpc: "2.0",
+                    id: 2,
+                    method: "tools/list",
+                    params: {},
+                  }),
+                }
+              : {}),
+          });
+          expect(response.status).toBe(200);
+          if (method !== "GET") await response.text();
+        } finally {
+          abort.abort();
+        }
+        const line = await accessLogFor("/mcp");
+        expect(line.fields.projectId).toBe("logging-project");
+        expect(line.fields.sessionId).toBe(sessionId);
+        expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+        expect(JSON.stringify(line)).not.toContain(VALID_API_KEY);
       });
-      expect(response.status).toBe(200);
-      if (method !== "GET") await response.text();
-    } finally {
-      abort.abort();
-    }
-    const line = await accessLogFor("/mcp");
-    expect(line.fields.projectId).toBe("logging-project");
-    expect(line.fields.sessionId).toBe(sessionId);
-    expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
-    expect(JSON.stringify(line)).not.toContain(VALID_API_KEY);
+    });
   });
 
   it("does not attribute another project's session on a bearer mismatch", async () => {
@@ -243,43 +247,51 @@ describe("Feature: MCP request logging", () => {
     expect((await accessLogFor("/mcp")).fields).not.toHaveProperty("projectId");
   });
 
-  it.each([
-    true,
-    false,
-  ])("attributes a Redis recovered session (legacy: %s)", async (legacy) => {
-    const sessionId = `recovered-logging-${legacy}`;
-    redisRecords.set(
-      `mcp:session:${sessionId}`,
-      JSON.stringify({
-        encryptedApiKey: VALID_API_KEY,
-        ...(legacy ? {} : { projectId: "logging-project" }),
-      }),
-    );
-    mockPrisma.project.findUnique.mockClear();
-    for (let id = 2; id < 4; id++) {
-      logLines.length = 0;
-      const response = await fetch(`${baseUrl}/mcp`, {
-        method: "POST",
-        headers: { ...requestHeaders, "mcp-session-id": sessionId },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id,
-          method: "tools/list",
-          params: {},
-        }),
+  describe("given a streamable session stored by another replica", () => {
+    describe("when the client resumes it on this replica", () => {
+      it.each([
+        true,
+        false,
+      ])("attributes the recovered session (legacy: %s)", async (legacy) => {
+        const sessionId = `recovered-logging-${legacy}`;
+        redisRecords.set(
+          `mcp:session:${sessionId}`,
+          JSON.stringify({
+            encryptedApiKey: VALID_API_KEY,
+            ...(legacy ? {} : { projectId: "logging-project" }),
+          }),
+        );
+        mockPrisma.project.findUnique.mockClear();
+        for (let id = 2; id < 4; id++) {
+          logLines.length = 0;
+          const response = await fetch(`${baseUrl}/mcp`, {
+            method: "POST",
+            headers: { ...requestHeaders, "mcp-session-id": sessionId },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id,
+              method: "tools/list",
+              params: {},
+            }),
+          });
+          expect(response.status).toBe(200);
+          await response.text();
+          expect((await accessLogFor("/mcp")).fields.projectId).toBe(
+            "logging-project",
+          );
+          if (legacy && id === 2) {
+            expect(
+              JSON.parse(
+                redisRecords.get(`mcp:session:${sessionId}`) ?? "null",
+              ),
+            ).toMatchObject({ projectId: "logging-project" });
+          }
+        }
+        expect(mockPrisma.project.findUnique).toHaveBeenCalledTimes(
+          legacy ? 1 : 0,
+        );
       });
-      expect(response.status).toBe(200);
-      await response.text();
-      expect((await accessLogFor("/mcp")).fields.projectId).toBe(
-        "logging-project",
-      );
-      if (legacy && id === 2) {
-        expect(
-          JSON.parse(redisRecords.get(`mcp:session:${sessionId}`) ?? "null"),
-        ).toMatchObject({ projectId: "logging-project" });
-      }
-    }
-    expect(mockPrisma.project.findUnique).toHaveBeenCalledTimes(legacy ? 1 : 0);
+    });
   });
 
   it("attributes local SSE messages", async () => {
@@ -313,37 +325,43 @@ describe("Feature: MCP request logging", () => {
     }
   });
 
-  it.each([
-    true,
-    false,
-  ])("attributes relayed SSE messages (legacy: %s)", async (legacy) => {
-    const sessionId = `remote-sse-${legacy}`;
-    redisRecords.set(
-      `mcp:sse:session:${sessionId}`,
-      JSON.stringify({
-        encryptedApiKey: VALID_API_KEY,
-        ...(legacy ? {} : { projectId: "logging-project" }),
-      }),
-    );
-    mockPrisma.project.findUnique.mockClear();
-    for (let id = 1; id < 3; id++) {
-      logLines.length = 0;
-      const response = await postMessage({
-        baseUrl,
-        path: `/messages?sessionId=${sessionId}`,
-        apiKey: VALID_API_KEY,
-        body: initializeBody({ id }),
+  describe("given an SSE session stored by another replica", () => {
+    describe("when this replica relays a message", () => {
+      it.each([
+        true,
+        false,
+      ])("attributes the relayed message (legacy: %s)", async (legacy) => {
+        const sessionId = `remote-sse-${legacy}`;
+        redisRecords.set(
+          `mcp:sse:session:${sessionId}`,
+          JSON.stringify({
+            encryptedApiKey: VALID_API_KEY,
+            ...(legacy ? {} : { projectId: "logging-project" }),
+          }),
+        );
+        mockPrisma.project.findUnique.mockClear();
+        for (let id = 1; id < 3; id++) {
+          logLines.length = 0;
+          const response = await postMessage({
+            baseUrl,
+            path: `/messages?sessionId=${sessionId}`,
+            apiKey: VALID_API_KEY,
+            body: initializeBody({ id }),
+          });
+          expect(response.status).toBe(202);
+          expect((await accessLogFor("/messages")).fields.projectId).toBe(
+            "logging-project",
+          );
+        }
+        expect(mockPrisma.project.findUnique).toHaveBeenCalledTimes(
+          legacy ? 1 : 0,
+        );
+        expect(mockRedis.publish).toHaveBeenCalledWith(
+          `mcp:sse:relay:${sessionId}`,
+          JSON.stringify(initializeBody({ id: 2 })),
+        );
       });
-      expect(response.status).toBe(202);
-      expect((await accessLogFor("/messages")).fields.projectId).toBe(
-        "logging-project",
-      );
-    }
-    expect(mockPrisma.project.findUnique).toHaveBeenCalledTimes(legacy ? 1 : 0);
-    expect(mockRedis.publish).toHaveBeenCalledWith(
-      `mcp:sse:relay:${sessionId}`,
-      JSON.stringify(initializeBody({ id: 2 })),
-    );
+    });
   });
 
   describe("given a client sends a request to an MCP route", () => {

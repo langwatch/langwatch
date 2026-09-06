@@ -796,9 +796,11 @@ export function createMcpHandler(): McpHandler {
   }
 
   /** Look up the credential and tenant saved by the session owner. */
-  async function getSessionFromRedis(
-    sessionId: string,
-  ): Promise<SessionCredential | null> {
+  async function getSessionFromRedis({
+    sessionId,
+  }: {
+    sessionId: string;
+  }): Promise<SessionCredential | null> {
     if (!redis) return null;
     try {
       const data = await redis.get(`${REDIS_SESSION_PREFIX}${sessionId}`);
@@ -974,9 +976,11 @@ export function createMcpHandler(): McpHandler {
     }
   }
 
-  async function getSseSessionFromRedis(
-    sessionId: string,
-  ): Promise<SessionCredential | null> {
+  async function getSseSessionFromRedis({
+    sessionId,
+  }: {
+    sessionId: string;
+  }): Promise<SessionCredential | null> {
     if (!redis) return null;
     try {
       const data = await redis.get(`${REDIS_SSE_SESSION_PREFIX}${sessionId}`);
@@ -1388,7 +1392,7 @@ export function createMcpHandler(): McpHandler {
     incomingToken: string | null;
     callerApiKey: string;
   }): Promise<SessionState | null> {
-    const credential = await getSessionFromRedis(sessionId);
+    const credential = await getSessionFromRedis({ sessionId });
     if (!credential || credential.apiKey !== callerApiKey) return null;
     const redisApiKey = credential.apiKey;
     // Older replicas wrote no tenant. Resolve it once when recovering locally.
@@ -1860,7 +1864,7 @@ export function createMcpHandler(): McpHandler {
     // The stream lives on another replica. Hand the message over rather than
     // reject it: the load balancer has no session affinity, so most messages
     // of a healthy session arrive on a replica that does not hold it.
-    const credential = await getSseSessionFromRedis(sessionId);
+    const credential = await getSseSessionFromRedis({ sessionId });
     if (!credential) {
       sendJson(res, 404, { error: "Session not found" });
       return;
