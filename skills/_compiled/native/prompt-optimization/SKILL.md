@@ -43,7 +43,7 @@ If you are not on an experiment (no slug in context), see "No experiment yet" be
 - **(a) Everything present.** State the current pass rate in one line and go straight to the loop.
 - **(b) A prompt but no dataset.** Offer to generate an example dataset. Follow the datasets skill's realism rules: rows must look like this bot's real users, no trivia. Size it for iteration speed, 15 to 25 rows for the first loop; more can come once the loop works. Preview 5 rows before adding them.
 - **(c) No evaluator.** Infer the task type from the dataset and the prompt (table below), attach the evaluator, map it for the baseline column, and confirm it scores sensibly on a subset run of the baseline before you trust it.
-- **(d) Ambiguous.** Ask with a `choices` card naming the concrete alternatives. This choice picks what "better" means, so it is the user's, not a default's.
+- **(d) Ambiguous.** Ask with the `question` tool, naming the concrete alternatives as the options. This choice picks what "better" means, so it is the user's, not a default's.
 
 ## Choosing the evaluator
 
@@ -123,7 +123,7 @@ If the scoring service errors on every cell, say so plainly, score the outputs a
 
 Narrate as you work. A line before a command says what you are about to do and why, a line after it says what you found; the panel draws each card between the paragraphs it ran between, and the turn is saved in that same order, so what the user reads later is what they watched. Do not save your account of the work for the end: a wall of text after a pile of cards is the hardest version of the turn to read.
 
-Close with the numbers in prose, for example: "Improved pass rate from 60% to 85% over all 40 rows and cut cost per row by 12%. The baseline column is unchanged." The closing sentence always names both figures: the pass rate (or score) before and after, and what happened to cost, even when cost barely moved. It also names the rows the figures cover, and both columns have to cover the same rows. Quoting a winner over one dataset slice against a baseline over another is the one mistake here that sends the user the wrong way, because they act on the verdict and not on the arithmetic. A conclusion without the cost side is incomplete. It also names where the work landed, from `executedVia` once `result` has confirmed the write: on the page the user has open, or on the saved workbench their page is a step behind. One clause is enough, and getting it wrong is worse than leaving it out. Add a `stats` card holding the two or three figures that carry the story, usually the baseline and the winner, and a `table` card listing the attempts with their hypothesis and outcome. Keep the stats card to three items; a fourth crowds the panel and none of them read. End with the one decision that is genuinely the user's, as a `choices` card: publish the winning draft as a prompt version, or keep iterating.
+Close with the numbers in prose, for example: "Improved pass rate from 60% to 85% over all 40 rows and cut cost per row by 12%. The baseline column is unchanged." The closing sentence always names both figures: the pass rate (or score) before and after, and what happened to cost, even when cost barely moved. It also names the rows the figures cover, and both columns have to cover the same rows. Quoting a winner over one dataset slice against a baseline over another is the one mistake here that sends the user the wrong way, because they act on the verdict and not on the arithmetic. A conclusion without the cost side is incomplete. It also names where the work landed, from `executedVia` once `result` has confirmed the write: on the page the user has open, or on the saved workbench their page is a step behind. One clause is enough, and getting it wrong is worse than leaving it out. Add a `stats` card holding the two or three figures that carry the story, usually the baseline and the winner, and a `table` card listing the attempts with their hypothesis and outcome. Keep the stats card to three items; a fourth crowds the panel and none of them read. End with the one decision that is genuinely the user's, asked with the `question` tool: publish the winning draft as a prompt version, or keep iterating.
 
 **Publishing is the user's own click, and it is on the column.** There is no publish action and no command for it: the winning text is a draft on its own column, and the Save in that column's prompt editor is what writes it to the prompt library as a new version. So when the answer is publish, say where the draft is and that Save publishes it, in one sentence, and stop. Never go looking for a publish control on other pages, and never navigate away: the reader is looking at the columns your numbers are about, and a hunt that ends on an unrelated page reads as the work coming apart.
 
@@ -142,7 +142,7 @@ Cards are ` ```langy-card ` fenced blocks in the reply text, never tool calls or
 ```
 ````
 
-`table` and `choices` blocks use the same fence.
+`table` blocks use the same fence. A question is never a fence: ask it with the `question` tool.
 
 ## No experiment yet
 

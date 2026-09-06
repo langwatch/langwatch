@@ -1,0 +1,29 @@
+{
+  "name": "acme-support",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ACME shop support agent, the demo application for LangWatch dogfooding",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.79",
+    "@hono/node-server": "^2.0.6",
+    "ai": "^6.0.217",
+    "dotenv": "^17.0.0",
+    "hono": "^4.12.27",
+    "langwatch": "file:../../../../sdks/typescript",
+    "zod": "^4.0.14"
+  },
+  "devDependencies": {
+    "@langwatch/scenario": "^1.5.0",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.0"
+  }
+}

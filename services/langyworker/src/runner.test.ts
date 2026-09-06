@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TurnRunner, lastAssistantError, type SessionLike } from "./runner.js";
+import { createTurnContext, type TurnContext } from "./tools/turn-context.js";
 import { ProtocolWriter } from "./writer.js";
 
 type Emitted = Record<string, unknown>;
@@ -70,7 +71,7 @@ function makeRunner({
 }: {
   session: SessionLike;
   appliedSystemPrompts?: string[];
-  options?: { sessionResumed?: boolean };
+  options?: { sessionResumed?: boolean; turnContext?: TurnContext };
 }) {
   const { writer, events } = makeWriter();
   const runner = new TurnRunner({
@@ -92,6 +93,20 @@ async function until(condition: () => boolean): Promise<void> {
 }
 
 describe("TurnRunner", () => {
+  describe("when the local tools need the turn they belong to", () => {
+    it("names the turn in flight and names none once it ends", async () => {
+      const fake = makeFakeSession();
+      const turnContext = createTurnContext();
+      const { runner } = makeRunner({ session: fake.session, options: { turnContext } });
+      const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "hi" });
+      await until(() => fake.promptCalls.length === 1);
+      expect(turnContext.turnId).toBe("t1");
+      fake.finish();
+      await done;
+      expect(turnContext.turnId).toBeNull();
+    });
+  });
+
   describe("when a turn completes cleanly", () => {
     it("emits turn_started then turn_done ok, with the recomposed system prompt applied", async () => {
       const fake = makeFakeSession();

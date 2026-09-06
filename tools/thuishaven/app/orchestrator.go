@@ -197,7 +197,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// live baseline stack's copy when one exists, so its URL stays defined. With
 		// no baseline to fall back to it is genuinely unavailable: drop the
 		// preallocated port so it is neither routed (dead 502) nor emitted into the
-		// overlay (e.g. an OPENCODE_AGENT_URL/LANGY_INTERNAL_SECRET for a dead
+		// overlay (e.g. a LANGY_AGENT_URL/LANGY_INTERNAL_SECRET for a dead
 		// socket). The app is always local.
 		if r.Name == domain.IdPService {
 			svc.DNSPort = ports[nSvc+2]
