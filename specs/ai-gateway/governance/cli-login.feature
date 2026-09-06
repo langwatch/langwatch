@@ -142,9 +142,10 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
   Scenario: The approval stream tells the CLI to poll the moment the browser settles the code
     Given the CLI is on "/api/auth/cli/device-approval" for its device_code
     When the browser approves or denies that code
-    Then the stream emits the settled status
+    Then the stream emits the settled status, approved or denied
     And a code that settled before the stream opened emits at once
     And an unknown code is reported as expired rather than held open
+    And the pod refuses a new stream once it holds too many, so the CLI polls
 
   @integration @cli @device-flow @login-latency @rate-limit
   Scenario: A poll on a settled device code is answered, not rate limited

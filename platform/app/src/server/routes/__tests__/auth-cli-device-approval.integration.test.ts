@@ -80,10 +80,13 @@ async function readFirstFrame(res: Response): Promise<string | null> {
 }
 
 /** Wait until the stream handler has actually subscribed to its channel. */
-async function waitForSubscriber(
-  redis: Redis,
-  deviceCode: string,
-): Promise<void> {
+async function waitForSubscriber({
+  redis,
+  deviceCode,
+}: {
+  redis: Redis;
+  deviceCode: string;
+}): Promise<void> {
   const channel = `lwcli:device-settled:${deviceCode}`;
   for (let attempt = 0; attempt < 100; attempt++) {
     const channels = (await redis.pubsub("CHANNELS", channel)) as string[];
@@ -108,69 +111,90 @@ describe("CLI device-approval stream", () => {
     await stopTestContainers().catch(() => {});
   });
 
-  describe("when the browser approves while the CLI is on the stream", () => {
-    /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
-    it("emits the settled status without waiting for a poll", async () => {
-      const deviceCode = await mintDeviceCode();
-      const stream = await openApprovalStream(deviceCode);
-      expect(stream.status).toBe(200);
-      expect(stream.headers.get("content-type")).toContain("text/event-stream");
+  describe("given a device code the CLI is waiting on", () => {
+    describe("when the browser approves while the CLI is on the stream", () => {
+      /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
+      it("emits the settled status without waiting for a poll", async () => {
+        const deviceCode = await mintDeviceCode();
+        const stream = await openApprovalStream(deviceCode);
+        expect(stream.status).toBe(200);
+        expect(stream.headers.get("content-type")).toContain(
+          "text/event-stream",
+        );
 
-      await waitForSubscriber(redisConnection!, deviceCode);
-      await approveDeviceCode({
-        deviceCode,
-        userId: USER_ID,
-        organizationId: ORG_ID,
+        await waitForSubscriber({ redis: redisConnection!, deviceCode });
+        await approveDeviceCode({
+          deviceCode,
+          userId: USER_ID,
+          organizationId: ORG_ID,
+        });
+
+        expect(await readFirstFrame(stream)).toBe('{"status":"approved"}');
       });
+    });
 
-      expect(await readFirstFrame(stream)).toBe('{"status":"approved"}');
+    describe("when the browser denies while the CLI is on the stream", () => {
+      /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
+      it("emits denied, so the CLI stops instead of waiting the code out", async () => {
+        const deviceCode = await mintDeviceCode();
+        const stream = await openApprovalStream(deviceCode);
+
+        await waitForSubscriber({ redis: redisConnection!, deviceCode });
+        await denyDeviceCode(deviceCode);
+
+        expect(await readFirstFrame(stream)).toBe('{"status":"denied"}');
+      });
+    });
+
+    describe("when the code settled before the CLI opened the stream", () => {
+      /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
+      it("emits at once rather than holding the connection open", async () => {
+        const deviceCode = await mintDeviceCode();
+        await approveDeviceCode({
+          deviceCode,
+          userId: USER_ID,
+          organizationId: ORG_ID,
+        });
+
+        const stream = await openApprovalStream(deviceCode);
+        expect(await readFirstFrame(stream)).toBe('{"status":"approved"}');
+      });
+    });
+
+    describe("when the CLI polls straight after the stream told it to", () => {
+      /** @scenario "A poll on a settled device code is answered, not rate limited" */
+      it("answers the settled code instead of asking it to slow down", async () => {
+        const deviceCode = await mintDeviceCode();
+
+        expect((await callExchange(deviceCode)).status).toBe(428);
+        // Still pending, so the poll window is what a second poll gets.
+        expect((await callExchange(deviceCode)).status).toBe(429);
+
+        await denyDeviceCode(deviceCode);
+
+        // Inside the same window, but the code has settled: this is the poll
+        // the stream just asked for, and it gets its answer.
+        expect((await callExchange(deviceCode)).status).toBe(410);
+      });
     });
   });
 
-  describe("when the code settled before the CLI opened the stream", () => {
-    /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
-    it("emits at once rather than holding the connection open", async () => {
-      const deviceCode = await mintDeviceCode();
-      await approveDeviceCode({
-        deviceCode,
-        userId: USER_ID,
-        organizationId: ORG_ID,
+  describe("given a request the stream can do nothing for", () => {
+    describe("when the device code is unknown", () => {
+      /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
+      it("says expired instead of holding a stream nothing will ever settle", async () => {
+        const stream = await openApprovalStream(`missing-${suffix}`);
+        expect(await readFirstFrame(stream)).toBe('{"status":"expired"}');
       });
-
-      const stream = await openApprovalStream(deviceCode);
-      expect(await readFirstFrame(stream)).toBe('{"status":"approved"}');
-    });
-  });
-
-  describe("when the device code is unknown", () => {
-    /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
-    it("says expired instead of holding a stream nothing will ever settle", async () => {
-      const stream = await openApprovalStream(`missing-${suffix}`);
-      expect(await readFirstFrame(stream)).toBe('{"status":"expired"}');
     });
 
-    it("refuses a request with no device_code", async () => {
-      const res = await app.request("/api/auth/cli/device-approval", {
-        headers: { accept: "text/event-stream" },
+    describe("when no device_code is given", () => {
+      it("refuses the request", async () => {
+        const res = await app.request("/api/auth/cli/device-approval", {
+          headers: { accept: "text/event-stream" },
+        });
+        expect(res.status).toBe(400);
       });
-      expect(res.status).toBe(400);
-    });
-  });
-
-  describe("when the CLI polls straight after the stream told it to", () => {
-    /** @scenario "A poll on a settled device code is answered, not rate limited" */
-    it("answers the settled code instead of asking it to slow down", async () => {
-      const deviceCode = await mintDeviceCode();
-
-      expect((await callExchange(deviceCode)).status).toBe(428);
-      // Still pending, so the poll window is what a second poll gets.
-      expect((await callExchange(deviceCode)).status).toBe(429);
-
-      await denyDeviceCode(deviceCode);
-
-      // Inside the same window, but the code has settled: this is the poll
-      // the stream just asked for, and it gets its answer.
-      expect((await callExchange(deviceCode)).status).toBe(410);
     });
   });
 });

@@ -61,11 +61,15 @@ function ensureSubscriber(redis: RedisConnection): RedisConnection | null {
 }
 
 /** Announce that a device code reached `approved` or `denied`. */
-export async function publishDeviceCodeSettled(
-  redis: RedisConnection,
-  deviceCode: string,
-  status: string,
-): Promise<void> {
+export async function publishDeviceCodeSettled({
+  redis,
+  deviceCode,
+  status,
+}: {
+  redis: RedisConnection;
+  deviceCode: string;
+  status: string;
+}): Promise<void> {
   try {
     await redis.publish(channelFor(deviceCode), status);
   } catch (error) {
@@ -81,11 +85,16 @@ export async function publishDeviceCodeSettled(
  * null when `signal` aborts first. A subscribe that fails resolves null too,
  * which drops the stream and leaves the CLI polling.
  */
-export function waitForDeviceCodeSettled(
-  redis: RedisConnection,
-  deviceCode: string,
-  signal: AbortSignal,
-): Promise<string | null> {
+export function waitForDeviceCodeSettled({
+  redis,
+  deviceCode,
+  signal,
+}: {
+  redis: RedisConnection;
+  deviceCode: string;
+  /** Aborts the wait: the stream closed, or the device code ran out of time. */
+  signal: AbortSignal;
+}): Promise<string | null> {
   const connection = ensureSubscriber(redis);
   if (!connection) return Promise.resolve(null);
 
@@ -96,7 +105,7 @@ export function waitForDeviceCodeSettled(
       if (settled) return;
       settled = true;
       signal.removeEventListener("abort", onAbort);
-      release(connection, channel, listener);
+      release({ connection, channel, listener });
       resolve(status);
     };
     const listener: Listener = (status) => finish(status);
@@ -125,11 +134,15 @@ export function waitForDeviceCodeSettled(
   });
 }
 
-function release(
-  connection: RedisConnection,
-  channel: string,
-  listener: Listener,
-): void {
+function release({
+  connection,
+  channel,
+  listener,
+}: {
+  connection: RedisConnection;
+  channel: string;
+  listener: Listener;
+}): void {
   const channelListeners = listeners.get(channel);
   if (!channelListeners) return;
   channelListeners.delete(listener);

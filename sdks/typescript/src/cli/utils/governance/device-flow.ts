@@ -252,13 +252,16 @@ export async function exchange(
  * the route, a proxy that buffers the body, or a dropped connection all leave
  * the poll timer in charge rather than making it fire early.
  */
-function watchDeviceApproval(
-  opts: DeviceFlowOptions,
-  deviceCode: string,
-): { settled: Promise<void>; close: () => void } {
+function watchDeviceApproval({
+  opts,
+  deviceCode,
+}: {
+  opts: DeviceFlowOptions;
+  deviceCode: string;
+}): { settled: Promise<void>; close: () => void } {
   const controller = new AbortController();
   const settled = new Promise<void>((resolve) => {
-    readApprovalStream(opts, deviceCode, controller.signal).then(
+    readApprovalStream({ opts, deviceCode, signal: controller.signal }).then(
       (sawFrame) => {
         if (sawFrame) resolve();
       },
@@ -271,11 +274,16 @@ function watchDeviceApproval(
 }
 
 /** Whether the approval stream delivered a frame before it ended. */
-async function readApprovalStream(
-  opts: DeviceFlowOptions,
-  deviceCode: string,
-  signal: AbortSignal,
-): Promise<boolean> {
+async function readApprovalStream({
+  opts,
+  deviceCode,
+  signal,
+}: {
+  opts: DeviceFlowOptions;
+  deviceCode: string;
+  /** Aborts the read once the login is over, so the socket is not left open. */
+  signal: AbortSignal;
+}): Promise<boolean> {
   const base = normalizeEndpoint(opts.baseUrl);
   const f = opts.fetchImpl ?? fetch;
   const res = await f(
@@ -309,10 +317,13 @@ async function readApprovalStream(
 }
 
 /** Sleep, cut short by the approval signal when one is still worth racing. */
-async function waitForNextPoll(
-  ms: number,
-  approval: Promise<void> | null,
-): Promise<void> {
+async function waitForNextPoll({
+  ms,
+  approval,
+}: {
+  ms: number;
+  approval: Promise<void> | null;
+}): Promise<void> {
   if (!approval) {
     await wait(ms);
     return;
@@ -350,7 +361,7 @@ export async function pollUntilDone(
   const ceiling = 60_000;
   const deadline = Date.now() + dc.expires_in * 1000;
 
-  const watch = watchDeviceApproval(opts, dc.device_code);
+  const watch = watchDeviceApproval({ opts, deviceCode: dc.device_code });
   let approval: Promise<void> | null = watch.settled;
   // A signal fires once. Racing a resolved promise every round would turn the
   // loop into a hot poll if /exchange somehow still answered `pending`.
@@ -367,7 +378,7 @@ export async function pollUntilDone(
       if (firstPoll) {
         firstPoll = false;
       } else {
-        await waitForNextPoll(interval, approval);
+        await waitForNextPoll({ ms: interval, approval });
       }
       try {
         return await exchange(opts, dc.device_code);

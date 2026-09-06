@@ -1090,6 +1090,15 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
 const APPROVAL_KEEPALIVE_MS = 15_000;
 
 /**
+ * How many approval streams one pod holds open at once. Minting a device code
+ * takes no credential, so without a ceiling anyone could park a connection, a
+ * pair of timers and a Redis subscription per code they mint. Past the ceiling
+ * the route refuses, and a CLI that gets nothing polls the way it always did.
+ */
+const MAX_OPEN_APPROVAL_STREAMS = 512;
+let openApprovalStreams = 0;
+
+/**
  * Tell the CLI the moment its device code settles, so `langwatch login` does
  * not sit on the spinner until its next scheduled poll.
  *
@@ -1118,6 +1127,18 @@ secured.access(CLI_POLICY).get("/device-approval", async (c: Context) => {
   const raw = await redis.get(deviceCodeKey(deviceCode));
   const record = raw ? (JSON.parse(raw) as DeviceCodeRecord) : null;
   const deadline = record?.expires_at ?? Date.now();
+  const wouldWait = record?.status === "pending" && Date.now() <= deadline;
+
+  if (wouldWait && openApprovalStreams >= MAX_OPEN_APPROVAL_STREAMS) {
+    return c.json(
+      {
+        error: "temporarily_unavailable",
+        error_description:
+          "Too many approval streams are open. Poll /exchange at the interval you were given.",
+      },
+      503,
+    );
+  }
 
   return streamSSE(c, async (stream) => {
     // An already-settled code (or one Redis no longer holds) needs no wait:
@@ -1129,6 +1150,7 @@ secured.access(CLI_POLICY).get("/device-approval", async (c: Context) => {
       return;
     }
 
+    openApprovalStreams++;
     const controller = new AbortController();
     const closeOnDeadline = setTimeout(
       () => controller.abort(),
@@ -1143,11 +1165,11 @@ secured.access(CLI_POLICY).get("/device-approval", async (c: Context) => {
     }, APPROVAL_KEEPALIVE_MS);
 
     try {
-      const status = await waitForDeviceCodeSettled(
+      const status = await waitForDeviceCodeSettled({
         redis,
         deviceCode,
-        controller.signal,
-      );
+        signal: controller.signal,
+      });
       if (status) {
         await stream.writeSSE({ data: JSON.stringify({ status }) });
       }
@@ -1160,6 +1182,7 @@ secured.access(CLI_POLICY).get("/device-approval", async (c: Context) => {
       clearInterval(keepalive);
       clearTimeout(closeOnDeadline);
       controller.abort();
+      openApprovalStreams--;
     }
   });
 });
@@ -3216,7 +3239,7 @@ export async function approveDeviceCode({
     "EX",
     remainingSeconds,
   );
-  await publishDeviceCodeSettled(redis, deviceCode, "approved");
+  await publishDeviceCodeSettled({ redis, deviceCode, status: "approved" });
   return { approved: true };
 }
 
@@ -3237,5 +3260,5 @@ export async function denyDeviceCode(deviceCode: string): Promise<void> {
     "EX",
     Math.ceil(remainingMs / 1000),
   );
-  await publishDeviceCodeSettled(redis, deviceCode, "denied");
+  await publishDeviceCodeSettled({ redis, deviceCode, status: "denied" });
 }
