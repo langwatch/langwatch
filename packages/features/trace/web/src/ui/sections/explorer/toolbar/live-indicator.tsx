@@ -105,9 +105,8 @@ export const LiveIndicator: React.FC = () => {
           size="xs"
           onClick={refresh}
           disabled={isSamplePreview}
-          // We don't actually disable the button during a normal fetch — `useTraceListRefresh` debounces
-          // internally and cancels prior in-flight calls, so a mid-fetch click is a no-op that costs nothing,
-          // and disabling would kill the affordance for someone who *wants* to re-kick a stalled fetch.
+          // Not disabled during a normal fetch: `useTraceListRefresh` debounces and cancels
+          // in-flight calls, so a mid-fetch click is a free no-op, not a hazard.
           css={isRefreshing ? REFRESH_SPIN_CSS : undefined}
         >
           <RefreshCw size={12} />

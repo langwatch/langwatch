@@ -141,15 +141,9 @@ function MessageContentImpl({
   /** Bind a derived card's verify hint. Absent = chip hidden. */
   onVerifyDerivedCard?: (a: { card: LangyDerivedCard }) => void;
   /**
-   * The question waits of this conversation, keyed by the tool call that
-   * asked (ADR-129).
-   *
-   * A question asked mid-turn is answered back to its WAIT, and that answer
-   * writes no selection into the transcript, so the timeline the lock state
-   * derives from knows nothing about it: the card came back on screen after
-   * the turn with both options empty and a click on it started a second turn
-   * for a question that was already settled. The wait is what knows, so it is
-   * what the card reads.
+   * The question waits of this conversation, keyed by the tool call that asked (ADR-129). A
+   * mid-turn answer writes no selection into the transcript, so the lock state must read the
+   * wait, not the timeline, to know a question already settled.
    */
   questionWaits?: ReadonlyMap<string, LangyQuestionCardData>;
   /**
@@ -224,13 +218,9 @@ function MessageContentImpl({
 
   // The connect card is NOT sniffed out of the assistant's prose any more.
 
-  // The PR-flow progress card, derived from the message's TOOL PARTS — the same
-  // parts the tool cards render from. `git push` IS the push; we no longer ask
-  // the model to print `[langy:progress:pushed]` next to it and then regex the
-  // reply. Two things get better: an errored command no longer marks its step
-  // complete (a rejected push has not pushed), and the card SURVIVES A REFRESH —
-  // the sentinels were stripped before the message was persisted, so it never
-  // used to.
+  // The PR-flow progress card, derived from the message's tool parts, the same parts the tool
+  // cards render from: an errored command doesn't mark its step complete, and the card survives
+  // a refresh since it's persisted with the message.
   const progressEvents = isPlainText ? [] : githubProgressFromToolParts(message.parts);
 
   // Strip the hidden [langy:feedback:...] directive: when present, Langy asked
@@ -251,14 +241,9 @@ function MessageContentImpl({
   // still gives the blur-reveal while `isStreaming`.
 
   const proposals = extractProposals(message);
-  // The PR cards, read off the message's TOOL PARTS — not scraped from the
-  // model's text. This was the LAST thing in Langy's UI steered by regexing the
-  // assistant's prose: any github.com/…/pull/N URL in the reply drew a card, so
-  // the model could mangle the URL, omit it, or merely MENTION a PR it never
-  // opened and get a card for it. The tool part is written by the control plane
-  // from `gh pr create`'s own stdout, is persisted with the message (so the card
-  // survives a refresh), and skips a `gh pr create` that FAILED — a PR that did
-  // not open must never render as one that did.
+  // The PR cards, read off the message's tool parts, not scraped from the model's text: the tool
+  // part is written by the control plane from `gh pr create`'s own stdout, persisted with the
+  // message, and skips a `gh pr create` that failed.
   const prs = isPlainText ? [] : githubPrsFromToolParts(message.parts);
   // "Opened pull request #1" is how Langy names a pull request, and the reader
   // had the number and no way through to it. The URLs come from the same tool
@@ -274,23 +259,16 @@ function MessageContentImpl({
   // something to render" so a turn whose only output is a running tool or a
   // settled card (no prose yet) still surfaces it.
   const showsActivity = isPlainText ? false : hasLangyActivity(message);
-  // The plan checklist, folded from the turn's `todowrite` tool parts. It is
-  // the steps only — the work itself is in the transcript, where it happened.
-  // On the LIVE streaming turn the manager's typed snapshot (store) is
-  // preferred over raw parsing, so the client honours the same caps the manager
-  // applied, and LangyPanel holds the checklist above the composer rather than
-  // letting it scroll away with the top of a long turn.
-  // Completed messages do not need to subscribe to the mutable live-turn
-  // snapshot. Keeping that subscription on every historical answer made one
-  // plan tick reconcile the full transcript.
+  // The plan checklist, folded from the turn's `todowrite` tool parts. On the live streaming turn
+  // the manager's typed snapshot is preferred over raw parsing; completed messages don't subscribe
+  // to it, so a plan tick doesn't reconcile the full transcript.
   const livePlan = useLangyStore((s) => (isStreaming ? s.turnPlan : null));
   const plan = isPlainText
     ? null
     : langyPlan(message, isStreaming ? { overrideItems: livePlan } : undefined);
   const hasActivityRecord = showsActivity || Boolean(plan);
-  // Reasoning-summary headlines ("Planning task execution strategy") are the model's thinking, not its answer —
-  // on a settled turn they fold into the completed-actions receipt instead of standing as loose bold paragraphs
-  // above the reply (and the last one no longer glues onto the reply's first word).
+  // Reasoning-summary headlines are the model's thinking, not its answer — on a settled turn they
+  // fold into the completed-actions receipt rather than standing as loose bold paragraphs above it.
   const reasoningFold =
     isPlainText || isStreaming
       ? { titles: [], text }
@@ -507,14 +485,8 @@ function MessageContentImpl({
             />
           </LangyCardBoundary>
         ) : null}
-        {/* WHEN to ask is the backend's call (langy.messages `shouldAskFeedback` —
-            conversation depth + a per-user quiet period), or the agent's own
-            [langy:feedback] directive at a high-signal moment, or the user
-            typing /feedback. `showFeedback` is only the position + settled
-            gate; the substance floor still stops the default path from rating
-            a bare one-word ack. `isFeedbackPinned` (a pin) keeps a shown card
-            mounted across the refetch that follows the shown-mark, and powers
-            /feedback. Never renders mid-stream. */}
+        {/* WHEN to ask is the backend's `shouldAskFeedback`, the agent's own directive, or
+            /feedback. `showFeedback` is only the position + settled gate. Never mid-stream. */}
         {/* The reply the user cut short says so, whatever it managed to say
             first. Without this line a stopped turn that had already run a tool
             or written a paragraph looked exactly like a finished one, so the
@@ -963,11 +935,8 @@ function isLangyProposal(value: unknown): value is LangyProposal {
 }
 
 /**
- * What a settled question WAIT says about one choices card, or null when the
- * wait knows nothing and the timeline should answer instead.
- *
- * A wait that is still pending leaves the card open; a wait that ended locks
- * it, on the option the answer names when the answer can be matched to one.
+ * What a settled question wait says about one choices card, or null when the wait knows nothing
+ * and the timeline should answer instead. A pending wait leaves the card open; ended locks it.
  */
 function questionWaitLockState({
   blockId,

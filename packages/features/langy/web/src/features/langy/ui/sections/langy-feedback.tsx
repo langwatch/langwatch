@@ -74,9 +74,8 @@ export function LangyFeedback({
   /** The moment Langy classified this as, via its feedback directive. */
   sentiment?: LangyFeedbackSentiment;
   /**
-   * How this card came to be: the backend cadence asked ("asked"), the agent's in-stream directive asked
-   * ("directive"), the user summoned it with `/feedback` ("requested"), or the dev card gallery is rendering a
-   * fixture ("preview" — fully inert: no pin, no marks, no cadence).
+   * How this card came to be: the backend cadence ("asked"), the agent's directive ("directive"),
+   * `/feedback` ("requested"), or the dev card gallery ("preview" — fully inert).
    */
   origin?: "asked" | "directive" | "requested" | "preview";
 }) {

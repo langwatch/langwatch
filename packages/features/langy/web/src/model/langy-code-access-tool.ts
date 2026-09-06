@@ -1,19 +1,7 @@
 /**
- * The `code_access` TOOL is the code access card (ADR-129) — this module is
- * the bridge, the same shape `langyQuestionTool` takes for the question tool.
- *
- * Langy calls `code_access` before the first change to the customer's own
- * program. The tool answers itself when a folder is already connected or the
- * user remembered GitHub; otherwise it records a control request and ends the
- * turn on the card. Either way the CALL is what the panel sees, so the call is
- * where the card hangs.
- *
- * The card's STATE is never read from the tool part: the folder can connect
- * after the turn settles, and the remembered choice can be cleared from the
- * settings page. `langy.getLocalWorkspace` is the one source, refetched when a
- * `local_workspace` entry says the folder came or went.
- *
- * Pure and JSX-free.
+ * The `code_access` tool is the code access card (ADR-129); this module is the bridge, the same
+ * shape `langyQuestionTool` takes. State is never read from the tool part — the folder or the
+ * remembered choice can change after the turn settles — so `langy.getLocalWorkspace` is the source.
  */
 export const LANGY_CODE_ACCESS_TOOL_NAME = "code_access";
 
@@ -27,18 +15,8 @@ interface CodeAccessPartLike {
 }
 
 /**
- * The first words of the answer a call gets when it RAISED the card.
- *
- * `code_access` answers itself whenever it can: a folder that is already
- * connected comes back as the workspace facts, and a remembered GitHub choice
- * comes back as one line about GitHub. Neither asked the reader anything, and a
- * card for one of them repeated a connect the chip and the first card already
- * carried, at the bottom of the transcript, after the pull request. Langy calls
- * the tool once per stretch of work, so a long turn drew that card three times.
- *
- * The words are the worker's, in
- * `services/langyworker/src/tools/local-workspace.ts`, and a test on each side
- * pins them.
+ * The first words of the answer a call gets when it raised the card. Owned by
+ * `services/langyworker/src/tools/local-workspace.ts`, pinned by a test on each side.
  */
 export const LANGY_CODE_ACCESS_CARD_ANSWER = "The code access card is shown to the user.";
 
@@ -78,12 +56,8 @@ export function codeAccessCallId(parts: readonly unknown[]): string | null {
 }
 
 /**
- * Whether one `code_access` call put the card up.
- *
- * A call whose answer has not landed yet counts as asking: the card belongs on
- * screen while the tool is deciding, and the first ask is the one the reader is
- * waiting on. A call that answered itself carries that answer, and the answer
- * is what says it asked nothing.
+ * Whether one `code_access` call put the card up. A call whose answer hasn't landed counts as
+ * asking; a call that answered itself carries that answer, which is what says it asked nothing.
  */
 function codeAccessAsked(part: CodeAccessPartLike): boolean {
   const output = part.output;
@@ -92,13 +66,9 @@ function codeAccessAsked(part: CodeAccessPartLike): boolean {
 }
 
 /**
- * The id of the LAST `code_access` call in a whole conversation, or null when
- * no message carries one.
- *
- * Only that card is live. Every state the card shows is read from the one
- * workspace query, so an older ask renders exactly what the newest one does:
- * two identical cards, two ways to answer the same question, and a click on
- * the older one answering a call the turn has moved past.
+ * The id of the last `code_access` call in a whole conversation, or null when none. Only that
+ * card is live, since state is read from the one workspace query — an older card would render
+ * identically and answer a call the turn has moved past.
  */
 export function latestCodeAccessCallId(
   messages: readonly { role?: string; parts?: readonly unknown[] }[],

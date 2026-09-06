@@ -164,9 +164,8 @@ export class OrganizationMemberRoleService {
   }
 
   /**
-   * The full member-role-change orchestration: personal-workspace assertion, shared-team scoping, seat
-   * classification (a Lite Member gaining non-view permissions re-checks the full-member seats) and the
-   * Enterprise gate for custom-role assignments, then the cascading role update itself.
+   * The full member-role-change orchestration: personal-workspace assertion, shared-team scoping,
+   * seat classification, the Enterprise gate for custom roles, then the cascading role update.
    */
   async changeMemberRole(params: {
     organizationId: string;

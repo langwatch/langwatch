@@ -1,16 +1,7 @@
 /**
- * The organization-scoped `/api/groups` REST family.
- *
- * The organization capability arrives as a provider rather than being read off
- * the request, so this family can be mounted into any process that has one.
- *
- * Two things the family needs are the process's, not this package's, and
- * arrive as ports: the Enterprise plan gate (it reads the deployment's billing
- * store and answers with the application's own 402) and the grants-ledger
- * attribution rule for a REST write.
- *
- * Spec: specs/groups/groups-rest-api.feature,
- *       specs/licensing/management-apis-enterprise-gate.feature
+ * The organization-scoped `/api/groups` REST family, mountable into any process holding an
+ * organization capability provider. The Enterprise plan gate and grants-ledger attribution
+ * arrive as ports, since both belong to the process, not this package.
  */
 import {
   organizationGroupBindingInputSchema,
@@ -62,12 +53,9 @@ const groupBindingParamsSchema = groupParamsSchema.extend({ bindingId: z.string(
 const organizationOf = (c: Context): { id: string } => c.get("organization") as { id: string };
 
 /**
- * The `/api/groups` family, built against one process's security.
- *
- * `enterpriseGate` is per-route middleware on purpose: the gate reads the
- * organization that org auth resolved onto the context, so a family-level
- * middleware would run before authentication and find nothing, and the RBAC
- * denial should fire before the plan denial anyway.
+ * The `/api/groups` family, built against one process's security. `enterpriseGate` is per-route
+ * middleware since it reads the organization org auth resolved, which a family-level middleware
+ * would run before, finding nothing.
  */
 export function createGroupRestApp(options: {
   security: AppRestSecurity;

@@ -82,9 +82,8 @@ const DEFAULT_SEARCH_WINDOW_MS = 24 * 60 * 60 * 1000;
 // ── traces ──────────────────────────────────────────────────────────────────
 
 /**
- * One trace header per id, in id order, via the same `tracesV2.header` read the trace drawer uses (minus full IO
- * resolution — this fetches N traces and immediately truncates each to `ROW_TEXT_MAX`, so it's never worth the
- * extra spans read `full: true` costs).
+ * One trace header per id, in id order, via the same `tracesV2.header` read the trace drawer uses,
+ * minus full IO resolution — each result is truncated to `ROW_TEXT_MAX` anyway.
  */
 async function traceByIds({
   utils,

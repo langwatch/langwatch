@@ -338,25 +338,10 @@ function ComposerImpl({
             />
           )}
 
-          {/* The input row: the field, and send / stop DIRECTLY BESIDE IT.
-              The control used to live on the bottom rail with the model picker,
-              which put two unrelated things — "what model runs this" and "run
-              it" — on one line and left the input floating above them both.
-              Beside the field it reads as the field's own action.
-
-              `align="flex-end"` so the button stays pinned to the bottom of a
-              growing textarea (autoresize climbs to 120px) rather than drifting
-              down with the vertical centre.
-
-              The HERO is the exception, and it has to be. In the panel this row
-              sits between a context summary above and the model rail below,
-              which is what gives the field its vertical bearings; the hero
-              shows neither, so the row IS the bar. Bottom-aligned against
-              nothing, the text rode high and the send button hung off the
-              floor. Centred, with symmetric padding, the placeholder and the
-              button share one optical centre line. It still flips to bottom
-              alignment once the field has grown past a single line, so a long
-              question does not drag the button down the middle of it. */}
+          {/* Send/stop sits directly beside the field so it reads as the field's own action.
+              `align="flex-end"` pins the button to the bottom of a growing textarea, except in
+              the hero (which has no context summary or model rail for bearings): there the row
+              centres instead, flipping to bottom-aligned once the field grows past one line. */}
           <ComposerInputRow
             hero={hero}
             disabled={disabled}
@@ -394,14 +379,8 @@ function ComposerImpl({
             display={hero ? "none" : undefined}
           >
             <Box flex={1} minWidth={0} />
-            {/* The two keys, said out loud. A palette you can only reach by
-                guessing a keystroke is a palette most people never see, so the
-                sigils sit on the rail as real buttons: they name what each key
-                opens AND open it, which means the shortcut teaches itself the
-                first time someone clicks one.
-
-                They keep a gap between them: at the rail's 4px they read as one
-                four-word control rather than as two things you can press. */}
+            {/* Real buttons that name each shortcut and open it, so the shortcut teaches itself.
+                Kept apart so they don't read as one control at the rail's 4px gap. */}
             <HStack gap={2} flexShrink={0} align="center">
               <LangyModelPill
                 model={model}
@@ -507,14 +486,8 @@ function composerKeyHandler({
 }
 
 /**
- * What the empty field says, in the state the composer is actually in.
- *
- * There is no queue (see composerKeyHandler), so the mid-turn line must not
- * read as a promise to send: it said "Write your next message…", the user
- * wrote one, pressed Enter, and nothing happened, with no sign it had been
- * refused. And while a card is open the turn is waiting for the READER, so the
- * line points at the card rather than blaming Langy for the wait, and names
- * the terminal as well when the folder is shared from one (ADR-129).
+ * What the empty field says, in the state the composer is actually in — never a promise to
+ * send (there's no queue), and pointed at the open card rather than blaming Langy for the wait.
  */
 export function composerPlaceholder({
   awaitingAnswer,

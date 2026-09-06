@@ -106,9 +106,8 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
       onOpenChange={() => handleClose()}
     >
       <Drawer.Content
-        // Transparent at the Content level so the header section below can run its own translucent +
-        // backdrop-blur fill (page content behind the drawer reads through blurred, consistent with the rest
-        // of the site's translucent chrome — see BelowFoldIndicator, sequence overlays).
+        // Transparent here so the header below can run its own translucent + backdrop-blur fill,
+        // consistent with the rest of the site's translucent chrome.
         bg="transparent"
         ref={drawerContentRef}
         paddingX={0}

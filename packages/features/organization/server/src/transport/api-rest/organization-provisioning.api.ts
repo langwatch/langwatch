@@ -40,7 +40,9 @@ export interface OrganizationProvisioningPort {
     slug?: string;
   }): Promise<{ organization: { id: string; name: string }; team: unknown }>;
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
-  tryGetProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null>;
+  tryGetProvisioningSummary(
+    organizationId: string,
+  ): Promise<OrganizationProvisioningSummary | null>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
 }
 
@@ -69,9 +71,9 @@ function isAuthorized(authorizationHeader: string | undefined, expected: string)
 }
 
 /**
- * Constant-time bearer check against the instance credential (the langy-internal pattern: a plain `===` leaks the secret one
- * byte at a time to anything that can time responses). Availability comes first: an unconfigured credential or a SaaS
- * deployment means the family does not exist, so the answer is 404 before any credential is examined.
+ * Constant-time bearer check against the instance credential, since a plain `===` leaks the
+ * secret one byte at a time. Availability comes first: unconfigured or SaaS answers 404 before
+ * any credential is examined.
  */
 export function verifyInstanceAdminKey(options: {
   instanceAdminKey: () => string | undefined;
@@ -180,10 +182,7 @@ export function createOrganizationsRestApp(options: {
 
   const instanceAdmin = policy(instanceAdminPolicy());
 
-  const provisionHandler = async (
-    _c: Context,
-    input: z.infer<typeof createOrganizationSchema>,
-  ) => {
+  const provisionHandler = async (_c: Context, input: z.infer<typeof createOrganizationSchema>) => {
     const service_ = organizations();
 
     const created = await service_.createForProvisioning({
@@ -263,10 +262,7 @@ export function createOrganizationsRestApp(options: {
     organizations: await organizations().listProvisioningSummaries(),
   });
 
-  const getHandler = async (
-    _c: Context,
-    input: z.infer<typeof organizationParamsSchema>,
-  ) => {
+  const getHandler = async (_c: Context, input: z.infer<typeof organizationParamsSchema>) => {
     const organization = await organizations().tryGetProvisioningSummary(input.id);
     if (!organization) {
       throw new NotFoundError("not_found", "Organization", input.id);

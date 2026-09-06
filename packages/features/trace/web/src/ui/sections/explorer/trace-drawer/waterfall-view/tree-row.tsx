@@ -366,15 +366,8 @@ export const TreeRow = memo(function TreeRow({
             <Icon as={isCollapsed ? LuChevronRight : LuChevronDown} boxSize={3} color="fg.muted" />
           </Flex>
 
-          {/* Type icon — rendered inside a colored chip so the span type
-              reads at a glance even before the row text. Uses
-              `colorPalette` (a Chakra v3 token-resolution scope) instead
-              of interpolating the palette into the token string —
-              `${palette}.subtle` would resolve OK in light mode but the
-              dark-mode variant for some palettes (esp. blue/purple at
-              `.subtle`) gave near-invisible icon-on-bg contrast. The
-              `colorPalette.subtle` / `colorPalette.fg` aliases pick the
-              right pair for the active colour mode automatically. */}
+          {/* Uses `colorPalette` scope resolution rather than interpolating the palette into the
+              token string — the latter gave near-invisible icon contrast in some dark palettes. */}
           <Flex
             width="18px"
             height="18px"

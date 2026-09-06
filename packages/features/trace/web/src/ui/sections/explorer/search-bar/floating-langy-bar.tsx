@@ -29,7 +29,7 @@ const LANGY_PROMPTS = [
 ] as const;
 
 /**
- * A Langy-styled ask surface anchored over the search bar — so the question is typed at the top of the trace explorer, next to the traces it is about, instead of over in the docked panel.
+ * A Langy-styled ask surface anchored over the search bar, next to the traces it is about.
  * Spec: specs/traces-v2/search.feature ("The search bar's ask affordance
  * belongs to Langy when Langy is available").
  */

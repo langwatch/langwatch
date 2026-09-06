@@ -281,9 +281,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             </motion.div>
           ) : stageDef.heading ? (
             <motion.div
-              // Including `replayToken` in the key is what makes the Replay button work: bumping the token
-              // forces this node to remount, which in turn restarts the typewriter (or the static hero's
-              // enter animation) even when the heading text and stage haven't changed.
+              // `replayToken` in the key makes Replay work: bumping it remounts this node and
+              // restarts the enter animation even when the heading and stage haven't changed.
               key={`${stageDef.heading}__${replayToken}`}
               initial={{ opacity: 0, y: 4 }}
               // `dimHero` (currently `auroraArrival`) drops the hero
@@ -378,14 +377,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
           )}
         </AnimatePresence>
 
-        {/* Quiet "hand this to your agent" affordance during the
-            welcome beats. The narrative: by the time the user
-            finishes watching the tour, their agent has done the
-            integration. Surfaced only on the welcome / trace_explorer
-            stages so it doesn't compete with later, more directed
-            CTAs. Lands the user on the Skill tab inside the
-            IntegrateDrawer (the drawer's default segment), which is
-            the lightest-touch handoff path. */}
+        {/* Quiet "hand this to your agent" affordance, surfaced only on the welcome/trace_explorer
+            stages so it doesn't compete with later, more directed CTAs. */}
         <AnimatePresence>
           {(stage === "welcome" || stage === "trace_explorer") && !isReturningWelcome && (
             <motion.div
@@ -449,15 +442,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
           )}
         </AnimatePresence>
 
-        {/* Primary "advance" CTA — promoted out of the secondary
-            footer row so it actually reads as the next thing to do.
-            Was previously a small ghost button inline with docs/skip,
-            which got lost ("Got it" / "Show me" looked like a quiet
-            label rather than the primary action). Renders as a
-            solid orange button keyed to the stage so each beat
-            animates in fresh. Skipped on the density spotlight (the
-            cards do double-duty as the advance affordance) and the
-            outro chapter (the OutroPanel owns its own CTAs). */}
+        {/* Primary "advance" CTA, keyed to the stage so each beat animates in fresh. Skipped on the
+            density spotlight (cards double as the CTA) and outro (owns its own CTAs). */}
         <AnimatePresence>
           {stageDef.cta && stageDef.next && !stageDef.showDensitySpotlight && stage !== "outro" && (
             <motion.div
@@ -487,18 +473,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
           )}
         </AnimatePresence>
 
-        {/* Single footer row — manual advance CTA (when the stage
-            defines one), docs link and skip, all inline. Saves the
-            vertical space we'd otherwise lose to a dedicated CTA
-            row above the footer, which matters most on the densest
-            stage (densityIntro). The Continue button stays quiet
-            until the user actually picks a density — once they
-            have, it wakes up to solid orange so pressing it next
-            reads as obvious. Suppressed on outro: the OutroPanel
-            top banner owns its own primary + dismiss controls, and
-            stacking another row of "Skip for now / Integration
-            overview" alongside the banner would re-introduce the
-            duplicate-CTA problem the banner is here to fix. */}
+        {/* Single footer row (CTA, docs link, skip) saves vertical space over a dedicated CTA row.
+            Suppressed on outro, whose top banner owns its own primary + dismiss controls. */}
         {stage !== "outro" && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -506,14 +482,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             transition={{ duration: 0.4, delay: 0.32 }}
           >
             <HStack gap={3} color="fg.muted" textStyle="xs" flexWrap="wrap" justify="center">
-              {/* Back + Replay sit before Continue / docs / skip — they
-                give the user a way out of "I missed that beat" without
-                forcing them to restart the whole tour. Hidden on the
-                density spotlight (its cards already double as advance
-                affordances). The outer gate already excludes the outro
-                chapter (the OutroPanel owns its own CTAs there). The
-                bullet separators are only rendered when an item is
-                shown so we don't get adjacent dots. */}
+              {/* Back + Replay let the user recover a missed beat without restarting the tour.
+                Bullet separators only render when an item is shown, to avoid adjacent dots. */}
               {!stageDef.showDensitySpotlight && !isReturningWelcome && (
                 <>
                   {canGoBack && (
@@ -597,16 +567,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
           </motion.div>
         )}
 
-        {/* Chapter progress strip — sits at the bottom of the hero
-            stack, beneath the docs / skip secondary controls, so it
-            reads as a quiet "where am I in this" indicator rather
-            than competing with the primary CTA. Hidden on `settle`
-            (no narrative beat has landed yet) and on `outro` (the
-            top banner is the entire chrome — adding a strip below it
-            re-introduces the stacked-card feel the banner is here to
-            replace). The strip itself is non-clickable — chapter
-            jumping is offered separately via `ReturningUserHub` for
-            users who've already done the tour once. */}
+        {/* Chapter progress strip: a quiet "where am I" indicator, non-clickable (chapter jumping
+            lives in `ReturningUserHub`). Hidden on `settle` and `outro`. */}
         {stage !== "settle" && stage !== "outro" && (
           <motion.div
             initial={{ opacity: 0 }}

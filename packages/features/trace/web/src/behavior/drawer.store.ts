@@ -4,9 +4,7 @@ import { isPreviewTraceId } from "../model/preview-trace-id";
 import { selectIsTraceEditDirty, useTraceEditStore } from "./trace-edit.store";
 
 export type DrawerViewMode = "trace" | "summary" | "conversation" | "terminal" | "session";
-// Flame was retired during the trace-view redesign on the grounds that Waterfall already showed depth/parent/child — then brought back in
-// Round 3 because the time-weighted block layout reads completely differently from the indented-row waterfall when scanning *where* time is
-// spent (the waterfall makes parent/child easy; flame makes hot paths obvious).
+// Flame's time-weighted blocks show where time is spent better than the indented waterfall does.
 export type VizTab = "waterfall" | "topology" | "sequence" | "flame";
 // "summary" / "llm" / "prompts" were removed from the SpanTabBar in the
 // redesign — Summary is now its own DrawerViewMode, and LLM / prompts

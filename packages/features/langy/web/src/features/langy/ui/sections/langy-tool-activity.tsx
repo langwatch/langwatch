@@ -553,16 +553,9 @@ export function LangyActivityParts({
     ? allCompletedGroups.filter((group) => group !== heldGroup)
     : allCompletedGroups;
 
-  // One ordered transcript, not four stacked piles keyed by kind. Every block
-  // knows the part it came from, so the render is a stable sort on that: a
-  // failure lands exactly where it happened, and the receipt for the steps
-  // before it stays before it. See {@link Sequenced}.
-  // A step that failed and was then followed by the turn's own reply is a step
-  // the turn RECOVERED from. A filmed run left three red cards standing for
-  // three self-corrected probes — a flag the command did not take, then the same
-  // command without it — beside a reply that had gone on to open a pull request.
-  // Nothing is hidden: a recovered failure folds to one line that opens into the
-  // same card. A turn that is still running, or one that never got to a reply,
+  // One ordered transcript, a stable sort on the part each block came from (see {@link Sequenced}).
+  // A step that failed and was followed by the turn's own reply is folded to one line that opens
+  // into the same card, since nothing is hidden. A turn still running, or one that never replied,
   // keeps its failures where they are.
   const answerIndex = lastAnswerTextIndex(view);
   const rows: Array<{ key: string; order: number; node: ReactNode }> = [
@@ -1163,11 +1156,8 @@ function FailedToolCallRow({
 }
 
 /**
- * A step that failed and that the turn then recovered from, as one line.
- *
- * Quiet, not gone. The same card is one click away, and the failure keeps its
- * place in the transcript — it just stops competing with the answer the turn
- * went on to give.
+ * A step that failed and that the turn recovered from, folded to one line — quiet, not gone,
+ * one click from the same card, no longer competing with the answer.
  */
 function RecoveredToolFailureRow({ presentation }: { presentation: LangyToolErrorPresentation }) {
   const [open, setOpen] = useState(false);

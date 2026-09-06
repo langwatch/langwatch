@@ -14,14 +14,8 @@ import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.reposit
 import { OrganizationService } from "../services/organization.service";
 
 export interface PostgresOrganizationAdapterOptions {
-  /**
-   * The composition root's own guarded client, typed.
-   *
-   * It used to arrive as `object` and be cast back to a `PrismaClient` inside
-   * each of the three repositories below, which let a caller hand in something
-   * that was not a client at all and find out on the first query. Every
-   * process that composes this adapter already holds the typed client.
-   */
+  /** The composition root's own guarded client, typed — every process composing this adapter
+   * already holds it, so it's never cast back from `object` inside the repositories. */
   database: PrismaClient;
   identities: PersonalWorkspaceIdentityPort;
   teamIdentities: TeamIdentityPort;

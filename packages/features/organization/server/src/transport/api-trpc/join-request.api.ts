@@ -1,32 +1,6 @@
 /**
- * Joining an organization (D12, ADR-117) over the process's tRPC transport:
- * the lookup, the ask, the two admin answers, and the setting behind them.
- * `invite` and `membership` are organization subjects, and so is the request
- * that precedes one, which is why this surface belongs to the organization
- * feature.
- *
- * The reveal discipline is the whole design of this file, and it is enforced
- * by what the procedures ACCEPT rather than by what they return.
- *
- * `lookup` takes NO address. It reads the caller's own verified identifiers
- * and answers about those, so there is no input a caller can vary to probe
- * for other people's organizations — the one shape that makes this endpoint
- * safe to expose at all. `request` re-derives the offer server-side for the
- * same reason: naming an organization that was never offered is refused
- * exactly as an organization that does not exist is, and both come back as
- * `join_not_available`.
- *
- * The requester-side procedures declare no permission deliberately. There is
- * no permission to hold — the caller is asking to join an organization they
- * are by definition not in yet — so the handler proves what it needs itself:
- * the address is the session's own and verified, and the organization is one
- * the matcher offered. The admin-side procedures take `organization:manage`,
- * the same permission that gates inviting, because approving a request and
- * sending an invitation are the same authority.
- *
- * Transport only: gates and delegation to the process's join-request service,
- * which is composed over the identity ledger, the membership writer and the
- * mailer.
+ * Joining an organization (D12, ADR-117) over tRPC. Reveal discipline lives in what procedures
+ * accept, not return: `lookup` takes no address, reading only the caller's own identifiers.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
@@ -63,34 +37,19 @@ type JoinRequestTrpcProcedures<
 > = Readonly<{
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  /**
-   * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one access declaration.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
-   */
+  /** The process's tracing/logging/error/authorization/audit policy for one access declaration.
+   * Applied after this feature's own input parser, since the check reads its scope id from it. */
   policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
   /** @see the mount field of the same name. */
   validateOutput: boolean;
 }>;
 
 /**
- * The process capabilities this transport needs.
- *
- * The join-request service itself is the process's: it is composed over the
- * identity ledger, a membership writer that emits authorization grants, the
- * organization's join settings and the mailer, none of which the organization
- * feature owns.
+ * The process capabilities this transport needs — the join-request service is composed over
+ * the identity ledger, a grant-emitting membership writer, join settings and the mailer.
  */
 export type JoinRequestTrpcPorts = Readonly<{
-  /**
-   * Which organizations are open to this address. Every closed door — an
-   * unverified address, a consumer mail domain, an organization that turned
-   * joining off, and one that does not exist — is the same answer.
-   */
+  /** Which organizations are open to this address — every closed door reads the same. */
   lookup(
     ctx: JoinRequestTrpcContext,
     input: Readonly<{ userId: string; verifiedEmail: string | null }>,
@@ -143,13 +102,8 @@ export type JoinRequestTrpcPorts = Readonly<{
       domains: readonly string[];
     }>,
   ): Promise<Readonly<{ previous: DomainJoinSetting; next: DomainJoinSetting }>>;
-  /**
-   * The caller's own verified address, and the reason every requester-side
-   * procedure starts here. A user who is not on identifiers yet falls back to
-   * the legacy column, but only where it is marked verified; an unverified
-   * address answers null, and every caller treats that as the universal
-   * nothing.
-   */
+  /** The caller's own verified address, falling back to the legacy column only when marked
+   * verified; an unverified address answers null, treated as the universal nothing. */
   tryResolveVerifiedEmail(
     ctx: JoinRequestTrpcContext,
     input: Readonly<{ userId: string }>,
@@ -191,13 +145,8 @@ const OWN_REQUEST_ONLY: AuthzDeclaration = {
   reason: "the requester withdrawing their own request, matched on the session's user id",
 };
 
-/**
- * The one input this surface still builds locally. Its `domainJoin` values are
- * `DOMAIN_JOIN_SETTINGS`, which the identity package owns; restating those
- * three words in the organization contract would be a second source of truth
- * for them, so the shape stays where the constant is in scope. Every other
- * input on this surface lives in `join-request.api.ts` in the contract.
- */
+/** The one input this surface still builds locally, since `domainJoin`'s `DOMAIN_JOIN_SETTINGS`
+ * values are owned by the identity package, not restated in the organization contract. */
 const setJoiningInputSchema = z.object({
   organizationId: z.string().min(1),
   domainJoin: z.enum(DOMAIN_JOIN_SETTINGS),
@@ -214,10 +163,8 @@ function waitingSince(request: JoinRequestAggregateState) {
 }
 
 /**
- * Installs the complete `joinRequests.*` tRPC surface on a process-owned root.
- * The procedure and the policy are injected by the process so its auth, audit,
- * error, logging and tracing policies wrap every feature procedure
- * consistently.
+ * Installs the complete `joinRequests.*` tRPC surface on a process-owned root. The procedure and
+ * policy are injected so the process's auth/audit/error/logging/tracing wrap every procedure.
  */
 export class JoinRequestTrpcApi {
   static create<
@@ -237,12 +184,8 @@ export class JoinRequestTrpcApi {
         procedures: { protected: procedure, policy },
         validateOutput,
       })
-        /**
-         * Which organizations are open to one of the caller's own verified
-         * addresses. Answers "none" for every closed door — an unverified
-         * address, a consumer mail domain, an organization that turned joining
-         * off, and one that does not exist are all one answer.
-         */
+        /** Which organizations are open to the caller's own verified addresses — every closed
+         * door, unverified, consumer domain, joining off, or nonexistent, is the same answer. */
         .query("lookup", (p) =>
           p
             .withoutInput("the caller's own session identifies the addresses to check")
@@ -316,10 +259,8 @@ export class JoinRequestTrpcApi {
               const pending = await ports.pendingForOrganization(ctx, {
                 organizationId: input.organizationId,
               });
-              // Who is asking, by name. The requester's ADDRESS is deliberately
-              // not returned: the domain is what was matched and what the admin is
-              // deciding on, and the local part is not the organization's business
-              // until the person is a member.
+              // Who is asking, by name — the requester's address is deliberately not returned,
+              // since the local part isn't the organization's business until they're a member.
               const names = await ports.listUserNames(ctx, {
                 userIds: pending.map((request) => request.userId),
               });
@@ -333,12 +274,8 @@ export class JoinRequestTrpcApi {
               }));
             }),
         )
-        /**
-         * Approve. No role on this input and never will be: an approval grants
-         * the organization's default role, and an admin who wants to hand over
-         * more sends a formal invitation, which is the flow that owns roles and
-         * teams.
-         */
+        /** Approve: no role on this input, ever — it grants the default role; more goes through
+         * a formal invitation instead. */
         .mutation("approve", (p) =>
           p
             .withInput(joinRequestApiDecisionInputSchema)

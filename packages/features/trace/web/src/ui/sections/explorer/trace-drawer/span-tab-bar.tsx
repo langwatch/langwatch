@@ -119,9 +119,8 @@ export const SpanTabBar = memo(function SpanTabBar({
   // Chrome DevTools' "Headers / Cookies / Request / Response" row).
   const detailCollapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
-  // Icon orientation tracks the pane's edge: horizontal layout puts the detail pane on the right, so the
-  // collapse chevron points right (LuPanelRight*); vertical stacks the detail pane on the *bottom*, so the icon
-  // shows a bottom-docked panel (LuPanelBottom*).
+  // Icon orientation tracks the pane's edge: horizontal layout docks the detail pane right
+  // (LuPanelRight*), vertical docks it at the bottom (LuPanelBottom*).
   const isHorizontalSplit = collapsePosition === "leading";
   const CollapseToggleIcon = isHorizontalSplit
     ? detailCollapsed
@@ -340,17 +339,8 @@ export const SpanTabBar = memo(function SpanTabBar({
             onUnpinSpan={unpinSpan}
           />
         )}
-        {/*
-          Right-aligned cluster: instrumentation scope chip + the
-          overflow kebab. `marginLeft: auto` on the wrapper consumes
-          the row's leftover space so this cluster always sits
-          flush-right (matching the operator expectation that the
-          chip and the kebab belong at the rightmost edge of the
-          strip, never inline with the tabs). When tabs overflow,
-          the cluster slides right; when the row gets too tight for
-          the chip, the cutoff iterator hides the chip first because
-          its `data-overflow-id` sits last in DOM order.
-        */}
+        {/* `marginLeft: auto` keeps the scope chip + overflow kebab flush-right. The chip hides
+          first under space pressure since its `data-overflow-id` sits last in DOM order. */}
         <Flex marginLeft="auto" align="center" gap="5px" flexShrink={0} minWidth={0}>
           {rightSlot ? (
             <Flex

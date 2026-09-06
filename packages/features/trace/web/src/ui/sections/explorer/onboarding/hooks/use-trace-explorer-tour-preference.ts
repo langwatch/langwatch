@@ -18,7 +18,7 @@ export function useTraceExplorerTourPreference() {
         {},
         {
           dismissed: true,
-          dismissedAt: new Date(),
+          dismissedAt: new Date().toISOString(),
         },
       );
       return { previous };

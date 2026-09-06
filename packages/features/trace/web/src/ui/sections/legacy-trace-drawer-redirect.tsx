@@ -1,17 +1,7 @@
 /**
- * Stands in for the removed legacy trace drawer (`drawer.open=traceDetails`).
- *
- * The drawer shell is resolved from the address bar, so a link shared before
- * the legacy drawer was removed names `traceDetails` and would resolve to
- * nothing at all. This resolves instead, and swaps the address for the Trace
- * Explorer drawer's — same trace, current experience.
- *
- * It stays on whatever page the link was opened on: the Trace Explorer drawer
- * is mounted everywhere, so a legacy link followed from an annotation queue
- * opens the trace over the queue rather than moving the reader to the list.
- *
- * The legacy `selectedTab` and `showMessages` parameters are dropped: the
- * Trace Explorer has no equivalent of those tabs.
+ * Resolves a legacy `drawer.open=traceDetails` link, which would otherwise resolve to nothing,
+ * by swapping the address for the Trace Explorer drawer's equivalent (same trace). Stays on
+ * whatever page the link was opened on, since that drawer is mounted everywhere.
  */
 
 import { useEffect } from "react";

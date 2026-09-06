@@ -113,9 +113,8 @@ export function Section({
         borderColor={{ base: "gray.200", _dark: "border.muted" }}
         transition="background 120ms ease, color 120ms ease"
         _hover={{ bg: "bg.softHover", color: "fg" }}
-        // Open state keeps the same white bg AND the same `fg.muted` title color as closed — operator
-        // feedback: promoting the title color on expand made the "INPUT AND OUTPUT" labels look heavier than
-        // their collapsed siblings, breaking the calm read of the section list.
+        // Open state keeps the same bg and `fg.muted` title color as closed — promoting the title
+        // color on expand made section labels look heavier than their collapsed siblings.
         _open={{
           borderBottomWidth: "1px",
           borderBottomColor: { base: "gray.200", _dark: "border.muted" },
@@ -166,17 +165,8 @@ export function Section({
             <SectionPresenceDot traceId={presenceTraceId!} tab={presenceTab!} section={value} />
           ) : null}
         </HStack>
-        {/* Custom indicator at a fixed 12px so it matches the close /
-            expand icon in the LLM-Optimized header row above — the
-            default `<Accordion.ItemIndicator>` inherits the trigger's
-            font size and reads visibly larger than its neighbours.
-            Explicit `_open` rotation because our own `display: flex`
-            override won the cascade against the default slot recipe
-            — the chevron would otherwise either not rotate at all,
-            or rotate the wrong direction. Closed = chevron-down,
-            open = rotate(180deg) = chevron-up.
-            `alignSelf: center` keeps the icon anchored to the
-            trigger's vertical midline through both states. */}
+        {/* Fixed 12px indicator to match the header row icon (the default inherits the trigger's
+            font size). Explicit `_open` rotation since our `display: flex` override needs it. */}
         <Accordion.ItemIndicator
           color="inherit"
           display="flex"

@@ -191,14 +191,8 @@ export const TracesPage: React.FC = () => {
                   <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
                 </Box>
               )}
-            {/* Cross-fade between the three main pane modes. `mode="wait"`
-                lets the IntegratePane finish its exit (0.32s) before the
-                ResultsPane mounts and fades in (0.36s with a short
-                delay) — that one beat is enough to hide the heavy mount
-                (TraceTable virtualizer, FilterSidebar facets, aurora
-                SVG) behind the fade rather than letting users watch a
-                janky pop-in. Without orchestration the swap was
-                instant + laggy; with it the swap reads as deliberate. */}
+            {/* `mode="wait"` lets the IntegratePane finish its exit before ResultsPane mounts and
+                fades in, hiding the heavy mount behind the fade instead of a janky pop-in. */}
             <AnimatePresence mode="wait" initial={false}>
               {showIntegratePane ? (
                 // No-traces + no sample preview → show the integration hero.

@@ -163,9 +163,8 @@ export class InviteCreationService {
   }
 
   /**
-   * A Lite Member seat allows the Viewer team role only, and a custom role requires a full seat, so an invitation
-   * cannot be written promising more. Refused here, where the admin choosing the roles can act on it; an invitation
-   * stored before this rule is corrected at acceptance instead (`resolveInviteTeamMemberships`).
+   * A Lite Member seat allows only the Viewer team role, and a custom role needs a full seat, so
+   * an invitation can't promise more. Refused here, where the admin can act on it.
    */
   assertAssignmentsWithinInvitedSeat({
     role,

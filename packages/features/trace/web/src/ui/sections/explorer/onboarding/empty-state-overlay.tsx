@@ -39,14 +39,8 @@ export const EmptyStateOverlay = () => {
           so the live table reads as the user's space, with only the
           thin top banner left as onboarding chrome. */}
       {stage !== "settle" && heroLayout !== "topBanner" && <OnboardingMeshBackground />}
-      {/* Hero band — full-width horizontal fade. Sticks regardless
-          of where the hero is anchored, because once the user is
-          past the table-centric beats (drawer open, sidebar open)
-          the band fades into being a soft atmospheric wash. Fades
-          in over the settle → welcome transition so the page
-          calmly slides into onboarding rather than slamming in.
-          Suppressed for the topBanner layout so the live table is
-          fully visible behind the wrap-up strip. */}
+      {/* Hero band: full-width fade eased in over the settle → welcome transition, suppressed for
+          the topBanner layout so the live table stays visible behind the wrap-up strip. */}
       <Flex
         position="absolute"
         inset={0}
@@ -59,9 +53,8 @@ export const EmptyStateOverlay = () => {
       >
         <Box
           width="full"
-          // `clamp` keeps the band big enough to mask the hero + CTAs on short viewports (~650px tall, where
-          // 58vh is only 377px and the buttons would land below the band) while preventing it from ballooning
-          // to half a metre of grey on very tall viewports (1400px+ would otherwise hit 812px).
+          // `clamp` keeps the band tall enough to mask the hero + CTAs on short viewports without
+          // ballooning to half a metre of grey on very tall ones.
           height={{
             base: "clamp(420px, 62vh, 680px)",
             md: "clamp(420px, 58vh, 680px)",

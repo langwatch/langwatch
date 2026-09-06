@@ -4,9 +4,8 @@ import { useDrawerStore } from "../../../../../behavior/drawer.store";
 export type DrawerLayout = "vertical" | "horizontal";
 
 /**
- * Returns "horizontal" when the drawer's content area is wider than tall (typical once the operator drags the
- * drawer wide on a laptop), otherwise "vertical" — the same rule Chrome DevTools uses for its Network tab "split
- * below" vs. "split right" auto orientation.
+ * Returns "horizontal" when the drawer's content area is wider than tall, otherwise "vertical" —
+ * the same rule Chrome DevTools uses for its Network tab auto orientation.
  */
 export function usePaneLayout(containerRef: RefObject<HTMLElement | null>): DrawerLayout {
   const widthPx = useDrawerStore((s) => s.widthPx);

@@ -305,9 +305,8 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
     );
   }
 
-  // Attributes section: same component for trace, span, event, and metadata — the section data carries its own
-  // filter prefix (`attribute.` vs `span.attribute.` vs `event.attribute.`) and key list, so the renderer
-  // doesn't need to know which flavour it's drawing.
+  // One component for trace/span/event/metadata attributes: the section data carries its own
+  // filter prefix and key list, so the renderer doesn't need to know which flavour it's drawing.
   const { filterPrefix, keys, label, displayStripPrefix, emptyDocsHref } = section;
   const fieldFor = (attrKey: string) => `${filterPrefix}.${attrKey}`;
   return (

@@ -25,9 +25,8 @@ export interface LangyTurnRequestContext {
 }
 
 /**
- * A live signal routed out-of-band (not a message part): status/progress/ milestone/reasoning tick the status
- * line + thinking line; `plan` mirrors the manager's typed plan snapshot into the store, which the plan card
- * prefers over parsing the raw `todowrite` tool part.
+ * A live signal routed out-of-band (not a message part): status/progress/milestone/reasoning tick
+ * the status/thinking lines; `plan` mirrors the manager's plan snapshot into the store.
  */
 export type LangyTurnSignalEntry =
   | (Extract<LangyStreamEntry, { type: "status" }> & {
@@ -65,10 +64,8 @@ export interface LangyChatTransportDeps {
    */
   onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
   /**
-   * A card the developer has to answer while the turn runs (ADR-129) — a
-   * permission ask, or a question. Bare passthrough like `onUiAction`: the
-   * durable `user_wait_started` event is the truth, and this is the fast path
-   * that puts the card on screen before the tail arrives.
+   * A card the developer has to answer while the turn runs (ADR-129), fast path for putting it
+   * on screen before the durable `user_wait_started` tail arrives.
    */
   onLocalWait?: (
     entry: Extract<LangyStreamEntry, { type: "local_permission" | "question" }>,

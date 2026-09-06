@@ -1,16 +1,7 @@
 /**
- * The permission card (ADR-129) — Langy wants to run one command on the
- * developer's machine, and the turn is holding until they answer.
- *
- * The command line is the trust boundary: it decides what needs asking, it
- * keeps the folder limit and the privilege rule whatever is answered here, and
- * this card only carries the answer back. The one thing the server rules on is
- * the skip switch, and only whether the model behind the conversation is on
- * its provider's allowed list.
- *
- * Four states, all read from the wait itself so a reload shows the same thing:
- * pending (the three answers and the skip switch), answered (what was picked),
- * expired (nobody answered in time), cancelled (the turn was stopped).
+ * The permission card (ADR-129): Langy wants to run one command on the developer's machine, and
+ * the turn holds until they answer. Four states, read from the wait: pending, answered, expired,
+ * cancelled.
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, CircleSlash, Clock, Terminal } from "lucide-react";
@@ -33,12 +24,8 @@ export const SKIP_NOT_ALLOWED_HINT =
   "This model is not allowed to skip permission checks. Check the allowed models list in the provider settings.";
 
 /**
- * The patterns as one phrase: "git fetch" and "git checkout".
- *
- * Every pattern, never the first one alone. One click on the session grant
- * covers each part of the chain that is not read-only, and the session's
- * grants are readable nowhere else, so a button that named one of three was
- * giving away two the reader never saw.
+ * The patterns as one phrase, e.g. "git fetch" and "git checkout" — every pattern, never just
+ * the first, since a session grant covers all of them and they're readable nowhere else.
  */
 export function langyPatternList(patterns: readonly string[]): string {
   const quoted = patterns.filter((pattern) => pattern !== "").map((pattern) => `"${pattern}"`);
@@ -48,14 +35,9 @@ export function langyPatternList(patterns: readonly string[]): string {
 }
 
 /**
- * What the settled card says the reader did. A pattern grant NAMES the
- * patterns: they cover every future command that matches them, and the
- * session's grants are readable nowhere else, so "this pattern" left the
- * reader with no way to know what they had given away.
- *
- * An ask can also be answered in the terminal that shares the folder, and the
- * reader looking at the card did not see that happen. The card then says where
- * the answer came from, so a card that settled on its own is not a mystery.
+ * What the settled card says the reader did. A pattern grant names the patterns, since they're
+ * readable nowhere else. When the ask was answered in the terminal instead, the card says so,
+ * so a card that settled on its own is not a mystery.
  */
 export function langyDecisionLabel({
   decision,
@@ -111,13 +93,8 @@ export function langyTimeLimitText(seconds: number): string {
 }
 
 /**
- * The answer an ask already had, read off the refusal a second answer gets.
- *
- * The terminal that shares the folder answers the same ask, and a card that
- * was still on screen when it did carries buttons for an answer that is
- * already given. The click is refused, and the refusal says who answered and
- * what they chose, so the card settles itself into the state it should
- * already have been in rather than showing the reader a failure.
+ * The answer an ask already had, read off the refusal a second answer gets — so a card still
+ * showing buttons for an already-answered ask settles into its correct state instead of failing.
  */
 export function settledAnswerOf(error: unknown): {
   decision: LangyPermissionDecision | null;

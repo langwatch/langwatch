@@ -362,14 +362,8 @@ export const FilterSidebar: React.FC = () => {
           </IconButton>
         </Tooltip>
         <HStack gap={1} align="center">
-          {/* Clear-all and Reset-to-lens only mount while there's something
-              to act on (active filters / a local draft). Both carry a soft
-              accent + halo ring so the live state is noticeable amid the
-              otherwise-quiet ghost chrome — clear in blue (the "active
-              filters" hue used by the facet selection badge), reset in orange
-              (the lens / unsaved-draft hue shared with the lens-tab draft
-              dot). The ring uses the colour's `.subtle` token so it reads as
-              a gentle glow, not a hard outline (T17). */}
+          {/* Clear-all/Reset-to-lens mount only while there's something to act on, with a soft
+              halo ring (blue for active filters, orange for the lens draft) to stay noticeable. */}
           {hasActiveFilters && (
             <Tooltip
               positioning={{ placement: "bottom" }}

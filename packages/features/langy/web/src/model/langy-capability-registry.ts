@@ -624,13 +624,8 @@ export function isProposalOutput(output: unknown): boolean {
 }
 
 /**
- * A line of a serialised document rather than prose.
- *
- * `extractToolText` stringifies a structured payload so a RAW view always has
- * something to show. A summary line must not repeat that: the reader gets `{`
- * and `"id": "scenario_0002Yw…",` where a sentence belongs. Both shapes occur —
- * a whole document on one line when the tool returned JSON as a string, and the
- * pretty-printed structure when it returned an object.
+ * A line of a serialised document rather than prose. A summary line must not repeat what a raw
+ * view already shows, e.g. `{` or `"id": "scenario_0002Yw…",` where a sentence belongs.
  */
 export function isSerializedDocumentLine(line: string): boolean {
   if (/^[[{]/.test(line) && /[\]}]$/.test(line)) return true;

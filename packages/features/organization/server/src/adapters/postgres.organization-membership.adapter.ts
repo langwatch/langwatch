@@ -20,11 +20,8 @@ export interface PostgresOrganizationMembershipAdapterOptions {
 }
 
 /**
- * The membership half over Postgres.
- *
- * One place a process says "these rows, that ledger, those four ports", so a
- * root composing the organization graph writes the same six words the REST and
- * tRPC doors need rather than assembling a repository and a service by hand.
+ * The membership half over Postgres — one place a process says "these rows, that ledger, those
+ * four ports" rather than assembling a repository and a service by hand.
  */
 export class PostgresOrganizationMembershipAdapter {
   static create(

@@ -66,9 +66,8 @@ export const RenderCode = ({
     };
   }, [code, language, colorMode]);
 
-  // Tagged with its inputs and compared here, rather than cleared inside the effect: highlighting is async, so
-  // on the render right after `code` changes the PREVIOUS highlight is still in state, and rendering it shows
-  // the previous snippet — visible when switching language tabs.
+  // Compared against current inputs rather than cleared in the effect, since highlighting is async
+  // and would otherwise flash the previous snippet while switching language tabs.
   const html =
     highlighted &&
     highlighted.code === code &&

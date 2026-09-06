@@ -30,7 +30,10 @@ import type { MediaProbeResult } from "@langwatch/scenario-web/surfaces/media-pa
 import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/share-contract";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-web/surfaces/agent-traces";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import {
+  createFeatureApi,
+  type OutputsFromMap,
+} from "@langwatch/platform-api-client/feature-api";
 import type { ConversationTurn } from "../model/explorer/conversation-turn";
 import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload";
 import type { ExportProgress, ExportProgressEvent } from "../model/export-types";
@@ -866,19 +869,10 @@ export type ModelProviderFrontendRead = {
 };
 
 /**
- * What each procedure hands back, addressed the way `RouterOutputs` was.
+ * What each procedure hands back, addressed the way `RouterOutputs` was, and
+ * shaped the way the browser receives it: dates arrive as ISO strings.
  */
-export type OutputsFrom<TMap> = {
-  [K in keyof TMap]: TMap[K] extends { query: { output: infer TOut } }
-    ? TOut
-    : TMap[K] extends { mutation: { output: infer TOut } }
-      ? TOut
-      : TMap[K] extends { subscription: { output: infer TOut } }
-        ? TOut
-        : OutputsFrom<TMap[K]>;
-};
-
-export type RouterOutputs = OutputsFrom<TraceApiMap>;
+export type RouterOutputs = OutputsFromMap<TraceApiMap>;
 
 /**
  * Trace's typed tRPC hooks. Same machinery, same transport and same React Query

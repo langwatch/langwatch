@@ -76,9 +76,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
       onEndTour();
     } else {
       setShowSamplePreview(true);
-      // Auto-start spotlights when the user opts into sample data — the whole point of "See sample data" is to
-      // give the user a tour of what the trace explorer looks like with content in it, which pairs naturally
-      // with contextual callouts that explain what each surface does.
+      // Auto-start spotlights on sample data: "See sample data" is meant as a tour, which pairs
+      // naturally with contextual callouts explaining each surface.
       const first = TRACE_EXPLORER_SPOTLIGHTS[0];
       const firstId = first?.id ?? null;
       setCurrentSpotlightId(firstId);
@@ -159,15 +158,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
       flexShrink={0}
       minHeight="36px"
     >
-      {/* Sample-data toggle sits at the front of the toolbar (before
-          the lens tabs) so it reads as a top-level "what am I looking
-          at?" affordance rather than a buried row in the right cluster.
-          The previous layout put it between Save-lens and Show-me-around,
-          which made the Save button feel orphaned from the rest of the
-          right-side actions. When `hideSampleDataAction` is set (the
-          IntegratePane case), the button is fully absent — no phantom
-          gap — because the inert chrome doesn't need to match the live
-          toolbar's exact pixel layout. */}
+      {/* Sample-data toggle sits at the front of the toolbar as a top-level "what am I looking at?"
+          affordance. Fully absent (no phantom gap) when `hideSampleDataAction` is set. */}
       {!hideSampleDataAction && showSampleDataToggle && (
         <Tooltip
           content={showSamplePreview ? "Hide sample traces" : "See sample traces to explore the UI"}

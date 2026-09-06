@@ -1,23 +1,6 @@
 /**
- * The code access card (ADR-129) — how Langy reaches the customer's own code.
- *
- * Langy asks once per conversation, through its `code_access` tool, and this
- * card is the ask. It has four states, and every one of them is read from
- * `langy.getLocalWorkspace` rather than from the tool call: the folder can
- * connect minutes after the turn ended, and the remembered choice can be
- * cleared from the settings page, so the tool call is only WHERE the card
- * hangs, never WHAT it says.
- *
- *   asking     no folder, nothing remembered — the two ways to reach the code
- *   waiting    the local folder was picked; the command and the countdown
- *   connected  the folder is shared, with the machine and the branch
- *   remembered GitHub was remembered — one line, with a way to change it
- *
- * Picking GitHub is a CHOICE, so it travels the ordinary choices path: the
- * selection becomes the next user message and Langy continues on the pull
- * request flow. Picking the local folder sends nothing: the request already
- * exists (the tool recorded it), and connecting the folder starts the next
- * turn on its own.
+ * The code access card (ADR-129): four states, all read from `langy.getLocalWorkspace` rather
+ * than the tool call, which is only where the card hangs, never what it says.
  */
 import { Box, Button, chakra, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
@@ -98,28 +81,16 @@ export interface LangyCodeAccessCardProps {
   onChoiceSelect?: (a: { selection: LangyChoiceSelection; card: LangyDerivedChoicesCard }) => void;
   /** Stop any running turn and ask Langy the question again. */
   onAskAgain?: () => void;
-  /**
-   * A newer `code_access` call exists in this conversation, so this card is
-   * the older ask. It reads closed and answers nothing: every state of the
-   * card is read from the one workspace query, so two live cards would offer
-   * the same answer twice and only the newer one belongs to the question the
-   * reader is being asked now.
-   */
+  /** A newer `code_access` call exists, so this is the older ask: reads closed, answers nothing. */
   superseded?: boolean;
   /** Test seam: the clock the countdown reads. */
   now?: () => number;
 }
 
 /**
- * Which of the four states the card is in. A pure reading of the one query and
- * the developer's own pick, so the decision is testable and the component
- * below only renders it.
- *
- * The waiting state is driven by the PICK alone, never by the open control
- * request. The `code_access` tool records the request before it answers, so a
- * request exists by the time the card first mounts: reading it as "waiting"
- * showed the command to a reader who had not been offered the choice, and made
- * the GitHub option unreachable from a first ask.
+ * Which of the four states the card is in — a pure reading of the query and the developer's own
+ * pick. Waiting is driven by the pick alone, never the open control request, since a request
+ * exists by the time the card first mounts.
  */
 export function langyCodeAccessState({
   connected,
@@ -255,12 +226,8 @@ function LoadingState() {
 }
 
 /**
- * The one query behind every state of this card failed.
- *
- * The words are the shared registry's, keyed on the error's own code, so a
- * platform failure reads as a platform failure and a conversation that is gone
- * says so. The card offers the read again, because that is the only thing that
- * moves this on.
+ * The one query behind every state of this card failed. Words come from the shared registry
+ * keyed on the error's code; the card offers the read again as the only way forward.
  */
 function UnreadableState({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   return (

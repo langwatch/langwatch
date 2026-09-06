@@ -1,18 +1,7 @@
 /**
- * Turning "Opened pull request #1" into a link.
- *
- * Langy names a pull request by its number, which is how people talk about
- * one. The panel had the number and no way through to it, in a panel that
- * links everything else.
- *
- * The URLs come from the turn's TOOL PARTS, never from the reply. On the
- * sandbox path the control plane records a `github.open_pr` part; on the local
- * path the developer's own `gh pr create` prints the URL on stdout, and the
- * shell call's output is persisted with the message. Both are machine-written.
- * A number Langy merely mentioned, with no tool call behind it, stays plain
- * text — the same rule the pull-request card follows.
- *
- * Spec: specs/langy/langy-github-prs.feature.
+ * Turning "Opened pull request #1" into a link. URLs come from the turn's tool parts, never the
+ * reply, so a number Langy merely mentioned with no tool call behind it stays plain text — the
+ * same rule the pull-request card follows. Spec: specs/langy/langy-github-prs.feature.
  */
 
 import { githubPrsFromToolParts } from "./shared/langy/github-pr-card";
@@ -58,10 +47,8 @@ const CODE_SPAN = /```[\s\S]*?```|`[^`\n]*`/g;
 const PR_REFERENCE = /(^|[^\w`[])#(\d+)\b/g;
 
 /**
- * Link every `#N` in the prose that names a pull request the turn opened.
- *
- * Code spans are copied through untouched, and a number with no URL behind it
- * is left as it was.
+ * Links every `#N` in the prose that names a pull request the turn opened. Code spans pass
+ * through untouched, and a number with no URL behind it is left as it was.
  */
 export function linkPullRequestReferences({
   text,

@@ -1,14 +1,7 @@
 /**
- * The published operations for the self-hosted organization provisioning
- * family (the api-keys `openapi.ts` pattern: typed DescribeRouteOptions
- * constants, request bodies left to the zod validators so the generator
- * cannot drift from them).
- *
- * `security` names the instance credential rather than an organization key:
- * this family exists before any organization does. On SaaS, and on
- * deployments that have not configured `LANGWATCH_INSTANCE_ADMIN_API_KEY`,
- * every path answers 404; the reference documents the self-hosted
- * capability.
+ * The published operations for the self-hosted organization provisioning family. `security`
+ * names the instance credential, not an organization key, since this family exists before any
+ * organization does; on SaaS or without `LANGWATCH_INSTANCE_ADMIN_API_KEY` every path 404s.
  */
 import type { DescribeRouteOptions, GenerateSpecOptions } from "hono-openapi";
 
@@ -17,12 +10,9 @@ type ResponseSpec = NonNullable<DescribeRouteOptions["responses"]>[string];
 const INSTANCE_KEY_SECURITY: DescribeRouteOptions["security"] = [{ instance_admin_key: [] }];
 
 /**
- * The instance credential itself, reaching the merged document through
- * `generateSpecs(organizationsApp, ORGANIZATIONS_SPEC_OPTIONS)`. A security
- * requirement naming a scheme the document never declares does not degrade
- * gracefully: the reference renders an operation nobody can authenticate, and
- * a client generator resolving `#/components/securitySchemes/...` finds
- * nothing there.
+ * The instance credential, reaching the merged document through `generateSpecs`. A security
+ * requirement naming an undeclared scheme doesn't degrade gracefully — a client generator
+ * resolving `#/components/securitySchemes/...` finds nothing there.
  */
 export const ORGANIZATIONS_SPEC_OPTIONS: Partial<GenerateSpecOptions> = {
   documentation: {
@@ -54,11 +44,8 @@ const ORGANIZATION_SUMMARY_SCHEMA: SchemaSpec = {
 };
 
 /**
- * The refusal body this family answers with. It is the SecuredApp legacy
- * envelope rather than the `{ error: { code, ... } }` one the organization-key
- * management families publish, because this family predates no organization at
- * all and authenticates against the instance; `error` carries the stable code
- * a provisioning tool branches on.
+ * The refusal body this family answers with: the SecuredApp legacy envelope, since this family
+ * predates any organization and authenticates against the instance instead.
  */
 const ERROR_SCHEMA: SchemaSpec = {
   type: "object",

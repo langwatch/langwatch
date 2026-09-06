@@ -1,34 +1,7 @@
 /**
- * The sign-up ceremony, over the process's tRPC transport.
- *
- *   initializeOrganization: the first organization, its first team, and — for
- *                           every intent but the coding-agent one — its first
- *                           project.
- *   setIntegrationMethod:   the flavour the second onboarding screen asks for.
- *
- * This lives beside `organization.createAndAssign` because it IS that
- * procedure plus its follow-ups: the same `signUpDataSchema` the process
- * supplies, the same `BEFORE_MEMBERSHIP` opt-out, the same
- * `ctx.app.organizations.createAndAssign` call, and the same organization and
- * team the client is handed back. Splitting the two put the whole ceremony a
- * package boundary away from the write it is built on, which is what forced
- * the app router to reach past `organization.createAndAssign` "straight to the
- * service" to avoid an import cycle. Co-located, there is no cycle to avoid.
- *
- * Four of the follow-ups are other verticals' and cross as ports: the standard
- * AI tool catalogue (Enterprise governance, which a core package may not
- * name), the signer's personal workspace, the first project, and the two
- * sign-up notifications. What stays here is the CEREMONY — which steps run for
- * which declared intent, which of them may fail without costing the user the
- * organization they just created, and what the client is told at the end.
- *
- * Three steps are deliberately non-fatal, and for one reason: the
- * organization already exists by the time they run, so a failure must not
- * unwind it. Each has its own lazy backfill — the catalogue is provisioned on
- * the first portal read, the personal workspace on the next session, and the
- * notifications are marketing traffic.
- *
- * Spec: specs/features/onboarding/intent-fork.feature.
+ * The sign-up ceremony over tRPC. Lives beside `organization.createAndAssign` to avoid the
+ * import cycle a package boundary would force. Cross-vertical follow-ups arrive as ports; three
+ * are deliberately non-fatal, each with its own lazy backfill instead of unwinding the org.
  */
 import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import {
@@ -81,15 +54,8 @@ type OnboardingTrpcProcedures<
 > = Readonly<{
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  /**
-   * The process's declared "no permission to check" policy, applied AFTER this
-   * feature's own input parser — tRPC runs middlewares in the order they were
-   * added, so a check installed before `.input()` would see no input at all.
-   *
-   * Both procedures run BEFORE the caller belongs to any organization, so
-   * there is no scope to check and no permission they could hold. The
-   * declaration is what keeps them reviewable rather than merely unchecked.
-   */
+  /** The process's declared "no permission to check" policy — both procedures run before the
+   * caller belongs to any organization, so the declaration keeps them reviewable, not unchecked. */
   noPermission(declaration: { reason: string }): <TProcedure>(procedure: TProcedure) => TProcedure;
   /** @see the mount field of the same name. */
   validateOutput: boolean;
@@ -122,26 +88,14 @@ export type OnboardingTrpcPorts<TSignUpDataSchema extends z.ZodTypeAny = z.ZodTy
    */
   signUpDataSchema: TSignUpDataSchema;
 
-  /**
-   * Gives a brand-new organization the standard AI tool catalogue, for every
-   * intent: the personal portal must render tiles on its very first load
-   * rather than a "no tools yet" empty state.
-   *
-   * A port because the catalogue is an Enterprise governance capability, which
-   * a core package may not name. Non-fatal at the call site — the portal's own
-   * read provisions the same set lazily.
-   */
+  /** Gives a brand-new organization the standard AI tool catalogue. A port since it's an
+   * Enterprise governance capability; non-fatal, since the portal's own read provisions lazily. */
   ensureDefaultAiToolCatalog(
     ctx: OnboardingTrpcContext,
     input: Readonly<{ organizationId: string }>,
   ): Promise<unknown>;
-  /**
-   * Makes the signer's personal workspace in the new organization exist.
-   *
-   * A port, and it names the person rather than the caller on purpose: this is
-   * where a coding-agent signup's usage lands, so the workspace belongs to the
-   * user the id identifies, not to whoever happened to ask.
-   */
+  /** Makes the signer's personal workspace exist. Names the person, not the caller, since this
+   * is where a coding-agent signup's usage lands. */
   ensurePersonalWorkspace(
     ctx: OnboardingTrpcContext,
     input: Readonly<{
@@ -245,12 +199,8 @@ export class OnboardingTrpcApi {
   ) {
     const { protected: procedure, noPermission, validateOutput } = procedures;
 
-    /**
-     * The one input built here rather than in the contract: `signUpData` is a
-     * schema the process supplies, so the shape cannot be closed over until it
-     * arrives. `primaryIntent` stays optional for rolling-deploy tolerance —
-     * absent means NULL, the safe legacy default (ADR-038).
-     */
+    /** The one input built here rather than the contract, since `signUpData`'s schema arrives
+     * from the process. `primaryIntent` stays optional for rolling-deploy tolerance (ADR-038). */
     const initializeOrganizationInputSchema = z.object({
       // Organization details
       orgName: z.string().optional(),
@@ -264,12 +214,8 @@ export class OnboardingTrpcApi {
       framework: z.string().default("other"),
     });
 
-    /**
-     * Neither procedure holds a permission — both run before the caller
-     * belongs to any organization — so the chain's own `policy` builder is
-     * never called. `withCustomPermission` is what carries the process's
-     * ALREADY-BUILT `noPermission` decorator instead.
-     */
+    /** Neither procedure holds a permission, so the chain's own `policy` builder is never
+     * called — `withCustomPermission` carries the process's already-built decorator instead. */
     const policy = (): TrpcPolicyDecorator => {
       throw new Error("onboarding declares no-permission for every procedure; policy() is unused");
     };
@@ -320,15 +266,10 @@ export class OnboardingTrpcApi {
                   });
                 }
 
-                // Coding-agent signups get their personal workspace here rather than
-                // on the first CLI login. That is where their usage lands, so
-                // provisioning it now is what makes the page the track ends on show
-                // something instead of an empty shell whose contents depend on a
-                // command the user has not run yet.
-                //
-                // Non-fatal, matching `organization.acceptInvite`: a failure must not
-                // cost the user the organization they just created, and the lazy
-                // backfill recovers on their next session.
+                // Coding-agent signups get their personal workspace here rather than on the
+                // first CLI login, so the ending page shows something rather than an empty
+                // shell. Non-fatal, matching `organization.acceptInvite`: the lazy backfill
+                // recovers on the next session.
                 if (input.primaryIntent === CODING_AGENT_INTENT) {
                   try {
                     await ports.ensurePersonalWorkspace(ctx, {
@@ -414,12 +355,8 @@ export class OnboardingTrpcApi {
               }
             }),
         )
-        /**
-         * Records the flavour the customer picked.
-         *
-         * Separate from `initializeOrganization` because the organization is
-         * created BEFORE the flavour screen is shown.
-         */
+        /** Records the flavour the customer picked, separate from `initializeOrganization`
+         * since the organization is created before the flavour screen is shown. */
         .mutation("setIntegrationMethod", (p) =>
           p
             .withInput(z.object({ integrationMethod: onboardingIntegrationMethodSchema }))

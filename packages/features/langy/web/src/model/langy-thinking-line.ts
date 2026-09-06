@@ -123,13 +123,9 @@ export function settledTool(message: ThinkingMessage | undefined): boolean {
 }
 
 /**
- * Everything that counts as the turn making progress.
- *
- * A local command runs on the developer's own machine and a tab that adopted a
- * running turn has no live stream at all, so the assistant message can stay
- * empty for minutes while the turn is working perfectly well. Those turns are
- * visible in the durable record instead, in its tool calls and the cards they
- * raised, and in the plan the agent keeps.
+ * Everything that counts as the turn making progress — a local command can leave the assistant
+ * message empty for minutes, so those turns are visible in the durable record's tool calls,
+ * cards, and plan instead.
  */
 export interface LangyTurnActivity {
   messages: ThinkingMessage[];
@@ -151,17 +147,9 @@ export interface LangyTurnActivity {
 }
 
 /**
- * A fingerprint of everything the turn has produced so far.
- *
- * The escalation used to measure the time since the line MOUNTED, so a turn
- * that ran a local command for two minutes, with a settled permission card on
- * screen and output arriving in the terminal, was told it "may be stuck". The
- * caller restarts its clock whenever this value changes, which turns the
- * ladder into a measure of silence: a turn that really is silent still
- * escalates, and a turn that is working never does.
- *
- * Only provable things go in, parts on the wire and rows in the durable
- * record, so this can no more invent progress than the line itself can.
+ * A fingerprint of everything the turn has produced so far. The caller restarts its escalation
+ * clock whenever this value changes, turning the ladder into a measure of silence rather than
+ * turn length. Only provable things go in — wire parts and durable record rows.
  */
 export function langyTurnActivityKey(activity: LangyTurnActivity): string {
   const parts = currentTurnAssistant(activity.messages)?.parts ?? [];

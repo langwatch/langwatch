@@ -174,20 +174,8 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
         ) : null}
         {!synthetic || max > 0 ? (
           <>
-            {/*
-             * A SimpleSlider with `min === max` (or any non-positive span)
-             * trips zag-js's invariants and throws synchronously, which has
-             * been masking real errors during empty-state mounts. Skip the
-             * slider in that degenerate case.
-             *
-             * When every visible trace shares the same value (e.g. all
-             * traces have `totalTokens = 512`) the range can't narrow
-             * anything. Render a disabled-looking slider with both thumbs
-             * collapsed at the value plus a hover tooltip explaining why
-             * — visually consistent with the interactive case, just
-             * inert. Rare in practice (mostly sample-data territory) so
-             * it doesn't deserve its own special-case empty-state copy.
-             */}
+            {/* SimpleSlider throws when min === max, so a shared value renders a disabled-looking,
+                collapsed slider with a tooltip instead of the interactive control. */}
             {max > min ? (
               <>
                 <SimpleSlider

@@ -310,12 +310,9 @@ interface LangyState extends TurnPhaseState {
   pinnedFeedbackMessageId: string | null;
   pinFeedback: (messageId: string) => void;
 
-  // The turn phase — the SINGLE, event-driven source for the composer's send/stop
-  // affordance and every "is a turn in flight" read (ADR-078).
   /**
-   * The user sent a message: go `active` at once, before the server has answered with the ids.
-   * What makes Stop available during the startup window instead of leaving Send on screen for
-   * the seconds a cold worker takes.
+   * The turn phase — the single source for send/stop (ADR-078). Sending goes `active` at once,
+   * before the server answers with ids, so Stop is available during a cold worker's startup.
    */
   beginSend: () => void;
   /** A turn was dispatched (transport adopted its ids): adopt it, go `active`. */
@@ -509,9 +506,8 @@ export const useLangyStore = create<LangyState>()(
       askLangy: (prompt) =>
         set(() => ({
           isOpen: true,
-          // A fresh ask starts a clean conversation, mirroring startNewConversation (the chat engine is reset
-          // panel-side when the queued prompt is consumed) — with ONE deliberate difference: the context the
-          // user just grabbed RIDES ALONG.
+          // A fresh ask starts a clean conversation like startNewConversation, but the context the
+          // user just grabbed rides along.
           activeConversationId: null,
           historyLoadConversationId: null,
           draft: "",

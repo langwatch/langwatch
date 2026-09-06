@@ -1,37 +1,7 @@
 /**
- * A group over the process's tRPC transport. A group belongs to exactly one
- * organization, which is why it is the organization feature that owns this
- * surface (`packages/features/catalogue.json` lists `group` among the
- * organization's subjects).
- *
- *   listAll:       every group in the organization, each with its access
- *                  bindings resolved to the names an admin reads.
- *   getById:       one group, with its bindings and its members.
- *   create:        a new group, optionally with bindings and members.
- *   rename:        renames one.
- *   delete:        removes one, SCIM-managed groups included.
- *   addBinding /
- *   removeBinding: one access binding at a time, for the row-level controls.
- *   addMember /
- *   removeMember:  one membership at a time.
- *   listForMember: the groups one member is in, for the member drawer.
- *   applyEdits:    the group editor's whole diff — rename, bindings added and
- *                  removed, members added and removed — in one call.
- *
- * Every procedure takes `organization:manage`. A group IS an access grant:
- * reading the list tells you who can reach what, and every write here hands
- * out or takes away access across teams and projects.
- *
- * Groups arrive with SCIM, so creating one and listing them are gated on the
- * Enterprise plan. The plan lives in the process's billing store, so that
- * refusal arrives as a port.
- *
- * Transport only: gates, plan enforcement, and delegation to
- * {@link OrganizationApp} — which is where the organization service, the
- * composed project service, the ledger attribution and the binding-scope name
- * resolution now arrive from.
- *
- * Spec: packages/features/organization/specs/organization-service.feature.
+ * A group over the process's tRPC transport. Every procedure takes `organization:manage`, since
+ * a group is an access grant. Groups arrive with SCIM, so create/list are gated on the Enterprise
+ * plan port. Transport only: gates, plan enforcement, delegation to {@link OrganizationApp}.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
@@ -57,14 +27,8 @@ import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from 
 import type { OrganizationApp } from "#app/organization.app";
 
 /**
- * The process supplies authentication; authorization arrives as `policy`.
- *
- * `app` is the slice of the process's application this feature reaches, not
- * the feature's application itself, because a tRPC root is shared by every
- * feature mounted on it and so carries all of them. Before
- * {@link OrganizationApp} this door declared its own `GroupApplication` —
- * thirteen organization methods and one project one — which is why it could
- * not reach the team screen's copy of the same composition.
+ * The process supplies authentication; authorization arrives as `policy`. `app` is the slice of
+ * the process's application this feature reaches, since a shared tRPC root carries every feature.
  */
 export type GroupTrpcContext = Readonly<{
   app: Readonly<{ organizations: OrganizationApp }>;
@@ -78,15 +42,8 @@ type GroupTrpcProcedures<
 > = Readonly<{
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  /**
-   * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one access declaration.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
-   */
+  /** The process's tracing/logging/error/authorization/audit policy for one access declaration.
+   * Applied after this feature's own input parser, since the check reads its scope id from it. */
   policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
   /** @see the mount field of the same name. */
   validateOutput: boolean;
@@ -132,10 +89,8 @@ function toGroupMembershipBinding(scopeNames: ReadonlyMap<string, string>) {
 }
 
 /**
- * Installs the complete `group.*` tRPC surface on a process-owned root. The
- * procedure and the policy are injected by the process so its auth, audit,
- * error, logging and tracing policies wrap every feature procedure
- * consistently.
+ * Installs the complete `group.*` tRPC surface on a process-owned root. The procedure and policy
+ * are injected so the process's auth/audit/error/logging/tracing wrap every procedure.
  */
 export class GroupTrpcApi {
   static create<

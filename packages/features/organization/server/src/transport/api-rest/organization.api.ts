@@ -1,38 +1,8 @@
 /**
- * The organization management REST family: the organization profile, its
- * members, and its invites, addressed with no {orgId} segment because the
- * organization is implied by the credential.
- *
- * Built on the versioned family the process's REST service hands out, so every
- * endpoint declares its RBAC permission once and gets the route-policy
- * registration, the org-key authentication (throwing mode), the permission
- * check (403) and the Enterprise plan gate (402) in that order. Every dated
- * version of a documented endpoint — plus `latest` — reaches the OpenAPI
- * document; there is no bare alias.
- *
- * Terraform-shaped: reads return every field a write accepts (the SSO fields
- * and the S3 secret are deliberately not owned by this API), PATCH is partial,
- * and deletes of missing resources answer their family's stable 404 code.
- *
- * ## Why the raw service and not {@link OrganizationApp}
- *
- * Every write here is attributed to `apiKeyUserId`, which is OPTIONAL: a
- * service credential acts as nobody, and both `deleteMember` and
- * `setMemberDisabled` document `null` as "skip the self-guard". The
- * application's member operations take a caller whose `id` is a `string`, so
- * routing this family through them would either invent an actor or refuse a
- * service key outright. The narrow service surface below is what the
- * credential can honestly reach; the application stays the browser's door.
- *
- * Everything this family touches that is NOT an organization read or write —
- * the invitation service, the licence seat guard, the trace-share revocation
- * that follows a settings change, the Enterprise plan gate and the audit sink —
- * is the process's, and arrives as a port.
+ * The organization management REST family: profile, members, invites, no {orgId} segment since
+ * it's implied by the credential. Uses the raw service, not {@link OrganizationApp}, since every
+ * write here is attributed to an optional `apiKeyUserId` the application's ops can't express.
  */
-// The role and scope vocabularies come from the authz contract, which
-// publishes them for the wire. They matched the generated Prisma enums
-// member for member; taking them from storage meant the database decided
-// what this door accepts.
 import {
   roleBindingScopeTypeSchema,
   teamUserRoleSchema,
@@ -98,12 +68,8 @@ export interface OrganizationRestMemberTeamBinding {
 }
 
 /**
- * The seven organization reads and writes this family makes.
- *
- * Named structurally rather than picked off `OrganizationService`: only
- * `getSettings` and `updateSettings` are on the canonical contract, and the
- * five membership operations are the legacy organization surface the app
- * process still owns.
+ * The seven organization reads and writes this family makes. Named structurally rather than
+ * picked off `OrganizationService`, since only two of the seven are on the canonical contract.
  */
 export interface OrganizationRestService {
   getSettings(input: { organizationId: string }): Promise<OrganizationSettings>;
@@ -171,13 +137,8 @@ export interface OrganizationRestInviteService {
  * rather than to the organization feature.
  */
 export interface OrganizationRestPorts {
-  /**
-   * The management surface's one wire code for "no seat left".
-   *
-   * The licence layer reports overflow under its own error class and its own
-   * code, so renaming it to this family's needs both, and neither is the
-   * organization feature's to own. Throws; never returns.
-   */
+  /** The management surface's one wire code for "no seat left" — neither the error class nor
+   * the code is the organization feature's to own. Throws; never returns. */
   rethrowSeatLimit(error: unknown): never;
   /**
    * The team role an invitation's organization role implies, for the legacy
@@ -387,11 +348,8 @@ const memberWire = (member: OrganizationRestMemberSummary) => ({
 });
 
 /**
- * One stored team assignment. `Array.isArray` proves the JSON column holds a list
- * and nothing about its members, so a legacy or hand-edited row would reach
- * the response schema with `teamId: undefined` and turn a read into a 500.
- * Malformed members are dropped rather than failing the read: the invite is
- * still worth reporting, and the row it came from cannot be fixed from here.
+ * One stored team assignment. `Array.isArray` proves nothing about the list's members, so
+ * malformed ones are dropped rather than failing the read — the invite is still worth reporting.
  */
 const storedTeamAssignmentSchema = z.object({
   teamId: z.string().min(1),
@@ -725,12 +683,8 @@ export function createOrganizationRestApp(options: {
         ...(actorUserId ? { user: { id: actorUserId } } : {}),
         validation: "strict",
       });
-      // The invitee addresses are the subject of the record, not incidental
-      // context: "who was granted a way into this organization" is the question
-      // this entry exists to answer, and an invite id answers it only for as
-      // long as the invite row survives. The record adds no exposure, since the
-      // same addresses are listed by `GET /api/organization/invites` to the same
-      // organization-scoped credentials.
+      // The invitee addresses are the subject of the record, not incidental context — an invite
+      // id alone answers "who was granted access" only while the row survives.
       emitManagementAudit({
         c,
         audit,

@@ -7,7 +7,10 @@ import type {
   LangyConversationListItemDto,
 } from "@langwatch/langy-contract";
 import type { ModelDefaultResolvedTrpcOutput } from "@langwatch/model-provider-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import {
+  createFeatureApi,
+  type OutputsFromMap,
+} from "@langwatch/platform-api-client/feature-api";
 
 /**
  * A payload no contract package publishes yet.
@@ -139,8 +142,8 @@ export type LangyApiMap = {
 /** What each procedure in the map takes. */
 export type RouterInputs = { [K in keyof LangyApiMap]: InputsOf<LangyApiMap[K]> };
 
-/** What each procedure in the map answers. */
-export type RouterOutputs = { [K in keyof LangyApiMap]: OutputsOf<LangyApiMap[K]> };
+/** What each procedure in the map answers, as the browser receives it. */
+export type RouterOutputs = OutputsFromMap<LangyApiMap>;
 
 type InputsOf<TNode> = TNode extends { query: { input: infer TIn } }
   ? TIn
@@ -150,13 +153,6 @@ type InputsOf<TNode> = TNode extends { query: { input: infer TIn } }
       ? TIn
       : { [K in keyof TNode]: InputsOf<TNode[K]> };
 
-type OutputsOf<TNode> = TNode extends { query: { output: infer TOut } }
-  ? TOut
-  : TNode extends { mutation: { output: infer TOut } }
-    ? TOut
-    : TNode extends { subscription: { output: infer TOut } }
-      ? TOut
-      : { [K in keyof TNode]: OutputsOf<TNode[K]> };
 
 export const api = createFeatureApi<LangyApiMap>();
 

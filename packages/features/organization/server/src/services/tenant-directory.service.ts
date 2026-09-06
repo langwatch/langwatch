@@ -1,10 +1,8 @@
 import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";
 
 /**
- * The three reads that place a tenant, in the order the rule below asks them.
- *
- * A reader rather than a database client, so the rule is testable without one
- * and both processes hold the same object.
+ * The three reads that place a tenant, in the order the rule below asks them. A reader rather
+ * than a database client, so the rule is testable without one.
  */
 export interface TenantOwnershipReader {
   /** The organization a project belongs to, or null when the id is no project. */
@@ -16,11 +14,8 @@ export interface TenantOwnershipReader {
 }
 
 /**
- * Where a tenant's data lives, for every kind of tenant the event store carries.
- *
- * A project names its owner, an organization names itself, and a user is
- * platform-level. An id that is none of the three answers null, which the
- * router refuses rather than sending to the shared instance.
+ * Where a tenant's data lives, for every kind the event store carries. An id that is none of
+ * project/organization/user answers null, which the router refuses.
  */
 export class TenantDirectoryService {
   static create(reader: TenantOwnershipReader): TenantDirectoryService {

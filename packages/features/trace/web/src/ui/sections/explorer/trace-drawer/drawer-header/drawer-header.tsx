@@ -89,7 +89,8 @@ interface DrawerHeaderProps {
 }
 
 /**
- * Inline trace ID chip — collapsed to the first 5 chars by default so it doesn't compete with the trace name, expands to the full ID on hover, and reveals a copy icon at the trailing edge.
+ * Inline trace ID chip, collapsed by default so it doesn't compete with the trace name; expands
+ * to the full ID with a copy icon on hover.
  */
 function TraceIdChip({ traceId }: { traceId: string }) {
   const short = traceId.slice(0, 8);
@@ -862,14 +863,8 @@ export const DrawerHeader = memo(function DrawerHeader({
           <SyntheticTraceBadge attributes={trace.attributes} />
         </HStack>
 
-        {/* Negative marginRight cancels the header's paddingX so the
-            close button sits flush with the drawer edge, matching the
-            online-evaluations / add-to-dataset drawers (their
-            DrawerCloseTrigger uses absolute positioning at the edge).
-            marginTop matches what the other drawers do — their close
-            button sits ~8px from the top of the drawer chrome, the
-            VStack's paddingTop={3} (12px) puts ours too low without
-            this offset. */}
+        {/* Negative margins cancel the header padding so the close button sits flush with the
+            drawer edge, matching the other drawers' absolutely-positioned DrawerCloseTrigger. */}
         {/* The whole action cluster is drawer chrome or needs a session:
             refresh, maximize, the overflow menu (which fires
             `pinnedTrace.getPin` on mount), dock and close. It must be
@@ -989,14 +984,8 @@ export const DrawerHeader = memo(function DrawerHeader({
         )}
       </HStack>
 
-      {/* Row 2: Unified context strip. Three logical sections — performance
-          metrics, pinned context, source/tools chips — flow into one wrapped
-          row separated by thin vertical dividers. The right end slot anchors
-          the trace ID + relative timestamp. Collapsing what used to be three
-          separate rows keeps the header dense without losing categorisation.
-          The strip wraps naturally — height tracks content rather than
-          locking to two rows, so traces with a single row of pills don't
-          carry a permanent ~28px empty band underneath. */}
+      {/* Row 2: performance metrics, pinned context, and source/tools chips flow into one wrapped
+          strip so a single row of pills doesn't carry a permanent empty band underneath. */}
       <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
         {/* Section 1: Performance metrics */}
         <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
@@ -1107,15 +1096,8 @@ export const DrawerHeader = memo(function DrawerHeader({
         {chipsOverflow}
       </HStack>
 
-      {/* Pin strip — auto-pins (identity / run / tag) inline with intra-
-          category dividers, custom pins capped at 3 inline with the rest in
-          a "+N pinned" overflow popover. The row only renders when there's
-          actually something to show; ~35% of traces have no auto-pins (LLM
-          completions without a conversation thread, error traces, etc.) and
-          the previous always-reserved 28px slot read as dead chrome. The
-          height jump on next/previous-trace nav between trace-with-pins and
-          trace-without is small enough (~28px) that it's cheaper than the
-          permanent waste. */}
+      {/* Pin strip only renders when there's something to show — many traces have no auto-pins,
+          and a small height jump between trace-with-pins and trace-without beats dead chrome. */}
       {(pinResult.inline.length > 0 || pinResult.overflow != null) && (
         <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
           {pinResult.inline}

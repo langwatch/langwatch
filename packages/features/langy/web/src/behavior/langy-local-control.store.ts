@@ -1,15 +1,6 @@
 /**
- * The live half of local control (ADR-129): the wait cards and the folder
- * state as the OPEN stream reports them, before the durable tail lands.
- *
- * Deliberately a separate store from `langyStore`, for the same two reasons
- * the context-target store is separate: the traffic is its own (a keepalive
- * and a card per command, none of which the composer or the conversation list
- * care about), and the lifetime is its own (everything here is scoped to one
- * conversation and dropped when another opens).
- *
- * Nothing here is the truth. The durable record is, and `langyLocalWaits`
- * merges the two with a rule that only ever moves a card forward.
+ * The live half of local control (ADR-129): wait cards and folder state as the OPEN stream
+ * reports them, before the durable tail lands and `langyLocalWaits` merges the two.
  */
 import { create } from "zustand";
 
@@ -49,12 +40,8 @@ interface LangyLocalControlState {
    */
   recordWorkspaceState: (a: { conversationId: string | null; connected: boolean }) => void;
   /**
-   * Mark a card settled locally, the moment the answer is accepted.
-   *
-   * Records the settle even for a card this stream never carried: a tab that
-   * adopted a running turn renders its cards from the durable record alone,
-   * and the answer it just gave has to win over a durable record that still
-   * reads `pending` until the tail lands.
+   * Marks a card settled locally the moment its answer is accepted, even for a card this stream
+   * never carried, so it wins over a durable record that still reads `pending`.
    */
   settleWait: (a: {
     waitId: string;

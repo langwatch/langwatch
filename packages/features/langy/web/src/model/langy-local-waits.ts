@@ -1,20 +1,7 @@
 /**
- * The cards the developer has to answer while a turn runs (ADR-129) — a
- * permission ask for one command on their machine, or a question Langy needs
- * settled before it goes on.
- *
- * TWO SOURCES, ONE ANSWER. The durable record is the truth: the wait rides on
- * the tool call it belongs to (`LangyTurnWait`), so a tab that adopted a
- * running turn renders the card from the folded turn document alone, with no
- * live stream at all. The live stream entries are the fast path for the tab
- * that sent the message, and the wake-up that says the card is there now.
- *
- * The merge rule is the same for both kinds: a terminal state wins over
- * `pending`, whichever side reports it first. Nothing here can invent a
- * terminal state, so the worst a lost entry costs is latency.
- *
- * Pure and JSX-free: the cards render what this yields, and the panel routes
- * the answer with the wait id it carries.
+ * The cards the developer has to answer while a turn runs (ADR-129). Two sources, one answer:
+ * the durable record is the truth, the live stream is the fast path — a terminal state always
+ * wins over `pending`, whichever side reports it first. Pure and JSX-free.
  */
 import type { LangyTurnToolCall, LangyTurnWait } from "@langwatch/langy-contract";
 
@@ -22,13 +9,8 @@ import type { LangyTurnToolCall, LangyTurnWait } from "@langwatch/langy-contract
 export type LangyWaitStatus = "pending" | "answered" | "expired" | "cancelled";
 
 /**
- * What the panel says while a card waits and a folder is shared from a
- * terminal.
- *
- * The same ask is open in that terminal, which is where the developer is
- * looking, so a line that sent them to the browser cost them the flow they
- * came for. One sentence, used by the waiting line and by the composer, so
- * the two can never disagree.
+ * What the panel says while a card waits and a folder is shared from a terminal, since the
+ * same ask is open there. Shared by the waiting line and the composer, so they can't disagree.
  */
 export const LANGY_ANSWER_HERE_OR_TERMINAL = "Answer on the card above or in the terminal.";
 
@@ -43,10 +25,8 @@ export type LangyPermissionDecision = "allow_once" | "allow_pattern" | "deny";
 export type LangyPermissionAnswerSource = "panel" | "terminal";
 
 /**
- * One live stream entry about a wait, in the shape the transport hands over.
- * Deliberately structural rather than the stream union: this module is the
- * only reader, and typing it here keeps the panel's live path and the card's
- * props one contract.
+ * One live stream entry about a wait, structural rather than the stream union — this module is
+ * the only reader, keeping the panel's live path and the card's props one contract.
  */
 export interface LangyLiveWait {
   waitId: string;
@@ -79,12 +59,7 @@ export interface LangyPermissionCardData {
   command: string;
   /** The pattern a session grant would cover, when one is offered. */
   pattern: string | null;
-  /**
-   * Every pattern one session grant covers. A chain that fetches and then
-   * checks out grants both, and the button has to name both: one click gave
-   * away more than the first pattern, and the session's grants are readable
-   * nowhere else.
-   */
+  /** Every pattern one session grant covers — grants are readable nowhere else. */
   patterns: string[];
   reason: string | null;
   /** The seconds after which the command is stopped, or null with no limit. */
@@ -101,15 +76,8 @@ export interface LangyQuestionWait {
 }
 
 /**
- * One question card, as the wait that raised it carries it.
- *
- * The transcript is not where a live question comes from. A tab that adopted
- * a running turn reads no live stream and its message list only grows when
- * the turn ends, so the `question` tool part reached the screen minutes after
- * the tool started waiting: the composer said to answer the card above while
- * there was no card to answer. The wait itself carries the question and its
- * options, and the wait is on the conversation record from the moment it is
- * raised.
+ * One question card, as the wait that raised it carries it — not the transcript, whose
+ * `question` tool part can reach the screen minutes after the tool started waiting.
  */
 export interface LangyQuestionCardData {
   waitId: string;
@@ -156,13 +124,8 @@ export function mergeLangyWaitStatus({
 }
 
 interface WaitSources {
-  /**
-   * Every card of the whole conversation, off the durable record
-   * (`langy.localRecord`). The broadest source and the slowest: it is what
-   * puts a card raised before this tab was watching on screen, and what keeps
-   * the answered cards of a finished conversation on screen when it is
-   * reopened. The two sources below overwrite it as they arrive.
-   */
+  /** Every card of the whole conversation, off the durable record — the broadest, slowest
+   * source, overwritten by the two below as they arrive. */
   record?: readonly LangyRecordWait[] | null | undefined;
   /** The folded turn document's tool calls, or null before any turn is seen. */
   toolCalls?: readonly LangyTurnToolCall[] | null | undefined;
@@ -181,12 +144,8 @@ function durableWaits(sources: WaitSources): LangyTurnWait[] {
 }
 
 /**
- * One permission card folded over its other durable reading.
- *
- * The two durable sources are the same record read at two moments, so neither
- * is simply newer: the turn fold can hold the answer the record has not caught
- * up with, and the record can hold the answer for a turn this browser stopped
- * folding. A card only ever moves forward.
+ * One permission card folded over its other durable reading — neither source is simply newer,
+ * so a card only ever moves forward.
  */
 function mergeDurable({
   known,
@@ -210,10 +169,8 @@ function mergeDurable({
 }
 
 /**
- * Every permission card of the current turn, in the order the commands were
- * asked about. A live entry with no durable twin still renders — that is the
- * whole point of the fast path — and the durable twin then takes over without
- * the card moving, because both key by wait id.
+ * Every permission card of the current turn. A live entry with no durable twin still renders
+ * (the point of the fast path); the durable twin then takes over without the card moving.
  */
 export function langyPermissionCards(sources: WaitSources): LangyPermissionCardData[] {
   const cards = new Map<string, LangyPermissionCardData>();
@@ -235,11 +192,8 @@ export function langyPermissionCards(sources: WaitSources): LangyPermissionCardD
 }
 
 /**
- * The patterns to name, given what a source carries.
- *
- * A record written before the ask carried its whole list holds one pattern,
- * and that one pattern is then the whole answer: the card names what it knows
- * rather than nothing at all.
+ * The patterns to name, given what a source carries — a record with just one pattern makes that
+ * the whole answer, rather than nothing at all.
  */
 function patternsOf({
   patterns,
@@ -287,10 +241,8 @@ function mergePatterns({
 }
 
 /**
- * The same card once the live stream has spoken. The durable side wins every
- * detail it holds — it was written by the server, not by a frame that may be
- * partial — and the live side contributes the state and whatever the durable
- * side has not carried yet.
+ * The same card once the live stream has spoken — the durable side wins every detail it holds,
+ * and the live side contributes the state plus whatever the durable side hasn't carried yet.
  */
 function withLive(
   durable: LangyPermissionCardData | undefined,
@@ -403,13 +355,8 @@ function mergeQuestionCard({
 }
 
 /**
- * The option ids one settled question wait names, given the card's own
- * options.
- *
- * A wait records the answer as the LABELS it was given, because that is what
- * the tool reads. The card binds by id, so the two are matched here: a card
- * read back after the turn then renders locked on what was chosen, instead of
- * offering an answer that was already given.
+ * The option ids one settled question wait names, given the card's own options — a wait
+ * records the answer as labels (what the tool reads), while the card binds by id.
  */
 export function langyAnsweredOptionIds({
   answers,
@@ -475,10 +422,8 @@ function liveQuestionWaits(sources: WaitSources): QuestionWaitEntry[] {
 }
 
 /**
- * The question waits of the current turn, keyed by the tool call that asked.
- * The choices card knows its own tool call id (its block id derives from it),
- * so this is what turns a selection into an answer the waiting tool receives
- * instead of the next user message.
+ * The question waits of the current turn, keyed by the tool call that asked, so a selection
+ * can be routed to the waiting tool instead of the next user message.
  */
 export function langyQuestionWaitsByToolCall(sources: WaitSources): Map<string, LangyQuestionWait> {
   const waits = new Map<string, LangyQuestionWait>(recordQuestionWaits(sources));
@@ -502,13 +447,8 @@ export function langyQuestionWaitsByToolCall(sources: WaitSources): Map<string, 
 }
 
 /**
- * Where one choices answer goes.
- *
- * A question the tool asked MID-TURN is a tool waiting on a person: the answer
- * returns to the wait and Langy carries on with the plan it had. Every other
- * answer — a question whose wait already ended, a card from a settled turn, a
- * stamped choices block — is the next USER MESSAGE, which is the path the
- * choices card has always taken.
+ * Where one choices answer goes: a mid-turn question routes back to the waiting tool; every
+ * other case (settled turn, already-ended wait, stamped block) goes as the next user message.
  */
 export function routeLangyChoiceAnswer({
   blockId,

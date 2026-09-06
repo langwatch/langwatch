@@ -58,9 +58,8 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
     filterSeededAnchorKey.current = anchor ? `${anchor.field}:${anchor.location.start}` : null;
   }, [anchor?.field, anchor?.location.start, anchor?.currentValue]);
 
-  // Focus the search input when the picker OPENS — deferred to the next frame so it wins the race against the
-  // chip-click that opened it (a plain `autoFocus` fires mid-mount and the opening click can steal focus
-  // straight back, which read as "the popover stole my cursor and I can't type").
+  // Deferred to the next frame so focus wins the race against the chip-click that opened the
+  // picker — a plain `autoFocus` fires mid-mount and the opening click can steal it right back.
   useEffect(() => {
     if (!anchor) return;
     const raf = requestAnimationFrame(() => {
@@ -103,9 +102,8 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
     debouncedFilter.trim() === "" ||
     debouncedFilter.trim().toLowerCase() === anchor.currentValue.trim().toLowerCase();
 
-  // Gated on BOTH the live `pristine` and the debounced `serverPristine`: the debounced gate waits for typing to
-  // settle before fetching, the live gate disables the query the instant the text returns to the chip's value so
-  // a stale prefix can't keep firing for the debounce window.
+  // Gated on both: `serverPristine` waits for typing to settle before fetching, while the live
+  // `pristine` disables the query instantly when text returns to the chip's value.
   const serverSearch = useFacetSearch({
     facetKey: anchor?.field ?? "",
     prefix: debouncedFilter,

@@ -98,10 +98,8 @@ const GITHUB_STAGE_TITLE: Record<string, string> = {
 };
 
 /**
- * The tools that run on the developer's own machine, in the folder they shared
- * (ADR-129). The act reads the same as its sandbox twin; what the row has to
- * add is WHERE it ran, because that is the whole difference and the reader
- * cannot see it anywhere else.
+ * Tools running on the developer's own machine (ADR-129) — the row adds where it ran, since
+ * that's the only difference from its sandbox twin.
  */
 const LOCAL_TOOLS: Record<string, string> = {
   local_read: "Reading a file",

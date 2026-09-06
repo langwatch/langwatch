@@ -1,21 +1,7 @@
 /**
- * Flatten the rendered conversation into the ordered timeline the choices
- * lock derivation reads (ADR-060 §6) — event order and NOTHING else. Because
- * it derives from whatever message list is being displayed, time travel gets
- * the right answer for free: scrub before the selection and the question is
- * open, scrub past it and the card is locked.
- *
- * A choices card reaches the panel two ways, and both are message PARTS: the
- * `question` tool call the agent makes mid-turn, and a stamped card part read
- * back from the durable record. Prose is never one of them, so the timeline
- * reads parts only.
- *
- * Per message, in conversation order:
- *   - an assistant message contributes a `question` entry per choices card
- *     it carries (its OWN prose never supersedes its own question);
- *   - a user message carrying selection parts contributes those selections
- *     (its "Chose: X" text is part of the answer, not a second exchange);
- *   - any other message contributes one `message` entry.
+ * Flattens the rendered conversation into the ordered timeline the choices lock derivation reads
+ * (ADR-060 §6), from message parts only (prose never carries a choices card), so time travel gets
+ * the right answer for free by construction.
  */
 import {
   type LangyChoicesTimelineEntry,

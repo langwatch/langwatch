@@ -50,9 +50,8 @@ export function useTraceFreshness() {
     (traceIds: string[]) => {
       const mode = useSseStatusStore.getState().liveUpdatesMode;
 
-      // newCount is always kept current so the "(N new)" pill stays in sync across all modes (live, ask, paused) — but coalesced the same way discover is: a
-      // busy coding-agent trace fires this handler on nearly every span, and re-querying the pill's count on each one is pure waste when the count usually
-      // hasn't even changed (an existing trace being updated doesn't add a new row to count).
+      // Coalesced like discover: a busy trace fires this on nearly every span, and re-querying the
+      // pill's count on each one is wasted work when the count usually hasn't changed at all.
       if (!newCountInvalidateTimer.current) {
         newCountInvalidateTimer.current = setTimeout(() => {
           newCountInvalidateTimer.current = null;

@@ -22,7 +22,7 @@ import {
 import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository";
 import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository";
 
-/** The two shared read helpers this repository leans on. Stateless; the client rides on each call. */
+/** The two shared read helpers this repository leans on. Stateless; the client rides each call. */
 const personalTeamScope = PrismaPersonalTeamScopeRepository.create();
 const effectiveTeamAdmins = PrismaEffectiveTeamAdminsRepository.create();
 import {
@@ -145,9 +145,9 @@ function namesSlug(target: unknown): boolean {
 }
 
 /**
- * Point a member's binding on one scope at a role without replacing the row — an UPDATE, never a delete-then-recreate, which would change its id mid-save: the member dialog stages removals by id,
- * and a binding batch built against ids a churned recreate had already replaced would carry ids that no longer exist. Keeping the id stable keeps what the admin staged addressable through the whole
- * save, and rows keep their creation order instead of jumping to the bottom of the access list on every correction. Several rows on one scope still collapse to the one this sync sets.
+ * Points a member's binding on one scope at a role without replacing the row — an update, never
+ * a delete-then-recreate, which would change its id mid-save while the member dialog stages
+ * removals by id. Several rows on one scope still collapse to the one this sync sets.
  */
 async function planUserScopeBinding({
   tx,
@@ -194,9 +194,9 @@ async function planUserScopeBinding({
 }
 
 /**
- * What a scope-binding correction resolves to once the transaction has read the rows: the ids that collapse away, and either the role change on the row that stays
- * or a fresh attach. Planned inside the transaction and emitted after it commits — bindings are ledger facts, and the ledger is their only
- * writer (ADR-092 §13).
+ * What a scope-binding correction resolves to once the transaction reads the rows: ids that
+ * collapse away, and either a role change or a fresh attach. Emitted after commit, since
+ * bindings are ledger facts and the ledger is their only writer (ADR-092 §13).
  */
 type ScopeBindingPlan = {
   revokeIds: string[];
@@ -209,9 +209,8 @@ type ScopeBindingPlan = {
 };
 
 /**
- * Emit a batch of plans, revocations first: a crash mid-batch leaves the member with less access than
- * the correction asked for, never more, and the retry converges. Revoking the collapsed siblings
- * before the role change also keeps the surviving row's target role free of a duplicate.
+ * Emits a batch of plans, revocations first: a crash mid-batch leaves the member with less
+ * access than asked for, never more, and the retry converges.
  */
 async function emitScopeBindingPlans({
   writer,
@@ -882,9 +881,9 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   /**
-   * Same guard as disabling or demoting the last admin, and the only irreversible one of the three: an organization with no admin who can
-   * sign in cannot be recovered from inside the product. Read ahead of the revocation as well as inside the removal transaction, so a
-   * refusal never strips the last admin's grants on its way to saying no; the locked read inside the transaction is still the authority.
+   * Same guard as disabling or demoting the last admin, and the only irreversible one of the
+   * three: an organization with no admin who can sign in can't be recovered from inside the
+   * product. Read ahead of the revocation as well as inside the removal transaction.
    */
   private async assertRemovalKeepsAnActiveAdmin({
     organizationId,
@@ -1231,11 +1230,10 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         );
       }
 
-      // The seat correction reaches everything the seat caps, and a member can hold PROJECT-scoped rows the team loop above never
-      // sees. Shared projects only: the member's own personal workspace keeps its stored rows and is capped at resolution, which is
-      // what makes re-promoting them a no-op (personal-workspace-integrity.feature). Corrected through planUserScopeBinding so ids
-      // survive, several rows on one project collapse to one, and a pre-existing Viewer row cannot collide with the correction on
-      // the partial unique index. Left alone on the way back up: an upgrade grants nothing on its own.
+      // The seat correction reaches PROJECT-scoped rows the team loop above never sees, shared
+      // projects only (personal workspaces are capped at resolution instead). Corrected through
+      // planUserScopeBinding so ids survive and a pre-existing Viewer row can't collide on the
+      // partial unique index.
       if (role === OrganizationUserRole.EXTERNAL) {
         const projectRows = await tx.roleBinding.findMany({
           where: {

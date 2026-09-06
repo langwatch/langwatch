@@ -232,9 +232,8 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     [],
   );
   const thawLayout = useCallback(() => setFrozenLayout(null), []);
-  // Bypass freeze whenever a typed-search is active: the value-search input lives inside the same hover-Box, so
-  // by the time the user types the layout is already frozen — `searchQuery → filtered → facetWindow` narrows
-  // live, but a frozen `layout.facetWindow.visible` would keep showing the pre-search snapshot.
+  // Bypass freeze during a typed search: freezing would keep showing the pre-search facet
+  // window instead of narrowing it live as `searchQuery` filters.
   const layout = searchQuery
     ? { activeItems, facetWindow, maxCount }
     : (frozenLayout ?? { activeItems, facetWindow, maxCount });

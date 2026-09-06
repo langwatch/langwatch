@@ -68,9 +68,9 @@ export function useDrawerUrlSync() {
   const updateDrawerParams = useUpdateDrawerParams();
   const router = useRouter();
 
-  // Only mirror view-state into the URL once the drawer is actually open in the URL. openDrawer's `?drawer.open=traceV2Details&drawer.traceId=…` push is an async shallow navigation; if the persisted view-mode
-  // differs from the URL (e.g. the operator's last mode was Trace but a freshly opened URL has no drawer.mode yet), the store→URL effect below would fire mid-transition and push `drawer.mode` off a stale asPath
-  // that has no drawer.open/traceId yet — clobbering them, so the resulting URL is just `?drawer.mode=trace` and a refresh loses the drawer.
+  // Only mirror view-state into the URL once the drawer is actually open in the URL — openDrawer's
+  // navigation is async, and syncing mid-transition would push drawer.mode off a stale asPath that
+  // has no drawer.open/traceId yet, clobbering them so a refresh loses the drawer.
   const drawerOpenInUrl = router.query["drawer.open"] === "traceV2Details";
 
   const viewMode = useDrawerStore((s) => s.viewMode);

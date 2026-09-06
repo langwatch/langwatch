@@ -1,9 +1,6 @@
 /**
- * Presence-broadcast toggle, drawn inside the account dropdown.
- *
- * Shaped as a `Menu.Item` so it sits flush with API Keys / Settings / Logout.
- * The shell offers it only where presence is live, so the row states its own
- * disabled treatment when presence is off at the organization or project.
+ * Presence-broadcast toggle, drawn as a `Menu.Item` flush with API Keys / Settings / Logout.
+ * States its own disabled treatment when presence is off at the organization or project.
  */
 
 import { Box, HStack, Icon, Menu, Text } from "@chakra-ui/react";

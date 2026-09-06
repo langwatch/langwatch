@@ -1,15 +1,7 @@
 /**
- * The conversation's local control record (ADR-129): every card the
- * developer's machine put up, and whether the folder is connected.
- *
- * Read from the durable record rather than from the live stream, because the
- * live stream cannot answer either question for a tab that did not start the
- * turn — it never subscribes — and answers neither at all for a conversation
- * that is simply reopened.
- *
- * It follows the conversation's event cursor: the messages poll moves that
- * while a turn is in flight, so a card raised on the running turn lands within
- * one poll, and a settled conversation reads it once.
+ * The conversation's local control record (ADR-129). Read from the durable record rather than
+ * the live stream, since the live stream can't answer for a tab that never subscribed. Follows
+ * the conversation's event cursor, so a card lands within one poll.
  */
 
 import type { LangyEventCursor } from "@langwatch/langy-contract";

@@ -45,9 +45,8 @@ const traceColumnDefs = {
   trace: traceCol.accessor("name", {
     id: "trace",
     header: "Trace (summary)",
-    // Was flex (`size: 9999, meta.flex`) so the column absorbed every pixel of leftover space — fine on a
-    // typical lens with eight to ten columns visible, but with a slimmer column set (or a collapsed sidebar)
-    // the trace cell ballooned out to 800px+ of mostly empty whitespace beside the name + ID.
+    // Fixed rather than flex: a flex column absorbing leftover space balloons out to mostly empty
+    // whitespace whenever the visible column set is slim or the sidebar is collapsed.
     size: 560,
     minSize: 320,
     maxSize: 820,

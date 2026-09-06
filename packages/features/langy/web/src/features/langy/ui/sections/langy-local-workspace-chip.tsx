@@ -1,13 +1,7 @@
 /**
- * The panel header chip for a shared folder (ADR-129).
- *
- * It is the standing answer to "where is Langy working right now": the folder
- * name while the folder is connected, the machine and the branch behind a
- * hover, and the way to end the share. Nothing renders while no folder is
- * connected, so the header keeps its one line for every other conversation.
- *
- * Disconnecting asks first. It stops whatever is running on the machine, and
- * a header chip is small enough to hit by accident.
+ * The panel header chip for a shared folder (ADR-129): the folder name, with the machine and
+ * branch behind a hover. Renders nothing while no folder is connected. Disconnecting asks first,
+ * since it stops what's running on the machine and the chip is small enough to hit by accident.
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { FolderCode } from "lucide-react";

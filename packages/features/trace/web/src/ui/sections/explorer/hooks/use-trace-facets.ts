@@ -63,9 +63,8 @@ export function useTraceFacets() {
     },
   );
 
-  // Live `discover_updated` freshness is owned by the single page-level coordinator (useTraceFreshness), not
-  // here: useTraceFacets is consumed by several sidebar components and a per-consumer subscription would open a
-  // duplicate SSE connection each.
+  // Live freshness is owned by useTraceFreshness, not here — this hook has several consumers, and
+  // a subscription per consumer would open a duplicate SSE connection each.
 
   // keepPreviousData is project-blind — without this guard it would surface
   // project A's facets while project B's discover request is in flight.

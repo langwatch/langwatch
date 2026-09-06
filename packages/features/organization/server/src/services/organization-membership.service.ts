@@ -262,9 +262,8 @@ export class OrganizationMembershipService {
   }
 
   /**
-   * Compensation for a provisioning run that created the organization but could not finish: without its bootstrap key the
-   * organization is unreachable, and its slug squats every retry as a 409. Removing what the run created lets the caller simply
-   * retry. Provisioning is the only caller; nothing else may delete an organization through this surface.
+   * Compensation for a provisioning run that created the organization but couldn't finish, whose
+   * slug would otherwise squat every retry as a 409. Provisioning is the only caller.
    */
   async deleteProvisionedOrganization({
     organizationId,

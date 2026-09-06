@@ -214,9 +214,8 @@ export const SearchBar: React.FC = () => {
     };
   }, [aiMode, langyAskMode]);
 
-  // ⌘I / Ctrl+I anywhere on the page fires the ask affordance: the Langy handoff when Langy owns it, otherwise
-  // AI mode — gated through the same provider-primer popover the button uses, since pressing the shortcut when
-  // no provider is configured shouldn't dump the user into a composer they can't actually submit from.
+  // ⌘I / Ctrl+I fires the ask affordance, gated through the same provider-primer popover as the
+  // button, so the shortcut can't dump the user into a composer they can't submit from.
   const handleAiShortcut = useCallback(() => {
     if (isSamplePreview) return;
     if (langyRoutesAsk) {

@@ -6,21 +6,9 @@ import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
 import { useLangyStore } from "./langy.store";
 
 /**
- * Open the panel on the conversation named by `?langyConversation=<id>`.
- *
- * The command line prints that link when a folder is shared and again on every
- * permission ask, and nothing read it: the link opened the project home with
- * whatever conversation the panel already had.
- *
- * The conversation is read through `langy.detail`, which answers null for one
- * this reader cannot see — missing and belonging-to-someone-else share that
- * answer on purpose, so a link cannot be used to learn that a conversation
- * exists. Either way the parameter is stripped, so a stale or hostile id
- * neither lingers in the address bar nor re-runs this.
- *
- * Mounted once per project, in ProjectLangyLayout.
- *
- * Spec: specs/langy/langy-local-control.feature.
+ * Opens the panel on the conversation named by `?langyConversation=<id>`. Read through
+ * `langy.detail`, which answers null both for missing and belonging-to-someone-else on purpose.
+ * Mounted once per project, in ProjectLangyLayout. Spec: specs/langy/langy-local-control.feature.
  */
 export function useLangyConversationDeepLink(): void {
   const [searchParams, setSearchParams] = useSearchParams();

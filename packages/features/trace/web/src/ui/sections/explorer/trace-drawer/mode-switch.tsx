@@ -224,19 +224,9 @@ export function ModeSwitch({
 
   return (
     <HStack paddingX={4} gap={4} align="center">
-      {/*
-        Tab order: Summary | Trace | [Session | Terminal] | Conversation.
-        Summary leads because it's the friendlier default for non-engineering
-        users who just want I/O + metadata at a glance; Trace sits middle for
-        the waterfall + span detail workflow. On a coding-agent trace, Session
-        and Terminal are what you open the drawer FOR — the raw conversation
-        transcript is the fallback view once you already know what happened,
-        so it moves after them rather than sitting between Trace and Session.
-        The previous order put Trace first to match the store default —
-        surfacing Summary instead lets the last-used-mode persistence (see
-        `drawerStore.lastModeChosen`) carry observability-first users straight
-        back to where they were.
-      */}
+      {/* Tab order: Summary | Trace | [Session | Terminal] | Conversation. Summary leads as the
+        friendlier default; Session/Terminal come before Conversation since they're what you open
+        a coding-agent trace for, leaving the raw transcript as the fallback view. */}
       <ModeTab
         label="Summary"
         shortcut="O"

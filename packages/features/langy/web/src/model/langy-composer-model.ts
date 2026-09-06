@@ -1,17 +1,7 @@
 /**
- * Which model the composer's picker should hold.
- *
- * The panel used to check the resolved default against the virtual key's
- * `modelsAllowed` list only. That list is null on almost every project, which
- * reads as "anything goes", so a default naming a provider the project has no
- * credential for went straight into the composer. The picker's own menu never
- * offers such a model, and the gateway refuses it with
- * `model_provider_not_bound` on every send.
- *
- * `reachable` is the list the picker renders: the project's models, from the
- * providers connected at the project, its team or its organization, already
- * narrowed by the key's allowlist. Seeding and snapping run on that list, so
- * the composer and the turn agree on what the project can serve.
+ * Which model the composer's picker should hold, from `reachable` — the project's models,
+ * narrowed to providers connected at the project, team, or organization and the key's allowlist —
+ * so the composer never seeds a model the gateway would refuse with `model_provider_not_bound`.
  */
 export function resolveComposerModel({
   current,

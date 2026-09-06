@@ -1,4 +1,4 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repos are intentional no-ops.
 
 import type { AuthzCustomRole } from "@langwatch/authz-contract";
 import type {
@@ -85,9 +85,8 @@ export interface CreateAndAssignResult {
 }
 
 /**
- * Input for creating an organization with no user attached: the instance provisioning path. Unlike
- * {@link CreateAndAssignInput} there is no member to assign: the caller mints an organization-scoped
- * admin API key afterwards, and that credential is how anything reaches the new organization.
+ * Input for creating an organization with no user attached: the instance provisioning path.
+ * Unlike {@link CreateAndAssignInput}, no member is assigned — an admin API key mints afterwards.
  */
 export interface CreateForProvisioningInput {
   orgId: string;
@@ -136,9 +135,8 @@ export interface AuditLogFilters {
 }
 
 /**
- * Enriched audit log entry with resolved user and project data. Backed by a single `AuditLog` table
- * that stores both gateway-shape (targetKind + before/after diff) and platform-shape (args + metadata)
- * rows. The `source` field is computed from the presence of `targetKind`.
+ * Enriched audit log entry with resolved user and project data. Backed by one `AuditLog` table
+ * storing both gateway-shape and platform-shape rows; `source` is computed from `targetKind`.
  */
 export interface EnrichedAuditLog {
   id: string;

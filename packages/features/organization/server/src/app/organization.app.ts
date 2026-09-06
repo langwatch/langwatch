@@ -1,29 +1,7 @@
 /**
- * The organization feature's application: what all of its doors call.
- *
- * Four tRPC doors answer for this feature — `organization.*`, `team.*`,
- * `group.*` and the personal-workspace nav predicate — and before this each
- * declared its own private bag of narrowed services: `GroupApplication`,
- * `TeamApplication`, `OrganizationApplication` and an inline
- * `Readonly<{ organizations: … }>`. Four descriptions of one composition,
- * agreeing by attention rather than by construction, and none of them
- * reachable from any other.
- *
- * Most operations are the services' own, reached through {@link organizations}
- * and {@link projects}. What lives here as a method is what a door would
- * otherwise have to know:
- *
- *   - attributing a write to its caller — eight handlers stamped the ledger
- *     actor for themselves, under two different spellings: a `ledgerActor()`
- *     helper in `group.*` and a bare `{ type: "user", id }` literal in
- *     `team.*`;
- *   - resolving a group binding's scope id to the name an admin reads, which
- *     is a rule about what an organization, a team and a project are — not
- *     about tRPC — and which needs both services at once.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
+ * The organization feature's application: what its four tRPC doors (`organization.*`, `team.*`,
+ * `group.*`, the personal-workspace nav predicate) call. What lives here is cross-door shared
+ * logic; most operations are the services' own, via {@link organizations} and {@link projects}.
  */
 import type {
   AddOrganizationGroupBindingInput,
@@ -79,12 +57,8 @@ import type {
 import type { PaginatedProjects, Project, ProjectService } from "@langwatch/project-contract";
 
 // ---------------------------------------------------------------------------
-// The rows this application hands back
-//
-// Restated from the same generated Prisma models the composed service reads
-// them with (`@langwatch/prisma-client/generated` IS `~/generated/prisma/client`),
-// so the shapes a transport publishes are byte-identical to the ones the
-// legacy router published.
+// The rows this application hands back — restated from the composed service's own generated
+// Prisma models, so the shapes a transport publishes stay byte-identical to the source rows.
 // ---------------------------------------------------------------------------
 
 type TeamWithProjectsAndMembers = Team & {
@@ -116,14 +90,9 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
 // ---------------------------------------------------------------------------
 
 /**
- * The organization reads and writes this feature makes that the canonical
- * `OrganizationService` contract does not carry.
- *
- * Named structurally rather than picked, because these fourteen are the legacy
- * organization surface the app process still owns — membership, invitations
- * and the audit trail — and the contract does not declare them. Settings is
- * no longer among them: the canonical contract declares that write, and it
- * answers with the trace-share revocation signal this half used to swallow.
+ * The organization reads and writes this feature makes that the canonical `OrganizationService`
+ * contract does not declare — membership, invitations, the audit trail. Named structurally
+ * rather than picked, since none of these fourteen live in the contract.
  */
 type OrganizationsAppService = Readonly<{
   createAndAssign(input: {
@@ -212,10 +181,9 @@ type OrganizationsAppService = Readonly<{
 }>;
 
 /**
- * The twenty-seven contract reads and writes this feature makes, named rather
- * than taking `OrganizationService` whole: it is the widest surface in the
- * platform, and an organization screen has no business depending on the parts
- * of it that answer ingestion or billing claims.
+ * The contract reads and writes this feature makes, named rather than taking
+ * `OrganizationService` whole: an organization screen has no business depending on the
+ * ingestion or billing parts of that widest-in-the-platform surface.
  */
 type OrganizationContractService = Pick<
   OrganizationService,
@@ -279,13 +247,7 @@ export class OrganizationApp {
 
   private constructor(private readonly dependencies: OrganizationAppDependencies) {}
 
-  /**
-   * The ledger actor a write is recorded under.
-   *
-   * One spelling, in one place. Two doors built this literal for themselves —
-   * `group.*` through a `ledgerActor()` helper, `team.*` inline — which is two
-   * chances for a write to land unattributed or attributed to the wrong kind.
-   */
+  /** The ledger actor a write is recorded under — one spelling, shared by every door. */
   private ledgerActor(by: OrganizationCaller): { type: "user"; id: string } {
     return { type: "user", id: by.id };
   }
@@ -308,12 +270,8 @@ export class OrganizationApp {
     return this.dependencies.organizations.deleteMember({ ...input, actingUserId: by.id });
   }
 
-  /**
-   * Frees a seat reversibly, attributed to the caller who asked for it.
-   *
-   * The acting user travels whole rather than as an id: the disable guard
-   * identifies the operator by more than their id.
-   */
+  /** Frees a seat reversibly. The acting user travels whole, since the disable
+   * guard identifies the operator by more than their id. */
   setMemberDisabled(
     input: Omit<Parameters<OrganizationsAppService["setMemberDisabled"]>[0], "actingUser">,
     by: OrganizationCaller & { name?: string | null; email?: string | null },
@@ -333,13 +291,9 @@ export class OrganizationApp {
   }
 
   /**
-   * Saves the organization settings form, and hands back what the write
-   * decided: whether turning trace sharing off means every existing share link
-   * on the organization still has to be revoked (ADR-057). Only the write can
-   * answer that — it is the one thing that saw the stored value beforehand —
-   * so the answer is carried through rather than dropped here. A door that
-   * repeats the revocation pass on it is idempotent; a door that drops it is
-   * relying on the composed service having revoked for itself.
+   * Saves the settings form and hands back whether turning trace sharing off means every
+   * existing share link now has to be revoked (ADR-057) — only the write saw the stored value
+   * beforehand, so the answer is carried through rather than dropped here.
    */
   updateSettings(
     input: UpdateOrganizationSettingsInput,
@@ -347,24 +301,14 @@ export class OrganizationApp {
     return this.dependencies.organizations.updateSettings(input);
   }
 
-  /**
-   * Whether a user is a member of an organization.
-   *
-   * A door rather than a `Pick` the caller reaches through: the feature-flag
-   * resolver asks it on every organization-targeted read, to decide whether a
-   * flag's answer for this organization is one this caller may see at all.
-   */
+  /** Whether a user is a member of an organization — a door the feature-flag resolver asks
+   * on every organization-targeted read, to gate whether the caller may see a flag's answer. */
   isMember(input: { organizationId: string; userId: string }): Promise<boolean> {
     return this.dependencies.organizations.isMember(input);
   }
 
-  /**
-   * Which of the named organizations this person belongs to.
-   *
-   * The batched form of the door above, for the feature-flag resolver: the
-   * workspace switcher asks a flag for every organization it lists, and one
-   * membership query per row is a query per row on a list page.
-   */
+  /** The batched form of {@link isMember}, for the feature-flag resolver: the workspace switcher
+   * asks a flag per listed organization, and this avoids a membership query per row. */
   memberOrganizationIds(input: { userId: string; organizationIds: string[] }): Promise<string[]> {
     return this.dependencies.organizations.memberOrganizationIds(input);
   }
@@ -393,14 +337,8 @@ export class OrganizationApp {
     return this.dependencies.organizations.getAllMembers(input.organizationId);
   }
 
-  /**
-   * The role a user holds in the organization that owns one team.
-   *
-   * Read by the process's project-protections resolver: someone with no team
-   * binding at all may still reach a project through an organization-wide
-   * role, and that is the read which says so. Keyed on the TEAM rather than
-   * the organization because a project names its team, not its tenant.
-   */
+  /** The role a user holds in the organization owning one team — read by the project-protections
+   * resolver, since a user with no team binding may still reach a project via an org-wide role. */
   tryGetUserOrgRoleByTeamId(input: {
     userId: string;
     teamId: string;
@@ -644,16 +582,9 @@ export class OrganizationApp {
     });
   }
 
-  /**
-   * The display name behind each binding's scope id, one lookup per distinct
-   * scope rather than one per binding — a group bound to the same team through
-   * several roles would otherwise read the team once for each.
-   *
-   * It lives here rather than in the group transport because what an
-   * `ORGANIZATION`, a `TEAM` and a `PROJECT` scope resolve to is a fact about
-   * the domain, and answering it needs both the organization service and the
-   * project one at the same time. A door holding only one of them cannot.
-   */
+  /** The display name behind each binding's scope id, one lookup per distinct scope. Lives here
+   * rather than in the group transport since resolving ORGANIZATION/TEAM/PROJECT scopes needs
+   * both the organization and project services at once, which no single door holds. */
   async resolveBindingScopeNames(input: {
     organizationId: string;
     bindings: readonly OrganizationGroupBinding[];

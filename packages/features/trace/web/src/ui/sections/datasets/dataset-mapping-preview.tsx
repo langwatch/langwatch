@@ -1,3 +1,4 @@
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /**
  * The mapping half of the "Add to Dataset" drawer: which trace field fills which
  * dataset column, and what the rows will look like once it does.
@@ -32,7 +33,7 @@ interface DatasetMappingPreviewProps {
   traces: Trace[];
   columnTypes: DatasetColumns;
   rowData: DatasetRecordEntry[];
-  selectedDataset: Pick<Dataset, "id" | "columnTypes" | "mapping">;
+  selectedDataset: Pick<WireOf<Dataset>, "id" | "columnTypes" | "mapping">;
   onEditColumns: () => void;
   onRowDataChange: (entries: DatasetRecordEntry[]) => void;
   paragraph?: string;

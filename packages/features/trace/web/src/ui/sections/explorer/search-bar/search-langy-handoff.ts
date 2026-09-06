@@ -34,9 +34,8 @@ export function handOffSearchToLangy({
   if (prompt) {
     askLangy(prompt);
   } else {
-    // Nothing typed, so there is no question to ask yet — opening the panel ALONE is what made this button look
-    // broken: you clicked "Ask Langy" and the only thing that happened was a panel appearing somewhere else on
-    // screen, empty, with the search you were working on left behind.
+    // Nothing typed, so there's no question to ask yet — just open the panel rather than leave
+    // the button looking broken.
     openPanel();
     seedDraft(SEARCH_HANDOFF_DRAFT);
   }

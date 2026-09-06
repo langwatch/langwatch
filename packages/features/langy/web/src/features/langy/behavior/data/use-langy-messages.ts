@@ -57,9 +57,8 @@ export interface LangyMessagesResult {
 const TURN_IN_FLIGHT_POLL_MS = 3_000;
 
 /**
- * Self-stopping poll (see dev/docs/best_practices/async-processing-ui.md): while the fold says a turn is in flight, re-check on a short
- * interval so the settled state lands even when the freshness signal is delayed or lost — without it a stale `isTurnInFlight: true` sits in
- * the cache and the working indicator outlives the answer.
+ * Self-stopping poll (see dev/docs/best_practices/async-processing-ui.md): while the fold says a
+ * turn is in flight, re-check so the settled state lands even if the freshness signal is lost.
  */
 export function langyMessagesPollInterval(
   data: { isTurnInFlight: boolean } | undefined,
@@ -96,12 +95,8 @@ export function useLangyMessages(conversationId: string | null): LangyMessagesRe
     }
   }, [conversationRead, conversationId]);
 
-  // With no conversation open there is nothing to read. `keepPreviousData`
-  // exists to smooth the switch BETWEEN two conversations, but after New chat
-  // it keeps handing back the conversation just left: its messages, its
-  // in-flight flag and its last error. The panel then reported all three about
-  // a conversation the reader had already walked away from — the composer said
-  // Langy was working and the column showed the old turn's failure.
+  // With no conversation open there is nothing to read: `keepPreviousData` smooths the switch
+  // between two conversations, but after New chat it would keep handing back the one just left.
   const data = conversationId ? query.data : undefined;
 
   return {

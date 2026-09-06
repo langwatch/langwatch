@@ -1,19 +1,6 @@
 /**
- * What a failed send hands back to the composer.
- *
- * Losing typed text is the worst failure a composer has, so a send that breaks
- * gives the words back. Three things are NOT the reader's words, and putting
- * any of them in the field is its own bug:
- *
- *   - a message the panel sent on their behalf (the code access re-ask): they
- *     never wrote it, and it appeared in the field as if they had;
- *   - a message whose turn already started: it is a bubble in the transcript,
- *     and a failure later in that turn used to duplicate it into the field;
- *   - anything at all, once they have started typing something else.
- *
- * The panel clears its memory of the sent text on both of the first two, so
- * `sentText` is null there; this function is the last rule, and the one place
- * the whole decision is written down.
+ * What a failed send hands back to the composer — never a message sent on the reader's behalf,
+ * one whose turn already started, or anything once they've started typing something else.
  */
 export function langyDraftToRestore({
   sentText,

@@ -542,7 +542,7 @@ export function TraceSummaryAccordions({
 }
 
 /**
- * Single dim row used in place of an IOViewer when the trace has the other side captured but this one is missing.
+ * Single dim row used in place of an IOViewer when this side is missing but the other is captured.
  */
 export function filterReservedMediaRefAttributes(
   attributes: Record<string, string>,
@@ -553,9 +553,8 @@ export function filterReservedMediaRefAttributes(
 }
 
 /**
- * Media widgets (players, images, attachment chips) for the fold-derived media refs riding the summary's reserved
- * attributes — the trace-level input/output are flattened text, so this strip is how the summary panel surfaces
- * the recording/image/attachment the winning span IO carried.
+ * Media widgets for the fold-derived media refs riding the summary's reserved attributes — the
+ * trace-level input/output are flattened text, so this is how media from the winning span surfaces.
  */
 export function SummaryMediaStrip({
   refsJson,

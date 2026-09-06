@@ -14,9 +14,8 @@ interface RefreshProgressBarProps {
 }
 
 export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({ forceVisible }) => {
-  // Two sources, OR-ed: - pulse: short fixed-duration flash for arrival moments that don't kick a fetch (0→N
-  // new-trace transition, view switches). - requested && fetching: an in-flight refetch, but ONLY when the
-  // operator explicitly asked for it (refresh button, "N new" pill, tab return).
+  // Two sources: a short pulse for arrival moments that don't kick a fetch, and an in-flight
+  // refetch the operator explicitly requested (refresh button, "N new" pill, tab return).
   const pulsed = useRefreshUIStore((s) => s.isRefreshing);
   const requested = useRefreshUIStore((s) => s.refreshRequested);
   const observeFetching = useRefreshUIStore((s) => s.observeFetching);

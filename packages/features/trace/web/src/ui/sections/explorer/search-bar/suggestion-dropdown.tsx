@@ -228,9 +228,8 @@ interface GroupedSection {
 const FACET_GROUP_LABEL = new Map(FACET_GROUPS.map((g) => [g.id, g.label] as const));
 
 /**
- * Bucket the flat suggestion list by the SAME taxonomy the facet sidebar / manager use (`getFacetGroupId`), so
- * the dropdown's section headers read identically to the facet manager — "Traces", "Errors", "Spans & Events",
- * etc. Fields with no facet group (time, scenario, dynamic prefixes) fall into a trailing "Other".
+ * Buckets the flat suggestion list by the same taxonomy as the facet sidebar (`getFacetGroupId`),
+ * so section headers read identically. Fields with no facet group fall into a trailing "Other".
  */
 function groupRows(items: SuggestionRow[]): GroupedSection[] {
   const buckets = new Map<

@@ -45,18 +45,9 @@ export function LangyContextTargetLayer() {
   const isOpen = useLangyStore((state) => state.isOpen);
   return (
     <>
-      {/* ALWAYS armable, whether the panel is open, peeking or shut.
-
-          This whole subtree used to sit behind `isOpen`, which meant the
-          arming listener itself was never attached unless Langy was already
-          open — so holding Shift anywhere else did nothing at all, silently.
-          That was always wrong (you reach for something on the page BEFORE
-          you go and talk about it) and the peek made it wrong most of the
-          time, since a minimised panel reads as closed.
-
-          Nothing expensive rides on this: `ArmableLayer` is one keydown
-          listener until the user actually arms, and the pointer tracking and
-          measurement stay behind that gate. */}
+      {/* Always armable, whether the panel is open, peeking or shut — you reach for something on
+          the page before you go and talk about it. Nothing expensive rides on this: `ArmableLayer`
+          is one keydown listener until the user actually arms. */}
       <ArmableLayer />
       {/* Panel → page, so this one genuinely does need the panel: it lights
           the card for whichever chip in the open list is under the pointer.

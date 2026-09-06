@@ -59,9 +59,8 @@ export function useSpanTreeCanonical() {
       sinceUpdatedAtMs: tree !== undefined ? spanTreeDeltaSinceMs(tree) : 0,
     },
     {
-      // Gated on the walk having FINISHED, not merely on `tree` being defined: progressive publishing sets the cache entry after page
-      // 1, so a mid-walk poll would take its high-water mark from a partial tree and ask for every span after it — one response of up
-      // to MAX_LIGHT_SPAN_READ_ROWS, i.e. exactly the unbounded fetch paging exists to avoid.
+      // Gated on the walk finishing, not merely `tree` being defined — a mid-walk poll would take
+      // its mark from a partial tree, causing the unbounded fetch paging exists to avoid.
       enabled: isReady && isLive && !shared && tree !== undefined && !treeQuery.isFetching,
       // Only when SSE can't push. With SSE up, `useTraceFreshness` invalidates
       // this query per `span.stored` batch, which refetches it on the spot.

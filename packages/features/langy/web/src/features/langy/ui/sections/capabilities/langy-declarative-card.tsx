@@ -422,12 +422,6 @@ function writeSentence(tone: CapabilityDescriptor["tone"]): string {
   }
 }
 
-/**
- * (`isUnconfirmedCreate` lived here. It is gone, and so is the "Couldn't confirm the resource was created" card it drew: a create whose
- * result names nothing now renders no card at all, decided once at the selection boundary in `hasCapabilityCard`. Owning the doubt in a
- * card was still a card about nothing, and it appeared beside the error card for the same operation.)
- */
-
 export function LangyDeclarativeCard({
   descriptor,
   input,

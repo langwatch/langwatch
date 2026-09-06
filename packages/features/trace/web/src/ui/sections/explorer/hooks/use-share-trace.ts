@@ -1,5 +1,7 @@
-import type { ShareLink } from "@langwatch/share-contract";
-import { type CreateShareLinkDraft } from "@langwatch/share-web/surfaces/share-link-views";
+import {
+  type CreateShareLinkDraft,
+  type ShareLinkView,
+} from "@langwatch/share-web/surfaces/share-link-views";
 import { expiryToDate } from "@langwatch/share-web/surfaces/share-links";
 import { useCallback } from "react";
 import { showErrorToast } from "../../errors";
@@ -26,7 +28,7 @@ function useShareLinksQuery({
     { enabled },
   );
 
-  const links: ShareLink[] = linksQuery.data ?? [];
+  const links: ShareLinkView[] = linksQuery.data ?? [];
 
   return {
     links,

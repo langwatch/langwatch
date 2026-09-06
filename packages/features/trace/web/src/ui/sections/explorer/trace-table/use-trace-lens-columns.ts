@@ -98,9 +98,8 @@ export function useTraceLensColumns({
 
   const minWidth = useMemo(() => {
     /**
-     * Floor the table at "every fixed column at its declared size + every flex column at its minSize + the select gutter." Earlier we used minSize across the board, but that produced
-     * a floor *below* what fixed columns actually claim at render time — `tableLayout: fixed` gave each fixed col its declared `size`, the flex col absorbed the deficit, and on narrow
-     * viewports the deficit went negative: the trace column collapsed to ~0px and its content visually bled into the next column.
+     * Floors the table at fixed columns' size + flex columns' minSize + the select gutter, so
+     * `tableLayout: fixed` can't collapse a fixed column below what it actually claims at render.
      */
     const widthFor = (def: {
       id?: string;

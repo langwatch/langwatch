@@ -10,9 +10,8 @@ import type {
 import type { InviteSendThrottleService } from "../services/invite-send-throttle.service";
 
 /**
- * The KSUID resource prefix a role binding is minted under, restated the way the membership repository
- * and the identifier adapter beside it restate it: the string is the stored id's shape, and it belongs
- * next to every writer that mints one rather than in a constants module a package cannot see.
+ * The KSUID resource prefix a role binding is minted under, restated next to every writer that
+ * mints one rather than in a constants module a package cannot see.
  */
 export const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
@@ -24,9 +23,8 @@ export const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 export const INVITE_EXPIRATION_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
- * Ceiling on the batch-invite transaction, derived from the work it holds: the batch endpoint accepts 50 invites and {@link InviteService.persistInvites} issues
- * one duplicate check and one insert per invite on the single connection an interactive transaction owns, so 100 sequential indexed statements. At 200ms apiece,
- * which is already an unhappy database, that is 20 seconds; Prisma's 5s default fails the whole batch with P2028 well before a large batch is unhealthy.
+ * Ceiling on the batch-invite transaction: 50 invites × 2 statements apiece = 100 sequential
+ * indexed statements on one connection, ~20s at 200ms each — well past Prisma's 5s P2028 default.
  */
 export const INVITE_BATCH_TXN_TIMEOUT_MS = 20_000;
 
@@ -55,9 +53,9 @@ export interface CreateAdminInviteInput {
 }
 
 /**
- * One requested invite for the {@link InviteService.createInvites} orchestrator. `teams` carries either built-in
- * team roles, `CUSTOM` with a `customRoleId`, or the `custom:{roleId}` string form the invite form sends;
- * `teamIds` is the legacy comma-separated form that assigns the default team role for the organization role.
+ * One requested invite for the {@link InviteService.createInvites} orchestrator. `teams` carries
+ * built-in team roles, `CUSTOM` with a `customRoleId`, or the invite form's `custom:{roleId}`
+ * string; `teamIds` is the legacy comma-separated default-role form.
  */
 export interface CreateInvitesInviteInput {
   email: string;

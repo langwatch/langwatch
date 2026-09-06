@@ -92,9 +92,9 @@ interface StatusRowGroupProps {
    */
   isPulsing?: boolean;
   /**
-   * Set while the Langy panel is open and this row has registered itself as a context target (see
-   * `useLangyContextTarget`): the shimmer-ring class, the added-state data attribute, and a capture-phase click
-   * handler that takes the row into Langy's context instead of opening the drawer.
+   * Set while the Langy panel is open and this row is a registered context target (see
+   * `useLangyContextTarget`): shimmer-ring class, added-state attribute, and a click handler
+   * that adds the row to Langy's context instead of opening the drawer.
    */
   langyTargetProps?: LangyContextTargetProps;
   children: React.ReactNode;

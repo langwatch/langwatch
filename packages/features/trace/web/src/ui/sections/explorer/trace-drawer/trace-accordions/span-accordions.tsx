@@ -361,9 +361,8 @@ export function SpanAccordions({
                             ? `[redacted — visible to ${log.bodyVisibleTo}]`
                             : "[redacted]";
                         } else if (log.body && log.body !== eventName) {
-                          // Same discrimination the redaction layer applies: claude stamps the event-name MARKER into the
-                          // top-level body, and copying that would both add a redundant row and overwrite the real content the
-                          // raw api_*_body records carry under the `body` attribute.
+                          // Same check the redaction layer applies: some events stamp the
+                          // event-name marker into the body, overwriting the real content.
                           attributes.body = log.body;
                         }
                         return (

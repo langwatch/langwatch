@@ -160,14 +160,8 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
             <Icon as={LuPencil} boxSize={3} />
             Open prompt
           </Button>
-          {/* Single smart-default button: server resolves to the
-              linked llm when this span isn't an llm itself
-              (Prompt.compile, PromptApiService.get), opens the
-              existing prompt at the traced version when one is
-              linked, or creates a fresh tab otherwise. Same
-              affordance the IOViewer header carries on llm spans —
-              kept identical here so behavior is predictable
-              wherever a prompt is surfaced. */}
+          {/* Single smart-default button: opens the existing prompt at its traced version when
+              linked, else creates a fresh tab — matches the IOViewer header's affordance. */}
           {buildUrl(span.spanId) && (
             <Link href={buildUrl(span.spanId)?.toString() ?? ""} isExternal variant="plain">
               <Button size="xs" variant="ghost" gap={1}>

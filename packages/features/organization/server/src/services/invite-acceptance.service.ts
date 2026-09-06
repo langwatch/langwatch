@@ -71,11 +71,9 @@ export class InviteAcceptanceService {
       throw new InviteNotReadyError(invite.id, invite.status);
     }
 
-    // Root client only, and it always was: the grants below are ledger commands that cannot ride a
-    // caller's transaction, and the acceptance now opens one of its own. The acceptance CLAIMS the row
-    // (D11): a conditional update on the expected (status, inviteCode) pair, inside the same transaction
-    // as the membership write. Two racers on one PENDING invite cannot both win — the loser's update
-    // matches nothing, the transaction rolls back, and no membership row is written for them.
+    // Root client only, since the grants below are ledger commands that can't ride a caller's
+    // transaction. Acceptance claims the row (D11) via a conditional update on (status,
+    // inviteCode) inside the membership write's transaction, so two racers can't both win.
     const claimed = await this.invites.withTransaction(async (transaction) => {
       const claim = await transaction.claimInviteForAcceptance({
         inviteId: invite.id,
@@ -122,9 +120,8 @@ export class InviteAcceptanceService {
   }
 
   /**
-   * Whether `userId` holds the organization membership `applyInvite`'s transaction writes — the two
-   * commit together, so holding it means THIS user's own accept is what committed, and retrying the
-   * grant tail is therefore a repair rather than a different person reaching for someone else's invite.
+   * Whether `userId` holds the membership `applyInvite`'s transaction writes — the two commit
+   * together, so holding it means retrying the grant tail is a repair, not a hijack.
    */
   private async callerHoldsMembership({
     userId,

@@ -1,9 +1,6 @@
 /**
- * The remembered answer to "how should Langy reach my code" (ADR-129).
- *
- * The choice is made in the chat, so this line only appears once one is stored, and its one job
- * is to let the reader take it back. It hangs off the Integrations screen's GitHub card, which
- * is where a person goes looking for what Langy may reach.
+ * The remembered answer to "how should Langy reach my code" (ADR-129), letting the reader take
+ * it back. Hangs off the Integrations screen's GitHub card.
  */
 import { Button, HStack, Text } from "@chakra-ui/react";
 import { showErrorToast } from "@langwatch/ui-host/errors";

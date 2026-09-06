@@ -247,22 +247,9 @@ function describeFailure(domain: CliHandledError): {
 const LOCAL_TOOL_PREFIX = "local_";
 
 /**
- * `gh` in the sandbox saying it has no login.
- *
- * gh answers an unauthenticated call with "To get started with GitHub CLI,
- * please run: gh auth login", and that sentence reached the customer verbatim:
- * the sandbox's own shell telling them to log into a machine they cannot open.
- * What it actually means on that path is that the LangWatch GitHub App is not
- * installed for this organization, which is a setup step with a real next
- * action.
- *
- * The manager's gate raises `langy_github_not_connected` for the same
- * condition, but it reads SETTLED tool frames — so the failed command's card is
- * already on screen by the time the turn stops. This is that card.
- *
- * On the LOCAL path gh's own instruction is exactly right: that is the
- * developer's gh, in their folder, on their machine. Local tools are left
- * alone.
+ * Rewrites `gh`'s "please run: gh auth login" from the sandbox — telling the customer to log
+ * into a machine they cannot open — into the real fix: install the LangWatch GitHub App. Local
+ * tools are left alone, since gh's own instruction is correct on the developer's own machine.
  */
 function githubAppNotInstalled({
   toolName,

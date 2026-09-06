@@ -21,9 +21,8 @@ import { RegistryRow } from "./registry";
 import { SELECT_COLUMN_ID } from "./registry/cells/select-cells";
 
 /**
- * Module-level singleton so the `pinnedColumnIds` prop is referentially stable across renders — without it, every
- * render would hand the shell a new Set and the SortableContext would treat its items as having changed, kicking
- * off unnecessary re-mounts of the header row.
+ * Module-level singleton so `pinnedColumnIds` stays referentially stable, else SortableContext
+ * treats it as changed every render and re-mounts the header row.
  */
 const NON_REORDERABLE_COLUMN_IDS = new Set([SELECT_COLUMN_ID, ADD_COLUMN_ID]);
 

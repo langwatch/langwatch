@@ -90,7 +90,8 @@ function groupModelsByGroup<T extends { profile: { group: LangyModelGroup } }>(
 }
 
 /**
- * The composer's per-send model picker, as a compact rail pill (reference `.mpick`): a provider glyph + the model name + a chevron, sized to its label and no bigger.
+ * The composer's per-send model picker, as a compact rail pill: provider glyph + model name +
+ * chevron, sized to its label and no bigger.
  */
 export const LangyModelPill = memo(function LangyModelPill({
   ref: triggerRef,
@@ -202,32 +203,14 @@ export const LangyModelPill = memo(function LangyModelPill({
       positioning={{ placement: "top-start", gutter: 6 }}
       width="auto"
     >
-      {/*
-       * The element Ark anchors the listbox to. Ark positions against the
-       * CONTROL, not the trigger — with no Control rendered there is no anchor,
-       * and the listbox lands in the top-left corner of the viewport. (Feeding
-       * it a rect from the trigger ref via `getAnchorRect` doesn't fix it: on
-       * the first open the ref hasn't landed, so the rect is null, and a null
-       * anchor collapses to the origin just the same.)
-       *
-       * `inline-flex` so it hugs the pill instead of stretching the composer
-       * rail. It must generate a layout box — never `display: contents`, which
-       * has no rect to measure.
-       */}
+      {/* Ark anchors the listbox to this Control, not the trigger — without it the listbox lands
+       * at the viewport origin. `inline-flex` hugs the pill; never `display: contents`, which has
+       * no rect to measure. */}
       <Combobox.Control display="inline-flex" width="auto" minWidth={0}>
         <Combobox.Trigger asChild>
-          {/*
-           * COLLAPSED BY DEFAULT: just the provider glyph, so the rail stays a row
-           * of quiet icons and the model name doesn't eat a third of the composer.
-           * It expands on hover — and on `:focus-visible`, so a keyboard user sees
-           * exactly what a mouse user sees before committing — and stays expanded
-           * while the listbox is open (`[data-state="open"]`).
-           *
-           * Purely a CSS width transition on a wrapper, so nothing re-renders and
-           * the button never loses focus mid-expand. The full model name is always
-           * in `aria-label`, so the collapsed state is never a loss for assistive
-           * tech — only for pixels.
-           */}
+          {/* Collapsed by default to the provider glyph so the rail stays a row of quiet icons;
+           * expands on hover/`:focus-visible` via a pure CSS width transition, so nothing
+           * re-renders. The full model name stays in `aria-label` regardless. */}
           <chakra.button
             ref={triggerRef}
             type="button"

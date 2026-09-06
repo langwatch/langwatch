@@ -30,7 +30,7 @@ const isGroupedLens = (id: string): boolean => GROUPED_LENS_IDS.has(id);
 // "+" button + the overflow "⋮" trigger sitting just outside it.
 const LENS_OVERFLOW_RESERVE_PX = 56;
 
-/** Resolves a group's declared lens ids against the live lens list, dropping any the user has dismissed. */
+/** Resolves a group's declared lens ids against the live lens list, dropping any dismissed. */
 function resolveGroupLenses(ids: readonly string[], allLenses: LensConfig[]): LensConfig[] {
   return ids.map((id) => allLenses.find((l) => l.id === id)).filter((l): l is LensConfig => !!l);
 }

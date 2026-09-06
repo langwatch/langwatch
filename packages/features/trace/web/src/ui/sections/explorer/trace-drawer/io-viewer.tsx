@@ -143,9 +143,8 @@ export const IOViewer = memo(function IOViewer({
   const isChat = allChatMessages !== null;
   const canJson = parsed !== null;
 
-  // Split the chat-shape payload between the two panels: • Input panel = the full conversation history sent to
-  // the model on this turn — user messages, system / developer prompts, and every prior assistant operation
-  // (thinking, tool_use, tool_result echoes, intermediate text).
+  // Input panel gets the full conversation history sent to the model this turn — user messages,
+  // system/developer prompts, and every prior assistant operation.
   const chatMessagesToRender = useMemo<ChatMessage[]>(() => {
     if (!allChatMessages) return [];
     const all = allChatMessages;

@@ -45,9 +45,8 @@ const PASTE_MAX_CHARS = 2000;
 const COMMIT_SETTLE_MS = 250;
 
 /**
- * Remove the chars at `[start, end)` from `text` and clean up any operator glue we left behind. Used by the X widget when the parser is
- * currently failing — a normal `removeNodeAtLocation` would no-op there and the X would feel broken. Strips a trailing or leading
- * `AND`/`OR` so we don't end up with `model:gpt AND ` orphaned at the end of the query.
+ * Removes `[start, end)` from `text` and any operator glue left behind, for when the X widget
+ * must work even while the parser is failing (where `removeNodeAtLocation` would no-op).
  */
 function sliceFallbackTokenRange(text: string, start: number, end: number): string {
   if (start < 0 || end > text.length || start >= end) return text;

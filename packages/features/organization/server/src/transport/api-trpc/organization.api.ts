@@ -1,7 +1,6 @@
 /**
- * An organization, its membership and its invitations over the process's tRPC transport. `organization`, `membership` and
- * `invite` are all organization subjects (`packages/features/catalogue.json`), which is why one surface owns all three.
- * Spec: packages/features/organization/specs/organization-service.feature.
+ * An organization, its membership and its invitations over tRPC. All three are organization
+ * subjects, which is why one surface owns them all.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type {
@@ -129,17 +128,13 @@ type ResourceLimitFacts = Readonly<{
 export type OrganizationTrpcPorts<TSignUpDataSchema extends z.ZodTypeAny = z.ZodTypeAny> =
   Readonly<{
     // -- input shapes the process owns ---------------------------------------
-    /**
-     * The sign-up questionnaire's schema. The process owns it because the acquisition-attribution fields it carries
-     * are captured in the browser, and `onboarding.initializeOrganization` parses the same shape.
-     */
+    /** The sign-up questionnaire's schema, owned by the process since it's captured in the
+     * browser; `onboarding.initializeOrganization` parses the same shape. */
     signUpDataSchema: TSignUpDataSchema;
 
     // -- authorization -------------------------------------------------------
-    /**
-     * Whether the caller may administer the organization. Not a gate: three reads use it to decide how
-     * much of the answer to redact, and a caller who cannot manage still gets an answer.
-     */
+    /** Whether the caller may administer the organization. Not a gate: three reads use it to
+     * decide how much to redact, and a caller who cannot manage still gets an answer. */
     probeOrganizationPermission(
       ctx: OrganizationTrpcContext,
       organizationId: string,
@@ -164,11 +159,8 @@ export type OrganizationTrpcPorts<TSignUpDataSchema extends z.ZodTypeAny = z.Zod
       ctx: OrganizationTrpcContext,
       input: Readonly<{ orgIds: string[]; userId: string }>,
     ): Promise<AuthzBindingForSynthesis[]>;
-    /**
-     * A team with a member row synthesized for a user who reaches it through a RoleBinding but carries no
-     * `TeamUser` row. Synchronous on purpose — the application's organization service is wrapped by
-     * `traced()`, which would turn a method call into a Promise and silently drop the members.
-     */
+    /** A team with a member row synthesized for a user with no `TeamUser` row. Synchronous on
+     * purpose, since `traced()` would turn a method call into a Promise and drop the members. */
     enrichTeamWithRoleBindings<
       T extends {
         id: string;
@@ -728,11 +720,9 @@ export class OrganizationTrpcApi {
                     b.scopeType === "ORGANIZATION" &&
                     b.role === "ADMIN",
                 );
-                // RoleBinding(scope=ORGANIZATION, role=ADMIN) is authoritative when present: promote the user's exposed role so the frontend
-                // hook `useOrganizationTeamProject().organizationRole` and downstream guards (`withPermissionGuard("organization:manage")`)
-                // honor it. Without this, a stale `OrganizationUser.role=MEMBER` row shadows a fresh ADMIN RoleBinding, gating the admin out
-                // of /governance + /governance/*. Backend RBAC paths already honor RoleBindings (`resolveOrganizationPermission`,
-                // `requireApiKeyPermission`); this closes the page-guard / SSR-only drift.
+                // An ORGANIZATION/ADMIN RoleBinding is authoritative when present, promoting the
+                // exposed role so frontend guards honor it — otherwise a stale MEMBER row would
+                // shadow a fresh ADMIN binding and gate the admin out of /governance.
                 if (isOrgAdminViaBinding) {
                   if (organization.members[0]) {
                     organization.members[0].role = "ADMIN";
@@ -754,11 +744,9 @@ export class OrganizationTrpcApi {
                 organization.teams = organization.teams.filter((team) => {
                   team.members = team.members.filter(memberIsOneOf(userId, demoProjectUserId));
 
-                  // RoleBinding is authoritative for team membership and role. Always prefer a team-scoped RoleBinding over any stale TeamUser row, since
-                  // dual-writes to TeamUser have been removed. Org-scoped bindings are intentionally excluded: org MEMBER/VIEWER bindings only grant
-                  // organization:view — they don't give team-level access. Org admins are handled by the organizationRole === ADMIN shortcut in the frontend
-                  // hasPermission and backend resolveTeamPermission. NOTE: supplied as a port (not a service method) because the application's organization
-                  // service is wrapped by traced(), which would turn this sync call into a Promise and silently drop team.members.
+                  // A team-scoped RoleBinding is authoritative over TeamUser. Org MEMBER/VIEWER are
+                  // excluded (view-only); org admins use the organizationRole === ADMIN shortcut.
+                  // A port, not a service method, since traced() would Promise-wrap this sync call.
                   const enriched = ports.enrichTeamWithRoleBindings(
                     team,
                     userId,
@@ -793,11 +781,9 @@ export class OrganizationTrpcApi {
             .withOutput(organizationWriteAckSchema)
             .withPermission(ORGANIZATION_MANAGE)
             .handle(async ({ input, ctx }) => {
-              // The settings form round-trips every S3 field on save, so an absent credential means
-              // "clear it". `updateSettings` is a partial update where absent means "leave it alone", so
-              // the clearing is made explicit here. `s3Bucket` keeps its historical
-              // leave-alone-if-absent existing trace link across the org) lives in the service.
-              // behavior. The ADR-057 trace-sharing disable cascade (revoke every
+              // The form round-trips every S3 field, so absent here means "clear it" — though
+              // `updateSettings` treats absent as "leave alone" for `s3Bucket`. The ADR-057 disable
+              // cascade lives in the service.
               await ctx.app.organizations.updateSettings({
                 organizationId: input.organizationId,
                 name: input.name,
@@ -815,9 +801,8 @@ export class OrganizationTrpcApi {
             }),
         )
         /**
-         * Stays at `organization:view` because non-admin pickers (annotation queue assignment, trace participants, group
-         * dialogs) legitimately need to enumerate org members by name. The full record contains member emails, which are
-         * admin-surface PII — redacted on the way out for non-admin callers below.
+         * Stays at `organization:view`: non-admin pickers (annotation assignment, trace
+         * participants, group dialogs) enumerate members by name. Emails are PII, redacted below.
          */
         .query("getOrganizationWithMembersAndTheirTeams", (p) =>
           p
@@ -957,11 +942,9 @@ export class OrganizationTrpcApi {
               }
 
               if (created.invites.length > 0) {
-                // D11 x D12, invitation -> request: a formal invitation sent to somebody with an open
-                // request ANSWERS it. The invitation carries the role and the teams, which is the flow
-                // that owns them, so the request resolves as approved-by-invitation rather than staying
-                // open beside it. Silent when nothing is open, and never fatal — the invitation is the
-                // durable outcome here.
+                // D11 x D12: a formal invitation to somebody with an open join request answers it
+                // — it owns role and teams, so the request resolves approved-by-invitation rather
+                // than staying open beside it. Silent when nothing is open, never fatal.
                 await Promise.all(
                   created.invites.map(async (record) => {
                     const invitedUserId = await ports.tryFindUserIdByEmail(ctx, {
@@ -1019,11 +1002,9 @@ export class OrganizationTrpcApi {
             .withOutput(organizationInviteResentSchema)
             .withPermission(ORGANIZATION_MANAGE)
             .handle(async ({ input, ctx }) => {
-              // Throttled per INVITATION, because the thing being protected is the recipient's inbox
-              // rather than this server: an admin with three invitations out may resend all three, and
-              // none of the three gets mailed repeatedly. Checked before the resend so a refused attempt
-              // leaves the live code alone — rotation is the old link's revocation, and a throttled
-              // click must not quietly break the link already sent.
+              // Throttled per INVITATION — it protects the recipient's inbox, not this server, so
+              // resending three invitations doesn't mail any of them repeatedly. Checked before the
+              // resend so a refused attempt leaves the live code (and already-sent link) alone.
               await ports.assertInviteSendAllowed(ctx, { inviteId: input.inviteId });
 
               const { invite, emailNotSent } = await ports.resendInvite(ctx, {
@@ -1096,10 +1077,9 @@ export class OrganizationTrpcApi {
               }
 
               // Identifier-aware acceptance (D11): an invitation targets an address, and ANY of the
-              // signed-in user's VERIFIED identifiers holding that address vouches for them — password,
-              // Google, or the org's SSO. The person invited by email who signed in with their Google
-              // account is no longer a support ticket. A user not yet on identifiers answers `null` and
-              // keeps the legacy session-email comparison byte-for-byte.
+              // user's VERIFIED identifiers holding that address vouches for them — password,
+              // Google, or the org's SSO. A user not yet on identifiers answers `null`, falling
+              // back to a plain session-email comparison.
               const { matches: inviteEmailMatches, viaIdentifierId } =
                 await ports.matchInviteToAcceptor(ctx, {
                   inviteEmail: invite.email,
@@ -1268,9 +1248,8 @@ export class OrganizationTrpcApi {
             }),
         )
         /**
-         * Tightened from `organization:view` to manage — the full member list with PII (emails) is admin-surface data. No
-         * TS callers currently depend on this procedure; documented here so a future picker UX that needs member names
-         * knows to use a basic-view variant rather than re-loosening the permission.
+         * `organization:manage`, not `view`: the full member list with emails is admin-surface PII.
+         * A future picker UX needing member names should add a basic-view variant, not loosen this.
          */
         .query("getAllOrganizationMembers", (p) =>
           p

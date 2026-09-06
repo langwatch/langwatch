@@ -15,16 +15,8 @@ export type LangyErrorRender =
   | "card"
   | "inline"
   | "suppress"
-  // A transient composer-level notice, not a message-history card: rendered as a
-  // dismissable box attached above the composer, leaving the user's draft in
-  // place (ADR-078).
-  //
-  // For the refusals that are WAITS rather than turn failures — nothing broke
-  // and nothing was lost, the message just cannot go yet: `langy_turn_in_progress`
-  // ("one turn at a time per conversation") and `langy_rate_limited` (the
-  // per-user message limit). Both resolve on their own with a few seconds'
-  // patience, so neither gets a retry action, and neither may leave a red card
-  // in the transcript claiming Langy is the thing at fault.
+  // A transient composer-level notice (ADR-078) for refusals that are waits rather than turn
+  // failures, e.g. `langy_turn_in_progress`/`langy_rate_limited`: no retry action, no red card.
   | "composer-notice";
 
 export interface LangyErrorAction {
@@ -399,18 +391,9 @@ export function isStaleLangyHistoryRead({
 }
 
 /**
- * Is a not-found history read still the projection lagging an accepted create?
- *
- * The create command is accepted before its row lands, so for a moment the
- * history read of a conversation this tab just minted answers not-found and
- * means "not yet". That window has to END. A conversation whose row is never
- * written answers not-found for ever, and the turn it was created for keeps
- * running: a whole turn once streamed into a panel that said nothing at all
- * about the conversation it could not read back.
- *
- * The grace is generous, because a cold worker makes the first turn slow, and
- * it is cut short anyway the moment any read or signal confirms the
- * conversation.
+ * Is a not-found history read still the projection lagging an accepted create? The window has to
+ * end eventually (an unwritten row would answer not-found forever), so the grace is generous but
+ * cut short the moment any read or signal confirms the conversation.
  */
 export const LANGY_CONVERSATION_PENDING_GRACE_MS = 20_000;
 

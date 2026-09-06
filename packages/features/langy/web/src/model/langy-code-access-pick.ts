@@ -1,16 +1,7 @@
 /**
- * Which way the developer chose to reach their code, for one card (ADR-129).
- *
- * The card asks until the developer answers, and the answer has to survive a
- * reload: picking "Share my local folder" turns the card into the command and
- * the countdown, and a refresh while the terminal is still being opened must
- * show the same card rather than the question again.
- *
- * The pick belongs to this browser, not to the conversation — the server
- * already holds the control request the pick opened — so it lives in
- * localStorage, keyed by the conversation and the `code_access` call. Every
- * access is guarded: a private window, a browser with site data blocked, and
- * the thumbnail renderer all throw on the accessor itself.
+ * Which way the developer chose to reach their code, for one card (ADR-129). Belongs to this
+ * browser, not the conversation, so it lives in localStorage keyed by conversation + call id and
+ * must survive a reload. Every access is guarded, since some contexts throw on the accessor itself.
  */
 
 const KEY_PREFIX = "langy:code-access-pick";
