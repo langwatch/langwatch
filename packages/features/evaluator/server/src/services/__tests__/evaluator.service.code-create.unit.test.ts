@@ -7,6 +7,11 @@ import type {
 } from "../../repositories/evaluator.repository";
 import type { EvaluatorCodeExecutionPort } from "../../ports/evaluator.port";
 
+/** The wire form of a config: what the repository row holds once persisted. */
+function persistedConfig(config: PersistEvaluatorInput["config"]): Evaluator["config"] {
+  return JSON.parse(JSON.stringify(config ?? null));
+}
+
 function buildService() {
   const created: PersistEvaluatorInput[] = [];
   const repository = {
@@ -14,6 +19,7 @@ function buildService() {
       created.push(input);
       return {
         ...input,
+        config: persistedConfig(input.config),
         slug: input.slug ?? null,
         workflowId: input.workflowId ?? null,
         copiedFromEvaluatorId: input.copiedFromEvaluatorId ?? null,
@@ -27,6 +33,7 @@ function buildService() {
       if (!match) throw new Error("not found");
       return {
         ...match,
+        config: persistedConfig(match.config),
         slug: match.slug ?? null,
         workflowId: match.workflowId ?? null,
         copiedFromEvaluatorId: match.copiedFromEvaluatorId ?? null,
@@ -42,6 +49,7 @@ function buildService() {
           (match) =>
             ({
               ...match,
+              config: persistedConfig(match.config),
               slug: match.slug ?? null,
               workflowId: match.workflowId ?? null,
               copiedFromEvaluatorId: match.copiedFromEvaluatorId ?? null,
