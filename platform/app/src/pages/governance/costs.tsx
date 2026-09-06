@@ -42,6 +42,10 @@ import {
   CostSampleToggle,
 } from "~/components/governance/costs/CostSampleControls";
 import {
+  CostSpenderList,
+  type SpenderRow,
+} from "~/components/governance/costs/CostSpenderPanel";
+import {
   sampleModeActive,
   useSettledRealDataState,
 } from "~/components/governance/costs/costSampleMode";
@@ -177,6 +181,16 @@ function CostsPage() {
     // the other gets the lanes and no failed queries underneath them.
     enabled: !!organizationId && hasAnyPermission("activityMonitor:view"),
   });
+  // Same split-grant rule as above: the spender labels are the People
+  // screen's data, so the read is gated on that screen's permission — the
+  // server refuses it anyway, this just spares the failed query.
+  const spenders = api.governanceCost.spenders.useQuery(
+    { organizationId, windowDays: filters.windowDays },
+    {
+      enabled: !!organizationId && hasAnyPermission("governance:view"),
+      refetchOnWindowFocus: false,
+    },
+  );
 
   useDepartmentSelectionReset({ filters, breakdowns, setFilters });
 
@@ -236,6 +250,7 @@ function CostsPage() {
           filters={filters}
           breakdowns={breakdowns}
           showSample={showSample}
+          spenderRows={spenders.data?.rows ?? null}
         />
       </VStack>
     </GovernanceLayout>
@@ -546,10 +561,18 @@ function CostBreakdowns({
   filters,
   breakdowns,
   showSample,
+  spenderRows,
 }: {
   filters: CostFilters;
   breakdowns: Breakdowns;
   showSample: boolean;
+  /**
+   * The pulled lane's spender breakdown, or null while unanswered — the read
+   * is refused without the People screen's permission, and the panel is then
+   * simply absent. Null and empty both render nothing: an absent panel, never
+   * a zero-filled one.
+   */
+  spenderRows: SpenderRow[] | null;
 }) {
   const days = useMemo(
     () => recentDays(filters.windowDays),
@@ -640,6 +663,17 @@ function CostBreakdowns({
         <CostPanel title="Cost by user">
           <CostRankList rows={userRows} />
         </CostPanel>
+        {/* Different money from "Cost by user" on purpose: that panel is the
+            gateway's own metering, this one is what the provider's BILL said
+            each person spent (the pulled lane). They disagree legitimately
+            and are never reconciled — each is labeled for its lane. Absent,
+            not zero-filled, when the breakdown holds no rows or the viewer
+            lacks the People screen's permission. */}
+        {spenderRows !== null && spenderRows.length > 0 && (
+          <CostPanel title="Billed spend by person">
+            <CostSpenderList rows={spenderRows} />
+          </CostPanel>
+        )}
 
         {showSample && (
           <>

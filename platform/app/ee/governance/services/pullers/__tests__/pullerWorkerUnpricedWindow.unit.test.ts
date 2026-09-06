@@ -164,11 +164,7 @@ describe("the window a pull read but was not allowed to price", () => {
     it("spans the window from the first dropped day to the last", async () => {
       isEnabled.mockResolvedValue(false);
       runOnce.mockResolvedValue({
-        events: [
-          pricedDay(AUGUST_2),
-          pricedDay(AUGUST_1),
-          pricedDay(AUGUST_3),
-        ],
+        events: [pricedDay(AUGUST_2), pricedDay(AUGUST_1), pricedDay(AUGUST_3)],
         cursor: "next",
         errorCount: 0,
       });

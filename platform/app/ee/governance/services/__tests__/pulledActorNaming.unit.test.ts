@@ -40,9 +40,7 @@ describe("naming a pulled day", () => {
   });
 
   it("keeps the day before the line blank for a pre-line source", () => {
-    const dayBefore = new Date(LINE_MS - 86_400_000)
-      .toISOString()
-      .slice(0, 10);
+    const dayBefore = new Date(LINE_MS - 86_400_000).toISOString().slice(0, 10);
     expect(
       actorForPulledDay({
         sourceCreatedAt: beforeLine,

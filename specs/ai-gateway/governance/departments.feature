@@ -111,6 +111,38 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
       rather than disappearing
 
   # ---------------------------------------------------------------------------
+  # Dated department links (ADR-128 §13): who was where, and when.
+  # The pointer on the membership answers "where are they now"; the dated
+  # links answer "where were they in January", which is what month-old spend
+  # resolves against.
+  # ---------------------------------------------------------------------------
+
+  @bdd @departments @integration
+  Scenario: A reorg closes the old dated link and opens a new one
+    Given a member assigned to "Support"
+    When the admin reassigns them to "Legal"
+    Then the "Support" link is closed at that moment
+    And an open "Legal" link starts there
+    And re-asserting the standing assignment neither closes nor reopens anything
+    And clearing the assignment closes the link and opens none
+    # "Unassigned" is the absence of a link, not a link to an absence.
+
+  @bdd @departments @integration
+  Scenario: January's spend stays with January's department
+    Given a member whose closed "January Dept" link covers January
+    And an open "February Dept" link from February onward
+    When a January day is resolved to a department
+    Then it answers "January Dept" even though today's pointer says otherwise
+
+  @bdd @departments @integration
+  Scenario: A standing assignment from before dated links gets its link seeded
+    Given a member whose department pointer predates the dated links
+    When the daily directory read re-asserts that same assignment
+    Then a dated link is seeded for the standing assignment
+    # Skipping them because the pointer already matches would leave "who was
+    # here in January" answering "unassigned" until a real reorg.
+
+  # ---------------------------------------------------------------------------
   # Where assignment happens (UI surface - the redesign)
   # An org can have tens of thousands of members, so assignment lives on the
   # pages that already paginate the org chart, not as one flat list.

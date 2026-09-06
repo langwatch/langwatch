@@ -361,6 +361,137 @@ Feature: One cost screen, three honest lanes
       # Zero is a number a summary would faithfully honour. Absent is the
       # honest answer for a pool nobody could read.
 
+  Rule: Pulled spend says who spent it, in the words the identity screen uses
+
+    # ADR-128 §14 / ADR-129. The rollup carries a spender id and an agent on
+    # every pulled cell from the naming line (2026-10-01) forward; this Rule
+    # is the read that puts them in front of a viewer. Until that line, and
+    # for every provider that names nobody, the ids are EMPTY and the
+    # not-named bucket below carries all of the money — the scenarios seed
+    # named rows in fixtures, and the panel is honest that live data starts
+    # at the line.
+    #
+    # A spender is (provider, spender id), never the id alone — that pair is
+    # the discovered person's unique key, and an id string two providers both
+    # use is two people. The label is the People screen's DISPLAY TEXT for
+    # that person, because that screen labels its rows with the display text
+    # always — a different word here (a member name, a prettified id) makes
+    # one person read as two. A spender discovery has not seen is shown as
+    # the id itself, which is all anybody knows.
+    #
+    # The breakdown reads the PULLED lane only. The gateway lane writes actor
+    # ids into the same table under a different provider vocabulary; letting
+    # them in would both mislabel and cross-sum the lanes the screen keeps
+    # apart.
+
+    @unit
+    Scenario: Pulled spend is grouped by who spent it
+      Given pulled cost recorded under two different spender ids at one provider
+      When the spender breakdown is read
+      Then each spender's rows total under their own spender and nobody else's
+
+    @unit
+    Scenario: Gateway rows never enter the spender breakdown
+      # The rollup holds both lanes. An unfiltered read would satisfy every
+      # other scenario here while quietly summing gateway money into a
+      # spender's pulled total — the cross-lane sum this screen exists to
+      # refuse.
+      Given pulled cost and gateway cost recorded for the same day
+      When the spender breakdown is read
+      Then only the pulled rows are counted
+
+    @unit
+    Scenario: The same spender id at two providers stays two spenders
+      Given pulled cost under one spender id string at two different providers
+      When the spender breakdown is read
+      Then the two providers' rows stay separate
+      And each is labeled from its own provider's discovery
+
+    @unit
+    Scenario: A spender discovery has seen is labeled with the identity screen's display text
+      Given pulled cost under a spender id that discovery has seen
+      When the spender breakdown is read
+      Then the row is labeled with that person's display text
+      # The display text, NOT the linked member's name: the People screen
+      # labels every row with the display text and shows the link beside it,
+      # so a member name here would name the same person differently on two
+      # screens. A spender discovery has not seen is labeled with the raw id
+      # itself.
+
+    @unit
+    Scenario: Spend nobody is named for gathers under one honest bucket
+      # OpenAI rows before the naming line and every provider that names
+      # nobody write an EMPTY spender id. Those rows are real money and must
+      # stay on the screen — under a label that says no one was named, never
+      # under an invented person and never silently dropped.
+      Given pulled cost whose rows carry no spender id
+      When the spender breakdown is read
+      Then that spend appears under a single not-named row
+      And no spender name is invented for it
+
+    @unit
+    Scenario: An erased spender is shown by pseudonym
+      # Erasure rewrites the rollup's spender id to the pseudonym and the
+      # discovery row's id and display text to the same pseudonym, so the
+      # breakdown matches and shows it. Pinned to that mechanism only: the
+      # suppression snapshot's staleness window and the cross-provider
+      # digest are known erasure gaps that live outside this read, and a
+      # universal "the raw id can never appear" is not a promise this
+      # breakdown can keep for them.
+      Given pulled cost recorded under an erased person's pseudonym
+      When the spender breakdown is read
+      Then the row is labeled with the pseudonym
+
+    @unit
+    Scenario: A spender mixing priced and unpriced rows holds no figure
+      # The same partial-sum rule as every lane total: a figure covering only
+      # the priced part of a spender's rows understates them by an amount the
+      # screen cannot disclose. No current puller can produce this row — the
+      # only non-USD biller names nobody, and every naming puller is USD-only
+      # — which is exactly why the rule is pinned now: the first puller that
+      # does must not be able to understate anyone.
+      Given one spender with rows priced in US dollars and rows holding no US dollar figure
+      When the spender breakdown is read
+      Then that spender's row holds no total
+      And it says how many of its rows carry no figure
+
+    @unit
+    Scenario: Breakdown rows are spender-and-agent pairings
+      # The agent is part of the cell's key, and one Genie user spends in
+      # several spaces. So a spender appears once PER AGENT they spent
+      # through, each pairing totaling its own rows; a provider that names
+      # no agent leaves the pairing's agent empty and the row shows none —
+      # never a blank pretending to be one.
+      Given one spender whose pulled rows name two different agents
+      And another spender whose rows name none
+      When the spender breakdown is read
+      Then the first spender appears once per agent with that agent's own total
+      And the second spender's row carries no agent
+
+    @integration
+    Scenario: The cost screen shows who spent the pulled money
+      Given pulled cost recorded under a spender id that discovery has seen
+      When a viewer holding both the cost and the identity permissions opens the cost screen
+      Then a spender panel lists that spender with their window total
+      And the panel is labeled as billed spend, apart from the gateway cost-by-user panel
+      # The screen already carries a gateway cost-by-user panel reading the
+      # gateway's own attribution; the two measure different money and stay
+      # side by side, each labeled — same lane discipline as the totals.
+      # Rendered from the same gates as the lanes: no panel on an
+      # unavailable screen, and the panel absent rather than zero-filled
+      # when the breakdown holds no rows.
+
+    @integration
+    Scenario: The spender breakdown stays behind the identity screen's permission
+      # The labels are the People screen's data. A custom role holding only
+      # the cost permission is refused that screen, and this breakdown must
+      # not hand its content over anyway — the cost permission alone buys
+      # figures, not names.
+      Given a member holding the governance cost permission but not the identity screen's permission
+      When they request the spender breakdown
+      Then the request is refused
+      And the cost lanes still answer for them
+
   Rule: The total shown is the bill; gateway detail splits it
 
     # Every scenario under this rule says what a reader is SHOWN, and nothing

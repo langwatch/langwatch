@@ -206,6 +206,15 @@ Feature: Erasing a person from the governance data, and making it stick
     And everybody else's spend is still filed under their own identifier
 
   @unit
+  Scenario: Pulled spend is erased by the same substitution as gateway spend
+    Given an organization that has erased somebody
+    When a provider's bill attributes pulled spend to the erased identifier
+    Then the pulled money row is filed under the stand-in
+    # One substitution, applied where every money row is written — not one per
+    # lane. A second copy for the pulled lane would drift the day the first
+    # one changed.
+
+  @unit
   Scenario: The rebuild the erasure asks for cannot re-derive the identifier
     Given a person being erased
     When the erasure asks for the affected days to be rebuilt

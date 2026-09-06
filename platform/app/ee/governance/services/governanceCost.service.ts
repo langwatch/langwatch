@@ -31,6 +31,7 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 
+import { DiscoveredPersonRepository } from "@ee/governance/repositories/governanceIdentity.repository";
 import type { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
 import type {
   GovernanceOcsfEventsClickHouseRepository,
@@ -243,6 +244,48 @@ export interface GovernanceCostSummaryDto {
   unpricedWindow: GovernanceCostUnpricedWindowDto | null;
 }
 
+/**
+ * One row of the spender breakdown: a (provider, spender, agent) pairing and
+ * what it spent over the window (ADR-128 §14 / ADR-129).
+ *
+ * A spender is (provider, rawActorId), never the id alone — that pair is the
+ * discovered person's unique key, and one id string at two providers is two
+ * people. A spender appears once PER AGENT they spent through, because the
+ * agent is part of the rollup cell's key and folding it away would hide which
+ * agent the money went through.
+ */
+export interface GovernanceSpenderRowDto {
+  /** Empty only on the not-named bucket row. */
+  provider: string;
+  /** Empty only on the not-named bucket row. */
+  rawActorId: string;
+  /**
+   * The discovered person's display text — the SAME word the People screen
+   * labels them with — or the raw id when discovery has never seen this
+   * spender. Null only on the not-named bucket row, whose copy belongs to the
+   * screen: inventing a name here would put it in every future consumer.
+   */
+  label: string | null;
+  /** Empty when the provider named no agent for these rows. */
+  agentId: string;
+  /** Withheld (null) unless every cell behind it is priced in USD. */
+  amountUsd: number | null;
+  cellsWithoutAmount: number;
+}
+
+export interface GovernanceSpenderBreakdownDto {
+  unavailableReason: GovernanceCostUnavailableReason | null;
+  /**
+   * Largest figure first, unpriced rows after, and the not-named bucket —
+   * every row whose day predates the naming line or whose provider names
+   * nobody — always last: it is a remainder, not a person outspending
+   * everyone. Empty while unavailable, and empty rather than zero-filled when
+   * the window holds no pulled rows.
+   */
+  rows: GovernanceSpenderRowDto[];
+  windowDays: number;
+}
+
 /** A lane nobody has a figure for. Null, never zero — see the file header. */
 function laneWithoutFigure(): GovernanceCostLaneDto {
   return {
@@ -373,6 +416,94 @@ export class GovernanceCostService {
   }
 
   /**
+   * Who spent the pulled money over the trailing window, labeled in the words
+   * the People screen uses.
+   *
+   * Reads the PULLED lane only — the repository's predicate, not a caller
+   * convention — and labels each (provider, spender) against that provider's
+   * own discovery row. An id discovery has never seen is shown as itself;
+   * blank ids (every day before the naming line, and every provider that
+   * names nobody) gather into one bucket row rather than an invented person.
+   *
+   * The caller must hold the People screen's permission as well as the cost
+   * one: the labels ARE that screen's data, and the cost permission alone
+   * buys figures, not names. The router enforces it; this method trusts its
+   * caller the same way `summary` does.
+   */
+  async spenderBreakdown({
+    organizationId,
+    windowDays,
+    now = new Date(),
+  }: {
+    organizationId: string;
+    windowDays: number;
+    now?: Date;
+  }): Promise<GovernanceSpenderBreakdownDto> {
+    const { costRollup, prisma } = this.deps;
+    if (!costRollup) {
+      return { unavailableReason: "no_cost_store", rows: [], windowDays };
+    }
+    const tenantId = await resolveGovProjectId({ prisma, organizationId });
+    if (!tenantId) {
+      return {
+        unavailableReason: "no_governance_project",
+        rows: [],
+        windowDays,
+      };
+    }
+
+    const toDay = utcDay(now);
+    const fromDay = utcDay(
+      new Date(now.getTime() - (windowDays - 1) * 86_400_000),
+    );
+
+    const [groups, people] = await Promise.all([
+      costRollup.sumWindowBySpender({ tenantId, fromDay, toDay }),
+      this.people.listByOrganization(prisma, { organizationId }),
+    ]);
+
+    // Keyed by (provider, id) — the person's unique key. Keying on the id
+    // alone would hand one provider's person another provider's name.
+    const displayTextBySpender = new Map(
+      people.map((p) => [spenderKey(p.provider, p.rawActorId), p.displayText]),
+    );
+
+    const named = groups.filter((g) => g.rawActorId !== "");
+    const blank = groups.filter((g) => g.rawActorId === "");
+
+    const rows: GovernanceSpenderRowDto[] = named.map((g) => ({
+      provider: g.provider,
+      rawActorId: g.rawActorId,
+      label:
+        displayTextBySpender.get(spenderKey(g.provider, g.rawActorId)) ??
+        g.rawActorId,
+      agentId: g.agentId,
+      ...spenderFigure([g]),
+    }));
+    rows.sort(
+      (a, b) =>
+        (b.amountUsd ?? -1) - (a.amountUsd ?? -1) ||
+        (a.label ?? "").localeCompare(b.label ?? ""),
+    );
+
+    if (blank.length > 0) {
+      // One bucket across providers and agents: nobody was named, and a
+      // per-provider split of "nobody" would dress the remainder up as rows.
+      rows.push({
+        provider: "",
+        rawActorId: "",
+        label: null,
+        agentId: "",
+        ...spenderFigure(blank),
+      });
+    }
+
+    return { unavailableReason: null, rows, windowDays };
+  }
+
+  private readonly people = new DiscoveredPersonRepository();
+
+  /**
    * The span of days that were pulled but never priced, across every source.
    *
    * Reported for the whole organization rather than clipped to the drawn
@@ -406,7 +537,13 @@ export class GovernanceCostService {
     const lost = sources.flatMap((source) => {
       const since = source.unpricedUsageSince;
       if (!since) return [];
-      return [{ name: source.name, since, through: source.unpricedUsageThrough ?? since }];
+      return [
+        {
+          name: source.name,
+          since,
+          through: source.unpricedUsageThrough ?? since,
+        },
+      ];
     });
     if (lost.length === 0) return null;
 
@@ -676,6 +813,42 @@ function isWithinSettlingWindow({
  * claiming to be the total. There is no honest way to render that, so it is
  * not rendered — a figure we cannot vouch for is no figure.
  */
+type SpenderGroup = Awaited<
+  ReturnType<GovernanceCostRollupClickHouseRepository["sumWindowBySpender"]>
+>[number];
+
+/** NUL never appears in a provider name, so the key cannot be forged by an id. */
+function spenderKey(provider: string, rawActorId: string): string {
+  return `${provider}\u0000${rawActorId}`;
+}
+
+/**
+ * A spender row's figure, under the same withholding rule as every lane
+ * total (`figureFor`): any unpriced cell withholds the whole figure, because
+ * the priced part alone reads as the complete one.
+ */
+function spenderFigure(rows: readonly SpenderGroup[]): {
+  amountUsd: number | null;
+  cellsWithoutAmount: number;
+} {
+  const withoutAmount = rows.reduce(
+    (count, row) => count + row.cellsWithoutAmount,
+    0,
+  );
+  const priced = rows.filter((row) => row.amountNanoUsd !== null);
+  if (priced.length === 0) {
+    return { amountUsd: null, cellsWithoutAmount: withoutAmount };
+  }
+  const totalNanoUsd = priced.reduce(
+    (sum, row) => sum + BigInt(row.amountNanoUsd ?? 0),
+    0n,
+  );
+  return {
+    amountUsd: usdFigure({ totalNanoUsd, cellsWithoutAmount: withoutAmount }),
+    cellsWithoutAmount: withoutAmount,
+  };
+}
+
 function figureFor(rows: readonly LaneRow[]): number | null {
   const withoutAmount = rows.reduce(
     (count, row) => count + row.cellsWithoutAmount,
