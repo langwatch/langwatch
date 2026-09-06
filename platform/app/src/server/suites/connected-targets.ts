@@ -35,6 +35,7 @@ import {
   type PresenceReads,
   readAgentPresence,
 } from "../connected-agents/presence.read";
+import { connectedAgentSelectability } from "../connected-agents/selectable";
 import {
   parseScenarioParameterDefinitions,
   type ScenarioParameterDefinition,
@@ -235,6 +236,10 @@ export function isAgentUnseen(
  * Refuses the run when one of its agents is a personal development agent of
  * someone other than the actor.
  *
+ * The same predicate the listings mark their rows with, so a row a client was
+ * told it could choose is never refused here, and one it was told it could
+ * not is never accepted.
+ *
  * A run with no actor at all, one started with a legacy project key, has no
  * person to match, so a personal agent refuses it too. The refusal names the
  * owner, so the customer reads who to ask.
@@ -254,8 +259,10 @@ export async function assertConnectedAgentsRunnable({
   const foreign = agents.find(
     (agent) =>
       agent.type === "connected" &&
-      agent.ownerUserId !== null &&
-      agent.ownerUserId !== actor?.id,
+      !connectedAgentSelectability({
+        ownerUserId: agent.ownerUserId,
+        viewerUserId: actor?.id ?? null,
+      }).selectable,
   );
   if (!foreign?.ownerUserId) return;
   const names = await ownerNamesOf({ agents: [foreign], users });

@@ -105,6 +105,16 @@ function buildPrisma() {
         txState.updatedApiKey = { ...txState.createdApiKey, ...args.data };
         return txState.updatedApiKey;
       }),
+      // A revoke writes through the fenced updateMany and reads the row back.
+      updateMany: vi.fn().mockImplementation((args: any) => {
+        txState.updatedApiKey = { ...txState.createdApiKey, ...args.data };
+        return { count: 1 };
+      }),
+      findUniqueOrThrow: vi
+        .fn()
+        .mockImplementation(
+          () => txState.updatedApiKey ?? txState.createdApiKey,
+        ),
     },
     roleBinding: {
       findFirst: vi.fn(),

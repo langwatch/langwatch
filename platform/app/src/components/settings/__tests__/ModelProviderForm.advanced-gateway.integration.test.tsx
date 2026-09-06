@@ -10,10 +10,11 @@
  *   /** @scenario Advanced (Gateway) renders as a collapsed accordion when the flag is on
  *   /** @scenario Single Save persists basic credentials and advanced gateway fields together
  *
- * The drawer renders Advanced as a collapsible accordion gated on the
- * `release_ui_ai_gateway_menu_enabled` flag for the caller's org. The
- * second-"Save Advanced" button is gone: a single Save funnels basic +
- * advanced to one `api.modelProvider.update` mutation.
+ * The drawer renders the gateway fields inside a collapsible "Advanced"
+ * accordion, gated on the `release_ui_ai_gateway_menu_enabled` flag for the
+ * caller's org. The accordion also holds fields that are not the gateway's,
+ * so the flag gates the fields rather than the accordion. There is one Save:
+ * it funnels basic + advanced to one `api.modelProvider.update` mutation.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -227,8 +228,13 @@ describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => 
       });
 
       /** @scenario Advanced (Gateway) is hidden when the AI gateway feature flag is off */
-      it("does not render the Advanced (Gateway) accordion trigger", () => {
-        expect(screen.queryByText(/advanced \(gateway\)/i)).toBeNull();
+      it("renders no gateway field under the Advanced accordion", () => {
+        // The accordion itself stays, because it also holds the models
+        // allowed to skip Langy permission checks. What the flag gates is
+        // the gateway's own fields, so those are what this asserts on.
+        expect(screen.queryByPlaceholderText(/no cap/i)).toBeNull();
+        expect(screen.queryByText(/fallback priority/i)).toBeNull();
+        expect(screen.queryByText(/provider config \(json\)/i)).toBeNull();
       });
 
       it("does not render any rate-limit input", () => {
@@ -258,8 +264,8 @@ describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => 
       });
 
       /** @scenario Advanced (Gateway) renders as a collapsed accordion when the flag is on */
-      it("renders the Advanced (Gateway) accordion trigger", () => {
-        expect(screen.getByText(/advanced \(gateway\)/i)).toBeTruthy();
+      it("renders the Advanced accordion trigger", () => {
+        expect(screen.getByText("Advanced")).toBeTruthy();
       });
 
       it("keeps the rate-limit inputs hidden until the accordion is expanded", () => {

@@ -203,6 +203,20 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Then Langy shows the connect card or empty state
     And it does not show a red error
 
+  @unit
+  Scenario: A platform failure to read the conversation is never told as Langy being slow
+    Given the conversation record cannot be read because the platform is unavailable
+    Then the panel says the conversation could not be loaded, and offers to try again
+    And the words come from the shared error copy for that code
+    And nothing on screen says Langy is slow or stuck
+
+  @unit
+  Scenario: A conversation that was never created stops reading as one on its way
+    Given the history read answers not found for a conversation this tab just created
+    Then the read counts as the record lagging the create, for a short grace only
+    And after that grace the panel says the conversation is not available
+    And a conversation the record has confirmed never reads as lagging
+
   @integration
   Scenario: An unknown error stays calm and traceable
     When a turn fails with an error Langy does not recognise
@@ -233,6 +247,39 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Given a turn is in flight and the reply's text is streaming on screen
     Then no thinking line renders under the answer
     And no status placeholder renders under the answer
+
+  @unit
+  Scenario: A turn held by a card says it is waiting for me
+    Given a turn is in flight with a card waiting for my answer
+    Then the thinking line says it is waiting for my answer on the card above
+    And it never says the turn is taking longer than usual
+    And it never says Langy may be stuck
+
+  # The escalation used to measure the time since the line appeared, which is
+  # turn length, not silence. So a turn that had answered a permission card and
+  # was running a local command, with its output arriving in the terminal, was
+  # told "Langy still has not answered. It may be stuck." while nothing was
+  # wrong. A local command and a card the developer answered never reach the
+  # message on screen, so the line has to read the turn's own record too.
+  @unit
+  Scenario: The escalation measures silence, not how long the turn has run
+    Given a turn that has been running far longer than the stuck threshold
+    When it produced something more recently than that
+    Then the line does not say the turn is slow or that Langy may be stuck
+
+  @unit
+  Scenario: Work that never reaches the message still counts as progress
+    Given a turn whose message on screen carries nothing
+    Then a tool call in the turn's record counts as the turn making progress
+    And a card the developer answered counts
+    And a plan step changing counts
+    And reasoning or prose arriving counts
+
+  @unit
+  Scenario: A turn that really is silent still ends up looking stuck
+    Given a turn that has produced nothing at all
+    When the silence passes the stuck threshold
+    Then the line says Langy may be stuck
 
   @unit
   Scenario: Live reasoning reads as thinking, not as starting up

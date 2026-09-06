@@ -86,8 +86,8 @@ export const LANGY_PROMPT_DEFAULT_TAG = "production";
  * The rules kept here are the measured defects, because last position in the
  * prompt is the right place to spend on them. Grounding: in production, 40% of
  * turns that reach `status: "completed"` make zero tool calls, so the answer
- * came from the model rather than from the project. Ending: on the pi harness
- * the model closes replies with a next-actions question, which AGENTS.md bans;
+ * came from the model rather than from the project. Ending: the model closes
+ * replies with a next-actions question, which AGENTS.md bans;
  * mid-prompt the ban loses to the model's own habit, so the pointer rides
  * here.
  */

@@ -9,6 +9,7 @@
 
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
 import type { AuthzPermission } from "@langwatch/authz";
+import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { Project } from "~/generated/prisma/client";
@@ -27,6 +28,7 @@ import {
   agentPresenceView,
   readAgentPresence,
 } from "~/server/connected-agents/presence.read";
+import { CONNECTED_AGENT_NOT_SELECTABLE_REASONS } from "~/server/connected-agents/selectable";
 import { scenarioParameterDefinitionSchema } from "~/server/scenarios/parameters";
 import { runActorOf } from "../../shared/run-actor";
 import { agentPlatformUrl } from "../agent-platform-url";
@@ -147,6 +149,17 @@ export const agentResponseSchema = z.object({
     .describe(
       "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind.",
     ),
+  selectable: z
+    .boolean()
+    .describe(
+      "Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name.",
+    ),
+  notSelectableReason: z
+    .enum(CONNECTED_AGENT_NOT_SELECTABLE_REASONS)
+    .nullable()
+    .describe(
+      "Why the agent cannot be run by this credential. Null when it can.",
+    ),
   createdAt: z.date(),
   updatedAt: z.date(),
   platformUrl: z.string().url(),
@@ -183,13 +196,25 @@ type AgentWire = z.infer<typeof agentResponseSchema>;
 
 type ReadableAgent = Parameters<typeof toAgentListRow>[0];
 
+/**
+ * The person the request's key belongs to, or nothing for a project or
+ * service key. It decides only what each row says about itself: a personal
+ * agent of somebody else is listed either way, marked as not selectable.
+ */
+function viewerUserIdOf(c: Context): string | null {
+  return c.get("apiKeyUserId") ?? null;
+}
+
 /** The rows as every read answers them: presence, owner and link added. */
 async function rowsWire({
   app,
   rows,
+  viewerUserId,
 }: {
   app: AgentsApp;
   rows: AgentListRow[];
+  /** The person the key belongs to; nothing for a project or service key. */
+  viewerUserId: string | null;
 }): Promise<AgentWire[]> {
   const [owners, presence] = await Promise.all([
     app.agents.ownersOf(rows),
@@ -198,7 +223,7 @@ async function rowsWire({
   return rows.map((row) => ({
     ...row,
     type: agentTypeSchema.parse(row.type),
-    ...agentPresenceView({ agent: row, owners, presence }),
+    ...agentPresenceView({ agent: row, owners, presence, viewerUserId }),
     platformUrl: agentPlatformUrl({
       projectSlug: app.project.slug,
       agentId: row.id,
@@ -210,11 +235,17 @@ async function rowsWire({
 async function agentWire({
   app,
   agent,
+  viewerUserId,
 }: {
   app: AgentsApp;
   agent: ReadableAgent;
+  viewerUserId: string | null;
 }): Promise<AgentWire> {
-  const [wire] = await rowsWire({ app, rows: [toAgentListRow(agent)] });
+  const [wire] = await rowsWire({
+    app,
+    rows: [toAgentListRow(agent)],
+    viewerUserId,
+  });
   return wire!;
 }
 
@@ -262,7 +293,7 @@ function registerCollectionEndpoints({ v, guard, docs }: RegisterAgents): void {
       docs: docsOf({ docs, operationId: "listAgents" }),
     },
     async (
-      _c,
+      c,
       {
         query,
         app,
@@ -278,7 +309,11 @@ function registerCollectionEndpoints({ v, guard, docs }: RegisterAgents): void {
       });
       return {
         pagination: result.pagination,
-        data: await rowsWire({ app, rows: result.data }),
+        data: await rowsWire({
+          app,
+          rows: result.data,
+          viewerUserId: viewerUserIdOf(c),
+        }),
       };
     },
   );
@@ -295,7 +330,7 @@ function registerCollectionEndpoints({ v, guard, docs }: RegisterAgents): void {
       docs: docsOf({ docs, operationId: "createAgent" }),
     },
     async (
-      _c,
+      c,
       {
         input,
         app,
@@ -313,7 +348,7 @@ function registerCollectionEndpoints({ v, guard, docs }: RegisterAgents): void {
         config: input.config as AgentComponentConfig,
         workflowId: input.workflowId,
       });
-      return agentWire({ app, agent });
+      return agentWire({ app, agent, viewerUserId: viewerUserIdOf(c) });
     },
   );
 }
@@ -329,12 +364,12 @@ function registerItemEndpoints({ v, guard, docs }: RegisterAgents): void {
         "Read one agent with its presence, its owner and the run parameters it declares. An id the project does not hold answers 404 agent_not_found.",
       docs: docsOf({ docs, operationId: "getAgent" }),
     },
-    async (_c, { params, app }: { params: { id: string }; app: AgentsApp }) => {
+    async (c, { params, app }: { params: { id: string }; app: AgentsApp }) => {
       const agent = await app.agents.getByIdOrThrow({
         id: params.id,
         projectId: app.project.id,
       });
-      return agentWire({ app, agent });
+      return agentWire({ app, agent, viewerUserId: viewerUserIdOf(c) });
     },
   );
 
@@ -356,7 +391,7 @@ function registerItemEndpoints({ v, guard, docs }: RegisterAgents): void {
         }),
       },
       async (
-        _c,
+        c,
         {
           params,
           input,
@@ -381,7 +416,7 @@ function registerItemEndpoints({ v, guard, docs }: RegisterAgents): void {
             }),
           },
         });
-        return agentWire({ app, agent });
+        return agentWire({ app, agent, viewerUserId: viewerUserIdOf(c) });
       },
     );
   }

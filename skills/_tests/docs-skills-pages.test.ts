@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
+import { listNativeSkills, renderSkill } from "../_compiler/native.js";
 import { listPublishedSkills } from "../_lib/feature-skills.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -242,6 +243,49 @@ describe("docs skills directory pages", () => {
       const css = fs.readFileSync(path.join(docsRoot, "style.css"), "utf8");
       expect(css).toContain(".lw-accordion[data-open] .lw-accordion-body");
       expect(css).not.toContain(".lw-accordion[open]");
+    });
+  });
+});
+
+// `langwatch docs <path>` fetches https://langwatch.ai/docs/<path>.md, which is
+// docs/<path>.mdx in this tree. The tracing skill offered
+// `integration/python/langgraph` as its example of a framework page; the real
+// pages live one directory deeper, and an agent following the example reached
+// for `integration/python/openai` and read a 404 mid-run.
+describe("the documentation paths the skills tell the agent to fetch", () => {
+  const skillFiles = listNativeSkills(skillsRoot).map((skill) => ({
+    slug: skill.slug,
+    rendered: renderSkill(skill),
+  }));
+
+  /**
+   * The paths, with the placeholders and the index (no path) left out.
+   *
+   * `scenario-docs` fetches the Scenario site, which is not in this tree, so
+   * only `langwatch docs` is checkable here.
+   */
+  function docsPaths(rendered: string): string[] {
+    return extractAll(rendered, /langwatch docs ([a-z0-9/_-]+)/g);
+  }
+
+  describe("given every skill Langy ships with is rendered", () => {
+    /** @scenario "Every documentation page a skill names exists" */
+    it("names only pages that exist in the documentation tree", () => {
+      const missing: string[] = [];
+      let checked = 0;
+      for (const { slug, rendered } of skillFiles) {
+        for (const docsPath of docsPaths(rendered)) {
+          checked += 1;
+          if (!fs.existsSync(path.join(docsRoot, `${docsPath}.mdx`))) {
+            missing.push(`${slug}: ${docsPath}`);
+          }
+        }
+      }
+      expect(checked, "expected the skills to name documentation pages").toBeGreaterThan(5);
+      expect(
+        missing,
+        `these pages would 404 for the agent that fetched them: ${missing.join(", ")}`
+      ).toEqual([]);
     });
   });
 });

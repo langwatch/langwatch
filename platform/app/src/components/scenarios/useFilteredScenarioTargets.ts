@@ -13,6 +13,7 @@
 import { useMemo } from "react";
 import { OFFLINE_AGENT_SELECT_COPY } from "~/components/agents/offlineAgentCopy";
 import { explainHandledError } from "~/features/errors";
+import { connectedAgentSelectability } from "~/server/connected-agents/selectable";
 import { targetLabelOf } from "~/server/suites/target-key";
 import type { TargetValue } from "./TargetSelector";
 
@@ -71,7 +72,12 @@ export function agentTargetLabel(agent: AgentLike): string {
   });
 }
 
-/** True when this agent is a personal development agent of another person. */
+/**
+ * True when this agent is a personal development agent of another person.
+ *
+ * The same rule the listings mark their rows with and the run refuses on, so
+ * the picker never offers a target the run would refuse.
+ */
 export function isTeammateOwned({
   agent,
   viewerUserId,
@@ -79,9 +85,10 @@ export function isTeammateOwned({
   agent: AgentLike;
   viewerUserId?: string | null;
 }): boolean {
-  const ownerId = agent.owner?.userId;
-  if (!ownerId) return false;
-  return ownerId !== viewerUserId;
+  return !connectedAgentSelectability({
+    ownerUserId: agent.owner?.userId ?? null,
+    viewerUserId,
+  }).selectable;
 }
 
 /** The agents of the project as targets, newest first, filtered by the search. */

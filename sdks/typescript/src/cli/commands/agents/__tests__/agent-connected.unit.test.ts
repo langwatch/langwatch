@@ -144,6 +144,22 @@ describe("listAgentsCommand()", () => {
       expect(agentOwnerLabel(connectedAgent({ hostLabel: "ada-laptop" }))).toBe("ada-laptop");
       expect(agentOwnerLabel(connectedAgent())).toBe("");
     });
+
+    /** @scenario "A row the key cannot choose reads as not selectable" */
+    it("marks the owner cell of a row this key cannot run", () => {
+      expect(
+        agentOwnerLabel(
+          connectedAgent({
+            owner: { userId: "u1", name: "Ada" },
+            selectable: false,
+            notSelectableReason: "owned_by_another_person",
+          }),
+        ),
+      ).toBe("Ada (owner only)");
+      expect(agentOwnerLabel(connectedAgent({ selectable: false }))).toBe(
+        "owner only",
+      );
+    });
   });
 });
 
@@ -193,6 +209,26 @@ describe("getAgentCommand()", () => {
 
     it("describes one parameter on one line", () => {
       expect(describeParameter({ name: "n", type: "number", default: 5 })).toBe("n: number, default 5");
+    });
+  });
+
+  describe("when the agent belongs to another person", () => {
+    /** @scenario "The detail says whether the key can choose the agent" */
+    it("names the owner and says only its owner can run it", async () => {
+      service.get.mockResolvedValue(
+        connectedAgent({
+          owner: { userId: "u1", name: "Ada" },
+          selectable: false,
+          notSelectableReason: "owned_by_another_person",
+        }),
+      );
+
+      const result = await getAgentCommand("agent_conn");
+      result?.table?.();
+
+      const output = printed();
+      expect(output).toContain("Ada");
+      expect(output).toContain("only its owner can run this agent");
     });
   });
 });
@@ -302,12 +338,14 @@ describe("runAgentCommand()", () => {
 describe("the agent command help", () => {
   const program = readFileSync(join(__dirname, "../../../program.ts"), "utf8");
 
-  /** @scenario "The dev command help points code agents to connectAgent" */
-  it("says agent dev is for HTTP agents and names connectAgent and connect_agent", () => {
-    const devHelp = program.slice(program.indexOf('.command("dev")'), program.indexOf('.option("--port <number>"'));
-    expect(devHelp).toContain("For HTTP agents");
-    expect(devHelp).toContain("connectAgent");
-    expect(devHelp).toContain("connect_agent");
+  /** @scenario "The tunnel command help points code agents to connectAgent" */
+  it("says agent tunnel is for HTTP agents and names connectAgent and connect_agent", () => {
+    const tunnelStart = program.indexOf('.command("tunnel")');
+    const tunnelEnd = program.indexOf(").action(runAgentTunnel)", tunnelStart);
+    const tunnelHelp = program.slice(tunnelStart, tunnelEnd);
+    expect(tunnelHelp).toContain("For HTTP agents");
+    expect(tunnelHelp).toContain("connectAgent");
+    expect(tunnelHelp).toContain("connect_agent");
   });
 
   /** @scenario "The target help names the connected forms" */
@@ -318,5 +356,26 @@ describe("the agent command help", () => {
     expect(targetHelp).toContain("connected:<name>@<environment>");
     expect(targetHelp).toContain("connected:<id>");
     expect(targetHelp.indexOf("connected:<name>")).toBeLessThan(targetHelp.indexOf("connected:<id>"));
+  });
+});
+
+describe("the agent dev alias", () => {
+  // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant,
+  // which no test runner defines (see help-topic.unit.test.ts).
+  (globalThis as Record<string, unknown>).__CLI_VERSION__ ??= "0.0.0-test";
+
+  /** @scenario "The hidden `agent dev` alias still runs the tunnel session" */
+  it("keeps `agent dev` as a hidden command wired to the same tunnel flags as `agent tunnel`", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const agentCmd = buildProgram().commands.find((cmd) => cmd.name() === "agent");
+    const tunnelCmd = agentCmd?.commands.find((cmd) => cmd.name() === "tunnel");
+    const devCmd = agentCmd?.commands.find((cmd) => cmd.name() === "dev");
+
+    expect(tunnelCmd).toBeDefined();
+    expect(devCmd).toBeDefined();
+    expect((devCmd as unknown as { _hidden?: boolean })._hidden).toBe(true);
+    expect(devCmd!.options.map((option) => option.long)).toEqual(
+      tunnelCmd!.options.map((option) => option.long),
+    );
   });
 });

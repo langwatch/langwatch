@@ -6,11 +6,14 @@ import {
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
   type LangyTurnProjectionState,
+  abandonSend as reduceAbandonSend,
   abandonStop as reduceAbandonStop,
+  beginSend as reduceBeginSend,
   beginTurn as reduceBeginTurn,
   observeBackendTurn as reduceObserveBackendTurn,
   requestStop as reduceRequestStop,
   settleTurn as reduceSettleTurn,
+  stopDispatched as reduceStopDispatched,
   seedLangyTurnProjection,
   type TurnPhaseState,
 } from "@langwatch/langy";
@@ -485,10 +488,28 @@ interface LangyState extends TurnPhaseState {
   // The phase STATE fields (turnPhase, activeTurnId, settledTurnId,
   // backendSawTurnInFlight) come from `TurnPhaseState`; the machine's pure
   // transitions live in @langwatch/langy's turnPhase.ts. The store exposes them as events:
+  /**
+   * The user sent a message: go `active` at once, before the server has
+   * answered with the ids. What makes Stop available during the startup window
+   * instead of leaving Send on screen for the seconds a cold worker takes.
+   */
+  beginSend: () => void;
   /** A turn was dispatched (transport adopted its ids): adopt it, go `active`. */
   beginTurn: (args: { conversationId: string; turnId: string }) => void;
-  /** The user hit Stop: `active` → `stopping` (a no-op in any other phase). */
-  requestStop: () => void;
+  /**
+   * The user hit Stop: `active` → `stopping` (a no-op in any other phase).
+   * `dispatched: false` says the caller had no turn id to name yet, so the
+   * intent is remembered (`stopPending`) and sent the moment one arrives.
+   */
+  requestStop: (args?: { dispatched?: boolean }) => void;
+  /** The remembered stop went out: nothing is owed, the phase stays `stopping`. */
+  stopDispatched: () => void;
+  /**
+   * The send failed before any turn id existed: back to `idle`, dropping a
+   * pending stop with it. A no-op once the turn has an id, where the turn's own
+   * terminal tells the story.
+   */
+  abandonSend: () => void;
   /**
    * The conversation whose last turn THIS browser stopped (ADR-078). What lets
    * an empty stopped reply read "Interrupted" instead of "No content". Session
@@ -996,8 +1017,21 @@ export const useLangyStore = create<LangyState>()(
         }),
 
       // The turn phase machine (@langwatch/langy turnPhase.ts) — pure transitions wired in a
-      // few lines. Every phase change goes through these four events.
+      // few lines. Every phase change goes through these events.
       ...initialTurnPhaseState,
+      beginSend: () =>
+        set((s) => ({
+          ...reduceBeginSend(s),
+          // The same live signals a dispatched turn clears: the previous
+          // answer's status line must not sit under the new question.
+          turnStatus: null,
+          turnStatusIsReadiness: false,
+          turnProgress: null,
+          turnProgressSample: null,
+          turnReasoning: null,
+          turnPlan: null,
+          interruptedConversationId: null,
+        })),
       beginTurn: ({ conversationId, turnId }) =>
         set((s) => ({
           ...reduceBeginTurn(s, turnId),
@@ -1034,15 +1068,32 @@ export const useLangyStore = create<LangyState>()(
           return { unconfirmedConversations: rest };
         }),
       interruptedConversationId: null,
-      requestStop: () =>
+      requestStop: (args) =>
         set((s) => ({
-          ...reduceRequestStop(s),
+          ...reduceRequestStop(s, args ?? {}),
           // Only a stop that actually moved the machine counts as an
           // interruption — requestStop is a no-op outside `active`.
           interruptedConversationId:
             s.turnPhase === "active"
               ? s.activeConversationId
               : s.interruptedConversationId,
+        })),
+      stopDispatched: () =>
+        set((s) => ({
+          ...reduceStopDispatched(s),
+          // The kept stop is real now, and the reply it cuts short belongs to
+          // this conversation: without this an empty stopped reply would read
+          // "No content" rather than "Interrupted".
+          interruptedConversationId: s.stopPending
+            ? s.activeConversationId
+            : s.interruptedConversationId,
+        })),
+      abandonSend: () =>
+        set((s) => ({
+          ...reduceAbandonSend(s),
+          // Nothing ran, so nothing was interrupted.
+          interruptedConversationId:
+            s.activeTurnId === null ? null : s.interruptedConversationId,
         })),
       abandonStop: () =>
         set((s) => ({
