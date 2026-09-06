@@ -13,7 +13,6 @@ const apiKeys = vi.hoisted(() => ({
   revoke: vi.fn(),
 }));
 const apiKeyRepo = vi.hoisted(() => ({
-  findIngestKey: vi.fn(),
   findIngestKeysForProject: vi.fn(),
 }));
 const workspace = vi.hoisted(() => ({
@@ -91,6 +90,23 @@ describe("IngestionKeyService.issueForPersonalProject", () => {
     });
   });
 
+  describe("when the source type is one the product knows but no CLI wraps", () => {
+    it("mints through the create-only path the tile and MCP use", async () => {
+      apiKeyRepo.findIngestKeysForProject.mockResolvedValue([]);
+
+      const issued = await service.createForPersonalProject({
+        ...PARAMS,
+        sourceType: "claude_cowork",
+      });
+
+      // The wrapped-tool list bounds what a device session may mint. The
+      // tile and the MCP tool name source types from the product's own
+      // catalog, so they reach the same create-only mint without it.
+      expect(issued.apiKeyId).toBe("ak_new");
+      expect(apiKeys.revoke).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when other devices already hold live keys under the cap", () => {
     it("mints a new key and revokes none of them", async () => {
       apiKeyRepo.findIngestKeysForProject.mockResolvedValue([
@@ -103,7 +119,6 @@ describe("IngestionKeyService.issueForPersonalProject", () => {
 
       expect(issued.apiKeyId).toBe("ak_new");
       expect(apiKeys.revoke).not.toHaveBeenCalled();
-      expect(apiKeyRepo.findIngestKey).not.toHaveBeenCalled();
     });
   });
 

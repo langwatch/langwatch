@@ -122,35 +122,6 @@ export class ApiKeyRepository {
   }
 
   /**
-   * Finds the live ingestion key for a (project, sourceType) pair: a non-revoked
-   * ApiKey carrying that ingestSourceType whose role binding is project-scoped to
-   * `projectId`. Used by the ingest-key service to rotate-in-place rather than
-   * accumulate keys.
-   */
-  async findIngestKey({
-    organizationId,
-    projectId,
-    sourceType,
-  }: {
-    organizationId: string;
-    projectId: string;
-    sourceType: string;
-  }): Promise<ApiKeyWithBindings | null> {
-    return this.prisma.apiKey.findFirst({
-      where: {
-        organizationId,
-        ingestSourceType: sourceType,
-        revokedAt: null,
-        roleBindings: {
-          some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
-        },
-      },
-      include: { roleBindings: true },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  /**
    * Lists every live ingestion key (`ingestSourceType IS NOT NULL`, not
    * revoked) whose role binding is project-scoped to `projectId`. Powers
    * the /me Trace Ingest installed-state lookup so a connected tile stays

@@ -151,6 +151,15 @@ export async function instrumentCommand(
 		token: credential.token,
 	});
 
+	// The wiring landed, but nothing confirmed the key in it: this device is
+	// signed out, so the key could not be checked and could not be replaced.
+	// Reporting only the success line would tell the user telemetry is
+	// flowing when the key may have been revoked weeks ago.
+	if (credential.sessionExpired) {
+		process.stderr.write(
+			`${lwTag()} this device is signed out, so \`${tool}\` was wired with the ingest key it already had. If telemetry stops arriving, run \`langwatch login --device\` and then \`langwatch instrument ${tool}\` again.\n`,
+		);
+	}
 	for (const warning of result.warnings) {
 		process.stderr.write(`${lwTag()} ${warning}\n`);
 	}

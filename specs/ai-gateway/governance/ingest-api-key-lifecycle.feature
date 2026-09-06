@@ -150,6 +150,39 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     When a device mints a personal key for "codex"
     Then no "claude_code" key is revoked
 
+  # The CLI is not the only door to a personal key. Connecting a source from
+  # the /me tile, and the MCP mint an agent calls, reach the same workspace,
+  # and both used to rotate in place: one click, or one agent, revoked the key
+  # every machine under that login was exporting with. Connecting a source is
+  # not a decision about those machines, so it adds a key like the CLI does.
+  # The tile's explicit rotate is still the verb that kills them.
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: Connecting a source from the personal tile keeps the devices' keys
+    Given jane's laptop already minted a personal ingestion key for "claude_code"
+    When she connects "claude_code" from her personal ingest tile
+    Then both tokens authorize trace writes into her personal workspace
+    And neither key is revoked by the other
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: An agent minting through MCP keeps the devices' keys
+    Given jane's laptop already minted a personal ingestion key for "claude_code"
+    When an agent mints a personal key for "claude_code" through the MCP tool
+    Then both tokens authorize trace writes into her personal workspace
+    And neither key is revoked by the other
+
+  # Rotation revoked one prior key, which was every key a project could have
+  # while the mint rotated. With several machines holding their own, a rotate
+  # that stops at the first leaves the rest writing under a page that says the
+  # key was rotated.
+
+  @integration @ingest-api-key @rotate @personal
+  Scenario: An explicit rotation from the personal tile revokes every prior key
+    Given jane's personal workspace holds several live "claude_code" keys
+    When she rotates "claude_code" from her personal ingest tile
+    Then the rotated key is the only live one
+    And none of the previous tokens authorize trace writes
+
   # The cap is per source type, so the set of source types must be finite or
   # a device session holds the cap again under every value it invents. The
   # personal mint accepts the tools the CLI wraps and nothing else.

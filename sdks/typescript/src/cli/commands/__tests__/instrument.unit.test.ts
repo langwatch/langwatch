@@ -116,6 +116,26 @@ describe("instrumentCommand", () => {
     });
   });
 
+  describe("given a platform that refuses the device session", () => {
+    /** @scenario "A signed-out device is told its wiring was not confirmed" */
+    it("wires the cached key and says the machine is signed out", async () => {
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        sessionExpired: true,
+      });
+
+      await instrumentCommand("claude", {});
+
+      // The wiring is worth writing: the cached key may still work. What is
+      // not acceptable is the success line alone, which reads as a confirmed
+      // setup on a machine that cannot confirm anything.
+      expect(installTelemetryWiring).toHaveBeenCalledTimes(1);
+      const err = writtenTo(stderrSpy);
+      expect(err).toContain("signed out");
+      expect(err).toContain("langwatch login --device");
+    });
+  });
+
   describe("given a tool with no ingestion path", () => {
     it("fails with the supported list", async () => {
       await expect(instrumentCommand("cursor", {})).rejects.toThrow(ExitError);

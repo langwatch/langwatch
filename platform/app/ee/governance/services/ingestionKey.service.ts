@@ -151,17 +151,24 @@ export class IngestionKeyService {
     ingestionTemplateId = null,
     createdByDeviceLabel = null,
   }: IngestionKeyMintParams): Promise<IssuedIngestionKey> {
-    // Hard-cut rotation: revoke any prior live ingest key for this
-    // (project, sourceType) so the previous token dies immediately and we
-    // never accumulate keys.
-    const prior = await this.apiKeyRepo.findIngestKey({
-      organizationId,
-      projectId,
-      sourceType,
-    });
-    if (prior) {
+    // Hard-cut rotation: revoke EVERY prior live ingest key for this
+    // (project, sourceType, template) so no previous token survives it.
+    // One key was enough while a project held one key per source; the
+    // create-only mints leave several, and a rotation that kills one of them
+    // hands the user a page saying rotated while two machines keep writing.
+    const prior = (
+      await this.apiKeyRepo.findIngestKeysForProject({
+        organizationId,
+        projectId,
+      })
+    ).filter(
+      (key) =>
+        key.ingestSourceType === sourceType &&
+        (key.ingestionTemplateId ?? null) === ingestionTemplateId,
+    );
+    for (const key of prior) {
       await this.apiKeys.revoke({
-        id: prior.id,
+        id: key.id,
         callerUserId,
         callerIsAdmin: true,
         organizationId,
@@ -298,6 +305,40 @@ export class IngestionKeyService {
     ) {
       throw new PersonalSourceTypeNotAllowedError(sourceType);
     }
+    return this.createForPersonalProject({
+      userId,
+      organizationId,
+      sourceType,
+      ingestionTemplateId,
+      createdByDeviceLabel,
+    });
+  }
+
+  /**
+   * Add a key to the caller's personal project without touching the keys
+   * already there, for any source type the product knows.
+   *
+   * Same create-only shape as `issueForPersonalProject`, minus the
+   * wrapped-tool allowlist that bounds the CLI device mint. The callers are
+   * the ones whose source type comes from the product's own catalog rather
+   * than from a device: the /me Trace Ingest tile connecting a source, and
+   * the MCP mint tool. Connecting a source is not a decision about the
+   * machines already exporting, so it must not revoke their keys; the
+   * explicit rotate is `ensureForPersonalProject`.
+   */
+  async createForPersonalProject({
+    userId,
+    organizationId,
+    sourceType,
+    ingestionTemplateId = null,
+    createdByDeviceLabel = null,
+  }: {
+    userId: string;
+    organizationId: string;
+    sourceType: string;
+    ingestionTemplateId?: string | null;
+    createdByDeviceLabel?: string | null;
+  }): Promise<IssuedIngestionKey> {
     const workspace = await this.personalWorkspace.findExisting({
       userId,
       organizationId,
