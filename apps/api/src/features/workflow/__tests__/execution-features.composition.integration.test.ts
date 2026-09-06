@@ -438,7 +438,7 @@ async function callTrpc(
   input: Record<string, unknown>,
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
-  const encoded = encodeURIComponent(JSON.stringify({ json: input }));
+  const encoded = encodeURIComponent(JSON.stringify(input));
   const response = await application.hono.request(
     `http://127.0.0.1/api/trpc/${path}?input=${encoded}`,
   );
@@ -454,7 +454,7 @@ async function mutateTrpc(
   const response = await application.hono.request(`http://127.0.0.1/api/trpc/${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ json: input }),
+    body: JSON.stringify(input),
   });
   return { status: response.status, body: await response.json() };
 }
@@ -484,7 +484,7 @@ describe("given the execution features composed over this process's own graph", 
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { id: "workflow-1", name: "Support triage" } } },
+        result: { data: { id: "workflow-1", name: "Support triage" } },
       });
       // The project id is in the WHERE clause, not only in the input: a
       // workflow read that resolved by id alone would cross tenants.
@@ -506,7 +506,7 @@ describe("given the execution features composed over this process's own graph", 
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: [{ id: "experiment-1", slug: "latency-sweep" }] } },
+        result: { data: [{ id: "experiment-1", slug: "latency-sweep" }] },
       });
       expect(prisma.experimentFindMany).toHaveBeenCalledWith(
         expect.objectContaining({

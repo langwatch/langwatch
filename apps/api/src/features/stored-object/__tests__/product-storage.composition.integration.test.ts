@@ -475,11 +475,9 @@ async function callTrpc(
       ? await application.hono.request(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ json: input }),
+          body: JSON.stringify(input),
         })
-      : await application.hono.request(
-          `${url}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
-        );
+      : await application.hono.request(`${url}?input=${encodeURIComponent(JSON.stringify(input))}`);
   return { status: response.status, body: await response.json() };
 }
 
@@ -495,7 +493,7 @@ describe("given an API process composed with the object store, retention and mon
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { status: "available", mediaType: "image/png" } } },
+        result: { data: { status: "available", mediaType: "image/png" } },
       });
     });
 
@@ -509,7 +507,7 @@ describe("given an API process composed with the object store, retention and mon
         });
 
         expect(body).toMatchObject({
-          result: { data: { json: { status: "missing", mediaType: "audio/wav" } } },
+          result: { data: { status: "missing", mediaType: "audio/wav" } },
         });
       });
     });
@@ -543,7 +541,7 @@ describe("given an API process composed with the object store, retention and mon
 
           expect(status).toBe(200);
           expect(body).toMatchObject({
-            result: { data: { json: { status: "available", mediaType: "image/jpeg" } } },
+            result: { data: { status: "available", mediaType: "image/jpeg" } },
           });
           expect(requests).toHaveLength(1);
           expect(requests[0]?.url).toBe(
@@ -585,7 +583,7 @@ describe("given an API process composed with the object store, retention and mon
           id: "so_never_existed",
         });
 
-        expect(body).toMatchObject({ result: { data: { json: { status: "not_found" } } } });
+        expect(body).toMatchObject({ result: { data: { status: "not_found" } } });
       });
     });
   });
@@ -599,8 +597,7 @@ describe("given an API process composed with the object store, retention and mon
       });
 
       expect(status).toBe(200);
-      const snapshot = (body as { result: { data: { json: Record<string, unknown> } } }).result.data
-        .json;
+      const snapshot = (body as { result: { data: Record<string, unknown> } }).result.data;
 
       // The caller manages one team and one project, and no organization.
       expect(snapshot.available).toEqual({
@@ -635,7 +632,7 @@ describe("given an API process composed with the object store, retention and mon
       // Two projects are in the organization; one is readable, so the rollup
       // reports one rather than widening to what the scope contains.
       expect(body).toMatchObject({
-        result: { data: { json: { totalBytes: 1_000, projectCount: 1 } } },
+        result: { data: { totalBytes: 1_000, projectCount: 1 } },
       });
     });
   });
@@ -650,7 +647,7 @@ describe("given an API process composed with the object store, retention and mon
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: [{ id: "monitor-1", name: "Toxicity" }] } },
+        result: { data: [{ id: "monitor-1", name: "Toxicity" }] },
       });
       expect(prisma.client.monitor.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { projectId: PROJECT_ID } }),
@@ -673,9 +670,7 @@ describe("given an API process composed with the object store, retention and mon
       // call refused with `service_unavailable`.
       expect(body).toMatchObject({
         result: {
-          data: {
-            json: [{ monitorId: "monitor-1", metric: "pass_rate", current: 0.5, previous: 0.25 }],
-          },
+          data: [{ monitorId: "monitor-1", metric: "pass_rate", current: 0.5, previous: 0.25 }],
         },
       });
       expect(clickHouse.resolveClient).toHaveBeenCalledWith(PROJECT_ID);

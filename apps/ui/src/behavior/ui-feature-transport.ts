@@ -18,7 +18,6 @@ import {
   splitLink,
 } from "@trpc/client";
 import type { ComponentType, ReactNode } from "react";
-import superjson from "superjson";
 import { type SseEventSourceConstructor, sseSubscriptionLink } from "./ui-sse-subscription-link";
 
 /** Same-origin, so the browser sends the session cookie without configuration. */
@@ -70,10 +69,9 @@ function uiFeatureApiLinks({
 }: UiFeatureApiClientOptions) {
   const httpRouting = splitLink({
     condition: (operation) => operation.context.skipBatch === true,
-    true: httpLink({ url, transformer: superjson, ...(fetch ? { fetch } : {}) }),
+    true: httpLink({ url, ...(fetch ? { fetch } : {}) }),
     false: httpBatchLink({
       url,
-      transformer: superjson,
       maxURLLength: MAX_BATCHED_URL_LENGTH,
       ...(fetch ? { fetch } : {}),
     }),
@@ -87,7 +85,7 @@ function uiFeatureApiLinks({
       // place for the number to live and a second place for it to drift.
       true: sseSubscriptionLink({
         url: subscriptionUrl,
-        transformer: superjson,
+        transformer: JSON,
         transformPath: (path) => `${UI_SSE_ENDPOINT_PREFIX}${path}`,
         ...(eventSource ? { eventSource } : {}),
       }),

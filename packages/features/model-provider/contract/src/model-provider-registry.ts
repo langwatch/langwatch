@@ -83,9 +83,11 @@ export type ModelProviderEditorValue = {
   // Nullable like every other stored column on this row: the wire always
   // carries the key, and null is "no health check has recorded a verdict".
   healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN" | null;
-  circuitOpenedAt?: Date | null;
-  lastHealthCheckAt?: Date | null;
-  disabledAt?: Date | null;
+  // ISO 8601 strings: this type is only ever read off the wire, and nothing
+  // transforms the wire, so an instant arrives as text.
+  circuitOpenedAt?: string | null;
+  lastHealthCheckAt?: string | null;
+  disabledAt?: string | null;
   models?: string[] | null;
   embeddingsModels?: string[] | null;
   disabledByDefault?: boolean;

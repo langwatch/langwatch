@@ -71,8 +71,8 @@ function toCallError({
   status: number;
   body: any;
 }): TrpcCallError {
-  const handled = body?.error?.json?.data?.error ?? {};
-  const legacy = body?.error?.json?.data?.domainError ?? {};
+  const handled = body?.error?.data?.error ?? {};
+  const legacy = body?.error?.data?.domainError ?? {};
   const error = new Error(
     `Langy ${path} -> ${status}: ${JSON.stringify(body?.error ?? body)}`,
   ) as TrpcCallError;
@@ -113,17 +113,17 @@ export async function trpcMutate<T>({
   const res = await fetch(`${APP_BASE}/api/trpc/${path}`, {
     method: "POST",
     headers: sessionHeaders(cookie),
-    body: JSON.stringify({ json: input }),
+    body: JSON.stringify(input),
     signal: AbortSignal.timeout(timeoutMs),
   });
   const body: any = await res.json().catch(() => null);
   if (!res.ok || !body || body.error) {
     throw toCallError({ path, status: res.status, body });
   }
-  return body.result.data.json as T;
+  return body.result.data as T;
 }
 
-/** The query half of the same wire: `GET ?input=<urlencoded {"json":input}>`. */
+/** The query half of the same wire: `GET ?input=<urlencoded input>`. */
 export async function trpcQuery<T>({
   cookie,
   path,
@@ -135,7 +135,7 @@ export async function trpcQuery<T>({
   input: unknown;
   timeoutMs?: number;
 }): Promise<T> {
-  const encoded = encodeURIComponent(JSON.stringify({ json: input }));
+  const encoded = encodeURIComponent(JSON.stringify(input));
   const res = await fetch(`${APP_BASE}/api/trpc/${path}?input=${encoded}`, {
     method: "GET",
     headers: sessionHeaders(cookie),
@@ -145,5 +145,5 @@ export async function trpcQuery<T>({
   if (!res.ok || !body || body.error) {
     throw toCallError({ path, status: res.status, body });
   }
-  return body.result.data.json as T;
+  return body.result.data as T;
 }

@@ -7,7 +7,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { getRoutePolicy, type AppRestSecurity } from "@langwatch/api/rest";
 import { TRPCError } from "@trpc/server";
-import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
 import { ApiRestSecurity } from "../../api-rest.security";
 import { ApiRestObservabilityComposition } from "../../app/api-rest-observability.composition";
@@ -109,7 +108,7 @@ async function framesOf(response: Response): Promise<unknown[]> {
         .join("\n"),
     )
     .filter((payload) => payload.length > 0)
-    .map((payload) => superjson.parse(payload));
+    .map((payload) => JSON.parse(payload));
 }
 
 describe("the API subscription lane", () => {
@@ -145,7 +144,7 @@ describe("the API subscription lane", () => {
       expect(response.headers.get("X-Accel-Buffering")).toBe("no");
     });
 
-    it("hands the procedure the superjson input off the query string", async () => {
+    it("hands the procedure the JSON input off the query string", async () => {
       const seen: unknown[] = [];
       const since = new Date("2026-09-02T00:00:00.000Z");
       const lane = laneOver({
@@ -155,12 +154,12 @@ describe("the API subscription lane", () => {
       });
 
       await lane.request(
-        `/api/sse/watch?input=${encodeURIComponent(superjson.stringify({ projectId: "p1", since }))}`,
+        `/api/sse/watch?input=${encodeURIComponent(JSON.stringify({ projectId: "p1", since }))}`,
       );
 
-      // A Date rather than a string is what proves superjson decoded it: a
-      // JSON.parse would have handed the procedure the ISO text.
-      expect(seen).toEqual([{ projectId: "p1", since }]);
+      // A string rather than a Date is what proves the lane decoded plain
+      // JSON: nothing revives an instant on the way in any more.
+      expect(seen).toEqual([{ projectId: "p1", since: since.toISOString() }]);
     });
   });
 
@@ -257,7 +256,7 @@ describe("the API subscription lane", () => {
         { procedureTypeAt: () => "mutation" },
       );
 
-      const input = encodeURIComponent(superjson.stringify({ projectId: "project-1" }));
+      const input = encodeURIComponent(JSON.stringify({ projectId: "project-1" }));
       const response = await lane.request(`/api/sse/project.regenerateApiKey?input=${input}`);
 
       expect(response.status).toBe(405);

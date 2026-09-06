@@ -144,7 +144,7 @@ async function callTrpc(
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
   const response = await application.hono.request(
-    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
+    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify(input))}`,
   );
   return { status: response.status, body: await response.json() };
 }
@@ -163,18 +163,16 @@ describe("given an API process composed with the setup checklist", () => {
       expect(body).toMatchObject({
         result: {
           data: {
-            json: {
-              workflows: 1,
-              customGraphs: 0,
-              teamMembers: 2,
-              modelProviders: 1,
-              prompts: 0,
-              // No scenario read composed, so the step reports not started
-              // rather than guessing at "done".
-              simulations: 0,
-              firstMessage: true,
-              integrated: false,
-            },
+            workflows: 1,
+            customGraphs: 0,
+            teamMembers: 2,
+            modelProviders: 1,
+            prompts: 0,
+            // No scenario read composed, so the step reports not started
+            // rather than guessing at "done".
+            simulations: 0,
+            firstMessage: true,
+            integrated: false,
           },
         },
       });

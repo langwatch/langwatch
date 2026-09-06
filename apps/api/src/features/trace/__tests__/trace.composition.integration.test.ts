@@ -8,7 +8,6 @@ import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
 import { SHARE_MAX_FULL_SPANS, type Span, type TraceSummaryData } from "@langwatch/trace-contract";
-import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
@@ -324,7 +323,7 @@ async function callTrpc(
   input: Record<string, unknown>,
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
-  const encoded = encodeURIComponent(JSON.stringify({ json: input }));
+  const encoded = encodeURIComponent(JSON.stringify(input));
   const response = await application.hono.request(
     `http://127.0.0.1/api/trpc/${path}?input=${encoded}`,
   );
@@ -347,7 +346,7 @@ async function watchSse(options: {
   if (!application.hono) throw new Error("HTTP composition was not created.");
 
   const controller = new AbortController();
-  const encoded = encodeURIComponent(superjson.stringify(input));
+  const encoded = encodeURIComponent(JSON.stringify(input));
   const response = await application.hono.request(
     `http://127.0.0.1/api/sse/${path}?input=${encoded}`,
     sameOriginSseInit({ signal: controller.signal }),
@@ -376,7 +375,7 @@ async function watchSse(options: {
           .filter((line) => line.startsWith("data: "))
           .map((line) => line.slice("data: ".length))
           .join("\n");
-        if (payload.length > 0) frames.push(superjson.parse(payload));
+        if (payload.length > 0) frames.push(JSON.parse(payload));
       }
     }
   } finally {
@@ -407,13 +406,12 @@ describe("given an API process composed with the observability collaborators", (
       [
         "traces.getById",
         { projectId: "project-1", traceId: "trace-1" },
-        (body) =>
-          expect(body).toMatchObject({ result: { data: { json: { trace_id: "trace-1" } } } }),
+        (body) => expect(body).toMatchObject({ result: { data: { trace_id: "trace-1" } } }),
       ],
       [
         "tracesV2.newCount",
         { projectId: "project-1", timeRange: { from: 0, to: 1 }, since: 0 },
-        (body) => expect(body).toMatchObject({ result: { data: { json: { count: 7 } } } }),
+        (body) => expect(body).toMatchObject({ result: { data: { count: 7 } } }),
       ],
       [
         "spans.getAllForTrace",
@@ -422,26 +420,25 @@ describe("given an API process composed with the observability collaborators", (
           expect(body).toMatchObject({
             // The waterfall order is the application's: earliest first, and the
             // longer of two that start together first.
-            result: { data: { json: [{ span_id: "span-a" }, { span_id: "span-b" }] } },
+            result: { data: [{ span_id: "span-a" }, { span_id: "span-b" }] },
           }),
       ],
       [
         "traceEditOverlay.getByTraceId",
         { projectId: "project-1", traceId: "trace-1" },
-        (body) =>
-          expect(body).toMatchObject({ result: { data: { json: { traceId: "trace-1" } } } }),
+        (body) => expect(body).toMatchObject({ result: { data: { traceId: "trace-1" } } }),
       ],
       [
         "savedViews.getAll",
         { projectId: "project-1" },
-        (body) => expect(body).toMatchObject({ result: { data: { json: [{ id: "view-1" }] } } }),
+        (body) => expect(body).toMatchObject({ result: { data: [{ id: "view-1" }] } }),
       ],
       [
         "costs.getAggregatedCostsForOrganization",
         { organizationId: "org-1", startDate: 0, endDate: 1 },
         (body) =>
           expect(body).toMatchObject({
-            result: { data: { json: [{ project: { id: "project-1" } }] } },
+            result: { data: [{ project: { id: "project-1" } }] },
           }),
       ],
       [
@@ -449,7 +446,7 @@ describe("given an API process composed with the observability collaborators", (
         { organizationId: "org-1" },
         (body) =>
           expect(body).toMatchObject({
-            result: { data: { json: { currentMonthMessagesCount: 3 } } },
+            result: { data: { currentMonthMessagesCount: 3 } },
           }),
       ],
     ];
@@ -748,7 +745,7 @@ describe("given an API process that composed the real observability collaborator
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { count: 12 } } } });
+      expect(body).toMatchObject({ result: { data: { count: 12 } } });
       // The read really went to this process's connection, tenant-first.
       expect(clickHouse.queries[0]).toContain("TenantId");
     });
@@ -844,10 +841,10 @@ describe("given an API process that composed the real observability collaborator
 
       expect(usage.status).toBe(200);
       expect(usage.body).toMatchObject({
-        result: { data: { json: { membersCount: 0, activePlan: { name: expect.any(String) } } } },
+        result: { data: { membersCount: 0, activePlan: { name: expect.any(String) } } },
       });
       expect(plan.status).toBe(200);
-      expect(plan.body).toMatchObject({ result: { data: { json: { name: expect.any(String) } } } });
+      expect(plan.body).toMatchObject({ result: { data: { name: expect.any(String) } } });
     });
   });
 });
@@ -1016,7 +1013,7 @@ describe("given the anonymous share read composed on this process", () => {
     clientIp?: string,
   ): Promise<{ status: number; body: unknown }> {
     if (!application.hono) throw new Error("HTTP composition was not created.");
-    const encoded = encodeURIComponent(JSON.stringify({ json: { token } }));
+    const encoded = encodeURIComponent(JSON.stringify({ token }));
     const response = await application.hono.request(
       `http://127.0.0.1/api/trpc/sharedTrace.get?input=${encoded}`,
       clientIp ? { headers: { "x-forwarded-for": clientIp } } : {},
@@ -1026,13 +1023,13 @@ describe("given the anonymous share read composed on this process", () => {
 
   /**
    * The handled error's code as the wire carries it, or `null` where the call
-   * succeeded. superjson wraps every payload, errors included, so the
-   * serialized handled error sits under `error.json.data.error`.
+   * succeeded. A tRPC error response carries its payload under `error.data`,
+   * so the serialized handled error sits under `error.data.error`.
    */
   function handledCodeOf(body: unknown): string | null {
     return (
-      (body as { error?: { json?: { data?: { error?: { code?: string } } } } }).error?.json?.data
-        ?.error?.code ?? null
+      (body as { error?: { data?: { error?: { code?: string } } } }).error?.data?.error?.code ??
+      null
     );
   }
 
@@ -1045,7 +1042,7 @@ describe("given the anonymous share read composed on this process", () => {
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { header: { traceId: "trace-1" } } } },
+        result: { data: { header: { traceId: "trace-1" } } },
       });
     });
 
@@ -1077,7 +1074,7 @@ describe("given the anonymous share read composed on this process", () => {
       // session, so this is the surface an anonymous holder of a trace id has:
       // it must refuse, or the share token would not be authorizing anything.
       const input = encodeURIComponent(
-        JSON.stringify({ json: { projectId: "project-1", traceId: "trace-1" } }),
+        JSON.stringify({ projectId: "project-1", traceId: "trace-1" }),
       );
       const refused = await application.hono.request(
         `http://127.0.0.1/api/trpc/tracesV2.header?input=${input}`,
@@ -1363,7 +1360,7 @@ describe("given the anonymous share read assembles its payload", () => {
     reader: { address: string; userAgent: string },
   ): Promise<{ status: number; payload: Record<string, unknown> }> {
     if (!application.hono) throw new Error("HTTP composition was not created.");
-    const encoded = encodeURIComponent(JSON.stringify({ json: { token } }));
+    const encoded = encodeURIComponent(JSON.stringify({ token }));
     const response = await application.hono.request(
       `http://127.0.0.1/api/trpc/sharedTrace.get?input=${encoded}`,
       { headers: { "user-agent": reader.userAgent } },

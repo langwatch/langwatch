@@ -30,7 +30,6 @@ import {
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { trace } from "@opentelemetry/api";
 import { Hono, type Context } from "hono";
-import superjson from "superjson";
 import type { AppTrpcFeatureRecord } from "./app-trpc/app-trpc.features";
 import type { TopicApiFeature } from "./features/topic/topic-api.feature";
 import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle";
@@ -383,7 +382,6 @@ export class NoApiTrpcFeatures extends ApiTrpcFeaturesPort<Record<string, never>
  */
 export function createTrpcRoot(errorFormatter: ApiErrorFormatter = defaultErrorFormatter) {
   return TrpcRootDefinition.forContext<ApiTrpcContext>().create({
-    transformer: superjson,
     errorFormatter,
   });
 }

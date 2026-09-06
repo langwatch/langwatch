@@ -19,7 +19,7 @@ export const SSE_SUBSCRIPTION_MAX_RECONNECT_ATTEMPTS = 5;
 /** The first retry's wait. Each further attempt doubles it. */
 export const SSE_SUBSCRIPTION_RECONNECT_DELAY_MS = 1000;
 
-/** Encodes the subscription input and decodes each frame. superjson, in practice. */
+/** Encodes the subscription input and decodes each frame. `JSON`, in practice. */
 export interface SseFrameTransformer {
   stringify(value: unknown): string;
   parse(text: string): unknown;

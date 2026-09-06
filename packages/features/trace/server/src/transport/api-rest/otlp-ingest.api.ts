@@ -470,7 +470,15 @@ export function createOtlpIngestRestApp(options: {
             const body = await readOtlpBody(c.req.raw);
             const contentType = c.req.header("content-type");
 
-            const customerTraceIds = peekCustomerTraceIds(body, contentType);
+            // ONE parse of the body, and the trace ids read off it. The
+            // rejection log wants the customer's ids before the plan
+            // allowance is weighed, which used to mean parsing the whole
+            // batch twice on every request; only the failure branch, where
+            // there is no parsed request to read, still parses on its own.
+            const parsed = parseOtlpTraces(body, contentType);
+            const customerTraceIds = parsed.ok
+              ? Array.from(collectDecodedTraceIds(parsed.request, 10))
+              : peekCustomerTraceIds(body, contentType);
             if (customerTraceIds.length > 0) {
               span.setAttribute("langwatch.otel.customer_trace_ids", customerTraceIds.join(","));
             }
@@ -488,7 +496,6 @@ export function createOtlpIngestRestApp(options: {
               });
             }
 
-            const parsed = parseOtlpTraces(body, contentType);
             if (!parsed.ok) {
               loggerTraces.error(
                 {

@@ -906,7 +906,7 @@ async function readTurnEntries({
   signal: AbortSignal;
 }): Promise<void> {
   const input = encodeURIComponent(
-    JSON.stringify({ json: { projectId: PROJECT_ID, conversationId, turnId } }),
+    JSON.stringify({ projectId: PROJECT_ID, conversationId, turnId }),
   );
   const response = await fetch(`${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`, {
     headers: { Cookie: cookie, Accept: "text/event-stream" },

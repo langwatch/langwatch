@@ -380,7 +380,7 @@ async function callTrpc(
   input: Record<string, unknown>,
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
-  const encoded = encodeURIComponent(JSON.stringify({ json: input }));
+  const encoded = encodeURIComponent(JSON.stringify(input));
   const response = await application.hono.request(
     `http://127.0.0.1/api/trpc/${path}?input=${encoded}`,
   );
@@ -419,7 +419,7 @@ describe("given the workbench run loop composed over this process's own graph", 
 
     expect(status).toBe(200);
     expect(body).toMatchObject({
-      result: { data: { json: [{ id: "experiment-1", slug: "latency-sweep" }] } },
+      result: { data: [{ id: "experiment-1", slug: "latency-sweep" }] },
     });
     expect(prisma.experimentFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ projectId: "project-1" }) }),

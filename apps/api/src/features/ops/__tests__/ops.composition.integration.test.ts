@@ -135,7 +135,7 @@ async function callTrpc(
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
   const response = await application.hono.request(
-    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
+    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify(input))}`,
   );
   return { status: response.status, body: await response.json() };
 }
@@ -148,7 +148,7 @@ describe("given the API process composed the operator feature from its own graph
       const { status, body } = await callTrpc(application, "ops.getScope", {});
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { scope: { kind: "platform" } } } } });
+      expect(body).toMatchObject({ result: { data: { scope: { kind: "platform" } } } });
     });
 
     it("reads the scheduled-job store rather than refusing it by name", async () => {
@@ -212,7 +212,7 @@ describe("given the API process composed the operator feature from its own graph
 
       // The PROBE variant: it reports "no access" rather than refusing, which is
       // what lets the global menu poll it on every page load.
-      expect(body).toMatchObject({ result: { data: { json: { scope: { kind: "none" } } } } });
+      expect(body).toMatchObject({ result: { data: { scope: { kind: "none" } } } });
     });
   });
 });

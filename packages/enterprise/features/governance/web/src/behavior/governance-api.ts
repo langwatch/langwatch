@@ -260,9 +260,9 @@ export type GovernanceUsageStats = {
  * `windowDays`, every pagination knob, and both quarantine thresholds are
  * written with a `?` even though the resolver always sees a value.
  *
- * DATES SURVIVE. The transport is superjson, so a `Date` the server returns
- * arrives as a `Date` rather than an ISO string. The many `*Iso` fields are the
- * opposite case: those are strings on the server too, named for what they hold.
+ * DATES ARE STRINGS. Nothing transforms the wire, so a `Date` the server
+ * returns arrives as an ISO 8601 string; parse it at the use site. The many
+ * `*Iso` fields were always strings, named for what they hold.
  *
  * ADD A PROCEDURE when a hook in this package needs it. Do not add one
  * speculatively: every entry is a promise that the router still mounts it under

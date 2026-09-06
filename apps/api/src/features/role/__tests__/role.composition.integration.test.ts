@@ -286,11 +286,9 @@ async function callTrpc(
       ? await application.hono.request(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ json: input }),
+          body: JSON.stringify(input),
         })
-      : await application.hono.request(
-          `${url}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
-        );
+      : await application.hono.request(`${url}?input=${encodeURIComponent(JSON.stringify(input))}`);
   return { status: response.status, body: await response.json() };
 }
 
@@ -307,10 +305,8 @@ describe("given an API process composed with the role, team and home features", 
       expect(body).toMatchObject({
         result: {
           data: {
-            json: {
-              scope: { type: "project", id: PROJECT_ID },
-              permissions: ["project:view", "prompts:view"],
-            },
+            scope: { type: "project", id: PROJECT_ID },
+            permissions: ["project:view", "prompts:view"],
           },
         },
       });
@@ -328,7 +324,7 @@ describe("given an API process composed with the role, team and home features", 
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { enabled: true } } } });
+      expect(body).toMatchObject({ result: { data: { enabled: true } } });
       expect(projects.getOrganizationId).toHaveBeenCalledWith(PROJECT_ID);
     });
   });
@@ -343,7 +339,7 @@ describe("given an API process composed with the role, team and home features", 
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: [{ id: "dataset-1", name: "Golden set" }] } },
+        result: { data: [{ id: "dataset-1", name: "Golden set" }] },
       });
     });
   });
@@ -360,7 +356,7 @@ describe("given an API process composed with the role, team and home features", 
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: [{ experimentId: "experiment-1" }] } },
+        result: { data: [{ experimentId: "experiment-1" }] },
       });
       expect(prisma.batchEvaluation.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({ where: { projectId: PROJECT_ID } }),
@@ -380,16 +376,14 @@ describe("given an API process composed with the role, team and home features", 
       expect(status).toBe(200);
       expect(body).toMatchObject({
         result: {
-          data: {
-            json: [
-              {
-                id: "prompt-1",
-                type: "prompt",
-                name: "Support triage",
-                href: "/acme/prompts?prompt=prompt-1",
-              },
-            ],
-          },
+          data: [
+            {
+              id: "prompt-1",
+              type: "prompt",
+              name: "Support triage",
+              href: "/acme/prompts?prompt=prompt-1",
+            },
+          ],
         },
       });
       // The trail is read as THIS person's, in THIS project: a blank user id
@@ -411,7 +405,7 @@ describe("given an API process composed with the role, team and home features", 
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { enabled: true } } } });
+      expect(body).toMatchObject({ result: { data: { enabled: true } } });
       expect(organizations.getPersonalWorkspaceFeatures).toHaveBeenCalledWith(
         { projectId: PROJECT_ID },
         { id: SESSION_USER.id },
@@ -428,7 +422,7 @@ describe("given an API process composed with the role, team and home features", 
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: [] } } });
+      expect(body).toMatchObject({ result: { data: [] } });
       expect(projects.getOrganizationId).toHaveBeenCalledWith(PROJECT_ID);
     });
   });
@@ -443,7 +437,7 @@ describe("given an API process composed with the role, team and home features", 
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: [{ id: "evaluator-1", name: "Toxicity" }] } },
+        result: { data: [{ id: "evaluator-1", name: "Toxicity" }] },
       });
     });
   });
@@ -472,7 +466,7 @@ describe("given an API process composed with the role, team and home features", 
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: [{ id: "role-1", name: "Auditor" }] } },
+        result: { data: [{ id: "role-1", name: "Auditor" }] },
       });
     });
   });

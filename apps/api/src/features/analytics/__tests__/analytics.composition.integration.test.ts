@@ -178,7 +178,7 @@ async function callTrpc(
   input: Record<string, unknown>,
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
-  const encoded = encodeURIComponent(JSON.stringify({ json: input }));
+  const encoded = encodeURIComponent(JSON.stringify(input));
   const response = await application.hono.request(
     `http://127.0.0.1/api/trpc/${path}?input=${encoded}`,
   );
@@ -211,7 +211,7 @@ describe("given the analytics collaborators composed over this process's own gra
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { currentPeriod: [] } } } });
+      expect(body).toMatchObject({ result: { data: { currentPeriod: [] } } });
       expect(clickhouse.issued).toHaveLength(1);
       expect(clickhouse.issued[0]?.tenantId).toBe("project-1");
       // Tenant isolation is the property worth pinning, not the table the
@@ -231,7 +231,7 @@ describe("given the analytics collaborators composed over this process's own gra
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: [{ id: "dashboard-1", _count: { graphs: 2 } }] } },
+        result: { data: [{ id: "dashboard-1", _count: { graphs: 2 } }] },
       });
       expect(prisma.dashboardFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -253,7 +253,7 @@ describe("given the analytics collaborators composed over this process's own gra
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { available: false, reason: "disabled" } } },
+        result: { data: { available: false, reason: "disabled" } },
       });
     });
   });
@@ -273,7 +273,7 @@ describe("given the analytics collaborators composed over this process's own gra
       // first from the flag service, the second from the restricted identity's
       // own absence.
       expect(body).toMatchObject({
-        result: { data: { json: { available: false, reason: "unprovisioned" } } },
+        result: { data: { available: false, reason: "unprovisioned" } },
       });
     });
   });

@@ -66,7 +66,7 @@ function channelRecorder(): {
   return { ctor, opened };
 }
 
-/** JSON stands in for superjson: the link takes whichever the process chose. */
+/** The link takes the transformer the process chose; production passes `JSON`. */
 const jsonFrames = {
   stringify: (value: unknown) => JSON.stringify(value),
   parse: (text: string) => JSON.parse(text) as unknown,

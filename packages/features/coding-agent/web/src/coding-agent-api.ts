@@ -47,8 +47,8 @@ export type PullRequestRef = {
 /**
  * The current state of one pull request.
  *
- * `mappedAt` is a DATE: the procedure answers with the stored row and the
- * transport runs superjson, so the instant arrives as an instant.
+ * `mappedAt` is an ISO 8601 STRING: the procedure answers with the stored
+ * row and nothing transforms the wire, so the instant arrives as text.
  */
 export type PullRequestLiveStatusView = PullRequestRef & {
   status: PullRequestStatus;

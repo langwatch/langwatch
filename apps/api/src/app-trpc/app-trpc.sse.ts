@@ -7,7 +7,6 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { handlerManagedAuth } from "@langwatch/api";
 import type { AppRestSecurity, SecuredApp } from "@langwatch/api/rest";
 import { TRPCError } from "@trpc/server";
-import superjson from "superjson";
 import { isCrossSiteRequest } from "../api-rest.cross-site";
 import {
   LiveStreamCrossSiteBlockedError,
@@ -164,7 +163,7 @@ export function createSseSubscriptionApp(options: {
       }
 
       const inputParam = url.searchParams.get("input") ?? undefined;
-      const input = inputParam ? superjson.parse(inputParam) : undefined;
+      const input = inputParam ? (JSON.parse(inputParam) as unknown) : undefined;
 
       const caller = await ports.createCaller({ request: raw, signal: raw.signal });
       const procedure = procedureAt(caller, path);
@@ -195,7 +194,7 @@ export function createSseSubscriptionApp(options: {
 
           const writeData = (value: unknown) => {
             if (ended) return;
-            const payload = superjson.stringify(value);
+            const payload = JSON.stringify(value);
             for (const line of payload.split(/\r?\n/)) {
               write(`data: ${line}\n`);
             }

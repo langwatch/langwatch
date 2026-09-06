@@ -25,8 +25,8 @@
  * here so the finding it raises is a decision rather than a surprise.
  *
  * DATE, STRING OR NUMBER IS NOT A CHOICE THIS FILE MAKES. The automation router
- * returns the stored rows over superjson, so every instant on them is a real
- * `Date`; the analytics and trace routers project through DTOs of their own.
+ * returns the stored rows over plain JSON, so every instant on them is an ISO
+ * 8601 string; the analytics and trace routers project through DTOs of their own.
  * Every entry below states which, because getting it wrong typechecks here and
  * fails at the call site.
  *

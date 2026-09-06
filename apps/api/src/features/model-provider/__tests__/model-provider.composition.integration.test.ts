@@ -83,7 +83,7 @@ async function callTrpc(
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
   const response = await application.hono.request(
-    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
+    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify(input))}`,
   );
   return { status: response.status, body: await response.json() };
 }
@@ -100,7 +100,7 @@ describe("given an API process composed with the provider surfaces", () => {
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { maxInputTokens: expect.any(Number) } } },
+        result: { data: { maxInputTokens: expect.any(Number) } },
       });
     });
   });

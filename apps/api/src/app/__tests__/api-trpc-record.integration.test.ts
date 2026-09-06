@@ -4,7 +4,6 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { EventEmitter } from "node:events";
-import superjson from "superjson";
 import { describe, expect, it } from "vitest";
 import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
 import { ApiAuditPort } from "../../api-request.policy";
@@ -203,7 +202,7 @@ async function waitFor(reached: () => boolean, timeoutMs = 2_000): Promise<void>
   }
 }
 
-/** The superjson frames of one SSE response, in order. */
+/** The JSON frames of one SSE response, in order. */
 function framesOf(body: string): unknown[] {
   return body
     .split("\n\n")
@@ -215,7 +214,7 @@ function framesOf(body: string): unknown[] {
         .join("\n"),
     )
     .filter((payload) => payload.length > 0)
-    .map((payload) => superjson.parse(payload));
+    .map((payload) => JSON.parse(payload));
 }
 
 describe("given an API process composed with the packaged tRPC record", () => {
@@ -226,7 +225,7 @@ describe("given an API process composed with the packaged tRPC record", () => {
       if (!application.hono) throw new Error("HTTP composition was not created.");
 
       const input = encodeURIComponent(
-        superjson.stringify({ projectId: PROJECT_ID, exportId: "export-1" }),
+        JSON.stringify({ projectId: PROJECT_ID, exportId: "export-1" }),
       );
       const response = await application.hono.request(
         `/api/sse/export.onExportProgress?input=${input}`,

@@ -47,8 +47,8 @@ describe("ApiApplication HTTP transport", () => {
     try {
       const input = encodeURIComponent(
         JSON.stringify({
-          0: { json: { projectId: "project-1" } },
-          1: { json: { projectId: "project-2" } },
+          0: { projectId: "project-1" },
+          1: { projectId: "project-2" },
         }),
       );
       const response = await fetch(
@@ -57,8 +57,8 @@ describe("ApiApplication HTTP transport", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toMatchObject([
-        { result: { data: { json: [{ projectId: "project-1", name: "MY_SECRET" }] } } },
-        { result: { data: { json: [{ projectId: "project-2", name: "MY_SECRET" }] } } },
+        { result: { data: [{ projectId: "project-1", name: "MY_SECRET" }] } },
+        { result: { data: [{ projectId: "project-2", name: "MY_SECRET" }] } },
       ]);
       expect(secrets.list).toHaveBeenNthCalledWith(1, { projectId: "project-1" });
       expect(secrets.list).toHaveBeenNthCalledWith(2, { projectId: "project-2" });

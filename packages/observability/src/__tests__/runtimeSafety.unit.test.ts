@@ -22,9 +22,9 @@ describe("runtime safety", () => {
     });
 
     const bundledInputs = Object.keys(result.metafile.inputs);
-    expect(
-      bundledInputs.some((input) => /@opentelemetry|node:async_hooks|superjson/.test(input)),
-    ).toBe(false);
+    expect(bundledInputs.some((input) => /@opentelemetry|node:async_hooks/.test(input))).toBe(
+      false,
+    );
 
     const bundle = result.outputFiles[0];
     expect(bundle).toBeDefined();

@@ -264,11 +264,9 @@ async function callTrpc(
       ? await application.hono.request(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ json: input }),
+          body: JSON.stringify(input),
         })
-      : await application.hono.request(
-          `${url}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
-        );
+      : await application.hono.request(`${url}?input=${encodeURIComponent(JSON.stringify(input))}`);
   return { status: response.status, body: await response.json() };
 }
 
@@ -356,7 +354,7 @@ describe("given an API process composed with its person-shaped features", () => 
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { success: true, teamName: "Acme", projectSlug: "acme-1" } } },
+        result: { data: { success: true, teamName: "Acme", projectSlug: "acme-1" } },
       });
 
       // The organization, its founding membership and its first team, in one
@@ -394,7 +392,7 @@ describe("given an API process composed with its person-shaped features", () => 
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { id: "user-1", email: "sam@acme.test" } } },
+        result: { data: { id: "user-1", email: "sam@acme.test" } },
       });
     });
   });
@@ -640,7 +638,7 @@ describe("given an API process that registered the identity pipelines producer-o
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { state: "PENDING" } } },
+        result: { data: { state: "PENDING" } },
       });
 
       // The ONE leg this tier has: the staged command, on the sender the producer
@@ -648,8 +646,8 @@ describe("given an API process that registered the identity pipelines producer-o
       // decides (ADR-110), so a staged command IS the durable write from here — and the
       // ledger waits for it before answering, so a request that came back PENDING without
       // one would be a request nothing could ever fold.
-      const requestId = (body as { result: { data: { json: { joinRequestId: string } } } }).result
-        .data.json.joinRequestId;
+      const requestId = (body as { result: { data: { joinRequestId: string } } }).result.data
+        .joinRequestId;
       expect(queue.staged).toHaveLength(1);
       expect(queue.staged[0]?.payload).toMatchObject({
         joinRequestId: requestId,

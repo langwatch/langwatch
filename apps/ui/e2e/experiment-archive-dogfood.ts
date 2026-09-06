@@ -138,7 +138,7 @@ async function main() {
     {
       headers: csrfHeaders,
       data: {
-        "0": { json: { projectId: project.id, experimentId: targetExp.id } },
+        "0": { projectId: project.id, experimentId: targetExp.id },
       },
     },
   );
@@ -182,7 +182,7 @@ async function main() {
     {
       headers: csrfHeaders,
       data: {
-        "0": { json: { projectId: project.id, experimentId: targetExp.id } },
+        "0": { projectId: project.id, experimentId: targetExp.id },
       },
     },
   );

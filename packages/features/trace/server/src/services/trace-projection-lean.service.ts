@@ -13,6 +13,7 @@ import {
 } from "@langwatch/trace-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { TraceAttributeCapService } from "./trace-attribute-cap.service";
+import { clonePayload } from "../rules/payload-clone.rules";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../rules/trace-payload-cap.rules";
 
 const traceAttributeCapService = TraceAttributeCapService.create();
@@ -109,8 +110,8 @@ function leanSpanReceivedEvent(event: Event): Event {
 
   // Deep-clone so the IO-lean pass and the cap both operate on independent copies, with no shared
   // object references left back to the input event.
-  const clonedSpan: OtlpSpan = structuredClone(data.span);
-  const clonedResource: OtlpResource | null = data.resource ? structuredClone(data.resource) : null;
+  const clonedSpan: OtlpSpan = clonePayload(data.span);
+  const clonedResource: OtlpResource | null = data.resource ? clonePayload(data.resource) : null;
   if (hasLargeIoAttr) {
     clonedSpan.attributes = leanIoAttributes({
       attributes: clonedSpan.attributes,

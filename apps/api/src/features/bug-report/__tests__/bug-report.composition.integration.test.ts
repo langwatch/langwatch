@@ -84,7 +84,7 @@ async function callTrpc(
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
   const response = await application.hono.request(
-    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
+    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify(input))}`,
   );
   return { status: response.status, body: await response.json() };
 }
@@ -101,7 +101,7 @@ describe("given an API process composed with the support inbox", () => {
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { total: 1, reports: [{ id: "bugreport_1" }] } } },
+        result: { data: { total: 1, reports: [{ id: "bugreport_1" }] } },
       });
       // Awaited, not fire-and-forget: the row is the record of who opened
       // somebody's transcript and it is written before they see it. The

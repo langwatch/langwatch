@@ -102,7 +102,7 @@ async function trpcMutate<T>({
       Cookie: cookie,
       Origin: APP_BASE,
     },
-    body: JSON.stringify({ json: input }),
+    body: JSON.stringify(input),
     // Generous on purpose: under a queue backlog the turn mutation has been measured
     // completing server-side at 135s, and a full failure-analysis turn on the opencode
     // harness has been measured working past 180s.
@@ -122,7 +122,7 @@ async function trpcMutate<T>({
     err.domainErrorCode = domainErrorCode;
     throw err;
   }
-  return body.result.data.json as T;
+  return body.result.data as T;
 }
 
 /**
@@ -259,7 +259,7 @@ async function streamTurnText({
    */
   onUiAction?: (entry: UiActionEntry) => void;
 }): Promise<TurnText> {
-  const input = encodeURIComponent(JSON.stringify({ json: params }));
+  const input = encodeURIComponent(JSON.stringify(params));
   const res = await fetch(`${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`, {
     headers: { Cookie: cookie, Accept: "text/event-stream" },
     signal: AbortSignal.timeout(240_000),

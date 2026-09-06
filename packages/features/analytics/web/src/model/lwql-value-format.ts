@@ -59,8 +59,8 @@ export type LangWatchQLCell =
  *
  * Uses `Object.hasOwn` rather than an `undefined` check so that a column the
  * row simply does not carry is distinguishable from one carrying `NULL`. A key
- * present but holding `undefined` — which superjson can deliver — says no more
- * than an absent one and is reported the same way.
+ * present but holding `undefined` says no more than an absent one and is
+ * reported the same way. Plain JSON drops such a key on the wire regardless.
  */
 export function readLangWatchQLCell({
   row,

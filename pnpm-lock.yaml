@@ -417,6 +417,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../packages/task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../../packages/features/topic/contract
@@ -471,9 +474,6 @@ importers:
       prom-client:
         specifier: ^15.1.3
         version: 15.1.3
-      superjson:
-        specifier: ^2.2.6
-        version: 2.2.6
       tsx:
         specifier: ^4.22.4
         version: 4.22.4
@@ -662,6 +662,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../packages/task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       '@langwatch/trace-server':
         specifier: workspace:*
         version: link:../../packages/features/trace/server
@@ -816,6 +819,9 @@ importers:
       '@langwatch/secret-web':
         specifier: workspace:*
         version: link:../../packages/features/secret/web
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       '@langwatch/topic-web':
         specifier: workspace:*
         version: link:../../packages/features/topic/web
@@ -876,9 +882,6 @@ importers:
       react-router:
         specifier: ^8.0.1
         version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      superjson:
-        specifier: ^2.2.6
-        version: 2.2.6
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1192,6 +1195,9 @@ importers:
       '@langwatch/suite-server':
         specifier: workspace:*
         version: link:../../packages/features/suite/server
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../../packages/features/topic/contract
@@ -1372,9 +1378,6 @@ importers:
       chalk:
         specifier: ^6.0.0
         version: 6.0.0
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.4.0
       dotenv:
         specifier: ^17.2.2
         version: 17.4.2
@@ -1606,9 +1609,6 @@ importers:
 
   packages/design-system:
     dependencies:
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       lodash-es:
         specifier: ^4.17.21
         version: 4.18.1
@@ -2278,9 +2278,6 @@ importers:
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../../ui-host
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -3012,12 +3009,12 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -3143,6 +3140,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -3155,9 +3155,6 @@ importers:
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       hono:
         specifier: '>=4.12.34'
         version: 4.13.1
@@ -3225,6 +3222,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
@@ -3258,9 +3258,6 @@ importers:
       chakra-react-select:
         specifier: ^6.1.3
         version: 6.1.3(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(next-themes@0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.4.0
       lodash-es:
         specifier: ^4.18.1
         version: 4.18.1
@@ -3456,6 +3453,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-web':
         specifier: workspace:*
         version: link:../../trace/web
@@ -3465,9 +3465,6 @@ importers:
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.4.0
       diff:
         specifier: ^9.0.0
         version: 9.0.0
@@ -3618,9 +3615,6 @@ importers:
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.4.0
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -4104,15 +4098,15 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       liqe:
         specifier: ^3.8.7
         version: 3.8.7
@@ -4284,6 +4278,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -4293,9 +4290,6 @@ importers:
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.4.0
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -4793,6 +4787,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/ui-drawer':
         specifier: workspace:*
         version: link:../../../ui-drawer
@@ -4811,9 +4808,6 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.14.5
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.4.0
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -5145,6 +5139,9 @@ importers:
       '@langwatch/prompt-web':
         specifier: workspace:*
         version: link:../../prompt/web
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -5166,9 +5163,6 @@ importers:
       '@xyflow/react':
         specifier: ^12.11.1
         version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       langwatch:
         specifier: workspace:*
         version: link:../../../../sdks/typescript
@@ -5445,6 +5439,9 @@ importers:
       '@langwatch/prompt-web':
         specifier: workspace:*
         version: link:../../prompt/web
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-web':
         specifier: workspace:*
         version: link:../../trace/web
@@ -5481,9 +5478,6 @@ importers:
       '@trpc/server':
         specifier: 11.18.0
         version: 11.18.0(typescript@7.0.2)
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.4.0
       fast-deep-equal:
         specifier: ^3.1.3
         version: 3.1.3
@@ -5826,15 +5820,15 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -6866,12 +6860,12 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.4.0
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -7434,15 +7428,15 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
       '@langwatch/workflow-web':
         specifier: workspace:*
         version: link:../../workflow/web
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       lodash-es:
         specifier: ^4.17.21
         version: 4.18.1
@@ -7716,9 +7710,6 @@ importers:
       '@tanstack/react-query':
         specifier: 5.101.4
         version: 5.101.4(react@19.2.8)
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.4.0
       lodash-es:
         specifier: ^4.17.21
         version: 4.18.1
@@ -8321,6 +8312,9 @@ importers:
       '@langwatch/suite-web':
         specifier: workspace:*
         version: link:../../suite/web
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -8345,9 +8339,6 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.14.5
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -8965,9 +8956,6 @@ importers:
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
     devDependencies:
       '@chakra-ui/react':
         specifier: ^3.36.0
@@ -9135,6 +9123,9 @@ importers:
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../../topic/contract
@@ -9165,9 +9156,6 @@ importers:
       ai:
         specifier: ^6.0.161
         version: 6.0.217(zod@4.4.3)
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       hono:
         specifier: '>=4.12.34'
         version: 4.13.1
@@ -9325,6 +9313,9 @@ importers:
       '@langwatch/suite-web':
         specifier: workspace:*
         version: link:../../suite/web
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9376,9 +9367,6 @@ importers:
       chakra-react-select:
         specifier: ^6.1.3
         version: 6.1.3(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(next-themes@0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       langwatch:
         specifier: workspace:*
         version: link:../../../../sdks/typescript
@@ -9601,9 +9589,6 @@ importers:
       '@paper-design/shaders-react':
         specifier: ^0.0.76
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -9856,9 +9841,6 @@ importers:
       '@xyflow/react':
         specifier: ^12.11.1
         version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       emoji-picker-react:
         specifier: ^4.19.1
         version: 4.19.1(react@19.2.8)
@@ -9925,9 +9907,6 @@ importers:
       slugify:
         specifier: ^1.6.9
         version: 1.6.9
-      superjson:
-        specifier: ^2.2.6
-        version: 2.2.6
       use-debounce:
         specifier: ^10.1.1
         version: 10.1.1(react@19.2.8)
@@ -10121,9 +10100,6 @@ importers:
       pino-pretty:
         specifier: ^13.1.3
         version: 13.1.3
-      superjson:
-        specifier: ^2.2.6
-        version: 2.2.6
     devDependencies:
       '@opentelemetry/sdk-trace-base':
         specifier: 2.10.0
@@ -10432,6 +10408,19 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/time:
+    dependencies:
+      temporal-polyfill:
+        specifier: ^1.0.4
+        version: 1.0.4
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.0
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/ui-drawer:
     dependencies:
       '@langwatch/design-system':
@@ -10501,12 +10490,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@langwatch/ui-drawer':
         specifier: workspace:*
         version: link:../ui-drawer
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       zustand:
         specifier: ^4.5.7
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -10807,6 +10796,34 @@ importers:
         version: 1.1.0
       tsx:
         specifier: ^4.19.2
+        version: 4.22.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.0
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  tools/visualdiff/runner:
+    dependencies:
+      pixelmatch:
+        specifier: ^7.2.0
+        version: 7.2.0
+      playwright:
+        specifier: 1.61.1
+        version: 1.61.1
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      '@types/pngjs':
+        specifier: ^6.0.5
+        version: 6.0.5
+      tsx:
+        specifier: ^4.22.4
         version: 4.22.4
       typescript:
         specifier: ^7.0.2
@@ -15029,6 +15046,9 @@ packages:
   '@types/picomatch@4.0.3':
     resolution: {integrity: sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==}
 
+  '@types/pngjs@6.0.5':
+    resolution: {integrity: sha512-0k5eKfrA83JOZPppLtS2C7OUtyNAl2wKNxfyYl9Q5g9lPkgBl/9hNyAu6HuEH2J4XmIv2znEpkDd0SaZVxW6iQ==}
+
   '@types/prompts@2.4.9':
     resolution: {integrity: sha512-qTxFi6Buiu8+50/+3DGIWLHM6QuWsEKugJnnP6iv2Mc4ncxE4A/OJkjuVOA+5X0X1S/nq5VJRa8Lu+nwcvbrKA==}
 
@@ -16485,10 +16505,6 @@ packages:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
 
-  copy-anything@4.0.5:
-    resolution: {integrity: sha512-7Vv6asjS4gMOuILabD3l739tsaxFQmC+a7pLZm02zyvs8p977bL3zEgq3yDk5rn9B0PbYgIv++jmHcuUab4RhA==}
-    engines: {node: '>=18'}
-
   core-js@3.50.0:
     resolution: {integrity: sha512-BRWgOLKkFeCgRudR6zrs8p9XJZcE14grzKMMssoYrk6krtuEZ7MTKPIY5RzOnqsEKIR9kst7wNzphttraT+Yqw==}
 
@@ -16727,9 +16743,6 @@ packages:
   data-urls@7.0.0:
     resolution: {integrity: sha512-23XHcCF+coGYevirZceTVD7NdJOqVn+49IHyxgszm+JIiHLoB2TkmPtsYkNWT1pvRSGkc35L6NHs0yHkN2SumA==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
-
-  date-fns@4.4.0:
-    resolution: {integrity: sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w==}
 
   dateformat@4.6.3:
     resolution: {integrity: sha512-2P0p0pFGzHS5EMnhdxQi7aJN+iMheud0UhG4dlE1DLAlvL8JHjJJTX/CSm4JXwV0Ka5nGk3zC5mcb5bUQUxxMA==}
@@ -17819,10 +17832,6 @@ packages:
 
   is-unicode-supported@2.1.0:
     resolution: {integrity: sha512-mE00Gnza5EEB3Ds0HfMyllZzbBrmLOX3vfWoj9A9PEnTfratQ/BcaJOuMhnkhjXvb2+FkY3VuHqtAGpTPmglFQ==}
-    engines: {node: '>=18'}
-
-  is-what@5.5.0:
-    resolution: {integrity: sha512-oG7cgbmg5kLYae2N5IVd3jm2s+vldjxJzK1pcu9LfpGuQ93MQSzo0okvRna+7y5ifrD+20FE8FvjusyGaz14fw==}
     engines: {node: '>=18'}
 
   is-wsl@3.1.1:
@@ -19298,6 +19307,10 @@ packages:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
     engines: {node: '>= 6'}
 
+  pixelmatch@7.2.0:
+    resolution: {integrity: sha512-xhcb4yHu9sM/G7foGzoLtXYcC0zHEaOXXjRKhGup0fw78Nf2Tkiapv4EQyMzrbcmQPsllAI7DbFY2UT7PlI9Pg==}
+    hasBin: true
+
   pkce-challenge@5.0.1:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
@@ -20324,10 +20337,6 @@ packages:
     engines: {node: '>=16 || 14 >=14.17'}
     hasBin: true
 
-  superjson@2.2.6:
-    resolution: {integrity: sha512-H+ue8Zo4vJmV2nRjpx86P35lzwDT3nItnIsocgumgr0hHMQ+ZGq5vrERg9kJBo5AWGmxZDhzDo+WVIJqkB0cGA==}
-    engines: {node: '>=16'}
-
   supports-color@10.2.2:
     resolution: {integrity: sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==}
     engines: {node: '>=18'}
@@ -20394,6 +20403,15 @@ packages:
 
   teex@1.0.1:
     resolution: {integrity: sha512-eYE6iEI62Ni1H8oIa7KlDU6uQBtqr4Eajni3wX7rpfXD8ysFx8z0+dri+KWEPWpBsxXfxu58x/0jvTVT1ekOSg==}
+
+  temporal-polyfill@1.0.4:
+    resolution: {integrity: sha512-MLEU0qOD2uXlz24oINNtdLZQl8RgmMxSnRtKEGZGGetTJjlRwQJjk+VsJ4EREaUoiaTb8NJOcUiKtoAiWn9EBg==}
+
+  temporal-spec@1.0.1:
+    resolution: {integrity: sha512-wxVoanmDeavXie1vu2JaQ3WIc3JZnWAOYFBsJyATaVsXsycKYUflGsyBmrRSnoCpZJpwPyr38VpgSUlQ8CbFxg==}
+
+  temporal-utils@1.0.2:
+    resolution: {integrity: sha512-1B8Dl4KzrOvsNUlpoWGno2VLQlxroLjDgc5NBjVC9ax9ymdo+ezfyvhyjEMx+IVfhINr6CIG2gcnlP95iRrybQ==}
 
   terser@5.48.0:
     resolution: {integrity: sha512-J/9An6vs9Us6wKRriSFXBWdRZapREHqFzdNUKk0pmu804EMR6dr6winwo7e5JDxN4xahxQsuysyYFwlwj4XN/Q==}
@@ -23197,11 +23215,11 @@ snapshots:
       chalk: 5.6.2
       ffmpeg-static: 5.3.0
       fft.js: 4.0.4
-      langwatch: 0.16.1(1d8175dbf716a59ce537a9e78e24bc2a)
+      langwatch: 0.16.1(31523fce2f0d736c61b8317c707123f3)
       open: 11.0.0
       openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
       rxjs: 7.8.2
-      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
       ws: 8.21.3(bufferutil@4.1.0)
       xksuid: 0.0.4
       zod: 3.25.76
@@ -25695,7 +25713,7 @@ snapshots:
       picocolors: 1.1.1
       redent: 3.0.0
     optionalDependencies:
-      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
@@ -26105,6 +26123,10 @@ snapshots:
       pg-types: 2.2.0
 
   '@types/picomatch@4.0.3': {}
+
+  '@types/pngjs@6.0.5':
+    dependencies:
+      '@types/node': 26.2.0
 
   '@types/prompts@2.4.9':
     dependencies:
@@ -26574,7 +26596,7 @@ snapshots:
       '@vitest/mocker': 5.0.0(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
       playwright: 1.61.1
       tinyrainbow: 3.1.1
-      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -26628,7 +26650,7 @@ snapshots:
       pngjs: 7.0.0
       sirv: 3.0.2
       tinyrainbow: 3.1.1
-      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
       ws: 8.21.3(bufferutil@4.1.0)
     transitivePeerDependencies:
       - bufferutil
@@ -26663,7 +26685,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.2.0
       tinyrainbow: 3.1.1
-      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
     optionalDependencies:
       '@vitest/browser': 5.0.0(bufferutil@4.1.0)(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@5.0.0)
 
@@ -26771,7 +26793,7 @@ snapshots:
       pathe: 2.0.3
       sirv: 3.0.2
       tinyrainbow: 3.1.1
-      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   '@vitest/utils@3.2.4':
     dependencies:
@@ -28028,10 +28050,6 @@ snapshots:
 
   cookie@1.1.1: {}
 
-  copy-anything@4.0.5:
-    dependencies:
-      is-what: 5.5.0
-
   core-js@3.50.0: {}
 
   core-util-is@1.0.3: {}
@@ -28301,8 +28319,6 @@ snapshots:
       whatwg-url: 16.0.1(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - '@noble/hashes'
-
-  date-fns@4.4.0: {}
 
   dateformat@4.6.3: {}
 
@@ -29419,7 +29435,7 @@ snapshots:
   import-in-the-middle@3.3.3:
     dependencies:
       cjs-module-lexer: 2.2.0
-      es-module-lexer: 2.3.1
+      es-module-lexer: 2.3.2
       module-details-from-path: 1.0.4
 
   import-meta-resolve@4.2.0: {}
@@ -29539,8 +29555,6 @@ snapshots:
   is-unicode-supported@0.1.0: {}
 
   is-unicode-supported@2.1.0: {}
-
-  is-what@5.5.0: {}
 
   is-wsl@3.1.1:
     dependencies:
@@ -29767,9 +29781,9 @@ snapshots:
       openai: 7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
       ws: 8.21.3(bufferutil@4.1.0)
 
-  langwatch@0.16.1(1d8175dbf716a59ce537a9e78e24bc2a):
+  langwatch@0.16.1(31523fce2f0d736c61b8317c707123f3):
     dependencies:
-      '@ai-sdk/openai': 3.0.79(zod@4.4.3)
+      '@ai-sdk/openai': 3.0.79(zod@3.25.76)
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
       '@langchain/langgraph': 0.4.6(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod-to-json-schema@3.25.2(zod@4.4.3))
       '@langchain/openai': 1.5.6(@aws-sdk/credential-provider-node@3.972.81)(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))
@@ -31433,6 +31447,10 @@ snapshots:
 
   pirates@4.0.7: {}
 
+  pixelmatch@7.2.0:
+    dependencies:
+      pngjs: 7.0.0
+
   pkce-challenge@5.0.1: {}
 
   pkg-types@1.3.1:
@@ -32690,10 +32708,6 @@ snapshots:
       tinyglobby: 0.2.17
       ts-interface-checker: 0.1.13
 
-  superjson@2.2.6:
-    dependencies:
-      copy-anything: 4.0.5
-
   supports-color@10.2.2: {}
 
   supports-color@7.2.0:
@@ -32787,6 +32801,15 @@ snapshots:
     transitivePeerDependencies:
       - bare-abort-controller
       - react-native-b4a
+
+  temporal-polyfill@1.0.4:
+    dependencies:
+      temporal-spec: 1.0.1
+      temporal-utils: 1.0.2
+
+  temporal-spec@1.0.1: {}
+
+  temporal-utils@1.0.2: {}
 
   terser@5.48.0:
     dependencies:

@@ -75,3 +75,34 @@ Feature: tRPC framework boundary
     When the surface is opened with no policy at all
     Then it builds, and a procedure that asks for a declared permission is refused by name
 
+
+  # JSON only on the wire. The transformer that used to wrap it cost 31.5 ms to
+  # encode a 428 KB payload against JSON's 1.1 ms, and the extra types it
+  # preserved were not worth that on a read path.
+  @unit
+  Scenario: No transformer is configured on either side
+    Given the process builds its tRPC root
+    When the root's runtime configuration is read
+    Then no data transformer is registered
+    And the browser transport registers none either
+
+  @unit
+  Scenario: An instant crosses the wire as an ISO 8601 string
+    Given a procedure answers with an instant
+    When the response is encoded for the wire
+    Then the instant is an ISO 8601 string
+    And the client's type for that field says string
+
+  @unit
+  Scenario: A stored row's timestamp column arrives as a string
+    Given a procedure answers with a stored row carrying a timestamp column
+    When the client receives the answer
+    Then that column holds an ISO 8601 string
+    And a caller that needs an instant parses it at the point of use
+
+  @unit
+  Scenario: The live subscription lane carries plain JSON
+    Given a subscriber opens a live procedure
+    When an entry is written to the stream
+    Then the frame is plain JSON
+    And the subscription input was encoded as plain JSON too

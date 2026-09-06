@@ -370,7 +370,7 @@ async function callTrpc(
   input: Record<string, unknown>,
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
-  const encoded = encodeURIComponent(JSON.stringify({ json: input }));
+  const encoded = encodeURIComponent(JSON.stringify(input));
   const response = await application.hono.request(
     `http://127.0.0.1/api/trpc/${path}?input=${encoded}`,
   );
@@ -399,7 +399,7 @@ describe("given an API process composed with the packaged tRPC collaborators", (
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: [{ id: "dashboard-1" }] } } });
+      expect(body).toMatchObject({ result: { data: [{ id: "dashboard-1" }] } });
     });
   });
 
@@ -412,7 +412,7 @@ describe("given an API process composed with the packaged tRPC collaborators", (
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: [{ id: "workflow-1" }] } } });
+      expect(body).toMatchObject({ result: { data: [{ id: "workflow-1" }] } });
       expect(prisma.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { projectId: "project-1", archivedAt: null },
@@ -445,7 +445,7 @@ describe("given an API process composed with the packaged tRPC collaborators", (
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { NEXTAUTH_PROVIDER: "email" } } },
+        result: { data: { NEXTAUTH_PROVIDER: "email" } },
       });
     });
   });
@@ -652,7 +652,7 @@ describe("given a browser session this process has already verified", () => {
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: [] } } });
+      expect(body).toMatchObject({ result: { data: [] } });
       expect(getAllForUser).toHaveBeenCalledWith(
         expect.objectContaining({ isDemo: false }),
         expect.objectContaining({ id: "user-1" }),
@@ -692,7 +692,7 @@ describe("given a browser session this process has already verified", () => {
       const { body } = await callTrpc(application, "organization.getAll", { isDemo: false });
 
       expect(body).toMatchObject({
-        error: { json: { data: { code: "UNAUTHORIZED" } } },
+        error: { data: { code: "UNAUTHORIZED" } },
       });
       expect(getAllForUser).not.toHaveBeenCalled();
     });

@@ -269,11 +269,9 @@ async function callTrpc(
       ? await application.hono.request(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ json: input }),
+          body: JSON.stringify(input),
         })
-      : await application.hono.request(
-          `${url}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
-        );
+      : await application.hono.request(`${url}?input=${encodeURIComponent(JSON.stringify(input))}`);
   return { status: response.status, body: await response.json() };
 }
 
@@ -304,7 +302,7 @@ describe("given an API process composed with the five tenant features", () => {
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { firstMessage: true } } } });
+      expect(body).toMatchObject({ result: { data: { firstMessage: true } } });
       expect(projects.tryGetById).toHaveBeenCalledWith(PROJECT_ID);
     });
   });
@@ -330,7 +328,7 @@ describe("given an API process composed with the five tenant features", () => {
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: [] } } });
+      expect(body).toMatchObject({ result: { data: [] } });
       expect(prisma.trigger.findMany).toHaveBeenCalled();
     });
   });

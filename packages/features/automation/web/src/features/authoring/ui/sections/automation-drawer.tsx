@@ -806,8 +806,8 @@ export function AutomationDrawer({
       {
         projectId,
         // Omit triggerId entirely on create — Zod's `.optional()` accepts a
-        // missing key cleanly, but `triggerId: undefined` round-trips
-        // inconsistently through superjson depending on tRPC version.
+        // missing key cleanly, and JSON drops a key holding `undefined`
+        // anyway, so writing one says nothing the omission does not.
         ...(automationId ? { triggerId: automationId } : {}),
         name: draft.name,
         action: draft.action,

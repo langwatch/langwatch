@@ -1,5 +1,4 @@
 import pino, { type DestinationStream, type LoggerOptions, type Logger as PinoLogger } from "pino";
-import type SuperJSON from "superjson";
 import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
 import {
   resolveLoggerConfiguration,
@@ -20,17 +19,6 @@ type LogContextProvider = () => Record<string, string | null>;
 const isNodeRuntime = typeof process !== "undefined" && typeof process.versions?.node === "string";
 
 let logContextProvider: LogContextProvider | undefined;
-let sharedSuperjson: typeof SuperJSON | undefined;
-
-function getSuperjson(): typeof SuperJSON {
-  if (!sharedSuperjson) {
-    const { createRequire } = process.getBuiltinModule("node:module");
-    const loadModule = createRequire(import.meta.url);
-    sharedSuperjson = loadModule("superjson") as typeof SuperJSON;
-  }
-
-  return sharedSuperjson;
-}
 
 /**
  * Registers the server context provider used by every logger mixin.
@@ -69,20 +57,41 @@ function presentLogContext(): Record<string, string> {
 }
 
 /**
- * Custom Error serializer using superjson.
- * Avoids expensive manual stack trace formatting while preserving metadata.
+ * The JSON-safe form of one logged value.
+ *
+ * A log record is JSON on the wire, and two of the things we log are not:
+ * a `bigint`, which `JSON.stringify` throws on rather than skips, and a
+ * nested `Error`, whose message and stack are non-enumerable and so serialise
+ * to `{}`. Both are rendered here instead.
  */
-const superjsonErrorSerializer = (error: unknown) => {
+function jsonSafe(value: unknown, seen: WeakSet<object>): unknown {
+  if (typeof value === "bigint") return value.toString();
+  if (value instanceof Error) return pino.stdSerializers.err(value);
+  if (value === null || typeof value !== "object") return value;
+  if (seen.has(value)) return "[Circular]";
+  seen.add(value);
+  if (Array.isArray(value)) return value.map((entry) => jsonSafe(entry, seen));
+  const out: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) out[key] = jsonSafe(entry, seen);
+  return out;
+}
+
+/**
+ * Custom Error serializer.
+ *
+ * pino's own serializer carries the message, stack, type and cause chain. The
+ * error's own enumerable properties are walked separately, so a `bigint` or a
+ * nested `Error` hung off a custom error class survives as something readable
+ * rather than throwing the whole record away.
+ */
+const errorSerializer = (error: unknown) => {
   if (!(error instanceof Error)) {
     return pino.stdSerializers.err(error as Error);
   }
 
-  const serialized = getSuperjson().serialize(error);
-
-  return {
-    ...pino.stdSerializers.err(error),
-    _superjson: serialized.meta,
-  };
+  const base = pino.stdSerializers.err(error);
+  const own = jsonSafe({ ...error }, new WeakSet()) as Record<string, unknown>;
+  return { ...base, ...own };
 };
 
 /**
@@ -98,8 +107,8 @@ const superjsonErrorSerializer = (error: unknown) => {
  * cause on records deliberately logged below error level.
  */
 export const NODE_LOG_SERIALIZERS = {
-  error: superjsonErrorSerializer,
-  [REQUEST_CAUSE_FIELD]: superjsonErrorSerializer,
+  error: errorSerializer,
+  [REQUEST_CAUSE_FIELD]: errorSerializer,
 } as const;
 
 export interface CreateLoggerOptions {

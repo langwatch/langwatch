@@ -283,11 +283,9 @@ async function callTrpc(
       ? await application.hono.request(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ json: input }),
+          body: JSON.stringify(input),
         })
-      : await application.hono.request(
-          `${url}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
-        );
+      : await application.hono.request(`${url}?input=${encodeURIComponent(JSON.stringify(input))}`);
   return { status: response.status, body: await response.json() };
 }
 
@@ -380,7 +378,7 @@ describe("given an API process composed with the gateway feature", () => {
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: [] } } });
+      expect(body).toMatchObject({ result: { data: [] } });
       expect(prisma.gatewayGuardrail.findMany).toHaveBeenCalled();
     });
   });
@@ -394,7 +392,7 @@ describe("given an API process composed with the gateway feature", () => {
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: [] } } });
+      expect(body).toMatchObject({ result: { data: [] } });
       expect(prisma.virtualKey.findMany).toHaveBeenCalled();
     });
   });
@@ -419,7 +417,7 @@ describe("given an API process composed with the gateway feature", () => {
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { budgets: [] } } } });
+      expect(body).toMatchObject({ result: { data: { budgets: [] } } });
     });
   });
 
@@ -443,7 +441,7 @@ describe("given an API process composed with the gateway feature", () => {
       // the resolver lands them: an organization with application traces and no
       // governance state goes to `/[project]`, never to `/governance`.
       expect(body).toMatchObject({
-        result: { data: { json: { destination: "/acme-production" } } },
+        result: { data: { destination: "/acme-production" } },
       });
       expect(prisma.project.findFirst).toHaveBeenCalled();
       expect(prisma.user.findUnique).toHaveBeenCalled();
@@ -470,7 +468,7 @@ describe("given an API process composed with the gateway feature", () => {
 
       expect(status).toBe(200);
       expect(body).toMatchObject({
-        result: { data: { json: { configured: true, connected: false } } },
+        result: { data: { configured: true, connected: false } },
       });
       expect(github.getConnectionStatus).toHaveBeenCalledWith({
         organizationId: ORGANIZATION_ID,

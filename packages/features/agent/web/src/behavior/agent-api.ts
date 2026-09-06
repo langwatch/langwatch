@@ -40,8 +40,8 @@ export type AgentApiMap = {
     /**
      * Every live agent in the project, newest first.
      *
-     * Instants are real `Date`s: the router returns the contract value over
-     * superjson rather than a JSON projection.
+     * Instants are ISO 8601 strings: the router returns the contract value
+     * and plain JSON is what carries it.
      */
     getAll: {
       query: { input: ProjectScope; output: AgentListView[] };

@@ -100,6 +100,7 @@
     "@langwatch/react-rum": "workspace:*",
     "@langwatch/scenario-web": "workspace:*",
     "@langwatch/secret-web": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/topic-web": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
@@ -120,7 +121,6 @@
     "react-dom": "^19.2.7",
     "react-error-boundary": "^6.1.2",
     "react-router": "^8.0.1",
-    "superjson": "^2.2.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {

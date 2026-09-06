@@ -1,4 +1,3 @@
-import superjson from "superjson";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createUiFeatureApiClient,
@@ -37,7 +36,7 @@ class FakeChannel implements SseEventSourceLike {
   }
 
   send(frame: unknown): void {
-    this.onmessage?.({ data: superjson.stringify(frame) });
+    this.onmessage?.({ data: JSON.stringify(frame) });
   }
 
   drop(): void {
@@ -74,9 +73,9 @@ function transport(bodies: unknown[] = []): Wiring {
   return { client: createUiFeatureApiClient({ fetch, eventSource }), channels, requests };
 }
 
-/** One tRPC result, in the shape the superjson-encoded transport sends back. */
+/** One tRPC result, in the shape the JSON transport sends back. */
 function resultOf(data: unknown): unknown {
-  return { result: { data: { json: data } } };
+  return { result: { data: data } };
 }
 
 /**
@@ -114,7 +113,7 @@ describe("given the browser process transport", () => {
 
       const opened = new URL(wiring.channels[0]!.url);
       expect(opened.pathname).toBe(`${UI_SSE_ENDPOINT_PREFIX}langy.onTurnStream`);
-      expect(superjson.parse(opened.searchParams.get("input") ?? "")).toEqual({
+      expect(JSON.parse(opened.searchParams.get("input") ?? "")).toEqual({
         turnId: "turn_1",
       });
     });
@@ -192,7 +191,30 @@ describe("given the browser process transport", () => {
 
       wiring.channels[0]!.send({ event: "span_stored", at: new Date("2026-01-01T00:00:00Z") });
 
-      expect(seen).toEqual([{ event: "span_stored", at: new Date("2026-01-01T00:00:00Z") }]);
+      // Plain JSON on the lane: the instant reaches the screen as the ISO
+      // string it was encoded to, not as a revived Date.
+      expect(seen).toEqual([{ event: "span_stored", at: "2026-01-01T00:00:00.000Z" }]);
+    });
+
+    /** @scenario "The live subscription lane carries plain JSON" */
+    it("carries the frame and the subscription input as plain JSON", () => {
+      const wiring = transport();
+      const seen: unknown[] = [];
+      wiring.client.subscription(
+        "traces.onTraceUpdate",
+        { projectId: "project_1", since: new Date("2026-01-01T00:00:00Z") },
+        { onData: (value) => seen.push(value) },
+      );
+      wiring.channels[0]!.accept();
+
+      wiring.channels[0]!.send({ event: "span_stored" });
+
+      const opened = new URL(wiring.channels[0]!.url);
+      expect(JSON.parse(opened.searchParams.get("input") ?? "")).toEqual({
+        projectId: "project_1",
+        since: "2026-01-01T00:00:00.000Z",
+      });
+      expect(seen).toEqual([{ event: "span_stored" }]);
     });
   });
 

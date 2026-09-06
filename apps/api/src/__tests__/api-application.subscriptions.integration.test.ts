@@ -7,7 +7,6 @@ import { AuthzService } from "@langwatch/authz-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { SecretService, type Secret } from "@langwatch/secret-contract";
 import type { TRPCCreateRouterOptions } from "@trpc/server";
-import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
@@ -121,7 +120,7 @@ async function framesOf(response: Response): Promise<unknown[]> {
         .join("\n"),
     )
     .filter((payload) => payload.length > 0)
-    .map((payload) => superjson.parse(payload));
+    .map((payload) => JSON.parse(payload));
 }
 
 describe("ApiApplication's subscription lane", () => {
@@ -149,7 +148,7 @@ describe("ApiApplication's subscription lane", () => {
       const lane = processWithLane(secrets);
 
       const input = encodeURIComponent(
-        superjson.stringify({ projectId: "project-1", name: "STOLEN", value: "x" }),
+        JSON.stringify({ projectId: "project-1", name: "STOLEN", value: "x" }),
       );
       const response = await lane.request(`/api/sse/secrets.create?input=${input}`);
 
@@ -165,7 +164,7 @@ describe("ApiApplication's subscription lane", () => {
       const secrets = new TestSecretService();
       const lane = processWithLane(secrets);
 
-      const input = encodeURIComponent(superjson.stringify({ projectId: "project-1" }));
+      const input = encodeURIComponent(JSON.stringify({ projectId: "project-1" }));
       const response = await lane.request(`/api/sse/secrets.list?input=${input}`);
 
       expect(response.status).toBe(405);

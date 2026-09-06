@@ -26,6 +26,7 @@ import type {
   TraceSpanTokenEstimationPort,
 } from "../ports/trace-span-preparation.port";
 import type { TraceSpanSpoolPort } from "../ports/trace-span-spool.port";
+import { clonePayload } from "../rules/payload-clone.rules";
 import { TraceAttributeCapService } from "../services/trace-attribute-cap.service";
 
 const traceAttributeCapService = TraceAttributeCapService.create();
@@ -142,8 +143,8 @@ export class EventingRecordSpanAdapter implements CommandHandler<
 
     this.logger.debug({ tenantId, traceId, spanId }, "Handling record span command");
 
-    const span = structuredClone(commandData.span);
-    const resource = commandData.resource ? structuredClone(commandData.resource) : null;
+    const span = clonePayload(commandData.span);
+    const resource = commandData.resource ? clonePayload(commandData.resource) : null;
 
     this.stripReservedAttributes(span, resource);
     if (!command.data.spoolRef) {

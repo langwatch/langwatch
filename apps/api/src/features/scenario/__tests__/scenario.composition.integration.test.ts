@@ -22,7 +22,6 @@ import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { TraceService } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { UserService } from "@langwatch/user-contract";
-import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
@@ -332,11 +331,9 @@ async function callTrpc(
       ? await application.hono.request(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ json: input }),
+          body: JSON.stringify(input),
         })
-      : await application.hono.request(
-          `${url}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
-        );
+      : await application.hono.request(`${url}?input=${encodeURIComponent(JSON.stringify(input))}`);
   return { status: response.status, body: await response.json() };
 }
 
@@ -358,7 +355,7 @@ async function watchSse(options: {
   if (!application.hono) throw new Error("HTTP composition was not created.");
 
   const controller = new AbortController();
-  const encoded = encodeURIComponent(superjson.stringify(input));
+  const encoded = encodeURIComponent(JSON.stringify(input));
   const response = await application.hono.request(
     `http://127.0.0.1/api/sse/${path}?input=${encoded}`,
     sameOriginSseInit({ signal: controller.signal }),
@@ -389,7 +386,7 @@ async function watchSse(options: {
           .filter((line) => line.startsWith("data: "))
           .map((line) => line.slice("data: ".length))
           .join("\n");
-        if (payload.length > 0) frames.push(superjson.parse(payload));
+        if (payload.length > 0) frames.push(JSON.parse(payload));
       }
     }
   } finally {
@@ -431,7 +428,7 @@ describe("given the API process composed the scenario feature from its own graph
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: [] } } });
+      expect(body).toMatchObject({ result: { data: [] } });
       // The discriminator: an archived case is never offered, and the read is
       // narrowed to the project the caller was authorized against.
       expect(prisma.scenario.findMany).toHaveBeenCalledWith(
@@ -459,7 +456,7 @@ describe("given the API process composed the scenario feature from its own graph
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { items: [] } } } });
+      expect(body).toMatchObject({ result: { data: { items: [] } } });
       expect(prisma.langyConversationProjection.findMany).toHaveBeenCalled();
     });
 
@@ -482,8 +479,8 @@ describe("given the API process composed the scenario feature from its own graph
       });
 
       expect(status).toBe(200);
-      const held = body as { result: { data: { json: { body: string } } } };
-      expect(held.result.data.json.body.length).toBeGreaterThan(1_000);
+      const held = body as { result: { data: { body: string } } };
+      expect(held.result.data.body.length).toBeGreaterThan(1_000);
     });
   });
 
@@ -576,7 +573,7 @@ describe("given the API process composed the scenario feature from its own graph
       );
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { cancelled: true } } } });
+      expect(body).toMatchObject({ result: { data: { cancelled: true } } });
       const appended = await storedEvents({
         aggregateId: SCENARIO_RUN_ID,
         aggregateType: "simulation_run",
@@ -601,7 +598,7 @@ describe("given the API process composed the scenario feature from its own graph
       );
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { success: true } } } });
+      expect(body).toMatchObject({ result: { data: { success: true } } });
       const appended = await storedEvents({
         aggregateId: CONVERSATION_ID,
         aggregateType: "langy_conversation",

@@ -23,9 +23,9 @@ function transportOver(bodies: unknown[]): {
   return { client: createUiFeatureApiClient({ fetch }), calls };
 }
 
-/** One tRPC result, in the shape superjson-encoded transport sends back. */
+/** One tRPC result, in the shape JSON transport sends back. */
 function resultOf(data: unknown): unknown {
-  return { result: { data: { json: data } } };
+  return { result: { data: data } };
 }
 
 describe("given the browser transport a feature package's hooks run on", () => {
@@ -82,7 +82,7 @@ describe("given the browser transport a feature package's hooks run on", () => {
   describe("when the platform API answers with an error", () => {
     it("surfaces it to the caller rather than resolving with nothing", async () => {
       const { client } = transportOver([
-        [{ error: { json: { message: "not_found", code: -32004, data: {} } } }],
+        [{ error: { message: "not_found", code: -32004, data: {} } }],
       ]);
 
       await expect(client.query("prompts.getById", { id: "missing" })).rejects.toThrow("not_found");

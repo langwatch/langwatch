@@ -53,11 +53,14 @@ type ProceduresFrom<TMap> = {
  * the way here: with the flag unknown it hands back BOTH answers, so a
  * procedure returning `{ archivedAt: Date | null }` infers as a union with
  * `{ archivedAt: string | null }` and every consumer of a date fails to
- * typecheck against itself. Every client this package builds runs superjson
- * (`apps/ui`'s transport and the application's alike), so a Date really does
- * arrive as a Date and `true` is the honest value.
+ * typecheck against itself.
+ *
+ * `false` is the honest value: nothing transforms the wire any more, so tRPC
+ * applies its own `Serialize<>` to every declared output and a `Date` a
+ * procedure returns is typed here as the ISO string that actually arrives.
+ * Parse it at the use site.
  */
-type FeatureApiRootTypes = Omit<AnyTRPCRootTypes, "transformer"> & { transformer: true };
+type FeatureApiRootTypes = Omit<AnyTRPCRootTypes, "transformer"> & { transformer: false };
 
 /** The router type a feature's map describes. */
 export type RouterFromMap<TMap> = TRPCBuiltRouter<FeatureApiRootTypes, ProceduresFrom<TMap>>;

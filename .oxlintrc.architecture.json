@@ -3465,6 +3465,21 @@
                 "importNames": ["Dialog", "Drawer", "Modal"],
                 "message": "Import Dialog or Drawer from ~/components/ui/dialog and ~/components/ui/drawer instead. Modal-style flows also use the Dialog wrapper (see AICreateModal, RunScenarioModal, etc.) -- there is no Modal wrapper. The wrappers force a transparent backdrop (no dark grey overlay), wire focus/scroll defaults, and add an inline error boundary. Raw Chakra primitives reintroduce the dark backdrop we explicitly do not want."
               }
+            ],
+            // date-fns is retired: every date and time operation lives in
+            // @langwatch/time, over Temporal, so one package owns the wording,
+            // the patterns and the time zone the reader is in. The pattern
+            // catches the deep imports (`date-fns/format`) as well as the
+            // barrel. See specs/dependencies/temporal-time.feature.
+            "patterns": [
+              {
+                "group": ["date-fns", "date-fns/*"],
+                "message": "Use @langwatch/time (Temporal)"
+              },
+              {
+                "group": ["superjson"],
+                "message": "JSON only on the wire; dates are ISO strings"
+              }
             ]
           }
         ]

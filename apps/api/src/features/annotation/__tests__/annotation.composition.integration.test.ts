@@ -235,11 +235,9 @@ async function callTrpc(
       ? await application.hono.request(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ json: input }),
+          body: JSON.stringify(input),
         })
-      : await application.hono.request(
-          `${url}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
-        );
+      : await application.hono.request(`${url}?input=${encodeURIComponent(JSON.stringify(input))}`);
   return { status: response.status, body: await response.json() };
 }
 
@@ -256,7 +254,7 @@ describe("given an API process composed with the annotation feature", () => {
       });
 
       expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { created: 1, skipped: 1 } } } });
+      expect(body).toMatchObject({ result: { data: { created: 1, skipped: 1 } } });
 
       // The existence answer came from trace storage, scoped by tenant, and it
       // is what decided the write.

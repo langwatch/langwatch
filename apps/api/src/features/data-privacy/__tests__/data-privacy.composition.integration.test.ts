@@ -155,7 +155,7 @@ async function callTrpc(
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
   const response = await application.hono.request(
-    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
+    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify(input))}`,
   );
   return { status: response.status, body: await response.json() };
 }
@@ -171,8 +171,7 @@ describe("given an API process composed with the privacy rules", () => {
       });
 
       expect({ status, body }).toMatchObject({ status: 200 });
-      const snapshot = (body as { result: { data: { json: Record<string, unknown> } } }).result.data
-        .json;
+      const snapshot = (body as { result: { data: Record<string, unknown> } }).result.data;
 
       expect(snapshot.projectId).toBe(PROJECT_ID);
       // Both baselines are resolved, which is the whole cascade running: the

@@ -198,7 +198,7 @@ export type PersonaResolutionView = {
 /**
  * The organization graph, narrowed to what this family reads. The procedure answers with the
  * stored Prisma rows — every organization column, every team column, every project column, and
- * every instant as a real `Date` over superjson.
+ * every instant as the ISO 8601 string plain JSON carries.
  */
 export type PersonalOrganizationGraph = {
   id: string;
