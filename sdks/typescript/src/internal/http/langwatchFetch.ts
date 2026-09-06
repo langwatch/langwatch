@@ -92,11 +92,14 @@ const isRedirect = (response: Response): boolean =>
 const isStream = (body: unknown): boolean =>
   typeof ReadableStream !== "undefined" && body instanceof ReadableStream;
 
-const abortError = (signal: AbortSignal): unknown =>
-  signal.reason ??
-  (typeof DOMException !== "undefined"
-    ? new DOMException("This operation was aborted", "AbortError")
-    : Object.assign(new Error("This operation was aborted"), { name: "AbortError" }));
+const abortError = (signal: AbortSignal): Error => {
+  const reason: unknown = signal.reason;
+  if (reason instanceof Error) return reason;
+  if (typeof DOMException !== "undefined") {
+    return new DOMException("This operation was aborted", "AbortError");
+  }
+  return Object.assign(new Error("This operation was aborted"), { name: "AbortError" });
+};
 
 /**
  * The body bytes to replay, read under the caller's signal.
