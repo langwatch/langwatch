@@ -8,7 +8,7 @@
  */
 
 import { Button, Card, Heading, HStack, Separator, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { isEqual } from "lodash-es";
+import isEqual from "lodash-es/isEqual";
 import { useCallback, useEffect, useState } from "react";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";

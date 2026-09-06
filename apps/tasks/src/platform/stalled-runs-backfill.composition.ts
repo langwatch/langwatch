@@ -1,12 +1,10 @@
 import { AgentService } from "@langwatch/agent-contract";
-import {
-  SimulationProcessingProducerAdapter,
-  ScenarioFailureHandlerService,
-  SimulationClickHouseAdapter,
-  SimulationExecutionPort,
-  SimulationStalledRunAdapter,
-  StalledRunsBackfillTask,
-} from "@langwatch/scenario-server";
+import { ScenarioFailureHandlerService } from "@langwatch/scenario-server/composition/scenario-failure-handler";
+import { SimulationClickHouseAdapter } from "@langwatch/scenario-server/composition/simulation-clickhouse";
+import { SimulationStalledRunAdapter } from "@langwatch/scenario-server/composition/simulation-eventing";
+import { SimulationExecutionPort } from "@langwatch/scenario-server/composition/simulation-execution-port";
+import { SimulationProcessingProducerAdapter } from "@langwatch/scenario-server/composition/simulation-processing-producer";
+import { StalledRunsBackfillTask } from "@langwatch/scenario-server/composition/stalled-runs-backfill";
 import {
   ScenarioExecutionService,
   type ScenarioExecutionJob,

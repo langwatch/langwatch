@@ -1,7 +1,8 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
 import { type LayoutMode, LayoutModeContext } from "../../../../model/layout-mode";
 import { type TabData, useTabId } from "../../studio-internals";
-import { cloneDeep, debounce } from "lodash-es";
+import cloneDeep from "lodash-es/cloneDeep";
+import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DeepPartial, FormProvider } from "react-hook-form";
 import { usePromptConfigForm } from "../../../../behavior/use-prompt-config-form";

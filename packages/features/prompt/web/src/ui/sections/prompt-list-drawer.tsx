@@ -15,7 +15,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { groupBy } from "lodash-es";
+import groupBy from "lodash-es/groupBy";
 import { ChevronRight, FileText, FolderOpen, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";

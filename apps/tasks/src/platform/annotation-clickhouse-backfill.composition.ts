@@ -1,4 +1,4 @@
-import { TraceProcessingProducerAdapter } from "@langwatch/trace-server";
+import { TraceProcessingProducerAdapter } from "@langwatch/trace-server/composition/trace-processing-producer";
 import {
   AnnotationClickHouseBackfillTask,
   PostgresAnnotationBackfillAdapter,

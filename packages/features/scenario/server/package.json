@@ -20,6 +20,30 @@
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"
+    },
+    "./composition/scenario-failure-handler": {
+      "types": "./src/services/scenario-failure-handler.service.ts",
+      "default": "./src/services/scenario-failure-handler.service.ts"
+    },
+    "./composition/simulation-clickhouse": {
+      "types": "./src/adapters/simulation.clickhouse.adapter.ts",
+      "default": "./src/adapters/simulation.clickhouse.adapter.ts"
+    },
+    "./composition/simulation-eventing": {
+      "types": "./src/adapters/simulation-eventing.adapter.ts",
+      "default": "./src/adapters/simulation-eventing.adapter.ts"
+    },
+    "./composition/simulation-execution-port": {
+      "types": "./src/ports/simulation-execution.port.ts",
+      "default": "./src/ports/simulation-execution.port.ts"
+    },
+    "./composition/simulation-processing-producer": {
+      "types": "./src/adapters/simulation-processing-producer.adapter.ts",
+      "default": "./src/adapters/simulation-processing-producer.adapter.ts"
+    },
+    "./composition/stalled-runs-backfill": {
+      "types": "./src/tasks/stalled-runs-backfill.task.ts",
+      "default": "./src/tasks/stalled-runs-backfill.task.ts"
     }
   },
   "scripts": {

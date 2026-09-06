@@ -1,5 +1,5 @@
 import { usePromptHost } from "../model/prompt-host";
-import { cloneDeep } from "lodash-es";
+import cloneDeep from "lodash-es/cloneDeep";
 import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import {

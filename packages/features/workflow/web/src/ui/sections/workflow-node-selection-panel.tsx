@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
-import { merge } from "lodash-es";
+import merge from "lodash-es/merge";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
 
 import type { Component, Field, NodeWithOptionalPosition } from "@langwatch/workflow-contract";

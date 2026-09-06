@@ -1,6 +1,6 @@
 "use client";
 import { current } from "immer";
-import { cloneDeep } from "lodash-es";
+import cloneDeep from "lodash-es/cloneDeep";
 import type { DeepPartial } from "react-hook-form";
 import { z } from "zod";
 import { create } from "zustand";

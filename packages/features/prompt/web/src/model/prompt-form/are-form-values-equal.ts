@@ -1,4 +1,4 @@
-import { isEqual } from "lodash-es";
+import isEqual from "lodash-es/isEqual";
 import type { DeepPartial } from "react-hook-form";
 import type { PromptConfigFormValues } from "./prompt-form.schemas";
 

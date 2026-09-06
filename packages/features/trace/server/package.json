@@ -24,6 +24,10 @@
     "./composition/trace-edit-overlay": {
       "types": "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts",
       "default": "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts"
+    },
+    "./composition/trace-processing-producer": {
+      "types": "./src/adapters/trace-processing-producer.adapter.ts",
+      "default": "./src/adapters/trace-processing-producer.adapter.ts"
     }
   },
   "scripts": {
@@ -63,6 +67,7 @@
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
@@ -73,7 +78,6 @@
     "@opentelemetry/sdk-trace-base": "2.10.0",
     "@trpc/server": "^11.18.0",
     "ai": "^6.0.217",
-    "date-fns": "^4.4.0",
     "hono": "^4.12.27",
     "hono-openapi": "^1.3.1",
     "langwatch": "workspace:*",
