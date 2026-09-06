@@ -27,7 +27,7 @@ function readPythonHexEscape(
 /** Where the walk stands: outside any string, or inside one the source delimited with ' or ". */
 type ReprState = "none" | "single" | "double";
 
-/** What one character position contributes: the text to emit, how far to move, and any new state. */
+/** What one character position contributes: text to emit, how far to move, and any new state. */
 interface ReprStep {
   emit: string;
   consumed: number;

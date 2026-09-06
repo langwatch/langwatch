@@ -1,5 +1,8 @@
 /**
- * The trace_processing pipeline as a PRODUCER registers it: one definition, two registrations. The worker (consumer) supplies the real span store, projection stores, canonicaliser and span-prep chain, draining every routing key; a producer registers the SAME definition only to obtain addAnnotation/removeAnnotation, starting no consumer loop, holding no event log, folding nothing. Every dependency the definition takes is consumer-side, so this module supplies stand-ins that construct successfully but refuse by name if ever CALLED — refusing beats a silently-succeeding fold that reports a projection as written when nothing was. Forking the definition (declaring only the two producer commands) is what this avoids: the routing triple derives from pipeline+command names, so two descriptions of one stream would drift into unroutable jobs.
+ * One trace_processing definition, two registrations: the worker (consumer) supplies the real
+ * dependencies; a producer registers the same definition only for addAnnotation/removeAnnotation,
+ * folding nothing. This module supplies stand-ins that construct successfully but refuse by name
+ * if ever called — refusing beats a silently-succeeding fold reporting nothing as written.
  */
 import type { AppendStore, FoldProjectionStore, TenantId } from "@langwatch/eventing";
 import {
@@ -64,7 +67,8 @@ class ProducerOnlyAppendStore<TRow> implements AppendStore<TRow> {
 }
 
 /**
- * The canonicaliser this process does not hold. Every member throws rather than returning an empty answer — canonicalisation decides what a span MEANS, and a stand-in answering "nothing" would be read as a span that carried nothing.
+ * The canonicaliser this process does not hold. Every member throws rather than returning an
+ * empty answer — a stand-in answering "nothing" would be read as a span that carried nothing.
  */
 class ProducerOnlyCanonicalisation extends TraceCanonicalisationService {
   constructor(private readonly processName: string) {
@@ -210,7 +214,8 @@ export class TraceProcessingProducerAdapter {
   }
 
   /**
-   * Builds the trace-processing definition for a process that only sends commands on it. processName names the refusal, so a stand-in reached by accident says which process reached it rather than reporting an anonymous failure.
+   * Builds the trace-processing definition for a process that only sends commands on it.
+   * `processName` names the refusal, so a stand-in reached by accident names which process.
    */
   static createTraceProcessingProducerPipeline(input: { processName: string }) {
     const { processName } = input;

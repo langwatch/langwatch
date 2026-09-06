@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 /**
  * Prefix for all transient spool objects, kept above the tenant segment so a lifecycle rule can
  * match it with a plain prefix filter. S3 lifecycle filters cannot wildcard a leading tenant
- * segment, so a tenant-first path would be unexpirable and orphans would accumulate. Do not reorder.
+ * segment, so a tenant-first path would be unexpirable. Do not reorder.
  */
 export const SPOOL_KEY_PREFIX = "trace-blobs/spool";
 

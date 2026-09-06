@@ -151,8 +151,9 @@ export class TraceExportService {
 
   /**
    * One page of the export. Blobs resolve for every mode: a summary export reads no span content
-   * but still emits the trace's own input and output, so gating resolution on spans shipped the
-   * truncated preview for any offloaded trace, silently. The batch resolver keeps the reads bounded.
+   * but still emits the trace's own input and output, so gating resolution on spans would ship
+   * the truncated preview for any offloaded trace, silently. The batch resolver keeps reads
+   * bounded.
    */
   private async fetchBatch({
     request,

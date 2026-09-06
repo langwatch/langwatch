@@ -1,23 +1,10 @@
 import type { Protections } from "@langwatch/trace-contract";
 /**
- * The single public surface for anonymous shared-trace reads.
- *
- * ONE token-validated call returns EVERYTHING the read-only share page needs,
- * as an explicit share-safe DTO. Because it is the only public trace read,
- * authorization happens exactly once (here). All the internal `tracesV2.*` /
- * `traces.*` / `annotation.*` reads stay authenticated. See ADR-057.
- *
- * A field can only reach a share viewer if it is deliberately named in
- * `trace-share.schemas.ts`, which builds the payload shape as an explicit
- * `.pick()` from each internal read schema and is applied below as the
- * procedure's `.output()` parser. tRPC runs that parser server-side and Zod
- * strips keys the schema does not name, so a new column on an internal read is
- * dropped at the share boundary rather than silently published — the guarantee
- * holds at runtime, not by convention.
- *
- * This router is deliberately its own surface rather than a procedure on
- * `tracesV2`: it is the ONE place a request with no session gets a trace back,
- * and keeping it separate is what makes that reviewable.
+ * The single public surface for anonymous shared-trace reads (ADR-057). One token-validated
+ * call returns everything the share page needs as an explicit share-safe DTO — a field only
+ * reaches a share viewer if it's named in `trace-share.schemas.ts`'s `.pick()`, applied as this
+ * procedure's `.output()` parser, so Zod strips unnamed keys at runtime. Kept as its own router,
+ * not a procedure on `tracesV2`, since it's the one place a request with no session gets a trace.
  */
 import { createHash } from "node:crypto";
 import {
@@ -63,15 +50,9 @@ const SHARE_READ_LIMIT_PER_TOKEN = 60;
 const SHARE_READ_LIMIT_PER_IP = 120;
 
 /**
- * The process supplies the request, the session (when there is one) and the
- * application. There is no authenticated actor here by design.
- *
- * `app` is the slice of the process's application this feature reaches, not
- * the feature's application itself, because a tRPC root is shared by every
- * feature mounted on it and so carries all of them. It is the SAME
- * {@link TraceApp} the authenticated explorer reads through, which is what
- * stops this surface drifting behind an in-app redaction: the five span reads
- * below are the explorer's own, not a second copy of them.
+ * No authenticated actor here by design. `app` is the SAME {@link TraceApp} the authenticated
+ * explorer reads through, which stops this surface drifting behind an in-app redaction — the
+ * span reads below are the explorer's own, not a second copy of them.
  */
 export type SharedTraceTrpcContext = Readonly<{
   app: Readonly<{ traces: TraceApp }>;
@@ -268,16 +249,9 @@ export class SharedTraceTrpcApi {
             const projectId = share.projectId;
             const traceId = share.resourceId;
 
-            // Share viewers read with the project's protections computed for the
-            // presented session: captured content follows the data-privacy policy and
-            // the plan visibility cutoff, and restricted resource/event attributes are
-            // stripped. Cost visibility follows the viewer's OWN `cost:view`
-            // permission (an anonymous viewer sees none), so a signed-in member
-            // resolving an org/project-scoped link may see spend — sharing never
-            // widens what a viewer could already see in-app. See ADR-057.
-            //
-            // A missing or archived project resolves like a bad token (generic
-            // NOT_FOUND) rather than surfacing a raw database error.
+            // Cost visibility follows the viewer's OWN `cost:view` permission, so sharing never
+            // widens what a viewer could already see in-app (ADR-057). A missing or archived
+            // project resolves like a bad token (generic NOT_FOUND).
             const protections = await ports.tryGetShareViewerProtections({
               projectId,
               session: ctx.session,
@@ -365,15 +339,9 @@ export class SharedTraceTrpcApi {
               protections,
             });
 
-            // Full span detail — the SAME pipeline as the internal
-            // `tracesV2.spansFull` read (span protections, content + spend
-            // redaction, privacy annotations), shared so the anonymous surface can
-            // never drift behind an in-app redaction.
-            //
-            // Capped: this endpoint is unauthenticated, and a wide agent trace would
-            // otherwise assemble every span's input/output into one unbounded
-            // response. The waterfall stays complete; only per-span detail stops,
-            // and the payload says so rather than rendering an empty detail pane.
+            // Full span detail — the same pipeline as `tracesV2.spansFull`, shared so this
+            // surface can never drift behind an in-app redaction. Capped since this endpoint is
+            // unauthenticated: only per-span detail stops, and the payload says so.
             const isSpanDetailTruncated = fullSpans.length > SHARE_MAX_FULL_SPANS;
             const spansFull = mapSpansToDetailDtos(
               isSpanDetailTruncated ? fullSpans.slice(0, SHARE_MAX_FULL_SPANS) : fullSpans,

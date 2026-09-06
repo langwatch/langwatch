@@ -57,7 +57,8 @@ export class TraceFormattingService {
   }
 
   /**
-   * Generate an ASCII tree representation from a list of spans, e.g. `.` / `└── llm: chat (gpt-4)` / `    ├── rag: retrieve` / `    └── tool: search`.
+   * Generate an ASCII tree representation from a list of spans, e.g. `.` / `└── llm: chat
+   * (gpt-4)` / `    ├── rag: retrieve` / `    └── tool: search`.
    */
   static generateAsciiTree = (spans: Span[]): string => {
     const tree = buildTree(spans);

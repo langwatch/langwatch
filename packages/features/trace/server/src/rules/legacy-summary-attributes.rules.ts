@@ -241,11 +241,7 @@ export function hasAnnotatedType(
   }
 }
 
-/**
- * Parses the computed input string to TraceInput format (value type annotations from attributes are used when available to avoid heuristic guessing).
- * @param computedInput - The computed input string from ClickHouse; @param attributes - Trace summary attributes (for value type hints)
- * @returns TraceInput with extracted text value
- */
+/** Value type annotations from attributes are used when available to avoid heuristic guessing. */
 export function parseComputedInput(
   computedInput: string | null,
   attributes: Record<string, string>,
@@ -285,11 +281,7 @@ export function parseComputedInput(
   };
 }
 
-/**
- * Parses the computed output string to TraceOutput format (value type annotations from attributes are used when available to avoid heuristic guessing).
- * @param computedOutput - The computed output string from ClickHouse; @param attributes - Trace summary attributes (for value type hints)
- * @returns TraceOutput with extracted text value
- */
+/** Value type annotations from attributes are used when available to avoid heuristic guessing. */
 export function parseComputedOutput(
   computedOutput: string | null,
   attributes: Record<string, string>,

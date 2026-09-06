@@ -1,7 +1,8 @@
 /**
  * Cold-scan detection for ClickHouse SELECTs. A SELECT with no predicate on the partition time
  * column cannot prune, so ClickHouse walks the S3-tiered partitions too — the dominant driver of
- * our S3 bill. Detection only; the table list lives in the ClickHouse package, shared with analytics.
+ * our S3 bill. Detection only; the table list lives in the ClickHouse package, shared with
+ * analytics.
  */
 
 import { TIME_PARTITIONED_TABLES } from "@langwatch/clickhouse-client";

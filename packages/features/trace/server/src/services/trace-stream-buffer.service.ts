@@ -1,9 +1,9 @@
 import type { Readable } from "node:stream";
 
 /**
- * Raised when a stream exceeds the byte cap passed to {@link TraceStreamBufferService.streamToBuffer}.
- * Callers that read untrusted object-store content pass a cap so a tampered or
- * unexpectedly large object cannot OOM the worker.
+ * Raised when a stream exceeds the byte cap passed to
+ * {@link TraceStreamBufferService.streamToBuffer}. Callers reading untrusted object-store
+ * content pass a cap so a tampered or unexpectedly large object cannot OOM the worker.
  */
 export class StreamTooLargeError extends Error {
   constructor(maxBytes: number) {

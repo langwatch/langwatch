@@ -1,34 +1,8 @@
 /**
- * The project's traces over the process's tRPC transport.
- *
- *   getAllForProject / getAllForDownload: the list and search grid, and the
- *                        same read taken as a download. The grid stays on the
- *                        stored preview; the download resolves offloaded
- *                        values in full.
- *   getById / getTracesWithSpans / getTracesByThreadId /
- *   getTracesWithSpansByThreadIds: one trace, several traces, one
- *                        conversation, several conversations — every one of
- *                        them a content read, so every one resolves in full.
- *   getEvaluations / getEvaluationsMultiple / getEvaluationInputs: the
- *                        evaluator verdicts on a trace or a page of them, and
- *                        one verdict's inputs fetched lazily when its card is
- *                        opened.
- *   getTopicCounts / getCustomersAndLabels / getFieldNames: what the topic,
- *                        customer, label and field-mapping pickers offer.
- *   getFormattedSpansDigest: the whole trace rendered as one readable digest.
- *   getSampleTraces / getSampleTracesDataset: the samples an evaluator wizard
- *                        and the dataset builder start from.
- *   onTraceUpdate:       the server-sent stream that tells an open grid its
- *                        project has new traces.
- *
- * Every procedure takes `traces:view`.
- *
- * Transport only: policy, input parsing and delegation to `TraceApp`. Which
- * reads resolve offloaded values in full and which stay on the stored preview
- * (#4991) is the application's decision, not this door's, so the same rule
- * answers the explorer, the share page and the REST surface. Anonymous shared
- * reads are NOT here — they go through the dedicated `sharedTrace.get`
- * surface, the single public trace read ADR-057 allows.
+ * The project's traces over the process's tRPC transport. Every procedure takes `traces:view`.
+ * Transport only: policy, input parsing and delegation to `TraceApp`. Which reads resolve
+ * offloaded values in full and which stay on the stored preview is the application's decision,
+ * not this door's. Anonymous shared reads are NOT here — see `sharedTrace.get` (ADR-057).
  */
 import { on } from "node:events";
 import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
@@ -75,13 +49,8 @@ type TracesTrpcProcedures<
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
-   * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one declared permission.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
+   * Applied AFTER this feature's own input parser: the authorization check reads its scope id
+   * from the validated input, and tRPC runs middlewares in the order they were added.
    */
   policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
   /** @see the mount field of the same name. */
@@ -89,14 +58,9 @@ type TracesTrpcProcedures<
 }>;
 
 /**
- * The process capabilities this transport needs that Trace does not own.
- *
- * The two filter schemas are injected rather than declared here because the
- * same shapes are the REST search body and the analytics read input: one
- * definition, in the process, is what keeps those surfaces from drifting while
- * the filter vertical is still application-owned. The precondition trio is the
- * evaluator wizard's rule engine, which belongs to Evaluation rather than to
- * Trace.
+ * The process capabilities this transport needs that Trace does not own. The two filter
+ * schemas are injected rather than declared here since the same shapes are the REST search body
+ * and the analytics read input. The precondition trio belongs to Evaluation, not Trace.
  */
 export type TracesTrpcPorts<
   TListInput extends TraceLegacyListInput,
@@ -189,18 +153,10 @@ export class TracesTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    // Each of these is intersected onto the process's filter parser, not
-    // chained after it with a second `.input()`. Chaining is the composition
-    // that reads better, but tRPC types the second `.input()` as a conditional
-    // on the input already accumulated, and the base parser arrives here as a
-    // type parameter: a conditional whose check type is an unresolved
-    // parameter never takes the merging branch, so the chained form does not
-    // compile at all. The declaration sweep reads through the intersection to
-    // both members, so `projectId` stays visible to it either way. The keys
-    // added here are exactly the ones the process's filter schema does not
-    // already carry — `projectId` and `query` were re-declared identically by
-    // the router this replaced, which added nothing and would now collide on
-    // merge.
+    // Intersected onto the process's filter parser, not chained with a second `.input()`: tRPC
+    // types a chained `.input()` as conditional on the already-accumulated input, and the base
+    // parser arrives here as a type parameter, so that conditional never takes the merging
+    // branch. The keys added here are exactly the ones the process's filter schema lacks.
     const sampleExtrasSchema = z.object({ sortBy: z.string().optional() });
 
     const sampleTracesExtrasSchema = z.object({

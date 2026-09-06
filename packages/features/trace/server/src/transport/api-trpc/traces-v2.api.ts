@@ -1,43 +1,9 @@
 import type { Protections } from "@langwatch/trace-contract";
 /**
- * The trace explorer's reads over the process's tRPC transport — the `tracesV2.*`
- * surface, twenty-nine procedures behind one permission model.
- *
- *   list / sessions / listEvents:   the grid, the Sessions lens, and the events
- *                                   column the grid fills in per page.
- *   facets / newCount / suggest /
- *   discover / facetValues /
- *   onDiscoverUpdate:               the filter sidebar's vocabulary, its live
- *                                   counts, and the stream that tells a browser
- *                                   its facets were recomputed.
- *   conversationContext:            the turns either side of the open trace.
- *   aiQuery / aiAction:             the composer, which turns a sentence into a
- *                                   query or into a saved lens.
- *   header / changeName /
- *   changeMetadata:                 the drawer's summary, and the two things a
- *                                   reader may change about a trace.
- *   spansPaginated / spansDelta /
- *   spanTreePaginated /
- *   spanTreeDelta / spanTree /
- *   spanLangwatchSignals /
- *   spansFull / spanDetail /
- *   resourceInfo:                   the waterfall, live or paged, and one span
- *                                   opened in full.
- *   traceEvents / evals /
- *   traceLogs /
- *   codingAgentTranscript /
- *   codingAgentSession:             the timeline, the verdicts, the raw log
- *                                   records, and what a coding agent did.
- *
- * Every read takes `traces:view`; `changeName` and `changeMetadata` take
- * `traces:update`.
- *
- * Transport only: policy, input parsing, delegation, and the read-time
- * redaction every payload goes through on its way out. The mapping and
- * redaction themselves live in `trace-read-mappers.api.ts`, shared with the
- * anonymous `sharedTrace.get` surface so the two can never drift apart.
- *
- * The anonymous read is NOT here. ADR-057 keeps it on its own router.
+ * The trace explorer's `tracesV2.*` tRPC surface. Every read takes `traces:view`;
+ * `changeName`/`changeMetadata` take `traces:update`. Transport only — mapping and read-time
+ * redaction live in `trace-read-mappers.api.ts`, shared with the anonymous `sharedTrace.get`
+ * surface (kept on its own router per ADR-057) so the two can never drift apart.
  */
 import { on } from "node:events";
 import { createTrpcService } from "@langwatch/api/trpc";
@@ -138,16 +104,8 @@ const logger = createLogger("langwatch:api:traces-v2");
 export type TracesV2TrpcContext = Readonly<{
   app: Readonly<{ traces: TraceApp }>;
   /**
-   * Who the write is attributed to.
-   *
-   * `actor()`, not the session: the process's session is nullable, so a
-   * context demanding a non-null one could not be satisfied by the root the
-   * app hands in — and because this context reaches `AppRouter`, that made
-   * every `api.*` result in the browser infer as `{}`. It is also what
-   * `TraceApp` asks for. Its own note: "the caller arrives as an argument
-   * rather than being read off a session, which is what lets one operation
-   * serve a browser session, an API key and a background job without knowing
-   * which it is serving."
+   * Who the write is attributed to. `actor()`, not the session: the session is nullable, and a
+   * non-null-session context here would make every `api.*` result infer as `{}` in the browser.
    */
   actor(): Readonly<{ id: string }>;
 }>;
@@ -160,13 +118,8 @@ type TracesV2TrpcProcedures<
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
-   * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one declared permission.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
+   * Applied by this feature AFTER its own input parser: the authorization check reads its scope
+   * id from the validated input, and tRPC runs middlewares in the order they were added.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
   /**
@@ -178,14 +131,9 @@ type TracesV2TrpcProcedures<
 }>;
 
 /**
- * The process capabilities this transport needs that Trace does not own.
- *
- * Each one belongs to another vertical — the viewer's protections and the plan
- * window are Identity's and Entitlement's, the composer is the model
- * providers', the span display and redaction passes are the legacy trace
- * read's, the content-key catalog is Data Privacy's, and the trace metadata
- * write and unmapped-cost suggestion are the application's. Injecting them is
- * what lets the transport move without dragging six features' modules with it.
+ * The process capabilities this transport needs that Trace does not own — each belongs to
+ * another vertical (Identity, Entitlement, model providers, legacy trace read, Data Privacy,
+ * the application). Injecting them lets the transport move without dragging in those modules.
  */
 export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Readonly<{
   /**
@@ -280,14 +228,8 @@ export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Rea
   /** Whether an llm span already carries its own `langwatch.prompt.*`. */
   hasOwnPromptAttrs(params: Record<string, unknown> | null): boolean;
   /**
-   * The application's `trace_not_found` handled error.
-   *
-   * Injected rather than constructed here because the code, its customer-safe
-   * copy and its remediation live in the application's handled-error registry
-   * (`features/errors/logic/codes.ts` and `presentation.ts`). Building an
-   * equivalent class in this package would be a second definition of one wire
-   * code, which is exactly how two surfaces start disagreeing about what a
-   * customer reads.
+   * The application's `trace_not_found` handled error. Injected rather than constructed here,
+   * since its code, copy and remediation live in the application's handled-error registry.
    */
   traceNotFound(id: string): Error;
 }>;
@@ -661,13 +603,9 @@ export class TracesV2TrpcApi {
       )
 
       /**
-       * The Sessions lens read (specs/traces-v2/sessions-lens.feature): one row
-       * per `gen_ai.conversation.id` with TRUE rollups computed in ClickHouse
-       * over every trace of the session in range, unlike the client grouping it
-       * replaces, which could only sum the fetched page. The free-text query
-       * ALSO matches session transcript content in `log_records`, so searching
-       * "#6418" finds the session whose transcript mentions it, for a viewer
-       * allowed to read that content: see `contentSearchTermsForViewer`.
+       * Sessions lens: one row per `gen_ai.conversation.id` with rollups computed in ClickHouse
+       * over every trace in range, not just the fetched page. Free-text also matches session
+       * transcript content in `log_records`; see `contentSearchTermsForViewer`.
        */
 
       .query("sessions", (p) =>
@@ -893,14 +831,9 @@ export class TracesV2TrpcApi {
       )
 
       /**
-       * SSE subscription that pushes `discover_updated` events to active
-       * browsers when a tenant's facet payload finishes background refresh.
-       * The client listens, invalidates its TanStack cache for
-       * `tracesV2.discover`, and refetches — landing the fresh payload
-       * without polling.
-       *
-       * Mirrors the shape of `traces.onTraceUpdate` so the existing
-       * `useSSESubscription` hook handles it without changes.
+       * Pushes `discover_updated` when a tenant's facet payload finishes background refresh, so
+       * the client invalidates its TanStack cache and refetches without polling. Mirrors
+       * `traces.onTraceUpdate` so `useSSESubscription` handles it without changes.
        */
 
       .subscription("onDiscoverUpdate", (p) =>
@@ -1023,21 +956,9 @@ export class TracesV2TrpcApi {
                */
               occurredAtMs: z.number().int().optional(),
               /**
-               * Whether to resolve any offloaded (ADR-022) input/output in full
-               * before returning. Costs one extra spans read per call — only the
-               * drawer's own detail read needs it; every other caller (hover
-               * peek, name lookups, bulk hydrators, sibling prefetch) reads a
-               * truncated preview or discards the content immediately, so every
-               * caller in this codebase passes it explicitly, true or false.
-               *
-               * Defaults to `true` (the pre-existing, unconditional behavior)
-               * purely for rollout safety: a browser tab still running the
-               * previous frontend bundle sends no `full` field at all, and this
-               * default keeps that in-flight request working exactly as before
-               * instead of a Zod validation error, until the tab refreshes onto
-               * the bundle that sends it. Every call site added by this change
-               * passes the field explicitly — this default only ever backstops
-               * a stale client, never a caller in the current code.
+               * Whether to resolve offloaded input/output in full before returning. Costs one
+               * extra spans read; only the drawer's own detail read needs it. Defaults to
+               * `true` so an old client sending no `full` field keeps working.
                */
               full: z.boolean().default(true),
             }),
@@ -1074,13 +995,9 @@ export class TracesV2TrpcApi {
       )
 
       /**
-       * Lets a user rename a trace. Trim happens in the procedure so the event
-       * always carries a canonical form, then the schema check rejects empty /
-       * over-long names — when those rejections fire we surface them as a
-       * `ValidationError` (HandledError), so the client receives the rich
-       * `domainError` payload via tRPC's error formatter alongside the safe
-       * user-facing message. The command pipeline still re-validates via Zod
-       * as a defence-in-depth check (replays from a poisoned event store).
+       * Trim happens here so the event always carries a canonical form; rejections surface as a
+       * `ValidationError` (HandledError). The command pipeline still re-validates via Zod as
+       * defence-in-depth.
        */
 
       .mutation("changeName", (p) =>
@@ -1161,17 +1078,9 @@ export class TracesV2TrpcApi {
       )
 
       /**
-       * The pre-folded coding-agent session rollup for one trace (ADR-056).
-       *
-       * Returns null for an ordinary LLM trace — the fold writes no row for those,
-       * so null is the normal answer rather than an error, and the caller simply
-       * doesn't offer the Session view.
-       *
-       * Unlike the sibling span / log reads this needs NO content redaction: the row
-       * is counters, bounded sets and ids by construction. It carries no prompt, no
-       * reply and no tool output, so there is nothing here for the data-privacy
-       * policy to gate. (If that ever stops being true, this comment is the thing
-       * that has to change first.)
+       * The pre-folded coding-agent session rollup for one trace (ADR-056). Returns null for
+       * an ordinary LLM trace — normal, not an error. Needs no content redaction: the row is
+       * counters, bounded sets and ids by construction, with no prompt/reply/tool output.
        */
 
       .query("codingAgentSession", (p) =>
@@ -1196,18 +1105,9 @@ export class TracesV2TrpcApi {
       )
 
       /**
-       * Every log record correlated to one trace (generic — not Claude-specific).
-       * Logs key by traceId (to spans only via `request_id`), so this is a
-       * trace-level read: the raw-log inspector renders untruncated bodies on
-       * demand, and the dashboard frontend join composes span content client-side
-       * from these logs. `occurredAtMs` is threaded as a `TimeUnixMs`
-       * partition-pruning hint like the sibling span reads.
-       *
-       * These records carry raw captured content (prompts / responses) in their
-       * `body`, so — exactly like the sibling span reads — the read is gated behind
-       * the viewer's captured-input / captured-output visibility via
-       * `redactTraceLogContent`, or the raw-log procedure would be a bypass of
-       * the data-privacy policy the span endpoints enforce.
+       * Every log record correlated to one trace (generic, not Claude-specific). These records
+       * carry raw captured content in `body`, so — like the sibling span reads — this is gated
+       * behind the viewer's captured-input/output visibility via `redactTraceLogContent`.
        */
 
       .query("traceLogs", (p) =>
@@ -1474,17 +1374,9 @@ export class TracesV2TrpcApi {
       )
 
       /**
-       * The coding-agent TRANSCRIPT for one trace — what the agent did, in order.
-       *
-       * The Terminal view used to assemble this in the browser out of three modules.
-       * It lives here now because a transcript is not a rendering concern: the CLI
-       * wants it, an MCP server wants it, and an export wants it, and none of them
-       * are going to run React to get one. One derivation, one answer.
-       *
-       * Reads spans AND logs through the same loaders the sibling endpoints use, so
-       * its content has been through the identical redaction pass — a transcript
-       * endpoint that did its own reads would be a way around the data-privacy
-       * policy, which is precisely why it does not.
+       * The coding-agent transcript for one trace — not a rendering concern, since the CLI, an
+       * MCP server and an export all want it too. Reads spans and logs through the same loaders
+       * the sibling endpoints use, so its content gets the identical redaction pass.
        */
 
       .query("codingAgentTranscript", (p) =>

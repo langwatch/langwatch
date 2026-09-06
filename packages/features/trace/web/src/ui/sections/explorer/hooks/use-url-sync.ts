@@ -153,9 +153,9 @@ function resolveTarget({
     };
   }
 
-  // A fragment naming a lens that hasn't hydrated yet — a reload or a shared `#custom-…` link lands here before
-  // `useLensSync` has fetched anything — gets the same treatment as the bare-URL branch above: show the default,
-  // but leave the stored preference alone so the real lens can still be restored once it arrives.
+  // A fragment naming a lens that hasn't hydrated yet gets the same treatment as the bare-URL
+  // branch above: show the default, but leave the stored preference alone so the real lens can
+  // still be restored once it arrives.
   const lensExists = allLenses.some((l) => l.id === parsed.lensId);
   return {
     lensId: lensExists ? parsed.lensId : DEFAULT_LENS_ID,
@@ -355,9 +355,9 @@ export function useURLSync(): void {
       // entry: older ones keep whatever body they were written with.
       const body = liveBody({ activeLensId, queryText, timeRange });
 
-      // A fragment naming a lens that hasn't hydrated is a live deep link, not stale state, and collapsing it
-      // to what live state spells — for the default fallback, the empty body — is what made a shared
-      // `#custom-…` link unopenable: the address was gone 150ms in, long before the lens it named arrived.
+      // A fragment naming a lens that hasn't hydrated is a live deep link, not stale state.
+      // Collapsing it to the default fallback's empty body made a shared `#custom-…` link
+      // unopenable, gone before the lens it named arrived.
       const pending = pendingLens.current;
       if (pending && body === canonicalBody(pending.applied)) return;
 

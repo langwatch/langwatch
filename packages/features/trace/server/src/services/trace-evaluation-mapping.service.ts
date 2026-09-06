@@ -93,7 +93,7 @@ export class TraceEvaluationMappingService {
       error: record.Error,
       inputs: TraceSafeJsonService.trySafeJsonParse(record.Inputs),
       timestamps: {
-        // CH DateTime64(3) returns UTC strings without timezone suffix; append "Z" only when missing
+        // CH DateTime64(3) returns UTC strings with no timezone suffix; append "Z" only if missing.
         scheduledAt: record.ScheduledAt
           ? new Date(appendUtcSuffix(record.ScheduledAt)).getTime()
           : null,
@@ -105,11 +105,7 @@ export class TraceEvaluationMappingService {
     };
   }
 
-  /**
-   * Maps a legacy ES Evaluation (snake_case, `error: ErrorCapture | null` reduced to just the message string) to the canonical TraceEvaluation type.
-   * @param evaluation - An Evaluation from the ES trace data
-   * @param traceId - The trace ID this evaluation belongs to
-   */
+  /** Maps a legacy ES Evaluation (snake_case, error reduced to just the message string). */
   static mapEsEvaluationToTraceEvaluation(
     evaluation: Evaluation,
     traceId: string,
@@ -135,11 +131,7 @@ export class TraceEvaluationMappingService {
     };
   }
 
-  /**
-   * Reverse mapper: converts TraceEvaluation records back to legacy Evaluation format for backward compatibility with existing callers (e.g. TraceService).
-   * @param result - Record of traceId to TraceEvaluation arrays
-   * @returns Record of traceId to legacy Evaluation arrays
-   */
+  /** Reverse mapper: converts TraceEvaluation records back to legacy Evaluation format. */
   static mapTraceEvaluationsToLegacyEvaluations(
     result: Record<string, TraceEvaluation[]>,
   ): Record<string, Evaluation[]> {

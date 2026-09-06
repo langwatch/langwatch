@@ -15,7 +15,10 @@ import { capPayloadString } from "./trace-payload-cap.rules";
 export interface ClaudeContentLog {
   /** `api_request_body` | `api_response_body` | `user_prompt` | `assistant_response` */
   eventName: string;
-  /** The model call's request id — present on `*_response_body` / `assistant_response`, absent on inputs. */
+  /**
+   * The model call's request id — present on `*_response_body`/`assistant_response`, absent on
+   * inputs.
+   */
   requestId: string | null;
   /** The agent's query source (e.g. `repl_main_thread`); null on older builds. */
   querySource: string | null;

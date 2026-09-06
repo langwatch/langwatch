@@ -103,11 +103,7 @@ export class TraceReadRedactionService {
     return [];
   }
 
-  /**
-   * Redacts sensitive values from an object.
-   * @param object - The object to redact; @param redactions - Set of strings to replace with [REDACTED]
-   * @returns The redacted object
-   */
+  /** Redacts sensitive values from an object. */
   static redactObject<T>(object: T, redactions: Set<string>): T {
     if (redactions.size === 0) {
       return object;
@@ -175,11 +171,7 @@ export class TraceReadRedactionService {
     );
   }
 
-  /**
-   * Applies redaction protections to a span.
-   * @param span/protections/redactions - Span to protect, protection settings, and strings to redact
-   * @returns The span with protections applied
-   */
+  /** Applies redaction protections to a span. */
   static applySpanProtections(span: Span, protections: Protections, redactions: Set<string>): Span {
     let transformedInput: SpanInputOutput | null | undefined = span.input;
     let transformedOutput: SpanInputOutput | null | undefined = span.output;

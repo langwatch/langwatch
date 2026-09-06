@@ -131,9 +131,9 @@ function getAnnotatedType(spanAttributes: NormalizedAttributes, attrKey: string)
 }
 
 /**
- * Extracts input from canonical span attributes only. After canonicalization, input is at: 1. gen_ai.input.messages (chat messages) 2. langwatch.input
- * (text/json/structured) 3. gen_ai.tool.call.arguments (tool spans from semconv-native emitters — e.g. Copilot CLI — whose ingest path never lifted them into
- * langwatch.input)
+ * Extracts input from canonical span attributes only. After canonicalization, input is at:
+ * gen_ai.input.messages, langwatch.input, or gen_ai.tool.call.arguments (semconv-native
+ * emitters whose ingest path never lifted them into langwatch.input).
  */
 export function extractInput(spanAttributes: NormalizedAttributes): SpanInputOutput | null {
   // Priority 1: gen_ai.input.messages → always chat_messages
@@ -220,9 +220,8 @@ function parseJsonOrText(value: unknown): SpanInputOutput {
 }
 
 /**
- * Extracts output from canonical span attributes only. After canonicalization, output is at: 1.
- * gen_ai.output.messages (chat messages) 2. langwatch.output (text/json/structured) 3. gen_ai.tool.call.result
- * (tool spans from semconv-native emitters)
+ * Extracts output from canonical span attributes only. After canonicalization, output is at:
+ * gen_ai.output.messages, langwatch.output, or gen_ai.tool.call.result (semconv-native emitters).
  */
 export function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOutput | null {
   // Priority 1: gen_ai.output.messages → always chat_messages

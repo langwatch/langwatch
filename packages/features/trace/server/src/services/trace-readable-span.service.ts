@@ -106,7 +106,7 @@ function buildAttributes(span: Span): Attributes {
   return attrs;
 }
 
-/** One side of the conversation, under the messages key when it is a chat and `input`/`output` otherwise. */
+/** One side of the conversation, under the messages key for a chat, `input`/`output` otherwise. */
 function assignIo({
   attrs,
   value,

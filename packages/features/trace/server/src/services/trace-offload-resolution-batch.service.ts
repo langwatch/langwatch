@@ -219,7 +219,7 @@ function planSpan({
   return { cleanedAttrs, refs, hadRefs: true };
 }
 
-/** One trace's spans with the fetched values scattered back, and its IO recomputed if any landed. */
+/** One trace's spans with fetched values scattered back, and its IO recomputed if any landed. */
 function assembleTrace({
   spanPlans,
   originalSpans,

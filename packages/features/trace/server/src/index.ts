@@ -2,7 +2,9 @@ export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matchin
 export { ClickHouseTraceAdapter } from "./adapters/clickhouse.trace.adapter";
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
 /**
- * The platform's retention policy in the shape the ClickHouse package asks for. Exported because Evaluation's own ClickHouse repository takes the same floor port, and a second floor would let a trace and the evaluations behind it disagree about how far back a project's rows go.
+ * The platform's retention policy in the shape the ClickHouse package asks for. Exported because
+ * Evaluation's own ClickHouse repository takes the same floor port, and a second floor would let
+ * a trace and the evaluations behind it disagree about how far back a project's rows go.
  */
 export { TraceRetentionFloorService } from "./services/trace-retention-floor.service";
 export { NullTraceListAdapter } from "./adapters/null-trace-list.adapter";
@@ -508,7 +510,9 @@ export { RESERVED_METADATA_KEYS } from "./rules/trace-export-columns.rules";
 export { enrichTracesWithEvaluations } from "./rules/trace-evaluation-enrichment.rules";
 
 /**
- * The EDGE media path: what a span carries inline, lifted into the object store before the span folds. Was platform/app's edge-media-extraction.ts + four content-part extractors under server/stored-objects/ — they walk TRACE content parts and media markers, so they belong to this vertical, not Stored Objects.
+ * The edge media path: what a span carries inline, lifted into the object store before the
+ * span folds. Belongs to this vertical, not Stored Objects, since it walks trace content parts
+ * and media markers.
  */
 export {
   TRACE_MEDIA_PURPOSE,

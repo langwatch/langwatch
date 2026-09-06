@@ -188,9 +188,8 @@ export function useFilterSidebarData() {
     [facetStateLookup],
   );
 
-  // Synthesise when (a) discover is still in flight, (b) discover completed but returned no descriptors (project has no traces yet), or (c) discover returned
-  // descriptors that all partition away — every categorical had zero buckets, every range a zero span, and no attribute keys surfaced — so nothing usable survives
-  // for the current view (e.g. a project with traces but an empty distinct set in this time window).
+  // Synthesise when discover is still in flight, returned no descriptors, or returned
+  // descriptors that all partition away, so nothing usable survives for the current view.
   const {
     categoricals,
     ranges,
@@ -504,9 +503,8 @@ function isPartitionEmpty(partition: ReturnType<typeof partitionDescriptors>): b
 }
 
 /**
- * Build a synthetic descriptor list from FACET_DEFAULTS and RANGE_DEFAULTS — used to render the sidebar before
- * discover responds (or when discover returns empty because the project has no traces yet), so users see the
- * well-known facets immediately instead of a blank sidebar.
+ * Build a synthetic descriptor list from FACET_DEFAULTS and RANGE_DEFAULTS, used to render the
+ * sidebar before discover responds, so users see the well-known facets instead of a blank sidebar.
  */
 type Descriptors = NonNullable<ReturnType<typeof useTraceFacets>["data"]>;
 function synthesizeDefaultDescriptors(): Descriptors {

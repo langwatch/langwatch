@@ -101,18 +101,11 @@ export type TraceSpoolIdentity = {
 };
 
 /**
- * Transient spool operations for the ADR-022 write path.
- *
- * A per-span transient object carries over-threshold command payloads from the
- * edge to the command worker. It is eagerly deleted after the event_log INSERT
- * succeeds; a 3-day lifecycle policy is the safety net for orphans (3 days
- * covers weekend incidents that need catch-up time).
- *
- * Spool writes go through the shared stored-objects layer, so the spool lands
- * wherever the project's storage destination points — S3, Azure Blob, or the
- * local filesystem. It used to speak the AWS SDK directly, which made it the
- * one byte-writing surface that silently ignored a deployment's Azure
- * configuration (langwatch/langwatch-saas#800).
+ * Transient spool operations for the ADR-022 write path. A per-span transient object carries
+ * over-threshold command payloads from the edge to the command worker, eagerly deleted after
+ * the event_log INSERT succeeds; a 3-day lifecycle policy is the safety net for orphans. Spool
+ * writes go through the shared stored-objects layer, so the spool lands wherever the project's
+ * storage destination points.
  */
 export class TraceSpoolService {
   static create(options: TraceSpoolServiceOptions): TraceSpoolService {
@@ -122,19 +115,10 @@ export class TraceSpoolService {
   private constructor(private readonly options: TraceSpoolServiceOptions) {}
 
   /**
-   * Fetches the full span body from the transient spool object.
-   * Called by the command worker when a command carries a `spoolRef`.
-   *
-   * The object's location is re-derived from `projectId` / `traceId` / `spanId`
-   * — all read from the command itself, which the queue authenticated — rather
-   * than from `spoolRef`. A tampered reference therefore cannot redirect this
-   * read at another tenant's bytes; the worst it can do is name a v1 format and
-   * miss.
-   *
-   * NOT fail-open, deliberately: the edge cleared `span.attributes` before
-   * spooling, so returning nothing here would write an empty span to
-   * `event_log` — permanent, silent loss in the sole source of truth. Throwing
-   * lets the command retry.
+   * The object's location is re-derived from `projectId`/`traceId`/`spanId` — read from the
+   * queue-authenticated command, never from `spoolRef` — so a tampered reference cannot redirect
+   * this read at another tenant's bytes. NOT fail-open: the edge already cleared
+   * `span.attributes`, so returning nothing would write a permanently empty span to `event_log`.
    */
   async getSpool(identity: TraceSpoolIdentity): Promise<Buffer> {
     if (isLegacySpoolRef(identity.spoolRef)) {
@@ -149,14 +133,9 @@ export class TraceSpoolService {
   }
 
   /**
-   * Writes the transient spool object for an over-threshold command payload and
-   * returns the reference the command will carry.
-   *
-   * The object lands at whichever backend the project's storage destination
-   * names. Object path: `trace-blobs/spool/{projectId}/{traceId}/{spanId}` —
-   * transient, eagerly deleted after the event_log INSERT succeeds. The
-   * bucket/container MUST have a 3-day lifecycle rule on the
-   * `trace-blobs/spool/` prefix as the safety net for orphans.
+   * Object path: `trace-blobs/spool/{projectId}/{traceId}/{spanId}` — transient, eagerly deleted
+   * after the event_log INSERT succeeds. The bucket/container must have a 3-day lifecycle rule
+   * on that prefix as the safety net for orphans.
    */
   async putSpool(input: {
     projectId: string;
@@ -212,18 +191,10 @@ export class TraceSpoolService {
   }
 
   /**
-   * Re-derives the spool object's URI from server-trusted inputs. Never reads a
-   * location out of the command.
-   *
-   * `purpose` decides whether the destination guards apply. They exist to stop
-   * a NEW object landing where nothing will reap it, so they are a write-time
-   * rule only. Applying them to a read or a delete would punish the objects
-   * already on disk: an operator who turns the retention assertion back off —
-   * the documented remediation, and what a chart rollback does — would make
-   * every in-flight spooled span permanently unreadable (`getSpool` does not
-   * fail open, and the edge already cleared the attributes), and would stop the
-   * eager delete that is the spool's FIRST line of cleanup, manufacturing
-   * exactly the orphan the guard is there to prevent.
+   * Re-derives the spool object's URI from server-trusted inputs, never from the command.
+   * `purpose` gates the destination guards to write time only: applying them to a read or
+   * delete would make in-flight spooled spans permanently unreadable and block the eager
+   * delete that is the spool's first line of cleanup.
    */
   private async mintSpoolUri(input: {
     projectId: string;

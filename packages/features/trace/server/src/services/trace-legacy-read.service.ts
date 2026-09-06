@@ -14,9 +14,8 @@ import { TraceEditOverlayService } from "./trace-edit-overlay.service";
 import { TraceReadEnrichmentService } from "./trace-read-enrichment.service";
 
 /**
- * Minimum prefix length we will attempt to resolve. Shorter strings fall through to "not found" — this keeps us
- * from scanning the entire trace_summaries table on a single-character typo and narrows the search space enough to
- * meaningfully detect ambiguity.
+ * Minimum prefix length we will attempt to resolve. Shorter strings fall through to "not found" —
+ * this avoids scanning the entire trace_summaries table on a single-character typo.
  */
 export const MIN_TRACE_ID_PREFIX_LENGTH = 8;
 
@@ -34,9 +33,9 @@ export const FULL_TRACE_ID_LENGTH = 32;
 export const TRACE_ID_PREFIX_CANDIDATE_LIMIT = 5;
 
 /**
- * Time window (in days) that prefix resolution scans. Without a partition bound, ClickHouse would scan every partition (including cold storage on S3) on a
- * miss. 90 days covers the CLI's "copy a truncated ID from a recent search" use case while keeping the query on hot partitions. Full 32-char IDs still
- * resolve unbounded via the normal exact-match path.
+ * Time window (in days) that prefix resolution scans. Without a partition bound, ClickHouse
+ * would scan every partition (incl. cold S3 storage) on a miss. Full 32-char IDs still resolve
+ * unbounded via the normal exact-match path.
  */
 export const TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS = 90;
 
@@ -106,11 +105,6 @@ export class TraceService {
     private readonly evaluationService: EvaluationService,
   ) {}
 
-  /**
-   * @param options composed service dependencies; @param blobResolutionDeps optional blob-offload deps (#4888);
-   * @param logRecordStorage optional log-record store for read-time Claude Code enrichment.
-   * @returns TraceService instance
-   */
   static create({
     traceCanonicalisation,
     traceRead,
@@ -134,11 +128,6 @@ export class TraceService {
     );
   }
 
-  /**
-   * @param projectId project ID; @param traceId trace ID to fetch; @param protections redaction protections.
-   * @param opts.full resolves offloaded blob previews when deps are present; @param opts.withEditOverlay applies a reviewer's saved correction.
-   * @returns The trace if found, undefined otherwise
-   */
   async tryGetById(
     projectId: string,
     traceId: string,
@@ -168,10 +157,8 @@ export class TraceService {
           return finish(traces[0]);
         }
 
-        // No exact match. If the input looks like a truncated hex prefix
-        // (shorter than a full trace ID, but long enough to meaningfully
-        // narrow the scan), try git-style prefix resolution scoped to this
-        // project and the last TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS days.
+        // No exact match. If the input looks like a truncated hex prefix, try git-style prefix
+        // resolution scoped to this project and TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS days.
         if (
           traceId.length < FULL_TRACE_ID_LENGTH &&
           traceId.length >= MIN_TRACE_ID_PREFIX_LENGTH &&
@@ -214,11 +201,7 @@ export class TraceService {
     );
   }
 
-  /**
-   * @param projectId project ID; @param traceIds trace IDs; @param protections redaction protections;
-   * @param occurredAt bounds the partition scan; @param opts.full resolves offloaded blob previews; @param opts.withEditOverlay applies reviewer corrections.
-   * @returns Array of Trace objects with spans
-   */
+  /** @param occurredAt bounds the partition scan. */
   async getTracesWithSpans(
     projectId: string,
     traceIds: string[],
@@ -249,11 +232,6 @@ export class TraceService {
     );
   }
 
-  /**
-   * @param projectId project ID; @param threadId thread ID to group by; @param protections redaction protections.
-   * @param opts.full resolves offloaded blob previews when deps are present.
-   * @returns Array of traces in the thread
-   */
   async getTracesByThreadId(
     projectId: string,
     threadId: string,
@@ -276,11 +254,6 @@ export class TraceService {
     );
   }
 
-  /**
-   * @param input query parameters (filters, pagination, sorting); @param protections redaction protections;
-   * @param options additional download-mode options.
-   * @returns TracesForProjectResult with groups, totalHits, and traceChecks
-   */
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
@@ -299,10 +272,8 @@ export class TraceService {
           return result;
         }
 
-        // includeSpans callers (bulk export, search) read whole spans, so the Claude Code content + cost join
-        // applies here exactly as on the single-trace and thread reads. Enrichment runs over the flattened page
-        // so the helper's bounded fan-out caps concurrent log reads for the whole page; a page with no
-        // coding-agent trace returns the same array reference and pays nothing.
+        // Enrichment runs over the flattened page so the helper's bounded fan-out caps concurrent
+        // log reads for the whole page; a page with no coding-agent trace pays nothing.
         const flat = result.groups.flat();
         const enriched = await this.enrichment.enrichCodingAgentTraces(input.projectId, flat);
         if (enriched === flat) {
@@ -321,10 +292,6 @@ export class TraceService {
     );
   }
 
-  /**
-   * @param projectId project ID; @param traceIds array of trace IDs; @param protections redaction protections.
-   * @returns Map of trace ID to evaluations
-   */
   async getEvaluationsMultiple(
     projectId: string,
     traceIds: string[],
@@ -375,11 +342,6 @@ export class TraceService {
     );
   }
 
-  /**
-   * @param projectId project ID; @param threadIds thread IDs; @param protections redaction protections;
-   * @param opts.full resolves preview, zero event_log reads (#4888 / ADR-022); @param opts.withEditOverlay applies corrections.
-   * @returns Array of traces
-   */
   async getTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
@@ -441,10 +403,6 @@ export class TraceService {
     );
   }
 
-  /**
-   * @param projectId project ID; @param startDate start of date range (epoch millis); @param endDate end of range.
-   * @returns DistinctFieldNamesResult with span names and metadata keys
-   */
   async getDistinctFieldNames(
     projectId: string,
     startDate: number,
@@ -459,10 +417,6 @@ export class TraceService {
     );
   }
 
-  /**
-   * @param projectId project ID; @param spanId span ID to find; @param protections redaction protections.
-   * @returns PromptStudioSpanResult or null if not found
-   */
   async tryGetSpanForPromptStudio({
     projectId,
     spanId,

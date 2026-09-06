@@ -85,7 +85,8 @@ const SLIDE_VARIANTS: Variants = {
 const SLIDE_TRANSITION = { duration: 0.16, ease: "easeOut" as const };
 
 /**
- * Pull a readable snippet out of an input/output payload using the unified `formatPreview` pipeline (JSON unwrap, fence/image strip, newline glyph, cap).
+ * Pull a readable snippet out of an input/output payload using the unified `formatPreview`
+ * pipeline (JSON unwrap, fence/image strip, newline glyph, cap).
  */
 function lastPreferredMessagePreview(parsed: unknown[], prefer: "user" | "assistant"): string {
   for (let i = parsed.length - 1; i >= 0; i--) {
@@ -278,9 +279,8 @@ export const ConversationContext = memo(function ConversationContext({
       width="100%"
       minHeight={0}
       minWidth={0}
-      // Light mode tone stack: panel bg = `bg.surface` (white) — header + content both sit on white, matching the accordion sections
-      // row borders = `gray.200` (light only) non-selected = `bg.surface` (white) selected = `blue.subtle` — matches the row-selection
-      // blue used on the trace list, replacing the previous gray indent Dark mode keeps the validated palette.
+      // Light mode: panel bg matches the accordion sections; selected row uses the same
+      // `blue.subtle` as the trace list's row-selection. Dark mode keeps the validated palette.
       bg={{ base: "bg.surface", _dark: "bg.surface" }}
       // Bottom border doubles as the ctx ↔ viz separator when the
       // pane is expanded (the header's own borderBottom only sits at
@@ -300,9 +300,9 @@ export const ConversationContext = memo(function ConversationContext({
         shouldShowTranslate={hasTranslatable && !collapsed}
       />
       {collapsed ? null : (
-        // Two-level structure on purpose: - outer Box `flex={1} overflow="auto"` — the scroll container, fills the Panel's remaining space - inner Box `ref={contentRef}` — naturally sized (no flex, no overflow), so its
-        // `scrollHeight` / `offsetHeight` always equals the row content's actual height regardless of how tall the Panel gets Without the split, `scrollHeight` on an overflow:auto element clamps to `>= clientHeight` —
-        // dragging the Panel bigger made the measured "content height" grow with it, ctxMaxSize grew with it, and the drag had no real cap (visible as the slow-drag with infinite trailing whitespace).
+        // Two-level structure on purpose: outer Box is the scroll container, inner Box (ref)
+        // is naturally sized so its `scrollHeight` always equals the row content's real height.
+        // Without the split, `scrollHeight` on an overflow:auto element clamps to `clientHeight`.
         <Box flex={1} minHeight={0} overflow="auto" paddingX={4} paddingY={3}>
           <Box ref={contentRef}>
             <ContextBody ctx={ctx} rows={displayRows} traceId={traceId} onSelect={navigate} />

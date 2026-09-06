@@ -78,9 +78,9 @@ export class TraceReadEnrichmentService {
   }
 
   /**
-   * Overlays reviewer corrections onto a page of traces, in one read for the whole page. Runs LAST on every
-   * opted-in path, after blob resolution and coding-agent enrichment, so a correction wins over whatever the
-   * resolvers put in the field.
+   * Overlays reviewer corrections onto a page of traces, in one read for the whole page. Runs
+   * last on every opted-in path, after blob resolution and coding-agent enrichment, so a
+   * correction wins over whatever the resolvers put in the field.
    */
   async applyEditOverlays(
     projectId: string,
@@ -137,10 +137,9 @@ export class TraceReadEnrichmentService {
       return traces;
     }
 
-    // Bounded fan-out: each coding-agent trace's enrichment holds a capped but heavy log read (raw bodies run to
-    // 60 KB a row) in memory, so an unbounded Promise.all over a big export/eval page multiplies that by the page
-    // size. Five in flight keeps the multi-trace paths at a bounded memory ceiling; non-coding-agent traces
-    // short-circuit inside `enrichCodingAgentTrace` and cost nothing.
+    // Bounded fan-out: each enrichment holds a heavy log read (raw bodies run to 60 KB a row) in
+    // memory, so an unbounded Promise.all over a big page multiplies that by the page size. Five
+    // in flight keeps a bounded memory ceiling; non-coding-agent traces cost nothing.
     const enrichConcurrency = 5;
     const enriched: Trace[] = [...traces];
     for (let start = 0; start < traces.length; start += enrichConcurrency) {

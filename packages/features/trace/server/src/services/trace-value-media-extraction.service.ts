@@ -33,8 +33,8 @@ const CONCURRENT_STORES = 4;
 
 /**
  * Mutable cost budget threaded through one span's extraction. Create with
- * `TraceValueMediaExtractionService.createExtractionBudget()` and share across every attribute value of the
- * span so the cap and deadline are per-span, not per-attribute.
+ * `TraceValueMediaExtractionService.createExtractionBudget()` and share across every attribute
+ * value of the span so the cap and deadline are per-span, not per-attribute.
  */
 export interface ExtractionBudget {
   deadlineAt: number;

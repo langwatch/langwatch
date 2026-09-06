@@ -34,9 +34,9 @@ interface TraceDrawerScaffold {
  * Data wiring + cross-cutting effects for the trace drawer.
  */
 export function useTraceDrawerScaffold(): TraceDrawerScaffold {
-  // `goBack` so closing the drawer pops just our entry off the drawer stack, e.g. clicking the close button from
-  // a trace opened via the scenarioRunDetail drawer restores that scenario drawer instead of nuking the whole
-  // drawer-state (which `closeDrawer` would do, also stripping the `span` and other shared params from the URL).
+  // `goBack` so closing the drawer pops just our entry off the drawer stack — e.g. closing a
+  // trace opened via the scenarioRunDetail drawer restores that drawer instead of nuking the
+  // whole drawer state, which `closeDrawer` would do.
   const { goBack, closeDrawer } = useDrawer();
 
   // The drawer store is the source of truth for `traceId` — see
@@ -97,9 +97,8 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
 
   const trpcUtils = api.useUtils();
   const closeDrawerNow = useCallback(() => {
-    // Cancel any in-flight per-trace queries so closing during a slow load doesn't leave the request running in
-    // the background, racing against a future re-open of the same drawer (or a different trace) and burning
-    // bandwidth/CH cycles for a result nobody is waiting on.
+    // Cancel any in-flight per-trace queries so closing during a slow load doesn't leave the
+    // request running, racing a future re-open and burning bandwidth/CH cycles for nothing.
     if (traceId) {
       void trpcUtils.tracesV2.header.cancel();
       void trpcUtils.tracesV2.spanTree.cancel();

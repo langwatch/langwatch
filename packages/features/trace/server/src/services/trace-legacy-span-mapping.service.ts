@@ -83,9 +83,8 @@ export class TraceLegacySpanMappingService {
   }
 
   /**
-   * Converts flat dot-notation keys into nested objects. e.g. {"gen_ai.usage.input_tokens": 100} → {"gen_ai": {"usage": {"input_tokens": 100}}} Keys without
-   * dots stay at top level. Leaf values (arrays, objects, scalars) stay as-is.
-   * @internal Exported for unit testing
+   * Converts flat dot-notation keys into nested objects, e.g. {"gen_ai.usage.input_tokens": 100}
+   * → {"gen_ai": {"usage": {"input_tokens": 100}}}. Keys without dots stay at top level.
    */
   static unflattenDotNotation(flat: NormalizedAttributes): Record<string, unknown> {
     return safeUnflatten(flat as Record<string, unknown>);

@@ -1,22 +1,8 @@
 /**
- * A trace's spans over the process's tRPC transport.
- *
- *   getAllForTrace:     every span on one trace, ordered the way a waterfall
- *                       reads: earliest start first, and where two spans start
- *                       together the longer one first, so a parent is never
- *                       drawn under the child it contains.
- *   getForPromptStudio: one LLM span reshaped into the messages and model
- *                       parameters the prompt studio opens with.
- *
- * Both take `traces:view` — a span is trace content, and nothing here is
- * readable to a caller who may not read the trace it belongs to.
- *
- * Transport only: policy, input parsing and delegation to `TraceApp`. The
- * waterfall order is the application's, not this door's, so the share page and
- * the explorer read the same trace the same way round. The viewer's redactions
- * are resolved by the process (they depend on the request's session, the
- * project's data-privacy policy and the plan's visibility window) and handed to
- * the read unchanged.
+ * A trace's spans over the process's tRPC transport. Both procedures take `traces:view` — a
+ * span is trace content, and nothing here is readable to a caller who may not read the trace it
+ * belongs to. Transport only: the waterfall order is the application's, not this door's, and the
+ * viewer's redactions are resolved by the process and handed to the read unchanged.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -47,13 +33,8 @@ type SpansTrpcProcedures<
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
-   * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one declared permission.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
+   * Applied AFTER this feature's own input parser: the authorization check reads its scope id
+   * from the validated input, and tRPC runs middlewares in the order they were added.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
   /** Whether the chain checks every answer against its declared output schema. */

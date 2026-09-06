@@ -211,9 +211,9 @@ export function PaneLayout({
     return () => observer.disconnect();
   }, [layout]);
 
-  // Whenever the measured `ctxMaxSize` shrinks below the Panel's current size — e.g., content got shorter, or the persisted autoSaveId
-  // restored a value from a wider state — clamp the Panel down. react-resizable-panels' `maxSize` prop is enforced on drag but not always
-  // on rehydration / dynamic prop change, so this makes the cap stick.
+  // Whenever the measured `ctxMaxSize` shrinks below the Panel's current size, clamp it down.
+  // react-resizable-panels' `maxSize` prop is enforced on drag but not always on rehydration /
+  // dynamic prop change, so this makes the cap stick.
   useEffect(() => {
     const handle = ctxPanelRef.current;
     if (!handle) return;
@@ -505,14 +505,15 @@ export function PaneLayout({
 }
 
 /**
- * The visible separator between two panels AND the drag hit zone in a single element — no pseudo-elements, no nested layers.
+ * The visible separator between two panels AND the drag hit zone in a single element — no
+ * pseudo-elements, no nested layers.
  */
 function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
   const isHorizontal = orientation === "horizontal";
   return (
-    // Single 1px element that IS the visible separator — claiming exactly 1px of layout space is cheaper and
-    // more reliable than a 0-area parent with a sub-pixel absolutely-positioned child (which rounded to 0px in
-    // some browsers, making the separator disappear in spots).
+    // Single 1px element that IS the visible separator — cheaper and more reliable than a
+    // 0-area parent with a sub-pixel absolutely-positioned child, which rounded to 0px in some
+    // browsers, making the separator disappear in spots.
     <Box
       width={isHorizontal ? "1px" : "100%"}
       height={isHorizontal ? "100%" : "1px"}

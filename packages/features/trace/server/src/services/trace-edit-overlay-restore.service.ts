@@ -12,8 +12,9 @@ import {
 
 /**
  * The span fields the stored correction holds that this viewer never received faithfully, having
- * been dropped or handed over redacted. Identity comparison is the test: every read gate passes a
- * readable value through by reference, so anything different is something the viewer could not edit.
+ * been dropped or handed over redacted. Identity comparison is the test: every read gate passes
+ * a readable value through by reference, so anything different is something the viewer could
+ * not edit.
  */
 function withheldSpanFields({
   storedSpan,

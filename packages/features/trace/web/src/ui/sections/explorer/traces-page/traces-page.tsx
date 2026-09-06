@@ -124,9 +124,9 @@ export const TracesPage: React.FC = () => {
     hasAnyTraces,
   });
 
-  // Project switches reset the per-project surfaces: the open drawer points at a trace the new project can't
-  // load, and the active filter query references facet values (evaluator ids, models, metadata) that don't exist
-  // across projects — both would render as confusing empty/error states if left in place.
+  // Project switches reset the per-project surfaces: the open drawer points at a trace the new
+  // project can't load, and filter facet values may not exist across projects — both would
+  // render as confusing empty/error states if left in place.
   const prevProjectIdRef = useRef<string | null>(null);
   const closeDrawerOnSwitch = useDrawerStore((s) => s.closeDrawer);
   const clearFilters = useFilterStore((s) => s.clearAll);
@@ -184,9 +184,9 @@ export const TracesPage: React.FC = () => {
                 for the facets/outro beats. */}
             {!showIntegratePane &&
               (!showEmptyState || sidebarVisibleDuringEmpty) && (
-                // `height="full"` + `overflow="hidden"` on this wrapper is load-bearing: without it the inner aside expands to
-                // its intrinsic content height (1700px+ once every facet group is rendered) and the HStack just hides the
-                // overflow at the bottom — meaning ~half the facets are invisible AND unscrollable on shorter viewports.
+                // `height="full"` + `overflow="hidden"` on this wrapper is load-bearing: without
+                // it the inner aside expands to its intrinsic height and facets become invisible
+                // and unscrollable on shorter viewports.
                 <Box flexShrink={0} data-tour-target="sidebar" height="full" overflow="hidden">
                   <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
                 </Box>

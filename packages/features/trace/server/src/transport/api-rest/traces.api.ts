@@ -1,5 +1,8 @@
 /**
- * REST for the v1 trace reads: `POST /api/traces/search`, `GET /api/traces/:traceId`, `GET /api/traces/:traceId/transcript`, `PATCH /api/traces/:traceId/metadata`. Was `platform/app/src/app/api/traces/[[...route]]/app.v1.ts` — everything the routes reached through the platform's global application container is a port now (legacy read, API-key redactions, deep-link builder, reserved-metadata write, coding-agent transcript join), while the projection compiler, evaluation enricher, and two formatters are this package's own and called directly. The search BODY arrives as a port for the same reason the analytics timeseries body does — the shared analytics filter vocabulary is not this feature's — with the additive half (projection DSL, output format, date axis) published here as {@link traceSearchBodyExtensions}.
+ * REST for the v1 trace reads: search, get-by-id, transcript, metadata PATCH. Everything the
+ * routes reach through the process is a port; the projection compiler, evaluation enricher and
+ * formatters are this package's own. The search body's additive half (projection DSL, output
+ * format, date axis) is published as {@link traceSearchBodyExtensions}.
  */
 import { TraceProjectionCompileService } from "#services/trace-projection-compile.service";
 import { TraceReadableSpanService } from "#services/trace-readable-span.service";
@@ -41,7 +44,9 @@ import {
 const logger = createLogger("langwatch:api:traces");
 
 /**
- * The additive half of the search body, published by the family that answers it. The other half is the deployment's shared analytics filter vocabulary, arriving as {@link TracesRestPorts}' `searchBodySchema`; a mount merges the two. The describe() text here is the public API documentation for these fields, so it belongs beside the handler that honours them rather than whichever process happens to mount it.
+ * The additive half of the search body; the other half is the deployment's shared analytics
+ * filter vocabulary, arriving as {@link TracesRestPorts}' `searchBodySchema`. A mount merges
+ * the two. The describe() text here is the public API documentation for these fields.
  */
 export const traceSearchBodyExtensions = {
   scrollId: z.string().optional().nullable(),
@@ -70,7 +75,8 @@ export const traceSearchBodyExtensions = {
 } as const;
 
 /**
- * What a caller may send to `POST /search`, as this family reads it. Everything beyond the named fields is the deployment's filter vocabulary and travels to the read untouched — the same pass-through the route has always made.
+ * What a caller may send to `POST /search`. Everything beyond the named fields is the
+ * deployment's filter vocabulary and travels to the read untouched.
  */
 export type TraceSearchBody = ProjectionRequest &
   Readonly<{
@@ -85,7 +91,8 @@ export type TraceSearchBody = ProjectionRequest &
   }>;
 
 /**
- * The legacy trace read, as the three read routes here use it. Declared narrowly rather than as the whole `TraceLegacyReadPort`: a REST door that could reach eleven readers invites a handler to answer a question this surface does not publish.
+ * The legacy trace read, as the three read routes here use it. Declared narrowly rather than as
+ * the whole `TraceLegacyReadPort`, so this surface can't answer a question it doesn't publish.
  */
 export interface TracesRestReadPort {
   getAllTracesForProject(
@@ -115,19 +122,26 @@ export interface TracesRestReadPort {
 /** What the v1 trace family needs from the process. */
 export interface TracesRestPorts<TBody extends TraceSearchBody, TBodyRaw> {
   /**
-   * The search body a caller may send: the deployment's shared analytics filter vocabulary merged with {@link traceSearchBodyExtensions}. Both the parsed shape and the shape a caller SENDS are carried, because they differ — `dateField` and `from` both carry defaults — and the validator types the 400 body off the sent shape.
+   * The deployment's shared analytics filter vocabulary merged with {@link
+   * traceSearchBodyExtensions}. Both the parsed and sent shapes are carried since they differ —
+   * `dateField` and `from` both carry defaults — and the validator types the 400 body off the
+   * sent shape.
    */
   searchBodySchema: z.ZodType<TBody, TBodyRaw>;
   /** The read itself. Resolved per request, never constructed at mount. */
   traces(): TracesRestReadPort;
   /**
-   * The API KEY caller's read-time redactions for one project: cost visibility, the data-privacy policy's content categories, the restricted-attribute rules and the plan's visibility cutoff. A key is not a person, so categories resolve as for a caller with no session; costs are visible because every project role grants `cost:view` and a project key carries full project access.
+   * The API key caller's read-time redactions for one project. A key is not a person, so
+   * categories resolve as for a caller with no session; costs are visible since every project
+   * role grants `cost:view` and a project key carries full project access.
    */
   getProtections(input: Readonly<{ projectId: string }>): Promise<unknown>;
   /** Deep links back into the product, built from the deployment's origin. */
   platformUrl: PlatformUrlBuilder;
   /**
-   * The reserved-metadata amendment, or none. None where the process registered no command queue: the amendment is a synthetic span on the ingestion pipeline, and a PATCH that answered 200 while recording nothing is a change a caller cannot tell did not happen. Absent, the route is not registered at all.
+   * The reserved-metadata amendment, or none where the process registered no command queue — a
+   * PATCH answering 200 while recording nothing is a change the caller can't tell didn't happen,
+   * so absent, the route is not registered at all.
    */
   updateTraceMetadata?:
     | ((
@@ -139,7 +153,9 @@ export interface TracesRestPorts<TBody extends TraceSearchBody, TBodyRaw> {
       ) => Promise<void>)
     | undefined;
   /**
-   * The coding-agent transcript join, or none. None where the process composed no coding-agent session store and no log canonicaliser: the transcript would come back empty, which reads as "this agent did nothing" rather than "this deployment cannot tell you". Absent, the route is not registered at all.
+   * The coding-agent transcript join, or none where the process composed no coding-agent
+   * session store — an empty transcript would misread as "this agent did nothing" rather than
+   * "this deployment cannot tell you", so absent, the route is not registered at all.
    */
   readCodingAgentTranscript?:
     | ((
@@ -201,9 +217,7 @@ const ambiguousPrefixResponse = {
     description: "Ambiguous trace ID prefix — the prefix matches more than one trace",
     content: {
       "application/json": {
-        schema: resolver(
-          z.object({ message: z.string(), candidateTraceIds: z.array(z.string()) }),
-        ),
+        schema: resolver(z.object({ message: z.string(), candidateTraceIds: z.array(z.string()) })),
       },
     },
   },
@@ -218,7 +232,8 @@ const TRACE_ANSWER_REASON =
   "the search streams its envelope and the reads answer an ambiguous-prefix 409 of their own";
 
 /**
- * The v1 trace family, built against one process's security. ORDERING inside the family is load-bearing: `/:traceId/transcript` and `/:traceId/metadata` are registered before the bare `/:traceId`, so the literal sub-resources are not swallowed by the parameter.
+ * ORDERING inside the family is load-bearing: `/:traceId/transcript` and `/:traceId/metadata`
+ * register before the bare `/:traceId`, so the literal sub-resources aren't swallowed by it.
  */
 export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(options: {
   security: AppRestSecurity;
@@ -538,7 +553,6 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
     ) => {
       const project = projectOf(c);
       const { traceId } = input;
-
 
       await updateTraceMetadata({
         projectId: project.id,

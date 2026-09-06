@@ -132,9 +132,9 @@ export function TraceTableShell<T>({
       // yellow.fg/8) composite over a known base.
       bg="bg.surface"
       css={{
-        // `separate` + `border-spacing: 0` keeps the visual look of a single-pixel grid (no gaps between cells) while letting each
-        // TH/TD render its OWN borders — under `collapse` adjacent borders are merged and the head's vertical separators were being
-        // absorbed by the body cells below, so the head looked borderless even though we set borderRight on every TH.
+        // `separate` + `border-spacing: 0` keeps the single-pixel grid look while letting each
+        // TH/TD render its own borders — under `collapse` adjacent borders merge and the head's
+        // vertical separators get absorbed by the body cells below.
         borderCollapse: "separate",
         borderSpacing: 0,
         tableLayout: "fixed",
@@ -289,9 +289,8 @@ function HeaderCell<T>({
     reorderable ? { ...listeners } : {}
   ) as React.HTMLAttributes<HTMLElement>;
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
-  // Open the one-off education dialog the first time the user tries to drag a header to reorder it. v2 doesn't support native drag-
-  // reorder (yet), so without the dialog the drag attempt silently does nothing and operators walk away thinking "you can't change the
-  // columns" — they can, just from the Columns dropdown / floating Configure CTA, which the dialog points at.
+  // v2 doesn't support native drag-reorder yet, so without this dialog the drag attempt silently
+  // does nothing; it points operators at the Columns dropdown / floating Configure CTA instead.
   const openEducation = useColumnEducationStore((s) => s.open);
   const educationDismissed = useColumnEducationStore((s) => s.hasDismissed);
   // Pinned headers (the row-select column) have no drag handle and no
@@ -372,9 +371,8 @@ function HeaderCell<T>({
               : undefined
       }
       ref={reorderable ? setNodeRef : undefined}
-      // Apply ONLY the translation from the sortable transform — `CSS.Translate.toString` skips the
-      // scaleX/scaleY that horizontalListSortingStrategy bakes in to fit the source's visual box to the target
-      // slot's width.
+      // Apply ONLY the translation from the sortable transform — `CSS.Translate.toString` skips
+      // the scaleX/scaleY that horizontalListSortingStrategy bakes in to fit the target slot.
       style={
         reorderable
           ? {

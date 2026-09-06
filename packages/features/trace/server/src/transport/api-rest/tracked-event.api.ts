@@ -1,16 +1,8 @@
 /**
- * REST for the user events a trace carries — a thumbs up, a selected span, a
- * custom metric a customer records against a run.
- *
- * `POST /api/events/track` is the canonical replacement for the legacy
- * `POST /api/track_event`. The legacy URL still works and is served by the
- * application's own misc routes; both go through the same recorder port, so
- * the two URLs stay in lockstep.
- *
- * The recorder, the predefined-payload check, the error sink and the
- * validation prose arrive as ports: dispatching the event's span reaches the
- * trace-processing pipeline, and rendering a rejection reaches the
- * application's own error vocabulary. Neither belongs in a transport.
+ * REST for the user events a trace carries. `POST /api/events/track` is the canonical
+ * replacement for the legacy `POST /api/track_event`, which stays served through the same
+ * recorder port so the two URLs stay in lockstep. The recorder, predefined-payload check, error
+ * sink and validation prose arrive as ports — neither belongs in a transport.
  */
 import { createLogger } from "@langwatch/observability";
 import {

@@ -3,8 +3,8 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { TraceSummaryProjectionPort } from "../../ports/trace-summary-projection.port";
 
 /**
- * Thin FoldProjectionStore adapter for trace summaries.
- * Delegates directly to TraceSummaryRepository (no mapper needed — projection uses camelCase types).
+ * Thin FoldProjectionStore adapter for trace summaries. Delegates directly to
+ * TraceSummaryRepository — no mapper needed since the projection uses camelCase types.
  */
 export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> {
   private constructor(
@@ -79,18 +79,10 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
 }
 
 /**
- * A fold state is worth persisting when it has at least one span, OR log
- * records that contributed something a reader can see. Log-only traces
- * (claude Path B + OTEL_LOGS_EXPORTER without a traces exporter, codex
- * Path B pre-codex-spans, custom gen_ai-on-logs emitters) are a supported
- * shape, and they reach trace_summaries through the second arm.
- *
- * The content check is what keeps ambient process telemetry out: an agent
- * that starts and dies before its first prompt still emits lifecycle and
- * error records, which fold into a state with a log count and nothing
- * else. Persisting those minted span-less rows with no input, no output
- * and no cost — one per dead agent per boot. The records themselves stay
- * stored either way; only the row waits for the trace to say something.
+ * A fold state is worth persisting when it has at least one span, or log records that
+ * contributed something a reader can see. The content check keeps ambient process telemetry
+ * out: an agent that dies before its first prompt still emits lifecycle/error records, and
+ * those must not mint a span-less row with no input, output or cost.
  */
 function hasPersistableSignal(state: TraceSummaryData): boolean {
   if (state.spanCount > 0) return true;

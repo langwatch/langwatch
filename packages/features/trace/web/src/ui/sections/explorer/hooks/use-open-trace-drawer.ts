@@ -65,9 +65,9 @@ export function useOpenTraceDrawer() {
   return useCallback(
     (trace: TraceListItem) => {
       if (project?.id) {
-        // Seed both keyed-with-timestamp and keyed-without — the drawer hook always sends `occurredAtMs` when present in the URL, but other entry points (back-stack, conversation
-        // jumps) don't, so we keep the bare key seeded as a fallback. full: true matches useTraceHeader's own query key — the drawer is the one caller that reads full: true, so
-        // the seed must land under the same key or the drawer's mount just sees a cache miss and reloads anyway.
+        // Seed both keyed-with-timestamp and keyed-without: some entry points don't send
+        // `occurredAtMs`. `full: true` matches useTraceHeader's own query key, so the seed must
+        // land under the same key or the drawer's mount sees a cache miss and reloads anyway.
         const seed = (prev?: TraceHeader) => prev ?? listItemToHeader(trace);
         utils.tracesV2.header.setData(
           { projectId: project.id, traceId: trace.traceId, full: true },
@@ -192,9 +192,8 @@ export function useOpenTraceDrawer() {
           }
         }
       }
-      // Kick off the heavier per-trace fetches in parallel with the route change so the waterfall + header
-      // render against real data by the time the drawer has finished mounting — operator feedback was that the
-      // trace tab sat on the loading skeleton for ~half a second even though we already had the row data.
+      // Kick off the heavier per-trace fetches in parallel with the route change so the
+      // waterfall + header render against real data by the time the drawer finishes mounting.
       if (project?.id && !isPreviewTraceId(trace.traceId)) {
         const input = {
           projectId: project.id,
@@ -202,9 +201,8 @@ export function useOpenTraceDrawer() {
           occurredAtMs: trace.timestamp,
         };
         const opts = { staleTime: 300_000 };
-        // The row seed above paints the header instantly, but the list row carries no attribute map
-        // (`attributes: {}`), so everything the header reads from attributes — cache-read / cache-write +
-        // reasoning token sums and the reasoning-effort setting — stays blank.
+        // The row seed above paints the header instantly, but the list row carries no attribute
+        // map, so everything the header reads from attributes stays blank until this resolves.
         void utils.tracesV2.header.prefetch({ ...input, full: true }, { staleTime: 0 });
         // Same key + queryFn as `useSpanTree`, so the drawer's mount joins
         // this in-flight paged fetch instead of firing a second one.

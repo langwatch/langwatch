@@ -129,11 +129,9 @@ function assertDestinationCanHostSpool({
   destination: ProjectStorageDestination;
   azureRetentionConfirmed: boolean;
 }): void {
-  // The spool is the one stored-objects consumer depending on something
-  // OUTSIDE the store to stay bounded: eager delete after event_log INSERT,
-  // plus a lifecycle rule reaping whatever a crash between the two leaves.
-  // A filesystem has no such rule, so here an orphan is permanent. Refusing
-  // is not a regression — before this moved onto the shared layer it hit a hardcoded nonexistent bucket and silently fell open to inline payloads.
+  // The spool depends on something outside the store to stay bounded: eager delete after
+  // event_log INSERT, plus a lifecycle rule reaping whatever a crash between the two leaves. A
+  // filesystem has no such rule, so here an orphan is permanent.
   if (destination.kind === "file") {
     throw new SpoolDestinationUnsupportedError(
       "The trace spool has no local-filesystem path: orphaned spool objects are reaped by a " +
@@ -244,9 +242,8 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Fetches a field value from event_log (ADR-022 read path). SELECTs by
-   * (TenantId, AggregateType, AggregateId, EventId), TenantId FIRST, blocking cross-tenant reads. Parses EventPayload JSON, extracts the named field.
-   * @throws {BlobNotFoundError} No rows. @throws {BlobFieldNotFoundError} Field absent. @throws {Error} Corrupt JSON / no ClickHouseClient.
+   * Fetches a field value from event_log (ADR-022 read path). SELECTs by (TenantId,
+   * AggregateType, AggregateId, EventId), TenantId first, blocking cross-tenant reads.
    */
   async getFromEventLog({
     eventId,
@@ -319,9 +316,9 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Fetches the full span body from the transient spool object. Location is
-   * re-derived from projectId/traceId/spanId (queue-authenticated), never
-   * spoolRef, so a tampered reference can't redirect this read. NOT fail-open, since the edge already cleared span.attributes before spooling.
+   * Location is re-derived from projectId/traceId/spanId (queue-authenticated), never spoolRef,
+   * so a tampered reference can't redirect this read. NOT fail-open, since the edge already
+   * cleared span.attributes before spooling.
    */
   async getSpool({
     spoolRef,
