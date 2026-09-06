@@ -209,7 +209,7 @@ Feature: Erasing a person from the governance data, and making it stick
   Scenario: Pulled spend is erased by the same substitution as gateway spend
     Given an organization that has erased somebody
     When a provider's bill attributes pulled spend to the erased identifier
-    Then the pulled money row is filed under the stand-in
+    Then the pulled lane's money key is addressed to the stand-in
     # One substitution, applied where every money row is written — not one per
     # lane. A second copy for the pulled lane would drift the day the first
     # one changed.

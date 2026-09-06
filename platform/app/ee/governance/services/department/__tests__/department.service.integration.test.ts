@@ -220,7 +220,7 @@ describe("DepartmentService", () => {
       expect(links).toHaveLength(0);
     });
 
-    /** @scenario "January's spend stays with January's department" */
+    /** @scenario "A past day resolves to the department whose link covered it" */
     it("resolves a past day against the link that was open then, not today's pointer", async () => {
       const jan = await service().create({
         organizationId: ORG_ID,

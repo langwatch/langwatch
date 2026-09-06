@@ -128,11 +128,15 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     # "Unassigned" is the absence of a link, not a link to an absence.
 
   @bdd @departments @integration
-  Scenario: January's spend stays with January's department
-    Given a member whose closed "January Dept" link covers January
-    And an open "February Dept" link from February onward
-    When a January day is resolved to a department
-    Then it answers "January Dept" even though today's pointer says otherwise
+  Scenario: A past day resolves to the department whose link covered it
+    Given a member whose closed "January Dept" link covered January
+    And a closed "February Dept" link that covered February
+    When each month's day is resolved to a department
+    Then January answers "January Dept" and February answers "February Dept"
+    And a day before any link answers by absence, never an error
+    # The dated-link read that month-by-month attribution needs. The links are
+    # written on every reorg, but nothing on the cost screens reads this yet —
+    # the read has no production caller until spend grouping arrives.
 
   @bdd @departments @integration
   Scenario: A standing assignment from before dated links gets its link seeded
