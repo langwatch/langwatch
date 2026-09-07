@@ -445,6 +445,11 @@ export function signInRouter(): SignInRouterService {
   return signInRouterService;
 }
 
+export async function localSignUpIsAllowed(email: string): Promise<boolean> {
+  const decision = await signInRouter().route({ identifier: email });
+  return decision.outcome === "route_to_signup";
+}
+
 /**
  * The SSO connection write surface (D04, ADR-117 §5). Composed per call like
  * the identity write surface: the ledger writer resolves the pipeline handle
@@ -846,16 +851,17 @@ export function passwordResetSessionBridge(): PasswordResetSessionBridge {
 /** Creating an account WITH a passkey, rather than adding one to an account. */
 export function passkeySignUp(): PasskeySignUpRegistration {
   return new PasskeySignUpRegistration({
+    eligibility: { isAllowed: localSignUpIsAllowed },
     directory: identityUsers,
     accounts: {
       createPasskeyUser: ({ email, claimHash }) =>
         credentialAccounts().openPasskeyAccount({ email, claimHash }),
     },
     verification: {
-      validateAddressProof: ({ token, email, purpose }) =>
-        signUpVerification().validateAddressProof({ token, email, purpose }),
-      claimAddressProof: ({ token, email, purpose }) =>
-        signUpVerification().claimAddressProof({ token, email, purpose }),
+      validateAddressProof: ({ token, email }) =>
+        signUpVerification().validateAddressProof({ token, email }),
+      claimAddressProof: ({ token, email }) =>
+        signUpVerification().claimAddressProof({ token, email }),
     },
   });
 }

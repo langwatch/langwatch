@@ -62,6 +62,7 @@ export interface PasskeySignUpVerificationPort {
 }
 
 export interface PasskeySignUpRegistrationDeps {
+  eligibility: { isAllowed(email: string): Promise<boolean> };
   directory: PasskeySignUpDirectoryPort;
   accounts: PasskeySignUpAccountsPort;
   verification: PasskeySignUpVerificationPort;
@@ -194,6 +195,12 @@ export class PasskeySignUpRegistration {
     context?: string | null | undefined;
   }): Promise<{ id: string; name: string; displayName: string }> {
     const { email, addressProof } = requireSignUpContext(context);
+    if (!(await this.deps.eligibility.isAllowed(email))) {
+      throw new APIError("FORBIDDEN", {
+        code: "REGISTRATION_NOT_ALLOWED",
+        message: "This address must use its organization's sign-in method.",
+      });
+    }
     if (
       !(await this.deps.verification.validateAddressProof({
         token: addressProof,
@@ -260,6 +267,12 @@ export class PasskeySignUpRegistration {
     }
 
     const { email, claimHash, addressProof } = requireSignUpContext(context);
+    if (!(await this.deps.eligibility.isAllowed(email))) {
+      throw new APIError("FORBIDDEN", {
+        code: "REGISTRATION_NOT_ALLOWED",
+        message: "This address must use its organization's sign-in method.",
+      });
+    }
     // Again, because the check in `resolveUser` was one network round trip ago
     // and an account can be created in that window. This is the one that
     // answers in WORDS; the decision that actually holds is taken inside the

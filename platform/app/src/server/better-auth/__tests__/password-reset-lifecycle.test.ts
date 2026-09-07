@@ -55,14 +55,6 @@ function buildHarness() {
         (session) => session.userId !== userId,
       );
     },
-    clearSignUpConfirmationPending: async ({ userId }) => {
-      const user = rows(db, "user").find(
-        (candidate) => candidate.id === userId,
-      );
-      if (user) {
-        user.signupConfirmationPending = false;
-      }
-    },
     recordPasswordReset: ({ userId }) => {
       bridge.recordPasswordReset({ userId });
     },

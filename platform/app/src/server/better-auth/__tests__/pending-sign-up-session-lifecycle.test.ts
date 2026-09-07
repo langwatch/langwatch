@@ -1,9 +1,9 @@
+import { compare, hash } from "bcrypt";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { compare, hash } from "bcrypt";
 import { describe, expect, it } from "vitest";
-import { beforeSessionCreate } from "../hooks";
 import { models } from "../config/models";
+import { beforeSessionCreate } from "../hooks";
 
 type Row = Record<string, unknown>;
 

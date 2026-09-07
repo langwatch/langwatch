@@ -36,12 +36,14 @@ const findAddressHolder = vi.fn();
 const createPasskeyUser = vi.fn();
 const validateAddressProof = vi.fn();
 const claimAddressProof = vi.fn();
+const localSignUpIsAllowed = vi.fn();
 
 const signUpContext = (email: string, claim = "a".repeat(43)) =>
   JSON.stringify({ email, claim, addressProof: "proof-1" });
 
 const registration = () =>
   new PasskeySignUpRegistration({
+    eligibility: { isAllowed: localSignUpIsAllowed },
     directory: { findAddressHolder },
     accounts: { createPasskeyUser },
     verification: { validateAddressProof, claimAddressProof },
@@ -102,6 +104,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     createPasskeyUser.mockResolvedValue({ id: "user_1", created: true });
     validateAddressProof.mockResolvedValue(true);
     claimAddressProof.mockResolvedValue(true);
+    localSignUpIsAllowed.mockResolvedValue(true);
     // Nobody signed in, which is the case this whole block is about.
     getSessionFromCtx.mockResolvedValue(null);
   });
@@ -153,6 +156,24 @@ describe("given passkey sign-up, which creates an account with no session", () =
       expect(findAddressHolder).toHaveBeenCalledWith({
         email: "victim@corp.com",
       });
+    });
+  });
+
+  describe("when the address becomes SSO-routed after mailbox proof", () => {
+    it("refuses both boundaries without spending proof or writing an account", async () => {
+      localSignUpIsAllowed.mockResolvedValue(false);
+      const { ctx } = fakeContext();
+      const context = signUpContext("someone@example.com");
+
+      await expect(resolveUser({ ctx, context })).rejects.toMatchObject({
+        body: { code: "REGISTRATION_NOT_ALLOWED" },
+      });
+      await expect(afterVerification({ ctx, context })).rejects.toMatchObject({
+        body: { code: "REGISTRATION_NOT_ALLOWED" },
+      });
+      expect(validateAddressProof).not.toHaveBeenCalled();
+      expect(claimAddressProof).not.toHaveBeenCalled();
+      expect(createPasskeyUser).not.toHaveBeenCalled();
     });
   });
 
@@ -433,6 +454,9 @@ describe("given passkey sign-up, which creates an account with no session", () =
         token: "proof-1",
         email: "someone@example.com",
       });
+      expect(claimAddressProof.mock.invocationCallOrder[0]).toBeLessThan(
+        createPasskeyUser.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+      );
     });
 
     it("refuses a proof that was spent by another enrollment", async () => {
