@@ -289,6 +289,13 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When the finish is handled
     Then it is refused with the conversation-mismatch code and no run is written
 
+  # AC13
+  @integration
+  Scenario: A session minted for one project cannot finish a call in another project
+    Given a session token minted for project A
+    When a finish request is sent to project B with that token
+    Then it is refused with the session-invalid code and no run is written
+
   # AC15
   @integration
   Scenario: The recording proxy refuses a conversation with no run in the project

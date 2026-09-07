@@ -139,6 +139,32 @@ describe("Feature: Voice session HTTP door", () => {
     });
   });
 
+  describe("given a finish for a different project than the token was minted for", () => {
+    /** @scenario "A session minted for one project cannot finish a call in another project" */
+    it("refuses with the session-invalid code and writes nothing", async () => {
+      const token = signVoiceSessionToken({
+        sessionId: "sess_1",
+        projectId: PROJECT_ID,
+        agentId: "agent_row",
+        agentExternalId: "el_agent_mine",
+        transport: "elevenlabs_convai",
+        exp: Date.now() + 60_000,
+      });
+
+      const res = await post("/api/voice/session/conv_1/finish", {
+        projectId: "project_other",
+        sessionToken: token,
+        conversationId: "conv_1",
+        transcript: [],
+        startedAt: 1,
+        endedAt: 2,
+      });
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("voice_session_invalid");
+      expect(fetchCallRecord).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a finish whose conversation ran against another agent", () => {
     /** @scenario "A finish whose conversation ran against another agent is refused" */
     it("refuses with the conversation-mismatch code and writes nothing", async () => {
