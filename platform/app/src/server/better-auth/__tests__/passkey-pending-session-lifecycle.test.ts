@@ -2,10 +2,20 @@ import { createHash } from "node:crypto";
 import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { models } from "../config/models";
 import { beforeSessionCreate } from "../hooks";
+import { PasskeySignUpRegistration } from "../passkey-signup";
+
+vi.mock("~/env.mjs", () => ({
+  env: { NEXTAUTH_SECRET: "passkey-proof-first-test-secret" },
+}));
+
+vi.mock("~/server/users/credential-user", () => ({
+  belongsToSomebody: () => false,
+  PasskeySignUpAddressTakenError: class extends Error {},
+}));
 
 type Row = Record<string, unknown>;
 
@@ -106,18 +116,18 @@ const registrationResponse = ({ challenge }: { challenge: string }) => {
   };
 };
 
-describe("real BetterAuth pending passkey session gate", () => {
-  /** @scenario Client session flags cannot bypass address confirmation */
-  it("refuses a forged createSession request for a pending passkey account", async () => {
-    const userId = "pending-passkey-user";
+describe("real BetterAuth proof-first passkey enrollment", () => {
+  it("consumes the mailbox proof before creating the account and session", async () => {
+    const userId = "verified-passkey-user";
+    const email = "verified-passkey@example.com";
     const now = new Date();
     const users: Row[] = [
       {
         id: userId,
-        name: "Pending Passkey",
-        email: "pending-passkey@example.com",
-        emailVerified: false,
-        signupConfirmationPending: true,
+        name: email,
+        email,
+        emailVerified: true,
+        signupConfirmationPending: false,
         createdAt: now,
         updatedAt: now,
       },
@@ -130,6 +140,22 @@ describe("real BetterAuth pending passkey session gate", () => {
       VerificationToken: [],
       passkey: [],
     };
+    let proofIsLive = false;
+    const registration = new PasskeySignUpRegistration({
+      eligibility: { isAllowed: async () => true },
+      directory: { findAddressHolder: async () => null },
+      accounts: {
+        createPasskeyUser: async () => ({ id: userId, created: true }),
+      },
+      verification: {
+        validateAddressProof: async () => proofIsLive,
+        claimAddressProof: async () => {
+          if (!proofIsLive) return false;
+          proofIsLive = false;
+          return true;
+        },
+      },
+    });
     const auth = betterAuth({
       baseURL: "http://localhost:3000",
       secret: "test-secret-test-secret-test-secret",
@@ -144,7 +170,7 @@ describe("real BetterAuth pending passkey session gate", () => {
                   user: {
                     findUnique: async () => ({
                       deactivatedAt: null,
-                      signupConfirmationPending: true,
+                      signupConfirmationPending: false,
                     }),
                   },
                 },
@@ -160,20 +186,34 @@ describe("real BetterAuth pending passkey session gate", () => {
           rpName: "LangWatch",
           registration: {
             requireSession: false,
-            resolveUser: async () => ({
-              id: userId,
-              name: "pending-passkey@example.com",
-              displayName: "Pending Passkey",
-            }),
-            afterVerification: async () => ({ userId }),
+            resolveUser: (args) => registration.resolveUser(args),
+            afterVerification: (args) => registration.afterVerification(args),
           },
         }),
       ],
     });
 
+    const context = encodeURIComponent(
+      JSON.stringify({
+        email,
+        claim: "a".repeat(43),
+        addressProof: "mailbox-proof",
+      }),
+    );
+    const deniedOptions = await auth.handler(
+      new Request(
+        `http://localhost:3000/api/auth/passkey/generate-register-options?context=${context}`,
+        { headers: { origin: "http://localhost:3000" } },
+      ),
+    );
+    expect(deniedOptions.status).toBe(403);
+    expect(db.passkey).toHaveLength(0);
+    expect(db.Session).toHaveLength(0);
+
+    proofIsLive = true;
     const options = await auth.handler(
       new Request(
-        "http://localhost:3000/api/auth/passkey/generate-register-options",
+        `http://localhost:3000/api/auth/passkey/generate-register-options?context=${context}`,
         { headers: { origin: "http://localhost:3000" } },
       ),
     );
@@ -202,11 +242,18 @@ describe("real BetterAuth pending passkey session gate", () => {
       ),
     );
 
-    expect(verification.status).toBe(500);
-    expect(
-      z.object({ code: z.string() }).parse(await verification.json()).code,
-    ).toBe("UNABLE_TO_CREATE_SESSION");
-    expect(verification.headers.get("set-cookie")).toBeNull();
-    expect(sessions).toHaveLength(0);
+    const verificationBody: unknown = await verification.json();
+    expect({ status: verification.status, body: verificationBody }).toEqual({
+      status: 200,
+      body: expect.any(Object),
+    });
+    expect(proofIsLive).toBe(false);
+    expect(users).toHaveLength(1);
+    expect(users[0]).toMatchObject({
+      emailVerified: true,
+      signupConfirmationPending: false,
+    });
+    expect(db.passkey).toHaveLength(1);
+    expect(db.Session).toHaveLength(1);
   });
 });

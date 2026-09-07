@@ -18,6 +18,7 @@ import { getApp } from "~/server/app-layer/app";
 import type { FederatedPasswordResult } from "~/server/app-layer/identity/credential-account.service";
 import {
   credentialAccounts,
+  localSignUpIsAllowed,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
 import { deploymentOffersTwoStepVerification } from "~/server/app-layer/identity/signin-method-policy";
@@ -275,6 +276,9 @@ export const userRouter = createTRPCRouter({
       // the signup form's actual backend — blocking it would kill the
       // fresh-signup recovery route (Decision 5c).
       if ((await resolveAuthProvider()) !== "email") {
+        throw new DirectRegistrationUnavailableError();
+      }
+      if (!(await localSignUpIsAllowed(email))) {
         throw new DirectRegistrationUnavailableError();
       }
 

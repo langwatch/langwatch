@@ -51,6 +51,9 @@ const { claimAddressProofMock } = vi.hoisted(() => ({
 const { registerMock } = vi.hoisted(() => ({
   registerMock: vi.fn(),
 }));
+const { localSignUpIsAllowedMock } = vi.hoisted(() => ({
+  localSignUpIsAllowedMock: vi.fn(),
+}));
 
 // The account-creating call is what sends the confirmation link, so the two
 // services it drives are the seam this suite reads. The verification service's
@@ -61,6 +64,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
     typeof import("~/server/app-layer/identity/runtime")
   >()),
   credentialAccounts: () => ({ register: registerMock }),
+  localSignUpIsAllowed: localSignUpIsAllowedMock,
   signUpVerification: () => ({
     claimAddressProof: claimAddressProofMock,
   }),
@@ -88,6 +92,7 @@ describe("userRouter.register()", () => {
     // Most cases here are the coerced/email-mode deployment; the licensed-SSO
     // case overrides this.
     resolveAuthProviderMock.mockResolvedValue("email");
+    localSignUpIsAllowedMock.mockResolvedValue(true);
     claimAddressProofMock.mockResolvedValue(true);
   });
 
@@ -204,7 +209,24 @@ describe("userRouter.register()", () => {
           name: "Sam",
           addressProof: "spent-or-borrowed",
         }),
-      ).rejects.toMatchObject({ code: "GONE" });
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the address becomes SSO-routed after proof", () => {
+    it("refuses before spending the proof or writing a credential", async () => {
+      localSignUpIsAllowedMock.mockResolvedValue(false);
+
+      await expect(
+        createCaller().register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          name: "Sam",
+          addressProof: "still-live",
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(claimAddressProofMock).not.toHaveBeenCalled();
       expect(registerMock).not.toHaveBeenCalled();
     });
   });
