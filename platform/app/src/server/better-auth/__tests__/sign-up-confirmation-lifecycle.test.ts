@@ -146,6 +146,7 @@ describe("real BetterAuth sign-up confirmation lifecycle", () => {
       sessions: harness.db.session,
     });
     const invalid = await harness.confirm("never-issued");
+    expect(invalid.status).toBe(410);
     expect(
       z.object({ error: z.string() }).parse(await invalid.json()).error,
     ).toBe("identity_verification_expired");

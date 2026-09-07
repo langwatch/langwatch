@@ -44,6 +44,7 @@ export interface SignUpConfirmationDirectoryPort {
  */
 export interface ConfirmSignUpAddressContext extends SessionMintingContext {
   body: { token: string };
+  setStatus: (status: number) => void;
   json: (
     body: Record<string, unknown> | null,
     init?: { status?: number },
@@ -113,9 +114,8 @@ export class SignUpConfirmationEndpoint {
       // an `APIError`.
       if (HandledError.isHandled(error)) {
         const { statusCode, body } = handledErrorResponseBody(error);
-        return ctx.json(body as Record<string, unknown>, {
-          status: statusCode,
-        });
+        ctx.setStatus(statusCode);
+        return ctx.json(body as Record<string, unknown>);
       }
       throw error;
     }
