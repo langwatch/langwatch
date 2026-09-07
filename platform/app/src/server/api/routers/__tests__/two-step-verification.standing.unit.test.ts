@@ -72,7 +72,7 @@ const service = new OrganizationMfaService({
   sessions: { amrFor: vi.fn(async () => null) },
   members,
   connections: { assertedFactorsFor: vi.fn(async () => null) },
-  notifier: { requirementTurnedOn: vi.fn(async () => void 0) },
+  notifier: { requirementChanged: vi.fn(async () => void 0) },
   offered: () => true,
   entitled: vi.fn(async () => true),
 });
