@@ -16,7 +16,9 @@ const { organizationMfaMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/server/app-layer/identity/runtime")>()),
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/identity/runtime")
+  >()),
   organizationMfa: () => organizationMfaMock(),
   twoStepVerification: () => ({}),
 }));
@@ -32,8 +34,13 @@ const members = {
     passkeyCount: 0,
   })),
   isMember: vi.fn(
-    async ({ userId, organizationId }: { userId: string; organizationId: string }) =>
-      userId === "sam" && organizationId === "org-acme",
+    async ({
+      userId,
+      organizationId,
+    }: {
+      userId: string;
+      organizationId: string;
+    }) => userId === "sam" && organizationId === "org-acme",
   ),
 };
 
@@ -82,7 +89,9 @@ describe("twoStepVerification.standing", () => {
   describe("given a required member who has not enrolled", () => {
     /** @scenario A held member can read the standing needed to recover */
     it("returns the unsatisfied standing that paints the setup screen", async () => {
-      await expect(callerFor("sam").standing({ organizationId: "org-acme" })).resolves.toEqual({
+      await expect(
+        callerFor("sam").standing({ organizationId: "org-acme" }),
+      ).resolves.toEqual({
         organizationId: "org-acme",
         organizationName: "Acme",
         required: true,
@@ -100,10 +109,15 @@ describe("twoStepVerification.standing", () => {
     it("cannot carry the recovery exemption into an API-key mutation", async () => {
       const context = contextFor("sam");
       const apiKeyCreate = vi.spyOn(context.prisma.apiKey, "create");
-      const membershipRead = vi.spyOn(context.prisma.organizationUser, "findFirst");
+      const membershipRead = vi.spyOn(
+        context.prisma.organizationUser,
+        "findFirst",
+      );
 
       await expect(
-        twoStepVerificationRouter.createCaller(context).standing({ organizationId: "org-acme" }),
+        twoStepVerificationRouter
+          .createCaller(context)
+          .standing({ organizationId: "org-acme" }),
       ).resolves.toMatchObject({
         required: true,
         satisfaction: { satisfied: false },
@@ -131,7 +145,9 @@ describe("twoStepVerification.standing", () => {
   describe("given no authenticated person", () => {
     /** @scenario A standing read still requires an authenticated person */
     it("still refuses before reading any organization standing", async () => {
-      await expect(callerFor(null).standing({ organizationId: "org-acme" })).rejects.toMatchObject({
+      await expect(
+        callerFor(null).standing({ organizationId: "org-acme" }),
+      ).rejects.toMatchObject({
         code: "UNAUTHORIZED",
       });
       expect(members.isMember).not.toHaveBeenCalled();

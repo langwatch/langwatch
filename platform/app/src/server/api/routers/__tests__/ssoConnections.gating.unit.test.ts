@@ -62,12 +62,39 @@ vi.mock(
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   ssoConnections: mockSsoConnections,
+  BACKUP_CODE_COUNT: 10,
+  betterAuthInstance: () => ({ provide: () => undefined }),
+  deploymentIsFederationCapable: () => false,
+  identityBridgeCeremonies: () => ({}),
+  identityCeremonies: () => ({}),
   // `betterAuth()` builds its adapter EAGERLY at module load, and this
   // suite's import graph reaches it through the router. It has to be real
   // enough to initialise; better-auth's own memory engine over an empty
   // store is exactly that, and holds nothing this suite could assert
   // against by accident.
   identityStorageAdapter: () => memoryAdapter({}),
+  lastWayInGuard: () => ({
+    refuseIfItClosesTheLastDoor: async () => undefined,
+  }),
+  mfaCeremonies: () => ({}),
+  organizationMfa: () => ({
+    standingForSession: async () => ({ satisfaction: { satisfied: true } }),
+  }),
+  PASSWORD_HASH_ROUNDS: 10,
+  passkeySignUp: () => ({}),
+  passwordResetSessionBridge: () => ({
+    recordPasswordReset: () => undefined,
+    signInAfterPasswordReset: async () => undefined,
+  }),
+  resolveSignInMethodPolicy: async () => ({}),
+  secondaryStorage: () => ({ configured: false, connection: () => null }),
+  sessionCallbackEvidence: () => ({}),
+  sessionClaims: () => ({}),
+  sessionRevocation: () => ({ revokeAll: async () => undefined }),
+  signUpConfirmationEndpoint: () => ({
+    confirmSignUpAddress: async () => undefined,
+  }),
+  twoStepAccount: () => ({ requiringOrganizations: async () => false }),
 }));
 
 vi.mock("~/server/db", () => ({ prisma: {} }));

@@ -126,7 +126,9 @@ vi.mock("~/components/LoadingScreen", () => ({
 
 // Legacy mode renders through DashboardLayout, which mounts the nudge. This
 // suite asserts on settings navigation, not on the nudge's own contract.
-vi.mock("~/components/me/PasskeyNudge", () => ({ PasskeyNudge: () => null }));
+vi.mock("~/components/me/SecureAccountNudge", () => ({
+  SecureAccountNudge: () => null,
+}));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({
@@ -182,6 +184,7 @@ vi.mock("~/utils/api", () => ({
       getUsage: { useQuery: () => ({ data: undefined }) },
     },
     user: {
+      secureAccountNudge: { useQuery: () => ({ data: undefined }) },
       getSsoStatus: { useQuery: () => ({ data: undefined }) },
       isAdmin: { useQuery: () => ({ data: { isAdmin: mockIsAdmin } }) },
     },

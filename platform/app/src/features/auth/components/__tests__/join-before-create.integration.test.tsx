@@ -72,6 +72,7 @@ describe("given an organization open to requests from the domain", () => {
 
   describe("when sign-up reaches the join-before-create step", () => {
     /** @scenario Sign-up offers the team before offering a workspace */
+    /** @scenario Sign-up offers my team before offering a new workspace */
     it("leads with joining and keeps creating as the explicit secondary", async () => {
       const { onCreateWorkspace } = renderStep({ lookup: openToAcme });
 

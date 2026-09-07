@@ -466,7 +466,9 @@ describe("declaredNoPermission", () => {
       const { params } = heldParams();
       const middleware = declaredNoPermission({
         reason: "the caller's own API keys",
-        allow: { organizationId: "creating a key in the caller's organization" },
+        allow: {
+          organizationId: "creating a key in the caller's organization",
+        },
       });
 
       await expect(middleware(params as any)).rejects.toMatchObject({
@@ -481,7 +483,8 @@ describe("declaredNoPermission", () => {
         reason: "the caller's own MFA standing",
         allow: { organizationId: "the organization whose gate they reached" },
         mfaRecovery: {
-          reason: "the standing answer tells the caller how to satisfy the gate",
+          reason:
+            "the standing answer tells the caller how to satisfy the gate",
         },
       });
 
@@ -490,7 +493,8 @@ describe("declaredNoPermission", () => {
       expect(authzDeclarationOf(middleware)).toMatchObject({
         kind: "no-permission",
         mfaRecovery: {
-          reason: "the standing answer tells the caller how to satisfy the gate",
+          reason:
+            "the standing answer tells the caller how to satisfy the gate",
         },
       });
     });
