@@ -1,4 +1,5 @@
 export type { MoneyByCurrency, Plan, PlanInfo, PlanSource } from "./plan.ts";
+export { EntitlementApi } from "./entitlement.api.ts";
 export { EntitlementService } from "./entitlement.service.ts";
 export type {
   BaselinePlanSource,

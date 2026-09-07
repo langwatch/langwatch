@@ -45,8 +45,9 @@ Feature: Provider-neutral entitlement resolution
     And no Stripe identifier, signed-license payload or database record is exposed
 
   @architecture @typecheck
-  Scenario: Entitlements is a class service with a compiled Zod contract
+  Scenario: The entitlement installer constructs its private service
     Given Entitlements contract schemas are compiled independently
-    When a runtime composes EntitlementService
-    Then it calls EntitlementService.create with typed sources and configuration
-    And no standalone service factory or direct environment read exists
+    When a runtime installs entitlementServer
+    Then EntitlementApp.create constructs its private service from typed sources
+    And peers receive the callable EntitlementApi
+    And importing the feature starts no work or reads the environment

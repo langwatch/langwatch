@@ -1,4 +1,10 @@
-export { EntitlementService, type EntitlementServiceOptions } from "./services/entitlement.service.ts";
+export { EntitlementApp } from "./app/entitlement.app.ts";
+export type { EntitlementInfrastructure } from "./app/entitlement.app.ts";
+export { entitlementServer } from "./entitlement.server.ts";
+export {
+  EntitlementService,
+  type EntitlementServiceOptions,
+} from "./services/entitlement.service.ts";
 export { PlanTrpcApi, type PlanTrpcContext } from "./transport/api-trpc/plan.api.ts";
 export {
   LimitsTrpcApi,

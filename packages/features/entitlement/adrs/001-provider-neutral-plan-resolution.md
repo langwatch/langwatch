@@ -81,9 +81,14 @@ before selection begins.
 
 ### Runtime and registration
 
-`EntitlementService` is a class created through `EntitlementService.create`.
-Importing either package performs no registration. The app and worker may each
-compose the service with the sources available to that runtime.
+`EntitlementApi` is the callable contract and dependency token.
+`entitlementServer` selects `EntitlementApp`, whose factory constructs its
+private `EntitlementService` from provider-neutral sources. The installer
+follows [ADR-133](../../../../dev/docs/adr/133-composition-spec.md).
+Importing either package performs no registration.
+
+The API and worker still compose the legacy service directly. Moving those
+process roots to the installer remains part of the composition migration.
 
 ### Environment and configuration
 
