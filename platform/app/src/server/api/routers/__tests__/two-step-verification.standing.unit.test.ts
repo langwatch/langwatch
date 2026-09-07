@@ -17,12 +17,18 @@ const { organizationMfaMock, setRequirementMock } = vi.hoisted(() => ({
   setRequirementMock: vi.fn(),
 }));
 
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
-  return appPermissionsMock();
-});
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    permissions: {
+      getDecision: vi.fn(async () => ({
+        permitted: true,
+        organizationRole: "ADMIN",
+        denialReason: null,
+      })),
+    },
+  }),
+  tryGetApp: () => null,
+}));
 
 vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   ...(await importOriginal<
