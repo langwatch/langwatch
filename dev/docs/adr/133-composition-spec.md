@@ -96,6 +96,15 @@ Peer installers and transport contributions are omitted from this example.
 any factory, then constructs it with stable peer clients. `start` begins serving.
 Imports, declarations and constructors never start background work.
 
+Factories register feature-owned subscriptions and loops with
+`resources.ownService({ name, start, stop })`. Registration is sealed when that
+feature's installation returns. The runtime starts these services before process
+hosts and drains hosts before stopping feature services. A failed start stops
+every attempted service, including the failing one, once in reverse order.
+Services that were never started receive no stop call. Allocations made during
+construction therefore use `resources.own(name, close)` separately; those
+allocations are released even if boot fails or the runtime stops before start.
+
 ### Accepted app factory shape
 
 The portable contract exports a `<Feature>Api` interface from

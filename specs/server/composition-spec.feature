@@ -463,6 +463,38 @@ Feature: Composing a process from feature installers
       And repeated shutdown does not close anything twice
       And failures during shutdown do not skip earlier resources
 
+    @unit
+    Scenario Outline: Feature services start before hosts and drain before API bindings close
+      Given a feature registers an inert subscription with resources.ownService
+      And the process registers a serving host
+      When the runtime boots for the <role> role
+      Then no subscription or host has started
+      When the runtime starts
+      Then the subscription starts before the host
+      When the runtime stops
+      Then the host drains before the subscription stops
+      And feature APIs remain callable during the drain
+      And API bindings close before construction resources close
+
+      Examples:
+        | role   |
+        | api    |
+        | worker |
+
+    @unit
+    Scenario: Unstarted services do not receive stop calls
+      Given a feature owns a construction allocation and registers an inert service
+      When boot fails or the runtime stops before start
+      Then the construction allocation closes once
+      And the service receives neither start nor stop
+
+    @unit
+    Scenario: Late service registration cannot escape lifecycle ownership
+      Given a feature retains its setup resource ownership
+      When installation has returned
+      Then registering another service is rejected
+      And allocations acquired during startup can still register cleanup
+
   Rule: a blocking migration gates readiness, and resumable work resumes
 
     @unimplemented @integration

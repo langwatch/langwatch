@@ -203,6 +203,7 @@ export class ApplicationBuilder<Infrastructure> {
     const order = orderByDependency(declarations, providerOf, role);
 
     const scope = new ResourceScope();
+    const featureServices: RuntimeService[] = [];
     const installed = new Map<string, InstalledFeatureState>();
     const provided = new Map<TokenIdentity, unknown>(this.preProvided);
     const apis = new LocalFeatureApis();
@@ -219,6 +220,7 @@ export class ApplicationBuilder<Infrastructure> {
           resolve: (token) =>
             token instanceof FeatureApiToken ? apis.reference(token) : provided.get(token),
         });
+        featureServices.push(...resources.sealServices());
         this.bindProviders(declaration, state, apis, provided);
         installed.set(
           declaration.name,
@@ -235,6 +237,7 @@ export class ApplicationBuilder<Infrastructure> {
     }
 
     return new BootedRuntime(this.name, role, this.infrastructure, installed, provided, scope, [
+      ...featureServices,
       ...this.services,
     ]);
   }
