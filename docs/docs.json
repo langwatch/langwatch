@@ -93,8 +93,7 @@
                 ]
               },
               "integration/cli",
-              "integration/mcp",
-              "better-agents/overview"
+              "integration/mcp"
             ]
           },
           {
@@ -2116,6 +2115,10 @@
     {
       "source": "/ai-governance/departments",
       "destination": "/ai-governance/people"
+    },
+    {
+      "source": "/better-agents/overview",
+      "destination": "/skills/directory"
     }
   ]
 }
