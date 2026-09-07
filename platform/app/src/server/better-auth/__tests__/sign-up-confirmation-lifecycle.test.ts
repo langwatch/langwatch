@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { z } from "zod";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   SignUpVerificationService,
   type SignUpVerificationTokenStore,
@@ -13,7 +13,15 @@ import {
 } from "../sign-up-confirmation";
 
 type Row = Record<string, unknown>;
-type MemoryDB = Record<string, Row[]>;
+type MemoryDB = {
+  user: Row[];
+  session: Row[];
+  account: Row[];
+  verification: Row[];
+} & Record<string, Row[]>;
+type AuthUnderTest = {
+  handler: (request: Request) => Promise<Response>;
+};
 
 const responseSchema = z.object({
   email: z.string(),
@@ -98,13 +106,12 @@ function buildHarness() {
     mintToken: () => `token-${++tokenSequence}`,
   });
 
-  let auth: ReturnType<typeof betterAuth>;
   const endpoint = new SignUpConfirmationEndpoint({
     verification,
     users: { findUserIdByEmail: async () => userId },
     minter: new BetterAuthSessionMinter(),
   });
-  auth = betterAuth({
+  const auth: AuthUnderTest = betterAuth({
     baseURL: "http://localhost:3000",
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter(db),
