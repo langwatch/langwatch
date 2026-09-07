@@ -43,7 +43,8 @@ Feature: Join requests - asking to join the organization your colleagues already
   # hand over more answers with a formal invitation instead, which is the flow
   # that owns roles and teams. Least privilege by construction.
   #
-  # Ships behind JOIN_REQUESTS. Flag off, none of this exists.
+  # On for everybody. The JOIN_REQUESTS flag is retired — see "The flag is
+  # retired" at the foot of this file for what replaced it.
 
   Background:
     Given an organization "acme" whose members hold verified addresses on "acme.com"
@@ -169,7 +170,7 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the attempt is refused with code join_request_throttled and status 429
     And asking after the cool-down opens a fresh PENDING request
 
-  @unit @unimplemented
+  @unit
   Scenario: Every refusal reaches the person as words
     When any of these refusals is shown to a person
     Then the screen shows the customer copy registered for that code
@@ -213,6 +214,16 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the pending requests and the pending invitations are in one panel
     And each request shows who is asking and when they asked
 
+  # An empty panel is not the same as a panel that failed to load, and from
+  # the browser they look identical. A tab somebody opened on purpose owes
+  # them a sentence either way.
+  @integration
+  Scenario: An empty request list says it is empty
+    Given "acme" has nobody waiting to join
+    When "ana" opens the members area
+    Then the panel says nobody is waiting rather than rendering blank
+    And there is nothing to approve or reject
+
   @unit
   Scenario: Answering a request needs the authority that already gates inviting
     Given a member of "acme" who cannot invite colleagues
@@ -220,11 +231,12 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the attempt is refused for lack of permission
     And no new permission had to be granted to anybody for approvals to work
 
-  # ── The flag ───────────────────────────────────────────────────────────
-
-  @unit
-  Scenario: With the flag off nothing here exists
-    Given the join-requests flag is off
-    When "sam" signs up with a work email
-    Then no request can be made and no panel appears
-    And sign-up proceeds exactly as it did before
+  # ── The flag is retired ────────────────────────────────────────────────
+  #
+  # `JOIN_REQUESTS` gated the whole deliverable through its bake and is gone.
+  # What it actually turned off was an offer that had already passed every
+  # other gate — a verified address, a company domain, an organization that
+  # opted in and that the caller is not already in — so keeping it meant a
+  # second, blunter answer to a question the matching rules answer precisely.
+  # The rollback lever customers have is the setting on their own Access page,
+  # which is where it belongs.

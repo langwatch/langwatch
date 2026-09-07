@@ -10,16 +10,6 @@ import (
 	"time"
 )
 
-// scimPushRequest asks the simulator to act as the provisioning side of an
-// IdP — the Okta/Entra role — and push one tenant's directory at a real SCIM
-// service provider, such as the app's /Users and /Groups endpoints.
-type scimPushRequest struct {
-	// Target is the SCIM base URL (…/scim/v2 style — Users/Groups appended).
-	Target string `json:"target"`
-	// Token is the bearer token the target requires.
-	Token string `json:"token"`
-}
-
 // scimPushResult reports what landed.
 type scimPushResult struct {
 	UsersCreated  int      `json:"usersCreated"`
@@ -29,15 +19,18 @@ type scimPushResult struct {
 
 // pushDirectory replays the tenant's users then groups against the target as
 // SCIM 2.0 creates, mapping seeded member ids onto the ids the target minted.
-func pushDirectory(ctx context.Context, t *Tenant, req scimPushRequest) scimPushResult {
+// This is the simulator acting as the provisioning side of an IdP — the
+// Okta/Entra role — against a real service provider such as the app's SCIM
+// endpoints, presenting the token that provider issued.
+func pushDirectory(ctx context.Context, t *Tenant, target ProvisioningTarget) scimPushResult {
 	client := &http.Client{Timeout: 15 * time.Second}
-	base := strings.TrimSuffix(req.Target, "/")
+	base := strings.TrimSuffix(target.BaseURL, "/")
 	var result scimPushResult
 
 	targetIDs := map[string]string{} // simulator user id -> target-minted id
 	for _, u := range t.Users() {
 		created, err := scimCreate(ctx, client, scimPost{
-			URL: base + "/Users", Token: req.Token, Resource: scimUserResource(u),
+			URL: base + "/Users", Token: target.Token, Resource: scimUserResource(u),
 		})
 		if err != nil {
 			result.Failures = append(result.Failures, fmt.Sprintf("user %s: %v", u.UserName, err))
@@ -50,7 +43,7 @@ func pushDirectory(ctx context.Context, t *Tenant, req scimPushRequest) scimPush
 	}
 	for _, g := range t.Groups() {
 		_, err := scimCreate(ctx, client, scimPost{
-			URL: base + "/Groups", Token: req.Token,
+			URL: base + "/Groups", Token: target.Token,
 			Resource: map[string]any{
 				"schemas":     []string{scimGroupSchema},
 				"displayName": g.Name,
@@ -77,6 +70,119 @@ func mappedMembers(g *Group, targetIDs map[string]string) []map[string]any {
 		}
 	}
 	return members
+}
+
+// directorySnapshot is what a target says it is holding, by the names a person
+// would recognize rather than the ids it minted.
+type directorySnapshot struct {
+	Users  []string
+	Groups []string
+}
+
+/**
+ * Read the target's directory back.
+ *
+ * A push reports what the target accepted, which is not the same as what it
+ * ended up with: a user who was already there, a group whose members were
+ * dropped, a deactivation that landed as a delete. Reading back is how you see
+ * the receiving side's own account of it, over the same credential, so a
+ * provisioning run can be checked without leaving the simulator.
+ */
+func pullDirectory(ctx context.Context, target ProvisioningTarget) (directorySnapshot, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	base := strings.TrimSuffix(target.BaseURL, "/")
+	var snapshot directorySnapshot
+
+	users, err := scimFetchList(ctx, client, scimGet{URL: base + "/Users", Token: target.Token})
+	if err != nil {
+		return snapshot, err
+	}
+	snapshot.Users = resourceLabels(users, "userName", "displayName")
+	groups, err := scimFetchList(ctx, client, scimGet{URL: base + "/Groups", Token: target.Token})
+	if err != nil {
+		return snapshot, err
+	}
+	snapshot.Groups = resourceLabels(groups, "displayName", "id")
+	return snapshot, nil
+}
+
+// scimGet is one collection read the simulator asks an external SCIM service
+// provider for.
+type scimGet struct {
+	URL   string
+	Token string
+}
+
+// scimFetchList fetches one SCIM collection from a target and returns its
+// Resources.
+func scimFetchList(ctx context.Context, client *http.Client, get scimGet) ([]any, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, get.URL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/scim+json")
+	req.Header.Set("Authorization", "Bearer "+get.Token)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, fmt.Errorf("target answered %s", resp.Status)
+	}
+	var listed struct {
+		Resources []any `json:"Resources"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&listed); err != nil {
+		return nil, fmt.Errorf("unparseable list response: %w", err)
+	}
+	return listed.Resources, nil
+}
+
+// resourceLabels names each resource by the first attribute it actually
+// carries, so a target that fills in fewer fields than we hoped still reads as
+// a list of somebodies rather than a row of blanks.
+func resourceLabels(resources []any, attrs ...string) []string {
+	labels := make([]string, 0, len(resources))
+	for _, raw := range resources {
+		resource, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		label := "(unnamed)"
+		for _, attr := range attrs {
+			if value, ok := resource[attr].(string); ok && value != "" {
+				label = value
+				break
+			}
+		}
+		labels = append(labels, label)
+	}
+	return labels
+}
+
+// pushSummary is the one sentence the page and the activity feed both show.
+func pushSummary(result scimPushResult, base string) string {
+	summary := fmt.Sprintf("pushed %s and %s into %s",
+		countOf(result.UsersCreated, "user"), countOf(result.GroupsCreated, "group"), base)
+	if len(result.Failures) > 0 {
+		summary += fmt.Sprintf(", and %s refused", countOf(len(result.Failures), "resource"))
+	}
+	return summary
+}
+
+// pullSummary is the same, for a read-back.
+func pullSummary(snapshot directorySnapshot, base string) string {
+	return fmt.Sprintf("%s holds %s and %s", base,
+		countOf(len(snapshot.Users), "user"), countOf(len(snapshot.Groups), "group"))
+}
+
+// countOf writes a count in words the feed can read back: "1 user", "3 users".
+func countOf(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
 }
 
 // scimPost is one create the simulator sends to an external SCIM service

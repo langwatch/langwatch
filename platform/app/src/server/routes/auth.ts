@@ -157,6 +157,7 @@ const betterAuthCatchAll = async (c: Context) => {
   if (
     !isAllowedAuthOrigin({
       method: c.req.method,
+      pathname: c.req.path,
       origin: c.req.header("origin"),
       referer: c.req.header("referer"),
       baseUrl: env.NEXTAUTH_URL,

@@ -17,12 +17,16 @@ import type {
 } from "./repositories/identity-event-log.repository";
 import type {
   IdentityLookupReadsRepository,
+  LookupDomainClaimRow,
   LookupIdentifierRow,
   LookupOperatorActivityRow,
 } from "./repositories/identity-lookup.prisma.repository";
 
 /** How many identity facts a person's history panel shows. */
 export const IDENTITY_LOOKUP_HISTORY_LIMIT = 50;
+
+/** How many claims the queue renders before it stops. */
+export const DOMAIN_CLAIM_QUEUE_LIMIT = 50;
 
 /** How many recent operator acts the trail panel shows. */
 export const OPERATOR_ACTIVITY_LIMIT = 50;
@@ -72,14 +76,17 @@ export interface LookupRouting {
   connectionId: string | null;
   /** What the auth screens would offer, by method id. */
   methods: readonly string[];
-  /** The connection owning the domain and the state it is in, named beside
-   *  the decision so the reason and its cause are read together. */
+  /** The connection configured for the domain, its proof qualification, and
+   *  the route kind, named beside the decision so configuration is never
+   *  mistaken for ownership. */
   connection: {
     connectionId: string;
     organizationId: string;
     organizationName: string | null;
     state: string;
     providerId: string;
+    ownershipProof: "QUALIFIED" | "UNKNOWN" | "LAPSED";
+    routeKind: "legacy-configuration" | "connection";
   } | null;
 }
 
@@ -127,8 +134,9 @@ export interface LookupPersonDetail {
 export interface LookupWaiting {
   proposals: readonly LinkProposalRecord[];
   invitations: readonly LookupInvitation[];
+  domainClaims: readonly LookupDomainClaim[];
   /** True when nothing at all is waiting, so the panel can collapse to one
-   *  line rather than render multiple empty sections saying so. */
+   *  line rather than render three empty sections saying so. */
   isEmpty: boolean;
 }
 
@@ -144,6 +152,14 @@ export interface LookupInvitation {
    *  (D11), and one that looked live here would send an operator to resend
    *  something that already works. */
   isExpired: boolean;
+}
+
+export interface LookupDomainClaim {
+  connectionId: string;
+  organizationId: string;
+  organizationName: string | null;
+  domain: string;
+  waitingSinceMs: number;
 }
 
 export interface IdentityLookupServiceDeps {
@@ -261,7 +277,7 @@ export class IdentityLookupService {
     return {
       person,
       identifiers: identifierRows.map(toLookupIdentifier),
-      waiting: await this.waitingFor({ person }),
+      waiting: await this.waitingFor({ person, identifiers: identifierRows }),
       history,
       sessions,
     };
@@ -280,6 +296,14 @@ export class IdentityLookupService {
     return this.deps.reads.findRecentOperatorActivity({
       limit: OPERATOR_ACTIVITY_LIMIT,
     });
+  }
+
+  /** The claims queue, longest wait first. */
+  async claimQueue(): Promise<readonly LookupDomainClaim[]> {
+    const rows = await this.deps.reads.findClaimQueue({
+      limit: DOMAIN_CLAIM_QUEUE_LIMIT,
+    });
+    return this.nameOrganizations({ claims: rows });
   }
 
   async confirmProposedSignIn({
@@ -438,14 +462,24 @@ export class IdentityLookupService {
 
   private async waitingFor({
     person,
+    identifiers,
   }: {
     person: LookupPerson;
+    identifiers: readonly LookupIdentifierRow[];
   }): Promise<LookupWaiting> {
-    const [proposals, invitationRows] = await Promise.all([
+    const domains = [
+      ...new Set(
+        identifiers
+          .map((row) => row.domain)
+          .filter((domain): domain is string => domain !== null),
+      ),
+    ];
+    const [proposals, invitationRows, claimRows] = await Promise.all([
       this.deps.proposals.findProposals({ userId: person.userId }),
       person.email
         ? this.deps.reads.findInvitations({ email: person.email })
         : Promise.resolve([]),
+      this.deps.reads.findClaimsAwaitingReview({ domains }),
     ]);
 
     const now = this.now();
@@ -462,11 +496,41 @@ export class IdentityLookupService {
         expiresAtMs: row.expiresAtMs,
         isExpired: row.expiresAtMs !== null && row.expiresAtMs <= now,
       }));
+    const domainClaims = await this.nameOrganizations({ claims: claimRows });
+
     return {
       proposals: undecided,
       invitations,
-      isEmpty: undecided.length === 0 && invitations.length === 0,
+      domainClaims,
+      isEmpty:
+        undecided.length === 0 &&
+        invitations.length === 0 &&
+        domainClaims.length === 0,
     };
+  }
+
+  /**
+   * Claims arrive named by organization id alone; an operator confirming an
+   * action against `org_LVYcVYGW1AJq` has been told nothing they can check.
+   * Resolved in one batched read rather than a join per row.
+   */
+  private async nameOrganizations({
+    claims,
+  }: {
+    claims: readonly LookupDomainClaimRow[];
+  }): Promise<readonly LookupDomainClaim[]> {
+    if (claims.length === 0) return [];
+    const named = await this.deps.reads.findOrganizationNames({
+      organizationIds: claims.map((claim) => claim.organizationId),
+    });
+    return claims.map((claim) => ({
+      connectionId: claim.connectionId,
+      organizationId: claim.organizationId,
+      organizationName:
+        claim.organizationName ?? named.get(claim.organizationId) ?? null,
+      domain: claim.domain,
+      waitingSinceMs: claim.waitingSinceMs,
+    }));
   }
 }
 

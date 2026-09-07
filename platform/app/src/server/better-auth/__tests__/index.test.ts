@@ -51,6 +51,13 @@ describe("better-auth config", () => {
       expect(options?.session?.storeSessionInDatabase).toBe(true);
     });
 
+    it("stores SAML replay reservations in the primary database", async () => {
+      const { auth } = await import("../index");
+      const options = (auth as any).options;
+
+      expect(options?.verification?.storeInDatabase).toBe(true);
+    });
+
     /** @scenario Credentials-only on-prem mode */
     // The scenario that used to bind here retired at D06 (the legacy
     // impersonation pair in phase-1-better-auth-config.feature, and with it

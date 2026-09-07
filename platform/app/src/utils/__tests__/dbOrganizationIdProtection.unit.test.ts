@@ -740,3 +740,140 @@ describe("guardOrganizationId — the migration rollout's enrollment rows", () =
     });
   });
 });
+
+/**
+ * "What am I waiting on?" — bounded by SUBJECT rather than by tenant.
+ *
+ * The regime exists to refuse an unbounded sweep across every organization,
+ * and a person's own pending join requests span every organization they asked,
+ * which is the whole question. So the read is bounded to ONE USER, named in
+ * the clause, and that is what makes it admissible.
+ *
+ * This was a live outage of the feature and not a hypothetical: the guard
+ * refused the query with a plain Error, the boundary degraded it to "unknown
+ * error", and nobody could see a request they had made — including on the
+ * screen that exists to tell them their request is with an administrator.
+ */
+describe("guardOrganizationId — a join request bounded by its subject", () => {
+  describe("when somebody reads their own pending requests", () => {
+    it("allows a findMany named by userId, across whichever organizations they asked", async () => {
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { userId: "user_sam", state: "PENDING" } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a query names no subject and no organization", () => {
+    it("still refuses the sweep over everybody's pending requests", async () => {
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { state: "PENDING" } },
+        } as GuardParams),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when an administrator lists one organization's queue", () => {
+    it("allows it, which is the ordinary org-bounded read", async () => {
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { organizationId: "org_acme", state: "PENDING" } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when the refusal is about tenancy rather than anything else", () => {
+    it("says so, so a later change cannot pass by refusing differently", async () => {
+      // A bare `rejects.toThrow()` passes for ANY throw — an unknown-model
+      // path, or a typo in the model key that makes the whole entry
+      // unreachable. This is the one case that tells "refused for tenancy"
+      // apart from "refused at all".
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { state: "PENDING" } },
+        } as GuardParams),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+});
+
+/**
+ * The two entries this wave added and did not pin.
+ *
+ * `ScimRequestLog` is admitted for a PLATFORM-scoped `findMany`, because the
+ * retention sweep spans every tenant by definition — and its delete is held
+ * to named ids, so an unbounded one cannot drop every customer's log at once.
+ * `SsoCredential` is admitted by `connectionId`, which is what a read already
+ * holds; a bare read over every tenant's client secrets is what it must
+ * refuse.
+ *
+ * Neither had a test, so widening `platformScopeActions` to include the
+ * delete, or dropping the id predicate, was a silent edit.
+ */
+describe("guardOrganizationId — the directory log and the credential vault", () => {
+  describe("when the retention sweep scans for what has aged out", () => {
+    it("admits the platform-scoped read", async () => {
+      await expect(
+        runGuard({
+          model: "ScimRequestLog",
+          action: "findMany",
+          args: { where: { occurredAt: { lt: new Date() } } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+
+    it("refuses a delete that names no rows", async () => {
+      // The scan spans every tenant; the delete that follows it must not.
+      await expect(
+        runGuard({
+          model: "ScimRequestLog",
+          action: "deleteMany",
+          args: { where: { occurredAt: { lt: new Date() } } },
+        } as GuardParams),
+      ).rejects.toThrow();
+    });
+
+    it("allows the delete bounded to the ids the scan returned", async () => {
+      await expect(
+        runGuard({
+          model: "ScimRequestLog",
+          action: "deleteMany",
+          args: { where: { id: { in: ["log_1", "log_2"] } } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when the credential vault is read", () => {
+    it("allows a read bounded to one connection", async () => {
+      await expect(
+        runGuard({
+          model: "SsoCredential",
+          action: "findMany",
+          args: { where: { connectionId: "ssoc_acme" } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+
+    it("refuses a read over every tenant's client secrets", async () => {
+      await expect(
+        runGuard({
+          model: "SsoCredential",
+          action: "findMany",
+          args: { where: { kind: "oidc-client-secret" } },
+        } as GuardParams),
+      ).rejects.toThrow();
+    });
+  });
+});

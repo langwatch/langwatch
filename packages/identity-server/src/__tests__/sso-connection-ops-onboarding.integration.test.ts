@@ -9,6 +9,7 @@ import { SsoConnectionService } from "../sso-connection.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubLicenseAuthority,
   StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
@@ -78,9 +79,11 @@ beforeEach(() => {
   service = new SsoConnectionService(
     new SsoConnectionGuards({
       connections,
+      registrationSlots: connections,
       breakGlass,
       stranding: new StubStranding([]),
       platformOperators: new StubPlatformOperators([OLIVE.id]),
+      licenseAuthority: new StubLicenseAuthority(),
     }),
     ledger,
   );
@@ -93,7 +96,7 @@ async function onboard(): Promise<void> {
     ...commandFor("ssocmd_1"),
     type: "oidc",
     idp: IDP,
-    allowsJit: true,
+    arrivalPolicy: "admit",
   });
   await service.claimDomain({ ...commandFor("ssocmd_2"), domain: "acme.com" });
   await service.approveDomainClaim({
@@ -103,6 +106,8 @@ async function onboard(): Promise<void> {
   await service.attestDomain({
     ...commandFor("ssocmd_4"),
     domain: "acme.com",
+    evidenceRef: "support-case:SSO-42",
+    note: "Verified the customer-controlled registry record.",
   });
 }
 
@@ -178,12 +183,13 @@ describe("ops-assisted onboarding", () => {
       // office and the operator lookup read the same answer without either
       // one having to replay history.
       expect(held?.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "acme.com",
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
       // And it never reads as a domain the customer proved: the method is a
       // value of its own, so there is no reading of this row under which the

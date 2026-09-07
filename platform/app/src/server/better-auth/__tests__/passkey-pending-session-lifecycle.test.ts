@@ -5,8 +5,8 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { models } from "../config/models";
-import { beforeSessionCreate } from "../hooks";
 import { PasskeySignUpRegistration } from "../passkey-signup";
+import { createSessionGateHooks } from "./support/session-gate";
 
 vi.mock("~/env.mjs", () => ({
   env: { NEXTAUTH_SECRET: "passkey-proof-first-test-secret" },
@@ -133,6 +133,12 @@ describe("real BetterAuth proof-first passkey enrollment", () => {
       },
     ];
     const sessions: Row[] = [];
+    const hooks = createSessionGateHooks({
+      findUser: async () => ({
+        deactivatedAt: null,
+        signupConfirmationPending: false,
+      }),
+    });
     const db: Record<string, Row[]> = {
       User: users,
       Account: [],
@@ -165,15 +171,7 @@ describe("real BetterAuth proof-first passkey enrollment", () => {
         session: {
           create: {
             before: async (session) => {
-              const permitted = await beforeSessionCreate({
-                prisma: {
-                  user: {
-                    findUnique: async () => ({
-                      deactivatedAt: null,
-                      signupConfirmationPending: false,
-                    }),
-                  },
-                },
+              const permitted = await hooks.beforeSessionCreate({
                 session: { userId: session.userId },
               });
               return permitted === false ? false : void 0;

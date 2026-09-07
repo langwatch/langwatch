@@ -140,7 +140,6 @@ export {
 } from "./join-request-guards";
 export {
   approveJoinCommandId,
-  expireJoinCommandId,
   newJoinRequestCommandId,
   newJoinRequestId,
 } from "./join-request-id";
@@ -151,6 +150,7 @@ export type {
 } from "./join-request.repository";
 export { JoinRequestService } from "./join-request.service";
 export {
+  retiredLetter,
   SCIM_APPLY_MAX_ATTEMPTS,
   ScimSyncGuards,
 } from "./scim-sync-guards";
@@ -168,25 +168,120 @@ export {
   type SsoConnectionGuardsDeps,
 } from "./sso-connection-guards";
 export {
+  activationRecoveryReservationId,
   grandfatherCommandId,
   grandfatheredSsoConnectionId,
+  legacyReplacementCommandId,
+  legacyReplacementConnectionId,
+  newSsoBreakGlassBindingId,
   newSsoConnectionCommandId,
+  looksLikeSsoConnectionId,
   newSsoConnectionId,
+  selfServeRegistrationCommandId,
+  selfServeRegistrationConnectionId,
 } from "./sso-connection-id";
 export type { SsoConnectionLedger } from "./sso-connection-ledger";
 export {
-  ShadowComparingDomainRoutingRepository,
-  type SsoConnectionRoutingShadowDeps,
-  type SsoConnectionRoutingShadowRecord,
-  type SsoConnectionRoutingShadowRecorder,
-} from "./sso-connection-routing-shadow";
+  SSO_CONNECTION_REGISTRATION_KINDS,
+  type SsoConnectionRegistrationKind,
+  type SsoConnectionRegistrationRepository,
+  type SsoConnectionRegistrationSlot,
+} from "./sso-connection-registration.repository";
 export type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoDomainClaimQueueRepository,
+  SsoLicenseAuthorityRepository,
   SsoPlatformOperatorRepository,
 } from "./sso-connection.repository";
 export { SsoConnectionService } from "./sso-connection.service";
+export {
+  SsoMigrationFinalizationBlockedError,
+  SsoMigrationFinalizationService,
+  type SsoLegacyIdentityRetirementPort,
+  type SsoMigrationFinalizationBlocker,
+  type SsoMigrationFinalizationEvidence,
+  type SsoMigrationFinalizationReadPort,
+  type SsoMigrationFinalizationServiceDeps,
+} from "./sso-migration-finalization.service";
+export type {
+  SsoBreakGlassRepository,
+  SsoBreakGlassWarningNotifier,
+} from "./break-glass.repository";
+export {
+  SsoBreakGlassService,
+  type SsoBreakGlassServiceDeps,
+} from "./break-glass.service";
+export {
+  type SelfServeActor,
+  type SelfServeBreakGlassBindingView,
+  type SelfServeDnsRecordLocation,
+  type SelfServeDnsRecordView,
+  type SelfServeDomainClaimView,
+  type SelfServeGoLiveView,
+  type SelfServeIssuedDnsRecord,
+  type SelfServeMigrationView,
+  type SelfServeSetupView,
+  type SsoBreakGlassReadPort,
+  type SsoDomainFileFetch,
+  type SsoDomainFileLookup,
+  type SsoDomainProofLookup,
+  type SsoDomainTxtLookup,
+  type SsoLicenseProofPort,
+  type SsoMigrationBlockerView,
+  type SsoMigrationProgressReadPort,
+  type SsoMigrationScimStatus,
+  type SsoMigrationStragglerView,
+  type SsoOrganizationMember,
+  type SsoOrganizationMemberLookup,
+  SsoSelfServeService,
+  type SsoSelfServeContextPort,
+  type SsoSelfServeServiceDeps,
+  type SsoTestSignIn,
+  type SsoTestSignInLookup,
+} from "./sso-self-serve.service";
+export {
+  SSO_DOMAIN_REPROOF_BATCH,
+  SsoDomainReproofService,
+  type SsoDomainReproofNotifier,
+  type SsoDomainReproofOutcome,
+  type SsoDomainReproofServiceDeps,
+  type SsoDomainReproofTarget,
+  type SsoDomainReproofTargetRepository,
+} from "./sso-domain-reproof.service";
+export {
+  SSO_CREDENTIAL_KINDS,
+  type SsoCredentialKind,
+  type SsoCredentialStore,
+} from "./sso-credential-store";
+export {
+  connectionIsDialable,
+  engineProviderFor,
+  serviceProviderDetailsFor,
+  type SsoEngineProviderRow,
+  type SsoServiceProviderDetails,
+} from "./sso-engine-provider";
+export {
+  isSealedProviderConfig,
+  plaintextProviderConfigCipher,
+  SSO_PROVIDER_CONFIG_SEAL,
+  type SsoProviderConfigCipher,
+} from "./sso-provider-config-cipher";
+export {
+  discoveryEndpointFor,
+  parseSamlIdpConfig,
+  ssoIdpRegistrationSchema,
+  ssoOidcRegistrationSchema,
+  ssoSamlRegistrationSchema,
+  type SsoIdpRegistration,
+  type SsoIssuerDiscoveryPort,
+  type SsoOidcRegistration,
+  type SsoSamlIdpConfig,
+  type SsoSamlRegistration,
+  validateOidcRegistration,
+  validateSamlRegistration,
+} from "./sso-idp-registration";
 export {
   IDENTITY_VERIFICATION_TTL_MS,
   type MintedEmailVerification,

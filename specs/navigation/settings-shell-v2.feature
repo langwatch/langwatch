@@ -7,19 +7,36 @@ Feature: Settings shell
   product dropdown (the icon rail marks its Settings tile instead), and
   the organization control stays. The sidebar opens with a back entry
   that returns to the product the user came from, then Quick Search,
-  then the settings menu regrouped with icons: ORGANIZATION, ACCESS,
-  AI INFRASTRUCTURE, DATA CONTROLS, PROJECT, and the internal OPS and
+  then the settings menu regrouped with icons: YOU, ORGANIZATION,
+  PEOPLE & ACCESS, AI INFRASTRUCTURE, DATA CONTROLS, PROJECT, and the internal OPS and
   BACKOFFICE groups with their current gates. Enterprise-plan entries
   carry a quiet grey pill, since it marks a plan rather than asking to
-  be read first. Every settings page keeps its address, and every
-  visibility gate keeps its current condition. The back entry and its
-  rule sit above the scroll region, so a long settings menu never
-  scrolls the way out of the column, and the entries are cut at that
-  rule as they pass under it.
+  be read first. Every visibility gate keeps its current condition. The
+  back entry and its rule sit above the scroll region, so a long
+  settings menu never scrolls the way out of the column, and the
+  entries are cut at that rule as they pass under it.
 
-  API Keys sits in the ORGANIZATION group, under General. In ACCESS it
-  came after four enterprise entries most readers cannot open, which put
-  a page they use often at the bottom of a group they have no use for.
+  YOU comes first and holds Profile and Security: the two pages that are
+  about the person reading them rather than about the organization they
+  are in. Everything below the first group is somebody's colleague's
+  business; these two are nobody's but theirs, and a reader hunting for
+  their own password should not have to work out which organization
+  heading hides it. Neither page asks for an organization permission,
+  because a member with no administrative authority at all still has a
+  name, a photo and a password.
+
+  API Keys sits in the ORGANIZATION group, under General. In the access
+  group it came after four enterprise entries most readers cannot open,
+  which put a page they use often at the bottom of a group they have no
+  use for.
+
+  PEOPLE & ACCESS holds Directory and Roles. Directory consolidates Members,
+  Teams & Projects, Groups and Access as tabs, while Roles holds Role Bindings
+  as its second tab. Their old addresses forward to the corresponding tabs.
+  Directory is offered on every plan and is named for what it holds rather
+  than for the provisioning protocol it speaks. Authentication remains in
+  ORGANIZATION because it controls how everyone in the organization signs in;
+  how the reader themselves signs in is Security, under You.
 
   @integration
   Scenario: The Settings sidebar opens with the way back
@@ -30,8 +47,30 @@ Feature: Settings shell
   @integration
   Scenario: The settings menu is grouped with its gates kept
     Given I open Settings
-    Then the sidebar shows the ORGANIZATION and ACCESS groups
-    And General and Members keep their current addresses
+    Then the sidebar shows the ORGANIZATION and PEOPLE & ACCESS groups
+    And General and Directory have their consolidated addresses
+
+  @integration
+  Scenario: The You section comes first and is about the reader
+    Given I open Settings in a new navigation mode
+    Then the first group is called "You"
+    And it offers Profile and Security, in that order
+    And it sits above the organization group
+
+  @integration
+  Scenario: The personal pages ask for no organization permission
+    Given I hold no permission over my organization
+    When the settings sidebar renders in a new navigation mode
+    Then Profile and Security are both still offered
+
+  @integration
+  Scenario: The access group is named for people and holds the organization's pages
+    Given I open Settings in a new navigation mode
+    Then the group is called "People & access"
+    And it offers Directory and Roles
+    And it has no separate Members, Groups, Access or Role Bindings entry
+    And Authentication stays in the Organization group
+    And the old page addresses forward to the corresponding consolidated tabs
 
   @integration
   Scenario: Enterprise entries carry a quiet grey pill

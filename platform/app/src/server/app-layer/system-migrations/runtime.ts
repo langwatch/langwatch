@@ -25,6 +25,7 @@ import {
 import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
 import {
+  connectionGrandfatherMigration,
   identifierBackfillMigration,
   identityNewbornReconciliation,
   identitySecretHealMigration,
@@ -132,6 +133,10 @@ export function registeredMigrations(): SystemMigration[] {
       ledger: authzEngineLedger,
       now: () => Date.now(),
     }),
+    // D04 records the configured legacy route without treating the old domain
+    // string as ownership evidence. Existing sign-in remains compatible, but
+    // activation, linking, and new-person trust still require qualified proof.
+    connectionGrandfatherMigration(),
   ];
 }
 

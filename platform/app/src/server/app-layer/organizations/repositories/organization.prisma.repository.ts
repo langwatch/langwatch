@@ -1908,6 +1908,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       // could in principle add their own target tracking later.
       const isGateway = log.action.startsWith("gateway.");
       return {
+        source: auditSourceOf({
+          action: log.action,
+          metadata: log.metadata,
+          isGateway,
+        }),
         id: log.id,
         createdAt: log.createdAt,
         userId: log.userId,
@@ -1921,7 +1926,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         args: isGateway ? { before: log.before, after: log.after } : log.args,
         user: log.userId ? (userMap.get(log.userId) ?? null) : null,
         project: log.projectId ? (projectMap.get(log.projectId) ?? null) : null,
-        source: isGateway ? "gateway" : "platform",
         targetKind: log.targetKind,
         targetId: log.targetId,
         before: log.before,
@@ -1931,4 +1935,40 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
     return { auditLogs, totalCount };
   }
+}
+
+/**
+ * Which system wrote an audit row (ADR-122).
+ *
+ * A grants row the customer's directory authored carries `source: "scim"` in
+ * its metadata — the same stamp the grant fact carries — and its `userId` is
+ * null, because the actor is `system:scim` and system actors have no user to
+ * name. Left as "platform" it renders as a change with no author, which is
+ * the reading that sends an administrator hunting for a person who does not
+ * exist. Naming the directory is what tells it apart from a change somebody
+ * made by hand.
+ *
+ * Exported so the reconciliation surfaces and this page cannot disagree about
+ * what counts as directory-authored.
+ */
+export function auditSourceOf({
+  action,
+  metadata,
+  isGateway,
+}: {
+  action: string;
+  metadata: unknown;
+  isGateway: boolean;
+}): "platform" | "gateway" | "directory" {
+  if (isGateway) return "gateway";
+  const source =
+    typeof metadata === "object" && metadata !== null
+      ? (metadata as Record<string, unknown>).source
+      : undefined;
+  // Both halves are required: the stamp says the directory authored it, and
+  // the action prefix says it is a membership change rather than something
+  // else that happens to carry the word.
+  return source === "scim" && action.startsWith("authz.grants.")
+    ? "directory"
+    : "platform";
 }

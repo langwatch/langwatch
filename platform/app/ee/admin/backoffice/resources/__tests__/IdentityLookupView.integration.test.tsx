@@ -21,6 +21,7 @@ const lookupState = vi.hoisted(() => ({
     error: null as Error | null,
   },
 }));
+const queueState = vi.hoisted(() => ({ current: { data: [] as unknown[] } }));
 const activityState = vi.hoisted(() => ({
   current: { data: [] as unknown[] },
 }));
@@ -37,6 +38,7 @@ vi.mock("~/utils/api", () => {
       identityLookup: {
         resolve: { useQuery: () => lookupState.current },
         person: { useQuery: () => ({ data: undefined, error: null }) },
+        claimQueue: { useQuery: () => queueState.current },
         recentActivity: { useQuery: () => activityState.current },
         confirmProposedSignIn: mutation(),
         rejectProposedSignIn: mutation(),
@@ -124,6 +126,7 @@ describe("given an operator who has resolved an address", () => {
       isFetching: false,
       error: null,
     };
+    queueState.current = { data: [] };
     activityState.current = { data: [] };
     routerState.query = {};
   });
@@ -192,6 +195,43 @@ describe("given an operator who has resolved an address", () => {
       expect(screen.getByText("email (DETACHED)")).toBeInTheDocument();
     });
   });
+
+  describe("when nothing is waiting in the claims queue", () => {
+    /** @scenario "The claims queue puts the longest wait first and says how long it has been" */
+    it("empty-states in one line, and orders the queue as the server hands it over", () => {
+      renderView();
+      expect(screen.getByTestId("claim-queue-empty")).toHaveTextContent(
+        "Nothing is waiting.",
+      );
+
+      queueState.current = {
+        data: [
+          {
+            connectionId: "ssoc_old",
+            organizationId: "org_old",
+            organizationName: "Old Co",
+            domain: "old.example",
+            waitingSinceMs: Date.now() - 9 * 24 * 60 * 60 * 1000,
+          },
+          {
+            connectionId: "ssoc_new",
+            organizationId: "org_new",
+            organizationName: "New Co",
+            domain: "new.example",
+            waitingSinceMs: Date.now() - 60 * 60 * 1000,
+          },
+        ],
+      };
+      renderView();
+
+      expect(
+        screen.getByText("waiting 9 days", { exact: false }),
+      ).toBeVisible();
+      expect(
+        screen.getByText("waiting 1 hour", { exact: false }),
+      ).toBeVisible();
+    });
+  });
 });
 
 describe("given an operator who may look but may not repair", () => {
@@ -202,6 +242,7 @@ describe("given an operator who may look but may not repair", () => {
       isFetching: false,
       error: null,
     };
+    queueState.current = { data: [] };
     activityState.current = { data: [] };
   });
 

@@ -4,6 +4,48 @@ import { isAllowedAuthOrigin } from "../originGate";
 const BASE = "http://localhost:5571";
 
 describe("isAllowedAuthOrigin", () => {
+  describe("given a cross-origin identity-provider form POST", () => {
+    it("allows only the exact SAML assertion consumer endpoint", () => {
+      expect(
+        isAllowedAuthOrigin({
+          method: "POST",
+          pathname: "/api/auth/sso/saml2/sp/acs/acme",
+          origin: "https://idp.example.com",
+          referer: undefined,
+          baseUrl: BASE,
+        }),
+      ).toBe(true);
+
+      for (const pathname of [
+        "/api/auth/sso/register",
+        "/api/auth/sso/callback/acme",
+        "/api/auth/sso/saml2/sp/acs/acme/extra",
+      ]) {
+        expect(
+          isAllowedAuthOrigin({
+            method: "POST",
+            pathname,
+            origin: "https://idp.example.com",
+            referer: undefined,
+            baseUrl: BASE,
+          }),
+        ).toBe(false);
+      }
+    });
+
+    it("does not exempt GET or another state-changing verb", () => {
+      expect(
+        isAllowedAuthOrigin({
+          method: "PUT",
+          pathname: "/api/auth/sso/saml2/sp/acs/acme",
+          origin: "https://idp.example.com",
+          referer: undefined,
+          baseUrl: BASE,
+        }),
+      ).toBe(false);
+    });
+  });
+
   describe("when method is GET / OPTIONS / HEAD", () => {
     it("allows GET requests regardless of origin", () => {
       expect(

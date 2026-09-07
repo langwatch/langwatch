@@ -160,6 +160,7 @@ describe("Langy permission coverage", () => {
           "gatewaySpend:view",
           "ingestionSources:view",
           "organization:view",
+          "sso:view",
           "webhookEndpoints:view",
         ]);
       });

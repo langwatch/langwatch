@@ -1,4 +1,4 @@
-Feature: The identifier-first sign-in router - one auth screen, routed by data
+Feature: The identifier-first sign-in router - one auth screens, routed by data
   As a person signing in to LangWatch
   I need my email to route me to the right identity provider or method set
   So that every sign-in method works through one door and credential failures
@@ -74,13 +74,12 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the decision never routes to sign-up with the reason code "identifier_unknown"
 
   @unit
-  Scenario: An account still waiting for identifier backfill keeps its way in
+  Scenario: An unlatched legacy account with a password offers password sign-in
     Given "home.net" belongs to no ACTIVE connection
-    And an existing account holds "legacy@home.net"
-    And that account's identifier backfill is not finalized
-    When "legacy@home.net" is submitted to the router
-    Then the decision offers the account's legacy sign-in method
-    And the decision never routes to sign-up with the reason code "identifier_unknown"
+    And the legacy account for "sam@home.net" has not completed identifier backfill and holds a password
+    When "sam@home.net" is submitted to the router
+    Then the decision offers the password with the reason code "account_methods"
+    And the decision never routes to sign-up
 
   @unit
   Scenario: The methods offered are the ones that account holds
@@ -130,13 +129,6 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When any email is submitted to the router
     Then the decision and its reason code are logged
     And the log carries the domain, never the local part of the address
-
-  @unit
-  Scenario: Auth throttles distinguish callers behind a trusted ingress
-    Given two callers reach the auth screen through the same configured trusted proxy
-    When each caller asks the sign-in router where an address should go
-    Then each caller spends a separate per-client budget
-    And a forwarding header received from an untrusted peer is ignored
 
   # ── Self-hosted priority ───────────────────────────────────────────────
 

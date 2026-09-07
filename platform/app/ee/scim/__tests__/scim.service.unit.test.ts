@@ -83,6 +83,8 @@ function buildMockUser(overrides: Partial<User> = {}): User {
     passkeySignupClaimHash: null,
     image: null,
     pendingSsoSetup: false,
+    signupConfirmationPending: false,
+    passkeySignupClaimHash: null,
     createdAt: new Date("2024-01-01T00:00:00Z"),
     updatedAt: new Date("2024-01-02T00:00:00Z"),
     lastLoginAt: null,
@@ -93,6 +95,7 @@ function buildMockUser(overrides: Partial<User> = {}): User {
     tracesExplorerTourDismissedAt: null,
     passkeyNudgeDismissedAt: null,
     langyCodeAccessPreference: null,
+    joinOfferDismissedDomains: [],
     ...overrides,
   };
 }

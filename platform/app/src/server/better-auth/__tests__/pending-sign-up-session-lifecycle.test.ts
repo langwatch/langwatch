@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { describe, expect, it } from "vitest";
 import { models } from "../config/models";
-import { beforeSessionCreate } from "../hooks";
+import { createSessionGateHooks } from "./support/session-gate";
 
 type Row = Record<string, unknown>;
 
@@ -26,6 +26,20 @@ describe("real BetterAuth pending sign-up session gate", () => {
       },
     ];
     const sessions: Row[] = [];
+    const hooks = createSessionGateHooks({
+      findUser: async () => {
+        const user = users[0];
+        if (!user) {
+          return null;
+        }
+
+        return {
+          deactivatedAt:
+            user.deactivatedAt instanceof Date ? user.deactivatedAt : null,
+          signupConfirmationPending: user.signupConfirmationPending === true,
+        };
+      },
+    });
     const db: Record<string, Row[]> = {
       User: users,
       Account: [
@@ -61,26 +75,7 @@ describe("real BetterAuth pending sign-up session gate", () => {
         session: {
           create: {
             before: async (session) => {
-              const permitted = await beforeSessionCreate({
-                prisma: {
-                  user: {
-                    findUnique: async () => {
-                      const user = users[0];
-                      if (!user) {
-                        return null;
-                      }
-
-                      return {
-                        deactivatedAt:
-                          user.deactivatedAt instanceof Date
-                            ? user.deactivatedAt
-                            : null,
-                        signupConfirmationPending:
-                          user.signupConfirmationPending === true,
-                      };
-                    },
-                  },
-                },
+              const permitted = await hooks.beforeSessionCreate({
                 session: { userId: session.userId },
               });
               return permitted === false ? false : void 0;
