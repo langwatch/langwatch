@@ -7,7 +7,6 @@ import {
   breakGlassIsLive,
   breakGlassWarningsDue,
   SsoBreakGlassExpiryOutOfRangeError,
-  SsoBreakGlassLastWayInError,
   SsoBreakGlassHolderIneligibleError,
 } from "@langwatch/identity";
 import type { SsoBreakGlassBindingRepository } from "./sso-connection.repository";
@@ -221,38 +220,13 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
     bindingId: string;
     organizationId: string;
   }): Promise<BreakGlassBinding> {
-    const binding = await this.deps.bindings.findById({ bindingId });
-    if (!binding || binding.organizationId !== organizationId) {
-      // Not a handled refusal: a revocation names a binding the surface just
-      // listed, so a miss is a caller defect or a race, and neither is
-      // something the reader can act on.
-      throw new Error(
-        `break-glass binding ${bindingId} is not one of organization ${organizationId}'s`,
-      );
-    }
     const nowMs = this.now();
-    // Already ended — by expiry, renewal or an earlier revocation. Ending it
-    // again changes nothing, so it answers as if it just had.
-    if (!breakGlassIsLive({ binding, nowMs })) return binding;
-
-    if (
-      await this.deps.organizationHasActiveConnection({ organizationId })
-    ) {
-      const otherWaysIn = (await this.live({ organizationId })).filter(
-        (candidate) => candidate.bindingId !== bindingId,
-      );
-      if (otherWaysIn.length === 0) {
-        throw new SsoBreakGlassLastWayInError(
-          `binding ${bindingId} is organization ${organizationId}'s only live way back in while a connection is ACTIVE`,
-        );
-      }
-    }
-
-    await this.deps.bindings.markSuperseded({
+    return this.deps.bindings.revokePreservingRecovery({
       bindingId,
-      supersededAtMs: nowMs,
+      organizationId,
+      nowMs,
+      recoveryMustRemain: await this.deps.organizationHasActiveConnection({ organizationId }),
     });
-    return { ...binding, supersededAtMs: nowMs };
   }
 
   /** Every binding an organization has held, so the history reads whole. */

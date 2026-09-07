@@ -245,4 +245,34 @@ describe("ending a way back in on purpose", () => {
     });
     expect(ended.supersededAtMs).toBe(clock);
   });
+
+  it("serializes concurrent revocations so one live recovery path remains", async () => {
+    connectionActive = true;
+    const first = await service.grant({
+      organizationId: ORG,
+      userId: "user_sam",
+      grantedByUserId: "user_ana",
+      expiresAtMs: T0 + 14 * DAY_MS,
+    });
+    const second = await service.grant({
+      organizationId: ORG,
+      userId: "user_ana",
+      grantedByUserId: "user_ana",
+      expiresAtMs: T0 + 14 * DAY_MS,
+    });
+
+    const attempts = await Promise.allSettled([
+      service.revoke({ bindingId: first.bindingId, organizationId: ORG }),
+      service.revoke({ bindingId: second.bindingId, organizationId: ORG }),
+    ]);
+
+    expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
+    expect(
+      attempts.filter(
+        (attempt) =>
+          attempt.status === "rejected" && attempt.reason?.code === "sso_break_glass_last_way_in",
+      ),
+    ).toHaveLength(1);
+    expect(await service.live({ organizationId: ORG })).toHaveLength(1);
+  });
 });

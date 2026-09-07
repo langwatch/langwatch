@@ -1,4 +1,8 @@
-import type { BreakGlassBinding } from "@langwatch/identity";
+import {
+  breakGlassIsLive,
+  type BreakGlassBinding,
+  SsoBreakGlassLastWayInError,
+} from "@langwatch/identity";
 import type { SsoBreakGlassRepository } from "@langwatch/identity-server";
 import type {
   PrismaClient,
@@ -72,6 +76,54 @@ export class PrismaSsoBreakGlassRepository implements SsoBreakGlassRepository {
     await this.prisma.ssoBreakGlassBinding.updateMany({
       where: { id: bindingId, supersededAt: null },
       data: { supersededAt: new Date(supersededAtMs) },
+    });
+  }
+
+  async revokePreservingRecovery({
+    bindingId,
+    organizationId,
+    nowMs,
+    recoveryMustRemain,
+  }: {
+    bindingId: string;
+    organizationId: string;
+    nowMs: number;
+    recoveryMustRemain: boolean;
+  }): Promise<BreakGlassBinding> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId}, 0))`;
+      const row = await tx.ssoBreakGlassBinding.findUnique({
+        where: { id: bindingId },
+      });
+      if (row === null || row.organizationId !== organizationId) {
+        throw new Error(
+          `break-glass binding ${bindingId} is not one of organization ${organizationId}'s`,
+        );
+      }
+      const binding = rowToBinding(row);
+      if (!breakGlassIsLive({ binding, nowMs })) return binding;
+
+      if (recoveryMustRemain) {
+        const otherLive = await tx.ssoBreakGlassBinding.count({
+          where: {
+            organizationId,
+            id: { not: bindingId },
+            supersededAt: null,
+            expiresAt: { gt: new Date(nowMs) },
+          },
+        });
+        if (otherLive === 0) {
+          throw new SsoBreakGlassLastWayInError(
+            `binding ${bindingId} is organization ${organizationId}'s only live way back in while a connection is ACTIVE`,
+          );
+        }
+      }
+
+      const revoked = await tx.ssoBreakGlassBinding.update({
+        where: { id: bindingId },
+        data: { supersededAt: new Date(nowMs) },
+      });
+      return rowToBinding(revoked);
     });
   }
 

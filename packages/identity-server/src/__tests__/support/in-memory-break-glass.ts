@@ -1,4 +1,5 @@
 import type { BreakGlassBinding } from "@langwatch/identity";
+import { breakGlassIsLive, SsoBreakGlassLastWayInError } from "@langwatch/identity";
 import type {
   SsoBreakGlassRepository,
   SsoBreakGlassWarningNotifier,
@@ -44,6 +45,40 @@ export class InMemoryBreakGlassBindings implements SsoBreakGlassRepository {
   }): Promise<void> {
     const held = this.rows.get(bindingId);
     if (held) this.rows.set(bindingId, { ...held, supersededAtMs });
+  }
+
+  async revokePreservingRecovery({
+    bindingId,
+    organizationId,
+    nowMs,
+    recoveryMustRemain,
+  }: {
+    bindingId: string;
+    organizationId: string;
+    nowMs: number;
+    recoveryMustRemain: boolean;
+  }): Promise<BreakGlassBinding> {
+    const binding = this.rows.get(bindingId);
+    if (!binding || binding.organizationId !== organizationId) {
+      throw new Error(
+        `break-glass binding ${bindingId} is not one of organization ${organizationId}'s`,
+      );
+    }
+    if (!breakGlassIsLive({ binding, nowMs })) return binding;
+    const otherLive = [...this.rows.values()].some(
+      (candidate) =>
+        candidate.organizationId === organizationId &&
+        candidate.bindingId !== bindingId &&
+        breakGlassIsLive({ binding: candidate, nowMs }),
+    );
+    if (recoveryMustRemain && !otherLive) {
+      throw new SsoBreakGlassLastWayInError(
+        `binding ${bindingId} is organization ${organizationId}'s only live way back in while a connection is ACTIVE`,
+      );
+    }
+    const revoked = { ...binding, supersededAtMs: nowMs };
+    this.rows.set(bindingId, revoked);
+    return revoked;
   }
 
   async recordWarningsSent({

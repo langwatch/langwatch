@@ -27,6 +27,15 @@ export interface SsoBreakGlassRepository {
     supersededAtMs: number;
   }): Promise<void>;
 
+  /** Atomically ends one binding without letting concurrent revocations
+   * remove the final recovery path. */
+  revokePreservingRecovery(args: {
+    bindingId: string;
+    organizationId: string;
+    nowMs: number;
+    recoveryMustRemain: boolean;
+  }): Promise<BreakGlassBinding>;
+
   /** Record that a warning was sent, so a second sweep the same day is silent. */
   recordWarningsSent(args: {
     bindingId: string;
