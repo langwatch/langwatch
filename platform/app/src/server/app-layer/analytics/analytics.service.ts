@@ -35,6 +35,7 @@ import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { featureFlagService } from "~/server/featureFlag";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
+import { assertFiltersAreSupported } from "~/server/filters/supported-values";
 import type { FilterField } from "~/server/filters/types";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { adjustTimeScaleForBucketCap } from "./query-builders/_shared";
@@ -110,6 +111,12 @@ export class AnalyticsService {
       "AnalyticsService.getTimeseries",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
+        // Before the cache and before routing: every table has its own filter
+        // translator, and each one used to widen rather than fail on a value
+        // it could not apply. Refusing here is the one place that covers all
+        // of them, so a dropped filter can never reach a result.
+        assertFiltersAreSupported(input.filters);
+
         const hash = createHash("sha256")
           // `options` is part of the cache identity, not a side channel: a
           // bounded read and an unbounded one are different questions, and a

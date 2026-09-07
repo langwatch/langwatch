@@ -25,6 +25,7 @@
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import { assertFilterValuesAreSupported } from "~/server/filters/supported-values";
 import type { FilterField } from "~/server/filters/types";
 import {
   isSlimEligibleTraceMetricKey,
@@ -314,9 +315,12 @@ function buildSlimFilterClauses(
         break;
       }
       case "traces.error": {
-        // ES sends "true"/"false"; map to HasError boolean.
+        // The options endpoint returns "true"/"false"; map to HasError. A
+        // value outside that pair is refused rather than dropped, which would
+        // answer the unfiltered numbers under a filtered request.
         const vals = collectStringValues(rawValue);
         if (vals.length === 0) break;
+        assertFilterValuesAreSupported({ field, values: vals });
         if (vals.includes("true") && !vals.includes("false")) {
           clauses.push(`${ta}.HasError = true`);
         } else if (vals.includes("false") && !vals.includes("true")) {
