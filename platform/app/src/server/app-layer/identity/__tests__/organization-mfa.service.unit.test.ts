@@ -4,8 +4,8 @@ import {
 } from "@langwatch/identity";
 import { describe, expect, it, vi } from "vitest";
 import {
-  type OrganizationMfaServiceDeps,
   OrganizationMfaService,
+  type OrganizationMfaServiceDeps,
 } from "../organization-mfa.service";
 
 const organizationId = "org-acme";

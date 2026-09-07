@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   type SessionCachePort,
-  type SessionRecord,
-  type SessionRecordsPort,
   SessionInventoryService,
   SessionIsCurrentError,
+  type SessionRecord,
+  type SessionRecordsPort,
 } from "../session-inventory.service";
 
 const session = ({

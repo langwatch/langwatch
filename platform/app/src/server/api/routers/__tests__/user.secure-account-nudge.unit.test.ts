@@ -96,17 +96,17 @@ describe("userRouter.secureAccountNudge", () => {
       account: facts({ twoStepEnabled: true }),
       expected: { passkey: true, twoStep: false },
     },
-  ])(
-    "removes the $held half and leaves the other",
-    async ({ account, expected }) => {
-      secureAccountFacts.mockResolvedValue(account);
+  ])("removes the $held half and leaves the other", async ({
+    account,
+    expected,
+  }) => {
+    secureAccountFacts.mockResolvedValue(account);
 
-      await expect(caller().secureAccountNudge({})).resolves.toMatchObject({
-        offer: true,
-        ...expected,
-      });
-    },
-  );
+    await expect(caller().secureAccountNudge({})).resolves.toMatchObject({
+      offer: true,
+      ...expected,
+    });
+  });
 
   /** @scenario "Only what the deployment offers is offered" */
   it("keeps the permanent passkey offer when two-step setup is unavailable", async () => {
