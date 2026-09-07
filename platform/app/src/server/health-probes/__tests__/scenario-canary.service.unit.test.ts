@@ -644,6 +644,7 @@ describe("parseRunPlanConfig", () => {
  */
 type FakeSuiteRow = {
   id: string;
+  slug?: string;
   projectId: string;
   scenarioIds: string[];
   targets: unknown;
@@ -653,7 +654,7 @@ type FakeSuiteRow = {
 
 /**
  * Drives `prisma.simulationSuite.findFirst` off an in-memory table that HONOURS
- * the `where` (id + `projectId` + `archivedAt: null` + `kind: "run_plan"`).
+ * the `where` (id-or-slug + `projectId` + `archivedAt: null` + `kind: "run_plan"`).
  * Returning `null` unconditionally would make an "archived plan is rejected"
  * test pass even if the filter were dropped; making the fake obey the filter is
  * what proves each clause is load-bearing — a row that would match without one
@@ -665,9 +666,16 @@ function fakeSuiteTable(rows: FakeSuiteRow[]) {
     args: { where?: Record<string, unknown> } | undefined,
   ) => {
     const where = args?.where ?? {};
+    const or = where.OR as Array<{ id?: string; slug?: string }> | undefined;
     const match = rows.find(
       (row) =>
         (where.id === undefined || row.id === where.id) &&
+        (or === undefined ||
+          or.some((clause) =>
+            clause.id !== undefined
+              ? row.id === clause.id
+              : row.slug === clause.slug,
+          )) &&
         (where.projectId === undefined || row.projectId === where.projectId) &&
         (where.archivedAt === undefined ||
           row.archivedAt === where.archivedAt) &&
@@ -714,8 +722,8 @@ describe("runScenarioHealthCanary", () => {
 
       expect(prisma.simulationSuite.findFirst).toHaveBeenCalledWith({
         where: {
-          id: "missing-plan",
           projectId: "canary-project",
+          OR: [{ id: "missing-plan" }, { slug: "missing-plan" }],
           archivedAt: null,
           kind: "run_plan",
         },
@@ -902,6 +910,47 @@ describe("runScenarioHealthCanary", () => {
         scenarioId: "plan-scenario",
         target: { type: "prompt", referenceId: "plan-prompt" },
       });
+    });
+  });
+
+  describe("given a runPlanId that is the plan's slug rather than its id", () => {
+    /** @scenario "A run plan may be named by its slug" */
+    it("resolves the plan by slug within the caller's project and launches through it", async () => {
+      fakeSuiteTable([
+        {
+          id: "plan-nanoid",
+          slug: "canary-health-check",
+          projectId: "plan-project",
+          scenarioIds: ["plan-scenario"],
+          targets: [{ type: "prompt", referenceId: "plan-prompt" }],
+          kind: "run_plan",
+          archivedAt: null,
+        },
+      ]);
+      vi.mocked(launchScenarioRun).mockResolvedValue({
+        scenarioRunId: "canary-run-2",
+      } as Awaited<ReturnType<typeof launchScenarioRun>>);
+      vi.mocked(getApp).mockReturnValue({
+        simulations: {
+          runs: {
+            getScenarioRunData: async () => ({
+              status: ScenarioRunStatus.SUCCESS,
+              results: verdictResults(Verdict.SUCCESS),
+            }),
+          },
+        },
+      } as unknown as ReturnType<typeof getApp>);
+
+      const result = await runScenarioHealthCanary({
+        projectId: "plan-project",
+        runPlanId: "canary-health-check",
+      });
+
+      expect(result).toMatchObject({
+        healthy: true,
+        scenarioRunId: "canary-run-2",
+      });
+      expect(launchScenarioRun).toHaveBeenCalledTimes(1);
     });
   });
 

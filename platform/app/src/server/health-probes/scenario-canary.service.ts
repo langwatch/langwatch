@@ -19,9 +19,9 @@
  *    second call for the same run plan while one is in flight starts no second
  *    run — a different run plan is unaffected.
  *  - {@link runScenarioHealthCanary} is the production entrypoint the route
- *    crosses: it looks up the run plan named by `?runPlanId=`, scoped to
- *    `?projectId=`, validates it, builds the real deps and drives the
- *    single-flight guard.
+ *    crosses: it looks up the run plan named by `?runPlanId=` (id or slug),
+ *    scoped to the project the API key resolved to, validates it, builds the
+ *    real deps and drives the single-flight guard.
  *
  * Two failure modes the injected clock alone cannot bound are handled with a
  * real timer instead: a boundary await (`queueRun` / `getScenarioRunData`) that
@@ -404,13 +404,19 @@ async function resolveCanaryConfigFromRunPlan({
     const raced = await raceDeadline({
       ms: remainingMs,
       // `projectId` scopes the read to a plan the caller's project owns and
-      // satisfies the multitenancy guard. `kind: "run_plan"` and
+      // satisfies the multitenancy guard. `runPlanId` may be the plan's id or
+      // its slug (slugs are unique per project). `kind: "run_plan"` and
       // `archivedAt: null` are load-bearing too: a 1×1 `test_suite` or an
       // archived plan would otherwise launch a real run the operator meant to
       // retire. Filtering in the query keeps every one of those decisions in a
       // single place instead of re-checking them after the read.
       work: prisma.simulationSuite.findFirst({
-        where: { id: runPlanId, projectId, archivedAt: null, kind: "run_plan" },
+        where: {
+          projectId,
+          OR: [{ id: runPlanId }, { slug: runPlanId }],
+          archivedAt: null,
+          kind: "run_plan",
+        },
       }),
     });
     if ("timedOut" in raced) {
@@ -469,9 +475,9 @@ export function buildProductionDeps(config: CanaryConfig): ScenarioCanaryDeps {
 const singleFlightCanary = createSingleFlightScenarioCanary(runScenarioCanary);
 
 /**
- * The route's single entrypoint. Takes the id of the run plan (a
+ * The route's single entrypoint. Takes the id or slug of the run plan (a
  * `SimulationSuite` with `kind: "run_plan"`) the canary is pointed at and the
- * `projectId` that plan belongs to. The run plan is looked up scoped to that
+ * `projectId` the caller's API key resolved to. The run plan is looked up scoped to that
  * project (both to satisfy the multitenancy guard and to confine the canary to
  * a plan the project owns), and the canary's own scenario and target come from
  * that plan's row — so a runPlanId that does not belong to `projectId`, or a
@@ -533,8 +539,10 @@ export async function runScenarioHealthCanary({
     );
     return { healthy: false, reason: "run_failed", durationMs: 0 };
   }
+  // Keyed per project AND plan: two projects may legitimately reuse a slug,
+  // and their monitors must never block each other.
   return singleFlightCanary({
-    key: runPlanId,
+    key: `${projectId}/${runPlanId}`,
     deps: buildProductionDeps(resolved),
     hardDeadline,
   });
