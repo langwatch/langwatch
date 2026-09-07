@@ -57,7 +57,7 @@ function firstCommand(commands: string[], pattern: RegExp): number {
 describe("Langy sets up the gateway from the kickoff", () => {
   describe("when the tour already minted the production-app key", () => {
     /** @scenario The gateway path prints the key and the snippet */
-    it("checks first, mints nothing, shows the snippet through the card and records the path", async () => {
+    it("shows the snippet from the reveal id in hand, looks nothing up, mints nothing and records the path", async () => {
       const org = await seedGuidedOrganization({
         label: "Gateway",
         paths: ["gateway"],
@@ -105,10 +105,10 @@ describe("Langy sets up the gateway from the kickoff", () => {
 
       const commands = langy.state.toolCommands;
       console.log("[layer2] commands:", commands.join(" | "));
-      const listAt = firstCommand(commands, /virtual-keys list/);
-      const createAt = firstCommand(commands, /virtual-keys create/);
-      expect(listAt).toBeGreaterThanOrEqual(0);
-      expect(createAt).toBe(-1);
+      // The brief carries the reveal id, so the key and its secret are both
+      // in hand: there is nothing to look up and nothing to mint.
+      expect(firstCommand(commands, /virtual-keys list/)).toBe(-1);
+      expect(firstCommand(commands, /virtual-keys create/)).toBe(-1);
 
       const keys = await listVirtualKeys(org.organizationId);
       console.log("[layer2] keys:", keys.map((key) => key.name).join(", "));
