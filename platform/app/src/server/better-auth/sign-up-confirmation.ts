@@ -10,7 +10,6 @@ import type {
 } from "./session-minter";
 
 const logger = createLogger("langwatch:better-auth:sign-up-confirmation");
-type BetterAuthStatus = Parameters<GenericEndpointContext["setStatus"]>[0];
 
 /** The path the sign-up screen posts a spent link to. */
 export const SIGN_UP_CONFIRM_ADDRESS_PATH = "/sign-up/confirm-address";
@@ -45,11 +44,8 @@ export interface SignUpConfirmationDirectoryPort {
  */
 export interface ConfirmSignUpAddressContext extends SessionMintingContext {
   body: { token: string };
-  setStatus: (status: BetterAuthStatus) => void;
-  json: (
-    body: Record<string, unknown> | null,
-    init?: { status?: BetterAuthStatus },
-  ) => unknown;
+  setStatus: GenericEndpointContext["setStatus"];
+  json: (body: Record<string, unknown> | null) => unknown;
 }
 
 export interface SignUpConfirmationEndpointDeps {
