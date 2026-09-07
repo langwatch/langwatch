@@ -175,8 +175,9 @@ const exportWorkflow = async (
       inMemoryDataset.datasetId = undefined;
       const dataset = inMemoryDatasetToNodeDataset(inMemoryDataset);
 
-      if (dsl.nodes?.[0]?.data) {
-        (dsl.nodes[0].data as NodeDataWithDataset).dataset = dataset;
+      const firstNodeData = dsl.nodes?.[0]?.data;
+      if (firstNodeData) {
+        (firstNodeData as NodeDataWithDataset).dataset = dataset;
       }
     }
 

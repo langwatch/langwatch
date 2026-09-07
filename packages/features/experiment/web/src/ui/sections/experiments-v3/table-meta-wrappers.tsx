@@ -23,9 +23,11 @@ export const CheckboxHeaderFromMeta = ({
   const meta = context.table.options.meta as TableMeta | undefined;
   if (!meta) return null;
 
+  const partialSelection = meta.someSelected ? "indeterminate" : false;
+
   return (
     <Checkbox.Root
-      checked={meta.allSelected ? true : meta.someSelected ? "indeterminate" : false}
+      checked={meta.allSelected ? true : partialSelection}
       onCheckedChange={() => {
         if (meta.allSelected) {
           meta.clearRowSelection();

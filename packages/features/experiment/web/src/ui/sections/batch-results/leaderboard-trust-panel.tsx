@@ -103,15 +103,19 @@ const buildSweepCheck = (leaderboard: BTLeaderboard): TrustCheck => ({
 /**
  * `didConverge` alone would overstate this.
  */
-const buildSettledCheck = (leaderboard: BTLeaderboard): TrustCheck => ({
-  label: "Ranking settled",
-  tone: leaderboard.didConverge && leaderboard.comparability.identifiable ? "ok" : "warn",
-  detail: !leaderboard.comparability.identifiable
-    ? "The ranking cannot settle across groups the run never connected, so treat gaps that span them as unmeasured."
-    : leaderboard.didConverge
-      ? "The ranking converged on a stable answer."
-      : "The ranking did not fully settle, so treat the order as approximate.",
-});
+const buildSettledCheck = (leaderboard: BTLeaderboard): TrustCheck => {
+  const convergenceDetail = leaderboard.didConverge
+    ? "The ranking converged on a stable answer."
+    : "The ranking did not fully settle, so treat the order as approximate.";
+
+  return {
+    label: "Ranking settled",
+    tone: leaderboard.didConverge && leaderboard.comparability.identifiable ? "ok" : "warn",
+    detail: !leaderboard.comparability.identifiable
+      ? "The ranking cannot settle across groups the run never connected, so treat gaps that span them as unmeasured."
+      : convergenceDetail,
+  };
+};
 
 /**
  * The margins of error are built from a thousand OTHER fits, and their failures used to

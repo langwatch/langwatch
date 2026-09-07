@@ -52,9 +52,9 @@ export const comparabilityOf = ({
   const gb = index[b];
   if (ga === void 0 || gb === void 0) return "incomparable";
   if (ga === gb) return "same-group";
-  return comparability.dominates[ga]?.[gb] || comparability.dominates[gb]?.[ga]
-    ? "dominated"
-    : "incomparable";
+  const { dominates } = comparability;
+  const oneDominatesTheOther = dominates[ga]?.[gb] || dominates[gb]?.[ga];
+  return oneDominatesTheOther ? "dominated" : "incomparable";
 };
 
 /**

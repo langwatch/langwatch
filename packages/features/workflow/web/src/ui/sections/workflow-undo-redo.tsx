@@ -4,6 +4,21 @@ import { RotateCcw, RotateCw } from "react-feather";
 
 import { _useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 
+/** Which history step a keystroke asks for, or null when it asks for none. */
+function historyShortcutOf(event: KeyboardEvent): "undo" | "redo" | null {
+  const isMac = navigator.userAgent.includes("Mac");
+  const shouldRedo =
+    (event.metaKey && event.shiftKey && event.key === "z") || (event.ctrlKey && event.key === "y");
+  if (shouldRedo) return "redo";
+
+  const shouldUndo =
+    (isMac && event.metaKey && !event.shiftKey && event.key === "z") ||
+    (!isMac && event.ctrlKey && event.key === "z");
+  if (shouldUndo) return "undo";
+
+  return null;
+}
+
 /** Browser-only workflow history controls. The app owns when the workflow query is loaded. */
 export function WorkflowUndoRedo({ isWorkflowLoaded }: { isWorkflowLoaded: boolean }) {
   const { undo, redo, pastStates, futureStates, clear, pause, resume } =
@@ -11,19 +26,9 @@ export function WorkflowUndoRedo({ isWorkflowLoaded }: { isWorkflowLoaded: boole
 
   useEffect(() => {
     const handleUndoRedoKeyDown = (event: KeyboardEvent) => {
-      const isMac = navigator.userAgent.includes("Mac");
-      const shouldRedo =
-        (event.metaKey && event.shiftKey && event.key === "z") ||
-        (event.ctrlKey && event.key === "y");
-      const shouldUndo =
-        (isMac && event.metaKey && !event.shiftKey && event.key === "z") ||
-        (!isMac && event.ctrlKey && event.key === "z");
-
-      if (shouldRedo) {
-        redo();
-      } else if (shouldUndo) {
-        undo();
-      }
+      const step = historyShortcutOf(event);
+      if (step === "redo") redo();
+      if (step === "undo") undo();
     };
 
     window.addEventListener("keydown", handleUndoRedoKeyDown);

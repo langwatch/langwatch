@@ -179,10 +179,8 @@ export function StudioNodeDrawer() {
   // opening when the user merely drags a node (which selects it on mousedown).
   const hasClickConfirmation = selectedNode && clickedNodeId === selectedNode.id;
 
-  const effectiveNode =
-    !hasUrlDrawer && !isEmptyEvaluator && !isEmptyAgent && !isDraggingNode && hasClickConfirmation
-      ? selectedNode
-      : undefined;
+  const isNodeDrawerBlocked = hasUrlDrawer || isEmptyEvaluator || isEmptyAgent || isDraggingNode;
+  const effectiveNode = !isNodeDrawerBlocked && hasClickConfirmation ? selectedNode : undefined;
 
   const PanelComponent = effectiveNode
     ? ComponentPropertiesPanelMap[effectiveNode.type as ComponentType]

@@ -7,6 +7,25 @@ import {
   useEvaluationsV3Store,
 } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 
+/** Which history step a keystroke asks for, or null when it asks for none. */
+function historyShortcutOf(event: KeyboardEvent): "undo" | "redo" | null {
+  // Check if we're in an input/textarea - don't intercept there
+  const target = event.target as HTMLElement;
+  const isTextEntry =
+    target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+  if (isTextEntry) return null;
+
+  const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+  const modKey = isMac ? event.metaKey : event.ctrlKey;
+  if (!modKey) return null;
+
+  if (event.key === "z") return event.shiftKey ? "redo" : "undo";
+  // Ctrl+Y for redo on Windows/Linux
+  if (event.key === "y" && !isMac) return "redo";
+
+  return null;
+}
+
 /**
  * UndoRedo component with keyboard shortcuts.
  * Cmd/Ctrl+Z for undo, Cmd/Ctrl+Shift+Z for redo.
@@ -40,26 +59,12 @@ export function UndoRedo() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if we're in an input/textarea - don't intercept there
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
-        return;
-      }
+      const step = historyShortcutOf(e);
+      if (!step) return;
 
-      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-      const modKey = isMac ? e.metaKey : e.ctrlKey;
-
-      if (modKey && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      } else if (modKey && e.key === "z" && e.shiftKey) {
-        e.preventDefault();
-        handleRedo();
-      } else if (modKey && e.key === "y" && !isMac) {
-        // Ctrl+Y for redo on Windows/Linux
-        e.preventDefault();
-        handleRedo();
-      }
+      e.preventDefault();
+      if (step === "undo") handleUndo();
+      if (step === "redo") handleRedo();
     };
 
     window.addEventListener("keydown", handleKeyDown);

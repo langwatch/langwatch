@@ -12,6 +12,33 @@ export type WorkflowPropertiesPanelProps = {
   renderOutputPanel: (props: { node: Node<Component> }) => React.ReactNode;
 };
 
+/** Panel geometry, which differs only by whether the panel is expanded. */
+function panelBoxStyle({
+  expanded,
+  fullPanelHeight,
+  middlePoint,
+}: {
+  expanded: boolean;
+  fullPanelHeight: number;
+  middlePoint: number;
+}): React.CSSProperties {
+  return {
+    position: expanded ? "absolute" : "relative",
+    top: 0,
+    right: expanded ? middlePoint : 0,
+    height: expanded ? fullPanelHeight - 40 : fullPanelHeight,
+    marginTop: expanded ? 20 : 0,
+    borderRadius: expanded ? 8 : 0,
+    background: "var(--chakra-colors-bg)",
+    border: "1px solid",
+    borderColor: "var(--chakra-colors-border-emphasized)",
+    boxShadow: expanded ? "0 0 10px rgba(0,0,0,0.1)" : undefined,
+    zIndex: 100,
+    overflowY: "auto",
+    overflowX: "hidden",
+  };
+}
+
 /** Layout shell for the expanded Studio properties panel. */
 export function WorkflowPropertiesPanel({
   renderNodePropertiesPanel,
@@ -52,6 +79,10 @@ export function WorkflowPropertiesPanel({
   const middlePoint = Math.round(width / 2 - halfPanelWidth);
   const fullPanelHeight = height - 50;
   const expanded = propertiesExpanded;
+  const collapseOnOuterBoxClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).classList.contains("js-outer-box"))
+      setPropertiesExpanded(false);
+  };
   const outerBoxProps = {
     width: "100%",
     height: "100%",
@@ -61,23 +92,7 @@ export function WorkflowPropertiesPanel({
 
   return (
     <Box>
-      <Box
-        style={{
-          position: expanded ? "absolute" : "relative",
-          top: 0,
-          right: expanded ? middlePoint : 0,
-          height: expanded ? fullPanelHeight - 40 : fullPanelHeight,
-          marginTop: expanded ? 20 : 0,
-          borderRadius: expanded ? 8 : 0,
-          background: "var(--chakra-colors-bg)",
-          border: "1px solid",
-          borderColor: "var(--chakra-colors-border-emphasized)",
-          boxShadow: expanded ? "0 0 10px rgba(0,0,0,0.1)" : undefined,
-          zIndex: 100,
-          overflowY: "auto",
-          overflowX: "hidden",
-        }}
-      >
+      <Box style={panelBoxStyle({ expanded, fullPanelHeight, middlePoint })}>
         <Box ref={ref}>{renderNodePropertiesPanel({ node: selectedNode })}</Box>
       </Box>
       {expanded && (
@@ -105,10 +120,7 @@ export function WorkflowPropertiesPanel({
             <Box
               style={{ ...outerBoxProps, paddingLeft: "40px" }}
               className="js-outer-box"
-              onClick={(event: React.MouseEvent<HTMLDivElement>) => {
-                if ((event.target as HTMLElement).classList.contains("js-outer-box"))
-                  setPropertiesExpanded(false);
-              }}
+              onClick={collapseOnOuterBoxClick}
             >
               {renderInputPanel({ node: selectedNode })}
             </Box>
@@ -125,10 +137,7 @@ export function WorkflowPropertiesPanel({
             <Box
               style={{ ...outerBoxProps, paddingRight: "40px" }}
               className="js-outer-box"
-              onClick={(event: React.MouseEvent<HTMLDivElement>) => {
-                if ((event.target as HTMLElement).classList.contains("js-outer-box"))
-                  setPropertiesExpanded(false);
-              }}
+              onClick={collapseOnOuterBoxClick}
             >
               {renderOutputPanel({ node: selectedNode })}
             </Box>

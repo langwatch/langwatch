@@ -18,8 +18,10 @@ import {
 /** Walk up from this package until the workspace root (the one holding the
  * evaluator source) is found, so the test resolves the same from any worktree. */
 function findRepoRoot(): string {
+  const holdsEvaluatorSource = (candidate: string) =>
+    existsSync(path.join(candidate, "services", "langevals"));
   let dir = import.meta.dirname;
-  while (!existsSync(path.join(dir, "services", "langevals"))) {
+  while (!holdsEvaluatorSource(dir)) {
     const parent = path.dirname(dir);
     if (parent === dir) throw new Error("workspace root not found above " + import.meta.dirname);
     dir = parent;

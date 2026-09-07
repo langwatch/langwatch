@@ -66,7 +66,9 @@ const Link = forwardRef<HTMLAnchorElement, NextLinkProps>(function Link(
   const to = buildHref(href);
 
   // External links
-  if (to.startsWith("http://") || to.startsWith("https://") || to.startsWith("mailto:")) {
+  const isExternal =
+    to.startsWith("http://") || to.startsWith("https://") || to.startsWith("mailto:");
+  if (isExternal) {
     return (
       <a ref={ref} href={to} {...rest}>
         {children}

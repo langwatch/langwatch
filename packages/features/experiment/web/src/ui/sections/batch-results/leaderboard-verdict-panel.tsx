@@ -5,7 +5,10 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
 import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
-import type { CheaperAlternative, LeaderboardVerdict } from "../batch-evaluation-results.verdict.ts";
+import type {
+  CheaperAlternative,
+  LeaderboardVerdict,
+} from "../batch-evaluation-results.verdict.ts";
 import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline.ts";
 
 export type LeaderboardVerdictPanelProps = {
@@ -154,10 +157,12 @@ function Callout({
 /**
  * A bootstrap over very few comparisons can hand back a non-finite bound.
  */
-const finiteCI = (entry: BTLeaderboard["entries"][number]): [number, number] | null =>
-  entry.scoreCI && Number.isFinite(entry.scoreCI[0]) && Number.isFinite(entry.scoreCI[1])
-    ? entry.scoreCI
-    : null;
+const finiteCI = (entry: BTLeaderboard["entries"][number]): [number, number] | null => {
+  const interval = entry.scoreCI;
+  if (!interval) return null;
+  const bothBoundsAreFinite = Number.isFinite(interval[0]) && Number.isFinite(interval[1]);
+  return bothBoundsAreFinite ? interval : null;
+};
 
 /** The variant's name, why it is or is not rankable, and its win record. */
 function ScoreBarCaption({

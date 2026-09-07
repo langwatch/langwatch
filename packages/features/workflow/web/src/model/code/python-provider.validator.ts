@@ -109,7 +109,9 @@ export function registerValidator(monaco: Monaco, contractRef: ContractRef): Val
       }
 
       const leading = /^([ \t]+)/.exec(line);
-      if (leading && /\t/.test(leading[1] ?? "") && / /.test(leading[1] ?? "")) {
+      const indent = leading?.[1] ?? "";
+      const mixesTabsAndSpaces = /\t/.test(indent) && / /.test(indent);
+      if (leading && mixesTabsAndSpaces) {
         markers.push({
           severity: monaco.MarkerSeverity.Warning,
           code: MIXED_INDENT,

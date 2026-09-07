@@ -183,6 +183,28 @@ export function NewVersionFields({
   // typed anything.
   const shouldShowValidation = form.formState.submitCount > 0;
 
+  // Always offer an explicit generate affordance: manual retry, re-roll, or
+  // (no model configured) the missing-model toast trigger. force:true bypasses
+  // the auto-gen gate.
+  const canGenerateDescription = canSave && resolvedDefault.isFetched && previousVersionDsl;
+  const generateDescriptionButton = canGenerateDescription ? (
+    <IconButton
+      size="xs"
+      variant="ghost"
+      color="blue.400"
+      aria-label="Generate description"
+      data-testid="generate-commit-message-button"
+      onClick={() => {
+        userEditedCommitMessage.current = false;
+        generateCommitMessageCallback(previousVersionDsl, getWorkflow(), {
+          force: true,
+        });
+      }}
+    >
+      <Sparkles size={16} />
+    </IconButton>
+  ) : undefined;
+
   return (
     <HStack width="full">
       <Field.Root
@@ -216,28 +238,7 @@ export function NewVersionFields({
           <InputGroup
             width="full"
             endElement={
-              generateCommitMessage.isPending ? (
-                <AISparklesLoader />
-              ) : canSave && resolvedDefault.isFetched && previousVersionDsl ? (
-                // Always offer an explicit generate affordance: manual retry,
-                // re-roll, or (no model configured) the missing-model toast
-                // trigger. force:true bypasses the auto-gen gate.
-                <IconButton
-                  size="xs"
-                  variant="ghost"
-                  color="blue.400"
-                  aria-label="Generate description"
-                  data-testid="generate-commit-message-button"
-                  onClick={() => {
-                    userEditedCommitMessage.current = false;
-                    generateCommitMessageCallback(previousVersionDsl, getWorkflow(), {
-                      force: true,
-                    });
-                  }}
-                >
-                  <Sparkles size={16} />
-                </IconButton>
-              ) : undefined
+              generateCommitMessage.isPending ? <AISparklesLoader /> : generateDescriptionButton
             }
           >
             <Input

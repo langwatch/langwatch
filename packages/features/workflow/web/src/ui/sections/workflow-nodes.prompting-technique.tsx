@@ -76,6 +76,8 @@ export function PromptingTechniqueWrapper({
     return children;
   }
 
+  const hoveredOutlineColor = hovered ? "gray.emphasized" : "none";
+
   return (
     <VStack
       position="relative"
@@ -86,7 +88,7 @@ export function PromptingTechniqueWrapper({
       fontSize="10px"
       boxShadow={wrapperShadow}
       outline={!!node.selected || hovered ? "1.5px solid" : "none"}
-      outlineColor={node.selected ? selectionColor : hovered ? "gray.emphasized" : "none"}
+      outlineColor={node.selected ? selectionColor : hoveredOutlineColor}
       gap={0}
       onClick={(e) => {
         let parent: HTMLElement | null = e.target as HTMLElement;

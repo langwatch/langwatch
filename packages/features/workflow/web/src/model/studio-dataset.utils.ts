@@ -171,11 +171,14 @@ export const trainTestSplit = <Value>(
   };
 };
 
-export const tryToMapPreviousColumnsToNewColumns = (
-  datasetRecords: DatasetRecordInput[],
+/**
+ * Which new column each previous column's values move to: matched by name
+ * first, then the leftovers paired off in the order they appear.
+ */
+const buildColumnNameMap = (
   previousColumns: DatasetColumns,
   newColumns: DatasetColumns,
-): DatasetRecordInput[] => {
+): Map<string, string> => {
   const columnNameMap = new Map<string, string>();
 
   for (const previousColumn of previousColumns) {
@@ -206,21 +209,37 @@ export const tryToMapPreviousColumnsToNewColumns = (
     }
   }
 
-  return datasetRecords.map((record) => {
-    const convertedRecord: DatasetRecordInput = {};
-    if (record.id !== void 0) {
-      convertedRecord.id = record.id;
+  return columnNameMap;
+};
+
+/** One record with its keys moved to the new column names, dropping the unmapped ones. */
+const renameRecordColumns = (
+  record: DatasetRecordInput,
+  columnNameMap: Map<string, string>,
+): DatasetRecordInput => {
+  const convertedRecord: DatasetRecordInput = {};
+  if (record.id !== void 0) {
+    convertedRecord.id = record.id;
+  }
+
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "id") continue;
+
+    const newColumnName = columnNameMap.get(key);
+    if (newColumnName) {
+      convertedRecord[newColumnName] = value;
     }
+  }
 
-    for (const [key, value] of Object.entries(record)) {
-      if (key === "id") continue;
+  return convertedRecord;
+};
 
-      const newColumnName = columnNameMap.get(key);
-      if (newColumnName) {
-        convertedRecord[newColumnName] = value;
-      }
-    }
+export const tryToMapPreviousColumnsToNewColumns = (
+  datasetRecords: DatasetRecordInput[],
+  previousColumns: DatasetColumns,
+  newColumns: DatasetColumns,
+): DatasetRecordInput[] => {
+  const columnNameMap = buildColumnNameMap(previousColumns, newColumns);
 
-    return convertedRecord;
-  });
+  return datasetRecords.map((record) => renameRecordColumns(record, columnNameMap));
 };

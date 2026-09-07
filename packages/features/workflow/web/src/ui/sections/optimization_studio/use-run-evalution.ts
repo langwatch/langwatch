@@ -71,12 +71,14 @@ export const useRunEvalution = () => {
   } | null>(null);
 
   useEffect(() => {
+    if (!triggerTimeout) return;
+
     const workflow = getWorkflow();
-    if (
-      triggerTimeout &&
-      workflow.state.evaluation?.run_id === triggerTimeout.run_id &&
-      workflow.state.evaluation?.status === triggerTimeout.timeout_on_status
-    ) {
+    const evaluation = workflow.state.evaluation;
+    const timedOutOnThisRun =
+      evaluation?.run_id === triggerTimeout.run_id &&
+      evaluation?.status === triggerTimeout.timeout_on_status;
+    if (timedOutOnThisRun) {
       logger.warn(
         {
           run_id: triggerTimeout.run_id,

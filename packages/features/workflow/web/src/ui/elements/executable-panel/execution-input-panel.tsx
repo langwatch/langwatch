@@ -21,6 +21,14 @@ type InputPanelProps = {
   buttonText?: string;
 };
 
+/** What an empty input field suggests, by the kind of value it takes. */
+function inputPlaceholder(type: string): string | undefined {
+  if (type === "image") return "image url";
+  if (type === "str") return undefined;
+
+  return type;
+}
+
 export const ExecutionInputPanel = ({
   fields = [],
   onExecute,
@@ -65,7 +73,8 @@ export const ExecutionInputPanel = ({
   const formValues = form.watch();
 
   useEffect(() => {
-    if (JSON.stringify(formValues) !== JSON.stringify(defaultValues)) {
+    const formIsStale = JSON.stringify(formValues) !== JSON.stringify(defaultValues);
+    if (formIsStale) {
       form.reset(defaultValues as Record<string, string>);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,13 +114,7 @@ export const ExecutionInputPanel = ({
             >
               <Textarea
                 {...form.register(input.identifier)}
-                placeholder={
-                  input.type === "image"
-                    ? "image url"
-                    : input.type === "str"
-                      ? undefined
-                      : input.type
-                }
+                placeholder={inputPlaceholder(input.type)}
               />
               <Field.ErrorText>{form.formState.errors[input.identifier]?.message}</Field.ErrorText>
             </HorizontalFormControl>

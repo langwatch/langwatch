@@ -12,14 +12,58 @@ import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 
 const logger = createLogger("langwatch:studio:componentExecution");
 
+/** The timer this hook arms, naming the node and the state it timed out on. */
+type ComponentTimeoutTrigger = {
+  component_id: string;
+  trace_id: string;
+  timeout_on_status: "waiting" | "running";
+};
+
+/** Marks the node as timed out, if it is still in the state the timer was armed on. */
+function applyComponentTimeout({
+  alertOnComponent,
+  node,
+  setComponentExecutionState,
+  trigger,
+}: {
+  alertOnComponent: (input: {
+    componentId: string;
+    execution_state: BaseComponent["execution_state"];
+  }) => void;
+  node: Node<Component>;
+  setComponentExecutionState: (
+    componentId: string,
+    execution_state: BaseComponent["execution_state"],
+  ) => void;
+  trigger: ComponentTimeoutTrigger;
+}) {
+  const executionState = node.data.execution_state;
+  const timedOutOnThisNode =
+    executionState?.trace_id === trigger.trace_id &&
+    executionState?.status === trigger.timeout_on_status;
+  if (!timedOutOnThisNode) return;
+
+  logger.warn(
+    {
+      componentId: node.id,
+      trace_id: trigger.trace_id,
+      timeout_on_status: trigger.timeout_on_status,
+    },
+    "component execution timeout triggered",
+  );
+  const execution_state: BaseComponent["execution_state"] = {
+    status: "error",
+    error: "Timeout",
+    timestamps: { finished_at: Date.now() },
+  };
+  setComponentExecutionState(node.id, execution_state);
+  alertOnComponent({ componentId: node.id, execution_state });
+}
+
 export const useComponentExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
 
-  const [triggerTimeout, setTriggerTimeout] = useState<{
-    component_id: string;
-    trace_id: string;
-    timeout_on_status: "waiting" | "running";
-  } | null>(null);
+  const [triggerTimeout, setTriggerTimeout] = useState<ComponentTimeoutTrigger | null>(null);
 
   const {
     node,
@@ -40,28 +84,14 @@ export const useComponentExecution = () => {
   const alertOnComponent = useAlertOnComponent();
 
   useEffect(() => {
-    if (
-      triggerTimeout &&
-      node &&
-      node.data.execution_state?.trace_id === triggerTimeout.trace_id &&
-      node.data.execution_state?.status === triggerTimeout.timeout_on_status
-    ) {
-      logger.warn(
-        {
-          componentId: node.id,
-          trace_id: triggerTimeout.trace_id,
-          timeout_on_status: triggerTimeout.timeout_on_status,
-        },
-        "component execution timeout triggered",
-      );
-      const execution_state: BaseComponent["execution_state"] = {
-        status: "error",
-        error: "Timeout",
-        timestamps: { finished_at: Date.now() },
-      };
-      setComponentExecutionState(node.id, execution_state);
-      alertOnComponent({ componentId: node.id, execution_state });
-    }
+    if (!triggerTimeout || !node) return;
+
+    applyComponentTimeout({
+      alertOnComponent,
+      node,
+      setComponentExecutionState,
+      trigger: triggerTimeout,
+    });
   }, [triggerTimeout, node, setComponentExecutionState, alertOnComponent]);
 
   const socketAvailable = useCallback(() => {

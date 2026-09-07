@@ -196,7 +196,9 @@ function MultipleInput({
     sendMultiMessage();
   };
 
-  if ((!isSingle && entryInputs.length === 1) || (isSingle && entryInputs.length > 1)) {
+  const singleInputWithoutSingleMode = !isSingle && entryInputs.length === 1;
+  const singleModeWithManyInputs = isSingle && entryInputs.length > 1;
+  if (singleInputWithoutSingleMode || singleModeWithManyInputs) {
     return null;
   }
 

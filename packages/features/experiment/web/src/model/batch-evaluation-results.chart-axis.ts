@@ -70,7 +70,8 @@ export const commonLabelPrefix = (names: string[]): string => {
   const candidate = prefix.slice(0, cut);
   // Every name must keep a non-empty remainder, or the labels stop naming
   // anything at all.
-  return names.every((name) => name.slice(candidate.length).length > 0) ? candidate : "";
+  const everyNameKeepsARemainder = names.every((name) => name.slice(candidate.length).length > 0);
+  return everyNameKeepsARemainder ? candidate : "";
 };
 
 /**

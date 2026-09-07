@@ -73,7 +73,9 @@ const differenceInterval = (
   mine: number | null | undefined,
   theirs: number | null | undefined,
 ): [number, number] | null => {
-  if (mine === null || mine === void 0 || theirs === null || theirs === void 0) {
+  const mineIsMissing = mine === null || mine === void 0;
+  const theirsIsMissing = theirs === null || theirs === void 0;
+  if (mineIsMissing || theirsIsMissing) {
     return null;
   }
   const diff = mine - theirs;

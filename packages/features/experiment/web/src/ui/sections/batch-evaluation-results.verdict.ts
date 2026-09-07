@@ -8,7 +8,10 @@ import type {
   BTLeaderboardEntry,
 } from "../../model/batch-evaluation-results.bt-leaderboard.ts";
 import { isIncomparable } from "../../model/batch-evaluation-results.comparability.ts";
-import { MIN_PRICED_ROWS, type VariantMetrics } from "./batch-evaluation-results.variant-metrics.ts";
+import {
+  MIN_PRICED_ROWS,
+  type VariantMetrics,
+} from "./batch-evaluation-results.variant-metrics.ts";
 import { areDistinguishable } from "../../model/batch-evaluation-results.score-separation.ts";
 
 export type LeaderboardVerdict = {
@@ -49,17 +52,16 @@ export const computeLeaderboardVerdict = (leaderboard: BTLeaderboard): Leaderboa
   const comparability = leaderboard.comparability;
   const tied: BTLeaderboardEntry[] = [leader];
   for (const entry of ranked.slice(1)) {
-    if (
-      tied.every(
-        (member) =>
-          !areDistinguishable({
-            a: member,
-            b: entry,
-            differenceCI,
-            comparability,
-          }),
-      )
-    ) {
+    const indistinguishableFromEveryTiedMember = tied.every(
+      (member) =>
+        !areDistinguishable({
+          a: member,
+          b: entry,
+          differenceCI,
+          comparability,
+        }),
+    );
+    if (indistinguishableFromEveryTiedMember) {
       tied.push(entry);
     }
   }
@@ -116,7 +118,8 @@ export type CheaperAlternative = {
  */
 const pairedSavingIsEstablished = (interval: [number, number] | undefined): boolean => {
   if (!interval) return true;
-  if (!interval.every((bound) => Number.isFinite(bound))) return false;
+  const everyBoundIsFinite = interval.every((bound) => Number.isFinite(bound));
+  if (!everyBoundIsFinite) return false;
   // cheapest minus baseline: a real saving sits entirely below zero.
   return interval[1] < 0;
 };
@@ -175,11 +178,9 @@ export const findCheaperTiedAlternative = ({
   if (savingRatio < minSaving) return null;
 
   // The gap also has to be one this run can actually see.
-  if (
-    !pairedSavingIsEstablished(
-      variantMetrics[cheapest.variantId]?.costDifferenceCI?.[baseline.variantId],
-    )
-  ) {
+  const cheapestAgainstBaseline =
+    variantMetrics[cheapest.variantId]?.costDifferenceCI?.[baseline.variantId];
+  if (!pairedSavingIsEstablished(cheapestAgainstBaseline)) {
     return null;
   }
 

@@ -20,6 +20,43 @@ type DatasetSuperHeaderProps = {
   isLoading?: boolean;
 };
 
+/** The dataset title, as a skeleton while loading and as plain text otherwise. */
+function DatasetLabel() {
+  return (
+    <Text fontWeight="semibold" fontSize="sm" color="fg">
+      Dataset
+    </Text>
+  );
+}
+
+/** Either the tabs for the active dataset or the bare title. */
+function DatasetSuperHeaderBody({
+  activeDataset,
+  datasetHandlers,
+  isLoading,
+}: Pick<DatasetSuperHeaderProps, "activeDataset" | "datasetHandlers" | "isLoading">) {
+  if (isLoading) {
+    return (
+      <>
+        <DatasetLabel />
+        <Skeleton height="20px" width="150px" />
+      </>
+    );
+  }
+  if (activeDataset && datasetHandlers) {
+    return (
+      <DatasetTabs
+        onSelectExisting={datasetHandlers.onSelectExisting}
+        onUploadCSV={datasetHandlers.onUploadCSV}
+        onEditDataset={datasetHandlers.onEditDataset}
+        onSaveAsDataset={datasetHandlers.onSaveAsDataset}
+      />
+    );
+  }
+
+  return <DatasetLabel />;
+}
+
 /**
  * Super header for the dataset columns section.
  * Memoized to prevent unnecessary re-renders on scroll.
@@ -37,25 +74,11 @@ export const DatasetSuperHeader = React.memo(function DatasetSuperHeader({
       icon={<Database size={14} />}
       paddingLeft="52px"
     >
-      {isLoading ? (
-        <>
-          <Text fontWeight="semibold" fontSize="sm" color="fg">
-            Dataset
-          </Text>
-          <Skeleton height="20px" width="150px" />
-        </>
-      ) : activeDataset && datasetHandlers ? (
-        <DatasetTabs
-          onSelectExisting={datasetHandlers.onSelectExisting}
-          onUploadCSV={datasetHandlers.onUploadCSV}
-          onEditDataset={datasetHandlers.onEditDataset}
-          onSaveAsDataset={datasetHandlers.onSaveAsDataset}
-        />
-      ) : (
-        <Text fontWeight="semibold" fontSize="sm" color="fg">
-          Dataset
-        </Text>
-      )}
+      <DatasetSuperHeaderBody
+        activeDataset={activeDataset}
+        datasetHandlers={datasetHandlers}
+        isLoading={isLoading}
+      />
     </SuperHeader>
   );
 });

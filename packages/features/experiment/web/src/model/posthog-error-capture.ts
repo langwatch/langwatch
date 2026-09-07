@@ -118,6 +118,44 @@ export function captureMessage(message: string, options?: CaptureExceptionOption
   }
 }
 
+/** Hands the exception to the server client, if one is configured. */
+function captureExceptionOnServer(properties: Record<string, unknown>): void {
+  const serverPostHog = getServerPostHogInstance();
+  if (!serverPostHog) return;
+
+  try {
+    serverPostHog.capture({
+      distinctId: "server",
+      event: "$exception",
+      properties,
+    });
+  } catch (err) {
+    console.error("Failed to capture exception with server PostHog:", err);
+  }
+}
+
+/** Hands the exception to the browser client, if it has loaded. */
+function captureExceptionOnClient({
+  error,
+  options,
+  properties,
+}: {
+  error: Error | string;
+  options?: CaptureExceptionOptions;
+  properties: Record<string, unknown>;
+}): void {
+  try {
+    if (posthog?.__loaded) {
+      posthog.capture("$exception", properties);
+      return;
+    }
+    // PostHog not initialized yet, log to console
+    console.error("PostHog not initialized, logging error:", error, options);
+  } catch (err) {
+    console.error("Failed to capture exception with client PostHog:", err);
+  }
+}
+
 /**
  * Captures an exception/error using PostHog
  */
@@ -145,34 +183,12 @@ export function captureException(error: Error | string, options?: CaptureExcepti
 
   // Try server-side PostHog first (for API routes, server components, etc.)
   if (typeof window === "undefined") {
-    const serverPostHog = getServerPostHogInstance();
-    if (serverPostHog) {
-      try {
-        serverPostHog.capture({
-          distinctId: "server",
-          event: "$exception",
-          properties: exceptionProperties,
-        });
-        return;
-      } catch (err) {
-        console.error("Failed to capture exception with server PostHog:", err);
-      }
-    }
+    captureExceptionOnServer(exceptionProperties);
+    return;
   }
 
   // Client-side PostHog (for browser/client components)
-  if (typeof window !== "undefined") {
-    try {
-      if (posthog?.__loaded) {
-        posthog.capture("$exception", exceptionProperties);
-      } else {
-        // PostHog not initialized yet, log to console
-        console.error("PostHog not initialized, logging error:", error, options);
-      }
-    } catch (err) {
-      console.error("Failed to capture exception with client PostHog:", err);
-    }
-  }
+  captureExceptionOnClient({ error, options, properties: exceptionProperties });
 }
 
 /**

@@ -75,6 +75,37 @@ function computeFieldsFromEvaluatorType(evaluatorType: string): {
   return { inputs, outputs };
 }
 
+/** The node's input and output fields, read off the evaluator the user picked. */
+function fieldsFromPickedEvaluator(evaluator: EvaluatorWithFields): {
+  inputs: Field[];
+  outputs: Field[];
+} {
+  const inputs = (evaluator.fields ?? []).map((field) =>
+    fieldSchema.parse({
+      identifier: field.identifier,
+      type: field.type,
+      ...(field.optional ? { optional: true } : {}),
+    }),
+  );
+  const outputs = (evaluator.outputFields ?? []).map((field) =>
+    fieldSchema.parse({ identifier: field.identifier, type: field.type }),
+  );
+
+  return { inputs, outputs };
+}
+
+/** The node's fields for an evaluator just created, which may not name a type yet. */
+function fieldsFromSavedEvaluator(saved: SavedEvaluator): { inputs: Field[]; outputs: Field[] } {
+  if (!saved.evaluatorType) {
+    return {
+      inputs: [],
+      outputs: [fieldSchema.parse({ identifier: "passed", type: "bool" })],
+    };
+  }
+
+  return computeFieldsFromEvaluatorType(saved.evaluatorType);
+}
+
 /** Workflow-owned state transition for selecting an evaluator after a canvas drop. */
 export function useWorkflowEvaluatorPickerFlow(port: EvaluatorPickerPort) {
   const { setNode, deleteNode, setSelectedNode } = useWorkflowStore((state) => ({
@@ -95,16 +126,7 @@ export function useWorkflowEvaluatorPickerFlow(port: EvaluatorPickerPort) {
             return;
           }
           const selectedNodeId = pendingEvaluatorRef.current;
-          const inputs = (evaluator.fields ?? []).map((field) =>
-            fieldSchema.parse({
-              identifier: field.identifier,
-              type: field.type,
-              ...(field.optional ? { optional: true } : {}),
-            }),
-          );
-          const outputs = (evaluator.outputFields ?? []).map((field) =>
-            fieldSchema.parse({ identifier: field.identifier, type: field.type }),
-          );
+          const { inputs, outputs } = fieldsFromPickedEvaluator(evaluator);
           setNode({
             id: selectedNodeId,
             data: {
@@ -123,12 +145,7 @@ export function useWorkflowEvaluatorPickerFlow(port: EvaluatorPickerPort) {
             if (!pendingEvaluatorRef.current) {
               return;
             }
-            const fields = saved.evaluatorType
-              ? computeFieldsFromEvaluatorType(saved.evaluatorType)
-              : {
-                  inputs: [],
-                  outputs: [fieldSchema.parse({ identifier: "passed", type: "bool" })],
-                };
+            const fields = fieldsFromSavedEvaluator(saved);
             const selectedNodeId = pendingEvaluatorRef.current;
             setNode({
               id: selectedNodeId,

@@ -48,6 +48,8 @@ export const areDistinguishable = ({
   }
 
   if (!a.scoreCI || !b.scoreCI) return false;
-  if (!isFinitePair(a.scoreCI) || !isFinitePair(b.scoreCI)) return false;
+  const aIntervalIsFinite = isFinitePair(a.scoreCI);
+  const bIntervalIsFinite = isFinitePair(b.scoreCI);
+  if (!aIntervalIsFinite || !bIntervalIsFinite) return false;
   return !intervalsOverlap(a.scoreCI, b.scoreCI);
 };

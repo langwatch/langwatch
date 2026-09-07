@@ -9,7 +9,10 @@ import type {
   ScoreDifferenceCI,
 } from "../../model/batch-evaluation-results.bt-leaderboard.ts";
 import type { Comparability } from "../../model/batch-evaluation-results.comparability.ts";
-import { MIN_PRICED_ROWS, type VariantMetrics } from "./batch-evaluation-results.variant-metrics.ts";
+import {
+  MIN_PRICED_ROWS,
+  type VariantMetrics,
+} from "./batch-evaluation-results.variant-metrics.ts";
 import { areDistinguishable } from "../../model/batch-evaluation-results.score-separation.ts";
 
 export type TradeoffDimension = "quality" | "cost" | "speed";
@@ -77,7 +80,9 @@ const comparePairedMetric = ({
   const differences =
     dimension === "cost" ? metrics?.costDifferenceCI : metrics?.durationDifferenceCI;
   const paired = differences?.[otherVariantId];
-  if (!paired?.every((bound) => Number.isFinite(bound))) return 0;
+  if (!paired) return 0;
+  const everyBoundIsFinite = paired.every((bound) => Number.isFinite(bound));
+  if (!everyBoundIsFinite) return 0;
 
   // Lower is better, so a is better when the whole interval is below zero.
   if (paired[1] < 0) return 1;

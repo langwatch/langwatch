@@ -279,6 +279,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
     `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.5" : "0.3"})`,
   );
 
+  const hoveredOutlineColor = isHovered ? "gray.emphasized" : "none";
+
   return (
     <VStack
       className="js-component-node"
@@ -297,7 +299,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       border="1px solid"
       borderColor="border"
       outline={!!props.selected || isHovered ? "1.5px solid" : "none"}
-      outlineColor={props.selected ? selectionColor : isHovered ? "gray.emphasized" : "none"}
+      outlineColor={props.selected ? selectionColor : hoveredOutlineColor}
       onMouseEnter={() => setHoveredNodeId(props.id)}
       onMouseLeave={() => setHoveredNodeId(void 0)}
       onDoubleClick={() => {

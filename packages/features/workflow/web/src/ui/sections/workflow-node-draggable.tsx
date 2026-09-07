@@ -94,15 +94,11 @@ export const NodeDraggable = (props: {
     }),
     end: (item, monitor) => {
       const dropResult = monitor.getDropResult();
+      if (!item || !dropResult) return;
 
-      if (item && dropResult) {
-        handleSetNodes(item.node, dropResult.x, dropResult.y);
-      }
-
+      handleSetNodes(item.node, dropResult.x, dropResult.y);
       // Only fire onDragEnd when the node was actually placed on canvas
-      if (item && dropResult) {
-        props.onDragEnd?.(item);
-      }
+      props.onDragEnd?.(item);
     },
   });
 

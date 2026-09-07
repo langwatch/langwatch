@@ -22,7 +22,8 @@ export const bootstrapMeanCI = ({
   // value, so the interval would come out zero-width and read as certainty.
   // Refusing is the honest output.
   if (values.length < 2) return null;
-  if (!values.every((v) => Number.isFinite(v))) return null;
+  const everyValueIsFinite = values.every((v) => Number.isFinite(v));
+  if (!everyValueIsFinite) return null;
 
   const rand = mulberry32(seed);
   const n = values.length;

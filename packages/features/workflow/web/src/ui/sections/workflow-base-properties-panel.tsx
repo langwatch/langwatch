@@ -613,6 +613,8 @@ export function WorkflowBasePropertiesPanel({
     : undefined;
   const nodeDescription = !isWorkflow(node) ? node.data.description : undefined;
 
+  const hasHeader = Boolean(header);
+
   const handleNameChange = (value: string, id: string) => {
     const result = validateNodeName({
       name: value,
@@ -654,9 +656,8 @@ export function WorkflowBasePropertiesPanel({
             alignItems="flex-start"
           >
             <HStack gap={2}>
-              {header ? (
-                header
-              ) : !isWorkflow(node) ? (
+              {hasHeader && header}
+              {!hasHeader && !isWorkflow(node) && (
                 <>
                   {parsedComponentType?.success &&
                     renderNodeIcon?.({
@@ -714,7 +715,7 @@ export function WorkflowBasePropertiesPanel({
                     ))
                   )}
                 </>
-              ) : null}
+              )}
             </HStack>
             <HStack gap={0} marginRight="-4px" hidden={isEditingName}>
               {!isWorkflow(node) && isExecutableComponent(node) && (

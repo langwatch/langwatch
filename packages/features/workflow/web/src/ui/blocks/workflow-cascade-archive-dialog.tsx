@@ -20,6 +20,46 @@ export type RelatedEntities = {
   monitors?: RelatedEntity[];
 };
 
+/** How the entity being archived is named in the dialog copy. */
+const ENTITY_TYPE_LABEL: Record<"workflow" | "evaluator" | "agent", string> = {
+  workflow: "workflow",
+  evaluator: "evaluator",
+  agent: "agent",
+};
+
+/** One group of related entities, capped at five names plus an "and N more" line. */
+function RelatedEntityList({
+  description,
+  entities,
+  label,
+}: {
+  description: string;
+  entities: RelatedEntity[] | undefined;
+  label: string;
+}) {
+  if (!entities || entities.length === 0) return null;
+
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontWeight="medium" fontSize="sm">
+        {label} ({entities.length}) - {description}
+      </Text>
+      <List.Root paddingLeft={4}>
+        {entities.slice(0, 5).map((entity) => (
+          <List.Item key={entity.id} fontSize="sm" color="fg.muted">
+            {entity.name}
+          </List.Item>
+        ))}
+        {entities.length > 5 && (
+          <List.Item fontSize="sm" color="fg.subtle">
+            ...and {entities.length - 5} more
+          </List.Item>
+        )}
+      </List.Root>
+    </VStack>
+  );
+}
+
 /**
  * Cascade archive confirmation dialog. Shows a warning when archiving an
  * entity that has related entities that will also be affected.
@@ -56,45 +96,6 @@ export function WorkflowCascadeArchiveDialog({
     (relatedEntities.agents?.length ?? 0) > 0 ||
     (relatedEntities.monitors?.length ?? 0) > 0;
 
-  const getEntityTypeLabel = (type: "workflow" | "evaluator" | "agent") => {
-    switch (type) {
-      case "workflow":
-        return "workflow";
-      case "evaluator":
-        return "evaluator";
-      case "agent":
-        return "agent";
-    }
-  };
-
-  const renderEntityList = (
-    entities: RelatedEntity[] | undefined,
-    label: string,
-    description: string,
-  ) => {
-    if (!entities || entities.length === 0) return null;
-
-    return (
-      <VStack align="stretch" gap={1}>
-        <Text fontWeight="medium" fontSize="sm">
-          {label} ({entities.length}) - {description}
-        </Text>
-        <List.Root paddingLeft={4}>
-          {entities.slice(0, 5).map((entity) => (
-            <List.Item key={entity.id} fontSize="sm" color="fg.muted">
-              {entity.name}
-            </List.Item>
-          ))}
-          {entities.length > 5 && (
-            <List.Item fontSize="sm" color="fg.subtle">
-              ...and {entities.length - 5} more
-            </List.Item>
-          )}
-        </List.Root>
-      </VStack>
-    );
-  };
-
   return (
     <Dialog.Root
       open={open}
@@ -106,7 +107,7 @@ export function WorkflowCascadeArchiveDialog({
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
-            Delete {getEntityTypeLabel(entityType)}?
+            Delete {ENTITY_TYPE_LABEL[entityType]}?
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
@@ -134,22 +135,26 @@ export function WorkflowCascadeArchiveDialog({
                     <Alert.Title>This will also affect:</Alert.Title>
                     <Alert.Description>
                       <VStack align="stretch" gap={2} marginTop={2}>
-                        {renderEntityList(
-                          relatedEntities.workflows,
-                          "Workflows",
-                          "will be archived",
-                        )}
-                        {renderEntityList(
-                          relatedEntities.evaluators,
-                          "Evaluators",
-                          "will be archived",
-                        )}
-                        {renderEntityList(relatedEntities.agents, "Agents", "will be archived")}
-                        {renderEntityList(
-                          relatedEntities.monitors,
-                          "Online Evaluations",
-                          "will be deleted",
-                        )}
+                        <RelatedEntityList
+                          entities={relatedEntities.workflows}
+                          label="Workflows"
+                          description="will be archived"
+                        />
+                        <RelatedEntityList
+                          entities={relatedEntities.evaluators}
+                          label="Evaluators"
+                          description="will be archived"
+                        />
+                        <RelatedEntityList
+                          entities={relatedEntities.agents}
+                          label="Agents"
+                          description="will be archived"
+                        />
+                        <RelatedEntityList
+                          entities={relatedEntities.monitors}
+                          label="Online Evaluations"
+                          description="will be deleted"
+                        />
                       </VStack>
                     </Alert.Description>
                   </Alert.Content>

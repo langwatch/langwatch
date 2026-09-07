@@ -22,7 +22,10 @@ import type {
   BTLeaderboard,
   BTLeaderboardEntry,
 } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
-import { computeParetoDominance, type ParetoDominance } from "../batch-evaluation-results.pareto.ts";
+import {
+  computeParetoDominance,
+  type ParetoDominance,
+} from "../batch-evaluation-results.pareto.ts";
 import type { VariantMetrics } from "../batch-evaluation-results.variant-metrics.ts";
 import { VARIANT_COLORS } from "./win-rate-chart.tsx";
 
@@ -106,8 +109,11 @@ type ParetoPoint = {
  * A bootstrap over a handful of rows can return an unbounded interval, and
  * there is no bar to draw for one. Drawing nothing is the honest rendering.
  */
-const finiteCI = (ci: [number, number] | null | undefined): [number, number] | null =>
-  ci?.every((bound) => Number.isFinite(bound)) ? ci : null;
+const finiteCI = (ci: [number, number] | null | undefined): [number, number] | null => {
+  if (!ci) return null;
+  const everyBoundIsFinite = ci.every((bound) => Number.isFinite(bound));
+  return everyBoundIsFinite ? ci : null;
+};
 
 const readAvg = ({
   metrics,

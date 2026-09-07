@@ -1442,10 +1442,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/experiment/web/src/behavior/experiments-v3/use-lambda-warmup.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/experiment/web/src/behavior/experiments-v3/use-open-target-editor.ts",
       "measured": "2026-09-06"
     },
@@ -1458,15 +1454,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/experiment/web/src/behavior/use-comparison-mode.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/experiment/web/src/model/experiments-v3/mapping-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/experiment/web/src/model/posthog-error-capture.ts",
       "measured": "2026-09-06"
     },
     {
@@ -1475,10 +1463,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/experiment/web/src/screens/experiments/workbench.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/experiment/web/src/ui/elements/experiments-v3/editable-heading.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1583,10 +1567,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/experiment/web/src/ui/sections/experiments-v3/run-evaluation-button.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/experiment/web/src/ui/sections/experiments-v3/undo-redo.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3926,10 +3906,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/workflow/web/src/behavior/use-workflow-evaluator-picker-flow.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/workflow/web/src/behavior/workflow-store.ts",
       "measured": "2026-09-06"
     },
@@ -3974,14 +3950,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/workflow/web/src/model/studio-dataset.utils.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/workflow/web/src/ui/blocks/workflow-cascade-archive-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/workflow/web/src/ui/elements/code/editor-status-bar.tsx",
       "measured": "2026-09-06"
     },
@@ -3991,14 +3959,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/workflow/web/src/ui/elements/code/workflow-code-editor.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/workflow/web/src/ui/elements/compat/next-head.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/workflow/web/src/ui/elements/executable-panel/execution-input-panel.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -4054,10 +4014,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/workflow/web/src/ui/sections/optimization_studio/use-evaluation-execution.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/workflow/web/src/ui/sections/optimization_studio/use-post-event.tsx",
       "measured": "2026-09-06"
     },
@@ -4067,14 +4023,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/workflow/web/src/ui/sections/optimization_studio/version-to-be-used.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/workflow/web/src/ui/sections/properties/workflow-end-properties-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/workflow/web/src/ui/sections/properties/workflow-properties-panel.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -4094,10 +4042,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/workflow/web/src/ui/sections/workflow-node-draggable.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/workflow/web/src/ui/sections/workflow-node-execution.tsx",
       "measured": "2026-09-06"
     },
@@ -4111,10 +4055,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/workflow/web/src/ui/sections/workflow-run-until-here-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/workflow/web/src/ui/sections/workflow-undo-redo.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -6890,14 +6830,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/experiment/web/src/__tests__/batch-evaluation-results.pareto.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/experiment/web/src/behavior/experiments-v3/use-evaluator-name.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/experiment/web/src/behavior/experiments-v3/use-saved-dataset-loader.ts",
       "measured": "2026-09-06"
     },
@@ -6906,27 +6838,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/experiment/web/src/model/batch-evaluation-results.bootstrap-ci.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/experiment/web/src/model/batch-evaluation-results.chart-axis.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/experiment/web/src/model/batch-evaluation-results.comparability.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/experiment/web/src/model/batch-evaluation-results.score-separation.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/experiment/web/src/model/experiments-v3/mapping-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/experiment/web/src/model/format-llm-error.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6954,15 +6866,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-evaluation-results.pareto.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-evaluation-results.types.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-evaluation-results.verdict.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6974,23 +6878,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/leaderboard-verdict-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/pareto-scatter-chart.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/table-utils.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/experiments-v3/EvaluatorPanel/__tests__/comparison-config-form.judge-prompt-parity.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
@@ -8562,15 +8454,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/workflow/web/src/behavior/use-field-redaction.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/workflow/web/src/behavior/workflow-store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/model/code-signature.ts",
       "measured": "2026-09-06"
     },
     {
@@ -8586,14 +8470,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/workflow/web/src/model/code/python-provider.validator.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/model/is-json.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/workflow/web/src/model/sse/fetch-sse.ts",
       "measured": "2026-09-06"
     },
@@ -8602,63 +8478,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/elements/compat/next-link.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/elements/executable-panel/execution-input-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/code/render-code.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/markdown.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/optimization_studio/drawers/studio-node-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/optimization_studio/properties/agent-properties-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/optimization_studio/publish.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/optimization_studio/results-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/optimization_studio/use-component-execution.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/optimization_studio/use-evaluation-execution.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/optimization_studio/use-optimization-execution.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/workflow/web/src/ui/sections/optimization_studio/use-post-event.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/optimization_studio/use-run-evalution.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/optimization_studio/use-workflow-execution.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/web/src/ui/sections/workflow-chat-box.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -9794,14 +9614,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/elements/experiments-v3/selection-toolbar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/elements/experiments-v3/workbench-stale-banner.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
       "measured": "2026-09-06"
     },
@@ -9818,19 +9630,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/batch-evaluation-results.pairwise.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/batch-evaluation-results/batch-evaluation-results.tsx",
       "measured": "2026-09-06"
     },
     {
       "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/batch-results/batch-runs-sidebar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/batch-results/leaderboard-trust-panel.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -9842,19 +9646,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/experiments-v3/dataset-super-header.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/experiments-v3/run-evaluation-button.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/experiments-v3/table-meta-wrappers.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -10930,10 +10722,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/workflow/web/src/behavior/use-ask-before-leaving.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/workflow/web/src/behavior/workflow-store.ts",
       "measured": "2026-09-06"
     },
@@ -10942,35 +10730,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/workflow/web/src/model/evaluate-api-snippet.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/workflow/web/src/model/run-via-api/run-snippets.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/elements/code/editor-status-bar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/workflow/web/src/ui/elements/code/liquid-condition-editor.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/elements/executable-panel/execution-input-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/executable-panel/execution-output-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/hoverable-big-text.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/optimization_studio/dataset-modal.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -10994,15 +10758,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/optimization_studio/version-to-be-used.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-autosave.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-base-properties-panel.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -11010,27 +10766,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-node-selection-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-nodes.prompting-technique.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-nodes.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-push-to-copies-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-run-until-here-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-running-status.tsx",
       "measured": "2026-09-06"
     },
     {

@@ -34,6 +34,20 @@ export const useLambdaWarmup = () => {
     });
   }, [project, warmupCount]);
 
+  const stopWarmupInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    intervalRef.current = null;
+  }, []);
+
+  const restartWarmupInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    intervalRef.current = setInterval(sendWarmup, WARMUP_INTERVAL_MS);
+  }, [sendWarmup]);
+
   // Set up interval for periodic warmup
   useEffect(() => {
     if (!project) return;
@@ -42,35 +56,29 @@ export const useLambdaWarmup = () => {
     sendWarmup();
 
     // Set up periodic warmup
-    intervalRef.current = setInterval(sendWarmup, WARMUP_INTERVAL_MS);
+    restartWarmupInterval();
 
     // Handle page visibility changes
     const handleVisibilityChange = () => {
       isPageVisibleRef.current = !document.hidden;
-      if (!document.hidden) {
-        // Page became visible, send warmup immediately and restart interval
-        sendWarmup();
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
-        intervalRef.current = setInterval(sendWarmup, WARMUP_INTERVAL_MS);
-      } else if (intervalRef.current) {
+      if (document.hidden) {
         // Page hidden, stop sending warmup requests
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+        stopWarmupInterval();
+        return;
       }
+
+      // Page became visible, send warmup immediately and restart interval
+      sendWarmup();
+      restartWarmupInterval();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+      stopWarmupInterval();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [project, sendWarmup]);
+  }, [project, restartWarmupInterval, sendWarmup, stopWarmupInterval]);
 
   return null; // This hook has no return value, it just runs side effects
 };

@@ -31,6 +31,29 @@ type UseComparisonModeReturn = {
   enterCompareWithRuns: (runId1: string, runId2: string) => void;
 };
 
+/**
+ * The runs compare mode opens with: the run being viewed and its nearest
+ * neighbour, falling back to the first two when that pair is not two runs.
+ */
+function initialComparisonSelection({
+  currentRunId,
+  runIds,
+}: {
+  currentRunId: string | undefined;
+  runIds: string[];
+}): string[] {
+  const currentIndex = currentRunId ? runIds.indexOf(currentRunId) : 0;
+  const firstRunId = runIds[currentIndex] ?? runIds[0];
+  const secondRunId = runIds[currentIndex + 1] ?? runIds[currentIndex - 1] ?? runIds[1];
+
+  const initialSelection = [firstRunId, secondRunId].filter((id): id is string => !!id);
+
+  // Ensure we have at least 2 unique runs
+  const uniqueSelection = [...new Set(initialSelection)];
+
+  return uniqueSelection.length >= 2 ? uniqueSelection : runIds.slice(0, 2);
+}
+
 export const useComparisonMode = ({
   runIds,
   currentRunId,
@@ -52,15 +75,7 @@ export const useComparisonMode = ({
     setCompareMode((prev) => {
       if (!prev) {
         // Entering compare mode - auto-select current run + next one
-        const currentIndex = currentRunId ? runIds.indexOf(currentRunId) : 0;
-        const firstRunId = runIds[currentIndex] ?? runIds[0];
-        const secondRunId = runIds[currentIndex + 1] ?? runIds[currentIndex - 1] ?? runIds[1];
-
-        const initialSelection = [firstRunId, secondRunId].filter((id): id is string => !!id);
-
-        // Ensure we have at least 2 unique runs
-        const uniqueSelection = [...new Set(initialSelection)];
-        setSelectedRunIds(uniqueSelection.length >= 2 ? uniqueSelection : runIds.slice(0, 2));
+        setSelectedRunIds(initialComparisonSelection({ currentRunId, runIds }));
 
         return true;
       }

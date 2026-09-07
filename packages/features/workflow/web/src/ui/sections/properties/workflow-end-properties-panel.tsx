@@ -42,6 +42,22 @@ const EVALUATOR_RESULT_DESCRIPTIONS: Record<string, string> = {
   details: "The reasoning behind the result, usually the LLM as judge explanation.",
 };
 
+/** Whether the node's inputs already are the fixed evaluator result vocabulary. */
+function matchesEvaluatorContract(data: End): boolean {
+  const current = data.inputs ?? [];
+
+  return (
+    data.behave_as === "evaluator" &&
+    current.length === EVALUATOR_RESULT_FIELDS.length &&
+    EVALUATOR_RESULT_FIELDS.every((f, i) => {
+      const c = current[i];
+      return (
+        !!c && c.identifier === f.identifier && c.type === f.type && !!c.optional === !!f.optional
+      );
+    })
+  );
+}
+
 export function EndPropertiesPanel({
   node: initialNode,
   renderBase: BasePropertiesPanel,
@@ -77,27 +93,17 @@ export function EndPropertiesPanel({
   // all-optional, details-first vocabulary.
   useEffect(() => {
     if (!isEvaluator) return;
-    const current = node.data.inputs ?? [];
-    const matchesContract =
-      node.data.behave_as === "evaluator" &&
-      current.length === EVALUATOR_RESULT_FIELDS.length &&
-      EVALUATOR_RESULT_FIELDS.every((f, i) => {
-        const c = current[i];
-        return (
-          c && c.identifier === f.identifier && c.type === f.type && !!c.optional === !!f.optional
-        );
-      });
-    if (!matchesContract) {
-      setNode({
-        id: node.id,
-        data: {
-          ...node.data,
-          behave_as: "evaluator",
-          inputs: EVALUATOR_RESULT_FIELDS,
-        },
-      });
-      updateNodeInternals(node.id);
-    }
+    if (matchesEvaluatorContract(node.data)) return;
+
+    setNode({
+      id: node.id,
+      data: {
+        ...node.data,
+        behave_as: "evaluator",
+        inputs: EVALUATOR_RESULT_FIELDS,
+      },
+    });
+    updateNodeInternals(node.id);
   }, [isEvaluator, node.id, node.data, setNode, updateNodeInternals]);
 
   const hasResultConnected = edges.some(

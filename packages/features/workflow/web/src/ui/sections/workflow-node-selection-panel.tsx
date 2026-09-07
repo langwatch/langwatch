@@ -97,7 +97,7 @@ export function WorkflowNodeSelectionPanel({
       display={isOpen ? "block" : "none"}
       opacity={propertiesExpanded ? 0 : 1}
       visibility={propertiesExpanded ? "hidden" : "visible"}
-      position={propertiesExpanded ? "absolute" : isOpen ? "relative" : "absolute"}
+      position={propertiesExpanded || !isOpen ? "absolute" : "relative"}
       top={0}
       left={0}
       background="bg"

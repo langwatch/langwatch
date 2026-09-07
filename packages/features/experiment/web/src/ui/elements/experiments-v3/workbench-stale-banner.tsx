@@ -3,6 +3,12 @@ import { useState } from "react";
 
 import { showErrorToast } from "@langwatch/ui-host/errors";
 
+/** Who last wrote the newer version, named by the actor the server reported. */
+const WHO_UPDATED_IT: Record<string, string> = {
+  langy: "Langy updated this evaluation",
+  api: "This evaluation was updated through the API",
+};
+
 /**
  * Shown when the server holds a newer version of this workbench and the user has
  * unsaved edits.
@@ -16,12 +22,7 @@ export function WorkbenchStaleBanner({
 }) {
   const [isReloading, setIsReloading] = useState(false);
 
-  const who =
-    actorLabel === "langy"
-      ? "Langy updated this evaluation"
-      : actorLabel === "api"
-        ? "This evaluation was updated through the API"
-        : "This evaluation was updated somewhere else";
+  const who = WHO_UPDATED_IT[actorLabel ?? ""] ?? "This evaluation was updated somewhere else";
 
   return (
     <HStack

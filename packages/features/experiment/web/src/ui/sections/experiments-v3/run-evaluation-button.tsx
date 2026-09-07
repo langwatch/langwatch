@@ -27,6 +27,33 @@ type RunEvaluationButtonProps = {
   disabled?: boolean;
 };
 
+/** What the button reads while the evaluation is idle, running or stopping. */
+function RunButtonLabel({ isAborting, isRunning }: { isAborting: boolean; isRunning: boolean }) {
+  if (isAborting) {
+    return (
+      <>
+        <Spinner size="xs" />
+        Stopping...
+      </>
+    );
+  }
+  if (isRunning) {
+    return (
+      <>
+        <LuSquare size={14} />
+        Stop
+      </>
+    );
+  }
+
+  return (
+    <>
+      <LuPlay size={14} />
+      Run
+    </>
+  );
+}
+
 export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonProps) => {
   const { openDrawer } = useDrawer();
   const { openTargetEditor } = useOpenTargetEditor();
@@ -204,22 +231,7 @@ export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonPro
         disabled={disabled || isAborting}
         data-testid="run-evaluation-button"
       >
-        {isAborting ? (
-          <>
-            <Spinner size="xs" />
-            Stopping...
-          </>
-        ) : isRunning ? (
-          <>
-            <LuSquare size={14} />
-            Stop
-          </>
-        ) : (
-          <>
-            <LuPlay size={14} />
-            Run
-          </>
-        )}
+        <RunButtonLabel isAborting={isAborting} isRunning={isRunning} />
       </Button>
     </Tooltip>
   );

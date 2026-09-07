@@ -46,6 +46,23 @@ export function extractTitleText(node: ReactNode): string {
   return "";
 }
 
+/** The title these children ask for, or null when they name none. */
+function titleFromHeadChildren(children: ReactNode): string | null {
+  if (!children) return null;
+
+  const childArray = Array.isArray(children) ? children : [children];
+  let title: string | null = null;
+  for (const child of childArray) {
+    if (!isValidElement(child) || child.type !== "title") continue;
+
+    const props = child.props as { children?: ReactNode } | undefined;
+    const text = extractTitleText(props?.children).trim();
+    if (text.length > 0) title = text;
+  }
+
+  return title;
+}
+
 /**
  * Simple Head component that processes children to update document.title.
  * For the basic usage in this app (just <title>), we don't need react-helmet-async.
@@ -58,16 +75,8 @@ export function extractTitleText(node: ReactNode): string {
  */
 export default function Head({ children }: HeadProps) {
   useLayoutEffect(() => {
-    if (children) {
-      const childArray = Array.isArray(children) ? children : [children];
-      for (const child of childArray) {
-        if (isValidElement(child) && child.type === "title") {
-          const props = child.props as { children?: ReactNode } | undefined;
-          const text = extractTitleText(props?.children).trim();
-          if (text.length > 0) document.title = text;
-        }
-      }
-    }
+    const title = titleFromHeadChildren(children);
+    if (title) document.title = title;
   }, [children]);
 
   return null;

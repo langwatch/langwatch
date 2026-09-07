@@ -1,5 +1,6 @@
 import { Box, Heading, HStack, Input, Skeleton } from "@chakra-ui/react";
 import { Edit2 } from "lucide-react";
+import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
 type EditableHeadingProps = {
@@ -43,6 +44,15 @@ export function EditableHeading({ value, onSave, isLoading = false }: EditableHe
     setEditingValue("");
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      handleFinishEdit();
+    }
+    if (event.key === "Escape") {
+      handleCancel();
+    }
+  };
+
   if (isLoading) {
     return <Skeleton height="28px" width="180px" />;
   }
@@ -54,14 +64,7 @@ export function EditableHeading({ value, onSave, isLoading = false }: EditableHe
         value={editingValue}
         onChange={(e) => setEditingValue(e.target.value)}
         onBlur={handleFinishEdit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            handleFinishEdit();
-          }
-          if (e.key === "Escape") {
-            handleCancel();
-          }
-        }}
+        onKeyDown={handleKeyDown}
         fontSize="md"
         fontWeight="500"
         variant="flushed"

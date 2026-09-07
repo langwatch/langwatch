@@ -6,6 +6,10 @@ import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 
+/** Which half of the run the timeout landed in, for the message the user reads. */
+const evaluationTimeoutStage = (timeoutOnStatus: "waiting" | "running") =>
+  timeoutOnStatus === "waiting" ? "starting" : "stopping";
+
 export const useEvaluationExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
 
@@ -56,23 +60,21 @@ export const useEvaluationExecution = () => {
     }) => {
       const timeoutId = setTimeout(() => {
         const workflow = getWorkflowRef.current();
-        if (
-          workflow.state.evaluation?.run_id === run_id &&
-          workflow.state.evaluation?.status === timeout_on_status
-        ) {
-          setEvaluationStateRef.current({
-            status: "error",
-            error: "Timeout",
-            timestamps: { finished_at: Date.now() },
-          });
-          toaster.create({
-            title: `Timeout ${
-              timeout_on_status === "waiting" ? "starting" : "stopping"
-            } evaluation execution`,
-            type: "error",
-            duration: 5000,
-          });
-        }
+        const evaluation = workflow.state.evaluation;
+        const timedOutOnThisRun =
+          evaluation?.run_id === run_id && evaluation?.status === timeout_on_status;
+        if (!timedOutOnThisRun) return;
+
+        setEvaluationStateRef.current({
+          status: "error",
+          error: "Timeout",
+          timestamps: { finished_at: Date.now() },
+        });
+        toaster.create({
+          title: `Timeout ${evaluationTimeoutStage(timeout_on_status)} evaluation execution`,
+          type: "error",
+          duration: 5000,
+        });
       }, delayMs);
 
       timeoutIdsRef.current.push(timeoutId);

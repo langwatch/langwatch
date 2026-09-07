@@ -20,9 +20,9 @@ export function WorkflowRunningStatus({
     return null;
   }
 
-  return (
-    <Box paddingLeft={2}>
-      {isRunning || isLoading ? (
+  if (isRunning || isLoading) {
+    return (
+      <Box paddingLeft={2}>
         <HStack>
           <Spinner size="xs" />
           <Text fontSize="13px">Running...</Text>
@@ -30,7 +30,13 @@ export function WorkflowRunningStatus({
             Stop
           </Button>
         </HStack>
-      ) : isWaiting ? (
+      </Box>
+    );
+  }
+
+  return (
+    <Box paddingLeft={2}>
+      {isWaiting ? (
         <HStack>
           <Spinner size="xs" />
           <Text fontSize="13px">Waiting for runtime...</Text>

@@ -19,11 +19,11 @@ export const useAskBeforeLeaving = () => {
         : undefined;
 
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      const message_ = message
-        ? message
-        : hasPendingChanges()
+      const unsavedChangesMessage = () =>
+        hasPendingChanges()
           ? "Changes were not autosaved yet, are you sure you want to leave?"
           : undefined;
+      const message_ = message ? message : unsavedChangesMessage();
       if (message_) {
         event.preventDefault();
         event.returnValue = message;

@@ -90,6 +90,9 @@ export function EditorStatusBar({
           errorCount > 0 && warningCount > 0 ? ", " : ""
         }${warningCount > 0 ? `${warningCount} warning${warningCount === 1 ? "" : "s"}` : ""}`;
 
+  const warningColor = warningCount > 0 ? "orange.500" : undefined;
+  const problemsColor = errorCount > 0 ? "red.500" : warningColor;
+
   return (
     <HStack
       bg="bg.muted"
@@ -113,9 +116,7 @@ export function EditorStatusBar({
         {selection > 0 ? ` (${selection} selected)` : ""}
       </Text>
       <Separator />
-      <Text color={errorCount > 0 ? "red.500" : warningCount > 0 ? "orange.500" : undefined}>
-        {problemsLabel}
-      </Text>
+      <Text color={problemsColor}>{problemsLabel}</Text>
       <HStack flex={1} justify="flex-end" gap={3}>
         <Text>Spaces: 4</Text>
         <Separator />

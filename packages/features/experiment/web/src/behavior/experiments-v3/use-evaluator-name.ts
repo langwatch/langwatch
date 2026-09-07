@@ -102,14 +102,12 @@ export const useCodeEvaluatorIds = (evaluators: EvaluatorConfig[]): Set<string> 
     ),
   );
 
-  const codeKey = evaluators
-    .map((ev, i) => `${ev.id}:${queries[i]?.data?.type === "code" ? 1 : 0}`)
-    .join("|");
+  const isCodeEvaluator = (index: number) => queries[index]?.data?.type === "code";
+
+  const codeKey = evaluators.map((ev, i) => `${ev.id}:${isCodeEvaluator(i) ? 1 : 0}`).join("|");
 
   return useMemo(() => {
-    return new Set(
-      evaluators.filter((_ev, index) => queries[index]?.data?.type === "code").map((ev) => ev.id),
-    );
+    return new Set(evaluators.filter((_ev, index) => isCodeEvaluator(index)).map((ev) => ev.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codeKey]);
 };

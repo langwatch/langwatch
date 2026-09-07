@@ -167,12 +167,12 @@ export function EvaluationResults({
 
   const sidebarSelectedRun = sidebarRuns.find((r) => r.runId === selectedRunId_);
 
-  if (
+  const hasNothingToShow =
     (experiment.isError && experiment.error.data?.httpStatus === 404) ||
     batchEvaluationRuns.data?.runs.length === 0 ||
     !experiment.data ||
-    !project
-  ) {
+    !project;
+  if (hasNothingToShow) {
     if (keepFetching) {
       return <WorkflowEvaluationResultsLayout status="loading" />;
     }

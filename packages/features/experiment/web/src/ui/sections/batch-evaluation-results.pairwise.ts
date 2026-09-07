@@ -12,12 +12,9 @@ export function buildPairwiseComparisons(column: BatchComparisonColumn): Pairwis
     // and a row the judge never settled are no evidence at all and are
     // excluded via winner: null. The distinction cannot be re-derived from
     // winnerId, so it is read off the two flags.
-    const winner: string | "tie" | null =
-      verdict.isUnresolved || verdict.isUnsettled
-        ? null
-        : verdict.winnerId === null
-          ? "tie"
-          : verdict.winnerId;
+    const isNoEvidence = verdict.isUnresolved || verdict.isUnsettled;
+    const settledWinner = verdict.winnerId === null ? "tie" : verdict.winnerId;
+    const winner: string | "tie" | null = isNoEvidence ? null : settledWinner;
 
     return {
       // Rows predating candidate-id capture (very old runs) have none

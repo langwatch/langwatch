@@ -612,7 +612,8 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   // Only block on the record fetch when the node carries no snapshot
   // to render from - with one, the editor shows the node's own state
   // immediately (and never the starter template).
-  if (agentQuery.isLoading && !node.data.parameters?.length) {
+  const hasNoSnapshot = !node.data.parameters?.length;
+  if (agentQuery.isLoading && hasNoSnapshot) {
     return (
       <HStack justify="center" paddingY={8} width="full">
         <Spinner size="md" />

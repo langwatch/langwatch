@@ -24,6 +24,30 @@ export type SelectionToolbarProps = {
   isAborting?: boolean;
 };
 
+/** What the run button reads while the selected rows are idle, running or stopping. */
+function RunButtonLabel({ isAborting, isRunning }: { isAborting: boolean; isRunning: boolean }) {
+  if (isAborting) {
+    return (
+      <>
+        <Spinner size="xs" /> Stopping...
+      </>
+    );
+  }
+  if (isRunning) {
+    return (
+      <>
+        <Square size={16} /> Stop
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Play size={16} /> Run
+    </>
+  );
+}
+
 export function SelectionToolbar({
   selectedCount,
   onRun,
@@ -79,19 +103,7 @@ export function SelectionToolbar({
           disabled={isAborting}
           data-testid="selection-run-btn"
         >
-          {isAborting ? (
-            <>
-              <Spinner size="xs" /> Stopping...
-            </>
-          ) : isRunning ? (
-            <>
-              <Square size={16} /> Stop
-            </>
-          ) : (
-            <>
-              <Play size={16} /> Run
-            </>
-          )}
+          <RunButtonLabel isAborting={isAborting} isRunning={isRunning} />
         </Button>
         <Button
           size="sm"

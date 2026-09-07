@@ -61,13 +61,9 @@ export const RenderCode = ({
   // highlighting is async, so on the render right after `code` changes the PREVIOUS
   // highlight is still in state, and rendering it shows the previous snippet — visible when
   // switching language tabs.
-  const html =
-    highlighted &&
-    highlighted.code === code &&
-    highlighted.language === language &&
-    highlighted.colorMode === colorMode
-      ? highlighted.html
-      : null;
+  const wasHighlightedFrom = (candidate: Highlighted) =>
+    candidate.code === code && candidate.language === language && candidate.colorMode === colorMode;
+  const html = highlighted && wasHighlightedFrom(highlighted) ? highlighted.html : null;
 
   return (
     <Box position="relative" className="group" style={propsStyle}>

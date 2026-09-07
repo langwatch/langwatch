@@ -10,6 +10,52 @@ import { useEffect, useState } from "react";
 import { workflowApi } from "../../model/workflow-api.ts";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
 
+/** One replica, as the picker lists it. */
+type WorkflowCopy = { id: string; name: string; fullPath: string };
+
+/** The replica picker: loading, empty, or the list of replicas to push to. */
+function ReplicaPicker({
+  isLoading,
+  onToggle,
+  rows,
+  selected,
+}: {
+  isLoading: boolean;
+  onToggle: (id: string) => void;
+  rows: WorkflowCopy[];
+  selected: ReadonlySet<string>;
+}) {
+  if (isLoading) return <Text>Loading replicas...</Text>;
+
+  if (rows.length === 0) {
+    return (
+      <Text color="fg.muted">
+        No replicas found. This may be because you don&apos;t have workflows:update permission on
+        the replica projects, or the replicas have been archived.
+      </Text>
+    );
+  }
+
+  return (
+    <VStack gap={2} align="start" width="full">
+      {rows.map((copy) => (
+        <Checkbox
+          key={copy.id}
+          checked={selected.has(copy.id)}
+          onCheckedChange={() => onToggle(copy.id)}
+        >
+          <VStack align="start" gap={0}>
+            <Text fontWeight="medium">{copy.name}</Text>
+            <Text fontSize="sm" color="fg.muted">
+              {copy.fullPath}
+            </Text>
+          </VStack>
+        </Checkbox>
+      ))}
+    </VStack>
+  );
+}
+
 export function WorkflowPushToCopiesDialog({
   open,
   onClose,
@@ -85,31 +131,12 @@ export function WorkflowPushToCopiesDialog({
             <Text fontSize="sm" color="fg.muted">
               Select which replicas to push the latest version to:
             </Text>
-            {copies.isLoading ? (
-              <Text>Loading replicas...</Text>
-            ) : rows.length === 0 ? (
-              <Text color="fg.muted">
-                No replicas found. This may be because you don&apos;t have workflows:update
-                permission on the replica projects, or the replicas have been archived.
-              </Text>
-            ) : (
-              <VStack gap={2} align="start" width="full">
-                {rows.map((copy) => (
-                  <Checkbox
-                    key={copy.id}
-                    checked={selected.has(copy.id)}
-                    onCheckedChange={() => toggle(copy.id)}
-                  >
-                    <VStack align="start" gap={0}>
-                      <Text fontWeight="medium">{copy.name}</Text>
-                      <Text fontSize="sm" color="fg.muted">
-                        {copy.fullPath}
-                      </Text>
-                    </VStack>
-                  </Checkbox>
-                ))}
-              </VStack>
-            )}
+            <ReplicaPicker
+              isLoading={copies.isLoading}
+              onToggle={toggle}
+              rows={rows}
+              selected={selected}
+            />
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>

@@ -9,13 +9,55 @@ import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 
 const logger = createLogger("langwatch:studio:execution");
 
+/** The timer this hook arms, naming the trace and the state it timed out on. */
+type WorkflowTimeoutTrigger = {
+  trace_id: string;
+  timeout_on_status: "waiting" | "running";
+};
+
+/** Marks the execution as timed out, if it is still in the state the timer was armed on. */
+function applyWorkflowTimeout({
+  getWorkflow,
+  setWorkflowExecutionState,
+  trigger,
+}: {
+  getWorkflow: () => { state: { execution?: { trace_id?: string; status?: string } } };
+  setWorkflowExecutionState: (state: {
+    status: "error";
+    error: string;
+    timestamps: { finished_at: number };
+  }) => void;
+  trigger: WorkflowTimeoutTrigger;
+}) {
+  const execution = getWorkflow().state.execution;
+  const timedOutOnThisTrace =
+    execution?.trace_id === trigger.trace_id && execution?.status === trigger.timeout_on_status;
+  if (!timedOutOnThisTrace) return;
+
+  logger.warn(
+    {
+      trace_id: trigger.trace_id,
+      timeout_on_status: trigger.timeout_on_status,
+    },
+    "workflow execution timeout triggered",
+  );
+  setWorkflowExecutionState({
+    status: "error",
+    error: "Timeout",
+    timestamps: { finished_at: Date.now() },
+  });
+  const stage = trigger.timeout_on_status === "waiting" ? "starting" : "stopping";
+  toaster.create({
+    title: `Timeout ${stage} workflow execution`,
+    type: "error",
+    duration: 5000,
+  });
+}
+
 export const useWorkflowExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
 
-  const [triggerTimeout, setTriggerTimeout] = useState<{
-    trace_id: string;
-    timeout_on_status: "waiting" | "running";
-  } | null>(null);
+  const [triggerTimeout, setTriggerTimeout] = useState<WorkflowTimeoutTrigger | null>(null);
 
   const { getWorkflow, setWorkflowExecutionState } = useWorkflowStore((state) => ({
     getWorkflow: state.getWorkflow,
@@ -35,32 +77,9 @@ export const useWorkflowExecution = () => {
   }, [socketStatus]);
 
   useEffect(() => {
-    const workflow = getWorkflow();
-    if (
-      triggerTimeout &&
-      workflow.state.execution?.trace_id === triggerTimeout.trace_id &&
-      workflow.state.execution?.status === triggerTimeout.timeout_on_status
-    ) {
-      logger.warn(
-        {
-          trace_id: triggerTimeout.trace_id,
-          timeout_on_status: triggerTimeout.timeout_on_status,
-        },
-        "workflow execution timeout triggered",
-      );
-      setWorkflowExecutionState({
-        status: "error",
-        error: "Timeout",
-        timestamps: { finished_at: Date.now() },
-      });
-      toaster.create({
-        title: `Timeout ${
-          triggerTimeout.timeout_on_status === "waiting" ? "starting" : "stopping"
-        } workflow execution`,
-        type: "error",
-        duration: 5000,
-      });
-    }
+    if (!triggerTimeout) return;
+
+    applyWorkflowTimeout({ getWorkflow, setWorkflowExecutionState, trigger: triggerTimeout });
   }, [triggerTimeout, setWorkflowExecutionState, getWorkflow]);
 
   const startWorkflowExecution = useCallback(

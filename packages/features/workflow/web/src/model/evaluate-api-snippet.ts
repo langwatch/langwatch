@@ -87,11 +87,12 @@ export function evaluateCurlSnippet({
   const bodyJson = JSON.stringify({ parameters }, null, 2).replace(/\n/g, "\n  ");
 
   const hasDataset = !!datasetName || datasetColumns.length > 0;
-  const datasetLine = !hasDataset
-    ? `# Evaluates the latest committed version. With no dataset attached, the\n# parameters below form the single evaluated row.`
-    : datasetName
-      ? `# Evaluates the latest committed version against this workflow's\n# attached dataset ("${datasetName}").`
-      : `# Evaluates the latest committed version against this workflow's\n# attached dataset.`;
+  const attachedDatasetLine = datasetName
+    ? `# Evaluates the latest committed version against this workflow's\n# attached dataset ("${datasetName}").`
+    : `# Evaluates the latest committed version against this workflow's\n# attached dataset.`;
+  const datasetLine = hasDataset
+    ? attachedDatasetLine
+    : `# Evaluates the latest committed version. With no dataset attached, the\n# parameters below form the single evaluated row.`;
 
   return `${datasetLine}
 curl -X POST "${baseUrl}/api/workflows/${workflowId}/evaluate" \\

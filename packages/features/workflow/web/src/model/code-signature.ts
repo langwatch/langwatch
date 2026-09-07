@@ -49,7 +49,9 @@ export const rewriteCodeSignature = (
         .map((i) => `${i.identifier}: ${typesMap[i.type as Field["type"]] ?? "Any"} = None`)
         .join(", ")})${returnType ?? ""}:`,
   );
-  if (next.includes(": Any") && !next.includes("from typing import Any")) {
+  const usesAnyType = next.includes(": Any");
+  const importsAnyType = next.includes("from typing import Any");
+  if (usesAnyType && !importsAnyType) {
     next = `from typing import Any\n${next}`;
   }
   return next;

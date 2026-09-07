@@ -71,7 +71,8 @@ export function parseLLMError(raw: string): ParsedLLMError {
 }
 
 function extractJsonMessage(raw: string): string {
-  if (!raw.trim().startsWith("{")) return raw;
+  const opensAsJsonObject = raw.trim().startsWith("{");
+  if (!opensAsJsonObject) return raw;
 
   try {
     const json = JSON.parse(raw);

@@ -6,6 +6,7 @@
 import { Box, Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
+import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
@@ -30,6 +31,69 @@ const DRAFT_DATASET_COLUMNS: DatasetColumns = [
   { name: "input", type: "string" },
   { name: "expected_output", type: "string" },
 ];
+
+/**
+ * The editor for the dataset being edited: the saved one by id, the draft one held
+ * inline, and nothing at all while the dialog is closed.
+ */
+function DatasetEditorBody({
+  attachDataset,
+  editingDataset,
+  editorPortalRef,
+  onDraftChange,
+  onSaveDraftAsDataset,
+  open,
+}: {
+  attachDataset: (dataset: Entry["dataset"], columnTypes: DatasetColumns) => void;
+  editingDataset: NonNullable<Entry["dataset"]>;
+  editorPortalRef: React.RefObject<HTMLDivElement | null>;
+  onDraftChange: (dataset: InMemoryDataset) => void;
+  onSaveDraftAsDataset: () => void;
+  open: boolean;
+}) {
+  if (!open) return null;
+
+  if (editingDataset.id) {
+    return (
+      <DatasetEditorTable
+        datasetId={editingDataset.id}
+        editorPortalRef={editorPortalRef}
+        floatingSelectionBar
+        onColumnsChanged={(columnTypes) => {
+          attachDataset(editingDataset, columnTypes);
+        }}
+      />
+    );
+  }
+
+  const inline = editingDataset.inline;
+  if (!inline) return null;
+
+  return (
+    <DatasetEditorTable
+      title={editingDataset.name ?? "Draft Dataset"}
+      editorPortalRef={editorPortalRef}
+      floatingSelectionBar
+      inMemoryDataset={{
+        name: editingDataset.name,
+        columnTypes: inline.columnTypes,
+        datasetRecords: transposeColumnsFirstToRowsFirstWithId(inline.records),
+      }}
+      onUpdateDataset={onDraftChange}
+      headerActions={
+        <Button
+          size="sm"
+          colorPalette="blue"
+          variant="outline"
+          data-testid="save-draft-as-dataset"
+          onClick={onSaveDraftAsDataset}
+        >
+          <Database size={14} /> Save as dataset
+        </Button>
+      }
+    />
+  );
+}
 
 export function DatasetModal({
   open,
@@ -141,41 +205,14 @@ export function DatasetModal({
             </Dialog.Header>
             <Dialog.Body paddingBottom="32px">
               <Box ref={editorPortalRef} width="full" height="full">
-                {open && editingDataset.id ? (
-                  <DatasetEditorTable
-                    datasetId={editingDataset.id}
-                    editorPortalRef={editorPortalRef}
-                    floatingSelectionBar
-                    onColumnsChanged={(columnTypes) => {
-                      attachDataset(editingDataset, columnTypes);
-                    }}
-                  />
-                ) : open && editingDataset.inline ? (
-                  <DatasetEditorTable
-                    title={editingDataset.name ?? "Draft Dataset"}
-                    editorPortalRef={editorPortalRef}
-                    floatingSelectionBar
-                    inMemoryDataset={{
-                      name: editingDataset.name,
-                      columnTypes: editingDataset.inline.columnTypes,
-                      datasetRecords: transposeColumnsFirstToRowsFirstWithId(
-                        editingDataset.inline.records,
-                      ),
-                    }}
-                    onUpdateDataset={handleDraftChange}
-                    headerActions={
-                      <Button
-                        size="sm"
-                        colorPalette="blue"
-                        variant="outline"
-                        data-testid="save-draft-as-dataset"
-                        onClick={handleSaveDraftAsDataset}
-                      >
-                        <Database size={14} /> Save as dataset
-                      </Button>
-                    }
-                  />
-                ) : null}
+                <DatasetEditorBody
+                  open={open}
+                  editingDataset={editingDataset}
+                  editorPortalRef={editorPortalRef}
+                  attachDataset={attachDataset}
+                  onDraftChange={handleDraftChange}
+                  onSaveDraftAsDataset={handleSaveDraftAsDataset}
+                />
               </Box>
             </Dialog.Body>
           </>

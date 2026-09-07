@@ -84,13 +84,17 @@ function toJsObjectLiteral(record: Record<string, string | number | boolean>): s
   return `{ ${entries.join(", ")} }`;
 }
 
+/** One python literal: booleans spelled the python way, everything else as JSON. */
+function toPyValueLiteral(value: string | number | boolean): string {
+  if (typeof value === "boolean") return value ? "True" : "False";
+
+  return JSON.stringify(value);
+}
+
 /** Render a python dict literal from an example record. */
 function toPyDictLiteral(record: Record<string, string | number | boolean>): string {
   const entries = Object.entries(record).map(
-    ([key, value]) =>
-      `${JSON.stringify(key)}: ${
-        typeof value === "boolean" ? (value ? "True" : "False") : JSON.stringify(value)
-      }`,
+    ([key, value]) => `${JSON.stringify(key)}: ${toPyValueLiteral(value)}`,
   );
   return `{${entries.join(", ")}}`;
 }
