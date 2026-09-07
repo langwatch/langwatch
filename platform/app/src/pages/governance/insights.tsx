@@ -1,5 +1,4 @@
-import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { Castle } from "lucide-react";
+import { Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -9,7 +8,18 @@ import {
 } from "~/components/governance/platform/InsightsSetupDialog";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import {
+  LangyMark,
+  LangyMarkGradientDefs,
+} from "~/features/langy/components/LangyMark";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+
+/**
+ * Own paint server for the mark. The Langy panel mounts the shared one,
+ * but a viewer without Langy never has it, and a mark filled from a missing
+ * gradient paints nothing.
+ */
+const INSIGHTS_MARK_GRADIENT_ID = "governance-insights-mark-grad";
 
 /**
  * The Insights inbox before there is anything in it.
@@ -37,50 +47,74 @@ function InsightsPage() {
           </Text>
         </VStack>
 
+        {/* Langy's own empty state, transplanted: the bare mark, the serif
+            display line under it, one quiet sentence, then the keys. No tile
+            behind the mark, one hairline, no shadow — see
+            features/langy/components/EmptyState.tsx and langyTheme.ts for
+            why each of those is a rule and not a taste. `langy-root` scopes
+            Langy's type face and dark palette to the card. */}
         <VStack
+          className="langy-root"
           data-testid="insights-empty-brief"
           alignSelf="center"
           width="full"
           maxWidth="900px"
-          gap={5}
-          paddingY={20}
+          gap={0}
+          paddingY={16}
           paddingX={8}
-          borderWidth="2px"
+          borderWidth="1px"
           borderStyle="dashed"
-          borderColor="border.muted"
+          borderColor="border"
           borderRadius="xl"
+          background="bg.surface"
         >
-          {/* The glyph the brief's mocks use: a plain outline on the tile,
-              not the gradient logo — that one is Langy's launcher, and it
-              needs a paint server this page would otherwise have to carry. */}
-          <Box
-            background="fg"
-            color="bg"
-            borderRadius="xl"
-            width="72px"
-            height="72px"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
+          <LangyMarkGradientDefs id={INSIGHTS_MARK_GRADIENT_ID} />
+          <LangyMark size={44} gradientId={INSIGHTS_MARK_GRADIENT_ID} />
+          <Text
+            as="h2"
+            fontFamily="var(--langy-font-serif)"
+            // 44px mark ÷ φ, the same pairing the panel's greeting uses.
+            fontSize="27px"
+            fontWeight="500"
+            letterSpacing="-0.02em"
+            lineHeight="1.2"
+            color="fg"
+            textAlign="center"
+            marginTop={4}
           >
-            <Castle size={32} strokeWidth={1.75} aria-hidden />
-          </Box>
-          <Heading size="lg" textAlign="center">
             Langy writes your brief here
-          </Heading>
-          <Text color="fg.muted" textAlign="center" maxWidth="640px">
+          </Text>
+          <Text
+            textStyle="sm"
+            color="fg.muted"
+            lineHeight="1.5"
+            textAlign="center"
+            textWrap="balance"
+            maxWidth="380px"
+            marginTop={2}
+          >
             Every morning a background job reads yesterday&apos;s traffic and
             files a couple of high-signal insights: not fifteen a day.
           </Text>
-          <HStack gap={3} paddingTop={2}>
-            <Button colorPalette="orange" onClick={() => setSetupOpen(true)}>
+          <HStack gap={2} marginTop={6}>
+            <Button
+              size="sm"
+              colorPalette="orange"
+              onClick={() => setSetupOpen(true)}
+            >
               Set up data
             </Button>
-            <Button variant="subtle" onClick={openLangy}>
+            <Button size="sm" variant="subtle" onClick={openLangy}>
               Open Langy
             </Button>
           </HStack>
-          <Button variant="plain" size="sm" color="fg.muted">
+          <Button
+            variant="plain"
+            size="xs"
+            fontWeight="400"
+            color="fg.subtle"
+            marginTop={3}
+          >
             or preview a sample inbox
           </Button>
         </VStack>
