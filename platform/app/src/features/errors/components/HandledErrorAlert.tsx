@@ -1,11 +1,14 @@
-import { Box, HStack, List, Stack, Text } from "@chakra-ui/react";
-import { AlertCircle } from "lucide-react";
+import { Box, HStack, IconButton, List, Stack, Text } from "@chakra-ui/react";
+import { AlertCircle, X } from "lucide-react";
+import { useState } from "react";
 
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
+import { isServerUnreachable } from "../logic/isServerUnreachable";
 import { resolveErrorCopy } from "../logic/resolveErrorCopy";
 
 import { ErrorActions } from "./ErrorActions";
+import { ServerUnreachableNotice } from "./ServerUnreachableNotice";
 
 /**
  * The same restrained hairline the toast wears — the tone lives in the border
@@ -35,12 +38,36 @@ export interface HandledErrorAlertProps {
    */
   showAllTips?: boolean;
   /**
-   * A surface that paints its own ground — the signed-out front door's glass —
+   * A surface that paints its own ground — the signed-out auth screens's glass —
    * hooks its treatment on here. The alert keeps its own structure and colour;
    * only the pane it sits on changes.
    */
   className?: string;
+  /**
+   * Runs the failed request again. Used only when nothing answered at all,
+   * where the screen becomes a wait that settles itself rather than an error
+   * somebody has to act on.
+   */
+  onRetry?: () => void;
+  /**
+   * Whether the reader may put this one away. On by default: an inline alert
+   * outlives the moment it describes, and a reader who has read it and cannot
+   * act on it should not have to keep it on screen to carry on working.
+   *
+   * Dismissing hides the ALERT, never the state — the query is still failed,
+   * the form still rejected — and a DIFFERENT failure brings the alert
+   * straight back, so putting one away can never hide the next one.
+   *
+   * Turn it off where the alert is the only thing explaining why a control in
+   * front of the reader will not work.
+   */
+  dismissible?: boolean;
+  /** Told when the reader dismisses it, for a caller that keeps its own state. */
+  onDismiss?: () => void;
 }
+
+/** No error has been dismissed yet — distinct from having dismissed `null`. */
+const NOTHING_DISMISSED = Symbol("nothing-dismissed");
 
 /**
  * The inline counterpart to `showErrorToast` — same copy, same affordances,
@@ -57,7 +84,15 @@ export function HandledErrorAlert({
   fallbackTitle,
   showAllTips = true,
   className,
+  onRetry,
+  dismissible = true,
+  onDismiss,
 }: HandledErrorAlertProps) {
+  // Keyed on the failure ITSELF rather than a boolean, so the alert returns
+  // the moment a different one arrives. A boolean would stay true across the
+  // next failure and silently swallow it.
+  const [dismissed, setDismissed] = useState<unknown>(NOTHING_DISMISSED);
+
   if (!error) return null;
 
   // Already surfaced by a global interceptor in `utils/api.tsx` — the upgrade
@@ -66,6 +101,19 @@ export function HandledErrorAlert({
   // wrong / We've been notified" underneath the modal that was busy explaining
   // it properly.
   if (isHandledByGlobalHandler(error)) return null;
+
+  // NOTHING ANSWERED. Said as a wait rather than as a fault, because that is
+  // what it is: the request never left the browser, so "we've been notified"
+  // is a promise nobody kept and the trace id names a trace that does not
+  // exist. Ahead of the registry, since no code arrived to look up.
+  if (isServerUnreachable(error)) {
+    return <ServerUnreachableNotice onRetry={onRetry} className={className} />;
+  }
+
+  // Put away by the reader, and it is still the same failure. Deliberately
+  // BELOW the unreachable branch: that one is a wait that settles itself and
+  // retries on its own, so there is nothing there to dismiss.
+  if (dismissible && dismissed === error) return null;
 
   // One parse, and the same two rules the toast renders — whose headline
   // wins, and which tips add to the description rather than repeating it.
@@ -127,6 +175,26 @@ export function HandledErrorAlert({
 
           <ErrorActions docsUrl={copy.docsUrl} traceId={copy.traceId} />
         </Stack>
+
+        {dismissible && (
+          <IconButton
+            aria-label="Dismiss"
+            title="Dismiss"
+            variant="ghost"
+            size="xs"
+            flexShrink={0}
+            marginTop="-2px"
+            marginRight="-6px"
+            color="fg.muted"
+            _hover={{ color: "fg", bg: "bg.muted" }}
+            onClick={() => {
+              setDismissed(error);
+              onDismiss?.();
+            }}
+          >
+            <X size={14} aria-hidden="true" />
+          </IconButton>
+        )}
       </HStack>
     </Box>
   );

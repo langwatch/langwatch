@@ -116,10 +116,15 @@ model Session {
   /// factor reads this when a member reaches its data; it is never read at
   /// mint and never ends a session.
   amr           String[] @default([])
+  actorUserId            String?
+  subjectUserId          String?
+  impersonationReason    String?   @db.Text
+  impersonationExpiresAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
   @@index([userId])
+  @@index([identifierId])
 }
 
 model User {
@@ -256,6 +261,7 @@ model Identifier {
   verifiedAt        DateTime?
   attachedAt        DateTime
   detachedAt        DateTime?
+  lastUsedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
@@ -2609,6 +2615,7 @@ model AuditLog {
   id             String   @id @default(cuid())
   createdAt      DateTime @default(now())
   userId         String?
+  actorUserId    String?
   projectId      String?
   organizationId String?
   action         String
@@ -2626,6 +2633,7 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([userId])
+  @@index([actorUserId])
   @@index([projectId])
   @@index([action])
   @@index([ipAddress])

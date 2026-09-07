@@ -163,8 +163,13 @@ describe("given a dev checkout running on a non-default port", () => {
       const response = await post(app, `http://localhost:${APP_PORT}`);
 
       expect(response.status).toBe(401);
+      // The refusal reaches the wire as the handled-error envelope, whose
+      // `error` is the stable code. Better than the raw better-auth string it
+      // replaced: one shape for every refusal, and the words a customer reads
+      // come from the presentation registry keyed by this code, not from here.
       expect(await response.json()).toMatchObject({
-        code: "INVALID_EMAIL_OR_PASSWORD",
+        error: "identity_sign_in_refused",
+        fault: "customer",
       });
     });
   });

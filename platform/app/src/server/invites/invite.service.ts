@@ -1196,6 +1196,46 @@ export class InviteService {
   }
 
   /**
+   * Move an invitation's expiry out, without touching its code.
+   *
+   * The asymmetry with `resendInvite` is the whole reason both exist. A
+   * resend mints a fresh code, which stops the old link working and sends a
+   * new mail — right when the person lost the mail, wrong when they still
+   * have it open and merely ran out of time. An extension changes one field
+   * and sends nothing, so the link already in their inbox starts working
+   * again.
+   *
+   * Measured from NOW rather than from the old expiry, so extending a
+   * fortnight-stale invitation gives the same fortnight as extending one
+   * that lapsed this morning. The caller is told the new expiry as a date;
+   * a duration would leave the reader adding it up.
+   */
+  async extendInvite({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<{ invite: OrganizationInvite }> {
+    const existing = await this.prisma.organizationInvite.findFirst({
+      where: { id: inviteId, organizationId },
+    });
+    if (existing?.status !== "PENDING") {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    const freshExpiration = new Date(Date.now() + INVITE_EXPIRATION_MS);
+    const claimed = await this.prisma.organizationInvite.updateMany({
+      where: { id: existing.id, organizationId, status: "PENDING" },
+      data: { expiration: freshExpiration },
+    });
+    if (claimed.count === 0) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+    return { invite: { ...existing, expiration: freshExpiration } };
+  }
+
+  /**
    * The invitee, holding an expired link, asks for a fresh one (D11).
    *
    * The asymmetry with `resendInvite` is deliberate: this mints nothing.

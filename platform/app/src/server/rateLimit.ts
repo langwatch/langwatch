@@ -59,17 +59,23 @@ export async function rateLimit(opts: {
   const redisConnection = tryGetApp()?.redis ?? null;
   if (redisConnection) {
     const redisKey = `langwatch:ratelimit:${key}`;
-    const count = await redisConnection.incr(redisKey);
-    if (count === 1) {
-      await redisConnection.expire(redisKey, windowSeconds);
+    try {
+      const count = await redisConnection.incr(redisKey);
+      if (count === 1) {
+        await redisConnection.expire(redisKey, windowSeconds);
+      }
+      const ttl = await redisConnection.ttl(redisKey);
+      const resetAt = now + (ttl > 0 ? ttl : windowSeconds) * 1000;
+      return {
+        allowed: count <= max,
+        remaining: Math.max(0, max - count),
+        resetAt,
+      };
+    } catch {
+      // Redis is an optimisation for a process-wide budget, not an
+      // availability dependency. Fall through to the per-process limiter with
+      // the same observable result shape when any Redis command fails.
     }
-    const ttl = await redisConnection.ttl(redisKey);
-    const resetAt = now + (ttl > 0 ? ttl : windowSeconds) * 1000;
-    return {
-      allowed: count <= max,
-      remaining: Math.max(0, max - count),
-      resetAt,
-    };
   }
 
   sweepExpiredMemoryEntries(now);

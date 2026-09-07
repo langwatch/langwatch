@@ -18,13 +18,19 @@ import { describe, expect, it } from "vitest";
  * convenience deny — it catches any future PR that downgrades a guard
  * back to `organization:view` or similar permissive shape.
  */
-const PAGES_REQUIRING_ORG_MANAGE = [
-  "audit-log.tsx",
-  "teams.tsx",
-  "members.tsx",
-  "roles.tsx",
-  "groups.tsx",
-] as const;
+/**
+ * Groups, Members and Teams are not on this list: each is now a forwarder
+ * onto a tab of Directory, holding nothing to leak, and the page it lands on
+ * carries the guard. A pin on a redirect would only pin the redirect.
+ *
+ * They left the list when they became forwarders, not because the guarantee
+ * relaxed. Directory gates per TAB rather than per page — `hasPermission`
+ * decides which tabs exist and `PermissionAlert permission="organization:manage"`
+ * stands in for the roster — so a whole-page `withPermissionGuard` is the
+ * wrong shape to pin there, and this regex would not find it. The real
+ * boundary was always the tRPC procedures underneath.
+ */
+const PAGES_REQUIRING_ORG_MANAGE = ["audit-log.tsx", "roles.tsx"] as const;
 
 describe("legacy /settings admin pages", () => {
   describe("when guarded by withPermissionGuard", () => {

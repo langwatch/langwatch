@@ -5,6 +5,12 @@
  * therefore keyed off the RESOLVED provider (coerced to "email" when the gate
  * denies), not raw env — otherwise the coerced UI offers a button the backend
  * always rejects.
+ *
+ * What the ROUTER decides is asserted here: which of the two credential stores
+ * the deployment's provider sends the change to, and which transport code each
+ * refusal becomes. Proving the current password, writing the new one and
+ * ending the other sessions are `CredentialAccountService`'s, and its own test
+ * drives them over fakes.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,19 +34,33 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { resolveAuthProviderMock } = vi.hoisted(() => ({
+const {
+  resolveAuthProviderMock,
+  changePasswordMock,
+  changeFederatedPasswordMock,
+} = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
+  changePasswordMock: vi.fn(),
+  changeFederatedPasswordMock: vi.fn(),
 }));
 vi.mock("@ee/sso/sso-gate", () => ({
   resolveAuthProvider: resolveAuthProviderMock,
 }));
+vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/identity/runtime")
+  >()),
+  credentialAccounts: () => ({
+    changePassword: changePasswordMock,
+    changeFederatedPassword: changeFederatedPasswordMock,
+  }),
+}));
 
 describe("userRouter.changePassword", () => {
-  let accountFindFirst: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    accountFindFirst = vi.fn().mockResolvedValue(null);
+    changePasswordMock.mockResolvedValue("changed");
+    changeFederatedPasswordMock.mockResolvedValue("changed");
   });
 
   const createCaller = () => {
@@ -51,7 +71,6 @@ describe("userRouter.changePassword", () => {
         expires: "2099-01-01",
       },
     });
-    (ctx as any).prisma = { account: { findFirst: accountFindFirst } };
     return userRouter.createCaller(ctx);
   };
 
@@ -66,10 +85,29 @@ describe("userRouter.changePassword", () => {
     it("passes the provider guard and reaches the credential path", async () => {
       resolveAuthProviderMock.mockResolvedValue("email");
 
-      // No credential account seeded → the credential path throws NOT_FOUND.
-      // Reaching that error proves the provider guard did NOT reject the call.
+      await expect(call()).resolves.toMatchObject({ success: true });
+
+      expect(changePasswordMock).toHaveBeenCalledWith({
+        userId: "user-1",
+        currentPassword: "current-password",
+        newPassword: "brand-new-password-1",
+        keepSessionId: "sess-1",
+      });
+      expect(changeFederatedPasswordMock).not.toHaveBeenCalled();
+    });
+
+    it("reports an account with no password set as not found", async () => {
+      resolveAuthProviderMock.mockResolvedValue("email");
+      changePasswordMock.mockResolvedValue("no_password_set");
+
       await expect(call()).rejects.toMatchObject({ code: "NOT_FOUND" });
-      expect(accountFindFirst).toHaveBeenCalled();
+    });
+
+    it("reports a current password that did not match as unauthorized", async () => {
+      resolveAuthProviderMock.mockResolvedValue("email");
+      changePasswordMock.mockResolvedValue("wrong_password");
+
+      await expect(call()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
 
@@ -78,26 +116,34 @@ describe("userRouter.changePassword", () => {
       resolveAuthProviderMock.mockResolvedValue("google");
 
       await expect(call()).rejects.toMatchObject({ code: "BAD_REQUEST" });
-      expect(accountFindFirst).not.toHaveBeenCalled();
+      expect(changePasswordMock).not.toHaveBeenCalled();
+      expect(changeFederatedPasswordMock).not.toHaveBeenCalled();
     });
   });
 
   describe("given a licensed Auth0 deployment", () => {
-    it("passes the provider guard and looks up the Auth0 database account", async () => {
+    it("sends the change to the identity provider rather than to our own rows", async () => {
       resolveAuthProviderMock.mockResolvedValue("auth0");
 
-      // Only the `auth0|` database connection has a password the Management
-      // API can update, so the lookup must be narrowed to it rather than
-      // matching any Auth0-linked social identity.
+      await expect(call()).resolves.toMatchObject({ success: true });
+
+      expect(changeFederatedPasswordMock).toHaveBeenCalledWith({
+        userId: "user-1",
+        email: "sso-born@acme.com",
+        currentPassword: "current-password",
+        newPassword: "brand-new-password-1",
+        keepSessionId: "sess-1",
+      });
+      expect(changePasswordMock).not.toHaveBeenCalled();
+    });
+
+    it("reports an account with no Auth0 database connection as not found", async () => {
+      // Only that connection has a password the Management API can update;
+      // social identities linked through Auth0 are their providers' to change.
+      resolveAuthProviderMock.mockResolvedValue("auth0");
+      changeFederatedPasswordMock.mockResolvedValue("no_federated_account");
+
       await expect(call()).rejects.toMatchObject({ code: "NOT_FOUND" });
-      expect(accountFindFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            provider: "auth0",
-            providerAccountId: { startsWith: "auth0|" },
-          }),
-        }),
-      );
     });
   });
 });

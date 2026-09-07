@@ -247,6 +247,44 @@ describe("attachIdentifier guard", () => {
       );
     });
   });
+
+  describe("when a newborn's heads hold the ledger's provisional row", () => {
+    /** @scenario "A newborn's provisional head does not silence its own attach" */
+    it("states the attach anyway, because nothing has folded for this user", async () => {
+      const heads = new InMemoryHeads();
+      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
+      const first = await guards.attachIdentifier(attachData());
+      // The ledger's provisional write: the row is there, the cursor is not.
+      heads.fold(USER, first);
+      heads.newborns.add(USER);
+
+      const rerun = await guards.attachIdentifier(attachData());
+
+      expect(rerun).toHaveLength(1);
+      expect((rerun[0]!.data as { identifierId: string }).identifierId).toBe(
+        (first[0]!.data as { identifierId: string }).identifierId,
+      );
+    });
+
+    /** @scenario "A provisional head with no event is restated by the next pass" */
+    it("keeps stating it for a later pass under another command id, until a fold lands", async () => {
+      const heads = new InMemoryHeads();
+      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
+      heads.fold(USER, await guards.attachIdentifier(attachData()));
+      heads.newborns.add(USER);
+
+      const nextPass = await guards.attachIdentifier(
+        attachData({ commandId: "backfill:acc_1" }),
+      );
+      expect(nextPass).toHaveLength(1);
+
+      heads.newborns.delete(USER);
+      const afterFold = await guards.attachIdentifier(
+        attachData({ commandId: "backfill:acc_1" }),
+      );
+      expect(afterFold).toEqual([]);
+    });
+  });
 });
 
 describe("verifyIdentifier guard", () => {

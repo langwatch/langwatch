@@ -122,6 +122,10 @@ const routes: RouteObject[] = [
     children: [
       { path: "/settings", ...page(() => import("./pages/settings")) },
       {
+        // Role Bindings became a tab of Roles. The address keeps resolving so
+        // old bookmarks and links do not dead-end; the page it loads renders
+        // <Navigate>, not a `loader` redirect, because loaders do not run on a
+        // cold load of the SPA — which is exactly how a stale link arrives.
         path: "/settings/role-bindings",
         ...page(() => import("./pages/settings/role-bindings")),
       },
@@ -146,8 +150,12 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/audit-log")),
       },
       {
-        path: "/settings/authentication",
-        ...page(() => import("./pages/settings/authentication")),
+        path: "/settings/profile",
+        ...page(() => import("./pages/settings/profile")),
+      },
+      {
+        path: "/settings/security",
+        ...page(() => import("./pages/settings/security")),
       },
       {
         path: "/settings/groups",
@@ -188,6 +196,10 @@ const routes: RouteObject[] = [
       {
         path: "/settings/secrets",
         ...page(() => import("./pages/settings/secrets")),
+      },
+      {
+        path: "/settings/authentication",
+        ...page(() => import("./pages/settings/authentication")),
       },
       {
         path: "/settings/subscription",
@@ -713,6 +725,10 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/sso-connections",
     ...page(() => import("./pages/ops/backoffice/sso-connections")),
+  },
+  {
+    path: "/ops/backoffice/identity-lookup",
+    ...page(() => import("./pages/ops/backoffice/identity-lookup")),
   },
 
   // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path

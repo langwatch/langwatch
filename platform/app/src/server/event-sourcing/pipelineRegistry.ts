@@ -22,6 +22,7 @@ import type {
   IdentityReservationRepository,
   IdentityUsersRepository,
   JoinRequestReadRepository,
+  LinkProposalReadsRepository,
   MfaEnrollmentRepository,
   ScimSyncReadRepository,
   SsoBreakGlassBindingRepository,
@@ -32,6 +33,7 @@ import type {
 import {
   IdentityGuards,
   JoinRequestGuards,
+  LinkProposalGuards,
   MfaGuards,
   ScimSyncGuards,
   SsoConnectionGuards,
@@ -421,6 +423,9 @@ export interface PipelineRepositories {
    * claim is the same claim rather than a second one.
    */
   identityReservations: IdentityReservationRepository;
+  /** The proposal log the link-decision guards read (ADR-117 §3, D05). A
+   *  proposal changes no head, so there is nothing else to read it from. */
+  identityLinkProposals: LinkProposalReadsRepository;
   /** The two-step verification pipeline's `MfaEnrollment` head + cursor (D06). */
   mfaProjection: StateProjectionStore<MfaFoldState>;
   /** Postgres reads the two-step verification guards run against (D06). */
@@ -776,14 +781,17 @@ export class PipelineRegistry {
         // plugin is not registered and nothing dispatches these.
         mfaProjectionStore: this.deps.repositories.mfaProjection,
         mfaGuards: new MfaGuards(this.deps.repositories.mfaEnrollments),
+        // D05's operator lookup decides waiting sign-ins through these. The
+        // staged re-run runs the same guard the calling path ran, so a
+        // proposal cannot be decided twice by taking the other leg.
+        linkProposalGuards: new LinkProposalGuards({
+          proposals: this.deps.repositories.identityLinkProposals,
+        }),
       }),
     );
     // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
     // `SSOCONN_ROUTING` defaults to `off`, so nothing routes off its
-    // projection and no `Organization.ssoDomain` write stops. Its only
-    // production writer until D05 is the grandfather migration, which is
-    // paced by per-organization enrollment like every other in-place
-    // migration — a deploy changes nothing on its own.
+    // projection and no `Organization.ssoDomain` write stops.
     this.deps.eventSourcing.register(
       createSsoConnectionPipeline({
         connectionProjectionStore:
@@ -815,9 +823,7 @@ export class PipelineRegistry {
     );
 
     // The join-request pipeline (ADR-117, D12). Ships dark: `JOIN_REQUESTS`
-    // defaults off, so nothing dispatches a join command, no interstitial
-    // renders and no admin panel appears — a deploy changes nothing on its
-    // own, and rollback is the flag.
+    // defaults off, so nothing dispatches a join command.
     this.deps.eventSourcing.register(
       createJoinRequestPipeline({
         joinRequestProjectionStore:

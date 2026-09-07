@@ -230,6 +230,7 @@ import {
   JoinRequestLifecycleDispatcher,
 } from "./identity/join-request-adapters";
 import { AdminEmailPlatformOperators } from "./identity/platform-operators";
+import { EventLogIdentityRepository } from "./identity/repositories/identity-event-log.repository";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
 import { PrismaIdentityReservationRepository } from "./identity/repositories/identity-reservations.prisma.repository";
@@ -844,6 +845,9 @@ export function initializeDefaultApp(options?: {
   // The address lock is shared: the guards claim through it and the fold
   // releases through it, so the two must be the same instance (ADR-116 §6).
   const identityReservations = new PrismaIdentityReservationRepository(prisma);
+  // One instance, two roles: the `User` reads identity runs on, and the one
+  // address the platform-operator list asks about an actor.
+  const identityUsers = new PrismaIdentityUsersRepository(prisma);
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
@@ -934,13 +938,15 @@ export function initializeDefaultApp(options?: {
       identityReservations,
     ),
     identityHeads: new PrismaIdentityHeadsRepository(prisma),
-    identityUsers: new PrismaIdentityUsersRepository(prisma),
+    identityUsers,
     identityReservations,
+    // The proposal log, not a table: reads the identity events back through
+    // the App's own event store, resolved lazily for the same reason the
+    // ledger writer resolves it lazily — this composes before an App exists.
+    identityLinkProposals: new EventLogIdentityRepository(),
     mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
     mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
-    ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
-      prisma,
-    ),
+    ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(prisma),
     ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
     ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
     ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
