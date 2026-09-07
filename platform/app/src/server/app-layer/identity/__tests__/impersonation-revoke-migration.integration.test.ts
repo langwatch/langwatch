@@ -62,7 +62,8 @@ describe("identity auth migration impersonation revoke", () => {
 
         const shipped = impersonationRevokeStatement().replace(/;$/, "");
         await tx.$executeRawUnsafe(
-          `${shipped} AND "id" IN ($1, $2)`,
+          `-- @tenancy: replaying the shipped fleet-wide impersonation revoke, narrowed to this test's synthetic sessions
+${shipped} AND "id" IN ($1, $2)`,
           impersonatingId,
           ordinaryId,
         );
