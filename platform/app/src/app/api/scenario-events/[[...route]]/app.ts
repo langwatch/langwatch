@@ -392,6 +392,7 @@ async function dispatchSimulationEvent(
             metCriteria: event.results.metCriteria,
             unmetCriteria: event.results.unmetCriteria,
             error: event.results.error,
+            evaluations: event.results.evaluations,
           }
         : undefined,
       status: event.status,

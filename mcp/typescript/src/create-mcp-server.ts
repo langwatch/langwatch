@@ -13,11 +13,17 @@ import {
   runPlanScopeSchema,
   runPlanTargetSchema,
 } from "./schemas/run-plan.js";
+import {
+  evaluatorAttachmentsSchema,
+  scenarioFieldValuesSchema,
+  suiteFieldsSchema,
+} from "./schemas/suite-fields.js";
 import { handleExperimentResults } from "./tools/get-experiment-results.js";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
 import { handleExperimentList } from "./tools/list-experiments.js";
 import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.js";
 import { handleTestAgent } from "./tools/test-agent.js";
+import { handleUpdateTestSuite } from "./tools/update-test-suite.js";
 
 const modelSchema = z
   .string()
@@ -546,6 +552,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .describe(
           "The test suite to file this scenario in. Pass a test suite ID, or null to unfile it."
         ),
+      fields: scenarioFieldValuesSchema.optional(),
     },
     withToolLogging("platform_create_scenario", async (params) => {
       requireApiKey();
@@ -630,6 +637,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .describe(
           "The test suite to file this scenario in. Pass a test suite ID, or null to unfile it."
         ),
+      fields: scenarioFieldValuesSchema.optional(),
     },
     withToolLogging("platform_update_scenario", async (params) => {
       requireApiKey();
@@ -708,6 +716,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .string()
         .optional()
         .describe("Model that judges the criteria. Omit for the project default."),
+      evaluators: evaluatorAttachmentsSchema
+        .optional()
+        .describe(
+          "The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Omit to keep what the plan already holds. See discover_schema({ category: 'scenarios' }) for the mapping paths.",
+        ),
       parameters: runParametersSchema
         .optional()
         .describe(
@@ -838,9 +851,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_create_test_suite",
-    "Create a test suite. A test suite groups scenarios: file a scenario in it by passing the suite ID as testSuiteId on platform_create_scenario or platform_update_scenario.",
+    "Create a test suite. A test suite groups scenarios: file a scenario in it by passing the suite ID as testSuiteId on platform_create_scenario or platform_update_scenario. A suite can declare typed fields every scenario carries a value for, and attach saved evaluators that run after every scenario run with mappings from their inputs to the conversation, the scenario's fields or the trace. Call discover_schema({ category: 'scenarios' }) first for the field rules and the mapping paths.",
     {
       name: z.string().describe("Test suite name"),
+      fields: suiteFieldsSchema.optional(),
+      evaluators: evaluatorAttachmentsSchema.optional(),
     },
     withToolLogging("platform_create_test_suite", async (params) => {
       requireApiKey();
@@ -868,6 +883,27 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       const { handleGetTestSuite } = await import("./tools/get-test-suite.js");
       return {
         content: [{ type: "text", text: await handleGetTestSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_test_suite",
+    "Edit a test suite: any of its name, its fields and its evaluators. A field list or an evaluator list replaces the one the suite holds; a key left out keeps what the suite has. A field an attached evaluator still reads cannot be removed. Call discover_schema({ category: 'scenarios' }) first for the field rules and the mapping paths.",
+    {
+      id: z.string().describe("The test suite ID"),
+      name: z.string().optional().describe("The new name. The slug is kept."),
+      fields: suiteFieldsSchema
+        .optional()
+        .describe("The full list of fields the suite declares. It replaces the list the suite holds."),
+      evaluators: evaluatorAttachmentsSchema
+        .optional()
+        .describe("The full list of evaluators attached to the suite. It replaces the list the suite holds."),
+    },
+    withToolLogging("platform_update_test_suite", async (params) => {
+      requireApiKey();
+      return {
+        content: [{ type: "text", text: await handleUpdateTestSuite(params) }],
       };
     })
   );
@@ -981,7 +1017,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_get_simulation_run",
-    "Get full details of a simulation run including conversation messages, results, costs, and verdict.",
+    "Get full details of a simulation run including conversation messages, results, costs, the verdict and the result of every evaluator attached to its test suite or run plan.",
     {
       scenarioRunId: z.string().describe("The simulation run ID"),
       format: z.enum(["digest", "json"]).optional().describe("Output format"),

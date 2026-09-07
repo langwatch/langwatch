@@ -12,6 +12,7 @@ vi.mock("../langwatch-api-test-suites.js", () => ({
   createTestSuite: vi.fn(),
   getTestSuite: vi.fn(),
   renameTestSuite: vi.fn(),
+  updateTestSuite: vi.fn(),
   archiveTestSuite: vi.fn(),
   runTestSuite: vi.fn(),
 }));
@@ -36,6 +37,7 @@ import {
   listTestSuites,
   renameTestSuite,
   runTestSuite,
+  updateTestSuite,
   type TestSuite,
 } from "../langwatch-api-test-suites.js";
 
@@ -48,11 +50,13 @@ import { handleListTestSuites } from "../tools/list-test-suites.js";
 import { handleRenameTestSuite } from "../tools/rename-test-suite.js";
 import { handleRunTestSuite } from "../tools/run-test-suite.js";
 import { handleUpdateScenario } from "../tools/update-scenario.js";
+import { handleUpdateTestSuite } from "../tools/update-test-suite.js";
 
 const mockListTestSuites = vi.mocked(listTestSuites);
 const mockCreateTestSuite = vi.mocked(createTestSuite);
 const mockGetTestSuite = vi.mocked(getTestSuite);
 const mockRenameTestSuite = vi.mocked(renameTestSuite);
+const mockUpdateTestSuite = vi.mocked(updateTestSuite);
 const mockArchiveTestSuite = vi.mocked(archiveTestSuite);
 const mockRunTestSuite = vi.mocked(runTestSuite);
 const mockListScenarios = vi.mocked(listScenarios);
@@ -422,6 +426,190 @@ describe("handleListScenarios() with a testSuiteId", () => {
       const result = await handleListScenarios({});
 
       expect(result).toContain("# Scenarios (2 total)");
+    });
+  });
+});
+
+const goldenSqlField = { identifier: "golden_sql", type: "text" as const };
+
+const sqlAttachment = {
+  id: "att_sql",
+  evaluatorId: "evaluator_sql",
+  required: true,
+  mappings: {
+    output: {
+      type: "source" as const,
+      sourceId: "trace" as const,
+      path: ["tool_calls", "run_sql", "input"],
+    },
+    expected_output: {
+      type: "source" as const,
+      sourceId: "scenario" as const,
+      path: ["fields", "golden_sql"],
+    },
+  },
+};
+
+describe("handleCreateTestSuite()", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateTestSuite.mockResolvedValue({
+      ...sampleSuite,
+      fields: [goldenSqlField],
+      evaluators: [sqlAttachment],
+    });
+  });
+
+  describe("when fields and evaluators are given", () => {
+    /** @scenario "Agent creates a test suite with fields and evaluators" */
+    it("sends the fields as given and the attachments with an id and a gate settled", async () => {
+      await handleCreateTestSuite({
+        name: "Case lookups",
+        fields: [goldenSqlField],
+        evaluators: [{ evaluatorId: "evaluator_sql", mappings: sqlAttachment.mappings }],
+      });
+
+      expect(mockCreateTestSuite).toHaveBeenCalledWith({
+        name: "Case lookups",
+        fields: [goldenSqlField],
+        evaluators: [
+          {
+            id: expect.stringMatching(/^att_/),
+            evaluatorId: "evaluator_sql",
+            required: true,
+            mappings: sqlAttachment.mappings,
+          },
+        ],
+      });
+    });
+
+    /** @scenario "Agent creates a test suite with fields and evaluators" */
+    it("lists the fields and the evaluators with their mappings in the digest", async () => {
+      const result = await handleCreateTestSuite({
+        name: "Case lookups",
+        fields: [goldenSqlField],
+        evaluators: [
+          { evaluatorId: "evaluator_sql", mappings: sqlAttachment.mappings },
+        ],
+      });
+
+      expect(result).toContain("- golden_sql (text)");
+      expect(result).toContain("evaluator_sql (required, attachment att_sql)");
+      expect(result).toContain("expected_output: scenario.fields.golden_sql");
+      expect(result).toContain("output: trace.tool_calls.run_sql.input");
+      expect(result).toContain("a value per field under `fields`");
+    });
+  });
+
+  describe("when neither fields nor evaluators are given", () => {
+    it("sends neither key when the agent gave neither", async () => {
+      await handleCreateTestSuite({ name: "Checkout" });
+
+      expect(mockCreateTestSuite).toHaveBeenCalledWith({ name: "Checkout" });
+    });
+  });
+});
+
+describe("handleUpdateTestSuite()", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUpdateTestSuite.mockResolvedValue({
+      ...sampleSuite,
+      name: "Case lookups v2",
+      fields: [goldenSqlField],
+      evaluators: [{ ...sqlAttachment, required: false }],
+    });
+  });
+
+  describe("when only fields are given", () => {
+    /** @scenario "Agent updates the fields of a test suite" */
+    it("sends the field list alone when only fields are given", async () => {
+      await handleUpdateTestSuite({ id: "suite_abc123", fields: [goldenSqlField] });
+
+      expect(mockUpdateTestSuite).toHaveBeenCalledWith({
+        id: "suite_abc123",
+        fields: [goldenSqlField],
+      });
+    });
+  });
+
+  describe("when evaluators are given", () => {
+    /** @scenario "Agent updates the evaluators of a test suite" */
+    it("sends the attachments with the gate the agent set", async () => {
+      await handleUpdateTestSuite({
+        id: "suite_abc123",
+        evaluators: [
+          { id: "att_sql", evaluatorId: "evaluator_sql", required: false, mappings: sqlAttachment.mappings },
+        ],
+      });
+
+      expect(mockUpdateTestSuite).toHaveBeenCalledWith({
+        id: "suite_abc123",
+        evaluators: [{ ...sqlAttachment, required: false }],
+      });
+    });
+  });
+
+  describe("when the suite already carries fields and evaluators", () => {
+    /** @scenario "Agent updates the evaluators of a test suite" */
+    it("confirms the new state, with each evaluator's gate and mappings", async () => {
+      const result = await handleUpdateTestSuite({ id: "suite_abc123", name: "Case lookups v2" });
+
+      expect(mockUpdateTestSuite).toHaveBeenCalledWith({ id: "suite_abc123", name: "Case lookups v2" });
+      expect(result).toContain('Test suite "Case lookups v2" updated.');
+      expect(result).toContain("- golden_sql (text)");
+      expect(result).toContain("evaluator_sql (reports only, attachment att_sql)");
+    });
+  });
+});
+
+describe("handleGetTestSuite()", () => {
+  describe("when the suite declares fields and evaluators", () => {
+    /** @scenario "Agent reads a test suite that declares fields and evaluators" */
+    it("lists the fields and the evaluators before the scenarios", async () => {
+      mockGetTestSuite.mockResolvedValue({
+        ...sampleSuite,
+        scenarios: [],
+        fields: [goldenSqlField],
+        evaluators: [sqlAttachment],
+      });
+
+      const result = await handleGetTestSuite({ id: "suite_abc123" });
+
+      expect(result).toContain("## Fields");
+      expect(result).toContain("- golden_sql (text)");
+      expect(result).toContain("## Evaluators");
+      expect(result).toContain("expected_output: scenario.fields.golden_sql");
+    });
+  });
+});
+
+describe("handleCreateScenario()", () => {
+  describe("when field values are given", () => {
+    /** @scenario "Agent files a scenario with values for the suite's fields" */
+    it("sends the values under fields and echoes them", async () => {
+      mockCreateScenario.mockResolvedValue({
+        id: "scen_new",
+        name: "Chargebacks by quarter",
+        situation: "A fraud analyst asks for chargebacks per quarter",
+        criteria: [],
+        labels: [],
+        testSuiteId: "suite_abc123",
+        fields: { golden_sql: "SELECT 1", row_limit: 10 },
+      });
+
+      const result = await handleCreateScenario({
+        name: "Chargebacks by quarter",
+        situation: "A fraud analyst asks for chargebacks per quarter",
+        testSuiteId: "suite_abc123",
+        fields: { golden_sql: "SELECT 1", row_limit: 10 },
+      });
+
+      expect(mockCreateScenario).toHaveBeenCalledWith(
+        expect.objectContaining({ fields: { golden_sql: "SELECT 1", row_limit: 10 } }),
+      );
+      expect(result).toContain('- golden_sql: "SELECT 1"');
+      expect(result).toContain("- row_limit: 10");
     });
   });
 });

@@ -192,65 +192,6 @@ func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred do
 	return nil
 }
 
-// dispatchCredential resolves the credential every lane below dispatches
-// with, and is the gateway's single call site for
-// domain.WithDeploymentSelfMap.
-//
-// Azure / Bedrock / Vertex route on deployment name, and the control-plane/VK
-// path materializes credentials straight off the bundle wire
-// (adapters/controlplane/config_wire.go), which carries no deployment map at
-// all — so without this the provider is handed a nil map and rejects the
-// dispatch before dialing. Resolving at the two dispatch entry points rather
-// than per lane is what stops the next lane added from forgetting it, and it
-// lands before Bifrost's key SELECTION stage (GetKeysForProvider reads the
-// credential off the context), which filters out keys whose deployment map
-// does not cover the model — a stage that runs earlier than the key-config
-// validation the symptom names.
-//
-// model must be the same string the request carries to Bifrost, since that is
-// the key the provider looks the deployment up under.
-func dispatchCredential(cred domain.Credential, model string) domain.Credential {
-	return domain.WithDeploymentSelfMap(cred, model)
-}
-
-// applyAzureRawForwardDeployment puts the resolved Azure deployment on the
-// request body's "model" field for the lanes that raw-forward that body.
-//
-// bifrost v1.5 routes Azure through the flat /openai/v1/... URLs and carries the
-// deployment in the request body's "model" field (resolved via Key.Aliases). It
-// applies that on its parsed lanes (SetModel -> ToOpenAIChatRequest), but the
-// chat, responses and passthrough lanes raw-forward the caller's body verbatim
-// (isOpenAICompatibleProvider): bifrost's SetModel updates only its struct copy,
-// which core's CheckAndGetRawRequestBody never serializes. So a deployment that
-// differs from the model id — an explicit Extra["deployment"] or a wired
-// deployment_map entry — would never reach Azure, and the request would 404 on a
-// deployment named after the model instead of the mapping. dispatchCredential
-// has already resolved the deployment into cred.DeploymentMap[model] (wired
-// entry > explicit deployment > model id), so this writes that value onto the
-// forwarded body.
-//
-// Azure is the only deployment-mapped provider that raw-forwards: Bedrock and
-// Vertex chat translate through the parsed path, where bifrost applies the
-// deployment itself. The rewrite is a no-op unless the deployment differs from
-// the body's model, so the common self-map case stays byte-identical and keeps
-// Azure's prompt-cache prefix identity intact.
-func applyAzureRawForwardDeployment(req *domain.Request, model string, cred domain.Credential) {
-	if cred.ProviderID != domain.ProviderAzure {
-		return
-	}
-	deployment := cred.DeploymentMap[model]
-	if deployment == "" || deployment == model {
-		return
-	}
-	current := gjson.GetBytes(req.Body, "model")
-	if !current.Exists() || current.String() == deployment {
-		return
-	}
-	if out, err := sjson.SetBytes(req.Body, "model", deployment); err == nil {
-		req.Body = out
-	}
-}
-
 // Dispatch sends a non-streaming request through bifrost.
 //
 // For /v1/chat/completions (RequestTypeChat) the inbound body is
@@ -293,7 +234,8 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
-	cred = dispatchCredential(cred, model)
+	cred = domain.WithDeploymentSelfMap(cred, model)
+	req = requestWithResolvedDeployment(req, cred, model)
 
 	// Voyage is not a Bifrost ModelProvider (its enum doesn't include
 	// Voyage). The gateway proxies directly to api.voyageai.com — wire
@@ -323,7 +265,6 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	}
 
 	provider := r.mapProviderForDispatch(cred)
-	applyAzureRawForwardDeployment(req, model, cred)
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponses(ctx, req, provider, model, cred)
@@ -682,7 +623,8 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
-	cred = dispatchCredential(cred, model)
+	cred = domain.WithDeploymentSelfMap(cred, model)
+	req = requestWithResolvedDeployment(req, cred, model)
 
 	// The image routes answer with one JSON body, so no credential and no
 	// provider lane streams them. This sits above every provider-specific
@@ -706,7 +648,6 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	}
 
 	provider := r.mapProviderForDispatch(cred)
-	applyAzureRawForwardDeployment(req, model, cred)
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponsesStream(ctx, req, provider, model, cred)

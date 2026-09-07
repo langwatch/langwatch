@@ -14,11 +14,16 @@ import type {
   AgentRepository,
 } from "../../agents/agent.repository";
 import type { SuiteRunService } from "../../app-layer/suites/suite-run.service";
-import type { AgentPresence } from "../../connected-agents/presence.read";
+import type { LiveInstance } from "../../connected-agents/instance.registry";
+import type {
+  AgentPresence,
+  PresenceReads,
+} from "../../connected-agents/presence.read";
 import type { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
 import type { ScenarioParameterDefinition } from "../../scenarios/parameters";
 import type { ScenarioRepository } from "../../scenarios/scenario.repository";
 import {
+  assertConnectedAgentsOnline,
   assertConnectedAgentsRunnable,
   type ConnectedTargetReads,
   resolveConnectedReferences,
@@ -55,6 +60,33 @@ function connectedAgent({
   };
 }
 
+/** One live instance holding an agent, as the registry lists it. */
+function liveInstance(agentId: string): LiveInstance {
+  return {
+    instanceId: `inst_${agentId}`,
+    projectId,
+    hostname: "dev-box",
+    username: "dev",
+    pid: 1,
+    sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+    label: null,
+    podId: "pod_a",
+    connectedAt: Date.now(),
+    maxConcurrency: 1,
+    inflight: 0,
+    lastSeenAt: Date.now(),
+  };
+}
+
+/** A presence read where every agent is online except the ones named. */
+function presenceWith(offlineIds: string[] = []) {
+  return {
+    listLive: vi.fn(async ({ agentId }: { agentId: string }) =>
+      offlineIds.includes(agentId) ? [] : [liveInstance(agentId)],
+    ),
+  };
+}
+
 function suiteWith(targets: SuiteTarget[]): SimulationSuite {
   return {
     id: "suite_1",
@@ -70,6 +102,8 @@ function suiteWith(targets: SuiteTarget[]): SimulationSuite {
     labels: [],
     simulatorModel: null,
     judgeModel: null,
+    fields: null,
+    evaluators: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -80,10 +114,13 @@ function serviceWith({
   agents,
   scenarioParameters,
   users = [],
+  offlineIds = [],
 }: {
   agents: AgentIdentityRow[];
   scenarioParameters: ScenarioParameterDefinition[] | null;
   users?: { id: string; name: string | null }[];
+  /** The agents no process is holding; every other one is online. */
+  offlineIds?: string[];
 }) {
   const startRun = vi.fn(async () => ({
     batchRunId: "batch_1",
@@ -113,6 +150,9 @@ function serviceWith({
         version: 1,
       })),
     ),
+    findTestSuiteIdsByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+      ids.map((id) => ({ id, testSuiteId: null })),
+    ),
   };
   const prisma = {
     user: {
@@ -128,6 +168,8 @@ function serviceWith({
     { findExistingIds: vi.fn() } as unknown as LlmConfigRepository,
     { startRun } as unknown as SuiteRunService,
     prisma as unknown as PrismaClient,
+    undefined,
+    presenceWith(offlineIds) as PresenceReads,
   );
   return { service, startRun };
 }
@@ -306,6 +348,29 @@ describe("SuiteService.run with a connected target", () => {
         code: "agent_owner_only",
         httpStatus: 403,
         meta: { agentId: "agent_1", ownerUserId: "u_2", ownerName: "Ana" },
+      });
+      expect(startRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when no process is holding the target", () => {
+    it("refuses the run as offline and schedules nothing", async () => {
+      const { service, startRun } = serviceWith({
+        agents: [connectedAgent({ id: "agent_1", parameters: [] })],
+        scenarioParameters: null,
+        offlineIds: ["agent_1"],
+      });
+
+      const failure = await service
+        .run({
+          ...runDefaults,
+          suite: suiteWith([{ type: "connected", referenceId: "agent_1" }]),
+        })
+        .catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        code: "agent_offline",
+        meta: { agentName: "support-agent", environment: "production" },
       });
       expect(startRun).not.toHaveBeenCalled();
     });
@@ -592,5 +657,87 @@ describe("assertConnectedAgentsRunnable", () => {
         meta: { ownerName: "Ana" },
       });
     });
+  });
+});
+
+describe("assertConnectedAgentsOnline", () => {
+  describe("when every connected agent has a live instance", () => {
+    it("lets the run through", async () => {
+      await expect(
+        assertConnectedAgentsOnline({
+          agents: [
+            connectedAgent({ id: "a", parameters: [] }),
+            connectedAgent({ id: "b", parameters: [] }),
+          ],
+          projectId,
+          presence: presenceWith(),
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when a connected agent has no live instance", () => {
+    it("refuses the run as offline, naming the agent and its environment", async () => {
+      await expect(
+        assertConnectedAgentsOnline({
+          agents: [
+            connectedAgent({ id: "a", parameters: [] }),
+            connectedAgent({ id: "b", parameters: [] }),
+          ],
+          projectId,
+          presence: presenceWith(["b"]),
+        }),
+      ).rejects.toMatchObject({
+        code: "agent_offline",
+        meta: { agentName: "support-agent", environment: "production" },
+      });
+    });
+  });
+
+  describe("when the run targets an HTTP agent", () => {
+    /** @scenario "An HTTP agent target is never offline" */
+    it("reads no presence and lets the run through", async () => {
+      const presence = presenceWith(["http_1"]);
+
+      await expect(
+        assertConnectedAgentsOnline({
+          agents: [
+            {
+              id: "http_1",
+              name: "Support API",
+              type: "http",
+              environment: null,
+            },
+          ],
+          projectId,
+          presence,
+        }),
+      ).resolves.toBeUndefined();
+      expect(presence.listLive).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("SuiteService.run with someone else's personal agent that is offline", () => {
+  /** @scenario "The owner-only refusal comes before the offline one" */
+  it("refuses as owner only and schedules nothing", async () => {
+    const { service, startRun } = serviceWith({
+      agents: [
+        connectedAgent({ id: "agent_1", parameters: [], ownerUserId: "u_2" }),
+      ],
+      scenarioParameters: null,
+      users: [{ id: "u_2", name: "Ana" }],
+      offlineIds: ["agent_1"],
+    });
+
+    const failure = await service
+      .run({
+        ...runDefaults,
+        suite: suiteWith([{ type: "connected", referenceId: "agent_1" }]),
+      })
+      .catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({ code: "agent_owner_only" });
+    expect(startRun).not.toHaveBeenCalled();
   });
 });

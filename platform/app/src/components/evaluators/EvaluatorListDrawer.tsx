@@ -34,6 +34,24 @@ import { ConfirmDialog } from "../gateway/ConfirmDialog";
 import { Menu } from "../ui/menu";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 
+/**
+ * Whether every evaluator the project has is hidden from this list, as
+ * opposed to the project having none at all.
+ */
+function allEvaluatorsHidden({
+  evaluators,
+  hiddenEvaluatorIds,
+}: {
+  evaluators: readonly { id: string }[] | undefined;
+  hiddenEvaluatorIds: ReadonlySet<string>;
+}): boolean {
+  return (
+    (evaluators?.length ?? 0) > 0 &&
+    (evaluators?.every((evaluator) => hiddenEvaluatorIds.has(evaluator.id)) ??
+      false)
+  );
+}
+
 export type EvaluatorListDrawerProps = {
   open?: boolean;
   onClose?: () => void;
@@ -45,6 +63,12 @@ export type EvaluatorListDrawerProps = {
    * comparison evaluators and nothing else.
    */
   filterEvaluatorType?: string;
+  /**
+   * Evaluators left out of the list. A caller that cannot offer what an
+   * evaluator needs, such as a run plan with no scenario field for an
+   * evaluator that expects a golden value, names those here.
+   */
+  hiddenEvaluatorIds?: string[];
   /** Drawer heading. Defaults to "Choose Evaluator". */
   title?: string;
   /** Label on the create button. Defaults to "New Evaluator". */
@@ -91,8 +115,16 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
     { enabled: !!project?.id && isOpen },
   );
 
+  const hiddenEvaluatorIds = new Set(props.hiddenEvaluatorIds ?? []);
+  const hasHiddenAll = allEvaluatorsHidden({
+    evaluators: evaluatorsQuery.data,
+    hiddenEvaluatorIds,
+  });
+  const listed = evaluatorsQuery.data?.filter(
+    (evaluator) => !hiddenEvaluatorIds.has(evaluator.id),
+  );
   const evaluators = props.filterEvaluatorType
-    ? evaluatorsQuery.data?.filter(
+    ? listed?.filter(
         (evaluator) =>
           (evaluator.config as { evaluatorType?: string } | null)
             ?.evaluatorType === props.filterEvaluatorType,
@@ -102,7 +134,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
       // Comparison card in TargetTypeSelectorDrawer, which sets their
       // `variants`/`goldenField`. Attached here as a per-target chip
       // instead, they'd have no variants configured and nothing to judge.
-      evaluatorsQuery.data?.filter((evaluator) => {
+      listed?.filter((evaluator) => {
         const evaluatorType = (
           evaluator.config as { evaluatorType?: string } | null
         )?.evaluatorType;
@@ -199,7 +231,11 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
                   <Spinner size="md" />
                 </HStack>
               ) : evaluators?.length === 0 ? (
-                <EmptyState onCreateNew={onCreateNew} itemLabel={itemLabel} />
+                <EmptyState
+                  onCreateNew={onCreateNew}
+                  itemLabel={itemLabel}
+                  hasHiddenAll={hasHiddenAll}
+                />
               ) : (
                 evaluators?.map((evaluator) => (
                   <EvaluatorCard
@@ -262,13 +298,20 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
  * its own wording from `itemLabel`, so it always agrees with the heading right
  * above it ("Create your first X to get started"). The header button is the
  * caller's to word; this one belongs to the empty state.
+ *
+ * A project can have evaluators that are all hidden from this particular
+ * list (the caller cannot offer what they need), which is not the same as
+ * having none at all: that state reads as "already attached" and offers no
+ * create button, since creating another would be hidden here too.
  */
 function EmptyState({
   onCreateNew,
   itemLabel,
+  hasHiddenAll,
 }: {
   onCreateNew: () => void;
   itemLabel: string;
+  hasHiddenAll: boolean;
 }) {
   return (
     <VStack paddingY={24} gap={4} textAlign="center">
@@ -277,20 +320,26 @@ function EmptyState({
       </Box>
       <VStack gap={1}>
         <Text fontWeight="medium" color="fg">
-          No {itemLabel}s yet
+          {hasHiddenAll
+            ? `Every ${itemLabel} is already attached`
+            : `No ${itemLabel}s yet`}
         </Text>
         <Text fontSize="sm" color="fg.muted">
-          Create your first {itemLabel} to get started
+          {hasHiddenAll
+            ? `Every ${itemLabel} the project has is already attached here`
+            : `Create your first ${itemLabel} to get started`}
         </Text>
       </VStack>
-      <Button
-        colorScheme="blue"
-        onClick={onCreateNew}
-        data-testid="create-first-evaluator-button"
-      >
-        <Plus size={16} />
-        {`Create your first ${itemLabel}`}
-      </Button>
+      {!hasHiddenAll && (
+        <Button
+          colorScheme="blue"
+          onClick={onCreateNew}
+          data-testid="create-first-evaluator-button"
+        >
+          <Plus size={16} />
+          {`Create your first ${itemLabel}`}
+        </Button>
+      )}
     </VStack>
   );
 }

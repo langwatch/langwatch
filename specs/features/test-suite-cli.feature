@@ -60,6 +60,106 @@ Feature: Test Suite CLI Commands
     When I run "langwatch test-suite get Refunds"
     Then I see an error naming both IDs
 
+  # ==========================================================================
+  # Fields and evaluators
+  # ==========================================================================
+
+  @unit
+  Scenario: Create a test suite with fields
+    When I run "langwatch test-suite create 'Case lookups' --field golden_sql:text --field row_limit:number"
+    Then the suite is created with those two fields, in that order
+    And I see each field with its type
+
+  @unit
+  Scenario: A field with a type the platform does not have is refused
+    When I run "langwatch test-suite create 'Case lookups' --field golden_sql:json"
+    Then the command refuses the flag naming the three types
+    And no suite is created
+
+  @unit
+  Scenario: A field whose identifier is reserved is refused
+    When I run "langwatch test-suite create 'Case lookups' --field situation:text"
+    Then the command refuses the flag with the reason
+    And no suite is created
+
+  @unit
+  Scenario: Create a test suite with an evaluator whose mappings are inferred
+    Given the project holds the evaluator "sql-query-equivalence" with the inputs output and expected_output
+    When I run "langwatch test-suite create 'Case lookups' --field golden_sql:text --evaluator sql-query-equivalence"
+    Then the suite is created with that evaluator attached, required
+    And output reads the last agent message and expected_output reads the field golden_sql
+
+  @unit
+  Scenario: The gate flag applies to the evaluator written just before it
+    Given the project holds two evaluators
+    When I run "langwatch test-suite create 'Case lookups' --evaluator judge --not-required --evaluator scanner"
+    Then the first attachment reports only and the second one is required
+
+  @unit
+  Scenario: A gate flag written before any evaluator is refused
+    When I run "langwatch test-suite create 'Case lookups' --required --evaluator judge"
+    Then the command refuses the flag, saying it must follow an --evaluator
+
+  @unit
+  Scenario: An evaluator that is not there is refused before anything is written
+    Given the project holds no evaluator named "missing"
+    When I run "langwatch test-suite create 'Case lookups' --evaluator missing"
+    Then the command ends with the platform's refusal
+    And no suite is created
+
+  @unit
+  Scenario: A required input the rules cannot map is reported, not refused
+    Given the project holds an evaluator whose input expected_contexts matches no field
+    When I run "langwatch test-suite create 'Case lookups' --field golden_sql:text --evaluator judge"
+    Then the suite is created
+    And stderr names the input that still needs a mapping
+
+  @unit
+  Scenario: The full attachment list comes from --evaluators-json
+    When I run "langwatch test-suite create 'Case lookups' --field golden_sql:text --evaluators-json <file>"
+    And the file maps output to the input of the run_sql tool call
+    Then the suite is created with that attachment as written, its id generated
+
+  @unit
+  Scenario: A mapping to a field the suite does not declare is refused
+    When I run "langwatch test-suite create 'Case lookups' --evaluators-json <json>"
+    And the document maps expected_output to the field golden_sql
+    Then the command refuses the document naming the field
+    And no suite is created
+
+  @unit
+  Scenario: Update the fields of a test suite
+    Given my project has a test suite "Case lookups" with one field
+    When I run "langwatch test-suite update 'Case lookups' --field golden_sql:text --field table_schema:text"
+    Then the suite is patched with those two fields and nothing else
+
+  @unit
+  Scenario: Update the evaluators of a test suite against its own fields
+    Given my project has a test suite "Case lookups" declaring the field golden_sql
+    When I run "langwatch test-suite update 'Case lookups' --evaluator sql-query-equivalence"
+    Then the suite is patched with that evaluator alone
+    And expected_output reads the field golden_sql
+
+  @unit
+  Scenario: Update the name of a test suite
+    Given my project has a test suite "Case lookups"
+    When I run "langwatch test-suite update 'Case lookups' --name 'Case lookups v2'"
+    Then the suite is patched with the name alone
+
+  @unit
+  Scenario: An update with nothing to change is refused
+    Given my project has a test suite "Case lookups"
+    When I run "langwatch test-suite update 'Case lookups'"
+    Then the command refuses, naming the four flags it reads
+    And no request is sent
+
+  @unit
+  Scenario: Get a test suite shows its fields and evaluators
+    Given my project has a test suite with one field and one evaluator
+    When I run "langwatch test-suite get <suite-id>"
+    Then I see the field with its type
+    And I see the evaluator with its gate and every mapping
+
   @unit
   Scenario: Rename a test suite
     Given my project has a test suite "Refunds"

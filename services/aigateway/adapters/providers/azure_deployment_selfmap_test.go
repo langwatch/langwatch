@@ -1,16 +1,14 @@
 package providers
 
 import (
+	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
 
-	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -19,119 +17,78 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// Azure routes on deployment, not on model id. Bifrost reads the deployment
-// out of AzureKeyConfig.Deployments keyed by the request's Model, and rejects
-// the dispatch outright when the map is nil ("deployments not set") or lacks
-// the key ("deployment not found for model X") — before any network call.
+// Azure addresses a model by deployment name, and its v1 API carries that name
+// in the request body's `model` field. Azure is raw-forwarded
+// (isOpenAICompatibleProvider), so the client's own bytes are what reach the
+// wire: whatever the gateway resolves has to land in that field, or it never
+// leaves the box.
 //
-// The control-plane/VK path builds its credential at
-// adapters/controlplane/config_wire.go:385, which never calls
-// domain.WithDeploymentSelfMap, so every Azure request on that path arrives
-// with a nil map. These tests drive the real BifrostRouter against a local
-// stand-in for a customer's Azure resource and assert on the deployment Bifrost
-// resolved. bifrost v1.5.17 flattened Azure's chat URL to /openai/v1/chat/
-// completions and moved model->deployment resolution onto Key.Aliases: the
-// resolved value is written into the request body's "model" field
-// (KeyAliases.Resolve -> req.SetModel, core@v1.5.17 bifrost.go:6086/6145), which
-// IS Aliases[bfReq.Model] by vendor construction.
+// The control plane only emits `deployment_map` when the provider row carries
+// an explicit deployment mapping (config.materialiser.ts), which most Azure
+// rows do not: by default the model id IS the deployment name. Every other
+// dispatch path already closes that gap with domain.WithDeploymentSelfMap
+// (nlpgo's dispatcheradapter and gatewayproxy, #5760); the gateway did not, so
+// the same Azure provider that worked in the playground missed its deployment
+// through the gateway.
 //
-// Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
+// These tests drive the real dispatch path against a local upstream standing
+// in for the customer's Azure resource, so what they observe is the request
+// Bifrost actually sends, not a restatement of the mapping helper.
 
-// azureResourceStub stands in for a customer's Azure OpenAI resource. It
-// records the path and body of every request it is asked to serve, so a test
-// can read back the deployment Bifrost resolved (now the body's "model" field)
-// without reaching into unexported dispatch internals.
-type azureResourceStub struct {
-	*httptest.Server
-
+// azureUpstream answers with an OpenAI-shaped chat completion (Azure's wire
+// format) and keeps every request it received, in arrival order.
+type azureUpstream struct {
+	srv    *httptest.Server
 	mu     sync.Mutex
-	paths  []string
-	bodies []string
+	bodies [][]byte
 }
 
-func newAzureResourceStub(t *testing.T, respondModel string) *azureResourceStub {
-	t.Helper()
-	stub := &azureResourceStub{}
-	stub.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		stub.mu.Lock()
-		stub.paths = append(stub.paths, r.URL.Path)
-		stub.bodies = append(stub.bodies, string(body))
-		stub.mu.Unlock()
+func (u *azureUpstream) received() [][]byte {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return append([][]byte(nil), u.bodies...)
+}
 
-		// A real Azure resource content-negotiates. Bifrost sends
-		// "Accept: text/event-stream" on every streaming lane and on no other
-		// (core@v1.4.22 providers/openai/openai.go:985), so that header is the
-		// same signal the real resource answers SSE to.
-		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
-			writeChatCompletionSSE(w, respondModel)
+func (u *azureUpstream) deploymentAddressed(t *testing.T, n int) string {
+	t.Helper()
+	bodies := u.received()
+	require.Greater(t, len(bodies), n,
+		"the request must actually reach the customer's Azure resource")
+	return gjson.GetBytes(bodies[n], "model").String()
+}
+
+func newAzureUpstream(t *testing.T) *azureUpstream {
+	t.Helper()
+	u := &azureUpstream{}
+	u.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		u.mu.Lock()
+		u.bodies = append(u.bodies, body)
+		u.mu.Unlock()
+		if bytes.Contains(body, []byte(`"stream":true`)) {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`data: {"id":"chatcmpl-azure1","object":"chat.completion.chunk",` +
+				`"created":1730000000,"model":"gpt-5-mini","choices":[{"index":0,` +
+				`"delta":{"role":"assistant","content":"ok"},"finish_reason":null}]}` + "\n\n" +
+				"data: [DONE]\n\n"))
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
 			return
 		}
-
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprintf(w, `{"id":"chatcmpl-test","object":"chat.completion","created":1,"model":%q,`+
-			`"choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],`+
-			`"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`, respondModel)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-azure1","object":"chat.completion",` +
+			`"created":1730000000,"model":"gpt-5-mini","choices":[{"index":0,` +
+			`"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],` +
+			`"usage":{"prompt_tokens":9,"completion_tokens":1,"total_tokens":10}}`))
 	}))
-	t.Cleanup(stub.Close)
-	return stub
+	t.Cleanup(u.srv.Close)
+	return u
 }
 
-// writeChatCompletionSSE answers a streaming chat completion the way an Azure
-// OpenAI resource does: text/event-stream, content deltas, the usage chunk
-// Bifrost asks for via stream_options.include_usage, then the [DONE] sentinel.
-//
-// Answering a streaming request with a JSON body is not merely unfaithful.
-// Bifrost reads an HTTP 200 whose Content-Type is not text/event-stream as an
-// error raised inside the stream (core@v1.4.22 providers/openai/openai.go:1121),
-// and that error reaches the request worker as the stream's first chunk
-// (bifrost.go:4963). The worker then releases the pooled plugin pipeline on its
-// error branch (bifrost.go:5256) while the provider goroutine's deferred
-// finalizer releases the same object (bifrost.go:5235) — the sync.Once at
-// bifrost.go:5231 guards the finalizer against itself, not against the worker.
-// Two unsynchronized resets of one pooled object is a data race, so a JSON
-// answer here fails this package under -race.
-func writeChatCompletionSSE(w http.ResponseWriter, model string) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.WriteHeader(http.StatusOK)
-
-	for _, data := range []string{
-		fmt.Sprintf(`{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1,"model":%q,`+
-			`"choices":[{"index":0,"delta":{"role":"assistant","content":"hi"},"finish_reason":null}]}`, model),
-		fmt.Sprintf(`{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1,"model":%q,`+
-			`"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`, model),
-		fmt.Sprintf(`{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1,"model":%q,`+
-			`"choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`, model),
-		"[DONE]",
-	} {
-		_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
-		}
-	}
-}
-
-// deployment returns the single deployment Bifrost resolved for the dispatch.
-// Under bifrost v1.5.17 Azure's chat URL is the flat /openai/v1/chat/completions
-// and the resolved deployment rides in the request body's "model" field
-// (KeyAliases.Resolve -> req.SetModel), so it is read from the body rather than
-// a path segment. The resolved value may itself carry an "azure/" prefix (an
-// unresolved request model keeps it), which the JSON string preserves verbatim.
-func (s *azureResourceStub) deployment(t *testing.T) string {
-	t.Helper()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	require.Len(t, s.paths, 1, "expected exactly one upstream request, got paths %q", s.paths)
-	require.Equal(t, "/openai/v1/chat/completions", s.paths[0],
-		"unexpected Azure chat request path %q", s.paths[0])
-	model := gjson.Get(s.bodies[0], "model").String()
-	require.NotEmpty(t, model, "the upstream request body carried no model field: %s", s.bodies[0])
-	return model
-}
-
-func newTestBifrostRouter(t *testing.T) *BifrostRouter {
+func azureRouter(t *testing.T) *BifrostRouter {
 	t.Helper()
 	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop()})
 	require.NoError(t, err)
@@ -139,217 +96,187 @@ func newTestBifrostRouter(t *testing.T) *BifrostRouter {
 	return router
 }
 
-// TestAzureDispatch_ResolvesDeploymentForControlPlaneCredential is the
-// regression for Defect A. Every row is a credential the control plane can
-// actually produce; each must reach the upstream with a resolved deployment.
-//
-// The rows are one table because they assert one property of one call — the
-// deployment the upstream was actually asked for — over the inputs that reach
-// it. Splitting them into a test per scenario would duplicate the fixture five
-// times to vary a struct field, so the scenarios are declared together here.
-//
-// @scenario "A slot with no deployment_map on the wire still resolves a deployment"
-// @scenario "The deployment-map key equals the model string placed on the provider request"
-// @scenario "A resolved model dispatches on its bare model id"
-// @scenario "An unresolved model keeps request model and map key identical"
-// @scenario "Deployment precedence is wire mapping, then explicit deployment, then the model id"
-func TestAzureDispatch_ResolvesDeploymentForControlPlaneCredential(t *testing.T) {
-	cases := []struct {
-		name string
-		// request as the gateway builds it
-		reqModel string
-		resolved *domain.ResolvedModel
-		// credential as the control plane materializes it
-		wireDeploymentMap  map[string]string
-		explicitDeployment string // Extra["deployment"], set by the provider row
-		// wantDeployment empty means "the model Bifrost was handed" — the
-		// self-map default. Stated as a rule rather than a literal so the
-		// expectation cannot drift away from the request (AC4).
-		wantDeployment string
-	}{
-		{
-			// AC1 / AC3 / AC5: the exact shape production VK traffic takes.
-			name:     "no wired deployment map, explicitly prefixed model",
-			reqModel: "azure/gpt-5.3-mini",
-			resolved: &domain.ResolvedModel{ModelID: "gpt-5.3-mini", ProviderID: domain.ProviderAzure, Source: domain.ModelSourceExplicit},
+// azureCredNoDeploymentMap is the shape the control plane sends for an Azure
+// provider row with no explicit deployment mapping: api key, endpoint, api
+// version, and nothing that says which deployment serves the model.
+func azureCredNoDeploymentMap(endpoint string) domain.Credential {
+	return domain.Credential{
+		ID:         "mp-azure",
+		ProviderID: domain.ProviderAzure,
+		APIKey:     "az-test",
+		Extra: map[string]string{
+			"endpoint":    endpoint,
+			"api_version": "2025-04-01-preview",
 		},
-		{
-			// AC2: the empty-map slot must behave identically to the absent one.
-			name:              "empty wired deployment map, explicitly prefixed model",
-			reqModel:          "azure/gpt-5.3-mini",
-			resolved:          &domain.ResolvedModel{ModelID: "gpt-5.3-mini", ProviderID: domain.ProviderAzure, Source: domain.ModelSourceExplicit},
-			wireDeploymentMap: map[string]string{},
-		},
-		{
-			// AC5: alias-resolved model, same requirement.
-			name:     "no wired deployment map, alias-resolved model",
-			reqModel: "fast-mini",
-			resolved: &domain.ResolvedModel{ModelID: "gpt-5.3-mini", ProviderID: domain.ProviderAzure, Source: domain.ModelSourceAlias},
-		},
-		{
-			// AC5: implicitly resolved model, same requirement.
-			name:     "no wired deployment map, implicitly resolved model",
-			reqModel: "gpt-5.3-mini",
-			resolved: &domain.ResolvedModel{ModelID: "gpt-5.3-mini", ProviderID: domain.ProviderAzure, Source: domain.ModelSourceImplicit},
-		},
-		{
-			// AC6: the unresolved fallback path. The model Bifrost is handed
-			// still carries the "azure/" prefix, and the map key must match it
-			// byte for byte — a "bare model" self-map would miss here.
-			name:     "no wired deployment map, model never resolved",
-			reqModel: "azure/gpt-5.3-mini",
-			resolved: nil,
-		},
-		{
-			// AC7 / AC8 row 1: a wired entry outranks Extra["deployment"].
-			name:               "wired entry wins over an explicit deployment",
-			reqModel:           "azure/gpt-4.1",
-			resolved:           &domain.ResolvedModel{ModelID: "gpt-4.1", ProviderID: domain.ProviderAzure, Source: domain.ModelSourceExplicit},
-			wireDeploymentMap:  map[string]string{"gpt-4.1": "wire-dep"},
-			explicitDeployment: "extra-dep",
-			wantDeployment:     "wire-dep",
-		},
-		{
-			// AC8 row 2: with no wired entry, Extra["deployment"] outranks the
-			// bare model.
-			name:               "explicit deployment wins over the bare model",
-			reqModel:           "azure/gpt-4.1",
-			resolved:           &domain.ResolvedModel{ModelID: "gpt-4.1", ProviderID: domain.ProviderAzure, Source: domain.ModelSourceExplicit},
-			explicitDeployment: "extra-dep",
-			wantDeployment:     "extra-dep",
-		},
-		{
-			// AC8 row 3: with neither, the model id is the deployment name.
-			name:     "bare model is the default deployment",
-			reqModel: "azure/gpt-4.1",
-			resolved: &domain.ResolvedModel{ModelID: "gpt-4.1", ProviderID: domain.ProviderAzure, Source: domain.ModelSourceExplicit},
-		},
-		{
-			// AC7: unrelated wired entries neither serve nor block this model,
-			// and must survive the dispatch untouched.
-			name:              "unrelated wired entries do not block the requested model",
-			reqModel:          "azure/gpt-4.1",
-			resolved:          &domain.ResolvedModel{ModelID: "gpt-4.1", ProviderID: domain.ProviderAzure, Source: domain.ModelSourceExplicit},
-			wireDeploymentMap: map[string]string{"gpt-5.3-mini": "prod-mini"},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			// The string Bifrost's request carries in Model, derived from this
-			// row's own inputs by the rule Dispatch applies (bifrost.go:192-199).
-			// AC4 requires the map key to equal that string, so the expectation
-			// is a function of the request and not a hardcoded key.
-			bfModel := tc.reqModel
-			if tc.resolved != nil {
-				bfModel = tc.resolved.ModelID
-			}
-			want := tc.wantDeployment
-			if want == "" {
-				want = bfModel
-			}
-
-			stub := newAzureResourceStub(t, bfModel)
-			router := newTestBifrostRouter(t)
-
-			extra := map[string]string{"endpoint": stub.URL, "api_version": "2024-10-21"}
-			if tc.explicitDeployment != "" {
-				extra["deployment"] = tc.explicitDeployment
-			}
-			cred := domain.Credential{
-				ID:            "cred-azure",
-				ProviderID:    domain.ProviderAzure,
-				APIKey:        "az-key",
-				Extra:         extra,
-				DeploymentMap: tc.wireDeploymentMap,
-			}
-			req := &domain.Request{
-				Type:     domain.RequestTypeChat,
-				Model:    tc.reqModel,
-				Resolved: tc.resolved,
-				// The body carries bfModel, not the raw reqModel: the pipeline's
-				// ModelResolve stage rewrites the body's model to the resolved id
-				// before dispatch (app/pipeline resolve.go), and Azure chat is
-				// raw-forwarded, so the body IS what reaches the wire.
-				Body: []byte(fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"hi"}]}`, bfModel)),
-			}
-
-			resp, err := router.Dispatch(context.Background(), req, cred)
-			require.NoError(t, err,
-				"Azure dispatch must resolve a deployment for model %q; the control-plane credential carries deployment_map %#v",
-				bfModel, tc.wireDeploymentMap)
-			require.NotNil(t, resp)
-
-			assert.Equal(t, want, stub.deployment(t),
-				"the deployment Bifrost looked up is Deployments[%q]", bfModel)
-		})
 	}
 }
 
-// AC23, and the second half of AC7: dispatch must not mutate the credential's
-// wired map. The chokepoint copies on write (domain.WithDeploymentSelfMap), and
-// a fix that writes through the reference would corrupt the bundle cache shared
-// by every request on that virtual key.
-//
-// @scenario "The self-map never mutates the caller's map"
-func TestAzureDispatch_DoesNotMutateTheBundlesDeploymentMap(t *testing.T) {
-	stub := newAzureResourceStub(t, "gpt-4.1")
-	router := newTestBifrostRouter(t)
-
-	wired := map[string]string{"gpt-5.3-mini": "prod-mini"}
-	cred := domain.Credential{
-		ID:            "cred-azure",
-		ProviderID:    domain.ProviderAzure,
-		APIKey:        "az-key",
-		Extra:         map[string]string{"endpoint": stub.URL, "api_version": "2024-10-21"},
-		DeploymentMap: wired,
+func azureChatRequest(isStream bool) *domain.Request {
+	body := `{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}]}`
+	if isStream {
+		body = `{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}],"stream":true}`
 	}
-	req := &domain.Request{
+	return &domain.Request{
 		Type:     domain.RequestTypeChat,
-		Model:    "azure/gpt-4.1",
-		Resolved: &domain.ResolvedModel{ModelID: "gpt-4.1", ProviderID: domain.ProviderAzure, Source: domain.ModelSourceExplicit},
-		Body:     []byte(`{"model":"azure/gpt-4.1","messages":[{"role":"user","content":"hi"}]}`),
+		Model:    "azure/gpt-5-mini",
+		Resolved: &domain.ResolvedModel{ModelID: "gpt-5-mini", ProviderID: domain.ProviderAzure},
+		Body:     []byte(body),
 	}
+}
 
-	_, err := router.Dispatch(context.Background(), req, cred)
+// Spec: specs/ai-gateway/azure-endpoint-from-api-base.feature
+//
+// @scenario "Gateway chat completion for an Azure model reaches the deployment named by the model id"
+func TestDispatch_Azure_NoDeploymentMap_SelfMapsToModelID(t *testing.T) {
+	upstream := newAzureUpstream(t)
+	router := azureRouter(t)
+
+	req := azureChatRequest(false)
+	sent := append([]byte(nil), req.Body...)
+
+	resp, err := router.Dispatch(context.Background(), req,
+		azureCredNoDeploymentMap(upstream.srv.URL))
+	require.NoError(t, err,
+		"an Azure credential without an explicit deployment mapping must still dispatch")
+	require.NotNil(t, resp)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	assert.Equal(t, "gpt-5-mini", upstream.deploymentAddressed(t, 0),
+		"the deployment defaults to the model id, so the request must address deployment gpt-5-mini")
+	// Azure is raw-forwarded to keep OpenAI's prompt-prefix auto-cache hitting.
+	// With nothing to remap, the customer's bytes must go out untouched.
+	assert.Equal(t, string(sent), string(upstream.received()[0]),
+		"with no deployment to remap the body must be forwarded byte-for-byte")
+}
+
+// The streaming lane resolves its credential separately from Dispatch, so it
+// needs its own resolution or stream:true keeps missing the deployment on
+// Azure while the non-streaming call gets it right.
+//
+// @scenario "Gateway streaming chat completion for an Azure model reaches the deployment named by the model id"
+func TestDispatchStream_Azure_NoDeploymentMap_SelfMapsToModelID(t *testing.T) {
+	upstream := newAzureUpstream(t)
+	router := azureRouter(t)
+
+	iter, err := router.DispatchStream(context.Background(), azureChatRequest(true),
+		azureCredNoDeploymentMap(upstream.srv.URL))
+	require.NoError(t, err,
+		"the streaming lane must resolve the deployment too, or stream:true fails "+
+			"on Azure providers the non-streaming lane serves fine")
+	for iter.Next(context.Background()) {
+	}
+	require.NoError(t, iter.Err(),
+		"the stream must drain cleanly; a mid-stream failure would leave the assertion "+
+			"below passing on a request that never produced a usable answer")
+
+	assert.Equal(t, "gpt-5-mini", upstream.deploymentAddressed(t, 0),
+		"the deployment defaults to the model id, so the request must address deployment gpt-5-mini")
+}
+
+// An explicit mapping is the provider saying the model id is NOT the
+// deployment name. Dropping it sends Azure a deployment it does not have.
+//
+// @scenario "An explicit deployment mapping still decides the deployment on the gateway lane"
+func TestDispatch_Azure_ExplicitDeploymentMap_Wins(t *testing.T) {
+	upstream := newAzureUpstream(t)
+	router := azureRouter(t)
+
+	cred := azureCredNoDeploymentMap(upstream.srv.URL)
+	cred.DeploymentMap = map[string]string{"gpt-5-mini": "prod-mini-eastus"}
+
+	_, err := router.Dispatch(context.Background(), azureChatRequest(false), cred)
 	require.NoError(t, err)
 
-	assert.Equal(t, map[string]string{"gpt-5.3-mini": "prod-mini"}, wired,
-		"the bundle's deployment map is shared across requests and must not be written through")
+	assert.Equal(t, "prod-mini-eastus", upstream.deploymentAddressed(t, 0),
+		"the provider's own mapping decides the deployment; the default only fills a gap")
 }
 
-// AC10, the "no Azure key configuration is fabricated" half. The other half,
-// that the credential's own map stays nil, is held at the chokepoint itself in
-// domain/deployment_self_map_chokepoint_test.go.
+// app.dispatch walks the credential chain with retry.Walk and hands the SAME
+// *domain.Request to Dispatch on every attempt, so resolving the deployment
+// must not write back into it. If it did, the first credential's deployment
+// would still be in the body on the second attempt: the guard early-returns
+// when deployment == model, so nothing rewrites it back, and the next Azure
+// resource is asked for a deployment it does not have.
 //
-// @scenario "Providers without deployments are left untouched"
-func TestCredentialToBifrostKey_NonMappedProvidersGetNoDeploymentConfig(t *testing.T) {
-	cases := []struct {
-		name     string
-		cred     domain.Credential
-		provider bfschemas.ModelProvider
-	}{
-		{
-			name:     "openai",
-			cred:     domain.Credential{ID: "cred-openai", ProviderID: domain.ProviderOpenAI, APIKey: "sk-test"},
-			provider: bfschemas.OpenAI,
-		},
-		{
-			name:     "anthropic",
-			cred:     domain.Credential{ID: "cred-anthropic", ProviderID: domain.ProviderAnthropic, APIKey: "sk-ant-test"},
-			provider: bfschemas.Anthropic,
-		},
+// @scenario "A deployment resolved for one credential does not leak into the next attempt"
+func TestDispatch_Azure_DeploymentDoesNotLeakAcrossCredentials(t *testing.T) {
+	upstream := newAzureUpstream(t)
+	router := azureRouter(t)
+
+	req := azureChatRequest(false)
+	sent := append([]byte(nil), req.Body...)
+
+	mapped := azureCredNoDeploymentMap(upstream.srv.URL)
+	mapped.DeploymentMap = map[string]string{"gpt-5-mini": "prod-mini-eastus"}
+	_, err := router.Dispatch(context.Background(), req, mapped)
+	require.NoError(t, err)
+
+	// Second attempt, as a failover would run it: same request pointer, a
+	// credential whose resource serves the model under its own name.
+	_, err = router.Dispatch(context.Background(), req, azureCredNoDeploymentMap(upstream.srv.URL))
+	require.NoError(t, err)
+
+	assert.Equal(t, "prod-mini-eastus", upstream.deploymentAddressed(t, 0))
+	assert.Equal(t, "gpt-5-mini", upstream.deploymentAddressed(t, 1),
+		"the second credential names no deployment, so its resource must be asked "+
+			"for gpt-5-mini and not the first credential's prod-mini-eastus")
+	assert.Equal(t, string(sent), string(req.Body),
+		"the caller's request is shared across retry attempts, so resolving the "+
+			"deployment must leave it untouched")
+}
+
+// The other side of the same leak, and the worse one: the non-Azure guard
+// returns before the deployment comparison, so an in-place rewrite would hand
+// a plain OpenAI provider an Azure deployment name as its model.
+//
+// @scenario "An Azure deployment does not leak into a non-Azure fallback"
+func TestDispatch_Azure_DeploymentDoesNotLeakIntoANonAzureFallback(t *testing.T) {
+	upstream := newAzureUpstream(t)
+	router := azureRouter(t)
+
+	req := azureChatRequest(false)
+
+	mapped := azureCredNoDeploymentMap(upstream.srv.URL)
+	mapped.DeploymentMap = map[string]string{"gpt-5-mini": "prod-mini-eastus"}
+	_, err := router.Dispatch(context.Background(), req, mapped)
+	require.NoError(t, err)
+
+	// Failover off Azure entirely, onto a provider that has never heard of
+	// deployments and serves the model under its own name.
+	fallback := domain.Credential{
+		ID:         "mp-openai",
+		ProviderID: domain.ProviderOpenAI,
+		APIKey:     "sk-test",
+		Extra:      map[string]string{"base_url": upstream.srv.URL},
 	}
+	_, err = router.Dispatch(context.Background(), req, fallback)
+	require.NoError(t, err)
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			require.Nil(t, tc.cred.DeploymentMap, "fixture precondition")
+	assert.Equal(t, "prod-mini-eastus", upstream.deploymentAddressed(t, 0))
+	assert.Equal(t, "gpt-5-mini", upstream.deploymentAddressed(t, 1),
+		"a non-Azure credential must be sent the model id, never the Azure "+
+			"deployment name left over from the previous attempt")
+}
 
-			key := credentialToBifrostKey(tc.cred, tc.provider, nil)
+// The two lanes read the deployment from the same place, so this covers the
+// streaming seam and the other credential shape at once: a deployment named
+// alongside the credential rather than in a mapping, which is what
+// WithDeploymentSelfMap folds into DeploymentMap for both lanes to read.
+//
+// @scenario "The streaming lane honors an explicit deployment name too"
+func TestDispatchStream_Azure_ExplicitDeployment_Wins(t *testing.T) {
+	upstream := newAzureUpstream(t)
+	router := azureRouter(t)
 
-			assert.Nil(t, key.AzureKeyConfig, "no AzureKeyConfig may be fabricated for %s", tc.name)
-			assert.Nil(t, key.BedrockKeyConfig, "no BedrockKeyConfig may be fabricated for %s", tc.name)
-			assert.Nil(t, key.VertexKeyConfig, "no VertexKeyConfig may be fabricated for %s", tc.name)
-		})
+	cred := azureCredNoDeploymentMap(upstream.srv.URL)
+	cred.Extra["deployment"] = "prod-mini-eastus"
+
+	iter, err := router.DispatchStream(context.Background(), azureChatRequest(true), cred)
+	require.NoError(t, err)
+	for iter.Next(context.Background()) {
 	}
+	require.NoError(t, iter.Err(), "the stream must drain cleanly")
+
+	assert.Equal(t, "prod-mini-eastus", upstream.deploymentAddressed(t, 0),
+		"the provider's own deployment name decides the deployment on the streaming lane too")
 }

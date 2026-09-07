@@ -8,6 +8,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the updated secret's metadata rather than printing it: the output
@@ -29,7 +30,7 @@ export const updateSecretCommand = async (
   const spinner = createSpinner(`Updating secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/secrets/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

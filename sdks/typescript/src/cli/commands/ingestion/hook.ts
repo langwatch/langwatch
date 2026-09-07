@@ -80,6 +80,7 @@ import {
   parseTraceparent,
   sessionContextFingerprint,
 } from "@/cli/utils/governance/session-context";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * What each accepted tool argument means: the agent the record declares, plus
@@ -169,7 +170,7 @@ export async function hookCommand({
   env = process.env,
   readInput = readStdin,
   runGit = runGitCommand,
-  fetchImpl = fetch,
+  fetchImpl = langwatchFetch,
   now = Date.now,
   stateDir = defaultStateDir(),
   claudeRegistryDir,

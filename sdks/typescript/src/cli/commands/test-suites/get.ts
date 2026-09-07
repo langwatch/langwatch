@@ -4,6 +4,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { createCliTestSuitesService } from "./cli-test-suites-service";
+import { printEvaluators, printSuiteFields } from "./renderSuiteDetails";
 import { resolveSuiteId } from "./resolveSuite";
 
 /**
@@ -34,6 +35,8 @@ export const getTestSuiteCommand = async (
         console.log(`    ${chalk.gray("Name:")}      ${chalk.cyan(suite.name)}`);
         console.log(`    ${chalk.gray("Slug:")}      ${chalk.yellow(suite.slug)}`);
         console.log(`    ${chalk.gray("Scenarios:")} ${suite.scenarioCount}`);
+        printSuiteFields(suite.fields);
+        printEvaluators(suite.evaluators);
 
         if (suite.scenarios.length > 0) {
           console.log();
