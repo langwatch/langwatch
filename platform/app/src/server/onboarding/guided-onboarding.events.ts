@@ -21,7 +21,8 @@ export type GuidedOnboardingEvent =
   | "tour_replayed"
   | "path_begun"
   | "path_completed"
-  | "conversation_attached";
+  | "conversation_attached"
+  | "virtual_key_minted";
 
 export interface GuidedOnboardingEventInput {
   organizationId: string;

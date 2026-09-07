@@ -83,6 +83,24 @@ describe("the guided onboarding kickoff", () => {
       );
     });
 
+    /** @scenario "The brief names the key the tour minted, by its reveal id" */
+    it("names the tour's virtual key by name, prefix and reveal id, never by its secret", () => {
+      const brief = buildGuidedKickoffBrief({
+        input: {
+          ...KICKOFF,
+          virtualKeyName: "production-app",
+          virtualKeyPreview: "vk-lw-01HZX9N",
+          virtualKeyRevealId: "rvl_abc123",
+        },
+      });
+      expect(brief.split("\n")).toContain(
+        "Virtual key: production-app, preview vk-lw-01HZX9N, reveal rvl_abc123",
+      );
+      expect(buildGuidedKickoffBrief({ input: KICKOFF })).toContain(
+        "Virtual key: none minted by the tour",
+      );
+    });
+
     it("says when no provider was connected", () => {
       const brief = buildGuidedKickoffBrief({
         input: { ...KICKOFF, provider: undefined, providerModel: undefined },

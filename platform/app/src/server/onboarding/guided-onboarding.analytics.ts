@@ -25,6 +25,7 @@ const POSTHOG_EVENT: Record<GuidedOnboardingEvent, string | null> = {
   path_begun: "guided_onboarding_path_begun",
   path_completed: "guided_onboarding_path_completed",
   conversation_attached: null,
+  virtual_key_minted: null,
 };
 
 /**

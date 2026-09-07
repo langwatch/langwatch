@@ -62,6 +62,7 @@ import {
   isQuestionToolPart,
   questionToolCardParts,
 } from "../logic/langyQuestionTool";
+import { isSecretSnippetToolPart } from "../logic/langySecretSnippetTool";
 import {
   type LangyToolErrorPresentation,
   presentLangyToolError,
@@ -587,6 +588,10 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     // reason: it speaks to the person, not to the model, and the card carries
     // its whole life.
     if (isCodeAccessToolPart(part)) return;
+    // The `secret_snippet` tool is the secret snippet card, rendered by
+    // MessageContent: the card is where the value shows, once, and an
+    // activity row would only say a card was drawn.
+    if (isSecretSnippetToolPart(part)) return;
     const name = partToolName(part);
     if (!name) return;
 

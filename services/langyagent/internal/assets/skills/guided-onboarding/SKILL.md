@@ -2,7 +2,7 @@
 name: guided-onboarding
 description: Take over from the sign-up tour and set up the path the user picked (Evals & LLM Ops, Coding agents, Gateway or Governance) inside the Langy panel. Use when a user message starts with "Guided onboarding kickoff" or with "Let's set up ... then.", and never otherwise.
 license: MIT
-compatibility: Runs inside a Langy worker session only. Needs the code_access and question tools and the langwatch CLI.
+compatibility: Runs inside a Langy worker session only. Needs the code_access, question and secret_snippet tools and the langwatch CLI.
 metadata:
   category: skill
 ---
@@ -21,6 +21,7 @@ The brief is the whole input. Never run `langwatch onboarding state` during a gu
 - **Everything picked** is the order the user chose; the Home page offers the rest later, so set up only the current path.
 - **Provider** is already connected when the brief names one. Never ask for a key.
 - **Gateway** is the address an app on this instance points at; the gateway path prints it.
+- **Virtual key** names the key the tour minted, with its preview (the first characters) and its reveal id, or says none was minted. The secret is never in the brief: the reveal id is what shows it, once, through the `secret_snippet` card.
 - **Tour: skipped** adds one line before the path's own opener, exactly:
 
   No worries! Everything the tour covers is in the menu on the left. I'll be right here when you need me.
@@ -215,21 +216,27 @@ langwatch virtual-keys list --format json
 If no row is named `production-app`:
 
 ```bash
-langwatch virtual-keys create --name production-app --format json
+langwatch virtual-keys create --name production-app --reveal-once --format json
 ```
 
-Take the secret from the create output. When the key already existed, the tour minted it and showed its secret in the dialog, and it is not readable again: say nothing about that, open with the line below as if the key were just made, and print the snippet with `<the production-app key the dialog showed>` where the secret goes.
+The output carries `reveal_id` and `preview`, never the secret. When the key already existed, the tour minted it: the `Virtual key:` line of the brief carries its name, its preview and its reveal id, and that is where they come from. Say nothing about the key having existed; open with the line below as if it were just made.
 
-The gateway address is the value after `Gateway:` in the brief, exactly as it stands there, never a host you remember: an instance serves its own. When the brief says none is configured, print the snippet with `<your gateway URL>` in its place and say in one line that the gateway is not set up on this instance yet.
+You never see the secret, and you never print it: never write a value that starts with `vk-lw-` in a message, and never write the snippet yourself. The `secret_snippet` card shows it to the user, once, and masks it afterwards.
 
-Say, verbatim, then the snippet:
+The gateway address is the value after `Gateway:` in the brief, exactly as it stands there, never a host you remember: an instance serves its own. When the brief says none is configured, use `<your gateway URL>` in its place and say in one line that the gateway is not set up on this instance yet.
+
+Say, verbatim:
 
 Your key production-app is live. Point your app at the gateway with it and every call gets budgets, routing and tracing for free:
 
-```bash
-export OPENAI_BASE_URL="<the address after Gateway: in the brief>"
-export OPENAI_API_KEY="<the key>"
+Then, in the same step and right after the line, call `secret_snippet` with the reveal id, the preview, and this template, the gateway address filled in and `{{secret}}` left exactly as it is:
+
 ```
+export OPENAI_BASE_URL="<the address after Gateway: in the brief>"
+export OPENAI_API_KEY="{{secret}}"
+```
+
+When a `production-app` key exists but the brief carries no reveal id for it, its secret is not readable any more: skip the card and print the two lines above in a `bash` fence with `<your production-app key>` where the secret goes.
 
 Say, verbatim, as the last line:
 

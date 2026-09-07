@@ -61,6 +61,9 @@ export function buildKickoff({
     firstName,
     tourStatus,
     gatewayUrl: state.gatewayUrl,
+    virtualKeyName: state.virtualKeyName,
+    virtualKeyPreview: state.virtualKeyPreview,
+    virtualKeyRevealId: state.virtualKeyRevealId,
     /* the conversation to continue whenever the guided state has one; the
        panel drain never queries for it */
     conversationId: state.conversationId ?? null,

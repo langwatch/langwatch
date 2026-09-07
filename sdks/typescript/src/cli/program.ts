@@ -2231,6 +2231,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--budget-window <w>", "Budget window for --budget-limit: day | week | month")
       .option("--budget-breach <action>", "block (default) or warn when the key's budget is hit")
       .option("--providers-allowed <ids>", "Comma-separated ModelProvider ids the key may dispatch to (default: every provider in scope)")
+      .option("--reveal-once", "Do not print the secret; print a one-time reveal id instead, which shows the secret once through the app to the person the key is for")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       name: string;
@@ -2244,6 +2245,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       budgetWindow?: string;
       budgetBreach?: "block" | "warn";
       providersAllowed?: string;
+      revealOnce?: boolean;
     }) => {
       const { createVirtualKeyCommand: impl } = await import("./commands/virtual-keys/create.js");
       return impl(options);

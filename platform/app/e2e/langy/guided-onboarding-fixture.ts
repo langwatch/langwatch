@@ -357,9 +357,24 @@ export async function guidedKickoffInput({
     orgName: org.orgName,
     firstName: await firstNameOfTestUser(),
     tourStatus,
-    // The Gateway line: the host takes it from the guided state, where the
-    // instance names the address an app on it points at.
-    gatewayUrl: (await readGuidedState(org.organizationId)).gatewayUrl,
+    // The Gateway and Virtual key lines: the host takes both from the guided
+    // state, where the instance names the address an app on it points at and
+    // the tour records the key it minted.
+    ...pickKickoffStateFields(await readGuidedState(org.organizationId)),
+  };
+}
+
+function pickKickoffStateFields(
+  state: GuidedState,
+): Pick<
+  GuidedKickoffInput,
+  "gatewayUrl" | "virtualKeyName" | "virtualKeyPreview" | "virtualKeyRevealId"
+> {
+  return {
+    gatewayUrl: state.gatewayUrl,
+    virtualKeyName: state.virtualKeyName,
+    virtualKeyPreview: state.virtualKeyPreview,
+    virtualKeyRevealId: state.virtualKeyRevealId,
   };
 }
 
@@ -456,6 +471,10 @@ export interface GuidedState {
   tourReplays?: number;
   /** The gateway URL an app on this instance points at, with its /v1. */
   gatewayUrl?: string;
+  /** The key the tour minted, named for Langy by its one-time reveal id. */
+  virtualKeyName?: string;
+  virtualKeyPreview?: string;
+  virtualKeyRevealId?: string;
 }
 
 export async function readGuidedState(
@@ -518,7 +537,11 @@ export async function listVirtualKeys(
   });
 }
 
-/** Mint the key the gateway tour mints, so Langy finds it already there. */
+/**
+ * Mint the key the gateway tour mints, so Langy finds it already there, and
+ * record it on the guided state the way the tour's drawer does: by its
+ * one-time reveal id, never by its secret.
+ */
 export async function mintVirtualKey({
   organizationId,
   projectId,
@@ -528,9 +551,13 @@ export async function mintVirtualKey({
   /** The project the key's traffic is traced into, which every key names. */
   projectId: string;
   name: string;
-}): Promise<{ id: string }> {
+}): Promise<{ id: string; preview: string; revealId: string }> {
   const cookie = await getSessionCookie();
-  return await trpcMutate<{ id: string }>({
+  const created = await trpcMutate<{
+    virtualKey: { id: string; name: string };
+    preview: string;
+    revealId: string;
+  }>({
     cookie,
     path: "virtualKeys.create",
     input: {
@@ -538,8 +565,78 @@ export async function mintVirtualKey({
       name,
       traceProjectId: projectId,
       scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+      revealOnce: true,
     },
   });
+  await trpcMutate({
+    cookie,
+    path: "onboarding.recordVirtualKeyReveal",
+    input: {
+      organizationId,
+      name: created.virtualKey.name,
+      preview: created.preview,
+      revealId: created.revealId,
+    },
+  });
+  return {
+    id: created.virtualKey.id,
+    preview: created.preview,
+    revealId: created.revealId,
+  };
+}
+
+/** The secret snippet calls a run made, as the stream reported their input. */
+export function secretSnippetCalls(
+  events: LangyToolEvent[],
+): Array<{ revealId: string; template: string; preview?: string }> {
+  return events
+    .filter(
+      (event) => event.phase === "start" && event.name === "secret_snippet",
+    )
+    .map((event) => event.input as Record<string, unknown> | null)
+    .filter(
+      (
+        input,
+      ): input is { revealId: string; template: string; preview?: string } =>
+        typeof input?.revealId === "string" &&
+        typeof input?.template === "string",
+    );
+}
+
+/**
+ * The snippet Langy handed to the secret snippet card points at this
+ * instance's gateway and leaves the key to the card.
+ */
+export function expectSecretSnippetOnThisGateway({
+  events,
+  gatewayUrl,
+  revealId,
+}: {
+  events: LangyToolEvent[];
+  gatewayUrl: string;
+  /** The reveal id the brief named, when the tour minted the key. */
+  revealId?: string;
+}): void {
+  const calls = secretSnippetCalls(events);
+  expect(calls).toHaveLength(1);
+  const call = calls[0]!;
+  const escaped = gatewayUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // The address ends at /v1: a sentence's full stop copied from the brief
+  // into the quotes would give the user an invalid base URL.
+  expect(call.template).toMatch(
+    new RegExp(`OPENAI_BASE_URL=["']?${escaped}/v1["']?(\\s|$)`, "m"),
+  );
+  expect(call.template).not.toMatch(new RegExp(`${escaped}/v1\\.`));
+  expect(call.template).not.toMatch(/gateway\.langwatch\.ai/);
+  expect(call.template).toMatch(/OPENAI_API_KEY=["']?\{\{secret\}\}/);
+  expect(call.template).not.toMatch(/vk-lw-[0-9A-Z]{26}/);
+  expect(call.revealId).toMatch(/^rvl_/);
+  if (revealId) expect(call.revealId).toBe(revealId);
+}
+
+/** No message Langy wrote carries a virtual key secret. */
+export function expectNoSecretInText(text: string): void {
+  expect(text).not.toMatch(/vk-lw-[0-9A-Z]{26}/);
 }
 
 /** The conversation's title, as the history list shows it. */
@@ -592,24 +689,6 @@ export async function gatewayPublicUrl(): Promise<string> {
   const url = publicEnv.GATEWAY_BASE_URL?.replace(/\/+$/, "");
   if (!url) throw new Error("publicEnv names no GATEWAY_BASE_URL");
   return url;
-}
-
-/** The snippet points the app at this instance's gateway, never the SaaS one. */
-export function expectSnippetOnThisGateway({
-  text,
-  gatewayUrl,
-}: {
-  text: string;
-  gatewayUrl: string;
-}): void {
-  const escaped = gatewayUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  // The address ends at /v1: a sentence's full stop copied from the brief
-  // into the quotes would give the user an invalid base URL.
-  expect(text).toMatch(
-    new RegExp(`OPENAI_BASE_URL=["']?${escaped}/v1["']?(\\s|$)`, "m"),
-  );
-  expect(text).not.toMatch(new RegExp(`${escaped}/v1\\.`));
-  expect(text).not.toMatch(/gateway\.langwatch\.ai/);
 }
 
 /**

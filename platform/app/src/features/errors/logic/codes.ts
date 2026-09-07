@@ -360,6 +360,8 @@ export const APP_ERROR_CODES = [
   "scim_write_outside_connection",
   "scope_not_in_organization",
   "seat_billing_unavailable",
+  "secret_already_revealed",
+  "secret_reveal_expired",
   "share_link_exhausted",
   "share_link_expired",
   "share_link_forbidden",

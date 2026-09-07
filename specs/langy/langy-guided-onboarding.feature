@@ -96,7 +96,27 @@ Feature: Langy guides the first setup after sign-up
       Given the tour already minted the production-app key
       When the compiled guided-onboarding skill is read
       Then the gateway path opens on the live line as if the key were just made
-      And the snippet's secret placeholder reads as the one the dialog showed
+      And the reveal id, the name and the preview come from the brief's Virtual key line
+
+    # The secret was pasted into a chat code block, and from there it was in
+    # the conversation store, the projection and every viewer's history. The
+    # key is minted with --reveal-once, so the CLI output carries a reveal id
+    # and never the secret, and the secret_snippet card is what shows it,
+    # once. See specs/langy/langy-secret-snippet.feature.
+    @unit
+    Scenario: The gateway snippet is shown through the secret snippet card, never printed
+      When the compiled guided-onboarding skill is read
+      Then the key is minted with --reveal-once
+      And the snippet is shown by calling secret_snippet with the reveal id, the preview and a template carrying the secret placeholder
+      And the card call comes right after the live line
+      And the skill never writes a value starting with vk-lw- in a message
+
+    @unit
+    Scenario: The brief names the key the tour minted, by its reveal id
+      When the panel builds the kickoff brief after the gateway tour minted a key
+      Then the brief carries the key's name, its preview and its reveal id on one line
+      And the brief never carries the secret
+      And a brief for a tour that minted no key says so
 
     @unit
     Scenario: The panel sends the kickoff exactly once
@@ -537,12 +557,13 @@ Feature: Langy guides the first setup after sign-up
     @e2e
     Scenario: The gateway path prints the key and the snippet
       Given the kickoff for the gateway path
-      And the tour minted the virtual key production-app
+      And the tour minted the virtual key production-app, with its reveal id in the brief
       When Langy starts
       Then Langy checks for an existing production-app key before minting one
       And no second key is minted
       And Langy says "Your key production-app is live. Point your app at the gateway with it and every call gets budgets, routing and tracing for free:"
-      And Langy prints the environment snippet with the gateway base URL and the key
+      And Langy shows the environment snippet through the secret_snippet card, with the gateway base URL and the brief's reveal id
+      And no message carries the secret
       And Langy says "That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with."
       And the gateway path is recorded as complete
 
@@ -551,8 +572,9 @@ Feature: Langy guides the first setup after sign-up
       Given the kickoff for the gateway path
       And no production-app key exists
       When Langy starts
-      Then Langy mints the virtual key production-app
-      And Langy prints the environment snippet with it
+      Then Langy mints the virtual key production-app with --reveal-once
+      And Langy shows the environment snippet through the secret_snippet card, with the reveal id the create printed
+      And no message carries the secret
 
     @e2e
     Scenario: The governance path asks where to start

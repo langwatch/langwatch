@@ -50,6 +50,7 @@ import {
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { currentPeriodStart } from "~/server/gateway/budgetPeriod";
 import { nextAnchoredResetAt } from "~/server/gateway/budgetWindow";
+import { OneTimeRevealService } from "~/server/secrets/oneTimeReveal.service";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
@@ -635,6 +636,32 @@ describe("gateway platform REST API (real PG + real CH)", () => {
   // ── Virtual keys: create ──────────────────────────────────────────────
 
   describe("virtual key create", () => {
+    /** @scenario "The REST create with reveal_once answers with the reveal id and the prefix, not the secret" */
+    it("withholds the secret with reveal_once and serves it once by the reveal id", async () => {
+      const { status, body } = await createVk({
+        name: `reveal-once-${suffix}`,
+        reveal_once: true,
+      });
+      expect(status).toBe(201);
+      expect(body).not.toHaveProperty("secret");
+      expect(JSON.stringify(body)).not.toMatch(/vk-lw-[0-9A-Z]{26}/);
+      expect(body.reveal_id).toMatch(/^rvl_/);
+      expect(body.preview).toBe(body.virtual_key.display_prefix);
+      expect(body.preview).toMatch(/^vk-lw-/);
+
+      const reveals = OneTimeRevealService.create();
+      const revealed = await reveals.reveal({
+        organizationId: ORG_ID,
+        revealId: body.reveal_id,
+      });
+      expect(revealed.secret).toMatch(/^vk-lw-[0-9A-Z]{26}$/);
+      expect(revealed.secret.startsWith(body.preview)).toBe(true);
+      expect(revealed.keyId).toBe(body.virtual_key.id);
+      await expect(
+        reveals.reveal({ organizationId: ORG_ID, revealId: body.reveal_id }),
+      ).rejects.toMatchObject({ code: "secret_already_revealed" });
+    });
+
     /** @scenario Create a virtual key with the SDK's current shape */
     it("accepts the SDK shape and defaults scope to the caller's project", async () => {
       const { status, body } = await createVk({ name: `sdk-min-${suffix}` });

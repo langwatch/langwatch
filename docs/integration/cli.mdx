@@ -847,6 +847,9 @@ langwatch virtual-keys create \
   --providers-allowed mp_01HZX...,mp_01HZY... \
   --budget-limit 500 --budget-window month
 
+# Create for someone else: the secret is not printed, the app shows it to them once
+langwatch virtual-keys create --name prod-key --reveal-once
+
 langwatch virtual-keys update vk_01HZX9K3MN... --budget-limit 750
 langwatch virtual-keys spend vk_01HZX9K3MN... --from 2026-07-01T00:00:00Z
 
@@ -859,7 +862,7 @@ langwatch virtual-keys enable vk_01HZX9K3MN...
 langwatch virtual-keys revoke vk_01HZX9K3MN...
 ```
 
-`--scope` takes `type:id` pairs (`org`, `team`, or `project`) and repeats for several; it defaults to the calling project. `--providers-allowed` is a comma-separated list of ModelProvider ids. The atomic `--budget-*` flags cap the key itself and accept `day`, `week`, or `month`.
+`--scope` takes `type:id` pairs (`org`, `team`, or `project`) and repeats for several; it defaults to the calling project. `--providers-allowed` is a comma-separated list of ModelProvider ids. The atomic `--budget-*` flags cap the key itself and accept `day`, `week`, or `month`. `--reveal-once` withholds the secret from the output and returns a `reveal_id` and the key's prefix instead: the secret is stored encrypted for 24 hours and can be read exactly once through the app, which is how Langy shows a key without ever printing it.
 
 ### Gateway budgets
 

@@ -227,6 +227,31 @@ export class GuidedOnboardingService {
     });
   }
 
+  /**
+   * Records the virtual key the gateway tour minted: its name, its display
+   * prefix and the one-time reveal id that serves its secret to the Langy
+   * card. A replay that mints another key replaces the earlier one.
+   */
+  async recordVirtualKeyReveal(
+    actor: Actor,
+    {
+      name,
+      preview,
+      revealId,
+    }: { name: string; preview: string; revealId: string },
+  ): Promise<GuidedOnboardingState> {
+    return this.write(actor, {
+      event: "virtual_key_minted",
+      payload: { name },
+      mutate: (state) => ({
+        ...state,
+        virtualKeyName: name,
+        virtualKeyPreview: preview,
+        virtualKeyRevealId: revealId,
+      }),
+    });
+  }
+
   private async write(
     { organizationId, userId }: Actor,
     {

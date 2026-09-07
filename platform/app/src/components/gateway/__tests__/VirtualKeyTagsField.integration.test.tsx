@@ -48,6 +48,11 @@ vi.mock("~/hooks/useRequiredSession", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    onboarding: {
+      recordVirtualKeyReveal: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false }),
+      },
+    },
     useUtils: () => ({
       virtualKeys: {
         list: { invalidate: vi.fn() },

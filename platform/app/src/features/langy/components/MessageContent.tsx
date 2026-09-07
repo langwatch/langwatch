@@ -46,6 +46,7 @@ import {
   foldReasoningTitles,
   stripReasoningTitles,
 } from "../logic/langyReasoningTitles";
+import { secretSnippetCalls } from "../logic/langySecretSnippetTool";
 import { stripToolNarration } from "../logic/langyToolNarration";
 import { langyRunText, langyTranscriptRuns } from "../logic/langyTranscript";
 import { useSpaLinkClick } from "../logic/spaLink";
@@ -54,6 +55,7 @@ import { GuidedTourCard } from "./derived-cards/GuidedTourCard";
 import { LangyCodeAccessCard } from "./derived-cards/LangyCodeAccessCard";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
 import { LangyFailedCard } from "./derived-cards/LangyFailedCard";
+import { LangySecretSnippetCard } from "./derived-cards/LangySecretSnippetCard";
 import { StreamingAnswerWithCards } from "./derived-cards/StreamingAnswerWithCards";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
@@ -240,6 +242,14 @@ function MessageContentImpl({
   // after this turn ended.
   const codeAccessCall = useMemo(
     () => (isPlainText ? null : codeAccessCallId(message.parts)),
+    [isPlainText, message.parts],
+  );
+
+  // The `secret_snippet` TOOL calls, one card each. The call carries the
+  // reveal id and the template; the card reads the secret itself, once, so
+  // nothing the transcript stores is the value.
+  const secretSnippets = useMemo(
+    () => (isPlainText ? [] : secretSnippetCalls(message.parts)),
     [isPlainText, message.parts],
   );
 
@@ -576,6 +586,17 @@ function MessageContentImpl({
             />
           </LangyCardBoundary>
         ) : null}
+        {/* A secret shown once, where it can be copied. The card is the only
+            place the value ever appears: it reads it on first render and the
+            server refuses every later read. */}
+        {secretSnippets.map((call) => (
+          <LangyCardBoundary key={call.callId} scope="the secret snippet card">
+            <LangySecretSnippetCard
+              organizationId={organizationId ?? null}
+              call={call}
+            />
+          </LangyCardBoundary>
+        ))}
         {/* WHEN to ask is the backend's call (langy.messages `shouldAskFeedback` —
             conversation depth + a per-user quiet period), or the agent's own
             [langy:feedback] directive at a high-signal moment, or the user

@@ -1,11 +1,14 @@
 /**
  * The gateway path of the guided onboarding, twice: once after a tour that
  * already minted the `production-app` key, once after a skipped tour that
- * minted nothing. Langy checks before it mints, prints the snippet and
- * records the path as done either way.
+ * minted nothing. Langy checks before it mints, shows the snippet through
+ * the secret snippet card and records the path as done either way. The
+ * secret itself is never in a message: the card reads it once by its
+ * reveal id.
  *
  * Layer 2 is the organization's virtual keys (never a second
- * `production-app`), the commands Langy ran, and the guided state.
+ * `production-app`), the commands Langy ran, the secret snippet call, and
+ * the guided state.
  *
  * RUN (one file per vitest run, see README):
  *   cd platform/app/e2e/langy && npx vitest run guided-onboarding-gateway.scenario.test.ts --reporter=verbose
@@ -17,13 +20,15 @@ import { describe, expect, it } from "vitest";
 import {
   assertPathCompletedAfterSkill,
   attachKickoffConversation,
-  expectSnippetOnThisGateway,
+  expectNoSecretInText,
+  expectSecretSnippetOnThisGateway,
   GUIDED_LINES,
   GUIDED_TONE_CRITERIA,
   gatewayPublicUrl,
   listVirtualKeys,
   mintVirtualKey,
   queueGuidedKickoff,
+  readGuidedState,
   saysVerbatim,
   seedGuidedOrganization,
   waitForPathDone,
@@ -38,7 +43,7 @@ const KEY_NAME = "production-app";
 
 const GATEWAY_CRITERIA = [
   `Langy says, word for word: "${GUIDED_LINES.gatewayLive}"`,
-  "Langy prints an environment snippet in a code block that sets the OpenAI base URL to the gateway and the API key to the production-app key.",
+  "Langy shows the environment snippet through the secret snippet card, and writes no value that starts with vk-lw- in any message.",
   `Langy ends with, word for word: "${GUIDED_LINES.gatewayClose}"`,
   "Langy asks the user no question and hands over no step; the closing line's offer to help is the copy, not a question.",
   ...GUIDED_TONE_CRITERIA,
@@ -52,7 +57,7 @@ function firstCommand(commands: string[], pattern: RegExp): number {
 describe("Langy sets up the gateway from the kickoff", () => {
   describe("when the tour already minted the production-app key", () => {
     /** @scenario The gateway path prints the key and the snippet */
-    it("checks first, mints nothing, prints the snippet and records the path", async () => {
+    it("checks first, mints nothing, shows the snippet through the card and records the path", async () => {
       const org = await seedGuidedOrganization({
         label: "Gateway",
         paths: ["gateway"],
@@ -83,7 +88,7 @@ describe("Langy sets up the gateway from the kickoff", () => {
             scenario.judgeAgent({
               model,
               criteria: [
-                "Langy does not create a second virtual key: the production-app key already exists, Langy says nothing about it having existed, and the snippet carries a placeholder for the secret the tour showed once.",
+                "Langy does not create a second virtual key: the production-app key already exists and Langy says nothing about it having existed.",
                 ...GATEWAY_CRITERIA,
               ],
             }),
@@ -121,11 +126,16 @@ describe("Langy sets up the gateway from the kickoff", () => {
       expect(text).not.toMatch(
         /already (exists?|have|had|minted|created|set up|there)/i,
       );
-      expectSnippetOnThisGateway({
-        text,
+      // The brief named the key by its reveal id, and the card reads that
+      // one: the secret never crosses a message.
+      const { virtualKeyRevealId } = await readGuidedState(org.organizationId);
+      expect(virtualKeyRevealId).toMatch(/^rvl_/);
+      expectSecretSnippetOnThisGateway({
+        events: langy.state.toolEvents,
         gatewayUrl: await gatewayPublicUrl(),
+        revealId: virtualKeyRevealId,
       });
-      expect(text).toMatch(/OPENAI_API_KEY/);
+      expectNoSecretInText(text);
       expect(saysVerbatim(text, GUIDED_LINES.gatewayClose)).toBe(true);
       expect(
         commands.some((command) =>
@@ -150,7 +160,7 @@ describe("Langy sets up the gateway from the kickoff", () => {
   describe("when the tour was skipped and no key exists", () => {
     /** @scenario The gateway path mints the key when the tour did not */
     /** @scenario A skipped tour gets the no-worries line */
-    it("says no worries, mints production-app once, and prints the snippet with it", async () => {
+    it("says no worries, mints production-app once with a one-time reveal, and shows the snippet through the card", async () => {
       const org = await seedGuidedOrganization({
         label: "Gateway skipped",
         paths: ["gateway"],
@@ -177,7 +187,7 @@ describe("Langy sets up the gateway from the kickoff", () => {
               model,
               criteria: [
                 `Langy opens with, word for word: "${GUIDED_LINES.skippedTour}"`,
-                "Langy creates one virtual key named production-app and prints its secret in the snippet.",
+                "Langy creates one virtual key named production-app and shows the snippet for it through the secret snippet card, never the secret itself.",
                 ...GATEWAY_CRITERIA,
               ],
             }),
@@ -199,6 +209,7 @@ describe("Langy sets up the gateway from the kickoff", () => {
       expect(listAt).toBeGreaterThanOrEqual(0);
       expect(createAt).toBeGreaterThan(listAt);
       expect(commands[createAt]).toMatch(/--name production-app/);
+      expect(commands[createAt]).toMatch(/--reveal-once/);
 
       const keys = await listVirtualKeys(org.organizationId);
       console.log("[layer2] keys:", keys.map((key) => key.name).join(", "));
@@ -210,11 +221,11 @@ describe("Langy sets up the gateway from the kickoff", () => {
         text.indexOf("production-app"),
       );
       expect(saysVerbatim(text, GUIDED_LINES.gatewayLive)).toBe(true);
-      expectSnippetOnThisGateway({
-        text,
+      expectSecretSnippetOnThisGateway({
+        events: langy.state.toolEvents,
         gatewayUrl: await gatewayPublicUrl(),
       });
-      expect(text).toMatch(/OPENAI_API_KEY="?[A-Za-z0-9_-]{16,}/);
+      expectNoSecretInText(text);
       expect(saysVerbatim(text, GUIDED_LINES.gatewayClose)).toBe(true);
       assertPathCompletedAfterSkill({
         events: langy.state.toolEvents,

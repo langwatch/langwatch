@@ -33,6 +33,10 @@ import {
   createLocalWorkspaceExtension,
 } from "./tools/local-workspace.js";
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
+import {
+  SECRET_SNIPPET_TOOL_NAME,
+  createSecretSnippetExtension,
+} from "./tools/secret-snippet.js";
 import { SKILL_TOOL_NAME, createSkillExtension } from "./tools/skill.js";
 import { TODOWRITE_TOOL_NAME, createTodowriteExtension } from "./tools/todowrite.js";
 import type { TurnContext } from "./tools/turn-context.js";
@@ -48,6 +52,7 @@ export const ENABLED_TOOLS = [
   TODOWRITE_TOOL_NAME,
   SKILL_TOOL_NAME,
   QUESTION_TOOL_NAME,
+  SECRET_SNIPPET_TOOL_NAME,
   CODE_ACCESS_TOOL_NAME,
   ...LOCAL_TOOL_NAMES,
 ] as const;
@@ -160,6 +165,7 @@ export async function createLangySession({
       createTodowriteExtension(),
       createSkillExtension(config.skillsDir),
       createQuestionExtension({ turnContext }),
+      createSecretSnippetExtension(),
       createLocalWorkspaceExtension({ turnContext }),
     ],
   });

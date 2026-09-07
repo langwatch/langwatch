@@ -44,6 +44,14 @@ export const guidedKickoffInputSchema = z.object({
   tourStatus: guidedKickoffTourStatusSchema,
   /** The gateway URL an app on this instance points at, with its /v1. */
   gatewayUrl: z.string().optional(),
+  /**
+   * The virtual key the gateway tour minted, when it minted one: its name,
+   * its display prefix and the reveal id that serves its secret once. The
+   * secret is never in the brief.
+   */
+  virtualKeyName: z.string().optional(),
+  virtualKeyPreview: z.string().optional(),
+  virtualKeyRevealId: z.string().optional(),
 });
 export type GuidedKickoffInput = z.infer<typeof guidedKickoffInputSchema>;
 
@@ -132,6 +140,11 @@ export function buildGuidedKickoffBrief({
     input.gatewayUrl
       ? `Gateway: ${input.gatewayUrl}`
       : "Gateway: none configured on this instance",
+  );
+  lines.push(
+    input.virtualKeyName && input.virtualKeyRevealId
+      ? `Virtual key: ${input.virtualKeyName}, preview ${input.virtualKeyPreview ?? "vk-lw-"}, reveal ${input.virtualKeyRevealId}`
+      : "Virtual key: none minted by the tour",
   );
   return lines.join("\n");
 }

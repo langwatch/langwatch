@@ -216,6 +216,7 @@ func TestToolTitle(t *testing.T) {
 	}{
 		{"code_access", "Code access"},
 		{"question", "Question"},
+		{"secret_snippet", "Secret snippet"},
 		{"local_read", "Read on your machine"},
 		{"local_write", "Write on your machine"},
 		{"local_edit", "Edit on your machine"},

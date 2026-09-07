@@ -120,10 +120,32 @@ describe("the guided-onboarding skill", () => {
     });
 
     /** @scenario "A key the tour minted gets the live line, not an apology" */
-    it("opens on the live line when the tour already minted the key", () => {
-      expect(rendered).toContain("say nothing about that, open with the line below as if the key were just made");
-      expect(rendered).toContain("<the production-app key the dialog showed>");
-      expect(rendered).not.toContain("<your production-app key>");
+    it("opens on the live line when the tour already minted the key, with the reveal id from the brief", () => {
+      expect(rendered).toContain("Say nothing about the key having existed; open with the line below as if it were just made.");
+      expect(rendered).toContain(
+        "the `Virtual key:` line of the brief carries its name, its preview and its reveal id, and that is where they come from",
+      );
+      expect(rendered).not.toContain("the dialog showed");
+    });
+
+    /** @scenario "The gateway snippet is shown through the secret snippet card, never printed" */
+    it("mints with --reveal-once and shows the snippet through the secret_snippet card", () => {
+      expect(rendered).toContain(
+        "langwatch virtual-keys create --name production-app --reveal-once --format json",
+      );
+      expect(rendered).toContain("The output carries `reveal_id` and `preview`, never the secret.");
+      expect(rendered).toContain(
+        "call `secret_snippet` with the reveal id, the preview, and this template",
+      );
+      expect(rendered).toContain('export OPENAI_API_KEY="{{secret}}"');
+      expect(rendered).not.toContain('export OPENAI_API_KEY="<the key>"');
+      expect(rendered).toContain(
+        "never write a value that starts with `vk-lw-` in a message, and never write the snippet yourself",
+      );
+      const line = rendered.indexOf("Your key production-app is live.");
+      const card = rendered.indexOf("call `secret_snippet`");
+      expect(line).toBeGreaterThan(-1);
+      expect(card).toBeGreaterThan(line);
     });
 
     it("checks for the production-app key before minting one", () => {

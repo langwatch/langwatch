@@ -92,6 +92,7 @@ import {
   PAGE_LIMIT_DEFAULT,
   PAGE_LIMIT_MAX,
 } from "~/server/gateway/wirePagination";
+import { OneTimeRevealService } from "~/server/secrets/oneTimeReveal.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
   canonicalBaseResponses,
@@ -475,6 +476,12 @@ const createVirtualKeySchema = z.object({
   name: z.string().min(1).max(128),
   description: z.string().optional(),
   principal_user_id: z.string().nullable().optional(),
+  /**
+   * Withhold the secret from this response and park it under a one-time
+   * reveal id instead. The reveal id is read once, by the person the key is
+   * for, through the app; the caller never holds the secret.
+   */
+  reveal_once: z.boolean().optional(),
   /**
    * Visibility set. Defaults to the caller's own project when omitted, so
    * the plain reseller flow (mint a key for this project) needs no ids.
@@ -1018,7 +1025,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
   describeRoute({
     summary: "Create virtual key",
     description:
-      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project, where `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app, so a caller that only relays the key (an agent printing a snippet) never holds it. `scopes` defaults to the caller's project, where `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
     tags: ["Virtual Keys"],
     parameters: [idempotencyKeyParameter],
     responses: {
@@ -1032,7 +1039,22 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
             schema: resolver(
               z.object({
                 virtual_key: virtualKeyDtoSchema,
-                secret: z.string(),
+                secret: z
+                  .string()
+                  .optional()
+                  .describe("The secret, absent when `reveal_once` was set."),
+                reveal_id: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "With `reveal_once`: the id that serves the secret once, through the app.",
+                  ),
+                preview: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "With `reveal_once`: the key's display prefix, safe to show in place of the secret.",
+                  ),
               }),
             ),
           },
@@ -1093,7 +1115,12 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
       // Only the create is inside the idempotent section. The pre-flight
       // above is read-only, so leaving it out means a replay still re-checks
       // the caller's scopes rather than trusting a grant it held yesterday.
-      const outcome = await withIdempotency({
+      const outcome = await withIdempotency<{
+        virtual_key: VirtualKeySnakeDto;
+        secret?: string;
+        reveal_id?: string;
+        preview?: string;
+      }>({
         prisma,
         operation: "gateway.v1.virtual-keys.create",
         scopeId: project.id,
@@ -1105,6 +1132,26 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
             { projectId: project.id, vkId: virtualKey.id },
             "Created virtual key via REST",
           );
+          // With reveal_once the secret goes to the one-time store and the
+          // response carries the id that reads it; the receipt then holds no
+          // secret either, and a replay answers with the same reveal id.
+          if (body.data.reveal_once) {
+            const { revealId } = await OneTimeRevealService.create().stash({
+              organizationId,
+              kind: "virtual_key",
+              keyId: virtualKey.id,
+              preview: virtualKey.displayPrefix,
+              secret,
+            });
+            return {
+              status: 201,
+              body: {
+                virtual_key: await toVkDto(virtualKey),
+                reveal_id: revealId,
+                preview: virtualKey.displayPrefix,
+              },
+            };
+          }
           // The secret is minted once and stored only as a hash, so a caller
           // that loses this response has no second way to read it. That is the
           // whole reason this route takes an idempotency key, and the reason

@@ -28,18 +28,47 @@ export interface CreateVirtualKeyOptions {
   budgetWindow?: string;
   budgetBreach?: "block" | "warn";
   providersAllowed?: string;
+  /**
+   * Withhold the secret and print a one-time reveal id instead. For a caller
+   * that relays the key to someone else, an agent printing a snippet for
+   * instance: the person reads the secret once through the app, and the
+   * caller never holds it.
+   */
+  revealOnce?: boolean;
 }
 
+/** The key as `--reveal-once` prints it: everything but the secret. */
+export function revealOnceLines({
+  id,
+  name,
+  preview,
+  revealId,
+}: {
+  id: string;
+  name: string;
+  preview: string;
+  revealId: string;
+}): string[] {
+  return [
+    "The secret was not printed. It is shown once, through the app, to the person the key is for.",
+    `Virtual key id: ${id}`,
+    `Name:           ${name}`,
+    `Prefix:         ${preview}...`,
+    `Reveal id:      ${revealId}`,
+  ];
+}
 
 /**
  * Returns the created key rather than printing it: the output port renders it
  * in whatever format the caller asked for (utils/output.ts).
  *
  * `data` deliberately includes `secret`. This is the ONE moment the secret
- * exists — the server stores only its hash and never returns it again — so the
+ * exists, the server stores only its hash and never returns it again, so the
  * human output prints it in full, as did the previous `--format json` branch.
- * A `virtual-key create -o json` that withheld it would produce a key nobody
- * could ever use.
+ * A `virtual-key create -o json` that withheld it would produce a key that
+ * cannot be used. The one exception is `--reveal-once`, where the server
+ * withholds the secret itself and answers with the reveal id that serves it
+ * once through the app; then no output, in any format, carries the secret.
  */
 export const createVirtualKeyCommand = async (
   options: CreateVirtualKeyOptions,
@@ -76,7 +105,7 @@ export const createVirtualKeyCommand = async (
   const spinner = createSpinner(`Creating virtual key "${options.name}"...`).start();
 
   try {
-    const { virtual_key, secret } = await service.create({
+    const input = {
       name: options.name,
       description: options.description,
       principal_user_id: options.principalUser ?? null,
@@ -88,7 +117,32 @@ export const createVirtualKeyCommand = async (
       ...(providersAllowed?.length
         ? { config: { providersAllowed } }
         : {}),
-    });
+    };
+
+    if (options.revealOnce) {
+      const { virtual_key, reveal_id, preview } = await service.create({
+        ...input,
+        reveal_once: true,
+      });
+      spinner.succeed(`Created virtual key "${chalk.cyan(virtual_key.name)}"`);
+      return {
+        data: { virtual_key, reveal_id, preview },
+        table: () => {
+          console.log();
+          for (const line of revealOnceLines({
+            id: virtual_key.id,
+            name: virtual_key.name,
+            preview,
+            revealId: reveal_id,
+          })) {
+            console.log(`  ${line}`);
+          }
+          console.log();
+        },
+      };
+    }
+
+    const { virtual_key, secret } = await service.create(input);
 
     spinner.succeed(`Created virtual key "${chalk.cyan(virtual_key.name)}"`);
 

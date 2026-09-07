@@ -67,7 +67,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | "set up tracing", "instrument my code" | `tracing`, then `code-changes` to apply it | `langwatch docs integration/<framework>` |
 | a change to the user's own program: "fix it in my app", "add a parameter to my agent" | `code-changes` | `code_access`, then the `local_*` tools or the `github` skill |
 | "set everything up", "overhaul", "level up" | `level-up` | runs multiple skills in order |
-| a "Guided onboarding kickoff" brief, "Let's set up … then." | `guided-onboarding` | load it with the `skill` tool before any other call; the brief is its input, and its script names every command, `code_access` and `question` included |
+| a "Guided onboarding kickoff" brief, "Let's set up … then." | `guided-onboarding` | load it with the `skill` tool before any other call; the brief is its input, and its script names every command and tool it calls |
 | "traces aren't arriving", "broken instrumentation" | `debug-instrumentation` | `langwatch trace search` |
 | "audit my setup", "best practices" | `agent-best-practices` | parallel `langwatch <resource> list` |
 | "evaluate images / audio / multimodal" | `evaluate-multimodal` | `langwatch scenario-docs multimodal` |

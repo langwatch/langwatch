@@ -44,6 +44,9 @@ Feature: Langy's cards read at the right attention weight
     Then the card leans in with the warm accent
     And it offers a clear action to respond with
 
+  # The secret snippet card shows a value once: it leans in while the value
+  # is on screen, and settles to a quiet masked receipt once it is gone.
+  # See specs/langy/langy-secret-snippet.feature.
   Scenario: A headline result takes full attention
     Given Langy is showing me something worth my full attention
     When it shows a spotlight card

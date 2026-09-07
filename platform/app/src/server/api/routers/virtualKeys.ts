@@ -50,6 +50,7 @@ import {
 import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudget.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
+import { OneTimeRevealService } from "~/server/secrets/oneTimeReveal.service";
 import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -338,6 +339,13 @@ export const virtualKeysRouter = createTRPCRouter({
         expiresAt: z.coerce.date().optional(),
         budget: virtualKeyBudgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
+        /**
+         * Also park the secret under a one-time reveal id, for a reader other
+         * than this caller: the guided tour mints the key here, and Langy
+         * shows the same secret once more through its secret snippet card.
+         * The secret is still returned, since the dialog is its first showing.
+         */
+        revealOnce: z.boolean().optional(),
       }),
     )
     // Per-scope authz (manage on EVERY requested scope) is data-dependent,
@@ -402,6 +410,15 @@ export const virtualKeysRouter = createTRPCRouter({
         config: input.config,
         actorUserId: ctx.session.user.id,
       });
+      const reveal = input.revealOnce
+        ? await OneTimeRevealService.create().stash({
+            organizationId: input.organizationId,
+            kind: "virtual_key",
+            keyId: virtualKey.id,
+            preview: virtualKey.displayPrefix,
+            secret,
+          })
+        : null;
       return {
         virtualKey: toVirtualKeyCamelDto({
           virtualKey,
@@ -411,6 +428,9 @@ export const virtualKeysRouter = createTRPCRouter({
           }),
         }),
         secret,
+        ...(reveal
+          ? { revealId: reveal.revealId, preview: virtualKey.displayPrefix }
+          : {}),
       };
     }),
 

@@ -237,6 +237,19 @@ Feature: Guided onboarding tour
     Then the drawer hands the secret over before the key list refreshes
     And the list refreshes behind it
 
+  # Langy shows the same secret once more, on the gateway path, through the
+  # secret snippet card (specs/langy/langy-secret-snippet.feature). The card
+  # reads it by a one-time reveal id, so the tour's create asks for one and
+  # the guided state keeps it for the kickoff brief. The secret itself is
+  # never stored.
+  @unit
+  Scenario: the tour's key is recorded for Langy by its reveal id
+    Given the gateway tour is running on the virtual keys page
+    When the tour submits the key through the drawer's registered action
+    Then the create is asked for a one-time reveal
+    And the key's name, its display prefix and the reveal id are recorded on the guided state
+    And the secret is still handed to the dialog, once
+
   @unit
   Scenario: the secret step reveals the secret
     Given the create request was sent by the previous step

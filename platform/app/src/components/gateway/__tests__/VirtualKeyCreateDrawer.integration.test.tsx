@@ -48,8 +48,10 @@ const {
   listInvalidate,
   applicableBudgetsData,
   capturedApplicableInputs,
+  recordVirtualKeyReveal,
 } = vi.hoisted(() => ({
   createMutateAsync: vi.fn(),
+  recordVirtualKeyReveal: vi.fn(),
   createMutationOptions: {
     current: null as { onSuccess?: (result: unknown) => unknown } | null,
   },
@@ -94,6 +96,14 @@ vi.mock("~/utils/api", () => ({
         applicableBudgets: { invalidate: async () => undefined },
       },
     }),
+    onboarding: {
+      recordVirtualKeyReveal: {
+        useMutation: () => ({
+          mutate: recordVirtualKeyReveal,
+          isPending: false,
+        }),
+      },
+    },
     virtualKeys: {
       create: {
         /* like react-query, mutateAsync settles only once onSuccess has */
@@ -215,6 +225,7 @@ describe("given the new-virtual-key drawer", () => {
     listInvalidate.mockReset();
     listInvalidate.mockResolvedValue(undefined);
     createMutationOptions.current = null;
+    recordVirtualKeyReveal.mockReset();
   });
 
   afterEach(() => cleanup());
@@ -275,6 +286,32 @@ describe("given the new-virtual-key drawer", () => {
       expect(onCreated).not.toHaveBeenCalled();
       await act(async () => {
         await request;
+      });
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ secret: "vk-lw-secret" }),
+      );
+    });
+
+    /** @scenario the tour's key is recorded for Langy by its reveal id */
+    it("asks the create for a one-time reveal and records it on the guided state", async () => {
+      createMutateAsync.mockResolvedValue({
+        virtualKey: { id: "vk-new", name: "production-app" },
+        secret: "vk-lw-secret",
+        revealId: "rvl_abc",
+        preview: "vk-lw-01HZX9N",
+      });
+      const onCreated = vi.fn();
+      renderDrawer(onCreated);
+      const request = submitThroughTheTour();
+      await act(async () => {
+        await request;
+      });
+      expect(lastCreateInput()).toMatchObject({ revealOnce: true });
+      expect(recordVirtualKeyReveal).toHaveBeenCalledWith({
+        organizationId: ORG_ID,
+        name: "production-app",
+        preview: "vk-lw-01HZX9N",
+        revealId: "rvl_abc",
       });
       expect(onCreated).toHaveBeenCalledWith(
         expect.objectContaining({ secret: "vk-lw-secret" }),

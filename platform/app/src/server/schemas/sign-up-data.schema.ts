@@ -30,6 +30,14 @@ export const guidedOnboardingStateSchema = z.object({
   providerSkippedAt: z.string().optional(),
   conversationId: z.string().optional(),
   tourReplays: z.number().int().nonnegative().optional(),
+  /**
+   * The virtual key the gateway tour minted, so the kickoff brief can name it
+   * and Langy can show its secret once more through the secret snippet card.
+   * The secret itself is never here: `virtualKeyRevealId` reads it once.
+   */
+  virtualKeyName: z.string().optional(),
+  virtualKeyPreview: z.string().optional(),
+  virtualKeyRevealId: z.string().optional(),
 });
 export type GuidedOnboardingState = z.infer<typeof guidedOnboardingStateSchema>;
 

@@ -254,7 +254,13 @@ export function VirtualKeyCreateDrawer({
     return expiryIncompleteReason({ preset: expiration.preset, expiresAt });
   })();
 
-  const handleSubmit = async () => {
+  const recordReveal = api.onboarding.recordVirtualKeyReveal.useMutation();
+
+  const handleSubmit = async ({
+    revealOnce = false,
+  }: {
+    revealOnce?: boolean;
+  } = {}) => {
     if (cannotIssueReason) {
       toaster.create({ title: cannotIssueReason, type: "error" });
       return;
@@ -287,7 +293,20 @@ export function VirtualKeyCreateDrawer({
           modelsAllowed: access.modelsAllowed,
           ...(tags.length > 0 ? { metadata: { tags } } : {}),
         },
+        ...(revealOnce ? { revealOnce: true } : {}),
       });
+      // The tour's key is shown once more by Langy, through the secret
+      // snippet card, so the guided state keeps the reveal id the brief
+      // carries. A failure to record it costs the brief that line, never
+      // the key.
+      if (revealOnce && result.revealId && result.preview) {
+        recordReveal.mutate({
+          organizationId,
+          name: result.virtualKey.name,
+          preview: result.preview,
+          revealId: result.revealId,
+        });
+      }
       onCreated({
         id: result.virtualKey.id,
         name: result.virtualKey.name,
@@ -348,7 +367,7 @@ export function VirtualKeyCreateDrawer({
           );
         }
       },
-      submitVirtualKeyCreate: () => submitRef.current(),
+      submitVirtualKeyCreate: () => submitRef.current({ revealOnce: true }),
     }),
     [utils, organizationId],
   );
@@ -489,7 +508,7 @@ export function VirtualKeyCreateDrawer({
               <Button
                 colorPalette="orange"
                 data-tour="vk-create"
-                onClick={handleSubmit}
+                onClick={() => void handleSubmit()}
                 loading={createMutation.isPending}
               >
                 Create

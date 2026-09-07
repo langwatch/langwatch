@@ -80,6 +80,26 @@ export const guidedOnboardingProcedures = {
       });
     }),
 
+  recordVirtualKeyReveal: protectedProcedure
+    .input(
+      organizationInput.extend({
+        name: z.string().min(1),
+        preview: z.string().min(1),
+        revealId: z.string().min(1),
+      }),
+    )
+    .permission("organization:view")
+    .mutation(async ({ input, ctx }) => {
+      return GuidedOnboardingService.create(ctx.prisma).recordVirtualKeyReveal(
+        { organizationId: input.organizationId, userId: ctx.session.user.id },
+        {
+          name: input.name,
+          preview: input.preview,
+          revealId: input.revealId,
+        },
+      );
+    }),
+
   recordTour: protectedProcedure
     .input(
       organizationInput.extend({
