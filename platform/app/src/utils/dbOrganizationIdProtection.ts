@@ -1,4 +1,7 @@
-import { HIDDEN_SYSTEM_KEY_NAMES } from "~/server/api-key/reserved-names";
+import {
+  CLI_LOGIN_KEY_NAME_PREFIX,
+  HIDDEN_SYSTEM_KEY_NAMES,
+} from "~/server/api-key/reserved-names";
 import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 
 /**
@@ -139,6 +142,36 @@ const isSystemManagedKeySweep = (clause: unknown): boolean => {
   const where = clause as Record<string, unknown>;
   return (
     isSystemManagedKeyName(where.name) &&
+    where.revokedAt === null &&
+    isElapsedExpiryBound(where.expiresAt)
+  );
+};
+
+/**
+ * The shape of the sweep over CLI login keys whose session ran out: the login
+ * key name PREFIX (matched as exactly `{ startsWith: <the prefix> }`),
+ * `revokedAt: null`, and the same elapsed-expiry bound the reserved-name
+ * sweep carries. Exactly those three clauses and nothing else.
+ *
+ * Unlike the reserved names, a customer can name a key this way, so the
+ * prefix alone bounds nothing. What bounds this read is the expiry: a key
+ * whose `expiresAt` has passed cannot authenticate (`ApiKeyService.verify`
+ * refuses it), so the rows it reaches are dead credentials, and what the
+ * sweep does with them is revoke each through the tenant-scoped path, one
+ * organization at a time. Granted to `findMany` only, and the sweep selects
+ * ids and owners, never secrets.
+ */
+const isCliLoginKeySweep = (clause: unknown): boolean => {
+  if (!clause || typeof clause !== "object") return false;
+  const where = clause as Record<string, unknown>;
+  const name = where.name;
+  return (
+    Object.keys(where).length === 3 &&
+    !!name &&
+    typeof name === "object" &&
+    Object.keys(name).length === 1 &&
+    (name as Record<string, unknown>).startsWith ===
+      CLI_LOGIN_KEY_NAME_PREFIX &&
     where.revokedAt === null &&
     isElapsedExpiryBound(where.expiresAt)
   );
@@ -299,9 +332,15 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // neither of which is a sweep, and both of which this bound would otherwise
     // have authorised. A new platform maintenance query does not inherit the
     // hatch; it is a deliberate widening here, with its own shape and action.
+    //
+    // The sweep over elapsed CLI login keys is the third bounded predicate,
+    // on its own terms too (see isCliLoginKeySweep): a read of the dead
+    // login keys, admitted to `findMany` only. The revokes that follow name
+    // each row's organization and go through the ordinary guard.
     extraBound: ({ clause, action }) =>
       typeof clauseField(clause, "lookupId") === "string" ||
-      (action === "updateMany" && isSystemManagedKeySweep(clause)),
+      (action === "updateMany" && isSystemManagedKeySweep(clause)) ||
+      (action === "findMany" && isCliLoginKeySweep(clause)),
   },
   RoutingPolicy: {},
   // The grants ledger's projection tables (ADR-092 §13). Written only by

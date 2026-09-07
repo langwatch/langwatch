@@ -219,6 +219,36 @@ const registry = {
     ],
     docsPath: "/api-reference/api-keys/overview",
   },
+
+  // ---- ingestion keys ----
+  ingestion_key_not_found: {
+    tips: [
+      "Check the key id against your own ingestion keys; another person's key and a key outside this organization both read as not found",
+      "List your ingestion keys to find the right id",
+    ],
+  },
+  ingestion_key_revoke_incomplete: {
+    tips: [
+      "Retry the rotation; keys already revoked stay revoked and only the survivors named in meta.survivors are attempted again",
+      "No new key was minted, so the tokens in use are unchanged",
+    ],
+  },
+  ingestion_key_session_revoked: {
+    tips: [
+      "Run `langwatch login --device` on this machine to start a new session, then mint again",
+    ],
+  },
+  ingestion_key_source_not_allowed: {
+    tips: [
+      "A tool the CLI wraps gets its key from `langwatch instrument <tool>` on the machine that runs it",
+      "Any other source needs a published ingestion template that names it; pass that template's id",
+    ],
+  },
+  ingestion_key_workspace_missing: {
+    tips: [
+      "Sign in to the organization once so your personal workspace is created, then mint again",
+    ],
+  },
   api_key_not_owned: {
     tips: ["Ask the key's owner or an organization admin to make this change"],
     docsPath: "/api-reference/api-keys/overview",

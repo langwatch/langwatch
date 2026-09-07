@@ -3301,12 +3301,21 @@ model ApiKey {
   revokedAt       DateTime?
 
   /// Why the key was revoked, set with `revokedAt`: "user" when a person
-  /// revoked it (the API-keys page, the REST API), "rotation" when a hard-cut
-  /// mint replaced it, "cap" when the personal ingest-key cap retired it. The
-  /// CLI reads it to decide whether a dead ingest key may be re-minted: a key
-  /// a person revoked stays dead. NULL for live keys and for keys revoked
-  /// before the cause was recorded.
+  /// revoked it (the API-keys page, the REST API, the devices tab), "rotation"
+  /// when a mint replaced it, "session" when the CLI login key it was parented
+  /// to was revoked, "expired" when that session ran out. "cap" survives on
+  /// rows the retired per-tool cap revoked. The CLI reads it to decide whether
+  /// a dead ingest key may be re-minted: a key a person revoked stays dead.
+  /// NULL for live keys and for keys revoked before the cause was recorded.
   revocationCause String?
+
+  /// The CLI login key of the device session that minted this ingestion key.
+  /// Set by the CLI's personal mint, NULL for every other key. Revoking the
+  /// parent (logout, the devices tab, a re-login from the same device, session
+  /// expiry) revokes the children with it. Column ref only, no FK and no
+  /// index: lookups filter by the indexed `userId` first and match the parent
+  /// in memory over a person's few live ingest keys.
+  parentApiKeyId String?
 
   /// Non-null marks this key as an "ingestion key": a project-scoped,
   /// ingest-only ApiKey the unified `langwatch <tool>` CLI (and template

@@ -181,6 +181,7 @@ export class ApiKeyService {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    parentApiKeyId,
     isSystemManaged = false,
   }: {
     name: string;
@@ -195,6 +196,12 @@ export class ApiKeyService {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    /**
+     * The CLI login key of the device session minting this ingestion key,
+     * so revoking that session revokes this key with it. Null for every key
+     * minted outside a CLI session.
+     */
+    parentApiKeyId?: string | null;
     /**
      * Only the product's own minting paths (e.g. the Langy session key) may
      * claim a HIDDEN_SYSTEM_KEY_NAMES name. Customer entry points leave this
@@ -336,6 +343,7 @@ export class ApiKeyService {
       ingestSourceType,
       ingestionTemplateId,
       createdByDeviceLabel,
+      parentApiKeyId,
       startsDisabled: true,
     });
 

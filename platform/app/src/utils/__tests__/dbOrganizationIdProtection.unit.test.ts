@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 
+import { reapExpiredCliLoginKeys } from "~/server/api-key/cli-login-key-reaper";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import { PrismaSystemMigrationEnrollmentRepository } from "~/server/app-layer/system-migrations/repositories/system-migration-enrollment.prisma.repository";
 import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
@@ -611,6 +612,129 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
           args: { where: { name: "Langy session" } },
         }),
       ).rejects.toThrow();
+    });
+  });
+
+  /**
+   * The sweep over elapsed CLI login keys is cross-tenant for the same
+   * structural reason: it runs on a timer with no request context. It is a
+   * READ (the revokes that follow name each row's organization), admitted on
+   * exactly the predicate the real reaper writes.
+   */
+  describe("when the expired CLI login key reaper runs its real hourly sweep", () => {
+    function guardedReadPrisma(rows: unknown[]) {
+      const calls: unknown[] = [];
+      const client = {
+        apiKey: {
+          findMany: async (args: unknown) => {
+            calls.push(args);
+            return guardOrganizationId(
+              { model: "ApiKey", action: "findMany", args },
+              async () => rows,
+            );
+          },
+        },
+      };
+      return { client, calls };
+    }
+
+    async function captureLoginKeySweepWhere(): Promise<
+      Record<string, unknown>
+    > {
+      const { client, calls } = guardedReadPrisma([]);
+      await reapExpiredCliLoginKeys({
+        prisma: client as unknown as PrismaClient,
+        now: new Date("2026-09-07T12:00:00Z"),
+        loginKeys: { revokeSessionKey: vi.fn() },
+      });
+      return (calls[0] as { where: Record<string, unknown> }).where;
+    }
+
+    it("passes the guard and hands the elapsed keys to the tenant-scoped revoke", async () => {
+      const { client } = guardedReadPrisma([
+        { id: "ak_1", userId: "user_1", organizationId: "org_1" },
+      ]);
+      const revokeSessionKey = vi
+        .fn()
+        .mockResolvedValue({ loginKeyRevoked: true, ingestKeysRevoked: 0 });
+
+      await expect(
+        reapExpiredCliLoginKeys({
+          prisma: client as unknown as PrismaClient,
+          now: new Date("2026-09-07T12:00:00Z"),
+          loginKeys: { revokeSessionKey },
+        }),
+      ).resolves.toBe(1);
+
+      expect(revokeSessionKey).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_1" }),
+      );
+    });
+
+    it("THROWS when the sweep's shape is replayed as an updateMany or deleteMany", async () => {
+      const where = await captureLoginKeySweepWhere();
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: { where, data: { revokedAt: new Date() } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+      await expect(
+        runGuard({ model: "ApiKey", action: "deleteMany", args: { where } }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+
+    it("THROWS when the read drops the elapsed-expiry bound: that is every live session in every organization", async () => {
+      const { expiresAt: _elapsed, ...withoutExpiryBound } =
+        await captureLoginKeySweepWhere();
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: withoutExpiryBound },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: { ...withoutExpiryBound, expiresAt: { not: null } } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+
+    it("THROWS when the read widens the name to a contains match or another prefix", async () => {
+      const where = await captureLoginKeySweepWhere();
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: { ...where, name: { contains: "CLI login" } } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: { ...where, name: { startsWith: "Ingestion key" } } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+
+    it("THROWS when the read carries any clause beyond the sweep's three", async () => {
+      const where = await captureLoginKeySweepWhere();
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: { ...where, userId: { not: null } } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
     });
   });
 

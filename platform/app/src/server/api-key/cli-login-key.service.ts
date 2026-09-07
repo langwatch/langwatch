@@ -1,3 +1,4 @@
+import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import { isRegistryPermission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -11,19 +12,10 @@ import {
 import { ApiKeyService, type CustomRoleBindingInput } from "./api-key.service";
 import { defaultCliKeyPermissions } from "./cli-key-defaults";
 import { ApiKeyAlreadyRevokedError, ApiKeyNotFoundError } from "./errors";
+import { CLI_LOGIN_KEY_NAME_PREFIX } from "./reserved-names";
+import type { ApiKeyRevocationCause } from "./revocation-cause";
 
 const logger = createLogger("langwatch:api-key:cli-login-key");
-
-/**
- * The marker that, together with `createdByDeviceLabel`, identifies a key the
- * device-flow login minted. Re-login from the same device revokes the previous
- * key by this pair before minting the next one, so logins never accumulate
- * credentials.
- */
-export const CLI_LOGIN_KEY_NAME_PREFIX = "CLI login - ";
-
-/** The device label stamped when an older CLI sends no client_info. */
-export const CLI_LOGIN_UNKNOWN_DEVICE_LABEL = "unknown-device";
 
 export type CliKeyScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
@@ -50,6 +42,37 @@ export interface CliKeyScopeSummary {
 }
 
 /**
+ * Why a login key dies. The ingest keys under it die with it: a session that
+ * ran out passes `expired` on to them, every other cause reaches them as
+ * `session`.
+ */
+export type CliLoginKeyRevocationCause = Extract<
+  ApiKeyRevocationCause,
+  "user" | "rotation" | "expired"
+>;
+
+/** What one revoke did, so a caller can count for the person who asked. */
+export interface CliLoginKeyRevocation {
+  /** False when the key was already revoked or gone. */
+  loginKeyRevoked: boolean;
+  /** Ingest keys retired under it by the cascade. */
+  ingestKeysRevoked: number;
+}
+
+/**
+ * The one dependency the cascade needs from the ingestion-key side, so the
+ * service can be built with a stand-in where the cascade is under test.
+ */
+export interface SessionIngestKeyRevoker {
+  revokeForSession(params: {
+    parentApiKeyId: string;
+    userId: string;
+    organizationId: string;
+    cause: "session" | "expired";
+  }): Promise<{ revokedCount: number }>;
+}
+
+/**
  * An approve request carried a selection the server cannot stamp: empty
  * bindings, empty permissions, or a permission the registry does not know.
  * `meta.fieldErrors` names the offending field so the authorize screen can
@@ -68,30 +91,65 @@ export class CliKeySelectionInvalidError extends HandledError {
 }
 
 /**
+ * When a login key's session runs out: the sooner of the refresh window from
+ * now and the organization's max session duration from the session start. A
+ * refresh recomputes it with a new `nowMs`, so the refresh window slides and
+ * the session ceiling does not. No ceiling (0) leaves the refresh window
+ * alone.
+ */
+export function loginKeyExpiresAt({
+  nowMs,
+  sessionStartedAtMs,
+  maxSessionDurationDays,
+  refreshWindowMs,
+}: {
+  nowMs: number;
+  sessionStartedAtMs: number;
+  maxSessionDurationDays: number;
+  refreshWindowMs: number;
+}): Date {
+  const refreshBoundMs = nowMs + refreshWindowMs;
+  if (maxSessionDurationDays <= 0) return new Date(refreshBoundMs);
+  const ceilingMs =
+    sessionStartedAtMs + maxSessionDurationDays * 24 * 60 * 60 * 1000;
+  return new Date(Math.min(refreshBoundMs, ceilingMs));
+}
+
+/**
  * Mints, replaces and revokes the user-scoped API key a `langwatch login`
  * device session carries, and resolves the selection that shapes it.
  *
+ * The login key is the anchor of the session's other credentials: every
+ * personal ingest key the CLI mints under a session stores this key's id as
+ * its parent, and revoking the login key, for any cause, retires them too.
+ *
  * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
+ * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
 export class CliLoginKeyService {
   private readonly prisma: PrismaClient;
   private readonly apiKeyService: ApiKeyService;
+  private readonly ingestKeys: SessionIngestKeyRevoker;
 
   constructor({
     prisma,
     apiKeyService,
+    ingestKeys,
   }: {
     prisma: PrismaClient;
     apiKeyService: ApiKeyService;
+    ingestKeys: SessionIngestKeyRevoker;
   }) {
     this.prisma = prisma;
     this.apiKeyService = apiKeyService;
+    this.ingestKeys = ingestKeys;
   }
 
   static create(prisma: PrismaClient): CliLoginKeyService {
     return new CliLoginKeyService({
       prisma,
       apiKeyService: ApiKeyService.create(prisma),
+      ingestKeys: IngestionKeyService.create(prisma),
     });
   }
 
@@ -266,17 +324,27 @@ export class CliLoginKeyService {
    * key of the same user + organization + device label first. Returns the
    * plaintext token (shown once, shipped to the CLI) and the scope summary
    * the CLI persists beside it.
+   *
+   * The key carries the session's expiry (see {@link loginKeyExpiresAt}), so
+   * a session nothing refreshes again is retired by the hourly sweep, and
+   * the ingest keys under it with it.
    */
   async mintForDeviceSession({
     userId,
     organizationId,
     deviceLabel,
     selection,
+    sessionStartedAtMs,
+    maxSessionDurationDays,
+    refreshWindowMs,
   }: {
     userId: string;
     organizationId: string;
     deviceLabel: string;
     selection: CliKeySelection;
+    sessionStartedAtMs: number;
+    maxSessionDurationDays: number;
+    refreshWindowMs: number;
   }): Promise<{
     token: string;
     apiKeyId: string;
@@ -300,6 +368,12 @@ export class CliLoginKeyService {
       permissions: selection.permissions,
       bindings: asCustomBindings(selection.bindings),
       createdByDeviceLabel: deviceLabel,
+      expiresAt: loginKeyExpiresAt({
+        nowMs: sessionStartedAtMs,
+        sessionStartedAtMs,
+        maxSessionDurationDays,
+        refreshWindowMs,
+      }),
     });
 
     // The predecessor stays usable until its replacement exists. A mint has
@@ -321,6 +395,7 @@ export class CliLoginKeyService {
         apiKeyId: created.apiKey.id,
         userId,
         organizationId,
+        cause: "rotation",
       });
       throw err;
     }
@@ -337,10 +412,38 @@ export class CliLoginKeyService {
   }
 
   /**
+   * Moves a login key's expiry with its session: a successful refresh calls
+   * this with the value {@link loginKeyExpiresAt} gives for the new refresh
+   * window. A key already revoked is left alone, so a refresh racing a
+   * revoke never brings a dead key back into the sweep's live set.
+   */
+  async extendExpiry({
+    apiKeyId,
+    userId,
+    organizationId,
+    expiresAt,
+  }: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    await this.prisma.apiKey.updateMany({
+      where: {
+        id: apiKeyId,
+        organizationId,
+        userId,
+        name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
+        revokedAt: null,
+      },
+      data: { expiresAt },
+    });
+  }
+
+  /**
    * Revokes every non-revoked CLI login key this user holds for this device
-   * label in this organization. Used after a re-login mint (which passes its
-   * fresh key as `exceptApiKeyId`) and by logout, which passes neither filter
-   * and so clears the device outright.
+   * label in this organization, and the ingest keys under each. Used after a
+   * re-login mint, which passes its fresh key as `exceptApiKeyId`.
    *
    * `createdBefore` is what keeps two logins racing on the same device from
    * revoking each other: each mint clears only keys OLDER than the one it
@@ -375,50 +478,93 @@ export class CliLoginKeyService {
       select: { id: true },
     });
     for (const key of priorKeys) {
-      await this.revokeQuietly({ apiKeyId: key.id, userId, organizationId });
+      await this.revokeQuietly({
+        apiKeyId: key.id,
+        userId,
+        organizationId,
+        cause: "rotation",
+      });
     }
   }
 
   /**
-   * Revokes one login key by id — the logout path, which stored the minted
-   * key's id on the session's Redis token records. Idempotent: a key already
-   * revoked (or gone) leaves logout a success, like the token deletes beside
-   * it.
+   * Revokes one login key by id, and the ingest keys parented to it: the
+   * logout path and the devices tab (cause `user`), a refused refresh and
+   * the hourly sweep (cause `expired`). Idempotent: a key already revoked
+   * (or gone) is reported as not revoked and nothing throws, like the token
+   * deletes beside it.
    */
-  async revokeForLogout({
+  async revokeSessionKey({
     apiKeyId,
     userId,
     organizationId,
+    cause,
   }: {
     apiKeyId: string;
     userId: string;
     organizationId: string;
-  }): Promise<void> {
-    await this.revokeQuietly({ apiKeyId, userId, organizationId });
+    cause: CliLoginKeyRevocationCause;
+  }): Promise<CliLoginKeyRevocation> {
+    return await this.revokeQuietly({
+      apiKeyId,
+      userId,
+      organizationId,
+      cause,
+    });
   }
 
+  /**
+   * The one funnel every login-key revoke goes through. The cascade runs
+   * after the login key is dead and never fails the caller: a logout whose
+   * ingest keys could not be retired is still a logout, and the failure is
+   * logged for the next sweep to find. A cascade that ran against a key that
+   * was already revoked still runs, so a child left behind by an earlier
+   * failure is retired on the next attempt.
+   */
   private async revokeQuietly({
     apiKeyId,
     userId,
     organizationId,
+    cause,
   }: {
     apiKeyId: string;
     userId: string;
     organizationId: string;
-  }): Promise<void> {
+    cause: CliLoginKeyRevocationCause;
+  }): Promise<CliLoginKeyRevocation> {
+    let loginKeyRevoked = true;
     try {
       await this.apiKeyService.revoke({
         id: apiKeyId,
         callerUserId: userId,
         callerIsAdmin: false,
         organizationId,
+        cause,
       });
     } catch (err) {
-      if (ApiKeyAlreadyRevokedError.is(err) || ApiKeyNotFoundError.is(err)) {
-        return;
+      if (ApiKeyNotFoundError.is(err)) {
+        return { loginKeyRevoked: false, ingestKeysRevoked: 0 };
       }
-      throw err;
+      if (!ApiKeyAlreadyRevokedError.is(err)) throw err;
+      loginKeyRevoked = false;
     }
+
+    let ingestKeysRevoked = 0;
+    try {
+      ({ revokedCount: ingestKeysRevoked } =
+        await this.ingestKeys.revokeForSession({
+          parentApiKeyId: apiKeyId,
+          userId,
+          organizationId,
+          cause: cause === "expired" ? "expired" : "session",
+        }));
+    } catch (err) {
+      logger.warn(
+        { err, apiKeyId, userId, organizationId, cause },
+        "could not revoke the ingest keys of a revoked CLI login key",
+      );
+    }
+    return { loginKeyRevoked, ingestKeysRevoked };
   }
 
   /**

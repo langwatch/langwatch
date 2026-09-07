@@ -68,6 +68,7 @@ export class ApiKeyRepository {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    parentApiKeyId,
     startsDisabled = false,
   }: {
     name: string;
@@ -82,6 +83,7 @@ export class ApiKeyRepository {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    parentApiKeyId?: string | null;
     /**
      * Born revoked, to be activated once the key's grants are facts (see
      * {@link activate}). The row and its grants cannot share a transaction —
@@ -104,6 +106,7 @@ export class ApiKeyRepository {
         ingestSourceType: ingestSourceType ?? null,
         ingestionTemplateId: ingestionTemplateId ?? null,
         createdByDeviceLabel: createdByDeviceLabel ?? null,
+        parentApiKeyId: parentApiKeyId ?? null,
         ...(startsDisabled ? { revokedAt: new Date() } : {}),
       },
     });
@@ -142,6 +145,32 @@ export class ApiKeyRepository {
         roleBindings: {
           some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
         },
+      },
+      include: { roleBindings: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  /**
+   * Lists every live ingestion key one person owns in an organization,
+   * newest first. This is the set a session cascade, a source rotation and
+   * the devices tab read: it filters by the indexed `userId` and the callers
+   * match parent, source type or template in memory over a person's few live
+   * keys, which is why `parentApiKeyId` needs no index of its own.
+   */
+  async findIngestKeysForUser({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ApiKeyWithBindings[]> {
+    return this.prisma.apiKey.findMany({
+      where: {
+        organizationId,
+        userId,
+        ingestSourceType: { not: null },
+        revokedAt: null,
       },
       include: { roleBindings: true },
       orderBy: { createdAt: "desc" },
