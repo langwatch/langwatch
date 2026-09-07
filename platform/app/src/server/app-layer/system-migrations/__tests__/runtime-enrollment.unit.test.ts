@@ -96,13 +96,31 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 });
 
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
-import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity/migration-name";
+import {
+  IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
+  IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+} from "../../identity/migration-name";
 import {
   migrationPassCohort,
+  registeredMigrations,
   runSystemMigrationPass,
   runSystemMigrationTargetedPass,
   userMigrationPassCohort,
 } from "../runtime";
+
+describe("the PR1 migration registry", () => {
+  /** @scenario "PR1 does not run the unproved SSO grandfather migration" */
+  it("leaves D04 out of every organization-rooted migration path", () => {
+    const migrationNames = registeredMigrations().map(
+      (migration) => migration.name,
+    );
+
+    expect(migrationNames).toEqual([AUTHZ_ENGINE_MIGRATION_NAME]);
+    expect(migrationNames).not.toContain(
+      IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
+    );
+  });
+});
 
 describe("migrationPassCohort on cloud", () => {
   beforeEach(() => {
