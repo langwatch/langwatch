@@ -176,7 +176,7 @@ export function requestHooks({
       // pending-confirmation latch and sends its continuation email. Leaving
       // BetterAuth's raw route reachable would create an account with no
       // supported way to request that proof.
-      if (pathname === "/sign-up/email") {
+      if (pathname.endsWith("/sign-up/email")) {
         throw new APIError("NOT_FOUND", {
           code: "NOT_FOUND",
           message: "Not found",

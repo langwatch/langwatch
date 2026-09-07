@@ -153,17 +153,21 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
     });
 
     /** @scenario Raw password sign-up cannot bypass confirmed registration */
-    it("refuses BetterAuth's raw sign-up route in favor of the confirmed registration flow", async () => {
-      await expect(
-        runBeforeHook(ctxFor("https://host/api/auth/sign-up/email")),
-      ).rejects.toMatchObject({ statusCode: 404 });
+    it.each([
+      "https://host/api/auth/sign-up/email",
+      "https://host/api/auth/sign-up/email/",
+      "https://host/api/auth/sign-up/email?callbackURL=%2F",
+    ])("refuses the raw sign-up route %s", async (url) => {
+      await expect(runBeforeHook(ctxFor(url))).rejects.toMatchObject({
+        statusCode: 404,
+      });
     });
 
     /** @scenario No password can be attached to an SSO account without inbox proof */
     it("still refuses credential-mutation endpoints", async () => {
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/set-password")),
-      ).rejects.toMatchObject({ statusCode: 404 });
+      ).rejects.toMatchObject({ statusCode: 400 });
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/change-password")),
       ).rejects.toMatchObject({ statusCode: 400 });
