@@ -112,10 +112,28 @@ export function getTrustedProxyClientIp(
 export function parseTrustedProxyAddresses(
   configured: string | undefined,
 ): readonly string[] {
-  return (configured ?? "")
+  const entries = (configured ?? "")
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
+
+  return entries.map(parseTrustedProxyEntry);
+}
+
+function parseTrustedProxyEntry(entry: string): string {
+  const parts = entry.split("/");
+  if (parts.length === 1) {
+    const address = parseAddress(entry);
+    if (address) return address;
+  } else if (parts.length === 2) {
+    const [network, prefix] = parts;
+    const bits = parseIpv4Prefix(prefix);
+    if (network && isIP(network) === 4 && bits !== null) {
+      return `${network}/${bits}`;
+    }
+  }
+
+  throw new Error(`Invalid trusted proxy address: ${entry}`);
 }
 
 function forwardedAddress(
@@ -153,11 +171,12 @@ function isTrustedProxy(
 }
 
 function withinIpv4Range(address: string, range: string): boolean {
-  const [network, prefix] = range.split("/");
-  const bits = Number(prefix);
-  if (!network || !Number.isInteger(bits) || bits < 0 || bits > 32) {
-    return false;
-  }
+  const parts = range.split("/");
+  if (parts.length !== 2) return false;
+
+  const [network, prefix] = parts;
+  const bits = parseIpv4Prefix(prefix);
+  if (!network || bits === null) return false;
 
   const target = ipv4AsNumber(address);
   const base = ipv4AsNumber(network);
@@ -165,6 +184,11 @@ function withinIpv4Range(address: string, range: string): boolean {
 
   const mask = bits === 0 ? 0 : (0xff_ff_ff_ff << (32 - bits)) >>> 0;
   return (target & mask) === (base & mask);
+}
+
+function parseIpv4Prefix(value: string | undefined): number | null {
+  if (!value || !/^(?:[0-9]|[12][0-9]|3[0-2])$/.test(value)) return null;
+  return Number(value);
 }
 
 function ipv4AsNumber(address: string): number | null {

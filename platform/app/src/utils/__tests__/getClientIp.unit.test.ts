@@ -167,6 +167,34 @@ describe("getTrustedProxyClientIp()", () => {
       parseTrustedProxyAddresses(" 10.0.0.9, 172.16.0.0/12, ,::1 "),
     ).toEqual(["10.0.0.9", "172.16.0.0/12", "::1"]);
   });
+
+  it.each([
+    "10.0.0.1/",
+    "10.0.0.1/00",
+    "10.0.0.1/8/extra",
+    "999.0.0.1/8",
+    "not-an-address",
+  ])("rejects malformed trusted proxy entry %s", (entry) => {
+    expect(() => parseTrustedProxyAddresses(entry)).toThrow(
+      `Invalid trusted proxy address: ${entry}`,
+    );
+  });
+
+  it("preserves an explicitly configured IPv4 zero-prefix range", () => {
+    expect(parseTrustedProxyAddresses("0.0.0.0/0")).toEqual(["0.0.0.0/0"]);
+  });
+
+  it("does not trust malformed CIDRs passed directly to the resolver", () => {
+    expect(
+      getTrustedProxyClientIp(
+        {
+          headers: { "x-forwarded-for": "203.0.113.8" },
+          socket: { remoteAddress: "198.51.100.4" },
+        },
+        ["10.0.0.1/", "198.51.100.4/24/extra"],
+      ),
+    ).toBe("198.51.100.4");
+  });
 });
 
 describe("getClientIpFromHonoContext()", () => {
