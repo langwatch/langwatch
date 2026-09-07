@@ -136,11 +136,6 @@ function organizationGroup({
       ...(!isLiteMember
         ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }]
         : []),
-      {
-        label: "Authentication",
-        href: "/settings/authentication",
-        icon: Fingerprint,
-      },
       ...(showEnterpriseNav && !isLiteMember && hasPermission("auditLog:view")
         ? [
             {
