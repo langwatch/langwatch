@@ -6,6 +6,15 @@ Feature: Feature package boundary lint
   So that feature boundaries cannot be bypassed by imports or exported types
 
   @unit @architecture
+  Scenario: Concurrent architecture checks wait before loading the lint engine
+    Given two architecture checks hold the machine's lint slots
+    When further checks start from any worktree
+    Then they wait without loading the lint engine
+    And no more than two checks run at once
+    And a completed or killed check releases its slot
+    And waiting callers can be cancelled without consuming a slot
+
+  @unit @architecture
   Scenario: A valid feature graph passes
     Given a singular feature and its subjects are registered in the ownership catalogue
     And it has a contract package with portable dependencies
@@ -243,6 +252,14 @@ Feature: Feature package boundary lint
     Given a package's emitted declaration mentions Prisma or a generated client path
     When architecture lint checks the public declarations
     Then it reports the exported declaration and fails
+
+  @unit @architecture
+  Scenario: Declaration producers prepare their production dependencies
+    Given an adopted package imports another adopted workspace package
+    And only its no-emit config references that dependency's declaration producer
+    When architecture lint checks the declaration project graph
+    Then it reports a declaration-project-references finding on the producer
+    And adding a reachable producer reference resolves the finding without generated output
 
   @unit @architecture
   Scenario: Feature services are classes

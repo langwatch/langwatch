@@ -53,6 +53,13 @@ Create an Oxlint plugin plus a private workspace tool named
 `@langwatch/architecture-lint`. Root lint runs the Oxlint source rules first,
 then the deterministic workspace CLI.
 
+The CLI admits at most two architecture-lint runs per machine, across worktrees
+and review modes. Admission happens before loading the lint engine. Two fixed
+loopback listeners (127.0.0.1 ports 47381 and 47382) act as OS-owned slots and
+are released even on forced termination. Contention waits; other admission
+errors fail the command rather than bypassing the limit. No external queue
+wrapper or developer opt-in is required.
+
 ```text
 packages/architecture-lint/
 ├── package.json
