@@ -51,6 +51,7 @@ describe("installTelemetryWiring", () => {
 			vi.mocked(runningCodeRestartNotice).mockReturnValue(notice);
 		});
 
+		/** @scenario "A running langwatch code command needs a restart after reconfiguration" */
 		it("reports restart advice after changing the ingest key", () => {
 			install();
 			expect(install("ik-lw-replacement_secret").warnings).toContain(notice);
@@ -73,6 +74,7 @@ describe("installTelemetryWiring", () => {
 			expect(install("ik-lw-replacement_secret").warnings).toEqual([]);
 		});
 
+		/** @scenario "Unchanged wiring needs no restart notice" */
 		it("does not inspect processes or advise restarting unchanged wiring", () => {
 			install();
 			vi.mocked(runningCodeRestartNotice).mockClear();

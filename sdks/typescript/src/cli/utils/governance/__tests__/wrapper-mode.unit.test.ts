@@ -119,6 +119,7 @@ describe("resolveWrapperMode", () => {
 			vi.mocked(runningCodeRestartNotice).mockReturnValue(restartNotice);
 		});
 
+		/** @scenario "Switching projects through the wrapper reports restart advice" */
 		it("returns restart advice alongside the refreshed wiring", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
 			persistCode("ik-lw-projecta_secret");

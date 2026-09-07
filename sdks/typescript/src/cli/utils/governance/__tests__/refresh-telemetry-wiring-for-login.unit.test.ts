@@ -49,6 +49,7 @@ const temp = installTempHomeAndCwd();
 
 describe("refreshTelemetryWiringForLogin", () => {
 	describe("when login changes the instance used by an active langwatch code launcher", () => {
+		/** @scenario "Login refresh reports the same restart advice" */
 		it("returns restart advice with the successful wiring refresh", async () => {
 			const notice =
 				"Restart `langwatch code` to apply the updated telemetry settings.";
