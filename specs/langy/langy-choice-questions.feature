@@ -135,6 +135,25 @@ Feature: Langy asks a real question with selectable options
       Then the choices card renders with the options
       And the turn stays in flight, with the tool waiting
 
+    # The dashed "Made by Langy" frame is provenance for a view Langy composed
+    # from the project's data. A question is an ask: the reader is deciding,
+    # not judging a chart, so the card is a plain option list under the reply.
+    @integration
+    Scenario: A question is an ask, not a view Langy composed
+      When a question card renders
+      Then it is a plain list of options under the reply, titled by the question
+      And it wears no derived frame and no provenance label
+
+    # When the reply before the call already says what is being asked, the
+    # card repeating it as a title says the same thing twice. The tool's
+    # `bare` flag keeps the options alone; the question is still recorded
+    # with the answer.
+    @integration
+    Scenario: A bare question shows only its options
+      Given Langy said in words what it proposes
+      When it asks with the question tool marked bare
+      Then the card shows the options and no question title
+
     @unit
     Scenario: A question renders in a tab that never watched the turn
       Given a turn this tab adopted, so it reads no live stream

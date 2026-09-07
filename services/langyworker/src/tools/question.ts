@@ -174,6 +174,12 @@ const questionParams = Type.Object({
       allowOther: Type.Optional(
         Type.Boolean({ description: "Let the user write their own answer." }),
       ),
+      bare: Type.Optional(
+        Type.Boolean({
+          description:
+            "Show only the options, without the question text on the card. Use it when the words before the call already say what is being asked; the question field is still recorded with the answer.",
+        }),
+      ),
     }),
     { description: "One to four questions. Ask one question at a time when you can." },
   ),

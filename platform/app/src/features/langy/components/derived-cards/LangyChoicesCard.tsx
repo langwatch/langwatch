@@ -15,6 +15,12 @@
  * Selecting sends the answer as the NEXT USER MESSAGE (structured part +
  * readable text) through the ordinary send path — the turn machinery is
  * untouched by construction.
+ *
+ * A question is an ask, not a view Langy composed from the project's data, so
+ * it wears none of the derived frame (the dashed provenance chrome is for the
+ * timeseries, table and stats cards): it is a plain option list under the
+ * reply. A `bare` card drops the question title too, because the words before
+ * it already said what is being asked.
  */
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type {
@@ -25,7 +31,6 @@ import type {
 import { Check, CircleSlash } from "lucide-react";
 import { useState } from "react";
 
-import { LangyDerivedCardFrame } from "./LangyDerivedCardFrame";
 import { type ChoicesRefRow, useChoicesRefRows } from "./useChoicesRefRows";
 
 /**
@@ -113,29 +118,23 @@ export function LangyChoicesCard({
   const chosen = new Set(answered ? lockState.optionIds : []);
 
   return (
-    <LangyDerivedCardFrame
-      forming={forming}
-      superseded={superseded}
-      title={
+    <VStack
+      align="stretch"
+      gap={1.5}
+      opacity={superseded ? 0.65 : 1}
+      role="group"
+      // The stable hook for the card as a whole; every other attribute is a
+      // style.
+      data-langy-choices-card
+      data-choices-bare={card.bare === true ? "true" : undefined}
+      data-choices-forming={forming ? "true" : undefined}
+    >
+      {card.bare === true ? null : (
         <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
           {card.question}
         </Text>
-      }
-      actions={
-        open && multi ? (
-          <Button
-            size="xs"
-            colorPalette="orange"
-            disabled={picked.size === 0}
-            onClick={() =>
-              answer({ blockId: card.blockId, optionIds: [...picked] })
-            }
-          >
-            <Check size={12} /> Answer
-          </Button>
-        ) : undefined
-      }
-    >
+      )}
+
       <VStack align="stretch" gap={1}>
         {card.options.map((option) => {
           const refRow = refRows.get(option.id) ?? { state: "plain" as const };
@@ -328,6 +327,21 @@ export function LangyChoicesCard({
           </Text>
         ) : null}
       </VStack>
-    </LangyDerivedCardFrame>
+
+      {open && multi ? (
+        <HStack gap={2} align="center" flexWrap="wrap">
+          <Button
+            size="xs"
+            colorPalette="orange"
+            disabled={picked.size === 0}
+            onClick={() =>
+              answer({ blockId: card.blockId, optionIds: [...picked] })
+            }
+          >
+            <Check size={12} /> Answer
+          </Button>
+        </HStack>
+      ) : null}
+    </VStack>
   );
 }

@@ -203,6 +203,12 @@ export const choicesCardFields = {
     .min(1),
   multiSelect: z.boolean().optional(),
   allowOther: z.boolean().optional(),
+  /**
+   * Only the options are drawn. The reply before the card carries the
+   * question in words, so the card repeating it as a title would say the
+   * same thing twice. The question is still recorded with the answer.
+   */
+  bare: z.boolean().optional(),
 } as const;
 
 /**

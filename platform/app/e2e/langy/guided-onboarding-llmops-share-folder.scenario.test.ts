@@ -21,12 +21,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertPathCompletedAfterSkill,
   attachKickoffConversation,
+  CREATE_FIRST_SCENARIO_OPTION,
   conversationMessages,
+  createFirstScenarioLabel,
   createGuidedCheckout,
   GUIDED_LINES,
   GUIDED_OPTIONS,
   GUIDED_TONE_CRITERIA,
   type GuidedOrganization,
+  isProposalQuestion,
   listProjectScenarios,
   listProjectSuites,
   mergeToolEvents,
@@ -99,9 +102,9 @@ describe("Langy sets up the llmops path through the shared folder", () => {
           adapter: langy,
           policy: { fallback: "allow_once" },
           answerQuestion: async (question) => {
-            if (question.question.includes(GUIDED_LINES.proposalStart)) {
+            if (isProposalQuestion(question)) {
               scenariosAtProposal = await listProjectScenarios();
-              return [GUIDED_OPTIONS.goAhead];
+              return [createFirstScenarioLabel(question)!];
             }
             return question.options?.[0]?.label
               ? [question.options[0].label]
@@ -134,7 +137,7 @@ describe("Langy sets up the llmops path through the shared folder", () => {
                   "Langy asks for code access through the code access card in its first step; the opener line and the card in that same step are the expected shape. Fail only if Langy writes more text or takes another action after the card and before the user answers it.",
                   "When the developer types an unrelated question while the card is up, Langy answers in one warm line that keeps the setup going and never drops the path it was on.",
                   "After the folder connects, Langy reads the code, reports the framework it found, and wires tracing and the connect call into the developer's own code.",
-                  `Langy proposes the first scenario with a question that starts "${GUIDED_LINES.proposalStart}" and ends "${GUIDED_LINES.proposalEnd}", and creates nothing before the developer picks "${GUIDED_OPTIONS.goAhead}".`,
+                  `Langy proposes the first scenario in words, word for word from "${GUIDED_LINES.proposalStart}" up to the reason, then asks with a question card that carries only two options: one reading Create "<the scenario title>" as your first scenario test, and the quiet "${GUIDED_OPTIONS.chatAboutThis}". It creates nothing before the developer picks the create option.`,
                   `After the go, Langy says, word for word: "${GUIDED_LINES.whyScenario}"`,
                   `Langy says, word for word: "${GUIDED_LINES.running}"`,
                   `After the first run, Langy says, word for word: "${GUIDED_LINES.proved}"`,
@@ -257,18 +260,15 @@ describe("Langy sets up the llmops path through the shared folder", () => {
         // and nothing existed while it was open.
         const proposal = watcher.questions
           .flatMap((ask) => ask.questions)
-          .find((question) =>
-            question.question.includes(GUIDED_LINES.proposalStart),
-          );
+          .find((question) => isProposalQuestion(question));
         console.log("[layer2] proposal:", JSON.stringify(proposal));
         expect(proposal).toBeDefined();
-        expect(saysVerbatim(proposal!.question, GUIDED_LINES.proposalEnd)).toBe(
-          true,
-        );
-        expect(proposal!.options?.map((option) => option.label)).toEqual([
-          GUIDED_OPTIONS.goAhead,
-          GUIDED_OPTIONS.chatAboutThis,
-        ]);
+        // The words carry the proposal; the card carries the options alone.
+        expect((proposal as { bare?: boolean }).bare).toBe(true);
+        const labels = proposal!.options?.map((option) => option.label) ?? [];
+        expect(labels).toHaveLength(2);
+        expect(labels[0]).toMatch(CREATE_FIRST_SCENARIO_OPTION);
+        expect(labels[1]).toBe(GUIDED_OPTIONS.chatAboutThis);
         expect(proposal!.options?.[1]?.quiet).toBe(true);
         expect(proposal!.options?.[0]?.quiet).not.toBe(true);
         expect(scenariosAtProposal).toEqual([]);
@@ -301,9 +301,7 @@ describe("Langy sets up the llmops path through the shared folder", () => {
         expect(commands.some((c) => /test-suite run/.test(c))).toBe(true);
         const createAt = commands.findIndex((c) => /scenario create/.test(c));
         const proposalAt = watcher.questions.findIndex((ask) =>
-          ask.questions.some((q) =>
-            q.question.includes(GUIDED_LINES.proposalStart),
-          ),
+          ask.questions.some((q) => isProposalQuestion(q)),
         );
         expect(proposalAt).toBeGreaterThanOrEqual(0);
         expect(createAt).toBeGreaterThanOrEqual(0);

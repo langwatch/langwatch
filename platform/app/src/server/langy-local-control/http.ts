@@ -126,6 +126,8 @@ export const questionSchema = z.object({
   multiple: z.boolean().optional(),
   /** Offer a free-text answer next to the options. */
   allowOther: z.boolean().optional(),
+  /** Show only the options: the words before the call carry the question. */
+  bare: z.boolean().optional(),
 });
 
 export const startWaitBodySchema = z.object({

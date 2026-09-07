@@ -60,8 +60,7 @@ export const GUIDED_LINES = {
   describeConnect:
     "Perfect. To write a scenario for that and run it against your real agent, and wire tracing in while I'm at it, I still need to reach the code. How should I connect?",
   proposalStart:
-    "I read through the code. I think the first scenario we should write is",
-  proposalEnd: "Can I create and run it for you?",
+    "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is",
   chatAboutThis:
     "Of course. Tell me what the scenario should cover and I'll write it with you.",
   whyScenario:
@@ -83,8 +82,33 @@ export const GUIDED_LINES = {
     "To govern anything I first need to see it. Your identity provider gives me people and teams, vendor billing exports give me the dollars, and each tool's admin API gives me seats and usage. Where should we start?",
 } as const;
 
+/**
+ * The proposal's primary option names the scenario Langy picked, so it is a
+ * shape rather than a fixed string: Create "{title}" as your first scenario
+ * test.
+ */
+export const CREATE_FIRST_SCENARIO_OPTION =
+  /^Create ".+" as your first scenario test$/;
+
+/** Is this the proposal question: the one whose first option creates the scenario? */
+export function isProposalQuestion(question: {
+  options?: Array<{ label: string }>;
+}): boolean {
+  return (question.options ?? []).some((option) =>
+    CREATE_FIRST_SCENARIO_OPTION.test(option.label),
+  );
+}
+
+/** The create option's label on the proposal question, as Langy worded it. */
+export function createFirstScenarioLabel(question: {
+  options?: Array<{ label: string }>;
+}): string | undefined {
+  return (question.options ?? []).find((option) =>
+    CREATE_FIRST_SCENARIO_OPTION.test(option.label),
+  )?.label;
+}
+
 export const GUIDED_OPTIONS = {
-  goAhead: "Sure, go ahead!",
   chatAboutThis: "Chat about this",
   identityProvider: "Connect identity provider",
   billingExport: "Connect a vendor billing export",

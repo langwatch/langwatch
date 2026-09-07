@@ -23,7 +23,7 @@ const VERBATIM_LINES = {
   "the second describe fallback line":
     "Perfect. To write a scenario for that and run it against your real agent, and wire tracing in while I'm at it, I still need to reach the code. How should I connect?",
   "the proposal":
-    "I read through the code. I think the first scenario we should write is {title}, because {reason}. Can I create and run it for you?",
+    "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is {title}, because {reason}.",
   "the chat-about-this line":
     "Of course. Tell me what the scenario should cover and I'll write it with you.",
   "the why-a-scenario line":
@@ -106,6 +106,22 @@ describe("the guided-onboarding skill", () => {
     it("marks the chat option quiet and asks before creating anything", () => {
       expect(rendered).toContain('"Chat about this", quiet');
       expect(rendered).toContain("Do not create it yet.");
+    });
+
+    /** @scenario "Sharing the folder leads to a proposal, not a creation" */
+    it("says the proposal in words and asks with a bare question whose first option names the scenario", () => {
+      const proposal = rendered.indexOf(VERBATIM_LINES["the proposal"]);
+      const bare = rendered.indexOf("ask with the `question` tool with `bare: true`");
+      const create = rendered.indexOf('1. Create "{title}" as your first scenario test');
+      const chat = rendered.indexOf('2. "Chat about this", quiet');
+      expect(proposal).toBeGreaterThan(-1);
+      expect(bare).toBeGreaterThan(proposal);
+      expect(create).toBeGreaterThan(bare);
+      expect(chat).toBeGreaterThan(create);
+      expect(rendered).toContain(
+        'The `question` field is "Create the first scenario test?"; it is recorded with the answer and not drawn.',
+      );
+      expect(rendered).not.toContain("Sure, go ahead!");
     });
 
     it("ends every path by recording its completion", () => {
@@ -413,7 +429,7 @@ describe("the guided-onboarding skill", () => {
       );
       expect(rendered).toContain("After that pick, their next message describes the scenario.");
       expect(rendered).toContain(
-        'On "Sure, go ahead!", or on the scenario agreed after "Chat about this", before any command',
+        'On the create option, or on the scenario agreed after "Chat about this", before any command',
       );
     });
 

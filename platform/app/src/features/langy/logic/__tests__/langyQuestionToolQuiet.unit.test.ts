@@ -36,6 +36,44 @@ describe("questionToolCardParts", () => {
       ]);
     });
 
+    /** @scenario "A bare question shows only its options" */
+    it("carries the bare mark, so the card draws the options alone", () => {
+      const [card] = questionToolCardParts({
+        type: "tool-question",
+        state: "input-available",
+        toolCallId: "call-3",
+        input: {
+          questions: [
+            {
+              question: "Create the first scenario test?",
+              bare: true,
+              options: [
+                {
+                  label:
+                    'Create "Guest completes checkout" as your first scenario test',
+                },
+                { label: "Chat about this", quiet: true },
+              ],
+            },
+          ],
+        },
+      });
+      if (card?.card.kind !== "choices") throw new Error("expected choices");
+      expect(card.card.bare).toBe(true);
+      expect(card.card.question).toBe("Create the first scenario test?");
+
+      const [plain] = questionToolCardParts({
+        type: "tool-question",
+        state: "input-available",
+        toolCallId: "call-4",
+        input: {
+          questions: [{ question: "Which one?", options: [{ label: "A" }] }],
+        },
+      });
+      if (plain?.card.kind !== "choices") throw new Error("expected choices");
+      expect(plain.card).not.toHaveProperty("bare");
+    });
+
     it("ignores a quiet value that is not exactly true", () => {
       const [card] = questionToolCardParts({
         type: "tool-question",

@@ -30,7 +30,7 @@ Say nothing about the brief itself: the panel draws it as a card, and the user n
 
 ## Rules that hold on every path
 
-- **Never act unasked.** Before anything is created or run on the project, the user has picked "Sure, go ahead!" or its equivalent on a question. Reading code, detecting the framework and wiring tracing are part of the setup they asked for by sharing the code; creating scenarios, suites and runs are not until they say so.
+- **Never act unasked.** Before anything is created or run on the project, the user has picked the create option on the proposal or its equivalent on a question. Reading code, detecting the framework and wiring tracing are part of the setup they asked for by sharing the code; creating scenarios, suites and runs are not until they say so.
 - **Every line below is verbatim.** The openers, the fallback lines, the proposal, the why-a-scenario line and the closers are product copy: say them word for word, with nothing added before them. Fill only the braces.
 - **Stay on the path.** A typed question mid-setup gets one line in the same tone and the setup continues where it was, for example: "We'll get to that! Let me finish getting you set up first, then I'm all yours." Never drop the path.
 - **Quiet options.** Where a script says an option is quiet, pass `quiet: true` on that option of the `question` tool. It renders as a link under the bordered options and answers like one.
@@ -95,13 +95,13 @@ Then say in one line of your own words that the tracing and the connect call are
 
 This question is the gate of step 4: no `scenario create`, no run and no suite before the person has answered it. Whatever arrives first, a message describing a scenario, a question, or a setup that stopped at a failed step and was then fixed, finish step 2 and ask it; a scenario the person described before the question becomes `{title}` in it, and the answer is still theirs to give.
 
-Do not create it yet. Ask with the `question` tool, verbatim, with the braces filled from what you read:
+Do not create it yet. Say the proposal as your reply, verbatim, with the braces filled from what you read:
 
-I read through the code. I think the first scenario we should write is {title}, because {reason}. Can I create and run it for you?
+Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is {title}, because {reason}.
 
-Options, in this order:
+Then, in the same step, ask with the `question` tool with `bare: true`, so the card shows the options alone under those words. The `question` field is "Create the first scenario test?"; it is recorded with the answer and not drawn. Options, in this order, with the same `{title}`:
 
-1. "Sure, go ahead!"
+1. Create "{title}" as your first scenario test
 2. "Chat about this", quiet
 
 The first scenario is the agent's golden path: the thing the agent exists to do, end to end, with inputs the code accepts. Refusals, expired inputs and edge cases come in the suite after it, never first. `{title}` names that path in a few words, for example "Guest completes checkout"; `{reason}` says in one clause why it goes first.
@@ -114,7 +114,7 @@ After that pick, their next message describes the scenario. Write it with them, 
 
 ### 4. The checklist, then create, explain, run
 
-On "Sure, go ahead!", or on the scenario agreed after "Chat about this", before any command, write this list into `todowrite`, in this order and these words, every item pending:
+On the create option, or on the scenario agreed after "Chat about this", before any command, write this list into `todowrite`, in this order and these words, every item pending:
 
 1. Create the first scenario
 2. Open it beside the panel

@@ -27,6 +27,7 @@ import {
   GUIDED_OPTIONS,
   GUIDED_TONE_CRITERIA,
   type GuidedOrganization,
+  isProposalQuestion,
   listProjectScenarios,
   listProjectSuites,
   mergeToolEvents,
@@ -94,7 +95,7 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
           adapter: langy,
           policy: { fallback: "allow_once" },
           answerQuestion: async (question) => {
-            if (question.question.includes(GUIDED_LINES.proposalStart)) {
+            if (isProposalQuestion(question)) {
               scenariosAtProposal = await listProjectScenarios();
               return [GUIDED_OPTIONS.chatAboutThis];
             }
@@ -207,10 +208,9 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
         // chat line with nothing created.
         const proposal = watcher.questions
           .flatMap((ask) => ask.questions)
-          .find((question) =>
-            question.question.includes(GUIDED_LINES.proposalStart),
-          );
+          .find((question) => isProposalQuestion(question));
         expect(proposal).toBeDefined();
+        expect((proposal as { bare?: boolean }).bare).toBe(true);
         expect(proposal!.options?.[1]?.label).toBe(
           GUIDED_OPTIONS.chatAboutThis,
         );

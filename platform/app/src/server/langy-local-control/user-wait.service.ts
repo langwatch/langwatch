@@ -121,6 +121,7 @@ export interface UserWaitQuestion {
   options: Array<{ label: string; description?: string; quiet?: boolean }>;
   multiple?: boolean;
   allowOther?: boolean;
+  bare?: boolean;
 }
 
 export interface UserWaitServiceOptions {

@@ -38,9 +38,9 @@ import { questionToolCardParts } from "../logic/langyQuestionTool";
 
 afterEach(cleanup);
 
-/** The frame the choices card renders inside — the ADR-060 provenance mark. */
-const derivedFrames = () =>
-  document.querySelectorAll("[data-derived-by-langy]");
+/** The choices cards on screen. A question is an ask, so it wears no derived frame. */
+const choicesCards = () =>
+  document.querySelectorAll("[data-langy-choices-card]");
 
 /** A `question` tool part exactly as the stream delivers one — and leaves it. */
 function questionToolPart(over: Record<string, unknown> = {}) {
@@ -98,16 +98,60 @@ function renderMessage(
 describe("the question tool card", () => {
   describe("given an assistant turn waiting on its question tool call", () => {
     describe("when the message renders", () => {
-      it("draws the interactive choices card, titled by the question itself", () => {
+      /** @scenario "A question is an ask, not a view Langy composed" */
+      it("draws the interactive choices card, titled by the question itself, without the derived frame", () => {
         renderMessage(assistantMessage([questionToolPart()]));
 
-        expect(derivedFrames().length).toBe(1);
+        expect(choicesCards().length).toBe(1);
         expect(
           screen.getByText("Which agent should the scenario run against?"),
         ).toBeInTheDocument();
         expect(screen.getByText("Staging agent")).toBeInTheDocument();
         expect(screen.getByText("The safe one")).toBeInTheDocument();
         expect(screen.getByText("Production agent")).toBeInTheDocument();
+        // The dashed provenance chrome is for the cards Langy composed from
+        // the project's data; a question is not one.
+        expect(document.querySelector("[data-derived-by-langy]")).toBeNull();
+        expect(screen.queryByText("Made by Langy")).toBeNull();
+      });
+
+      /** @scenario "A bare question shows only its options" */
+      it("draws only the options when the question is bare", () => {
+        renderMessage(
+          assistantMessage([
+            questionToolPart({
+              input: {
+                questions: [
+                  {
+                    question: "Create the first scenario test?",
+                    bare: true,
+                    options: [
+                      {
+                        label:
+                          'Create "Guest completes checkout" as your first scenario test',
+                      },
+                      { label: "Chat about this", quiet: true },
+                    ],
+                  },
+                ],
+              },
+            }),
+          ]),
+        );
+
+        expect(choicesCards().length).toBe(1);
+        expect(
+          screen.queryByText("Create the first scenario test?"),
+        ).toBeNull();
+        expect(
+          screen.getByText(
+            'Create "Guest completes checkout" as your first scenario test',
+          ),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Chat about this")).toBeInTheDocument();
+        expect(choicesCards()[0]!.getAttribute("data-choices-bare")).toBe(
+          "true",
+        );
       });
 
       it("never renders the tool as raw activity — no dead 'Question…' card, no JSON", () => {
@@ -230,7 +274,7 @@ describe("the question tool card", () => {
         ]),
       );
 
-      expect(derivedFrames().length).toBe(0);
+      expect(choicesCards().length).toBe(0);
       // The honest fallback: the tool surfaces as ordinary activity.
       expect(screen.getByLabelText("Langy activity")).toBeInTheDocument();
     });

@@ -520,7 +520,7 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: The path is a checklist Langy keeps
       When the compiled guided-onboarding skill is read
-      Then on "Sure, go ahead!" the fixed order goes into the plan tool as eleven pending items, before any command
+      Then on the create option the fixed order goes into the plan tool as eleven pending items, before any command
       And each item is marked done as it finishes
       And a turn never ends with an open item unless a command answered an error
 
@@ -721,8 +721,8 @@ Feature: Langy guides the first setup after sign-up
       Then Langy detects LangGraph
       And Langy instruments tracing and the connect endpoint through the tracing, connect-agent and code-changes skills
       And Langy starts the agent
-      And Langy asks "I read through the code. I think the first scenario we should write is Guest completes checkout, because it is the path most of your users take and it crosses the discount, payment and confirmation steps in one conversation. Can I create and run it for you?"
-      And the question offers "Sure, go ahead!" and the quiet "Chat about this"
+      And Langy says "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is Guest completes checkout, because it is the path most of your users take and it crosses the discount, payment and confirmation steps in one conversation."
+      And the question under it carries only the options: "Create "Guest completes checkout" as your first scenario test" and the quiet "Chat about this"
       And no scenario exists yet
 
     @e2e
@@ -736,7 +736,7 @@ Feature: Langy guides the first setup after sign-up
     @e2e
     Scenario: Going ahead creates the scenario in the drawer beside the panel
       Given Langy proposed the first scenario
-      When I pick "Sure, go ahead!"
+      When I pick "Create "Guest completes checkout" as your first scenario test"
       Then Langy creates the scenario
       And the scenario editor drawer opens beside the docked panel with the draft in it
       And the panel stays open while the turn continues
