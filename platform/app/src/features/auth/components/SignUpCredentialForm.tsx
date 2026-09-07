@@ -22,9 +22,7 @@ import "../auth.css";
 import { AuthField } from "./AuthField";
 import { AuthPrimaryButton } from "./AuthPrimaryButton";
 import { EmailPill } from "./EmailPill";
-import { PasskeySignUpButton } from "./PasskeySignUpButton";
 import { PasswordInput } from "./PasswordInput";
-import { MethodDivider } from "./SignInMethodPicker";
 
 // No name. Onboarding asks for it, in a place where it is worth asking —
 // putting it here charges a field at the one moment somebody has least
@@ -90,33 +88,16 @@ const ACCOUNT_CREATED_FALLBACK =
 export function SignUpCredentialForm({
   email,
   callbackUrl,
-  addressIsConfirmed = false,
   addressProof,
   onUseDifferentEmail,
-  onAwaitingConfirmation,
   onAddressAlreadyRegistered,
 }: {
   email: string;
   callbackUrl: string;
-  /**
-   * Whether an emailed link has already proved this address. False on the
-   * ordinary sign-up, where the link has not been sent yet.
-   */
-  addressIsConfirmed?: boolean;
-  /**
-   * The single-use proof of that confirmation, handed over by the link that
-   * carried it. Without it the account would be born unconfirmed and mailed a
-   * second link for the address it just proved.
-   */
-  addressProof?: string | null;
+  /** The single-use proof returned by the address-confirmation link. */
+  addressProof: string;
   /** Back to the address step, for the address that was typed wrong. */
   onUseDifferentEmail: () => void;
-  /**
-   * The account exists and its address is not confirmed, so the link is on
-   * its way and nobody has been signed in. Required whenever
-   * `addressIsConfirmed` is false — the screen has nowhere else to go.
-   */
-  onAwaitingConfirmation?: (email: string, method: string) => void;
   /**
    * The address turned out to have an account. Not a refusal and not a field
    * error — it is the wrong door, and the screen becomes the right one with
@@ -153,18 +134,10 @@ export function SignUpCredentialForm({
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);
-  const [passkeyError, setPasskeyError] = useState<unknown>(null);
   // Whether the password half of the form has opened. Latched rather than
   // derived from focus, so the confirmation does not vanish the moment
   // somebody tabs into it.
   const [isChoosingPassword, setIsChoosingPassword] = useState(false);
-  // Not on the step a spent link lands on. That step is reached with a
-  // single-use proof that only `user.register` can spend, and a passkey does
-  // not go through it — the ceremony creates the account itself, which would
-  // leave the proof unspent and the address asked for a second time. A passkey
-  // is an offer once there is an account to enrol it against (D07).
-  const offersPasskeys = !addressIsConfirmed;
-
   const onSubmit = async (values: SignUpValues) => {
     setSubmitError(null);
     setServerErrorIsOnTheForm(false);
@@ -172,7 +145,7 @@ export function SignUpCredentialForm({
       await register.mutateAsync({
         email,
         password: values.password,
-        addressProof: addressProof ?? void 0,
+        addressProof,
       });
     } catch (error) {
       // An address that already has an account is a wrong door, not a bad
@@ -190,16 +163,6 @@ export function SignUpCredentialForm({
       setServerErrorIsOnTheForm(
         applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }),
       );
-      return;
-    }
-
-    // The ordinary sign-up ends HERE, one step short of a session. The
-    // account exists and the link is on its way to it; opening a session now
-    // would be getting in on an address nobody has proved, which is the whole
-    // thing this order exists to prevent (ADR-117 §6).
-    if (!addressIsConfirmed) {
-      rememberLastUsedMethod({ id: "password" });
-      onAwaitingConfirmation?.(email, "password");
       return;
     }
 
@@ -241,11 +204,6 @@ export function SignUpCredentialForm({
             assigned from a `?.message`, and that file-level taint arrives at a
             literal — the identical alerts on the log-in screen, in files
             without such a local, are not flagged. */}
-        <HandledErrorAlert
-          error={passkeyError}
-          fallbackTitle="Could not create a passkey" // no-raw-error-toast-ok
-          className="lw-auth-alert"
-        />
         {/* The address this is for, and the way back to change it. It is the
             last chance to notice a typo before it becomes an account. */}
         <EmailPill
@@ -254,23 +212,6 @@ export function SignUpCredentialForm({
           onAction={onUseDifferentEmail}
           testId="signup-identifier"
         />
-        {/* Above the password, because it is the better thing to leave with
-            and the one most people have never been offered. Beside it rather
-            than in front of it: declining has to cost nothing, and here it
-            costs a glance — the other way on is already on the screen. */}
-        {offersPasskeys ? (
-          <>
-            <PasskeySignUpButton
-              email={email}
-              callbackUrl={callbackUrl}
-              addressIsConfirmed={addressIsConfirmed}
-              onError={setPasskeyError}
-              onAwaitingConfirmation={onAwaitingConfirmation}
-              onAddressAlreadyRegistered={onAddressAlreadyRegistered}
-            />
-            <MethodDivider />
-          </>
-        ) : null}
         {/* Carried in the form as well as shown above it, so a password
             manager saves the pair it was registered with. */}
         <input

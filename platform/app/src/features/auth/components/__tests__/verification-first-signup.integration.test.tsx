@@ -150,6 +150,12 @@ const localPicker: RoutingDecision = {
   reasonCode: "no_domain_match",
 };
 
+const unknownIdentifier: RoutingDecision = {
+  outcome: "route_to_signup",
+  methodSet: [],
+  reasonCode: "identifier_unknown",
+};
+
 // The REST body a refused spend answers with — the flat shape a Hono route
 // sends, which is what the better-auth endpoint answers a handled error in.
 const expiredLink = {
@@ -189,7 +195,10 @@ describe("given the sign-up screen", () => {
     searchParamsRef.current = new URLSearchParams("");
     publicEnvRef.current = { IS_SAAS: true };
     requestVerificationMock.mockResolvedValue({ sent: true });
-    routeMock.mockResolvedValue(localPicker);
+    routeMock.mockImplementation(
+      ({ identifier }: { identifier: string | null }) =>
+        Promise.resolve(identifier === null ? localPicker : unknownIdentifier),
+    );
   });
 
   afterEach(() => cleanup());
@@ -303,6 +312,7 @@ describe("given the sign-up screen", () => {
       // card: the routed picker rather than a password box, because the
       // credential this account holds may be a passkey.
       expect(await screen.findByTestId("method-picker")).toBeTruthy();
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
       expect(hardRedirectMock).not.toHaveBeenCalled();
     });
   });
@@ -315,6 +325,8 @@ describe("given the sign-up screen", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
+        addressProof: "proof_1",
+        signedIn: false,
       });
 
       const { container } = renderScreen();
@@ -332,6 +344,76 @@ describe("given the sign-up screen", () => {
         identifier: "sam@acme.com",
         breakGlass: false,
       });
+    });
+
+    it("offers a fresh link when a replay returns no usable proof", async () => {
+      searchParamsRef.current = new URLSearchParams("verify=spent-token");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: null,
+        signedIn: false,
+      });
+
+      const { container } = renderScreen();
+
+      expect(
+        await screen.findByRole("button", { name: /send a new link/i }),
+      ).toBeTruthy();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
+      expect(routeMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps credentials hidden while post-link routing is unavailable", async () => {
+      searchParamsRef.current = new URLSearchParams("verify=a-token");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: "proof_1",
+        signedIn: false,
+      });
+      routeMock.mockRejectedValue(new Error("routing is down"));
+
+      const { container } = renderScreen();
+
+      expect(
+        await screen.findByRole("button", { name: /try again/i }),
+      ).toBeTruthy();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
+    });
+
+    it("hands off to SSO when domain policy changed before the link returned", async () => {
+      searchParamsRef.current = new URLSearchParams("verify=a-token");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: "proof_1",
+        signedIn: false,
+      });
+      routeMock.mockResolvedValue({
+        outcome: "redirect_to_connection",
+        connectionId: "conn_acme",
+        methodSet: [
+          { id: "okta", kind: "federated", connectionId: "conn_acme" },
+        ],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      const { container } = renderScreen();
+
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalledWith(
+          "okta",
+          expect.objectContaining({ callbackUrl: "/auth/join" }),
+        );
+      });
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
     });
   });
 
@@ -362,6 +444,7 @@ describe("given the sign-up screen", () => {
   describe("when the address already has an account", () => {
     /** @scenario Sign-up with an address that already has an account becomes a log-in */
     it("turns into the log-in step with the address already in it", async () => {
+      routeMock.mockResolvedValue(localPicker);
       requestVerificationMock.mockRejectedValue({
         data: {
           error: {
@@ -473,6 +556,8 @@ describe("given the sign-up screen", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
+        addressProof: "proof_1",
+        signedIn: false,
       });
       registerMock.mockRejectedValue({
         data: {
@@ -514,6 +599,8 @@ describe("given the sign-up screen", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
+        addressProof: "proof_1",
+        signedIn: false,
       });
 
       renderScreen();
@@ -542,6 +629,8 @@ describe("given the sign-up screen", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
+        addressProof: "proof_1",
+        signedIn: false,
       });
 
       renderScreen();
@@ -565,6 +654,8 @@ describe("given the sign-up screen", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
+        addressProof: "proof_1",
+        signedIn: false,
       });
 
       const { container } = renderScreen();
@@ -585,6 +676,20 @@ describe("given the sign-up screen", () => {
   describe("when the deployment offers passkeys", () => {
     /** Reaches the credential step through an address-confirmation link. */
     const reachCredentialStep = async () => {
+      const signupPolicy: RoutingDecision = {
+        outcome: "method_picker",
+        methodSet: [
+          { id: "passkey", kind: "passkey", connectionId: null },
+          { id: "password", kind: "password", connectionId: null },
+        ],
+        reasonCode: "no_domain_match",
+      };
+      routeMock.mockImplementation(
+        ({ identifier }: { identifier: string | null }) =>
+          Promise.resolve(
+            identifier === null ? signupPolicy : unknownIdentifier,
+          ),
+      );
       searchParamsRef.current = new URLSearchParams("verify=a-token");
       completeVerificationMock.mockResolvedValue({
         email: "sam@acme.com",

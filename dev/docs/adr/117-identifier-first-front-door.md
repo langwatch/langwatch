@@ -421,9 +421,11 @@ address ─► link sent ─► proof returned ─► password or passkey ─►
   bounded by caller and normalized-address rate limits. A delivery failure
   therefore leaves no half-created account.
 - **`completeVerification` mints a single-use address proof.** Password and
-  passkey registration both carry it, and their server boundaries bind and
-  consume it atomically with account creation. A replay or an email mismatch
-  is refused before credential enrollment begins.
+  passkey registration both carry it. Claiming the proof is atomic and happens
+  before their separate account and credential writes; this is not a
+  cross-resource transaction. A replay or email mismatch is refused before
+  enrollment begins. If a later write fails after the claim, recovery requires
+  a fresh emailed proof.
 - **Sign-up asks the router before offering any credential.** It did not, and
   that was a hole: an address on a domain a customer routes through an
   identity provider could be given a password box, which is the one thing the
