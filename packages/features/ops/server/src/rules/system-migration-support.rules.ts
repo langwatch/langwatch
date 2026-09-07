@@ -72,7 +72,7 @@ export interface SystemMigrationStateReader {
     migrationName: string;
     statuses: TenantMigrationStatus[];
     limit: number;
-  }): Promise<Array<TenantMigrationRecord & { updatedAt: Date }>>;
+  }): Promise<OpsMigrationOverview["attention"]>;
 
   tryFindRecord(args: {
     migrationName: string;

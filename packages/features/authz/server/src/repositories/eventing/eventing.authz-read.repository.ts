@@ -36,6 +36,7 @@ import {
   SHARE_VISIBILITY_BY_PRINCIPAL_DB,
 } from "../prisma/prisma.authz-grant.mapper.ts";
 import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
+import { type Instant, fromDate } from "@langwatch/time";
 
 const SYSTEM_API_KEY_ROLE_KIND = "system_api_key" as const;
 
@@ -74,7 +75,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     const row = (await this.database.organizationUser.findFirst({
       where: { userId, organizationId },
       select: { role: true, disabledAt: true },
-    })) as { role: OrganizationRole; disabledAt: Date | null } | null;
+    })) as { role: OrganizationRole; disabledAt: unknown } | null;
     if (!row) return null;
     return { role: row.role, disabled: row.disabledAt !== null };
   }
@@ -344,27 +345,29 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     tokens: readonly string[];
     links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
   }): Promise<ShareLinkGrantCandidateRow[]> {
-    return (await liveGrants(this.database).findMany({
-      where: {
-        organizationId,
-        projectId,
-        scopeType: "RESOURCE",
-        token: { in: [...tokens] },
-        OR: links.map((link) => ({
-          resourceKind: RESOURCE_KIND_TO_DB[link.kind],
-          scopeId: link.id,
-        })),
-      },
-      select: {
-        id: true,
-        principalType: true,
-        resourceKind: true,
-        scopeId: true,
-        projectId: true,
-        expiresAt: true,
-        maxViews: true,
-      },
-    })) as ShareLinkGrantCandidateRow[];
+    return (
+      (await liveGrants(this.database).findMany({
+        where: {
+          organizationId,
+          projectId,
+          scopeType: "RESOURCE",
+          token: { in: [...tokens] },
+          OR: links.map((link) => ({
+            resourceKind: RESOURCE_KIND_TO_DB[link.kind],
+            scopeId: link.id,
+          })),
+        },
+        select: {
+          id: true,
+          principalType: true,
+          resourceKind: true,
+          scopeId: true,
+          projectId: true,
+          expiresAt: true,
+          maxViews: true,
+        },
+      })) as Array<Omit<ShareLinkGrantCandidateRow, "expiresAt"> & { expiresAt: unknown }>
+    ).map((row) => ({ ...row, expiresAt: storedInstant(row.expiresAt) }));
   }
 
   /** The view budget lives on its own table (decision 22); a resource with no
@@ -566,6 +569,11 @@ type ShareLinkGrantCandidateRow = {
   resourceKind: string | null;
   scopeId: string;
   projectId: string | null;
-  expiresAt: Date | null;
+  expiresAt: Instant | null;
   maxViews: number | null;
 };
+
+/** A nullable stored timestamp column, as the store hands it back. */
+function storedInstant(value: unknown): Instant | null {
+  return value instanceof Date ? fromDate(value) : null;
+}

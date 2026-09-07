@@ -1,12 +1,13 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
+  type OrganizationLedgerActor,
+  type OrganizationService,
+  type Team,
   organizationTeamRestArchivedSchema,
   organizationTeamRestMemberListSchema,
   organizationTeamRestPageSchema,
   organizationTeamRestSchema,
   organizationTeamRoleSchema,
-  type OrganizationLedgerActor,
-  type OrganizationService,
 } from "@langwatch/organization-contract";
 import { projectSchema, type ProjectService } from "@langwatch/project-contract";
 import type { Context } from "hono";
@@ -51,8 +52,8 @@ function teamResponse(team: {
   name: string;
   slug: string;
   organizationId: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Team["createdAt"];
+  updatedAt: Team["updatedAt"];
 }) {
   return {
     id: team.id,

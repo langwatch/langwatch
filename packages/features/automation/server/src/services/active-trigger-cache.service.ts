@@ -65,13 +65,13 @@ export class ActiveTriggerCacheService {
 
   private async getAll(projectId: string): Promise<TriggerSummary[]> {
     const cached = this.entries.get(projectId);
-    if (cached && cached.expires > this.clock.now().getTime()) {
+    if (cached && cached.expires > this.clock.now().epochMilliseconds) {
       return cached.value;
     }
 
     const value = await this.triggers.findActiveForProject(projectId);
     this.entries.set(projectId, {
-      expires: this.clock.now().getTime() + ACTIVE_CACHE_TTL_MS,
+      expires: this.clock.now().epochMilliseconds + ACTIVE_CACHE_TTL_MS,
       value,
     });
 

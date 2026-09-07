@@ -8,6 +8,7 @@ import type {
   StoredObjectProjectId,
   StoredObjectReference,
 } from "@langwatch/stored-object-contract";
+import type { Instant } from "@langwatch/time";
 
 export type StoredObjectStorageAddress = Readonly<{
   provider: string;
@@ -39,7 +40,7 @@ export abstract class StoredObjectStoragePort {
     byteLength: number;
     sha256: string;
     mediaType: string;
-    expiresAt: Date;
+    expiresAt: Instant;
   }): Promise<{
     address: StoredObjectStorageAddress;
     target: StoredObjectDirectUploadTarget;
@@ -85,8 +86,8 @@ export type LegacyStoredObjectRow = Readonly<{
   sizeBytes: number;
   sha256: string;
   storageUri: string;
-  createdAt: Date;
-  insertedAt: Date;
+  createdAt: Instant;
+  insertedAt: Instant;
 }>;
 
 export abstract class StoredObjectProjectSourcePort {
@@ -114,6 +115,6 @@ export abstract class StoredObjectLegacyWriterDrainPort {
   abstract get(input: {
     organizationId: string;
   }): Promise<
-    { valid: true; minimumWriterGeneration: string; assertedAt: Date } | { valid: false }
+    { valid: true; minimumWriterGeneration: string; assertedAt: Instant } | { valid: false }
   >;
 }

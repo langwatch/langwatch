@@ -49,6 +49,7 @@ import {
 } from "./postgres.authz-cutover.adapter.ts";
 import { ObservabilityAuthzCutoverAdapter } from "./observability.authz-cutover.adapter.ts";
 import { ObservabilityAuthzRevocationAdapter } from "./observability.authz-revocation.adapter.ts";
+import { fromDate } from "@langwatch/time";
 
 /**
  * The one structural Postgres capability the AuthZ feature needs. A runtime
@@ -237,7 +238,11 @@ export class PostgresAuthzAdapter {
       bindings: bindingRepository,
       epoch,
       isOnEngine: selectHead,
-      tryGetEngineCutoverAt: (organizationId) => cutover.tryGetFinalizedAt({ organizationId }),
+      tryGetEngineCutoverAt: async (organizationId) => {
+        const finalizedAt = await cutover.tryGetFinalizedAt({ organizationId });
+
+        return finalizedAt === null ? null : fromDate(finalizedAt);
+      },
     };
     if (this.options.cacheEnabled) {
       authzOptions.cacheEnabled = this.options.cacheEnabled;

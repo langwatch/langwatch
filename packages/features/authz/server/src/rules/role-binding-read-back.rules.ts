@@ -19,7 +19,12 @@
  * behind, and only answers 409 `role_binding_already_exists` once the first
  * one's row has landed.
  */
-import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/authz-contract";
+import type {
+  AuthzManagedOrganizationBinding,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@langwatch/authz-contract";
+import { type Instant, toDate } from "@langwatch/time";
 
 /** One binding as both the list and the writes report it. */
 export type BindingWire = {
@@ -35,7 +40,8 @@ export type BindingWire = {
   scopeType: RoleBindingScopeType;
   scopeId: string;
   scopeName: string | null;
-  createdAt: Date;
+  /** The wire's own moment type: the listing contract declares it. */
+  createdAt: AuthzManagedOrganizationBinding["createdAt"];
 };
 
 /** The principal a create names — exactly one of the three id fields. */
@@ -69,7 +75,7 @@ export function optimisticBindingWire({
   customRoleId?: string | undefined;
   scopeType: RoleBindingScopeType;
   scopeId: string;
-  now: () => Date;
+  now: () => Instant;
 }): BindingWire {
   return {
     id,
@@ -80,7 +86,7 @@ export function optimisticBindingWire({
     scopeType,
     scopeId,
     scopeName: null,
-    createdAt: now(),
+    createdAt: toDate(now()),
   };
 }
 

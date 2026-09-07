@@ -4,7 +4,11 @@
  */
 
 import type { TimeInput } from "@langwatch/time";
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
+import {
+  createFeatureApi,
+  type FeatureApi,
+  type OutputsFromMap,
+} from "@langwatch/platform-api-client/feature-api";
 import type {
   AggregateDiscovery,
   AggregateEventView,
@@ -629,7 +633,7 @@ export type OpsApiMap = {
 /**
  * The hooks every Ops screen calls. One instance for the package.
  */
-export const opsApi = createFeatureApi<OpsApiMap>();
+export const opsApi: FeatureApi<OpsApiMap> = createFeatureApi<OpsApiMap>();
 
 /**
  * Every procedure's output, addressed the way the screens already address it. The application's
@@ -642,4 +646,4 @@ export type RouterOutputs = OutputsFromMap<OpsApiMap>;
  * The name the screens call it by. They were written against the application's `api` proxy and
  * are moved unchanged; the import line is what tells them which one they have.
  */
-export const api = opsApi;
+export const api: FeatureApi<OpsApiMap> = opsApi;

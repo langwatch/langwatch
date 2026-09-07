@@ -3,19 +3,29 @@
  * `group.*`, the personal-workspace nav predicate) call. What lives here is cross-door shared
  * logic; most operations are the services' own, via {@link organizations} and {@link projects}.
  */
+import { OrganizationApi, OrganizationGroupService } from "@langwatch/organization-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   AddOrganizationGroupBindingInput,
+  AddOrganizationTeamMemberInput,
   ApplyOrganizationGroupEditsInput,
   ChangeOrganizationGroupMemberInput,
   CreateOrganizationGroupInput,
   CreateOrganizationTeamWithMembersInput,
+  CreateOrganizationTeamInput,
   DeleteOrganizationGroupInput,
   GetOrganizationBillingProfileInput,
+  GetOrganizationIdByTeamIdInput,
+  GetOrganizationMembersInput,
   GetOrganizationGroupInput,
   GetOrganizationTeamByIdInput,
   GetOrganizationTeamBySlugForMemberInput,
   GetOrganizationTeamInput,
   GetOrganizationTeamWithMembersInput,
+  GetOldestTeamInput,
   ListMemberOrganizationGroupsInput,
   ListOrganizationGroupsInput,
   ListOrganizationTeamAccessInput,
@@ -35,6 +45,7 @@ import type {
   FindPersonalWorkspaceInput,
   PersonalFeatures,
   PersonalWorkspace,
+  PersonalWorkspaceInput,
   PersonalWorkspaceFeaturesInput,
   RemoveOrganizationGroupBindingInput,
   RemoveOrganizationTeamMemberInput,
@@ -43,6 +54,22 @@ import type {
   UpdateOrganizationSettingsResult,
   UpdateOrganizationTeamWithMembersInput,
 } from "@langwatch/organization-contract";
+import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
+import { PostgresOrganizationAdapter } from "../adapters/postgres.organization.adapter.ts";
+import { PostgresOrganizationMembershipAdapter } from "../adapters/postgres.organization-membership.adapter.ts";
+import type {
+  GroupIdentityPort,
+  OrganizationSettingsSecretPort,
+  PersonalWorkspaceDiagnosticsPort,
+  PersonalWorkspaceIdentityPort,
+  TeamIdentityPort,
+} from "../ports/organization.port.ts";
+import type {
+  OrganizationGrantCachePort,
+  OrganizationPromptSeedPort,
+  OrganizationSeatLicensePort,
+  OrganizationSessionRevocationPort,
+} from "../ports/organization-membership.port.ts";
 import type {
   CustomRole,
   Organization,
@@ -54,7 +81,12 @@ import type {
   TeamUser,
   User,
 } from "@langwatch/organization-contract";
-import type { PaginatedProjects, Project, ProjectService } from "@langwatch/project-contract";
+import type { PaginatedProjects, Project } from "@langwatch/project-contract";
+import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
+import {
+  organizationMemberDatesFromDate,
+  organizationProvisioningSummaryFromDate,
+} from "../rules/organization-time-boundary.rules.ts";
 
 // ---------------------------------------------------------------------------
 // The rows this application hands back — restated from the composed service's own generated
@@ -94,140 +126,10 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
  * contract does not declare — membership, invitations, the audit trail. Named structurally
  * rather than picked, since none of these fourteen live in the contract.
  */
-type OrganizationsAppService = Readonly<{
-  createAndAssign(input: {
-    userId: string;
-    orgName?: string;
-    phoneNumber?: string;
-    signUpData?: Record<string, unknown>;
-    primaryIntent?: OrganizationIntent | null;
-    userDisplayName?: string | null;
-  }): Promise<{
-    organization: { id: string; name: string };
-    team: { id: string; slug: string; name: string };
-  }>;
-  deleteMember(input: {
-    organizationId: string;
-    userId: string;
-    actingUserId?: string | null;
-  }): Promise<void>;
-  setMemberDisabled(input: {
-    organizationId: string;
-    userId: string;
-    disabled: boolean;
-    actingUser?: { id: string; name?: string | null; email?: string | null } | null;
-  }): Promise<void>;
-  getAllForUser(input: {
-    userId: string;
-    isDemo: boolean;
-    demoProjectUserId: string;
-    demoProjectId: string;
-  }): Promise<FullyLoadedOrganization[]>;
-  tryGetOrganizationWithMembers(input: {
-    organizationId: string;
-    userId: string;
-    includeDeactivated: boolean;
-  }): Promise<OrganizationWithMembersAndTheirTeams | null>;
-  tryGetMemberById(input: {
-    organizationId: string;
-    userId: string;
-    currentUserId: string;
-  }): Promise<OrganizationMemberWithUser | null>;
-  getAllMembers(organizationId: string): Promise<User[]>;
-  tryGetUserOrgRoleByTeamId(input: {
-    userId: string;
-    teamId: string;
-  }): Promise<OrganizationUserRole | null>;
-  tryGetPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null>;
-  ensurePersonalWorkspace(input: {
-    userId: string;
-    organizationId: string;
-    displayName?: string | null;
-    displayEmail?: string | null;
-  }): Promise<EnsuredPersonalWorkspace>;
-  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
-  updateTeamMemberRole(input: {
-    teamId: string;
-    userId: string;
-    role: string;
-    customRoleId?: string;
-    currentUserId: string;
-  }): Promise<void>;
-  changeMemberRole(input: {
-    organizationId: string;
-    userId: string;
-    role: OrganizationUserRole;
-    teamRoleUpdates?: {
-      teamId: string;
-      userId: string;
-      role: string;
-      customRoleId?: string;
-    }[];
-    currentUserId: string;
-    planUser?: { id: string; name?: string | null; email?: string | null };
-  }): Promise<{ teamsLeftWithoutAdmin: { id: string; name: string }[] }>;
-  getAuditLogs(input: {
-    organizationId: string;
-    projectId?: string;
-    userId?: string;
-    pageOffset: number;
-    pageSize: number;
-    action?: string;
-    startDate?: number;
-    endDate?: number;
-    targetKind?: string;
-    targetId?: string;
-  }): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }>;
-}>;
-
-/**
- * The contract reads and writes this feature makes, named rather than taking
- * `OrganizationService` whole: an organization screen has no business depending on the
- * ingestion or billing parts of that widest-in-the-platform surface.
- */
-type OrganizationContractService = Pick<
-  OrganizationService,
-  // the organization's own settings
-  | "updateSettings"
-  // membership, asked by the feature-flag resolver before it widens a
-  // project-scoped read into an organization-scoped one
-  | "isMember"
-  | "memberOrganizationIds"
-  // groups
-  | "getBillingProfile"
-  | "getTeam"
-  | "listGroups"
-  | "getGroup"
-  | "listGroupsForMember"
-  | "createGroup"
-  | "renameGroup"
-  | "deleteGroup"
-  | "addGroupMember"
-  | "removeGroupMember"
-  | "addGroupBinding"
-  | "removeGroupBinding"
-  | "applyGroupEdits"
-  // teams
-  | "getTeamBySlugForMember"
-  | "getTeamWithMembers"
-  | "listTeamsWithMembers"
-  | "listTeamAccess"
-  | "getTeamById"
-  | "createTeamWithMembers"
-  | "updateTeamWithMembers"
-  | "archiveTeam"
-  | "removeTeamMember"
-  // the personal workspace's own feature switches
-  | "getPersonalWorkspaceFeatures"
-  | "enableAllPersonalWorkspaceFeatures"
-  | "disableAllPersonalWorkspaceFeatures"
->;
+type OrganizationMembershipPort = OrganizationMembershipService;
 
 /** The three project reads an organization screen makes: what lives where. */
-type OrganizationProjectService = Pick<
-  ProjectService,
-  "tryGetById" | "listByOrganization" | "listByTeam"
->;
+type OrganizationProjectApi = ProjectApi;
 
 /** Who a write is attributed to. */
 export interface OrganizationCaller {
@@ -235,20 +137,75 @@ export interface OrganizationCaller {
 }
 
 /** What the process composes this feature's application from. */
-export interface OrganizationAppDependencies {
-  organizations: OrganizationsAppService & OrganizationContractService;
-  projects: OrganizationProjectService;
+export interface ServerOrganizationAppDependencies {
+  organizations: OrganizationService;
+  membership: OrganizationMembershipService;
+  groups: OrganizationGroupService;
+  projects: OrganizationProjectApi;
 }
 
-export class OrganizationApp {
-  static create(dependencies: OrganizationAppDependencies): OrganizationApp {
-    return new OrganizationApp(dependencies);
+type OrganizationSetup = FeatureSetup<
+  { projects: typeof ProjectApi },
+  OrganizationInfrastructure,
+  undefined
+>;
+
+export type OrganizationInfrastructure = Readonly<{
+  database: PrismaClient;
+  authz: AuthzService;
+  grants: AuthzGrantsService;
+  identities: PersonalWorkspaceIdentityPort;
+  teamIdentities: TeamIdentityPort;
+  groupIdentities: GroupIdentityPort;
+  settingsSecrets: OrganizationSettingsSecretPort;
+  diagnostics?: PersonalWorkspaceDiagnosticsPort;
+  prompts: OrganizationPromptSeedPort;
+  seats: OrganizationSeatLicensePort;
+  sessions: OrganizationSessionRevocationPort;
+  grantCache: OrganizationGrantCachePort;
+}>;
+
+export class ServerOrganizationApp implements OrganizationApi {
+  static readonly contract = OrganizationApi;
+  static readonly dependencies = { projects: ProjectApi };
+  #dependencies: ServerOrganizationAppDependencies;
+
+  static create(setup: OrganizationSetup): ServerOrganizationApp {
+    const organizations = PostgresOrganizationAdapter.create({
+      database: setup.infrastructure.database,
+      identities: setup.infrastructure.identities,
+      teamIdentities: setup.infrastructure.teamIdentities,
+      groupIdentities: setup.infrastructure.groupIdentities,
+      authz: setup.infrastructure.authz,
+      grants: setup.infrastructure.grants,
+      settingsSecrets: setup.infrastructure.settingsSecrets,
+      diagnostics: setup.infrastructure.diagnostics,
+    }).build();
+    const membership = PostgresOrganizationMembershipAdapter.create({
+      database: setup.infrastructure.database,
+      grants: setup.infrastructure.grants,
+      prompts: setup.infrastructure.prompts,
+      seats: setup.infrastructure.seats,
+      sessions: setup.infrastructure.sessions,
+      grantCache: setup.infrastructure.grantCache,
+    }).build();
+    return new ServerOrganizationApp({
+      organizations,
+      membership,
+      groups: OrganizationGroupScopeService.create({
+        organizations,
+        projects: setup.dependencies.projects,
+      }),
+      projects: setup.dependencies.projects,
+    });
   }
 
-  private constructor(private readonly dependencies: OrganizationAppDependencies) {}
+  private constructor(dependencies: ServerOrganizationAppDependencies) {
+    this.#dependencies = dependencies;
+  }
 
   /** The ledger actor a write is recorded under — one spelling, shared by every door. */
-  private ledgerActor(by: OrganizationCaller): { type: "user"; id: string } {
+  #ledgerActor(by: OrganizationCaller): { type: "user"; id: string } {
     return { type: "user", id: by.id };
   }
 
@@ -256,38 +213,38 @@ export class OrganizationApp {
 
   /** Sign-up: the caller's first organization and its first team. */
   createAndAssign(
-    input: Omit<Parameters<OrganizationsAppService["createAndAssign"]>[0], "userId">,
+    input: Omit<Parameters<OrganizationMembershipPort["createAndAssign"]>[0], "userId">,
     by: OrganizationCaller,
-  ): ReturnType<OrganizationsAppService["createAndAssign"]> {
-    return this.dependencies.organizations.createAndAssign({ ...input, userId: by.id });
+  ): ReturnType<OrganizationMembershipPort["createAndAssign"]> {
+    return this.#dependencies.membership.createAndAssign({ ...input, userId: by.id });
   }
 
   /** Removes one seat, attributed to the caller who asked for it. */
   deleteMember(
-    input: Omit<Parameters<OrganizationsAppService["deleteMember"]>[0], "actingUserId">,
-    by: OrganizationCaller,
+    input: Omit<Parameters<OrganizationMembershipPort["deleteMember"]>[0], "actingUserId">,
+    by: OrganizationCaller | null,
   ): Promise<void> {
-    return this.dependencies.organizations.deleteMember({ ...input, actingUserId: by.id });
+    return this.#dependencies.membership.deleteMember({ ...input, actingUserId: by?.id ?? null });
   }
 
   /** Frees a seat reversibly. The acting user travels whole, since the disable
    * guard identifies the operator by more than their id. */
   setMemberDisabled(
-    input: Omit<Parameters<OrganizationsAppService["setMemberDisabled"]>[0], "actingUser">,
-    by: OrganizationCaller & { name?: string | null; email?: string | null },
+    input: Omit<Parameters<OrganizationMembershipPort["setMemberDisabled"]>[0], "actingUser">,
+    by: (OrganizationCaller & { name?: string | null; email?: string | null }) | null,
   ): Promise<void> {
-    return this.dependencies.organizations.setMemberDisabled({
+    return this.#dependencies.membership.setMemberDisabled({
       ...input,
-      actingUser: { id: by.id, name: by.name ?? null, email: by.email ?? null },
+      actingUser: by ? { id: by.id, name: by.name ?? null, email: by.email ?? null } : null,
     });
   }
 
   /** Every organization the caller can reach, fully loaded. */
   getAllForUser(
-    input: Omit<Parameters<OrganizationsAppService["getAllForUser"]>[0], "userId">,
+    input: Omit<Parameters<OrganizationMembershipPort["getAllForUser"]>[0], "userId">,
     by: OrganizationCaller,
   ): Promise<FullyLoadedOrganization[]> {
-    return this.dependencies.organizations.getAllForUser({ ...input, userId: by.id });
+    return this.#dependencies.membership.getAllForUser({ ...input, userId: by.id });
   }
 
   /**
@@ -298,27 +255,89 @@ export class OrganizationApp {
   updateSettings(
     input: UpdateOrganizationSettingsInput,
   ): Promise<UpdateOrganizationSettingsResult> {
-    return this.dependencies.organizations.updateSettings(input);
+    return this.#dependencies.organizations.updateSettings(input);
+  }
+
+  getSettings(input: { organizationId: string }) {
+    return this.#dependencies.organizations.getSettings(input);
+  }
+
+  listMembers(input: Parameters<OrganizationMembershipService["listMembers"]>[0]) {
+    return this.#dependencies.membership.listMembers(input).then((result) => ({
+      ...result,
+      members: result.members.map((member) => ({
+        ...member,
+        ...organizationMemberDatesFromDate(member),
+      })),
+    }));
+  }
+
+  getMember(input: Parameters<OrganizationMembershipService["getMember"]>[0]) {
+    return this.#dependencies.membership.getMember(input).then((member) => ({
+      ...member,
+      ...organizationMemberDatesFromDate(member),
+    }));
+  }
+
+  createForProvisioning(
+    input: Parameters<OrganizationMembershipService["createForProvisioning"]>[0],
+  ) {
+    return this.#dependencies.membership.createForProvisioning(input);
+  }
+
+  listProvisioningSummaries() {
+    return this.#dependencies.membership
+      .listProvisioningSummaries()
+      .then((summaries) => summaries.map(organizationProvisioningSummaryFromDate));
+  }
+
+  tryGetProvisioningSummary(organizationId: string) {
+    return this.#dependencies.membership
+      .tryGetProvisioningSummary(organizationId)
+      .then((summary) =>
+        summary === null ? null : organizationProvisioningSummaryFromDate(summary),
+      );
+  }
+
+  deleteProvisionedOrganization(
+    input: Parameters<OrganizationMembershipService["deleteProvisionedOrganization"]>[0],
+  ) {
+    return this.#dependencies.membership.deleteProvisionedOrganization(input);
   }
 
   /** Whether a user is a member of an organization — a door the feature-flag resolver asks
    * on every organization-targeted read, to gate whether the caller may see a flag's answer. */
   isMember(input: { organizationId: string; userId: string }): Promise<boolean> {
-    return this.dependencies.organizations.isMember(input);
+    return this.#dependencies.organizations.isMember(input);
   }
 
   /** The batched form of {@link isMember}, for the feature-flag resolver: the workspace switcher
    * asks a flag per listed organization, and this avoids a membership query per row. */
   memberOrganizationIds(input: { userId: string; organizationIds: string[] }): Promise<string[]> {
-    return this.dependencies.organizations.memberOrganizationIds(input);
+    return this.#dependencies.organizations.memberOrganizationIds(input);
+  }
+
+  getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]> {
+    return this.#dependencies.organizations.getOrganizationMembers(input);
+  }
+
+  getOldestTeamId(input: GetOldestTeamInput): Promise<string> {
+    return this.#dependencies.organizations.getOldestTeamId(input);
+  }
+
+  tryGetOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string | null> {
+    return this.#dependencies.organizations.tryGetOrganizationIdByTeamId(input);
   }
 
   /** One organization with its members and each member's teams. */
   tryGetOrganizationWithMembers(
-    input: Omit<Parameters<OrganizationsAppService["tryGetOrganizationWithMembers"]>[0], "userId">,
+    input: Omit<
+      Parameters<OrganizationMembershipPort["tryGetOrganizationWithMembers"]>[0],
+      "userId"
+    >,
     by: OrganizationCaller,
   ): Promise<OrganizationWithMembersAndTheirTeams | null> {
-    return this.dependencies.organizations.tryGetOrganizationWithMembers({
+    return this.#dependencies.membership.tryGetOrganizationWithMembers({
       ...input,
       userId: by.id,
     });
@@ -326,15 +345,15 @@ export class OrganizationApp {
 
   /** One member, redacted to what the calling member may see. */
   tryGetMemberById(
-    input: Omit<Parameters<OrganizationsAppService["tryGetMemberById"]>[0], "currentUserId">,
+    input: Omit<Parameters<OrganizationMembershipPort["tryGetMemberById"]>[0], "currentUserId">,
     by: OrganizationCaller,
   ): Promise<OrganizationMemberWithUser | null> {
-    return this.dependencies.organizations.tryGetMemberById({ ...input, currentUserId: by.id });
+    return this.#dependencies.membership.tryGetMemberById({ ...input, currentUserId: by.id });
   }
 
   /** Every member of one organization, for the member pickers. */
   getAllMembers(input: { organizationId: string }): Promise<User[]> {
-    return this.dependencies.organizations.getAllMembers(input.organizationId);
+    return this.#dependencies.membership.getAllMembers(input.organizationId);
   }
 
   /** The role a user holds in the organization owning one team — read by the project-protections
@@ -343,7 +362,7 @@ export class OrganizationApp {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null> {
-    return this.dependencies.organizations.tryGetUserOrgRoleByTeamId(input);
+    return this.#dependencies.membership.tryGetUserOrgRoleByTeamId(input);
   }
 
   /**
@@ -352,15 +371,22 @@ export class OrganizationApp {
    * the organization is being walked through.
    */
   tryGetPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
-    return this.dependencies.organizations.tryGetPrimaryIntent(organizationId);
+    return this.#dependencies.membership.tryGetPrimaryIntent(organizationId);
   }
 
   /** Makes the caller's personal workspace in this organization exist. */
+  ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace>;
   ensurePersonalWorkspace(
-    input: Omit<Parameters<OrganizationsAppService["ensurePersonalWorkspace"]>[0], "userId">,
+    input: Omit<PersonalWorkspaceInput, "userId">,
     by: OrganizationCaller,
+  ): Promise<EnsuredPersonalWorkspace>;
+  ensurePersonalWorkspace(
+    input: PersonalWorkspaceInput | Omit<PersonalWorkspaceInput, "userId">,
+    by?: OrganizationCaller,
   ): Promise<EnsuredPersonalWorkspace> {
-    return this.dependencies.organizations.ensurePersonalWorkspace({ ...input, userId: by.id });
+    const userId = by?.id ?? ("userId" in input ? input.userId : void 0);
+    if (userId === void 0) throw new Error("A user is required to ensure a personal workspace");
+    return this.#dependencies.organizations.ensurePersonalWorkspace({ ...input, userId });
   }
 
   /**
@@ -368,19 +394,26 @@ export class OrganizationApp {
    * have none. The read half of `ensurePersonalWorkspace` above, for the
    * callers that must not create one as a side effect of asking.
    */
+  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
   tryFindPersonalWorkspace(
     input: Omit<FindPersonalWorkspaceInput, "userId">,
     by: OrganizationCaller,
+  ): Promise<PersonalWorkspace | null>;
+  tryFindPersonalWorkspace(
+    input: FindPersonalWorkspaceInput | Omit<FindPersonalWorkspaceInput, "userId">,
+    by?: OrganizationCaller,
   ): Promise<PersonalWorkspace | null> {
-    return this.dependencies.organizations.tryFindPersonalWorkspace({ ...input, userId: by.id });
+    const userId = by?.id ?? ("userId" in input ? input.userId : void 0);
+    if (userId === void 0) throw new Error("A user is required to find a personal workspace");
+    return this.#dependencies.organizations.tryFindPersonalWorkspace({ ...input, userId });
   }
 
   /** Changes one member's role inside one team. */
   updateTeamMemberRole(
-    input: Omit<Parameters<OrganizationsAppService["updateTeamMemberRole"]>[0], "currentUserId">,
+    input: Omit<Parameters<OrganizationMembershipPort["updateTeamMemberRole"]>[0], "currentUserId">,
     by: OrganizationCaller,
   ): Promise<void> {
-    return this.dependencies.organizations.updateTeamMemberRole({
+    return this.#dependencies.membership.updateTeamMemberRole({
       ...input,
       currentUserId: by.id,
     });
@@ -388,36 +421,47 @@ export class OrganizationApp {
 
   /** Changes one member's organization role, with its team-role fallout. */
   changeMemberRole(
-    input: Omit<Parameters<OrganizationsAppService["changeMemberRole"]>[0], "currentUserId">,
-    by: OrganizationCaller,
-  ): ReturnType<OrganizationsAppService["changeMemberRole"]> {
-    return this.dependencies.organizations.changeMemberRole({ ...input, currentUserId: by.id });
+    input: Omit<Parameters<OrganizationMembershipPort["changeMemberRole"]>[0], "currentUserId">,
+    by: OrganizationCaller | null,
+  ): ReturnType<OrganizationMembershipPort["changeMemberRole"]> {
+    return this.#dependencies.membership.changeMemberRole({
+      ...input,
+      currentUserId: by?.id ?? null,
+    });
   }
 
   /** The organization's audit trail, one page at a time. */
   getAuditLogs(
-    input: Parameters<OrganizationsAppService["getAuditLogs"]>[0],
+    input: Parameters<OrganizationMembershipPort["getAuditLogs"]>[0],
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
-    return this.dependencies.organizations.getAuditLogs(input);
+    return this.#dependencies.membership.getAuditLogs(input);
   }
 
   /** The billing-facing profile, which is also where the display name lives. */
   getBillingProfile(
     input: GetOrganizationBillingProfileInput,
   ): Promise<OrganizationBillingProfile> {
-    return this.dependencies.organizations.getBillingProfile(input);
+    return this.#dependencies.organizations.getBillingProfile(input);
   }
 
   // -- teams -----------------------------------------------------------------
 
   /** One team by id. */
   getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {
-    return this.dependencies.organizations.getTeam(input);
+    return this.#dependencies.organizations.getTeam(input);
+  }
+
+  createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam> {
+    return this.#dependencies.organizations.createTeam(input);
+  }
+
+  addTeamMember(input: AddOrganizationTeamMemberInput): Promise<void> {
+    return this.#dependencies.organizations.addTeamMember(input);
   }
 
   /** One team by id, without naming its organization. */
   getTeamById(input: GetOrganizationTeamByIdInput): Promise<OrganizationTeam> {
-    return this.dependencies.organizations.getTeamById(input);
+    return this.#dependencies.organizations.getTeamById(input);
   }
 
   /** The team behind a `/[team]` route, resolved for the caller. */
@@ -425,7 +469,7 @@ export class OrganizationApp {
     input: Omit<GetOrganizationTeamBySlugForMemberInput, "userId">,
     by: OrganizationCaller,
   ): Promise<OrganizationTeam> {
-    return this.dependencies.organizations.getTeamBySlugForMember({ ...input, userId: by.id });
+    return this.#dependencies.organizations.getTeamBySlugForMember({ ...input, userId: by.id });
   }
 
   /** One team's members, filtered against what the caller may see. */
@@ -433,7 +477,7 @@ export class OrganizationApp {
     input: Omit<GetOrganizationTeamWithMembersInput, "callerUserId">,
     by: OrganizationCaller,
   ): Promise<OrganizationTeamWithMembers> {
-    return this.dependencies.organizations.getTeamWithMembers({
+    return this.#dependencies.organizations.getTeamWithMembers({
       ...input,
       callerUserId: by.id,
     });
@@ -444,7 +488,7 @@ export class OrganizationApp {
     input: Omit<ListOrganizationTeamsWithMembersInput, "callerUserId">,
     by: OrganizationCaller,
   ): Promise<OrganizationTeamWithMembers[]> {
-    return this.dependencies.organizations.listTeamsWithMembers({
+    return this.#dependencies.organizations.listTeamsWithMembers({
       ...input,
       callerUserId: by.id,
     });
@@ -452,7 +496,7 @@ export class OrganizationApp {
 
   /** The access matrix the team-permissions screen renders. */
   listTeamAccess(input: ListOrganizationTeamAccessInput): Promise<OrganizationTeamAccess[]> {
-    return this.dependencies.organizations.listTeamAccess(input);
+    return this.#dependencies.organizations.listTeamAccess(input);
   }
 
   /** Creates a team with its initial members, attributed to its caller. */
@@ -460,9 +504,9 @@ export class OrganizationApp {
     input: Omit<CreateOrganizationTeamWithMembersInput, "actor">,
     by: OrganizationCaller,
   ): Promise<OrganizationTeam> {
-    return this.dependencies.organizations.createTeamWithMembers({
+    return this.#dependencies.organizations.createTeamWithMembers({
       ...input,
-      actor: this.ledgerActor(by),
+      actor: this.#ledgerActor(by),
     });
   }
 
@@ -471,15 +515,15 @@ export class OrganizationApp {
     input: Omit<UpdateOrganizationTeamWithMembersInput, "actor">,
     by: OrganizationCaller,
   ): Promise<void> {
-    return this.dependencies.organizations.updateTeamWithMembers({
+    return this.#dependencies.organizations.updateTeamWithMembers({
       ...input,
-      actor: this.ledgerActor(by),
+      actor: this.#ledgerActor(by),
     });
   }
 
   /** Archives one team. */
   archiveTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {
-    return this.dependencies.organizations.archiveTeam(input);
+    return this.#dependencies.organizations.archiveTeam(input);
   }
 
   /** Removes one member from a team, attributed to its caller. */
@@ -487,9 +531,9 @@ export class OrganizationApp {
     input: Omit<RemoveOrganizationTeamMemberInput, "actor">,
     by: OrganizationCaller,
   ): Promise<void> {
-    return this.dependencies.organizations.removeTeamMember({
+    return this.#dependencies.organizations.removeTeamMember({
       ...input,
-      actor: this.ledgerActor(by),
+      actor: this.#ledgerActor(by),
     });
   }
 
@@ -497,19 +541,26 @@ export class OrganizationApp {
 
   /** Every group in the organization, one page at a time. */
   listGroups(input: ListOrganizationGroupsInput): Promise<OrganizationGroupPage> {
-    return this.dependencies.organizations.listGroups(input);
+    return this.#dependencies.organizations.listGroups(input);
   }
 
   /** One group with its bindings and its members. */
   getGroup(input: GetOrganizationGroupInput): Promise<OrganizationGroupDetails> {
-    return this.dependencies.organizations.getGroup(input);
+    return this.#dependencies.organizations.getGroup(input);
   }
 
   /** The groups one member is in. */
   listGroupsForMember(
     input: ListMemberOrganizationGroupsInput,
   ): Promise<OrganizationGroupSummary[]> {
-    return this.dependencies.organizations.listGroupsForMember(input);
+    return this.#dependencies.organizations.listGroupsForMember(input);
+  }
+
+  resolveBindingScopeNames(input: {
+    organizationId: string;
+    bindings: readonly import("@langwatch/organization-contract").OrganizationGroupBinding[];
+  }): Promise<ReadonlyMap<string, string>> {
+    return this.#dependencies.groups.resolveBindingScopeNames(input);
   }
 
   /** Creates a group, attributed to the caller who asked for it. */
@@ -517,15 +568,15 @@ export class OrganizationApp {
     input: Omit<CreateOrganizationGroupInput, "actor">,
     by: OrganizationCaller,
   ): Promise<OrganizationGroup> {
-    return this.dependencies.organizations.createGroup({
+    return this.#dependencies.organizations.createGroup({
       ...input,
-      actor: this.ledgerActor(by),
+      actor: this.#ledgerActor(by),
     });
   }
 
   /** Renames one group. */
   renameGroup(input: RenameOrganizationGroupInput): Promise<OrganizationGroup> {
-    return this.dependencies.organizations.renameGroup(input);
+    return this.#dependencies.organizations.renameGroup(input);
   }
 
   /** Deletes one group, attributed to the caller who asked for it. */
@@ -533,20 +584,20 @@ export class OrganizationApp {
     input: Omit<DeleteOrganizationGroupInput, "actor">,
     by: OrganizationCaller,
   ): Promise<void> {
-    return this.dependencies.organizations.deleteGroup({
+    return this.#dependencies.organizations.deleteGroup({
       ...input,
-      actor: this.ledgerActor(by),
+      actor: this.#ledgerActor(by),
     });
   }
 
   /** Adds one member to a group. */
   addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
-    return this.dependencies.organizations.addGroupMember(input);
+    return this.#dependencies.organizations.addGroupMember(input);
   }
 
   /** Removes one member from a group. */
   removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
-    return this.dependencies.organizations.removeGroupMember(input);
+    return this.#dependencies.organizations.removeGroupMember(input);
   }
 
   /** Adds one access binding to a group, attributed to its caller. */
@@ -554,9 +605,9 @@ export class OrganizationApp {
     input: Omit<AddOrganizationGroupBindingInput, "actor">,
     by: OrganizationCaller,
   ): Promise<OrganizationGroupBinding> {
-    return this.dependencies.organizations.addGroupBinding({
+    return this.#dependencies.organizations.addGroupBinding({
       ...input,
-      actor: this.ledgerActor(by),
+      actor: this.#ledgerActor(by),
     });
   }
 
@@ -565,9 +616,9 @@ export class OrganizationApp {
     input: Omit<RemoveOrganizationGroupBindingInput, "actor">,
     by: OrganizationCaller,
   ): Promise<void> {
-    return this.dependencies.organizations.removeGroupBinding({
+    return this.#dependencies.organizations.removeGroupBinding({
       ...input,
-      actor: this.ledgerActor(by),
+      actor: this.#ledgerActor(by),
     });
   }
 
@@ -576,46 +627,10 @@ export class OrganizationApp {
     input: Omit<ApplyOrganizationGroupEditsInput, "actor">,
     by: OrganizationCaller,
   ): Promise<void> {
-    return this.dependencies.organizations.applyGroupEdits({
+    return this.#dependencies.organizations.applyGroupEdits({
       ...input,
-      actor: this.ledgerActor(by),
+      actor: this.#ledgerActor(by),
     });
-  }
-
-  /** The display name behind each binding's scope id, one lookup per distinct scope. Lives here
-   * rather than in the group transport since resolving ORGANIZATION/TEAM/PROJECT scopes needs
-   * both the organization and project services at once, which no single door holds. */
-  async resolveBindingScopeNames(input: {
-    organizationId: string;
-    bindings: readonly OrganizationGroupBinding[];
-  }): Promise<Map<string, string>> {
-    const { organizationId, bindings } = input;
-    const names = new Map<string, string>();
-    const uniqueBindings = [
-      ...new Map(bindings.map((binding) => [binding.scopeId, binding])).values(),
-    ];
-    await Promise.all(
-      uniqueBindings.map(async (binding) => {
-        if (binding.scopeType === "ORGANIZATION") {
-          const organization = await this.dependencies.organizations.getBillingProfile({
-            organizationId,
-          });
-          names.set(binding.scopeId, organization.name);
-          return;
-        }
-        if (binding.scopeType === "TEAM") {
-          const team = await this.dependencies.organizations.getTeam({
-            organizationId,
-            teamId: binding.scopeId,
-          });
-          names.set(binding.scopeId, team.name);
-          return;
-        }
-        const project = await this.dependencies.projects.tryGetById(binding.scopeId);
-        if (project) names.set(binding.scopeId, project.name);
-      }),
-    );
-    return names;
   }
 
   // -- the personal workspace's own feature switches -------------------------
@@ -629,7 +644,7 @@ export class OrganizationApp {
     input: Omit<PersonalWorkspaceFeaturesInput, "callerUserId">,
     by: OrganizationCaller,
   ): Promise<PersonalFeatures> {
-    return this.dependencies.organizations.getPersonalWorkspaceFeatures({
+    return this.#dependencies.organizations.getPersonalWorkspaceFeatures({
       ...input,
       callerUserId: by.id,
     });
@@ -640,7 +655,7 @@ export class OrganizationApp {
     input: Omit<PersonalWorkspaceFeaturesInput, "callerUserId">,
     by: OrganizationCaller,
   ): Promise<PersonalFeatures> {
-    return this.dependencies.organizations.enableAllPersonalWorkspaceFeatures({
+    return this.#dependencies.organizations.enableAllPersonalWorkspaceFeatures({
       ...input,
       callerUserId: by.id,
     });
@@ -651,7 +666,7 @@ export class OrganizationApp {
     input: Omit<PersonalWorkspaceFeaturesInput, "callerUserId">,
     by: OrganizationCaller,
   ): Promise<PersonalFeatures> {
-    return this.dependencies.organizations.disableAllPersonalWorkspaceFeatures({
+    return this.#dependencies.organizations.disableAllPersonalWorkspaceFeatures({
       ...input,
       callerUserId: by.id,
     });
@@ -661,7 +676,7 @@ export class OrganizationApp {
 
   /** One project, or null when it does not exist. */
   tryGetProject(id: string): Promise<Project | null> {
-    return this.dependencies.projects.tryGetById(id);
+    return this.#dependencies.projects.tryGetById(id);
   }
 
   /** The organization's projects, one page at a time. */
@@ -671,11 +686,33 @@ export class OrganizationApp {
     limit: number;
     projectIds?: string[];
   }): Promise<PaginatedProjects> {
-    return this.dependencies.projects.listByOrganization(input);
+    return this.#dependencies.projects.listByOrganization(input);
   }
 
   /** The projects that live in one team. */
   listProjectsByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
-    return this.dependencies.projects.listByTeam(input);
+    return this.#dependencies.projects.listByTeam(input);
   }
+}
+
+/** Test-only construction over stub services without weakening the production factory. */
+export function createOrganizationAppForTesting(setup: {
+  infrastructure: Omit<ServerOrganizationAppDependencies, "groups"> & {
+    groups?: OrganizationGroupService;
+  };
+  [key: string]: unknown;
+}): ServerOrganizationApp {
+  const { groups, ...dependencies } = setup.infrastructure;
+  const Constructor = ServerOrganizationApp as unknown as new (
+    dependencies: ServerOrganizationAppDependencies,
+  ) => ServerOrganizationApp;
+  return new Constructor({
+    ...dependencies,
+    groups:
+      groups ??
+      OrganizationGroupScopeService.create({
+        organizations: dependencies.organizations,
+        projects: dependencies.projects,
+      }),
+  });
 }

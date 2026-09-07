@@ -17,8 +17,9 @@ import {
   isAuditPeriodPresetKey,
   readAuditPeriod,
 } from "../audit-period.ts";
+import { Temporal } from "@langwatch/time";
 
-const NOW = new Date("2026-03-04T15:20:00.000Z");
+const NOW = Temporal.Instant.from("2026-03-04T15:20:00.000Z");
 
 describe("given an address with no window in it", () => {
   describe("when the window is read", () => {
@@ -28,7 +29,7 @@ describe("given an address with no window in it", () => {
 
       expect(mode).toBe("relative");
       expect(period.endDate).toEqual(NOW);
-      expect(period.startDate.getTime()).toBeLessThan(NOW.getTime());
+      expect(period.startDate.epochMilliseconds).toBeLessThan(NOW.epochMilliseconds);
     });
   });
 });
@@ -41,7 +42,7 @@ describe("given an address naming a preset", () => {
 
       expect(mode).toBe("relative");
       expect(period.endDate).toEqual(NOW);
-      expect(NOW.getTime() - period.startDate.getTime()).toBe(24 * 60 * 60 * 1000);
+      expect(NOW.epochMilliseconds - period.startDate.epochMilliseconds).toBe(24 * 60 * 60 * 1000);
     });
   });
 
@@ -71,8 +72,12 @@ describe("given an address naming an absolute range", () => {
       );
 
       expect(mode).toBe("absolute");
-      expect(period.startDate.toISOString()).toBe("2026-01-01T00:00:00.000Z");
-      expect(period.endDate.toISOString()).toBe("2026-01-31T00:00:00.000Z");
+      expect(period.startDate.toString({ fractionalSecondDigits: 3 })).toBe(
+        "2026-01-01T00:00:00.000Z",
+      );
+      expect(period.endDate.toString({ fractionalSecondDigits: 3 })).toBe(
+        "2026-01-31T00:00:00.000Z",
+      );
     });
   });
 
@@ -134,8 +139,8 @@ describe("given a window on screen", () => {
     it("names both ends", () => {
       const label = auditPeriodLabel(
         {
-          startDate: new Date("2026-01-01T00:00:00.000Z"),
-          endDate: new Date("2026-01-31T00:00:00.000Z"),
+          startDate: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
+          endDate: Temporal.Instant.from("2026-01-31T00:00:00.000Z"),
         },
         "absolute",
         NOW,

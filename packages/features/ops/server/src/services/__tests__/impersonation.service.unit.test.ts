@@ -13,6 +13,7 @@ import {
   type ImpersonationTarget,
   type ImpersonationWindow,
 } from "../impersonation.service.ts";
+import { Temporal } from "@langwatch/time";
 
 class InMemoryImpersonationRepository extends ImpersonationRepository {
   window: ImpersonationWindow | null = null;
@@ -79,7 +80,7 @@ const serviceFor = (repository: InMemoryImpersonationRepository) => {
         adminEmails: ["root@langwatch.ai"],
       }),
       audit,
-      now: () => new Date("2026-01-01T00:00:00.000Z"),
+      now: () => Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
     }),
   };
 };
@@ -109,7 +110,9 @@ describe("ImpersonationService", () => {
         req: input.req,
       },
     ]);
-    expect(repository.window?.expires.toISOString()).toBe("2026-01-01T01:00:00.000Z");
+    expect(repository.window?.expires.toString({ fractionalSecondDigits: 3 })).toBe(
+      "2026-01-01T01:00:00.000Z",
+    );
   });
 
   /** @scenario "An admin cannot impersonate another admin" */
@@ -119,7 +122,9 @@ describe("ImpersonationService", () => {
     ).rejects.toBeInstanceOf(UserToImpersonateNotFoundError);
     await expect(
       serviceFor(
-        new InMemoryImpersonationRepository(target({ deactivatedAt: new Date("2025-01-01") })),
+        new InMemoryImpersonationRepository(
+          target({ deactivatedAt: Temporal.Instant.from("2025-01-01T00:00:00Z") }),
+        ),
       ).service.start(input),
     ).rejects.toBeInstanceOf(CannotImpersonateDeactivatedUserError);
     await expect(

@@ -18,7 +18,7 @@ import {
   AutomationPersistCapService,
   type AutomationPersistCapRedisPort,
 } from "../services/persist-cap.service.ts";
-import { fromDate } from "@langwatch/time";
+import { type Instant, fromDate } from "@langwatch/time";
 
 /** The four tables settlement's ledger touches, named here and nowhere above it. */
 export type AutomationSettlementLedgerDatabase = Pick<
@@ -166,13 +166,12 @@ export class PostgresAutomationSettlementLedgerAdapter extends AutomationSettlem
   consumePersistCapSlot(input: {
     projectId: string;
     triggerId: string;
-    now: Date;
+    now: Instant;
     cap: number;
     dedupKey: string;
   }): Promise<AutomationPersistCapDecision> {
     return AutomationPersistCapService.consumePersistCapSlot({
       ...input,
-      now: fromDate(input.now),
       redis: this.redis,
     });
   }

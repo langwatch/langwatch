@@ -24,6 +24,7 @@ import {
 } from "@langwatch/organization-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import { Temporal, toDate } from "@langwatch/time";
 
 /** The process supplies authentication; authorization arrives as `policy`. */
 export type JoinRequestTrpcContext = Readonly<{
@@ -157,8 +158,11 @@ const setJoiningInputSchema = z.object({
 function waitingSince(request: JoinRequestAggregateState) {
   return {
     joinRequestId: request.joinRequestId,
-    requestedAt: new Date(request.createdAtMs),
-    expiresAt: request.expiresAtMs === null ? null : new Date(request.expiresAtMs),
+    requestedAt: toDate(Temporal.Instant.fromEpochMilliseconds(request.createdAtMs)),
+    expiresAt:
+      request.expiresAtMs === null
+        ? null
+        : toDate(Temporal.Instant.fromEpochMilliseconds(request.expiresAtMs)),
   };
 }
 

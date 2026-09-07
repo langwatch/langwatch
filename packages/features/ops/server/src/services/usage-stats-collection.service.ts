@@ -3,12 +3,13 @@ import type {
   UsageStatsProjectRepositoryPort,
   UsageStatsReport,
 } from "../ports/usage-stats-worker.port.ts";
+import type { Instant } from "@langwatch/time";
 
 export interface UsageStatsCollectionServiceOptions {
   projects: UsageStatsProjectRepositoryPort;
   clickhouse: UsageStatsClickHouseRepositoryPort;
   builderChartKind: string;
-  now: () => Date;
+  now: () => Instant;
 }
 
 /** Collects the organization-wide usage report sent by the daily Ops worker. */
@@ -34,7 +35,7 @@ export class UsageStatsCollectionService {
       totalTraces,
       totalScenarioEvents,
       ...projectCounts,
-      timestamp: this.options.now().toISOString(),
+      timestamp: this.options.now().toString({ fractionalSecondDigits: 3 }),
     };
   }
 }

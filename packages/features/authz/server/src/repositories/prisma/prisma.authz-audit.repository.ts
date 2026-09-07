@@ -3,6 +3,7 @@ import {
   type AuthzAuditRow,
   AuthzAuditTrailStore,
 } from "../../adapters/eventing.authz-audit.adapter.ts";
+import { toDate } from "@langwatch/time";
 
 /**
  * Only what this repository touches: one call, `createMany`.
@@ -25,7 +26,8 @@ export type AuthzAuditDatabase = {
  * Stating the written row here is what lets the seam above be narrow enough
  * to implement without the generated delegate.
  */
-export type AuthzAuditInsert = Omit<AuthzAuditRow, "metadata"> & {
+export type AuthzAuditInsert = Omit<AuthzAuditRow, "createdAt" | "metadata"> & {
+  createdAt: Date;
   metadata: Prisma.InputJsonValue;
 };
 
@@ -48,7 +50,13 @@ export class PrismaAuthzAuditRepository extends AuthzAuditTrailStore {
       // The audit mapper builds `metadata` by copying named scalar fields off
       // the event, so it is a plain JSON object by construction and the column
       // it lands in is `Json`.
-      data: [{ ...row, metadata: row.metadata as Prisma.InputJsonValue }],
+      data: [
+        {
+          ...row,
+          createdAt: toDate(row.createdAt),
+          metadata: row.metadata as Prisma.InputJsonValue,
+        },
+      ],
       skipDuplicates: true,
     });
   }

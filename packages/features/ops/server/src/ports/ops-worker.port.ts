@@ -1,3 +1,5 @@
+import type { Instant } from "@langwatch/time";
+
 export interface OpsWorkerHandle {
   stop(): void | Promise<void>;
 }
@@ -7,7 +9,7 @@ export interface UsageStatsWorkerConfig {
   installMethod: string;
   hostname: string | undefined;
   environment: string | undefined;
-  now: () => Date;
+  now: () => Instant;
 }
 
 /** Process controls for the complete Ops worker graph. */

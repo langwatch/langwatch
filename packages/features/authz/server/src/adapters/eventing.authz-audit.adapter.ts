@@ -10,6 +10,7 @@ import {
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { AuthzGrantsEvent } from "./eventing.authz.adapter.ts";
+import { type Instant, Temporal } from "@langwatch/time";
 
 export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
 export const AUTHZ_AUDIT_VERBS = [
@@ -63,7 +64,7 @@ const logger = createLogger("langwatch:authz:audit-trail");
 
 export interface AuthzAuditRow {
   id: string;
-  createdAt: Date;
+  createdAt: Instant;
   userId: string | null;
   organizationId: string;
   action: string;
@@ -110,7 +111,7 @@ class AuthzAuditRowMapper {
     }
     return {
       id: this.rowId(event.id),
-      createdAt: new Date(event.occurredAt),
+      createdAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
       userId: actor?.type === "user" ? actor.id : null,
       organizationId: event.tenantId,
       action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,

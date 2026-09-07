@@ -15,6 +15,7 @@ import {
 } from "./prisma.admin.repository.ts";
 import { PrismaAdminUserMapper, USER_BACKOFFICE_INCLUDE } from "./prisma.admin-user.mapper.ts";
 import { AdminBackofficeRepository } from "../admin-backoffice.repository.ts";
+import { type Instant, toDate } from "@langwatch/time";
 
 /**
  * Private Prisma/React-Admin adapter for the Ops backoffice surface.
@@ -50,10 +51,10 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
     return { data };
   }
 
-  async setUserDeactivatedAt(id: string, value: Date): Promise<void> {
+  async setUserDeactivatedAt(id: string, value: Instant): Promise<void> {
     await this.database.user.update({
       where: { id },
-      data: { deactivatedAt: value },
+      data: { deactivatedAt: toDate(value) },
     });
   }
 

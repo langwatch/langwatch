@@ -7,6 +7,7 @@ import type { StoredObjectsClickHousePort } from "../../ports/stored-objects-cli
 import { StoredObjectsRepository } from "../stored-objects.repository.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import { storedObjectSchema } from "../../rules/stored-object-row.rules.ts";
+import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 const TABLE_NAME = "stored_objects" as const;
 
@@ -153,8 +154,8 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
           size_bytes: Number(raw.size_bytes),
           sha256: raw.sha256,
           storage_uri: raw.storage_uri,
-          created_at: new Date(raw.created_at as string),
-          inserted_at: new Date(raw.inserted_at as string),
+          created_at: clickHouseDate(raw.created_at),
+          inserted_at: clickHouseDate(raw.inserted_at),
         });
       },
     );
@@ -260,8 +261,8 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
       storedObjectSchema.parse({
         ...raw,
         size_bytes: Number(raw.size_bytes),
-        created_at: new Date(raw.created_at as string),
-        inserted_at: new Date(raw.inserted_at as string),
+        created_at: clickHouseDate(raw.created_at),
+        inserted_at: clickHouseDate(raw.inserted_at),
       }),
     );
   }
@@ -395,4 +396,12 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
       },
     );
   }
+}
+
+/**
+ * ClickHouse hands a DateTime64 back as an ISO string; the row schema declares
+ * a `Date` because the client serialises one on the way back in.
+ */
+function clickHouseDate(value: unknown) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value as string)));
 }

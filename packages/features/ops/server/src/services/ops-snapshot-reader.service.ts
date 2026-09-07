@@ -4,11 +4,12 @@ import type {
   DashboardData,
   DetailSnapshot,
   LiveSnapshot,
+  OpsApiGetBadgeCountsOutput,
   OpsSnapshotAbortSignal,
   OpsSnapshotLease,
 } from "@langwatch/ops-contract";
 import { OpsSnapshotRepository } from "../repositories/ops-snapshot.repository.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:snapshot-reader");
 
@@ -36,7 +37,7 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
   private badgeCache: {
     blockedCount: number;
     dlqCount: number;
-    computedAt: Date;
+    computedAt: NonNullable<OpsApiGetBadgeCountsOutput["computedAt"]>;
   } | null = null;
 
   static create(repository: OpsSnapshotRepository): DefaultOpsSnapshotService {
@@ -54,7 +55,7 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
   getBadgeCounts(): {
     blockedCount: number;
     dlqCount: number;
-    computedAt: Date;
+    computedAt: NonNullable<OpsApiGetBadgeCountsOutput["computedAt"]>;
   } {
     const now = nowInstant().epochMilliseconds;
     if (this.badgeCache && now - this.badgeCache.computedAt.getTime() < BADGE_CACHE_TTL_MS) {
@@ -68,7 +69,7 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
       dlqCount += q.dlqCount;
     }
 
-    this.badgeCache = { blockedCount, dlqCount, computedAt: new Date(now) };
+    this.badgeCache = { blockedCount, dlqCount, computedAt: toDate(nowInstant()) };
 
     return this.badgeCache;
   }

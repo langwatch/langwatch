@@ -4,9 +4,10 @@
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { HandledError } from "@langwatch/handled-error";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AutomationApp, type AutomationAppDependencies } from "../../../app/automation.app.ts";
+import type { AutomationApp } from "../../../app/automation.app.ts";
+import { createCanonicalAutomationApp } from "../../../app/__tests__/automation-app.fixture.ts";
 import { createTriggerRestApp } from "../automation.api.ts";
 
 const storedTrigger = {
@@ -30,14 +31,9 @@ function mount(options: { realConditionRule?: boolean } = {}) {
   const creates: unknown[] = [];
   // The condition rule is the application's own; a suite about the rule composes the real
   // one, and a suite about anything else keeps the stub so its own subject stays alone.
-  const rules = AutomationApp.create({
-    automation: {
-      create: vi.fn(async (command: unknown) => {
-        creates.push(command);
-        return storedTrigger;
-      }),
-    },
-  } as unknown as AutomationAppDependencies);
+  const fixture = createCanonicalAutomationApp();
+  resources.push(fixture.resources);
+  const rules = fixture.app;
   const app = {
     tryGetLiveById: vi.fn(async () => storedTrigger),
     assertConditionSurvivesEdit: options.realConditionRule
@@ -80,6 +76,12 @@ function mount(options: { realConditionRule?: boolean } = {}) {
       ),
   };
 }
+
+const resources: ReturnType<typeof createCanonicalAutomationApp>["resources"][] = [];
+
+afterEach(async () => {
+  await Promise.all(resources.splice(0).map((resource) => resource.close()));
+});
 
 /** Renders the typed refusal the way every client reads it: by code. */
 const renderError: ErrorHandler = (error, c) => {

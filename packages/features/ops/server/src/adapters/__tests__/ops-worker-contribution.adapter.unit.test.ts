@@ -10,6 +10,7 @@ import {
   AnomalyWorkerContributionAdapter,
   UsageStatsWorkerContributionAdapter,
 } from "../ops-worker-contribution.adapter.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = vi.hoisted(() => ({
   debug: vi.fn(),
@@ -90,7 +91,7 @@ const createUsageStatsWorker = (disabled = false) => {
       installMethod: "self-hosted",
       hostname: "self-hosted.example",
       environment: "production",
-      now: () => new Date(),
+      now: nowInstant,
     },
     organizations,
     usageStats,

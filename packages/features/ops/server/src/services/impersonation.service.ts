@@ -8,6 +8,7 @@ import {
 } from "@langwatch/ops-contract";
 import type { AdminAuditRequest } from "@langwatch/ops-contract";
 import type { AdminAccess } from "./admin-access.service.ts";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 const IMPERSONATION_TTL_MS = 60 * 60 * 1_000;
 
@@ -16,7 +17,7 @@ export interface ImpersonationTarget {
   name: string | null;
   email: string | null;
   image: string | null;
-  deactivatedAt: Date | null;
+  deactivatedAt: Instant | null;
   /**
    * The target's organizations that require a second factor. Their data is
    * what the operator is about to see, so they are what decides whether the
@@ -30,7 +31,7 @@ export interface ImpersonationWindow {
   name: string | null;
   email: string | null;
   image: string | null;
-  expires: Date;
+  expires: Instant;
 }
 
 export abstract class ImpersonationRepository {
@@ -54,7 +55,7 @@ export interface ImpersonationServiceOptions {
   repository: ImpersonationRepository;
   access: AdminAccess;
   audit: AdminAuditSink;
-  now?: (() => Date) | undefined;
+  now?: (() => Instant) | undefined;
 }
 
 export class ImpersonationService {
@@ -62,7 +63,7 @@ export class ImpersonationService {
     private readonly repository: ImpersonationRepository,
     private readonly access: AdminAccess,
     private readonly audit: AdminAuditSink,
-    private readonly now: () => Date,
+    private readonly now: () => Instant,
   ) {}
 
   static create(options: ImpersonationServiceOptions): ImpersonationService {
@@ -70,7 +71,7 @@ export class ImpersonationService {
       options.repository,
       options.access,
       options.audit,
-      options.now ?? (() => new Date()),
+      options.now ?? nowInstant,
     );
   }
 
@@ -105,7 +106,7 @@ export class ImpersonationService {
       name: target.name,
       email: target.email,
       image: target.image,
-      expires: new Date(this.now().getTime() + IMPERSONATION_TTL_MS),
+      expires: this.now().add({ milliseconds: IMPERSONATION_TTL_MS }),
     });
   }
 

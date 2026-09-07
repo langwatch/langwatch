@@ -40,6 +40,7 @@ import {
 } from "../../projections/authz-grant.projection.ts";
 import { AuthzMigrationOwnershipMapper } from "../../migrations/legacy-import.authz-grant.migration.ts";
 import { AuthzGrantMapper } from "./prisma.authz-grant.mapper.ts";
+import { toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:authz:projection-compat");
 
@@ -123,7 +124,7 @@ class AuthzProjectionResultMapper {
     const count = (result as { count?: unknown } | null)?.count;
     if (count !== 0) return;
     logger.warn(
-      { write: write.kind, occurredAt: write.occurredAt },
+      { write: write.kind, occurredAt: write.occurredAt.toString({ fractionalSecondDigits: 3 }) },
       "authz projection write matched no row; the grant it names is absent or newer",
     );
   }
@@ -404,13 +405,13 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
 
       case "grant.setRole":
         return this.prisma.grant.updateMany({
-          where: { id: write.grantId, occurredAt: { lte: write.occurredAt } },
+          where: { id: write.grantId, occurredAt: { lte: toDate(write.occurredAt) } },
           // legacyRole is cleared, never carried - see the projection's
           // mapAuthzGrantRoleChanged for the escalation this closes.
           data: {
             roleKey: write.roleKey,
             legacyRole: null,
-            occurredAt: write.occurredAt,
+            occurredAt: toDate(write.occurredAt),
           },
         });
 
@@ -422,12 +423,12 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
           where: {
             id: write.grantId,
             revokedAt: null,
-            occurredAt: { lte: write.occurredAt },
+            occurredAt: { lte: toDate(write.occurredAt) },
           },
           data: {
-            revokedAt: write.occurredAt,
+            revokedAt: toDate(write.occurredAt),
             revokedReason: write.reason,
-            occurredAt: write.occurredAt,
+            occurredAt: toDate(write.occurredAt),
           },
         });
 
@@ -436,10 +437,10 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
 
       case "role.setPermissions":
         return this.prisma.role.updateMany({
-          where: { id: write.roleId, occurredAt: { lte: write.occurredAt } },
+          where: { id: write.roleId, occurredAt: { lte: toDate(write.occurredAt) } },
           data: {
             permissions: write.permissions,
-            occurredAt: write.occurredAt,
+            occurredAt: toDate(write.occurredAt),
           },
         });
 
@@ -448,9 +449,9 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
           where: {
             id: write.roleId,
             deletedAt: null,
-            occurredAt: { lte: write.occurredAt },
+            occurredAt: { lte: toDate(write.occurredAt) },
           },
-          data: { deletedAt: write.occurredAt, occurredAt: write.occurredAt },
+          data: { deletedAt: toDate(write.occurredAt), occurredAt: toDate(write.occurredAt) },
         });
     }
   }
@@ -478,8 +479,8 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
         ${row.roleKey}, ${row.legacyRole}, ${row.source},
         ${row.scopeType}::"GrantScopeType", ${row.scopeId}, ${row.token},
         ${row.permission}, ${row.resourceKind}, ${row.projectId},
-        ${row.createdByUserId}, ${row.expiresAt}, ${row.maxViews},
-        ${row.occurredAt}, NOW()
+        ${row.createdByUserId}, ${row.expiresAt ? toDate(row.expiresAt) : null}, ${row.maxViews},
+        ${toDate(row.occurredAt)}, NOW()
       )
       ON CONFLICT ("id") DO UPDATE SET
         "organizationId"  = EXCLUDED."organizationId",
@@ -513,7 +514,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
       ) VALUES (
         ${row.id}, ${row.organizationId}, ${row.name}, ${row.description},
         ${JSON.stringify(row.permissions)}::jsonb, ${row.kind},
-        ${row.occurredAt}, NOW()
+        ${toDate(row.occurredAt)}, NOW()
       )
       ON CONFLICT ("id") DO UPDATE SET
         "organizationId" = EXCLUDED."organizationId",

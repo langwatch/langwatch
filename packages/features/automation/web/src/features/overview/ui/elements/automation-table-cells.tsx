@@ -8,7 +8,9 @@ import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
 import type { TriggerActionParams } from "../../model/trigger-action-params.ts";
 import { HelpCircle, Plus } from "lucide-react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { nowInstant } from "@langwatch/time";
+import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
+import { readableDate } from "../../../../model/display-formatters.ts";
+
 const OPERATOR_LABELS: Record<string, string> = {
   gt: "greater than",
   lt: "less than",
@@ -32,12 +34,12 @@ export interface AutomationListTrigger {
 }
 
 export interface AutomationTriggerStats {
-  lastFiredAt: Date | string | null;
+  lastFiredAt: TimeInput | null;
 }
 
 export interface AutomationReportSchedule {
-  nextRunAt: Date | string | null;
-  lastRunAt: Date | string | null;
+  nextRunAt: TimeInput | null;
+  lastRunAt: TimeInput | null;
 }
 
 export type FormatTimeAgo = (timestamp: number) => string | undefined;
@@ -68,12 +70,12 @@ function DigestScheduleHint({
 }: {
   active: boolean;
   cadence: string;
-  lastFiredAt: Date | string | null;
+  lastFiredAt: TimeInput | null;
 }) {
   const windowMs = CADENCE_WINDOW_MS[cadence as NotificationCadence] ?? 0;
   if (!active || windowMs <= 0) return null;
 
-  const dueAt = lastFiredAt ? new Date(lastFiredAt).getTime() + windowMs : null;
+  const dueAt = lastFiredAt ? toEpochMs(lastFiredAt) + windowMs : null;
   const now = nowInstant().epochMilliseconds;
   const label =
     dueAt && dueAt > now
@@ -101,7 +103,7 @@ export function LastFiredCell({
   return (
     <VStack align="start" gap={0.5}>
       {stats?.lastFiredAt ? (
-        <Text as="span">{formatTimeAgo(new Date(stats.lastFiredAt).getTime())}</Text>
+        <Text as="span">{formatTimeAgo(toEpochMs(stats.lastFiredAt))}</Text>
       ) : (
         <Text as="span" color="fg.muted">
           —
@@ -232,9 +234,9 @@ export function ReportRunCells({
     <>
       <Table.Cell whiteSpace="nowrap">
         {schedule?.nextRunAt ? (
-          <Tooltip content={new Date(schedule.nextRunAt).toLocaleString()}>
+          <Tooltip content={readableDate(schedule.nextRunAt).toLocaleString()}>
             <Text textStyle="sm" cursor="help">
-              {formatTimeAgo(new Date(schedule.nextRunAt).getTime())}
+              {formatTimeAgo(toEpochMs(schedule.nextRunAt))}
             </Text>
           </Tooltip>
         ) : (
@@ -245,9 +247,9 @@ export function ReportRunCells({
       </Table.Cell>
       <Table.Cell whiteSpace="nowrap">
         {schedule?.lastRunAt ? (
-          <Tooltip content={new Date(schedule.lastRunAt).toLocaleString()}>
+          <Tooltip content={readableDate(schedule.lastRunAt).toLocaleString()}>
             <Text textStyle="sm" cursor="help">
-              {formatTimeAgo(new Date(schedule.lastRunAt).getTime())}
+              {formatTimeAgo(toEpochMs(schedule.lastRunAt))}
             </Text>
           </Tooltip>
         ) : (

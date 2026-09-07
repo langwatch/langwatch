@@ -8,5 +8,5 @@ export abstract class WebhookDeliveryRepository {
     triggerId: string;
     limit: number;
   }): Promise<WebhookDeliveryRow[]>;
-  abstract pruneExpired(now?: Date): Promise<number>;
+  abstract pruneExpired(now?: Instant): Promise<number>;
 }

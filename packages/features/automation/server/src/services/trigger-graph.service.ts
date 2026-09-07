@@ -5,7 +5,7 @@ import type {
   GraphTriggerSweepCandidate,
 } from "@langwatch/automation-contract";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
@@ -34,7 +34,7 @@ export class AutomationGraphService {
   static create(input: {
     triggers: TriggerRepository;
     customGraphs: CustomGraphRepository;
-    projects: ProjectService;
+    projects: ProjectApi;
     analytics: AnalyticsService;
     triggerSent: GraphTriggerSentRepository;
     notifier: AutomationGraphNotifierPort;
@@ -82,7 +82,7 @@ export class AutomationGraphService {
     return this.evaluator.evaluate(input);
   }
 
-  decideHeartbeat(input: { now: Date }): Promise<GraphTriggerSweepCandidate[]> {
+  decideHeartbeat(input: { now: Instant }): Promise<GraphTriggerSweepCandidate[]> {
     return this.heartbeat.decide(input);
   }
 

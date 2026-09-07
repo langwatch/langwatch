@@ -14,6 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 import { TriggerSettlementNotificationService } from "../trigger-settlement-notification.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const TRIGGER = { id: "trigger-1", name: "Errors", action: "SEND_SLACK_MESSAGE" };
 const FOLD = { computedInput: "in", computedOutput: "out", occurredAt: 1 };
@@ -59,7 +60,7 @@ function harness(
       },
     },
     observability: { recordDispatch: () => undefined, recordFailure: () => undefined },
-    clock: { now: () => new Date(0) },
+    clock: { now: () => Temporal.Instant.fromEpochMilliseconds(0) },
     emailCaps: {},
     slack: {},
     webhooks: {},

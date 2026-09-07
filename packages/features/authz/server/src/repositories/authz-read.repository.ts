@@ -11,6 +11,7 @@ import type {
   LegacyTeamMembership,
   ShareableResourceKind,
 } from "@langwatch/authz-contract";
+import type { Instant } from "@langwatch/time";
 
 /** OrganizationUser.role, or null when no membership row exists. */
 export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL";
@@ -49,7 +50,7 @@ export type ShareLinkRow = {
   resourceId: string;
   projectId: string;
   visibility: "PUBLIC" | "ORGANIZATION" | "PROJECT";
-  expiresAt: Date | null;
+  expiresAt: Instant | null;
   maxViews: number | null;
   viewCount: number;
 };

@@ -17,7 +17,7 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import type { OrganizationApp } from "#app/organization.app";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 /**
  * The four keys the "pick your flavour" screen offers. The trait values they
@@ -43,7 +43,7 @@ type OnboardingTrpcSessionUser = Readonly<{
 
 /** The process supplies authentication; authorization arrives as `noPermission`. */
 export type OnboardingTrpcContext = Readonly<{
-  app: Readonly<{ organizations: OrganizationApp }>;
+  app: Readonly<{ organizations: OrganizationApi }>;
   session: Readonly<{ user: OnboardingTrpcSessionUser }> | null;
 }>;
 

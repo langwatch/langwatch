@@ -392,7 +392,7 @@ export class OpsTrpcApi {
           .withOutput(opsParkedGroupsPageSchema)
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.listParkedQueueGroups(input);
           }),
       )
@@ -402,7 +402,7 @@ export class OpsTrpcApi {
           .withOutput(queueSummaryInfoSchema.array())
           .withPermission("ops:view")
           .handle(async ({ ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.listQueues();
           }),
       )
@@ -418,9 +418,7 @@ export class OpsTrpcApi {
           .withInput(opsListScheduledJobsInputSchema)
           .withOutput(opsScheduledJobSchema.array())
           .withPermission("ops:view")
-          .handle(async ({ input, ctx }) =>
-            ctx.app.ops.operations.listScheduledJobs({ limit: input.limit }),
-          ),
+          .handle(async ({ input, ctx }) => ctx.app.ops.listScheduledJobs({ limit: input.limit })),
       )
       /**
        * Only the switched-off schedules, for the dashboard's "Switched off"
@@ -433,7 +431,7 @@ export class OpsTrpcApi {
           .withOutput(opsPausedSchedulesPageSchema)
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) =>
-            ctx.app.ops.operations.listPausedSchedules({ limit: input.limit }),
+            ctx.app.ops.listPausedSchedules({ limit: input.limit }),
           ),
       )
       /** Recent scheduler operator actions, so the page explains its own history. */
@@ -443,7 +441,7 @@ export class OpsTrpcApi {
           .withOutput(schedulerAuditEntryViewSchema.array())
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) =>
-            ctx.app.ops.operations.listSchedulerActions({ limit: input.limit }),
+            ctx.app.ops.listSchedulerActions({ limit: input.limit }),
           ),
       )
       /**
@@ -457,7 +455,7 @@ export class OpsTrpcApi {
           .withOutput(opsScheduledJobSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) =>
-            ctx.app.ops.operations.setScheduleActive({
+            ctx.app.ops.setScheduleActive({
               scheduleId: input.scheduleId,
               active: input.active,
               actorUserId: ctx.actor().id,
@@ -471,7 +469,7 @@ export class OpsTrpcApi {
           .withOutput(opsScheduledJobSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) =>
-            ctx.app.ops.operations.clearStuckScheduleSlot({
+            ctx.app.ops.clearStuckScheduleSlot({
               scheduleId: input.scheduleId,
               actorUserId: ctx.actor().id,
             }),
@@ -488,7 +486,7 @@ export class OpsTrpcApi {
           .withOutput(opsScheduledJobSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) =>
-            ctx.app.ops.operations.runScheduleNow({
+            ctx.app.ops.runScheduleNow({
               scheduleId: input.scheduleId,
               actorUserId: ctx.actor().id,
             }),
@@ -507,7 +505,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueGroupsPageSchema)
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.listQueueGroups(input);
           }),
       )
@@ -538,7 +536,7 @@ export class OpsTrpcApi {
           .withOutput(opsBlockedSummarySchema)
           .withPermission("ops:view")
           .handle(async ({ ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.getBlockedQueueSummary();
           }),
       )
@@ -548,7 +546,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueJobsPageSchema)
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.listQueueGroupJobs(input);
           }),
       )
@@ -558,7 +556,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueUnblockedGroupSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.unblockQueueGroup({
               ...input,
               requestedBy: ctx.actor().id,
@@ -571,7 +569,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueUnblockedAllSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.unblockAllQueueGroups({
               ...input,
               requestedBy: ctx.actor().id,
@@ -584,7 +582,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueDrainedGroupSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.drainQueueGroup({
               ...input,
               requestedBy: ctx.actor().id,
@@ -597,7 +595,7 @@ export class OpsTrpcApi {
           .withOutput(z.void())
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.pauseQueuePipeline(input);
           }),
       )
@@ -607,7 +605,7 @@ export class OpsTrpcApi {
           .withOutput(z.void())
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.unpauseQueuePipeline(input);
           }),
       )
@@ -617,7 +615,7 @@ export class OpsTrpcApi {
           .withOutput(z.void())
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.pauseQueueTenant(input);
           }),
       )
@@ -627,7 +625,7 @@ export class OpsTrpcApi {
           .withOutput(z.void())
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.unpauseQueueTenant(input);
           }),
       )
@@ -637,7 +635,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueNameListSchema)
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.listPausedQueueTenants(input);
           }),
       )
@@ -647,7 +645,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueDrainedTenantSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.drainQueueTenant({
               ...input,
               requestedBy: ctx.actor().id,
@@ -660,7 +658,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueUnblockedGroupSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.retryBlockedQueueJob(input);
           }),
       )
@@ -690,7 +688,7 @@ export class OpsTrpcApi {
           .withOutput(aggregateProcessManagerSchema.array())
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) =>
-            ctx.app.ops.processes.getForAggregate({
+            ctx.app.ops.getForAggregate({
               aggregateType: input.aggregateType,
               projectId: input.tenantId,
               aggregateId: input.aggregateId,
@@ -709,7 +707,7 @@ export class OpsTrpcApi {
           .withOutput(opsProcessRequeuedSchema)
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) =>
-            ctx.app.ops.processes.requeueDeadMessages({
+            ctx.app.ops.requeueDeadMessages({
               processName: input.processName,
               projectId: input.tenantId,
               processKey: input.processKey,
@@ -727,7 +725,7 @@ export class OpsTrpcApi {
           .withoutInput("every registered process manager")
           .withOutput(processFleetSummarySchema.array())
           .withPermission("ops:view")
-          .handle(({ ctx }) => ctx.app.ops.processes.getFleetSummary()),
+          .handle(({ ctx }) => ctx.app.ops.getFleetSummary()),
       )
       /**
        * Retired messages across every process. Answers "what has permanently
@@ -740,7 +738,7 @@ export class OpsTrpcApi {
           .withInput(opsListDeadLettersInputSchema)
           .withOutput(opsDeadLetterPageSchema)
           .withPermission("ops:view")
-          .handle(({ input, ctx }) => ctx.app.ops.processes.getDeadLetters(input)),
+          .handle(({ input, ctx }) => ctx.app.ops.getDeadLetters(input)),
       )
       /** Dead totals per process, for the navigation badge and dashboard card. */
       .query("listDeadLetterCounts", (p) =>
@@ -748,14 +746,14 @@ export class OpsTrpcApi {
           .withoutInput("the fleet-wide totals; a per-process read is its own procedure")
           .withOutput(deadLetterCountSchema.array())
           .withPermission("ops:view")
-          .handle(({ ctx }) => ctx.app.ops.processes.getDeadLetterCounts()),
+          .handle(({ ctx }) => ctx.app.ops.getDeadLetterCounts()),
       )
       .query("listProcessInstances", (p) =>
         p
           .withInput(opsListProcessInstancesInputSchema)
           .withOutput(opsProcessInstancePageSchema)
           .withPermission("ops:view")
-          .handle(async ({ input, ctx }) => ctx.app.ops.processes.getInstances(input)),
+          .handle(async ({ input, ctx }) => ctx.app.ops.getInstances(input)),
       )
       /** The soonest-due process wakes, for the dashboard's timed-work table. */
       .query("listUpcomingWakes", (p) =>
@@ -763,16 +761,14 @@ export class OpsTrpcApi {
           .withInput(opsListUpcomingWakesInputSchema)
           .withOutput(processWakeRowSchema.array())
           .withPermission("ops:view")
-          .handle(async ({ input, ctx }) => ctx.app.ops.processes.getUpcomingWakes(input)),
+          .handle(async ({ input, ctx }) => ctx.app.ops.getUpcomingWakes(input)),
       )
       .query("getProcessInstance", (p) =>
         p
           .withInput(opsProcessRefInputSchema)
           .withOutput(processInstanceDetailSchema.nullable())
           .withPermission("ops:view")
-          .handle(async ({ input, ctx }) =>
-            ctx.app.ops.processes.tryGetInstanceDetail({ ref: input }),
-          ),
+          .handle(async ({ input, ctx }) => ctx.app.ops.tryGetInstanceDetail({ ref: input })),
       )
       .query("listProcessOutbox", (p) =>
         p
@@ -781,7 +777,7 @@ export class OpsTrpcApi {
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) => {
             const { page, pageSize, ...ref } = input;
-            return ctx.app.ops.processes.getOutbox({ ref, page, pageSize });
+            return ctx.app.ops.getOutbox({ ref, page, pageSize });
           }),
       )
       .query("listProcessActions", (p) =>
@@ -789,7 +785,7 @@ export class OpsTrpcApi {
           .withInput(opsListProcessActionsInputSchema)
           .withOutput(processAuditEntryViewSchema.array())
           .withPermission("ops:view")
-          .handle(async ({ input, ctx }) => ctx.app.ops.processes.listRecentActions(input)),
+          .handle(async ({ input, ctx }) => ctx.app.ops.listRecentActions(input)),
       )
       .mutation("processWakeNow", (p) =>
         p
@@ -797,7 +793,7 @@ export class OpsTrpcApi {
           .withOutput(opsProcessWokeSchema)
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) =>
-            ctx.app.ops.processes.wakeNow({
+            ctx.app.ops.wakeNow({
               ref: input,
               actorUserId: ctx.actor().id,
             }),
@@ -809,7 +805,7 @@ export class OpsTrpcApi {
           .withOutput(opsProcessRequeuedSchema)
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) =>
-            ctx.app.ops.processes.redriveDeadInstance({
+            ctx.app.ops.redriveDeadInstance({
               ref: input,
               actorUserId: ctx.actor().id,
             }),
@@ -822,7 +818,7 @@ export class OpsTrpcApi {
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) => {
             const { messageId, ...ref } = input;
-            return ctx.app.ops.processes.redriveDeadMessage({
+            return ctx.app.ops.redriveDeadMessage({
               ref,
               messageId,
               actorUserId: ctx.actor().id,
@@ -837,7 +833,7 @@ export class OpsTrpcApi {
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) => {
             const { messageId, ...ref } = input;
-            return ctx.app.ops.processes.discardDeadMessage({
+            return ctx.app.ops.discardDeadMessage({
               ref,
               messageId,
               actorUserId: ctx.actor().id,
@@ -854,7 +850,7 @@ export class OpsTrpcApi {
           .withOutput(opsProcessRedrivenDeadLettersSchema)
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) =>
-            ctx.app.ops.processes.redriveDeadLetters({
+            ctx.app.ops.redriveDeadLetters({
               ...input,
               actorUserId: ctx.actor().id,
             }),
@@ -875,7 +871,7 @@ export class OpsTrpcApi {
           .withOutput(opsProcessDiscardedDeadLettersSchema)
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) =>
-            ctx.app.ops.processes.discardDeadLetters({
+            ctx.app.ops.discardDeadLetters({
               ...(input.processName ? { processName: input.processName } : {}),
               actorUserId: ctx.actor().id,
             }),
@@ -887,7 +883,7 @@ export class OpsTrpcApi {
           .withInput(opsListOutboxAttemptsInputSchema)
           .withOutput(outboxAttemptViewSchema.array())
           .withPermission("ops:view")
-          .handle(async ({ input, ctx }) => ctx.app.ops.processes.getOutboxAttempts(input)),
+          .handle(async ({ input, ctx }) => ctx.app.ops.getOutboxAttempts(input)),
       )
       .mutation("processReleaseLapsedLease", (p) =>
         p
@@ -896,7 +892,7 @@ export class OpsTrpcApi {
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) => {
             const { messageId, ...ref } = input;
-            return ctx.app.ops.processes.releaseLapsedLease({
+            return ctx.app.ops.releaseLapsedLease({
               ref,
               messageId,
               actorUserId: ctx.actor().id,
@@ -916,7 +912,7 @@ export class OpsTrpcApi {
           .withOutput(opsAggregateDiscoverySchema)
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) =>
-            ctx.app.ops.events.discoverAggregates({
+            ctx.app.ops.discoverAggregates({
               projectionNames: input.projectionNames,
               since: input.since,
               tenantIds: input.tenantIds ?? [],
@@ -947,7 +943,7 @@ export class OpsTrpcApi {
           .withoutInput("every run this deployment has recorded")
           .withOutput(replayHistoryEntrySchema.array())
           .withPermission("ops:view")
-          .handle(async ({ ctx }) => ctx.app.ops.replay.getHistory()),
+          .handle(async ({ ctx }) => ctx.app.ops.getHistory()),
       )
       .query("getReplayRun", (p) =>
         p
@@ -955,7 +951,7 @@ export class OpsTrpcApi {
           .withOutput(replayHistoryEntrySchema.nullable())
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) =>
-            ctx.app.ops.replay.tryFindHistoryEntry({ runId: input.runId }),
+            ctx.app.ops.tryFindHistoryEntry({ runId: input.runId }),
           ),
       )
       .mutation("startReplay", (p) =>
@@ -968,7 +964,7 @@ export class OpsTrpcApi {
             const userName = user?.name ?? user?.email ?? "unknown";
 
             try {
-              return await ctx.app.ops.replay.startReplay({
+              return await ctx.app.ops.startReplay({
                 projectionNames: input.projectionNames,
                 since: input.since,
                 tenantIds: input.tenantIds ?? [],
@@ -1003,14 +999,14 @@ export class OpsTrpcApi {
           .withoutInput("there is at most one run at a time")
           .withOutput(replayStatusSchema)
           .withPermission("ops:view")
-          .handle(async ({ ctx }) => ctx.app.ops.replay.getStatus()),
+          .handle(async ({ ctx }) => ctx.app.ops.getStatus()),
       )
       .mutation("cancelReplay", (p) =>
         p
           .withoutInput("cancels the one run that can be in flight")
           .withOutput(opsReplayCancelledSchema)
           .withPermission("ops:manage")
-          .handle(async ({ ctx }) => ctx.app.ops.replay.cancelReplay()),
+          .handle(async ({ ctx }) => ctx.app.ops.cancelReplay()),
       )
       .build();
 
@@ -1025,7 +1021,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueDlqGroupSchema.array())
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.listQueueDlqGroups(input);
           }),
       )
@@ -1035,7 +1031,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueDlqGroupWithQueueSchema.array())
           .withPermission("ops:view")
           .handle(async ({ ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.listAllQueueDlqGroups();
           }),
       )
@@ -1045,7 +1041,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueNameListSchema)
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.listPausedQueueKeys(input);
           }),
       )
@@ -1055,7 +1051,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueDrainPreviewSchema)
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.getQueueDrainPreview(input);
           }),
       )
@@ -1065,7 +1061,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueMovedToDlqSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.moveQueueGroupToDlq({
               ...input,
               requestedBy: ctx.actor().id,
@@ -1078,7 +1074,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueMovedAllToDlqSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.moveAllBlockedQueueGroupsToDlq({
               ...input,
               requestedBy: ctx.actor().id,
@@ -1091,7 +1087,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueReplayedFromDlqSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.replayQueueGroupFromDlq(input);
           }),
       )
@@ -1101,7 +1097,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueReplayedAllFromDlqSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.replayAllQueueGroupsFromDlq(input);
           }),
       )
@@ -1116,7 +1112,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueRedrivenDlqGroupsSchema)
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) =>
-            ctx.app.ops.operations.redriveQueueDlqGroups({
+            ctx.app.ops.redriveQueueDlqGroups({
               ...input,
               requestedBy: ctx.actor().id,
             }),
@@ -1132,7 +1128,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueDiscardedDlqGroupsSchema)
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) =>
-            ctx.app.ops.operations.discardQueueDlqGroups({
+            ctx.app.ops.discardQueueDlqGroups({
               ...input,
               requestedBy: ctx.actor().id,
             }),
@@ -1144,7 +1140,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueCanaryRedrivenSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.canaryRedriveQueueDlq(input);
           }),
       )
@@ -1154,7 +1150,7 @@ export class OpsTrpcApi {
           .withOutput(opsQueueCanaryUnblockedSchema)
           .withPermission("ops:manage")
           .handle(async ({ input, ctx }) => {
-            const ops = ctx.app.ops.operations;
+            const ops = ctx.app.ops;
             return ops.canaryUnblockQueueGroups(input);
           }),
       )
@@ -1174,7 +1170,7 @@ export class OpsTrpcApi {
             const DEFAULT_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
             const sinceMs = input.sinceMs ?? nowInstant().epochMilliseconds - DEFAULT_LOOKBACK_MS;
 
-            return ctx.app.ops.events.searchAggregates({
+            return ctx.app.ops.searchAggregates({
               query: input.query,
               tenantIds: input.tenantId ? [input.tenantId] : [],
               sinceMs,
@@ -1197,7 +1193,7 @@ export class OpsTrpcApi {
           .withInput(opsLoadAggregateEventsInputSchema)
           .withOutput(opsAggregateEventsSchema)
           .withPermission("ops:view")
-          .handle(async ({ input, ctx }) => ctx.app.ops.events.getAggregateEvents(input)),
+          .handle(async ({ input, ctx }) => ctx.app.ops.getAggregateEvents(input)),
       )
       .query("computeProjectionState", (p) =>
         p
@@ -1327,28 +1323,28 @@ export class OpsTrpcApi {
           .withoutInput("every queue holding blobs")
           .withOutput(opsQueueNameListSchema)
           .withPermission("ops:view")
-          .handle(async ({ ctx }) => ctx.app.ops.operations.listBlobQueues()),
+          .handle(async ({ ctx }) => ctx.app.ops.listBlobQueues()),
       )
       .query("getBlobStoreStats", (p) =>
         p
           .withoutInput("one store-wide reading")
           .withOutput(opsBlobStoreStatsSchema)
           .withPermission("ops:view")
-          .handle(async ({ ctx }) => ctx.app.ops.operations.getBlobStoreStats()),
+          .handle(async ({ ctx }) => ctx.app.ops.getBlobStoreStats()),
       )
       .query("listBlobs", (p) =>
         p
           .withInput(listBlobsInputSchema)
           .withOutput(opsBlobPageSchema)
           .withPermission("ops:view")
-          .handle(async ({ input, ctx }) => ctx.app.ops.operations.listBlobs(input)),
+          .handle(async ({ input, ctx }) => ctx.app.ops.listBlobs(input)),
       )
       .query("getBlob", (p) =>
         p
           .withInput(getBlobInputSchema)
           .withOutput(opsBlobSummarySchema.nullable())
           .withPermission("ops:view")
-          .handle(async ({ input, ctx }) => ctx.app.ops.operations.tryGetBlob(input)),
+          .handle(async ({ input, ctx }) => ctx.app.ops.tryGetBlob(input)),
       )
       .mutation("runBlobCleanup", (p) =>
         p
@@ -1359,7 +1355,7 @@ export class OpsTrpcApi {
             if (!input.dryRun) {
               requireDestructiveOpsAuth(ctx, input.confirm);
             }
-            return ctx.app.ops.operations.runBlobCleanup({
+            return ctx.app.ops.runBlobCleanup({
               dryRun: input.dryRun,
               // Opaque id, not email: the audit trail must trace the actor without
               // carrying PII into the log stream.
@@ -1374,7 +1370,7 @@ export class OpsTrpcApi {
           .withPermission("ops:manage")
           .handle(async ({ ctx, input }) => {
             requireDestructiveOpsAuth(ctx, input.confirm);
-            return ctx.app.ops.operations.deleteBlob({
+            return ctx.app.ops.deleteBlob({
               queueName: input.queueName,
               projectId: input.projectId,
               hash: input.hash,

@@ -6,6 +6,7 @@ import type {
 } from "@langwatch/automation-contract";
 import { AutomationRunawayPort } from "../../ports/automation-runaway.port.ts";
 import { RunawayContainmentService, RUNAWAY_PAUSE_REASON } from "../runaway-containment.service.ts";
+import { Temporal } from "@langwatch/time";
 
 class TestRunawayPort extends AutomationRunawayPort {
   readonly paused = vi.fn();
@@ -91,7 +92,7 @@ function runtime(port = new TestRunawayPort()): {
   const service = RunawayContainmentService.create({
     runaway: port,
     triggers: { update: port.paused } as never,
-    clock: { now: () => new Date("2026-01-01T00:00:00Z") } as never,
+    clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,
   });
   return { port, service };
 }
@@ -275,7 +276,7 @@ describe("runaway containment policy", () => {
     const service = RunawayContainmentService.create({
       runaway: port,
       triggers: { update: failThenSucceed } as never,
-      clock: { now: () => new Date("2026-01-01T00:00:00Z") } as never,
+      clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,
     });
 
     await service.handle(breach());
@@ -311,7 +312,7 @@ describe("runaway containment policy", () => {
           if (!input.active) active.delete(input.id);
         },
       } as never,
-      clock: { now: () => new Date("2026-01-01T00:00:00Z") } as never,
+      clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,
     });
 
     expect(active).toContain("trigger-1");

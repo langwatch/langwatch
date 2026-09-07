@@ -24,9 +24,11 @@ import type {
 } from "../ports/automation-graph.port.ts";
 import type { AutomationRunawayPort } from "../ports/automation-runaway.port.ts";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { AutomationTestFirePort } from "../ports/automation-test-fire.port.ts";
 import type { AutomationPersistCapService } from "../services/persist-cap.service.ts";
+
+export type AutomationDatabase = PrismaClient;
 
 /** Canonical process binding. The app supplies its already-created database
  * capability; this adapter never reaches for a global Prisma client. */
@@ -38,7 +40,7 @@ export class PostgresAutomationAdapter {
       jobs: ScheduledJobStorePort;
       clock: AutomationClockPort;
       wake: SchedulerWakePort;
-      projects: ProjectService;
+      projects: ProjectApi;
       analytics: AnalyticsService;
       notifier: AutomationGraphNotifierPort;
       baseHost: string;
@@ -58,7 +60,7 @@ export class PostgresAutomationAdapter {
     jobs: ScheduledJobStorePort;
     clock: AutomationClockPort;
     wake: SchedulerWakePort;
-    projects: ProjectService;
+    projects: ProjectApi;
     analytics: AnalyticsService;
     notifier: AutomationGraphNotifierPort;
     baseHost: string;

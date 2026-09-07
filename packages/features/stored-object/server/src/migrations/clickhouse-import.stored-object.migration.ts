@@ -18,6 +18,7 @@ import {
   type LegacyStoredObjectRow,
 } from "../ports/stored-object.port.ts";
 import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store.ts";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 export const STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME =
   "stored-objects-clickhouse-import-v0" as const;
@@ -29,28 +30,21 @@ export type ClickHouseImportStoredObjectMigrationOptions = Readonly<{
   drain: StoredObjectLegacyWriterDrainPort;
   store: StoredObjectStore;
   pageSize?: number;
-  now?: () => Date;
+  now?: () => Instant;
 }>;
 
 /** In-place, idempotent import driven by the shared system-migration runner. */
 export class ClickHouseImportStoredObjectMigration implements SystemMigration {
+  readonly executionMode = "startup" as const;
   readonly name = STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME;
   readonly title = "Stored Objects ClickHouse import";
   readonly description =
     "Imports each organization's latest Stored Object metadata from " +
     "ClickHouse into Postgres, then waits for proof that legacy writers have " +
     "drained before allowing the tenant to cut over.";
-  readonly requiresOperatorConfirmation = true;
-  // Ships inert on self-hosted until a later release flips this once the cloud
-  // rollout has soaked (ADR-001 "ClickHouse migration").
-  readonly runsAutomaticallyOnSelfHosted = false;
-  // The soaking posture on cloud: cut-over is paced per organization from the
-  // ops migrations page, which is the pacing the operator confirmation above
-  // exists to gate. Declaring `true` would say the rollout is finished and stop
-  // the page offering enrollment rows at all. Flip it only once every
-  // organization that existed has cut over and the remaining question is
-  // reaching the ones created since.
-  readonly enrolledAutomatically = false;
+  readonly requiresOperatorConfirmation = false;
+  readonly runsAutomaticallyOnSelfHosted = true;
+  readonly enrolledAutomatically = true;
 
   static create(
     options: ClickHouseImportStoredObjectMigrationOptions,
@@ -58,16 +52,17 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     return new ClickHouseImportStoredObjectMigration(options);
   }
 
-  private readonly now: () => Date;
+  private readonly now: () => Instant;
 
   private constructor(private readonly options: ClickHouseImportStoredObjectMigrationOptions) {
-    this.now = options.now ?? (() => new Date());
+    this.now = options.now ?? nowInstant;
   }
 
   async migrateTenant(input: {
     tenantId: string;
     signal?: AbortSignal;
   }): Promise<TenantMigrationOutcome> {
+    const initialDrain = await this.options.drain.get({ organizationId: input.tenantId });
     const projects = await this.options.projects.listForOrganization({
       organizationId: input.tenantId,
     });
@@ -97,9 +92,11 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
       }
     }
 
-    const drain = await this.options.drain.get({
-      organizationId: input.tenantId,
-    });
+    const drain = initialDrain.valid
+      ? await this.options.drain.get({
+          organizationId: input.tenantId,
+        })
+      : initialDrain;
     if (drain.valid) {
       return {
         status: "finalized",
@@ -181,7 +178,7 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     audience: StoredObjectDeliveryAudience;
     fingerprint: string;
     current: StoredObjectRecord | null;
-    now: Date;
+    now: Instant;
     address: StoredObjectRecord["storage"];
   }): StoredObjectRecord {
     return {
@@ -222,7 +219,7 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
           row.sizeBytes,
           row.sha256,
           row.storageUri,
-          row.insertedAt.toISOString(),
+          toDate(row.insertedAt).toISOString(),
         ]),
       )
       .digest("hex");

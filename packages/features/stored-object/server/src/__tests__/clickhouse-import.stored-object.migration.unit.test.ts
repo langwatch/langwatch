@@ -7,6 +7,7 @@ import {
   StoredObjectProjectSourcePort,
 } from "../index.ts";
 import { InMemoryStoredObjectStore } from "../testing.ts";
+import { Temporal } from "@langwatch/time";
 
 class OneProject extends StoredObjectProjectSourcePort {
   async listForOrganization() {
@@ -28,8 +29,8 @@ class OneLegacyObject extends StoredObjectLegacySourcePort {
         sizeBytes: 3,
         sha256: "a".repeat(64),
         storageUri: "s3://bucket/project_1/so_legacy",
-        createdAt: new Date("2026-08-21T00:00:00.000Z"),
-        insertedAt: new Date("2026-08-21T00:01:00.000Z"),
+        createdAt: Temporal.Instant.from("2026-08-21T00:00:00.000Z"),
+        insertedAt: Temporal.Instant.from("2026-08-21T00:01:00.000Z"),
       },
     ];
   }
@@ -50,8 +51,22 @@ class ProvedDrain extends StoredObjectLegacyWriterDrainPort {
     return {
       valid: true as const,
       minimumWriterGeneration: "2026.08.22",
-      assertedAt: new Date("2026-08-22T00:00:00.000Z"),
+      assertedAt: Temporal.Instant.from("2026-08-22T00:00:00.000Z"),
     };
+  }
+}
+
+class DrainBecomesValidAfterFirstScan extends StoredObjectLegacyWriterDrainPort {
+  private calls = 0;
+  async get() {
+    this.calls += 1;
+    return this.calls === 1
+      ? { valid: false as const, reason: "writers active" }
+      : {
+          valid: true as const,
+          minimumWriterGeneration: "2026.08.22",
+          assertedAt: Temporal.Instant.from("2026-08-22T00:00:00.000Z"),
+        };
   }
 }
 
@@ -67,19 +82,14 @@ function newMigration() {
 
 describe("ClickHouseImportStoredObjectMigration", () => {
   describe("when the runner reads its declaration", () => {
-    it("registers under a paced, operator-gated rollout posture", () => {
+    it("registers for automatic startup completion", () => {
       const declared = newMigration();
 
       // The state table's key. Renaming it orphans every stored record.
       expect(declared.name).toBe("stored-objects-clickhouse-import-v0");
-      // Cut-over changes which store answers for the tenant, so finalizing it
-      // takes the typed confirmation.
-      expect(declared.requiresOperatorConfirmation).toBe(true);
-      // Inert on self-hosted until a later release flips it.
-      expect(declared.runsAutomaticallyOnSelfHosted).toBe(false);
-      // Still soaking on cloud: the rollout is paced per organization from the
-      // ops migrations page, and `true` would retire that pacing.
-      expect(declared.enrolledAutomatically).toBe(false);
+      expect(declared.requiresOperatorConfirmation).toBe(false);
+      expect(declared.runsAutomaticallyOnSelfHosted).toBe(true);
+      expect(declared.enrolledAutomatically).toBe(true);
     });
   });
 
@@ -106,5 +116,19 @@ describe("ClickHouseImportStoredObjectMigration", () => {
       status: "finalized",
       report: { imported: 0, unchanged: 1, drainProved: true },
     });
+  });
+
+  it("holds the first scan when the writer drain becomes valid during it", async () => {
+    const migration = ClickHouseImportStoredObjectMigration.create({
+      projects: new OneProject(),
+      legacy: new OneLegacyObject(),
+      locations: new LegacyLocations(),
+      drain: new DrainBecomesValidAfterFirstScan(),
+      store: InMemoryStoredObjectStore.create(),
+    });
+    const first = await migration.migrateTenant({ tenantId: "org_1" });
+    expect(first.status).toBe("migrated");
+    const second = await migration.migrateTenant({ tenantId: "org_1" });
+    expect(second.status).toBe("finalized");
   });
 });

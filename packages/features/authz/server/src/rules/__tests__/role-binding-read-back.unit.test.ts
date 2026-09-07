@@ -6,8 +6,9 @@
 import { RoleBindingScopeType, TeamUserRole } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 import { optimisticBindingWire } from "../role-binding-read-back.rules.ts";
+import { Temporal, toDate } from "@langwatch/time";
 
-const AT = new Date("2026-08-18T09:00:00.000Z");
+const AT = Temporal.Instant.from("2026-08-18T09:00:00.000Z");
 
 describe("the binding a create answers with while the projection lags", () => {
   describe("when the create is for a user", () => {
@@ -30,7 +31,7 @@ describe("the binding a create answers with while the projection lags", () => {
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: "team_1",
         scopeName: null,
-        createdAt: AT,
+        createdAt: toDate(AT),
       });
     });
   });

@@ -24,7 +24,7 @@ import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
-import { formatDistanceToNow } from "@langwatch/time";
+import { formatDistanceToNow, nowInstant } from "@langwatch/time";
 import { ArrowLeft, Download, Search } from "lucide-react";
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 import Parse from "papaparse";
@@ -47,6 +47,7 @@ import {
   withoutAuditTarget,
 } from "../../model/audit-log-filters.ts";
 import { auditPeriodLabel, auditPeriodQuery, readAuditPeriod } from "../../model/audit-period.ts";
+import { readableDate } from "../../model/display-formatters.ts";
 import { disambiguateLabels } from "../../model/disambiguate-labels.ts";
 import { useOrganizationHost } from "../../model/organization-host.ts";
 import { AuditPaginationFooter } from "../../ui/elements/audit-pagination-footer.tsx";
@@ -69,7 +70,7 @@ export default function AuditLogScreen() {
   const { query } = host.route();
   const organizationId = scope.organizationId ?? "";
 
-  const now = useMemo(() => new Date(), []);
+  const now = useMemo(() => nowInstant(), []);
   const { period, mode } = readAuditPeriod(query, now);
   const { pageOffset, pageSize } = readAuditPaging(query);
   const target = readAuditTarget(query);
@@ -101,8 +102,8 @@ export default function AuditLogScreen() {
     projectId: selectedProjectId ?? void 0,
     userId: searchUserId,
     action: actionFilter || void 0,
-    startDate: period.startDate.getTime(),
-    endDate: period.endDate.getTime(),
+    startDate: period.startDate.epochMilliseconds,
+    endDate: period.endDate.epochMilliseconds,
     targetKind: target?.targetKind,
     targetId: target?.targetId,
   };
@@ -195,7 +196,7 @@ export default function AuditLogScreen() {
       // renames a column.
       const { fields, data } = auditLogCsvTable(collected);
       host.download({
-        fileName: auditLogFileName(new Date()),
+        fileName: auditLogFileName(nowInstant()),
         contents: Parse.unparse({
           fields: fields.map(neutralizeFormula),
           data: neutralizeRows(data),
@@ -344,9 +345,9 @@ export default function AuditLogScreen() {
                   <Table.Row key={log.id}>
                     <Table.Cell>
                       <VStack align="start" gap={0}>
-                        <Text fontSize="sm">{new Date(log.createdAt).toLocaleString()}</Text>
+                        <Text fontSize="sm">{readableDate(log.createdAt).toLocaleString()}</Text>
                         <Text fontSize="xs" color="fg.muted">
-                          {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                          {formatDistanceToNow(readableDate(log.createdAt), { addSuffix: true })}
                         </Text>
                       </VStack>
                     </Table.Cell>

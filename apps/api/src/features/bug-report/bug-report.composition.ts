@@ -9,7 +9,7 @@ import {
   type BugReportListing,
   type BugReportTrpcPorts,
 } from "@langwatch/ops-server";
-import type { BugReport } from "@langwatch/prisma-client/generated";
+import type { BugReport } from "@langwatch/ops-contract";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createBugReportTrpcRouter } from "./bug-report-trpc.mount.ts";

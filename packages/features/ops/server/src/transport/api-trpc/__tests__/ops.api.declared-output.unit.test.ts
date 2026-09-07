@@ -13,6 +13,7 @@
  * are what is exercised here.
  */
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { OpsEventingIntrospectionPort } from "../../../ports/eventing-introspection.port.ts";
@@ -78,23 +79,28 @@ function buildCaller(capability: Partial<OpsCapability> = {}) {
   );
 
   const app = OpsApp.create({
-    ops: capability as OpsCapability,
-    featureFlags: {} as FeatureFlagService,
-    projects: { searchByQuery: async () => [] },
-    eventingIntrospection: new (class extends OpsEventingIntrospectionPort {
-      projections() {
-        return [];
-      }
-      killSwitches() {
-        return [];
-      }
-      processManagers() {
-        return [];
-      }
-      dejaViewProjections() {
-        return [];
-      }
-    })(),
+    infrastructure: {
+      ops: capability as OpsCapability,
+      featureFlags: {} as FeatureFlagService,
+      projects: { searchByQuery: async () => [] },
+      eventingIntrospection: new (class extends OpsEventingIntrospectionPort {
+        projections() {
+          return [];
+        }
+        killSwitches() {
+          return [];
+        }
+        processManagers() {
+          return [];
+        }
+        dejaViewProjections() {
+          return [];
+        }
+      })(),
+    },
+    dependencies: {},
+    config: undefined,
+    resources: new ResourceScope(),
   });
 
   return router.createCaller({

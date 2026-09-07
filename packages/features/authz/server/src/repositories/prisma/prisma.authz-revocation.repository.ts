@@ -4,6 +4,7 @@ import {
   AuthzRevocationTelemetryPort,
 } from "../../ports/authz-revocation-telemetry.port.ts";
 import type { AuthzDatabase } from "../authz-read.repository.ts";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:authz:revocation");
 
@@ -34,13 +35,13 @@ export class PrismaAuthzRevocationRepository {
     organizationId,
     grantIds,
     reason,
-    revokedAt = new Date(),
+    revokedAt = nowInstant(),
     revokedReason = null,
   }: {
     organizationId: string;
     grantIds: string[];
     reason: AuthzRevocationReason;
-    revokedAt?: Date;
+    revokedAt?: Instant;
     revokedReason?: string | null;
   }): Promise<void> {
     if (grantIds.length === 0) return;
@@ -57,7 +58,7 @@ export class PrismaAuthzRevocationRepository {
 
     await this.database.grant.updateMany({
       where: { organizationId, id: { in: grantIds }, revokedAt: null },
-      data: { revokedAt, revokedReason },
+      data: { revokedAt: toDate(revokedAt), revokedReason },
     });
   }
 }

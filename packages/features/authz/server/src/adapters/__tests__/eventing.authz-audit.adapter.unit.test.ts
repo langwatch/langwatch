@@ -14,6 +14,7 @@ import {
   EventingAuthzAuditAdapter,
 } from "../eventing.authz-audit.adapter.ts";
 import type { AuthzGrantsEvent } from "../eventing.authz.adapter.ts";
+import { Temporal } from "@langwatch/time";
 
 const TENANT_ID = "org_acme";
 const OCCURRED_AT = 1_700_000_000_000;
@@ -83,7 +84,7 @@ describe("EventingAuthzAuditAdapter", () => {
     expect(store.attempts).toHaveLength(1);
     expect(store.attempts[0]).toEqual({
       id: "authz-evt-evt_2Zk",
-      createdAt: new Date(OCCURRED_AT),
+      createdAt: Temporal.Instant.fromEpochMilliseconds(OCCURRED_AT),
       userId: "user_admin",
       organizationId: TENANT_ID,
       action: "authz.grants.attach",

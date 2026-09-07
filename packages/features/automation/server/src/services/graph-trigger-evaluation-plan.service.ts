@@ -82,7 +82,7 @@ export class GraphTriggerEvaluationPlanService {
       return series;
     }
 
-    const now = fromDate(request.deps.clock.now());
+    const now = request.deps.clock.now();
     const startDate = now.subtract({ milliseconds: trigger.params.timePeriod! * 60 * 1000 });
 
     return {

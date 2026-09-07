@@ -4,6 +4,7 @@
  * @see specs/ops/internal-feature-flags.feature
  */
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
 import {
   OpsEventingIntrospectionPort,
@@ -44,10 +45,15 @@ function buildApp(): { app: OpsApp; written: string[] } {
 
   return {
     app: OpsApp.create({
-      ops: {} as OpsCapability,
-      featureFlags,
-      projects: { searchByQuery: async () => [] },
-      eventingIntrospection: new OneSwitchIntrospection(),
+      infrastructure: {
+        ops: {} as OpsCapability,
+        featureFlags,
+        projects: { searchByQuery: async () => [] },
+        eventingIntrospection: new OneSwitchIntrospection(),
+      },
+      dependencies: {},
+      config: undefined,
+      resources: new ResourceScope(),
     }),
     written,
   };

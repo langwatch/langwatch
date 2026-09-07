@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildGraphAlertTemplateContext } from "../template-context.ts";
+import { Temporal } from "@langwatch/time";
 
-const NOW = new Date("2026-06-21T10:00:00.000Z");
+const NOW = Temporal.Instant.from("2026-06-21T10:00:00.000Z");
 
 const baseArgs = {
   trigger: {
@@ -40,9 +41,9 @@ describe("buildGraphAlertTemplateContext", () => {
       const ctx = buildGraphAlertTemplateContext({
         ...baseArgs,
         history: [
-          { timestamp: new Date("2026-06-21T09:00:00.000Z"), value: 1 },
+          { timestamp: Temporal.Instant.from("2026-06-21T09:00:00.000Z"), value: 1 },
           { timestamp: "2026-06-21T09:30:00Z", value: 5 },
-          { timestamp: new Date("2026-06-21T10:00:00.000Z"), value: 9 },
+          { timestamp: Temporal.Instant.from("2026-06-21T10:00:00.000Z"), value: 9 },
         ],
         previousValue: 4,
       });
@@ -76,7 +77,7 @@ describe("buildGraphAlertTemplateContext", () => {
       const ctx = buildGraphAlertTemplateContext({
         ...baseArgs,
         window: {
-          start: new Date("2026-06-21T09:00:00.000Z"),
+          start: Temporal.Instant.from("2026-06-21T09:00:00.000Z"),
           end: NOW,
         },
       });

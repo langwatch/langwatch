@@ -9,6 +9,7 @@ import {
   type StoredObjectRecord,
   type StoredObjectSource,
 } from "../stored-object.store.ts";
+import { type Instant, Temporal, fromDate, toDate, toEpochMs } from "@langwatch/time";
 
 type StoredObjectDelegate = {
   findUnique(args: unknown): Promise<unknown>;
@@ -77,13 +78,13 @@ export class PostgresStoredObjectStore extends StoredObjectStore {
     tenantId: StoredObjectProjectId;
     afterId?: StoredObjectId;
     status?: StoredObjectLifecycleStatus;
-    expiresBefore?: Date;
+    expiresBefore?: Instant;
     limit: number;
   }): Promise<StoredObjectRecord[]> {
     const where: Record<string, unknown> = { tenantId: input.tenantId };
     if (input.afterId) where.id = { gt: input.afterId };
     if (input.status) where.status = input.status;
-    if (input.expiresBefore) where.expiresAt = { lte: input.expiresBefore };
+    if (input.expiresBefore) where.expiresAt = { lte: toDate(input.expiresBefore) };
     const rows = await this.database.storedObject.findMany({
       where,
       orderBy: { id: "asc" },
@@ -110,13 +111,13 @@ export class PostgresStoredObjectStore extends StoredObjectStore {
       storageProviderRelativeId: value.storage?.relativeId ?? null,
       generation: value.generation,
       audiences: [...value.audiences],
-      expiresAt: value.expiresAt,
-      availableAt: value.availableAt,
-      deletedAt: value.deletedAt,
+      expiresAt: value.expiresAt ? toDate(value.expiresAt) : null,
+      availableAt: value.availableAt ? toDate(value.availableAt) : null,
+      deletedAt: value.deletedAt ? toDate(value.deletedAt) : null,
       source: value.source,
       legacyFingerprint: value.legacyFingerprint,
-      createdAt: value.createdAt,
-      updatedAt: value.updatedAt,
+      createdAt: toDate(value.createdAt),
+      updatedAt: toDate(value.updatedAt),
     };
   }
 
@@ -175,15 +176,15 @@ export class PostgresStoredObjectStore extends StoredObjectStore {
       : [];
   }
 
-  private date(value: unknown, field: string): Date {
-    if (value instanceof Date) return value;
+  private date(value: unknown, field: string): Instant {
+    if (value instanceof Date) return fromDate(value);
     if (typeof value === "string" || typeof value === "number") {
-      return new Date(value);
+      return Temporal.Instant.fromEpochMilliseconds(toEpochMs(value));
     }
     throw new TypeError(`StoredObject.${field} is invalid`);
   }
 
-  private tryDate(value: unknown): Date | null {
+  private tryDate(value: unknown): Instant | null {
     return value === null || value === undefined ? null : this.date(value, "date");
   }
 }

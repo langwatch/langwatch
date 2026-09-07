@@ -8,7 +8,13 @@
  */
 
 import type { Plan } from "@langwatch/entitlement-contract";
-import type { EnrichedAuditLog } from "@langwatch/organization-contract";
+import type {
+  EnrichedAuditLog,
+  JoinRequestPending,
+  OrganizationInvite,
+  OrganizationUser,
+  User,
+} from "@langwatch/organization-contract";
 import type { TeamRoleValue } from "../model/member-role-constraints.ts";
 import type {
   OrganizationUserRole,
@@ -150,16 +156,16 @@ export type OrganizationMemberWithTeams = {
   userId: string;
   role: OrganizationUserRole;
   /** When the seat was freed reversibly. Null while the member is active. */
-  disabledAt: Date | null;
+  disabledAt: OrganizationUser["disabledAt"];
   customRoleId?: string | null;
   user: {
     id: string;
     name: string | null;
     email: string | null;
     image?: string | null;
-    pendingSince?: Date | null;
+    pendingSince?: User["deactivatedAt"];
     /** When the ACCOUNT was deactivated, which outlives one organization. */
-    deactivatedAt?: Date | null;
+    deactivatedAt?: User["deactivatedAt"];
   };
   teamMemberships?: Array<{ teamId: string; role: TeamUserRole; team: { name: string } }>;
 };
@@ -185,7 +191,7 @@ export type OrganizationInviteReading = {
    */
   displayStatus: string;
   inviteCode: string;
-  expiration: Date;
+  expiration: NonNullable<OrganizationInvite["expiration"]>;
   teamIds: string;
 };
 
@@ -254,8 +260,8 @@ export type JoinRequestReading = {
   email: string;
   name: string | null;
   domain: string;
-  requestedAt: Date;
-  expiresAt: Date;
+  requestedAt: JoinRequestPending[number]["requestedAt"];
+  expiresAt: NonNullable<JoinRequestPending[number]["expiresAt"]>;
 };
 
 export type OrganizationApiMap = {

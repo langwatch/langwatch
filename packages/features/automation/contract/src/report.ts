@@ -1,5 +1,6 @@
 import { Cron } from "croner";
 import { z } from "zod";
+import { nowInstant, toDate } from "@langwatch/time";
 
 export const MIN_REPORT_INTERVAL_MS = 15 * 60 * 1000;
 const GAP_PROBE_RUNS = 5;
@@ -36,10 +37,8 @@ export const reportScheduleSchema = z
       return;
     }
 
-    let runs: Date[];
-    try {
-      runs = new Cron(cron, { timezone }).nextRuns(GAP_PROBE_RUNS, new Date());
-    } catch {
+    const runs = tryNextRuns({ cron, timezone });
+    if (!runs) {
       reject("cron", `"${cron}" is not a valid cron expression.`);
       return;
     }
@@ -126,4 +125,13 @@ export function extractReportFromTriggerRow(
     ...(actionParams as Record<string, unknown>),
     ...parsed.data,
   };
+}
+
+/** The next few fires a cron would produce, or null when it does not parse. */
+function tryNextRuns({ cron, timezone }: { cron: string; timezone: string }) {
+  try {
+    return new Cron(cron, { timezone }).nextRuns(GAP_PROBE_RUNS, toDate(nowInstant()));
+  } catch {
+    return null;
+  }
 }

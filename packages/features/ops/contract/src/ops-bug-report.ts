@@ -4,6 +4,8 @@
  * moves with it.
  */
 
+import type { Instant } from "@langwatch/time";
+
 /** A Json column's value, mirroring the generated client's own shape. */
 export type BugReportJsonObject = { [Key in string]?: BugReportJsonValue };
 export type BugReportJsonArray = BugReportJsonValue[];
@@ -17,7 +19,7 @@ export type BugReportJsonValue =
 
 export type BugReport = {
   id: string;
-  createdAt: Date;
+  createdAt: Instant;
   source: string;
   kind: string;
   title: string;

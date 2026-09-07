@@ -10,11 +10,14 @@ const IDENTIFIER_BACKFILL = "identity-d01-identifier-backfill";
 function migrationOf({
   name,
   enrolledAutomatically = false,
+  executionMode,
 }: {
   name: string;
   enrolledAutomatically?: boolean;
+  executionMode?: "background" | "startup";
 }): SystemMigration {
   return {
+    executionMode,
     name,
     title: name,
     description: name,

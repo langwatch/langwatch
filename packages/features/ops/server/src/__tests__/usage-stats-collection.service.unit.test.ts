@@ -13,6 +13,7 @@ import {
 import { ClickHouseUsageStatsRepository } from "../repositories/clickhouse/clickhouse.usage-stats.repository.ts";
 import { PrismaUsageStatsProjectRepository } from "../repositories/prisma/prisma.usage-stats-project.repository.ts";
 import { UsageStatsCollectionService } from "../services/usage-stats-collection.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const projectCounts: UsageStatsProjectCounts = {
   projectIds: ["project-1"],
@@ -69,7 +70,7 @@ function serviceFor({
     projects,
     clickhouse,
     builderChartKind: "builder",
-    now: () => new Date("2026-08-25T12:00:00.000Z"),
+    now: () => Temporal.Instant.from("2026-08-25T12:00:00.000Z"),
   });
   return { service, projects, clickhouse };
 }

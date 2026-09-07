@@ -44,6 +44,7 @@ import type {
 import { AuthzListingRepository } from "../authz-listing.repository.ts";
 import type { AuthzDatabase } from "../authz-read.repository.ts";
 import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
+import { type Instant, fromDate, toDate } from "@langwatch/time";
 
 const USER_CREATED_ROLE_KIND = "custom" as const;
 const ACCESS_LISTING_USER_SELECT = {
@@ -97,8 +98,8 @@ type GrantListRow = {
   legacyRole: string | null;
   scopeType: string;
   scopeId: string;
-  occurredAt: Date;
-  updatedAt: Date;
+  occurredAt: Instant;
+  updatedAt: Instant;
 };
 
 type ListableGrant = {
@@ -260,8 +261,8 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
         userId: user.id,
         role: grant.role,
         customRoleId: grant.customRoleId,
-        createdAt: grant.row.occurredAt,
-        updatedAt: grant.row.updatedAt,
+        createdAt: toDate(grant.row.occurredAt),
+        updatedAt: toDate(grant.row.updatedAt),
         user,
         customRole: grant.customRoleId ? (roleById.get(grant.customRoleId) ?? null) : null,
       });
@@ -283,19 +284,21 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       orgIds,
     });
 
-    const rows = (await liveGrants(this.database).findMany({
-      where: {
-        organizationId: { in: [...orgIds] },
-        scopeType: { in: [...BINDING_SCOPE_TYPES] },
-        AND: [LISTABLE_ROLE_KEY_WHERE],
-        OR: this.userAndGroupGrantWhere({
-          userId,
-          groupIds: allGroupIds,
-        }),
-      },
-      select: GRANT_ROW_SELECT,
-      orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
-    })) as GrantListRow[];
+    const rows = (
+      (await liveGrants(this.database).findMany({
+        where: {
+          organizationId: { in: [...orgIds] },
+          scopeType: { in: [...BINDING_SCOPE_TYPES] },
+          AND: [LISTABLE_ROLE_KEY_WHERE],
+          OR: this.userAndGroupGrantWhere({
+            userId,
+            groupIds: allGroupIds,
+          }),
+        },
+        select: GRANT_ROW_SELECT,
+        orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+      })) as Array<StoredHeadRow<GrantListRow>>
+    ).map(headRow<GrantListRow>);
     const grants = this.listableGrants(rows).filter(
       ({ row }) =>
         row.principalType !== "GROUP" ||
@@ -392,10 +395,12 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
   }: {
     organizationId: string;
   }): Promise<AuthzCustomRole[]> {
-    const roles = (await liveRoles(this.database).findMany({
-      where: { organizationId, kind: USER_CREATED_ROLE_KIND },
-      orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
-    })) as RoleHeadRow[];
+    const roles = (
+      (await liveRoles(this.database).findMany({
+        where: { organizationId, kind: USER_CREATED_ROLE_KIND },
+        orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+      })) as Array<StoredHeadRow<RoleHeadRow>>
+    ).map(headRow<RoleHeadRow>);
     return roles.map((role) => this.toCustomRoleShape(role));
   }
 
@@ -411,16 +416,18 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     organizationId: string;
     where: Readonly<Record<string, unknown>>;
   }): Promise<GrantListRow[]> {
-    return (await liveGrants(this.database).findMany({
-      where: {
-        organizationId,
-        scopeType: { in: [...BINDING_SCOPE_TYPES] },
-        principalType: { in: [...BINDING_PRINCIPAL_TYPES] },
-        AND: [LISTABLE_ROLE_KEY_WHERE, where],
-      },
-      select: GRANT_ROW_SELECT,
-      orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
-    })) as GrantListRow[];
+    return (
+      (await liveGrants(this.database).findMany({
+        where: {
+          organizationId,
+          scopeType: { in: [...BINDING_SCOPE_TYPES] },
+          principalType: { in: [...BINDING_PRINCIPAL_TYPES] },
+          AND: [LISTABLE_ROLE_KEY_WHERE, where],
+        },
+        select: GRANT_ROW_SELECT,
+        orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+      })) as Array<StoredHeadRow<GrantListRow>>
+    ).map(headRow<GrantListRow>);
   }
 
   /** The `Role` head's rows in the full `CustomRole` column shape the
@@ -434,9 +441,11 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     roleIds: readonly string[];
   }): Promise<AuthzCustomRole[]> {
     if (roleIds.length === 0) return [];
-    const roles = (await liveRoles(this.database).findMany({
-      where: { id: { in: [...roleIds] }, organizationId },
-    })) as RoleHeadRow[];
+    const roles = (
+      (await liveRoles(this.database).findMany({
+        where: { id: { in: [...roleIds] }, organizationId },
+      })) as Array<StoredHeadRow<RoleHeadRow>>
+    ).map(headRow<RoleHeadRow>);
     return roles.map((role) => this.toCustomRoleShape(role));
   }
 
@@ -669,7 +678,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       customRoleId: grant.customRoleId,
       scopeType: grant.scopeType,
       scopeId: row.scopeId,
-      createdAt: row.occurredAt,
+      createdAt: toDate(row.occurredAt),
       user,
       group,
       apiKey,
@@ -685,8 +694,8 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       description: role.description,
       permissions: role.permissions,
       kind: role.kind,
-      createdAt: role.occurredAt,
-      updatedAt: role.updatedAt,
+      createdAt: toDate(role.occurredAt),
+      updatedAt: toDate(role.updatedAt),
     };
   }
 }
@@ -715,6 +724,28 @@ type RoleHeadRow = {
   description: string | null;
   permissions: unknown;
   kind: string;
-  occurredAt: Date;
-  updatedAt: Date;
+  occurredAt: Instant;
+  updatedAt: Instant;
 };
+
+/** A head row as the store hands it back: its two timestamps are stored moments. */
+type StoredHeadRow<TRow> = Omit<TRow, "occurredAt" | "updatedAt"> & {
+  occurredAt: unknown;
+  updatedAt: unknown;
+};
+
+function storedInstant(value: unknown): Instant {
+  if (!(value instanceof Date)) throw new TypeError("stored timestamp is missing");
+
+  return fromDate(value);
+}
+
+function headRow<TRow extends { occurredAt: Instant; updatedAt: Instant }>(
+  row: StoredHeadRow<TRow>,
+): TRow {
+  return {
+    ...row,
+    occurredAt: storedInstant(row.occurredAt),
+    updatedAt: storedInstant(row.updatedAt),
+  } as TRow;
+}

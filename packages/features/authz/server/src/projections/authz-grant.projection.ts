@@ -28,6 +28,7 @@ import type {
   RoleDeletedEvent,
   RolePermissionsChangedEvent,
 } from "../adapters/eventing.authz.adapter.ts";
+import { type Instant, Temporal } from "@langwatch/time";
 
 export type GrantProjectionWrite =
   | { kind: "grant.upsert"; row: GrantRowShape }
@@ -35,22 +36,22 @@ export type GrantProjectionWrite =
       kind: "grant.setRole";
       grantId: string;
       roleKey: string;
-      occurredAt: Date;
+      occurredAt: Instant;
     }
   | {
       kind: "grant.revoke";
       grantId: string;
       reason: string | null;
-      occurredAt: Date;
+      occurredAt: Instant;
     }
   | { kind: "role.upsert"; row: RoleRowShape }
   | {
       kind: "role.setPermissions";
       roleId: string;
       permissions: string[];
-      occurredAt: Date;
+      occurredAt: Instant;
     }
-  | { kind: "role.delete"; roleId: string; occurredAt: Date };
+  | { kind: "role.delete"; roleId: string; occurredAt: Instant };
 
 /** Storage port for the guarded, state-setting projection writes. */
 export abstract class GrantProjectionWriteStore implements AppendStore<GrantProjectionWrite> {
@@ -116,9 +117,11 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
         resourceKind: data.resource ? RESOURCE_KIND_TO_DB[data.resource.kind] : null,
         projectId: data.resource?.projectId ?? null,
         createdByUserId: data.resource?.createdByUserId ?? null,
-        expiresAt: data.resource?.expiresAtMs ? new Date(data.resource.expiresAtMs) : null,
+        expiresAt: data.resource?.expiresAtMs
+          ? Temporal.Instant.fromEpochMilliseconds(data.resource.expiresAtMs)
+          : null,
         maxViews: data.resource?.maxViews ?? null,
-        occurredAt: new Date(event.occurredAt),
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
       },
     };
   }
@@ -128,7 +131,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
       kind: "grant.setRole",
       grantId: event.data.grantId,
       roleKey: event.data.to,
-      occurredAt: new Date(event.occurredAt),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
     };
   }
 
@@ -137,7 +140,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
       kind: "grant.revoke",
       grantId: event.data.grantId,
       reason: event.data.reason ?? null,
-      occurredAt: new Date(event.occurredAt),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
     };
   }
 
@@ -152,7 +155,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
         description: data.description ?? null,
         permissions: data.permissions,
         kind: data.kind,
-        occurredAt: new Date(event.occurredAt),
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
       },
     };
   }
@@ -162,7 +165,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
       kind: "role.setPermissions",
       roleId: event.data.roleId,
       permissions: [...event.data.permissions],
-      occurredAt: new Date(event.occurredAt),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
     };
   }
 
@@ -170,7 +173,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
     return {
       kind: "role.delete",
       roleId: event.data.roleId,
-      occurredAt: new Date(event.occurredAt),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
     };
   }
 }

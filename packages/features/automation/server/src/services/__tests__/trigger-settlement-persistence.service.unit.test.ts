@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { TriggerSettlementPersistenceService } from "../trigger-settlement-persistence.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const trigger: TriggerSummary = {
   id: "trigger-1",
@@ -24,14 +25,16 @@ const fold: TraceSummaryData = {
   traceId: "trace-1",
 } as never;
 
-function runtime(overrides: {
-  confirms?: boolean;
-  capDecision?: { allowed: boolean; count: number; cap: number; skipped: number };
-  breachThrows?: Error;
-} = {}) {
-  const consumePersistCapSlot = vi.fn().mockResolvedValue(
-    overrides.capDecision ?? { allowed: true, count: 1, cap: 100, skipped: 0 },
-  );
+function runtime(
+  overrides: {
+    confirms?: boolean;
+    capDecision?: { allowed: boolean; count: number; cap: number; skipped: number };
+    breachThrows?: Error;
+  } = {},
+) {
+  const consumePersistCapSlot = vi
+    .fn()
+    .mockResolvedValue(overrides.capDecision ?? { allowed: true, count: 1, cap: 100, skipped: 0 });
   const handlePersistCapBreach = overrides.breachThrows
     ? vi.fn().mockRejectedValue(overrides.breachThrows)
     : vi.fn().mockResolvedValue(undefined);
@@ -55,7 +58,7 @@ function runtime(overrides: {
     traces: { tryGetSummary: vi.fn().mockResolvedValue(fold) } as never,
     confirmation: { confirms: vi.fn().mockResolvedValue(overrides.confirms ?? true) } as never,
     persistActions: { dispatch } as never,
-    clock: { now: () => new Date("2026-01-01T00:00:00Z") } as never,
+    clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,
     observability: { recordOverflow: vi.fn(), capture } as never,
   });
 
@@ -68,7 +71,11 @@ describe("given a settled match at persist dispatch", () => {
     it("consumes one slot of the trigger's daily ceiling", async () => {
       const { service, consumePersistCapSlot, dispatch } = runtime({ confirms: true });
 
-      await service.dispatch({ projectId: "project-1", triggerId: "trigger-1", traceIds: ["trace-1"] });
+      await service.dispatch({
+        projectId: "project-1",
+        triggerId: "trigger-1",
+        traceIds: ["trace-1"],
+      });
 
       expect(consumePersistCapSlot).toHaveBeenCalledTimes(1);
       expect(dispatch).toHaveBeenCalledTimes(1);
@@ -80,7 +87,11 @@ describe("given a settled match at persist dispatch", () => {
     it("consumes no ceiling slot and dispatches no action", async () => {
       const { service, consumePersistCapSlot, dispatch } = runtime({ confirms: false });
 
-      await service.dispatch({ projectId: "project-1", triggerId: "trigger-1", traceIds: ["trace-1"] });
+      await service.dispatch({
+        projectId: "project-1",
+        triggerId: "trigger-1",
+        traceIds: ["trace-1"],
+      });
 
       expect(consumePersistCapSlot).not.toHaveBeenCalled();
       expect(dispatch).not.toHaveBeenCalled();

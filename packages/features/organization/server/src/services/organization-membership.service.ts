@@ -5,6 +5,7 @@
 import { generate } from "@langwatch/ksuid";
 import {
   type OrganizationIntent,
+  type OrganizationUser,
   type OrganizationUserRole,
   PricingModel,
   RoleBindingScopeType,
@@ -35,6 +36,7 @@ import type {
   OrganizationMembershipRepository,
   OrganizationWithMembersAndTheirTeams,
 } from "../repositories/organization-membership.repository.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 /** The KSUID resources an organization and its first team are born under. */
 const ORGANIZATION_KSUID_RESOURCE = "organization";
@@ -51,8 +53,8 @@ type TeamMembershipLike = {
   role: TeamUserRole;
   assignedRoleId: string | null;
   assignedRole?: unknown;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: OrganizationUser["createdAt"];
+  updatedAt: OrganizationUser["updatedAt"];
 };
 
 /**
@@ -100,8 +102,8 @@ export class OrganizationMembershipService {
       role: binding.role,
       assignedRoleId: binding.customRoleId ?? null,
       assignedRole: binding.customRole ?? null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: toDate(nowInstant()),
+      updatedAt: toDate(nowInstant()),
     };
     const existingIndex = team.members.findIndex((m) => m.userId === userId);
     const newMembers =

@@ -16,7 +16,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import type { OrganizationApp } from "../../../app/organization.app.ts";
+import type { ServerOrganizationApp } from "../../../app/organization.app.ts";
 import { OnboardingTrpcApi, type OnboardingTrpcPorts } from "../onboarding.api.ts";
 
 const SIGN_UP_DATA_SCHEMA = z.object({
@@ -34,7 +34,7 @@ const TEAM = { id: "team_1", slug: "acme-team", name: "Acme Team" };
  * ceremony calls, so the stand-in below is that one method and nothing else.
  */
 type TestContext = {
-  app: { organizations: OrganizationApp };
+  app: { organizations: ServerOrganizationApp };
   session: { user: { id: string; name?: string | null; email?: string | null } } | null;
 };
 
@@ -80,7 +80,7 @@ function harness(
   );
 
   const ctx: TestContext = {
-    app: { organizations: { createAndAssign } as unknown as OrganizationApp },
+    app: { organizations: { createAndAssign } as unknown as ServerOrganizationApp },
     session: { user: { id: "user_1", name: "Jane Doe", email: "jane@example.com" } },
   };
 

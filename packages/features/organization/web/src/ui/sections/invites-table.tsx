@@ -5,6 +5,7 @@ import { Link } from "../elements/link.tsx";
 import { Menu } from "@langwatch/design-system/menu";
 import type { RouterOutputs } from "../../behavior/organization-api.ts";
 import { orgRoleOptions } from "../elements/organization-user-role-field.tsx";
+import { readableDate } from "../../model/display-formatters.ts";
 
 type OrganizationInvite = RouterOutputs["organization"]["getOrganizationPendingInvites"][number];
 
@@ -111,7 +112,9 @@ const InviteRow = ({
         </Badge>
       </Table.Cell>
       <Table.Cell>
-        {isOpen && invite.expiration ? new Date(invite.expiration).toLocaleDateString() : "\u2014"}
+        {isOpen && invite.expiration
+          ? readableDate(invite.expiration).toLocaleDateString()
+          : "\u2014"}
       </Table.Cell>
       <Table.Cell>{roleLabel}</Table.Cell>
       <Table.Cell>

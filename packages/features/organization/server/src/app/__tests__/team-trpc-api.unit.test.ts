@@ -1,3 +1,4 @@
+import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 /**
  * The `team.*` tRPC surface: the eight procedure names the clients call, the `callerCanManage` probe the two member reads pass to the service so it can decide how much of
  * each member row to return, the team lookup that supplies the organization the write acts in, and the Enterprise plan gate that refuses a custom team role.
@@ -8,11 +9,15 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { OrganizationApp, type OrganizationAppDependencies } from "../organization.app.ts";
+import {
+  ServerOrganizationApp,
+  createOrganizationAppForTesting,
+  type ServerOrganizationAppDependencies,
+} from "../organization.app.ts";
 import { TeamTrpcApi } from "../../transport/api-trpc/team.api.ts";
 
 type TestContext = {
-  app: { organizations: OrganizationApp };
+  app: { organizations: ServerOrganizationApp };
   actor(): { id: string };
   session: { user: { id: string } } | null;
 };
@@ -21,10 +26,16 @@ type TestContext = {
 function application(
   organizations: Partial<OrganizationService>,
   projects: Partial<ProjectService>,
-): OrganizationApp {
-  return OrganizationApp.create({
-    organizations: organizations as unknown as OrganizationAppDependencies["organizations"],
-    projects: projects as unknown as OrganizationAppDependencies["projects"],
+): ServerOrganizationApp {
+  return createOrganizationAppForTesting({
+    infrastructure: {
+      organizations: organizations as unknown as ServerOrganizationAppDependencies["organizations"],
+      membership: organizations as unknown as ServerOrganizationAppDependencies["membership"],
+      projects: projects as unknown as ServerOrganizationAppDependencies["projects"],
+    },
+    dependencies: { projects: {} as unknown as ProjectApiContract },
+    config: undefined,
+    resources: { own: () => undefined },
   });
 }
 

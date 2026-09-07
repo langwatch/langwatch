@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { MIGRATION_OWNED_SOURCES } from "../../../migrations/legacy-import.authz-grant.migration.ts";
 import type { GrantProjectionWrite } from "../../../projections/authz-grant.projection.ts";
 import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
+import { Temporal } from "@langwatch/time";
 
 const ORG = "org_acme";
 
@@ -38,7 +39,7 @@ function grantRow(overrides: Record<string, unknown> = {}) {
     createdByUserId: null,
     expiresAt: null,
     maxViews: null,
-    occurredAt: new Date(1_700_000_000_000),
+    occurredAt: Temporal.Instant.fromEpochMilliseconds(1_700_000_000_000),
     ...overrides,
   } as never;
 }
@@ -139,7 +140,7 @@ describe("PrismaAuthzProjectionRepository", () => {
         kind: "grant.setRole",
         grantId: "grant_1",
         roleKey: "custom:cr_ops",
-        occurredAt: new Date(5),
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(5),
       } as GrantProjectionWrite);
 
       expect(prisma.grant.updateMany).toHaveBeenCalledWith(
@@ -164,7 +165,7 @@ describe("PrismaAuthzProjectionRepository", () => {
         kind: "grant.setRole",
         grantId: "grant_1",
         roleKey: "custom:cr_ops",
-        occurredAt: new Date(5),
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(5),
       } as GrantProjectionWrite);
 
       expect(prisma.grant.updateMany).toHaveBeenCalledWith(
@@ -203,7 +204,7 @@ describe("PrismaAuthzProjectionRepository", () => {
         kind: "grant.revoke",
         grantId: "grant_1",
         reason: "offboarded",
-        occurredAt: new Date(9),
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(9),
       } as GrantProjectionWrite);
 
       expect(prisma.roleBinding.deleteMany).toHaveBeenCalledWith({

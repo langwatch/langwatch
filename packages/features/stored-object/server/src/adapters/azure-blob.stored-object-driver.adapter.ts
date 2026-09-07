@@ -13,6 +13,7 @@ import type { AzureCredentials } from "./azure-blob-credentials.adapter.ts";
 import { AzureBlobTokenProviderAdapter } from "./azure-blob-token-provider.adapter.ts";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import type { StoredObjectStorageDriver } from "./stored-object-storage-registry.adapter.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 interface ParsedAzureBlobUri {
   accountName: string;
@@ -431,7 +432,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
     /** Canonicalised query params (e.g. `{ restype: "container" }`) for container-level operations. */
     queryParams?: Record<string, string>;
   }): Promise<Record<string, string>> {
-    const date = new Date().toUTCString();
+    const date = toDate(nowInstant()).toUTCString();
     const xMsVersion = "2021-12-02"; // Supports both SharedKey and Entra (OAuth) authentication.
 
     if (this.credentials.mode === "sharedKey") {

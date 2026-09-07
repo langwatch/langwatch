@@ -1,6 +1,7 @@
 import { Badge, Button, Card, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import type { PendingJoinRequest } from "../../model/pending-join-request.ts";
+import { readableDate } from "../../model/display-formatters.ts";
 
 interface JoinRequestsTableProps {
   requests: PendingJoinRequest[];
@@ -119,7 +120,7 @@ function JoinRequestRow({
 
 /** Spelled out, never abbreviated: "24 Aug 2026", not "24/08". */
 function formatDay(date: string): string {
-  return new Date(date).toLocaleDateString(undefined, {
+  return readableDate(date).toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",
     year: "numeric",

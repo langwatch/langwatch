@@ -3,6 +3,7 @@ import type {
   StoredObjectReference,
 } from "@langwatch/stored-object-contract";
 import type { StoredObjectRecord } from "../stores/stored-object.store.ts";
+import { toDate } from "@langwatch/time";
 
 /** The stored object as a caller reads it: facts only, every timestamp already a string. */
 export function storedObjectMetadataOf(value: StoredObjectRecord): StoredObjectMetadata {
@@ -21,14 +22,14 @@ export function storedObjectMetadataOf(value: StoredObjectRecord): StoredObjectM
       ownerKind: value.ownerKind,
       ownerId: value.ownerId,
     },
-    createdAt: value.createdAt.toISOString(),
+    createdAt: toDate(value.createdAt).toISOString(),
   };
   if (value.availableAt) {
-    result.availableAt = value.availableAt.toISOString();
+    result.availableAt = toDate(value.availableAt).toISOString();
   }
 
   if (value.deletedAt) {
-    result.deletedAt = value.deletedAt.toISOString();
+    result.deletedAt = toDate(value.deletedAt).toISOString();
   }
 
   return result;

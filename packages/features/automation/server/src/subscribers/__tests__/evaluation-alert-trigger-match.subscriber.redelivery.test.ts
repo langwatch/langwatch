@@ -35,6 +35,7 @@ import {
   AutomationEvaluationTriggerFilterService,
   AutomationTriggerMatchRecorderPort,
 } from "../../index.ts";
+import type { Instant } from "@langwatch/time";
 
 function trigger(): TriggerSummary {
   return {
@@ -190,7 +191,7 @@ class TestAutomationService extends AutomationService {
   }): Promise<GraphTriggerEvaluationResult> {
     return this.unavailable();
   }
-  decideGraphTriggerHeartbeat(_input: { now: Date }): Promise<GraphTriggerSweepCandidate[]> {
+  decideGraphTriggerHeartbeat(_input: { now: Instant }): Promise<GraphTriggerSweepCandidate[]> {
     return this.unavailable();
   }
   handlePersistCapBreach(_input: AutomationPersistCapBreach): Promise<void> {
@@ -202,7 +203,7 @@ class TestAutomationService extends AutomationService {
   consumePersistCapSlot(_input: {
     projectId: string;
     triggerId: string;
-    now: Date;
+    now: Instant;
     cap: number;
     dedupKey: string;
   }) {
@@ -211,7 +212,7 @@ class TestAutomationService extends AutomationService {
   readPersistCapCounts(_input: {
     projectId: string;
     triggerIds: readonly string[];
-    now: Date;
+    now: Instant;
     cap: number;
   }) {
     return this.unavailable();
@@ -307,8 +308,8 @@ class TestAutomationService extends AutomationService {
     triggerId: string;
     traceId?: string | null;
     customGraphId?: string | null;
-    createdAt: Date;
-    resolvedAt?: Date | null;
+    createdAt: Instant;
+    resolvedAt?: Instant | null;
   }): Promise<TriggerFire> {
     return this.unavailable();
   }
@@ -371,7 +372,7 @@ class TestAutomationService extends AutomationService {
   }): Promise<WebhookDeliveryRow[]> {
     return this.unavailable();
   }
-  pruneWebhookDeliveries(_now?: Date): Promise<number> {
+  pruneWebhookDeliveries(_now?: Instant): Promise<number> {
     return this.unavailable();
   }
 }

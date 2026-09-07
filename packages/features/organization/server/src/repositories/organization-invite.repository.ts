@@ -10,7 +10,7 @@ import type {
 export type WriteInviteInput = {
   email: string;
   inviteCode: string;
-  expiration: Date | null;
+  expiration: OrganizationInvite["expiration"];
   organizationId: string;
   teamIds: string;
   teamAssignments?: unknown;
@@ -89,7 +89,7 @@ export abstract class OrganizationInviteRepository {
     organizationId: string;
     expectedInviteCode: string;
     inviteCode: string;
-    expiration: Date;
+    expiration: NonNullable<OrganizationInvite["expiration"]>;
   }): Promise<number>;
   abstract tryFindInviteByCodeWithOrganization(input: {
     inviteCode: string;
@@ -129,6 +129,6 @@ export abstract class OrganizationInviteRepository {
   abstract approvePaymentPendingInvite(input: {
     inviteId: string;
     organizationId: string;
-    expiration: Date;
+    expiration: NonNullable<OrganizationInvite["expiration"]>;
   }): Promise<OrganizationInvite>;
 }

@@ -23,6 +23,7 @@ import {
 import { AutomationEmailCapService } from "../../../services/email-cap.service.ts";
 import { AutomationPersistActionService } from "../../../services/persist-action.service.ts";
 import { AutomationSettlementDispatchService } from "../../../services/trigger-settlement-dispatch.service.ts";
+import { type Instant, Temporal } from "@langwatch/time";
 
 function unavailable(): never {
   throw new Error("unused test capability");
@@ -305,7 +306,7 @@ class SettlementAutomationService extends AutomationService {
   async consumePersistCapSlot(input: {
     projectId: string;
     triggerId: string;
-    now: Date;
+    now: Instant;
     cap: number;
     dedupKey: string;
   }) {
@@ -372,6 +373,15 @@ export class SettlementProjectService extends ProjectService {
     return unavailable();
   }
   isPresenceEnabled(): never {
+    return unavailable();
+  }
+  updateSettings(): never {
+    return unavailable();
+  }
+  regenerateLegacyProjectKey(): never {
+    return unavailable();
+  }
+  requestTopicClustering(): never {
     return unavailable();
   }
   getById(): never {
@@ -509,8 +519,8 @@ class SettlementConfirmation extends AutomationSettlementMatchConfirmationPort {
 }
 
 class SettlementClock extends AutomationClockPort {
-  now(): Date {
-    return new Date("2026-01-01T00:00:00.000Z");
+  now(): Instant {
+    return Temporal.Instant.from("2026-01-01T00:00:00.000Z");
   }
 }
 

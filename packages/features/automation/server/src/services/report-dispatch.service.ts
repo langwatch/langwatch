@@ -207,7 +207,7 @@ export class ReportDispatchService {
       viewUrl: viewUrl(report.source, deps.baseHost, project.slug),
       traces,
       charts,
-      occurredAt: fire.slot,
+      occurredAt: fromDate(fire.slot),
       project: { id: project.id, name: project.name, slug: project.slug },
       baseHost: deps.baseHost,
     });

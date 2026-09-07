@@ -13,14 +13,14 @@ import {
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { OrganizationApp } from "#app/organization.app";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 /**
  * The process supplies authentication; authorization arrives as `policy`. `app` is the slice of
  * the process's application this feature reaches, since a shared tRPC root carries every feature.
  */
 export type PersonalWorkspaceFeaturesTrpcContext = Readonly<{
-  app: Readonly<{ organizations: OrganizationApp }>;
+  app: Readonly<{ organizations: OrganizationApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 

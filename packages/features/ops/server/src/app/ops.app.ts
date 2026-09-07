@@ -58,8 +58,11 @@ import type {
   ReplayHistoryEntry,
   ReplayStatus,
 } from "@langwatch/ops-contract";
+import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
+import { OpsApi } from "@langwatch/ops-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
 
 /** One process ref, the triple every process-manager read is keyed by. */
@@ -225,13 +228,14 @@ export interface OpsAppDependencies {
    */
   eventingIntrospection: OpsEventingIntrospectionPort;
 }
+type OpsSetup = FeatureSetup<Record<string, never>, OpsAppDependencies, undefined>;
 
 /** The badge's two integers, and when they were computed. */
 export interface OpsBadgeReading {
   blockedCount: number;
   dlqCount: number;
   /** Null when no snapshot collector is running: "we cannot say", not "all clear". */
-  computedAt: Date | null;
+  computedAt: OpsApiGetBadgeCountsOutput["computedAt"];
 }
 
 /**
@@ -314,33 +318,19 @@ export class OpsUnknownFeatureFlagError extends HandledError {
   }
 }
 
-export class OpsApp {
-  static create(dependencies: OpsAppDependencies): OpsApp {
-    return new OpsApp(dependencies);
+export class OpsApp implements OpsApi {
+  static readonly contract = OpsApi;
+  static readonly dependencies = {};
+  static readonly configSchema = undefined;
+
+  static create({ infrastructure }: OpsSetup): OpsApp {
+    return new OpsApp(infrastructure);
   }
 
-  private constructor(private readonly dependencies: OpsAppDependencies) {}
+  readonly #dependencies: OpsAppDependencies;
 
-  // -- the composed capabilities ---------------------------------------------
-
-  /** The portable platform-operations capability: queues, schedules, blobs. */
-  get operations(): OpsService {
-    return this.dependencies.ops;
-  }
-
-  /** The event-log explorer. */
-  get events(): OpsEventExplorer {
-    return this.dependencies.ops.eventExplorer;
-  }
-
-  /** The process-manager fleet explorer. */
-  get processes(): OpsProcessExplorer {
-    return this.dependencies.ops.managerExplorer;
-  }
-
-  /** The projection replay runner. */
-  get replay(): OpsReplayRunner {
-    return this.dependencies.ops.replay;
+  private constructor(dependencies: OpsAppDependencies) {
+    this.#dependencies = dependencies;
   }
 
   /**
@@ -354,7 +344,7 @@ export class OpsApp {
    * same slice.
    */
   isAdmin(identity: AdminIdentity): boolean {
-    return this.dependencies.ops.isAdmin(identity);
+    return this.#dependencies.ops.isAdmin(identity);
   }
 
   // -- the rules the transport used to hold ----------------------------------
@@ -381,7 +371,7 @@ export class OpsApp {
 
   /** The collected dashboard, or null when no snapshot collector is running. */
   tryGetDashboardData(): DashboardData | null {
-    return this.dependencies.ops.snapshots?.tryGetDashboardData() ?? null;
+    return this.#dependencies.ops.snapshots?.tryGetDashboardData() ?? null;
   }
 
   /**
@@ -394,7 +384,7 @@ export class OpsApp {
    * field exists.
    */
   badgeCounts(): OpsBadgeReading {
-    const snapshots = this.dependencies.ops.snapshots;
+    const snapshots = this.#dependencies.ops.snapshots;
     if (!snapshots) return { blockedCount: 0, dlqCount: 0, computedAt: null };
     return snapshots.getBadgeCounts();
   }
@@ -403,14 +393,14 @@ export class OpsApp {
   async *streamDashboard(
     input: Parameters<OpsSnapshotService["streamDashboard"]>[0],
   ): AsyncIterable<DashboardData> {
-    const snapshots = this.dependencies.ops.snapshots;
+    const snapshots = this.#dependencies.ops.snapshots;
     if (!snapshots) return;
     yield* snapshots.streamDashboard(input);
   }
 
   /** One queue group, raising a not-found rather than answering null. */
   async getQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo> {
-    const group = await this.dependencies.ops.tryGetQueueGroup(input);
+    const group = await this.#dependencies.ops.tryGetQueueGroup(input);
     if (!group) {
       throw new NotFoundError("not_found", "Queue group", input.groupId, {
         meta: { queueName: input.queueName },
@@ -432,7 +422,7 @@ export class OpsApp {
     projectionName: string;
     eventIndex: number;
   }): Promise<ProjectionStateAtEvent> {
-    const state = await this.dependencies.ops.eventExplorer.computeProjectionState(input);
+    const state = await this.#dependencies.ops.eventExplorer.computeProjectionState(input);
     if (!state.aggregateType) {
       throw new NotFoundError("not_found", "Projection", input.projectionName);
     }
@@ -441,19 +431,19 @@ export class OpsApp {
 
   /** Currently-active tenant anomalies, hard tier first. */
   listAnomalies(): Promise<Anomaly[]> {
-    return this.dependencies.ops.listAnomalies();
+    return this.#dependencies.ops.listAnomalies();
   }
 
   /** Dismisses one tenant anomaly. */
   dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean> {
-    return this.dependencies.ops.dismissAnomaly(input);
+    return this.#dependencies.ops.dismissAnomaly(input);
   }
 
   /** The project lookup behind the operator's tenant pickers. */
   searchProjects(
     input: Parameters<ProjectService["searchByQuery"]>[0],
   ): ReturnType<ProjectService["searchByQuery"]> {
-    return this.dependencies.projects.searchByQuery(input);
+    return this.#dependencies.projects.searchByQuery(input);
   }
 
   // -- feature flags ---------------------------------------------------------
@@ -465,8 +455,8 @@ export class OpsApp {
    */
   async featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue> {
     return withKillSwitchDescriptors({
-      catalogue: await this.dependencies.featureFlags.listOperatorCatalogue(),
-      descriptors: this.dependencies.eventingIntrospection.killSwitches(),
+      catalogue: await this.#dependencies.featureFlags.listOperatorCatalogue(),
+      descriptors: this.#dependencies.eventingIntrospection.killSwitches(),
     });
   }
 
@@ -477,7 +467,7 @@ export class OpsApp {
     lastEditedBy: string | null;
   }): Promise<void> {
     this.requireRegisteredFlag(input.key);
-    await this.dependencies.featureFlags.setEnabled(input);
+    await this.#dependencies.featureFlags.setEnabled(input);
   }
 
   /** Replaces one registered flag's targeting rules. */
@@ -487,7 +477,7 @@ export class OpsApp {
     lastEditedBy: string | null;
   }): Promise<void> {
     this.requireRegisteredFlag(input.key);
-    await this.dependencies.featureFlags.setRules(input);
+    await this.#dependencies.featureFlags.setRules(input);
   }
 
   /**
@@ -499,7 +489,238 @@ export class OpsApp {
    * exactly that cleanup path.
    */
   clearFeatureFlag(input: { key: string; lastEditedBy: string | null }): Promise<void> {
-    return this.dependencies.featureFlags.clearStoredFlag(input);
+    return this.#dependencies.featureFlags.clearStoredFlag(input);
+  }
+
+  discoverAggregates(input: Parameters<OpsEventExplorer["discoverAggregates"]>[0]) {
+    return this.#dependencies.ops.eventExplorer.discoverAggregates(input);
+  }
+
+  searchAggregates(input: Parameters<OpsEventExplorer["searchAggregates"]>[0]) {
+    return this.#dependencies.ops.eventExplorer.searchAggregates(input);
+  }
+
+  getAggregateEvents(input: Parameters<OpsEventExplorer["getAggregateEvents"]>[0]) {
+    return this.#dependencies.ops.eventExplorer.getAggregateEvents(input);
+  }
+
+  getForAggregate(input: Parameters<OpsProcessExplorer["getForAggregate"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.getForAggregate(input);
+  }
+
+  requeueDeadMessages(input: Parameters<OpsProcessExplorer["requeueDeadMessages"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.requeueDeadMessages(input);
+  }
+
+  getFleetSummary() {
+    return this.#dependencies.ops.managerExplorer.getFleetSummary();
+  }
+  getDeadLetters(input: Parameters<OpsProcessExplorer["getDeadLetters"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.getDeadLetters(input);
+  }
+  getDeadLetterCounts() {
+    return this.#dependencies.ops.managerExplorer.getDeadLetterCounts();
+  }
+  getInstances(input: Parameters<OpsProcessExplorer["getInstances"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.getInstances(input);
+  }
+  getUpcomingWakes(input: Parameters<OpsProcessExplorer["getUpcomingWakes"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.getUpcomingWakes(input);
+  }
+  tryGetInstanceDetail(input: Parameters<OpsProcessExplorer["tryGetInstanceDetail"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.tryGetInstanceDetail(input);
+  }
+  getOutbox(input: Parameters<OpsProcessExplorer["getOutbox"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.getOutbox(input);
+  }
+  listRecentActions(input: Parameters<OpsProcessExplorer["listRecentActions"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.listRecentActions(input);
+  }
+  wakeNow(input: Parameters<OpsProcessExplorer["wakeNow"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.wakeNow(input);
+  }
+  redriveDeadInstance(input: Parameters<OpsProcessExplorer["redriveDeadInstance"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.redriveDeadInstance(input);
+  }
+  redriveDeadMessage(input: Parameters<OpsProcessExplorer["redriveDeadMessage"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.redriveDeadMessage(input);
+  }
+  discardDeadMessage(input: Parameters<OpsProcessExplorer["discardDeadMessage"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.discardDeadMessage(input);
+  }
+  redriveDeadLetters(input: Parameters<OpsProcessExplorer["redriveDeadLetters"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.redriveDeadLetters(input);
+  }
+  discardDeadLetters(input: Parameters<OpsProcessExplorer["discardDeadLetters"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.discardDeadLetters(input);
+  }
+  getOutboxAttempts(input: Parameters<OpsProcessExplorer["getOutboxAttempts"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.getOutboxAttempts(input);
+  }
+  releaseLapsedLease(input: Parameters<OpsProcessExplorer["releaseLapsedLease"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.releaseLapsedLease(input);
+  }
+  getHistory() {
+    return this.#dependencies.ops.replay.getHistory();
+  }
+  tryFindHistoryEntry(input: Parameters<OpsReplayRunner["tryFindHistoryEntry"]>[0]) {
+    return this.#dependencies.ops.replay.tryFindHistoryEntry(input);
+  }
+  startReplay(input: Parameters<OpsReplayRunner["startReplay"]>[0]) {
+    return this.#dependencies.ops.replay.startReplay(input);
+  }
+  getStatus() {
+    return this.#dependencies.ops.replay.getStatus();
+  }
+  cancelReplay() {
+    return this.#dependencies.ops.replay.cancelReplay();
+  }
+
+  startImpersonation(input: Parameters<OpsService["startImpersonation"]>[0]) {
+    return this.#dependencies.ops.startImpersonation(input);
+  }
+  stopImpersonation(input: Parameters<OpsService["stopImpersonation"]>[0]) {
+    return this.#dependencies.ops.stopImpersonation(input);
+  }
+  adminOperation(input: Parameters<OpsService["adminOperation"]>[0]) {
+    return this.#dependencies.ops.adminOperation(input);
+  }
+  listBlobQueues() {
+    return this.#dependencies.ops.listBlobQueues();
+  }
+  getBlobStoreStats() {
+    return this.#dependencies.ops.getBlobStoreStats();
+  }
+  listBlobs(input: Parameters<OpsService["listBlobs"]>[0]) {
+    return this.#dependencies.ops.listBlobs(input);
+  }
+  tryGetBlob(input: Parameters<OpsService["tryGetBlob"]>[0]) {
+    return this.#dependencies.ops.tryGetBlob(input);
+  }
+  runBlobCleanup(input: Parameters<OpsService["runBlobCleanup"]>[0]) {
+    return this.#dependencies.ops.runBlobCleanup(input);
+  }
+  deleteBlob(input: Parameters<OpsService["deleteBlob"]>[0]) {
+    return this.#dependencies.ops.deleteBlob(input);
+  }
+  listScheduledJobs(input: Parameters<OpsService["listScheduledJobs"]>[0]) {
+    return this.#dependencies.ops.listScheduledJobs(input);
+  }
+  setScheduleActive(input: Parameters<OpsService["setScheduleActive"]>[0]) {
+    return this.#dependencies.ops.setScheduleActive(input);
+  }
+  clearStuckScheduleSlot(input: Parameters<OpsService["clearStuckScheduleSlot"]>[0]) {
+    return this.#dependencies.ops.clearStuckScheduleSlot(input);
+  }
+  runScheduleNow(input: Parameters<OpsService["runScheduleNow"]>[0]) {
+    return this.#dependencies.ops.runScheduleNow(input);
+  }
+  listQueues() {
+    return this.#dependencies.ops.listQueues();
+  }
+  getBlockedQueueSummary() {
+    return this.#dependencies.ops.getBlockedQueueSummary();
+  }
+  listAllQueueDlqGroups() {
+    return this.#dependencies.ops.listAllQueueDlqGroups();
+  }
+  pauseQueuePipeline(input: Parameters<OpsService["pauseQueuePipeline"]>[0]) {
+    return this.#dependencies.ops.pauseQueuePipeline(input);
+  }
+  unpauseQueuePipeline(input: Parameters<OpsService["unpauseQueuePipeline"]>[0]) {
+    return this.#dependencies.ops.unpauseQueuePipeline(input);
+  }
+  listPausedQueueKeys(input: Parameters<OpsService["listPausedQueueKeys"]>[0]) {
+    return this.#dependencies.ops.listPausedQueueKeys(input);
+  }
+  pauseQueueTenant(input: Parameters<OpsService["pauseQueueTenant"]>[0]) {
+    return this.#dependencies.ops.pauseQueueTenant(input);
+  }
+  unpauseQueueTenant(input: Parameters<OpsService["unpauseQueueTenant"]>[0]) {
+    return this.#dependencies.ops.unpauseQueueTenant(input);
+  }
+  listPausedQueueTenants(input: Parameters<OpsService["listPausedQueueTenants"]>[0]) {
+    return this.#dependencies.ops.listPausedQueueTenants(input);
+  }
+  listQueueDlqGroups(input: Parameters<OpsService["listQueueDlqGroups"]>[0]) {
+    return this.#dependencies.ops.listQueueDlqGroups(input);
+  }
+  discoverQueueNames() {
+    return this.#dependencies.ops.discoverQueueNames();
+  }
+  scanQueues(input: Parameters<OpsService["scanQueues"]>[0]) {
+    return this.#dependencies.ops.scanQueues(input);
+  }
+  readQueuePendingDrift(input: Parameters<OpsService["readQueuePendingDrift"]>[0]) {
+    return this.#dependencies.ops.readQueuePendingDrift(input);
+  }
+  listPausedSchedules(input: Parameters<OpsService["listPausedSchedules"]>[0]) {
+    return this.#dependencies.ops.listPausedSchedules(input);
+  }
+  listSchedulerActions(input: Parameters<OpsService["listSchedulerActions"]>[0]) {
+    return this.#dependencies.ops.listSchedulerActions(input);
+  }
+  listQueueGroups(input: Parameters<OpsService["listQueueGroups"]>[0]) {
+    return this.#dependencies.ops.listQueueGroups(input);
+  }
+  tryGetQueueGroup(input: Parameters<OpsService["tryGetQueueGroup"]>[0]) {
+    return this.#dependencies.ops.tryGetQueueGroup(input);
+  }
+  listQueueGroupJobs(input: Parameters<OpsService["listQueueGroupJobs"]>[0]) {
+    return this.#dependencies.ops.listQueueGroupJobs(input);
+  }
+  listParkedQueueGroups(input: Parameters<OpsService["listParkedQueueGroups"]>[0]) {
+    return this.#dependencies.ops.listParkedQueueGroups(input);
+  }
+  unblockQueueGroup(input: Parameters<OpsService["unblockQueueGroup"]>[0]) {
+    return this.#dependencies.ops.unblockQueueGroup(input);
+  }
+  unblockAllQueueGroups(input: Parameters<OpsService["unblockAllQueueGroups"]>[0]) {
+    return this.#dependencies.ops.unblockAllQueueGroups(input);
+  }
+  drainQueueGroup(input: Parameters<OpsService["drainQueueGroup"]>[0]) {
+    return this.#dependencies.ops.drainQueueGroup(input);
+  }
+  retryBlockedQueueJob(input: Parameters<OpsService["retryBlockedQueueJob"]>[0]) {
+    return this.#dependencies.ops.retryBlockedQueueJob(input);
+  }
+  drainQueueTenant(input: Parameters<OpsService["drainQueueTenant"]>[0]) {
+    return this.#dependencies.ops.drainQueueTenant(input);
+  }
+  moveQueueGroupToDlq(input: Parameters<OpsService["moveQueueGroupToDlq"]>[0]) {
+    return this.#dependencies.ops.moveQueueGroupToDlq(input);
+  }
+  moveAllBlockedQueueGroupsToDlq(
+    input: Parameters<OpsService["moveAllBlockedQueueGroupsToDlq"]>[0],
+  ) {
+    return this.#dependencies.ops.moveAllBlockedQueueGroupsToDlq(input);
+  }
+  replayQueueGroupFromDlq(input: Parameters<OpsService["replayQueueGroupFromDlq"]>[0]) {
+    return this.#dependencies.ops.replayQueueGroupFromDlq(input);
+  }
+  replayAllQueueGroupsFromDlq(input: Parameters<OpsService["replayAllQueueGroupsFromDlq"]>[0]) {
+    return this.#dependencies.ops.replayAllQueueGroupsFromDlq(input);
+  }
+  redriveQueueDlqGroups(input: Parameters<OpsService["redriveQueueDlqGroups"]>[0]) {
+    return this.#dependencies.ops.redriveQueueDlqGroups(input);
+  }
+  discardQueueDlqGroups(input: Parameters<OpsService["discardQueueDlqGroups"]>[0]) {
+    return this.#dependencies.ops.discardQueueDlqGroups(input);
+  }
+  canaryRedriveQueueDlq(input: Parameters<OpsService["canaryRedriveQueueDlq"]>[0]) {
+    return this.#dependencies.ops.canaryRedriveQueueDlq(input);
+  }
+  canaryUnblockQueueGroups(input: Parameters<OpsService["canaryUnblockQueueGroups"]>[0]) {
+    return this.#dependencies.ops.canaryUnblockQueueGroups(input);
+  }
+  getQueueDrainPreview(input: Parameters<OpsService["getQueueDrainPreview"]>[0]) {
+    return this.#dependencies.ops.getQueueDrainPreview(input);
+  }
+  tryReconcileQueuePending(input: Parameters<OpsService["tryReconcileQueuePending"]>[0]) {
+    return this.#dependencies.ops.tryReconcileQueuePending(input);
+  }
+  listParkedQueueTenants(input: Parameters<OpsService["listParkedQueueTenants"]>[0]) {
+    return this.#dependencies.ops.listParkedQueueTenants(input);
   }
 
   /**
@@ -509,7 +730,7 @@ export class OpsApp {
    */
   private requireRegisteredFlag(key: string): void {
     if (listFeatureFlags().some((flag) => flag.key === key)) return;
-    if (this.dependencies.eventingIntrospection.killSwitches().some((d) => d.key === key)) return;
+    if (this.#dependencies.eventingIntrospection.killSwitches().some((d) => d.key === key)) return;
     throw new OpsUnknownFeatureFlagError(key);
   }
 }

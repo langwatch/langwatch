@@ -123,9 +123,16 @@ export class UsageStatsWorkerContributionAdapter {
       }
     };
 
-    const nextNoonUtc = this.options.config.now();
-    nextNoonUtc.setUTCHours(12, 0, 0, 0);
-    let firstTickDelayMs = nextNoonUtc.getTime() - this.options.config.now().getTime();
+    const startedAt = this.options.config.now();
+    const nextNoonUtc = startedAt.toZonedDateTimeISO("UTC").with({
+      hour: 12,
+      minute: 0,
+      second: 0,
+      millisecond: 0,
+      microsecond: 0,
+      nanosecond: 0,
+    });
+    let firstTickDelayMs = nextNoonUtc.epochMilliseconds - startedAt.epochMilliseconds;
     if (firstTickDelayMs <= 0) {
       firstTickDelayMs += USAGE_STATS_INTERVAL_MS;
     }

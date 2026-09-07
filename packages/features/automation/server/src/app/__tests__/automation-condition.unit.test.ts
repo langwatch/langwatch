@@ -3,20 +3,24 @@
  * An automation with no condition matches every trace forever, so the easiest create call
  * produced the most expensive automation. Editing is the other route to the same state.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { AutomationAppDependencies } from "../automation.app.ts";
-import { AutomationApp } from "../automation.app.ts";
+import { createCanonicalAutomationApp } from "./automation-app.fixture.ts";
+import type { AutomationApp } from "../automation.app.ts";
 
 const CREATED = { id: "trigger_new", triggerKind: "AUTOMATION" };
 
 function app(): { app: AutomationApp; create: ReturnType<typeof vi.fn> } {
-  const create = vi.fn(async () => CREATED);
-  return {
-    create,
-    app: AutomationApp.create({ automation: { create } } as unknown as AutomationAppDependencies),
-  };
+  const fixture = createCanonicalAutomationApp();
+  resources.push(fixture.resources);
+  return { app: fixture.app, create: fixture.triggerCreate };
 }
+
+const resources: ReturnType<typeof createCanonicalAutomationApp>["resources"][] = [];
+
+afterEach(async () => {
+  await Promise.all(resources.splice(0).map((resource) => resource.close()));
+});
 
 const storedWithCondition = {
   id: "trigger_1",
@@ -117,7 +121,7 @@ describe("given a graph alert or a scheduled report", () => {
           message: null,
           alertType: "WARNING",
         } as never),
-      ).resolves.toEqual(CREATED);
+      ).resolves.toMatchObject(CREATED);
 
       expect(create).toHaveBeenCalledTimes(1);
     });

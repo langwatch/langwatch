@@ -1,4 +1,8 @@
-import type { OrganizationTeam, OrganizationTeamPage } from "@langwatch/organization-contract";
+import type {
+  OrganizationTeam,
+  OrganizationTeamPage,
+  Team,
+} from "@langwatch/organization-contract";
 
 export abstract class TeamRepository {
   abstract get(input: { teamId: string; organizationId: string }): Promise<OrganizationTeam>;
@@ -52,7 +56,7 @@ export abstract class TeamRepository {
   abstract fenceMembershipChange(input: {
     teamId: string;
     organizationId: string;
-    expectedUpdatedAt: Date;
+    expectedUpdatedAt: Team["updatedAt"];
     name?: string;
     removeLegacyUserId?: string;
   }): Promise<OrganizationTeam>;

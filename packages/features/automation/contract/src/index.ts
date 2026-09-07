@@ -7,6 +7,7 @@ export * from "./automation.errors.ts";
 export * from "./automation-filters.ts";
 export * from "./automation.queries.ts";
 export * from "./automation.service.ts";
+export * from "./automation.api.ts";
 export * from "./automation-evaluation-subscriber.service.ts";
 export {
   alertTypeSchema,
@@ -34,3 +35,4 @@ export * from "./test-fire.ts";
 export * from "./webhook-delivery.ts";
 export * from "./report.ts";
 export * from "./templating.ts";
+export * from "./automation.config.ts";

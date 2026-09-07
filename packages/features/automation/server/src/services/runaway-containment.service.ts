@@ -33,7 +33,7 @@ export class RunawayContainmentService {
 
   async handle(input: AutomationPersistCapBreach): Promise<void> {
     const { trigger, projectId, cap, skipped } = input;
-    const now = fromDate(this.clock.now());
+    const now = this.clock.now();
     const dayBucket = Math.floor(now.epochMilliseconds / 86_400_000);
     try {
       this.runaway.onCeilingBreach();

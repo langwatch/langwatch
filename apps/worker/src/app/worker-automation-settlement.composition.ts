@@ -1,7 +1,5 @@
-import {
-  AnnotationAnnotatorReferenceInvalidError,
-  AnnotationQueueingService,
-} from "@langwatch/annotation-server";
+import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-server";
+import type { AnnotationQueueService } from "@langwatch/annotation-contract";
 import type {
   AutomationPersistCapBreach,
   AutomationPlanProvider,
@@ -11,7 +9,7 @@ import {
   LegacyFilterMatchingService,
   PreconditionTraceDataService,
 } from "@langwatch/analytics-server";
-import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { TRACE_EXPANSIONS, type DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   AutomationClockPort,
   AutomationDatasetMapperPort,
@@ -56,13 +54,12 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { EmailDeliveryPort } from "@langwatch/notification-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
-  mapTraceToDatasetEntry,
   traceSchema,
-  TRACE_EXPANSIONS,
   type DerivedTraceEvent,
   type TraceRecord,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
+import { mapTraceToDatasetEntry } from "@langwatch/dataset-contract";
 import { TraceQueryEvaluationAdapter } from "@langwatch/trace-server";
 import {
   WorkerAutomationRunawayAdapter,
@@ -72,6 +69,7 @@ import {
 } from "../features/automation/automation-runaway.adapter.ts";
 import type { AutomationWorkerCapability } from "../features/automation/automation-worker-feature.installer.ts";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import type { Instant } from "@langwatch/time";
 
 export type WorkerAutomationSettlementCompositionOptions = Readonly<{
   config: WorkerConfig;
@@ -157,14 +155,7 @@ export type WorkerAutomationContainment = Readonly<{
   nextStep?: WorkerAutomationNextStepResolver | undefined;
 }>;
 
-export type WorkerAutomationAnnotationWriter = Readonly<{
-  annotations: Parameters<
-    typeof AnnotationQueueingService.createOrUpdateQueueItems
-  >[0]["annotations"];
-  findExistingTraceIds: Parameters<
-    typeof AnnotationQueueingService.createOrUpdateQueueItems
-  >[0]["findExistingTraceIds"];
-}>;
+export type WorkerAutomationAnnotationWriter = AnnotationQueueService;
 
 /**
  * What this process CANNOT do about a settled match, said once at composition.
@@ -178,7 +169,7 @@ export abstract class WorkerAutomationSettlementAbsenceReportPort {
 
   /**
    * `ADD_TO_DATASET`'s WRITE. The row MAPPING is composed unconditionally —
-   * `mapTraceToDatasetEntry` and `TRACE_EXPANSIONS` are `@langwatch/trace-contract`'s, so the
+   * `mapTraceToDatasetEntry` is Dataset's and `TRACE_EXPANSIONS` is Trace's, so the
    * columns this process fills are the columns the customer previewed.
    */
   abstract withoutDatasetPersist(): void;
@@ -460,7 +451,7 @@ class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriterP
     }
 
     try {
-      await AnnotationQueueingService.createOrUpdateQueueItems({ ...input, ...annotations });
+      await annotations.queueTraces(input);
     } catch (error) {
       // Annotation answers a caller who sent a malformed annotator reference with a 400, which is
       // right for the surface a person typed it into and wrong for this one: the reference is SAVED
@@ -524,13 +515,13 @@ class WorkerAutomationScheduledIntents extends AutomationScheduledIntentPort {
 
   private constructor(
     private readonly heartbeat: GraphTriggerHeartbeatService,
-    private readonly deliveries: { pruneExpired(now?: Date): Promise<number> },
+    private readonly deliveries: { pruneExpired(now?: Instant): Promise<number> },
     private readonly graphActivity: AutomationGraphActivityPort | undefined,
   ) {
     super();
   }
 
-  decideGraphTriggerHeartbeat(input: { now: Date }) {
+  decideGraphTriggerHeartbeat(input: { now: Instant }) {
     return this.heartbeat.decide(input);
   }
 
@@ -552,7 +543,7 @@ class WorkerAutomationScheduledIntents extends AutomationScheduledIntentPort {
     return this.graphActivity.evaluateGraphTrigger(input);
   }
 
-  pruneWebhookDeliveries(now?: Date): Promise<number> {
+  pruneWebhookDeliveries(now?: Instant): Promise<number> {
     return this.deliveries.pruneExpired(now);
   }
 }

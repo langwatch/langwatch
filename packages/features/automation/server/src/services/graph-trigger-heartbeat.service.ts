@@ -121,8 +121,7 @@ export class GraphTriggerHeartbeatService {
     return new GraphTriggerHeartbeatService(deps);
   }
 
-  async decide({ now: at }: { now: Date }): Promise<GraphTriggerSweepCandidate[]> {
-    const now = fromDate(at);
+  async decide({ now }: { now: Instant }): Promise<GraphTriggerSweepCandidate[]> {
     const deps = this.deps;
     const triggerSent = deps.triggerSent;
     // Step 1: load the union of "has graph triggers" + "has open sent"

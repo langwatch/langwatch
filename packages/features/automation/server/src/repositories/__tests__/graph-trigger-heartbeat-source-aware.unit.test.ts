@@ -17,6 +17,7 @@ import {
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { GraphTriggerSentRepository } from "../graph-trigger-sent.repository.ts";
 import { HeartbeatTriggerRepository, SilentAutomationLogger } from "./support/heartbeat.fakes.ts";
+import { type Instant, Temporal } from "@langwatch/time";
 
 const TriggerAction = { SEND_EMAIL: "SEND_EMAIL" } as const;
 const TriggerKind = { ALERT: "ALERT" } as const;
@@ -28,7 +29,7 @@ type HeartbeatCandidateSources = {
 async function decideGraphTriggerHeartbeat(input: {
   deps: GraphTriggerHeartbeatDeps;
   sources: HeartbeatCandidateSources;
-  now: Date;
+  now: Instant;
 }) {
   input.deps.triggerSent.findProjectsWithGraphTriggers =
     input.sources.loadProjectsWithGraphTriggers;
@@ -126,7 +127,7 @@ function makeClickHouseStub(): {
 }
 
 describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () => {
-  const now = new Date("2026-06-20T12:00:00Z");
+  const now = Temporal.Instant.from("2026-06-20T12:00:00Z");
   let clickHouseStub: ReturnType<typeof makeClickHouseStub>;
 
   beforeEach(() => {

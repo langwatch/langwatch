@@ -1,7 +1,7 @@
 /**
  * A group over the process's tRPC transport. Every procedure takes `organization:manage`, since
  * a group is an access grant. Groups arrive with SCIM, so create/list are gated on the Enterprise
- * plan port. Transport only: gates, plan enforcement, delegation to {@link OrganizationApp}.
+ * plan port. Transport only: gates, plan enforcement, delegation to {@link OrganizationApi}.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
@@ -24,14 +24,14 @@ import {
   type OrganizationGroupBinding,
 } from "@langwatch/organization-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import type { OrganizationApp } from "#app/organization.app";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 /**
  * The process supplies authentication; authorization arrives as `policy`. `app` is the slice of
  * the process's application this feature reaches, since a shared tRPC root carries every feature.
  */
 export type GroupTrpcContext = Readonly<{
-  app: Readonly<{ organizations: OrganizationApp }>;
+  app: Readonly<{ organizations: OrganizationApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 

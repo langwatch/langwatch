@@ -21,6 +21,7 @@ import type {
   ShareLinkRow,
 } from "../authz-read.repository.ts";
 import { AuthzReadRepository, type AuthzDatabase } from "../authz-read.repository.ts";
+import { fromDate } from "@langwatch/time";
 
 const SYSTEM_API_KEY_ROLE_KIND = "system_api_key" as const;
 
@@ -253,7 +254,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     tokens: readonly string[];
     links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
   }): Promise<ShareLinkRow[]> {
-    return (await this.database.shareLink.findMany({
+    const rows = (await this.database.shareLink.findMany({
       where: {
         projectId,
         token: { in: [...tokens] },
@@ -271,7 +272,12 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
         maxViews: true,
         viewCount: true,
       },
-    })) as ShareLinkRow[];
+    })) as Array<Omit<ShareLinkRow, "expiresAt"> & { expiresAt: Date | null }>;
+
+    return rows.map((row) => ({
+      ...row,
+      expiresAt: row.expiresAt === null ? null : fromDate(row.expiresAt),
+    }));
   }
 
   async tryFindProjectLineage({

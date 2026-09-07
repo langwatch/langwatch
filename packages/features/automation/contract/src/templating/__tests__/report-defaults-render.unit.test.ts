@@ -12,6 +12,7 @@ import {
   type ReportTemplateContext,
   type ReportTraceRow,
 } from "../template-context.ts";
+import { Temporal } from "@langwatch/time";
 
 const SLACK_DEFAULTS = {
   slackString: REPORT_TRIGGER_DEFAULTS.slackString,
@@ -44,7 +45,7 @@ function makeReportContext(traceCount: number): ReportTemplateContext {
     },
     viewUrl: "https://app.langwatch.ai/acme/traces",
     traces: Array.from({ length: traceCount }, (_, i) => makeTraceRow(i)),
-    occurredAt: new Date("2026-06-21T10:00:00.000Z"),
+    occurredAt: Temporal.Instant.from("2026-06-21T10:00:00.000Z"),
     project: { id: "proj_1", name: "Acme", slug: "acme" },
     baseHost: "https://app.langwatch.ai",
   });

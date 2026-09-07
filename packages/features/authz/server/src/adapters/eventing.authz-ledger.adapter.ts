@@ -30,7 +30,7 @@ import { liveGrants } from "../repositories/eventing/eventing.authz-live-rows.ma
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
 import { AUTHZ_AUDIT_ACTION_PREFIX, type AuthzAuditVerb } from "./eventing.authz-audit.adapter.ts";
 import { PostgresAuthzCutoverAdapter } from "./postgres.authz-cutover.adapter.ts";
-import { nowInstant } from "@langwatch/time";
+import { type Instant, Temporal, nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -192,14 +192,14 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     organizationId: string;
     actor: LedgerActor;
     verb: AuthzAuditVerb;
-    createdAt: Date;
+    createdAt: Instant;
     facts: Record<string, unknown>[];
   }): Promise<void> {
     if (facts.length === 0) return;
     try {
       await this.options.database.auditLog.createMany({
         data: facts.map((metadata) => ({
-          createdAt,
+          createdAt: toDate(createdAt),
           userId: actor.type === "user" ? actor.id : null,
           organizationId,
           action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,
@@ -441,7 +441,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       organizationId,
       actor,
       verb: "attach",
-      createdAt: new Date(occurredAtMs),
+      createdAt: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
       facts: AuthzLedgerMapper.attachAuditFacts({ fresh, source }),
     });
     await this.options.epoch.bump({ organizationId });
@@ -516,7 +516,10 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
           projectId,
           userId: resource.createdByUserId ?? null,
           visibility,
-          expiresAt: resource.expiresAtMs === undefined ? null : new Date(resource.expiresAtMs),
+          expiresAt:
+            resource.expiresAtMs === undefined
+              ? null
+              : toDate(Temporal.Instant.fromEpochMilliseconds(resource.expiresAtMs)),
           maxViews: resource.maxViews ?? null,
         },
       });
@@ -630,7 +633,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       // The same instant and reason the events above carry, so the row the
       // deny marks is byte-identical to what the queued write would state —
       // the queue's `revokedAt: null` guard makes this mark the durable one.
-      revokedAt: new Date(revokedAtMs),
+      revokedAt: Temporal.Instant.fromEpochMilliseconds(revokedAtMs),
       revokedReason: reason ?? null,
     });
     await this.options.epoch.bump({ organizationId });
@@ -885,7 +888,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       organizationId,
       actor,
       verb: "role_change",
-      createdAt: new Date(this.now()),
+      createdAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
       facts: [{ grantId: bindingId, from, to }],
     });
     await this.options.epoch.bump({ organizationId });
@@ -918,7 +921,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
         organizationId,
         actor,
         verb: "revoke",
-        createdAt: new Date(this.now()),
+        createdAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
         facts: bindingIds.map((grantId) => {
           const fact: Record<string, unknown> = { grantId };
           if (reason) fact.reason = reason;
@@ -983,7 +986,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
         organizationId,
         actor,
         verb: "revoke",
-        createdAt: new Date(this.now()),
+        createdAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
         facts,
       });
       await this.options.epoch.bump({ organizationId });
@@ -1053,7 +1056,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
         organizationId,
         actor,
         verb: "revoke",
-        createdAt: new Date(this.now()),
+        createdAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
         facts: [{ userId, revokedGrantIds }],
       });
       await this.options.epoch.bump({ organizationId });
@@ -1083,7 +1086,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       grantIds: revokedGrantIds,
       reason: "offboard",
       // Same instant and reason as the events above — see appendGrantRevocation.
-      revokedAt: new Date(offboardedAtMs),
+      revokedAt: Temporal.Instant.fromEpochMilliseconds(offboardedAtMs),
       revokedReason: `offboarded:${userId}`,
     });
     await this.options.epoch.bump({ organizationId });
@@ -1237,7 +1240,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       organizationId,
       actor,
       verb: "role_defined",
-      createdAt: new Date(occurredAtMs),
+      createdAt: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
       facts: [fact],
     });
     await this.options.epoch.bump({ organizationId });
@@ -1274,7 +1277,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
         organizationId,
         actor,
         verb: "role_deleted",
-        createdAt: new Date(this.now()),
+        createdAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
         facts: [{ roleId }],
       });
       await this.options.epoch.bump({ organizationId });

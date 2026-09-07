@@ -31,6 +31,7 @@ import {
 import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store.ts";
 import { storedObjectMetadataOf } from "../rules/stored-object-view.rules.ts";
 import { StoredObjectUploadService } from "./stored-object-upload.service.ts";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 export type StoredObjectServiceOptions = Readonly<{
   store: StoredObjectStore;
@@ -41,7 +42,7 @@ export type StoredObjectServiceOptions = Readonly<{
   maximumUploadBytes: number;
   uploadExpiryMs: number;
   cleanupBatchSize?: number;
-  now?: () => Date;
+  now?: () => Instant;
   operationId?: () => string;
 }>;
 
@@ -59,13 +60,13 @@ export class StoredObjectService extends StoredObjectServiceContract {
     return new StoredObjectService(options);
   }
 
-  private readonly now: () => Date;
+  private readonly now: () => Instant;
   private readonly operationId: () => string;
   private readonly uploads: StoredObjectUploadService;
 
   private constructor(private readonly options: StoredObjectServiceOptions) {
     super();
-    this.now = options.now ?? (() => new Date());
+    this.now = options.now ?? nowInstant;
     this.operationId = options.operationId ?? (() => `upload_${randomUUID()}`);
     this.uploads = StoredObjectUploadService.create({
       ...options,
@@ -147,7 +148,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
       return {
         id: value.id,
         generation: value.generation,
-        deletedAt: value.deletedAt.toISOString(),
+        deletedAt: toDate(value.deletedAt).toISOString(),
       };
     }
 
@@ -173,7 +174,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     return {
       id: deleted.id,
       generation: deleted.generation,
-      deletedAt: deletedAt.toISOString(),
+      deletedAt: toDate(deletedAt).toISOString(),
     };
   }
 

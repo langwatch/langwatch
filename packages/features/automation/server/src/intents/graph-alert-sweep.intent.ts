@@ -3,6 +3,7 @@ import type { GraphTriggerSweepCandidate } from "@langwatch/automation-contract"
 import { z } from "zod";
 import type { AutomationIntentRetentionPort } from "../ports/automation-intent-retention.port.ts";
 import type { AutomationScheduledIntentPort } from "../ports/automation-scheduled-intent.port.ts";
+import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automation:graph-alert-sweep");
 const SWEEP_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -18,7 +19,7 @@ export function runGraphAlertSweep(
   return async (input: z.infer<typeof graphAlertSweepIntentSchema>): Promise<void> => {
     const startedAt = input.scheduledFor;
     const candidates = await scheduledIntents.decideGraphTriggerHeartbeat({
-      now: new Date(startedAt),
+      now: Temporal.Instant.fromEpochMilliseconds(startedAt),
     });
     const failures: GraphTriggerSweepCandidate[] = [];
     for (const candidate of candidates) {

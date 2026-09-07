@@ -5,6 +5,7 @@ import {
 } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import { SLACK_BLOCK_KIT_TEMPLATES } from "../ui/elements/registry.ts";
+import { Temporal } from "@langwatch/time";
 
 /**
  * `history` is `[...previousPoints, ...currentPoints]` — oldest first, easily
@@ -15,11 +16,11 @@ import { SLACK_BLOCK_KIT_TEMPLATES } from "../ui/elements/registry.ts";
  */
 const HISTORY_POINTS = 100;
 const BREACH_VALUE = HISTORY_POINTS - 1;
-const OCCURRED_AT = new Date("2026-06-21T18:00:00.000Z");
+const OCCURRED_AT = Temporal.Instant.from("2026-06-21T18:00:00.000Z");
 
 function makeContext(): GraphAlertTemplateContext {
   const history = Array.from({ length: HISTORY_POINTS }, (_, i) => ({
-    timestamp: new Date(OCCURRED_AT.getTime() - (HISTORY_POINTS - 1 - i) * 5 * 60 * 1000),
+    timestamp: OCCURRED_AT.subtract({ milliseconds: (HISTORY_POINTS - 1 - i) * 5 * 60 * 1000 }),
     value: i,
   }));
   return buildGraphAlertTemplateContext({

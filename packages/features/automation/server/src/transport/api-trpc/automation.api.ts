@@ -529,7 +529,7 @@ export class AutomationTrpcApi {
               const counts = await ctx.app.automation.readPersistCapCounts({
                 projectId: input.projectId,
                 triggerIds: triggers.map((trigger) => trigger.id),
-                now: toDate(nowInstant()),
+                now: nowInstant(),
                 cap,
               });
               return { cap, counts };

@@ -4,6 +4,7 @@ import type {
   TriggerSummary,
   WebhookDeliveryInput,
 } from "@langwatch/automation-contract";
+import type { Instant } from "@langwatch/time";
 
 /**
  * Everything trigger settlement asks Automation for, and nothing else.
@@ -72,7 +73,7 @@ export abstract class AutomationSettlementLedgerPort {
   abstract consumePersistCapSlot(input: {
     projectId: string;
     triggerId: string;
-    now: Date;
+    now: Instant;
     cap: number;
     dedupKey: string;
   }): Promise<AutomationPersistCapDecision>;

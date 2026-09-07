@@ -68,8 +68,8 @@ describe("toAutomationActivityEntries", () => {
       ["deleted", "fired", "Deleted automation"],
       ["trace", "fired", "My automation"],
     ]);
-    expect(entries[0]?.at.toISOString()).toBe("2026-07-11T11:00:00.000Z");
-    expect(entries[1]?.at.toISOString()).toBe("2026-07-11T10:00:00.000Z");
+    expect(entries[0]?.at.toString({ fractionalSecondDigits: 3 })).toBe("2026-07-11T11:00:00.000Z");
+    expect(entries[1]?.at.toString({ fractionalSecondDigits: 3 })).toBe("2026-07-11T10:00:00.000Z");
   });
 
   /** @scenario "History distinguishes what kind of thing happened" */

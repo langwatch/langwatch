@@ -113,7 +113,7 @@ export class PrismaTriggerRepository extends TriggerRepository {
   async updateLastRunAt(input: { triggerId: string; projectId: string }): Promise<void> {
     await this.database.trigger.update({
       where: { id: input.triggerId, projectId: input.projectId },
-      data: { lastRunAt: this.clock.now().getTime() },
+      data: { lastRunAt: this.clock.now().epochMilliseconds },
     });
   }
   async findByIdOrThrow(input: { triggerId: string; projectId: string }): Promise<Trigger> {
@@ -165,7 +165,7 @@ export class PrismaTriggerRepository extends TriggerRepository {
         ...(rest.id ? { id: rest.id } : {}),
         ...rest,
         actionParams: toPrismaJsonObject(actionParams),
-        lastRunAt: input.lastRunAt?.getTime() ?? this.clock.now().getTime(),
+        lastRunAt: input.lastRunAt?.getTime() ?? this.clock.now().epochMilliseconds,
         triggerKind: input.triggerKind ?? "AUTOMATION",
         filters: toPrismaJsonObject(filters ?? {}),
         filterQuery: input.filterQuery ?? null,

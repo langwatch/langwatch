@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AuthzDatabase } from "../../authz-read.repository.ts";
 import { EventingAuthzReadRepository } from "../eventing.authz-read.repository.ts";
+import { fromDate } from "@langwatch/time";
 
 /**
  * The grants-head adapter's contract with Prisma, the mirror of
@@ -704,7 +705,7 @@ describe("EventingAuthzReadRepository", () => {
           resourceId: "trace-1",
           projectId: "proj-1",
           visibility: "PUBLIC",
-          expiresAt,
+          expiresAt: fromDate(expiresAt),
           maxViews: 5,
           viewCount: 3,
         },

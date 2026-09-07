@@ -6,6 +6,7 @@ import {
   buildGraphAlertTemplateContext,
   type GraphAlertTemplateContext,
 } from "../template-context.ts";
+import { Temporal } from "@langwatch/time";
 
 function makeContext(
   overrides: Partial<Parameters<typeof buildGraphAlertTemplateContext>[0]> = {},
@@ -16,7 +17,7 @@ function makeContext(
     metric: { label: "Latency p95", seriesName: "0/duration/p95" },
     condition: { operator: "gt", threshold: 500, timePeriodMinutes: 60 },
     currentValue: 712,
-    occurredAt: new Date("2026-06-21T10:00:00.000Z"),
+    occurredAt: Temporal.Instant.from("2026-06-21T10:00:00.000Z"),
     reason: "real-time",
     project: { id: "proj_1", name: "Acme", slug: "acme" },
     baseHost: "https://app.langwatch.ai",

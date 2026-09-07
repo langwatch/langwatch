@@ -21,6 +21,7 @@ import {
   organizationOf,
 } from "@langwatch/api/rest";
 import { optimisticBindingWire } from "../../rules/role-binding-read-back.rules.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** The handler context: the framework's variables plus the family's provider. */
 type RoleBindingsContext = OrganizationScopedContext<
@@ -228,7 +229,7 @@ export function createRoleBindingsRestApp(options: {
         customRoleId: input.customRoleId,
         scopeType: input.scopeType,
         scopeId: input.scopeId,
-        now: () => new Date(),
+        now: nowInstant,
       });
     return {
       ...binding,

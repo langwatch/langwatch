@@ -18,6 +18,8 @@ import type {
 import type { AutomationPersistCapBreach } from "./runaway.ts";
 import type { AutomationPersistCapCount, AutomationPersistCapDecision } from "./persist-cap.ts";
 import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire.ts";
+import type { Instant } from "@langwatch/time";
+
 export abstract class AutomationService {
   abstract validateTemplateDraft(input: TestFireTemplateDraft): void;
   abstract testFire(input: TestFireInput): Promise<TestFireResult>;
@@ -26,20 +28,22 @@ export abstract class AutomationService {
     projectId: string;
     reason: GraphTriggerEvaluationReason;
   }): Promise<GraphTriggerEvaluationResult>;
-  abstract decideGraphTriggerHeartbeat(input: { now: Date }): Promise<GraphTriggerSweepCandidate[]>;
+  abstract decideGraphTriggerHeartbeat(input: {
+    now: Instant;
+  }): Promise<GraphTriggerSweepCandidate[]>;
   abstract handlePersistCapBreach(input: AutomationPersistCapBreach): Promise<void>;
   abstract resolvePersistDailyCap(projectId: string): Promise<number>;
   abstract consumePersistCapSlot(input: {
     projectId: string;
     triggerId: string;
-    now: Date;
+    now: Instant;
     cap: number;
     dedupKey: string;
   }): Promise<AutomationPersistCapDecision>;
   abstract readPersistCapCounts(input: {
     projectId: string;
     triggerIds: readonly string[];
-    now: Date;
+    now: Instant;
     cap: number;
   }): Promise<Record<string, AutomationPersistCapCount>>;
   abstract getById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
@@ -100,8 +104,8 @@ export abstract class AutomationService {
     triggerId: string;
     traceId?: string | null;
     customGraphId?: string | null;
-    createdAt: Date;
-    resolvedAt?: Date | null;
+    createdAt: Instant;
+    resolvedAt?: Instant | null;
   }): Promise<TriggerFire>;
   abstract getSuppressions(input: { projectId: string }): Promise<EmailSuppression[]>;
   abstract getAllEnriched(input: {
@@ -141,5 +145,5 @@ export abstract class AutomationService {
     triggerId: string;
     limit: number;
   }): Promise<WebhookDeliveryRow[]>;
-  abstract pruneWebhookDeliveries(now?: Date): Promise<number>;
+  abstract pruneWebhookDeliveries(now?: Instant): Promise<number>;
 }

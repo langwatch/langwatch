@@ -112,7 +112,7 @@ export class GraphAlertDispatchService {
       return emptyResult("email");
     }
 
-    const now = fromDate(this.clock.now());
+    const now = this.clock.now();
     const hourly = await this.emailCaps.consumeHourly({
       projectId: input.project.id,
       triggerId: input.trigger.id,
@@ -248,7 +248,7 @@ export class GraphAlertDispatchService {
       url: params.url,
       method: params.method,
       headers: this.webhooks.decryptHeaders(params),
-      signingSecrets: this.webhooks.decryptSigningSecrets(params, fromDate(this.clock.now())),
+      signingSecrets: this.webhooks.decryptSigningSecrets(params, this.clock.now()),
       body: rendered.body,
       triggerName: input.trigger.name,
     });

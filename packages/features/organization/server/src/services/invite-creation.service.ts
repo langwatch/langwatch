@@ -25,7 +25,7 @@ import type { OrganizationInviteMailPort } from "../ports/invite.port.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
 import { InviteService } from "./invite.service.ts";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 import {
   INVITE_BATCH_TXN_MAX_WAIT_MS,
   INVITE_BATCH_TXN_TIMEOUT_MS,
@@ -217,7 +217,7 @@ export class InviteCreationService {
     return this.invites.createPendingInvite({
       email: input.email,
       inviteCode: nanoid(),
-      expiration: new Date(nowInstant().epochMilliseconds + INVITE_EXPIRATION_MS),
+      expiration: toDate(nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS })),
       organizationId: input.organizationId,
       teamIds: input.teamIds,
       ...(input.teamAssignments && input.teamAssignments.length > 0

@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { AggregateSearchResult } from "@langwatch/ops-contract";
 import type { EventExplorerRepository } from "../repositories/event-explorer.repository.ts";
 import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
+import { toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:event-explorer");
 
@@ -45,7 +46,7 @@ export class EventExplorerService {
     }
 
     const aggregateTypes = [...new Set(selected.map((p) => p.aggregateType))];
-    const sinceMs = new Date(params.since).getTime();
+    const sinceMs = toEpochMs(params.since);
 
     const rows = await this.repo.findAggregates({
       aggregateTypes,

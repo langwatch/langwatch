@@ -5,6 +5,7 @@ import type {
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
 import type { StoredObjectStorageAddress } from "../ports/stored-object.port.ts";
+import type { Instant } from "@langwatch/time";
 
 export type StoredObjectSource = "canonical" | "imported";
 
@@ -23,13 +24,13 @@ export type StoredObjectRecord = Readonly<{
   storage: StoredObjectStorageAddress | null;
   generation: number;
   audiences: readonly StoredObjectDeliveryAudience[];
-  expiresAt: Date | null;
-  availableAt: Date | null;
-  deletedAt: Date | null;
+  expiresAt: Instant | null;
+  availableAt: Instant | null;
+  deletedAt: Instant | null;
   source: StoredObjectSource;
   legacyFingerprint: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 }>;
 
 /** One persistence boundary for the single StoredObject table. */
@@ -50,7 +51,7 @@ export abstract class StoredObjectStore {
     tenantId: StoredObjectProjectId;
     afterId?: StoredObjectId;
     status?: StoredObjectLifecycleStatus;
-    expiresBefore?: Date;
+    expiresBefore?: Instant;
     limit: number;
   }): Promise<StoredObjectRecord[]>;
 }

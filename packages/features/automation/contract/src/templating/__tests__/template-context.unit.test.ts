@@ -4,6 +4,7 @@ import {
   buildReportTemplateContext,
   buildTemplateContext,
 } from "../template-context.ts";
+import { Temporal } from "@langwatch/time";
 
 const baseArgs = {
   trigger: {
@@ -53,8 +54,8 @@ describe("buildTemplateContext", () => {
 
   describe("when given a digest window", () => {
     it("serializes the bounds to ISO strings", () => {
-      const start = new Date("2026-05-29T00:00:00.000Z");
-      const end = new Date("2026-05-29T01:00:00.000Z");
+      const start = Temporal.Instant.from("2026-05-29T00:00:00.000Z");
+      const end = Temporal.Instant.from("2026-05-29T01:00:00.000Z");
       const ctx = buildTemplateContext({
         ...baseArgs,
         matches: [{ traceId: "a" }],
@@ -102,7 +103,7 @@ describe("buildGraphAlertTemplateContext", () => {
         metric: { label: "Trace count", seriesName: "0/trace_id/cardinality" },
         condition: { operator: "gt", threshold: 10, timePeriodMinutes: 30 },
         currentValue: 12,
-        occurredAt: new Date("2026-05-29T00:00:00.000Z"),
+        occurredAt: Temporal.Instant.from("2026-05-29T00:00:00.000Z"),
         reason: "real-time",
         project: { id: "proj_1", name: "Acme", slug: "acme" },
         baseHost: "https://app.langwatch.ai",
@@ -124,7 +125,7 @@ describe("buildReportTemplateContext", () => {
           scheduleLabel: "every Monday at 09:00 (UTC)",
         },
         viewUrl: "https://app.langwatch.ai/acme/traces",
-        occurredAt: new Date("2026-05-29T00:00:00.000Z"),
+        occurredAt: Temporal.Instant.from("2026-05-29T00:00:00.000Z"),
         project: { id: "proj_1", name: "Acme", slug: "acme" },
         baseHost: "https://app.langwatch.ai",
       });

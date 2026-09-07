@@ -17,6 +17,7 @@ import {
   type QueueMigrationBlocker,
 } from "../object-storage-migration.service.ts";
 import { createMigrationStorageEndpoint } from "../../rules/object-storage-migration-transfer.rules.ts";
+import { Temporal } from "@langwatch/time";
 
 class MemoryDriver implements StoredObjectStorageDriver {
   readonly objects = new Map<string, Buffer>();
@@ -132,7 +133,7 @@ const setup = ({
     auditQueues: async () => queueBlockers,
     writesPaused: () => writesPaused,
     readsPaused: () => readsPaused,
-    now: () => new Date("2026-02-01T00:00:00.000Z"),
+    now: () => Temporal.Instant.from("2026-02-01T00:00:00.000Z"),
   });
   return {
     migration,

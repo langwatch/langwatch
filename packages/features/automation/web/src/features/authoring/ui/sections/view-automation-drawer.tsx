@@ -10,7 +10,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { differenceInMinutes, differenceInSeconds } from "@langwatch/time";
+import {
+  type TimeInput,
+  differenceInMinutes,
+  differenceInSeconds,
+  toEpochMs,
+} from "@langwatch/time";
 import { parseAutomationFiltersWire } from "@langwatch/automation-contract";
 import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";
@@ -45,7 +50,7 @@ interface ViewAutomationDrawerProps {
  * ("resolved after 15m"). Sub-minute incidents show seconds so a fast
  * recovery doesn't read as "resolved after 0m".
  */
-function formatDurationBetween(from: Date, to: Date): string {
+function formatDurationBetween(from: TimeInput, to: TimeInput): string {
   const minutes = differenceInMinutes(to, from);
   if (minutes < 1) return `${Math.max(differenceInSeconds(to, from), 1)}s`;
   if (minutes < 60) return `${minutes}m`;
@@ -302,7 +307,7 @@ type RecentFire = RouterOutputs["automation"]["getRecentFires"][number];
 function RecentFiresList({ fires, isGraphAlert }: { fires: RecentFire[]; isGraphAlert: boolean }) {
   const rows = isGraphAlert
     ? fires.map((fire) => {
-        const firedAt = new Date(fire.createdAt);
+        const firedAt = toEpochMs(fire.createdAt);
         const open = !fire.resolvedAt;
         return {
           key: fire.id,
@@ -310,9 +315,9 @@ function RecentFiresList({ fires, isGraphAlert }: { fires: RecentFire[]; isGraph
           label: open ? "Firing" : "Resolved",
           detail: open
             ? "still firing"
-            : `${formatTimeAgo(firedAt.getTime())} · lasted ${formatDurationBetween(
+            : `${formatTimeAgo(firedAt)} · lasted ${formatDurationBetween(
                 firedAt,
-                new Date(fire.resolvedAt!),
+                toEpochMs(fire.resolvedAt!),
               )}`,
           detailColor: open ? "red.fg" : "fg.muted",
         };
@@ -364,7 +369,7 @@ function RecentFiresList({ fires, isGraphAlert }: { fires: RecentFire[]; isGraph
 function groupFiresByLabel(fires: RecentFire[]): { key: string; label: string; count: number }[] {
   const groups: { key: string; label: string; count: number }[] = [];
   for (const fire of fires) {
-    const label = formatTimeAgo(new Date(fire.createdAt).getTime()) ?? "";
+    const label = formatTimeAgo(toEpochMs(fire.createdAt)) ?? "";
     const last = groups[groups.length - 1];
     if (last && last.label === label) last.count++;
     else groups.push({ key: fire.id, label, count: 1 });
@@ -480,7 +485,7 @@ function DeliveryAttemptRow({
         </Text>
         <Text textStyle="xs" color="fg.muted" flexShrink={0} whiteSpace="nowrap">
           {attempt.latencyMs != null ? `${attempt.latencyMs}ms · ` : ""}
-          {formatTimeAgo(new Date(attempt.firedAt).getTime())}
+          {formatTimeAgo(toEpochMs(attempt.firedAt))}
         </Text>
       </HStack>
       {open && hasDetail ? (

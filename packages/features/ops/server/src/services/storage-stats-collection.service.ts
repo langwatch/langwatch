@@ -6,6 +6,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { StorageStatsMetricsPort } from "../ports/storage-stats-metrics.port.ts";
+import { toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:storage-stats");
 
@@ -244,7 +245,7 @@ export class StorageStatsCollectionService {
       return;
     }
 
-    const succeededAtSeconds = new Date(row.last_success_time).getTime() / 1000;
+    const succeededAtSeconds = toEpochMs(row.last_success_time) / 1000;
     if (!Number.isFinite(succeededAtSeconds) || succeededAtSeconds <= 0) {
       return;
     }

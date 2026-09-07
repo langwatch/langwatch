@@ -5,6 +5,7 @@ import {
   type ImpersonationTarget,
   type ImpersonationWindow,
 } from "../../services/impersonation.service.ts";
+import { fromDate, toDate } from "@langwatch/time";
 
 export type AdminDatabase = PrismaClient;
 
@@ -39,9 +40,10 @@ export class PrismaImpersonationRepository extends ImpersonationRepository {
     });
     if (!row) return null;
 
-    const { orgMemberships, ...target } = row;
+    const { orgMemberships, deactivatedAt, ...target } = row;
     return {
       ...target,
+      deactivatedAt: deactivatedAt ? fromDate(deactivatedAt) : null,
       mfaRequiredOrganizationSlugs: orgMemberships.map(
         (membership) => membership.organization.slug,
       ),
@@ -62,7 +64,7 @@ export class PrismaImpersonationRepository extends ImpersonationRepository {
       data: {
         impersonating: {
           ...window,
-          expires: window.expires.toISOString(),
+          expires: toDate(window.expires).toISOString(),
         },
       },
     });

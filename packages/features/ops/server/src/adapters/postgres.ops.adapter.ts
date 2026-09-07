@@ -39,12 +39,13 @@ import {
   PrismaSchedulerAuditRepository,
   type SchedulerAuditDatabase,
 } from "../repositories/prisma/prisma.scheduler-audit.repository.ts";
+import type { Instant } from "@langwatch/time";
 
 export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   database: AdminDatabase & SchedulerAuditDatabase;
   audit: AdminAuditSink;
   access?: AdminAccess | undefined;
-  now?: (() => Date) | undefined;
+  now?: (() => Instant) | undefined;
   redis?: IORedis | Cluster | undefined;
   queuePayloads?: QueuePayloadDecoderPort | undefined;
   users: UserService;

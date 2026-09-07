@@ -3,6 +3,7 @@
 import type { AuthzCustomRole } from "@langwatch/authz-contract";
 import type {
   CustomRole,
+  EnrichedAuditLog as ContractEnrichedAuditLog,
   Organization,
   OrganizationIntent,
   OrganizationUser,
@@ -106,7 +107,7 @@ export interface OrganizationProvisioningSummary {
   id: string;
   name: string;
   slug: string;
-  createdAt: Date;
+  createdAt: Organization["createdAt"];
 }
 
 /**
@@ -140,7 +141,7 @@ export interface AuditLogFilters {
  */
 export interface EnrichedAuditLog {
   id: string;
-  createdAt: Date;
+  createdAt: ContractEnrichedAuditLog["createdAt"];
   /** Nullable to support system-actor writes (background jobs, migrations). */
   userId: string | null;
   organizationId: string | null;
@@ -174,9 +175,9 @@ export interface OrganizationMemberSummary {
   userId: string;
   organizationId: string;
   role: OrganizationUserRole;
-  disabledAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  disabledAt: OrganizationUser["disabledAt"];
+  createdAt: OrganizationUser["createdAt"];
+  updatedAt: OrganizationUser["updatedAt"];
   user: { id: string; name: string | null; email: string | null };
 }
 

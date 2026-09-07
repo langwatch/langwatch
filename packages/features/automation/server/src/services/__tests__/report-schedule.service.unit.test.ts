@@ -7,7 +7,7 @@ import type {
   TriggerRepository,
 } from "../../repositories/trigger.repository.ts";
 import { ReportScheduleService } from "../report-schedule.service.ts";
-import { Temporal, type Instant } from "@langwatch/time";
+import { type Instant, Temporal } from "@langwatch/time";
 
 /** Only the one read the reconcile sweep makes; the rest is not this test's subject. */
 function reportTargets(rows: ReportScheduleTarget[]): TriggerRepository {
@@ -15,8 +15,8 @@ function reportTargets(rows: ReportScheduleTarget[]): TriggerRepository {
 }
 
 class Clock extends AutomationClockPort {
-  now(): Date {
-    return new Date("2026-01-01T08:00:00Z");
+  now(): Instant {
+    return Temporal.Instant.from("2026-01-01T08:00:00Z");
   }
 }
 class Wake extends SchedulerWakePort {

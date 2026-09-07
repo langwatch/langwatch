@@ -7,6 +7,8 @@
 
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import { type Instant, toDate } from "@langwatch/time";
+import { readableDate } from "./display-formatters.ts";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
@@ -64,7 +66,7 @@ export const AUDIT_LOG_CSV_FIELDS = [
 /** One report row, in the column order above. */
 export function auditLogCsvRow(log: EnrichedAuditLog): string[] {
   return [
-    new Date(log.createdAt).toISOString(),
+    readableDate(log.createdAt).toISOString(),
     log.source ?? "platform",
     log.user?.name ?? "",
     log.user?.email ?? "",
@@ -93,8 +95,8 @@ export function auditLogCsvTable(logs: readonly EnrichedAuditLog[]): {
 }
 
 /** What the saved file is called. Dated so two exports never collide. */
-export function auditLogFileName(now: Date): string {
-  return `audit_logs_${now.toISOString().split("T")[0]}.csv`;
+export function auditLogFileName(now: Instant): string {
+  return `audit_logs_${toDate(now).toISOString().split("T")[0]}.csv`;
 }
 
 /**

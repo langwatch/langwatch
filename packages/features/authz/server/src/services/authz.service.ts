@@ -66,6 +66,7 @@ import { AuthzGrantSnapshotService } from "./authz-grant-snapshot.service.ts";
 import { AuthzScopeLineageService } from "./authz-scope-lineage.service.ts";
 import { AuthzIdDecisionsService } from "./authz-id-decisions.service.ts";
 import { AuthzPermissionGateService } from "./authz-permission-gate.service.ts";
+import type { Instant } from "@langwatch/time";
 
 const decisions = createLogger("langwatch:authz:decisions");
 
@@ -105,7 +106,7 @@ export type AuthzServiceOptions = {
    */
   isOnEngine: (organizationId: string) => Promise<boolean>;
   /** Finalized cutover time used by compatibility fact minting. */
-  tryGetEngineCutoverAt?: (organizationId: string) => Promise<Date | null>;
+  tryGetEngineCutoverAt?: (organizationId: string) => Promise<Instant | null>;
 };
 
 export class AuthzService extends AuthzServiceContract {
@@ -203,7 +204,7 @@ export class AuthzService extends AuthzServiceContract {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<Date | null> {
+  }): Promise<Instant | null> {
     return this.options.tryGetEngineCutoverAt?.(organizationId) ?? null;
   }
 

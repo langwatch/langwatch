@@ -10,6 +10,7 @@ import {
   AutomationPersistCapService,
   AutomationTraceRecordUnavailableError,
 } from "@langwatch/automation-server";
+import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-server";
 import { PLAN_LIMITS, PlanTypes } from "@langwatch/enterprise-billing-contract";
 import { PlanLimitsPlanCatalogueAdapter } from "@langwatch/enterprise-billing-server";
 import { PlanNextStepService } from "@langwatch/entitlement-server";
@@ -24,6 +25,7 @@ import {
   WorkerAutomationSettlementAbsenceReportPort,
 } from "../worker-automation-settlement.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
+import { type Instant, Temporal } from "@langwatch/time";
 
 /**
  * Spec: specs/automations/worker-automation-settlement-conversion.feature
@@ -147,8 +149,8 @@ class RecordingAbsence extends WorkerAutomationSettlementAbsenceReportPort {
 }
 
 class FrozenClock extends AutomationClockPort {
-  now(): Date {
-    return new Date("2026-01-02T03:04:05.000Z");
+  now(): Instant {
+    return Temporal.Instant.from("2026-01-02T03:04:05.000Z");
   }
 }
 
@@ -579,27 +581,36 @@ function recordingDatasets() {
  */
 function recordingAnnotations(heldTraceIds: readonly string[]) {
   return {
-    annotations: {
-      assertAnnotatorReferences: async (input: {
-        projectId: string;
-        queueIds: string[];
-        userIds: string[];
-      }) => {
-        RECORDED.annotatorChecks.push(input);
-      },
-      createQueueItems: async (input: {
-        projectId: string;
-        traceIds: string[];
-        queueIds: string[];
-        userIds: string[];
-        createdByUserId: string;
-      }) => {
-        RECORDED.queueItems.push(input);
-      },
-    },
-    findExistingTraceIds: async (input: { projectId: string; traceIds: string[] }) => {
-      RECORDED.existenceChecks.push({ projectId: input.projectId, traceIds: [...input.traceIds] });
-      return input.traceIds.filter((traceId) => heldTraceIds.includes(traceId));
+    queueTraces: async (input: {
+      projectId: string;
+      traceIds: readonly string[];
+      annotators: readonly string[];
+      userId: string;
+    }) => {
+      const queueIds: string[] = [];
+      const userIds: string[] = [];
+      for (const annotator of input.annotators) {
+        if (annotator.startsWith("user-")) {
+          userIds.push(annotator.slice("user-".length));
+        } else if (annotator.startsWith("queue-")) {
+          queueIds.push(annotator.slice("queue-".length));
+        } else {
+          throw new AnnotationAnnotatorReferenceInvalidError(annotator);
+        }
+      }
+      RECORDED.annotatorChecks.push({ projectId: input.projectId, queueIds, userIds });
+      const existingTraceIds = await (async () => {
+        const traceIds = [...input.traceIds];
+        RECORDED.existenceChecks.push({ projectId: input.projectId, traceIds });
+        return traceIds.filter((traceId) => heldTraceIds.includes(traceId));
+      })();
+      RECORDED.queueItems.push({
+        projectId: input.projectId,
+        traceIds: existingTraceIds,
+        queueIds,
+        userIds,
+        createdByUserId: input.userId,
+      });
     },
   } as never;
 }

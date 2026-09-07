@@ -16,6 +16,7 @@ import type {
   StoredScopeTier,
   TeamUserRole,
 } from "@langwatch/authz-contract";
+import { type Instant, Temporal } from "@langwatch/time";
 
 /** The single permission a share link has ever conferred (ADR-057) - the one
  *  spelling every minter and every importer of a share-link grant uses
@@ -85,9 +86,9 @@ export interface GrantRowShape {
   resourceKind: string | null;
   projectId: string | null;
   createdByUserId: string | null;
-  expiresAt: Date | null;
+  expiresAt: Instant | null;
   maxViews: number | null;
-  occurredAt: Date;
+  occurredAt: Instant;
 }
 
 export interface RoleRowShape {
@@ -97,7 +98,7 @@ export interface RoleRowShape {
   description: string | null;
   permissions: string[];
   kind: string;
-  occurredAt: Date;
+  occurredAt: Instant;
 }
 
 export interface CompatBindingRowShape {
@@ -238,9 +239,12 @@ export class AuthzGrantMapper {
       resourceKind: grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
       projectId: grant.resource?.projectId ?? null,
       createdByUserId: grant.resource?.createdByUserId ?? null,
-      expiresAt: grant.resource?.expiresAtMs != null ? new Date(grant.resource.expiresAtMs) : null,
+      expiresAt:
+        grant.resource?.expiresAtMs != null
+          ? Temporal.Instant.fromEpochMilliseconds(grant.resource.expiresAtMs)
+          : null,
       maxViews: grant.resource?.maxViews ?? null,
-      occurredAt: new Date(grant.occurredAtMs),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(grant.occurredAtMs),
     };
   }
 
@@ -255,7 +259,7 @@ export class AuthzGrantMapper {
       roleKey: row.roleKey,
       scope: { type: row.scopeType as LedgerScopeType, id: row.scopeId },
       source: row.source as GrantEventSource,
-      occurredAtMs: row.occurredAt.getTime(),
+      occurredAtMs: row.occurredAt.epochMilliseconds,
     };
     if (row.legacyRole != null) {
       fact.legacyRole = row.legacyRole as LegacyBindingRole;
@@ -277,7 +281,7 @@ export class AuthzGrantMapper {
       if (row.createdByUserId != null) {
         resource.createdByUserId = row.createdByUserId;
       }
-      if (row.expiresAt != null) resource.expiresAtMs = row.expiresAt.getTime();
+      if (row.expiresAt != null) resource.expiresAtMs = row.expiresAt.epochMilliseconds;
       if (row.maxViews != null) resource.maxViews = row.maxViews;
       fact.resource = resource;
     }
@@ -298,7 +302,7 @@ export class AuthzGrantMapper {
       description: role.description ?? null,
       permissions: role.permissions,
       kind: role.kind,
-      occurredAt: new Date(role.occurredAtMs),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(role.occurredAtMs),
     };
   }
 
@@ -308,7 +312,7 @@ export class AuthzGrantMapper {
       name: row.name,
       permissions: row.permissions,
       kind: row.kind as RoleFact["kind"],
-      occurredAtMs: row.occurredAt.getTime(),
+      occurredAtMs: row.occurredAt.epochMilliseconds,
     };
     if (row.description != null) fact.description = row.description;
     return fact;

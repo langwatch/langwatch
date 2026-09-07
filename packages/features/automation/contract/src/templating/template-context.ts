@@ -1,4 +1,5 @@
 import type { AlertType } from "../trigger.ts";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 /**
  * The single variable contract every trigger-notification template renders
@@ -307,15 +308,15 @@ export function buildGraphAlertTemplateContext({
     timePeriodMinutes: number;
   };
   currentValue: number;
-  occurredAt: Date;
+  occurredAt: Instant;
   reason: GraphAlertTemplateContext["reason"];
   /** Recent buckets around the alert window (chronological). Optional so
    *  callers without timeseries access (preview, test-fire) can omit it. */
-  history?: Array<{ timestamp: Date | string; value: number }>;
+  history?: Array<{ timestamp: Instant | string; value: number }>;
   /** Aggregated value over the window preceding the alert window. */
   previousValue?: number | null;
   /** Incident window appended to `graph.url` as `startDate`/`endDate`. */
-  window?: { start: Date; end: Date };
+  window?: { start: Instant; end: Instant };
   project: { id: string; name: string; slug: string };
   baseHost: string;
 }): GraphAlertTemplateContext {
@@ -326,11 +327,11 @@ export function buildGraphAlertTemplateContext({
     graphId: graph.id,
   });
   const graphUrl = window
-    ? `${baseGraphUrl}?startDate=${encodeURIComponent(window.start.toISOString())}&endDate=${encodeURIComponent(window.end.toISOString())}`
+    ? `${baseGraphUrl}?startDate=${encodeURIComponent(toDate(window.start).toISOString())}&endDate=${encodeURIComponent(toDate(window.end).toISOString())}`
     : baseGraphUrl;
   const historyPoints: GraphAlertHistoryPoint[] = (history ?? []).map((point) => ({
     timestamp:
-      typeof point.timestamp === "string" ? point.timestamp : point.timestamp.toISOString(),
+      typeof point.timestamp === "string" ? point.timestamp : toDate(point.timestamp).toISOString(),
     value: point.value,
   }));
   return {
@@ -362,7 +363,7 @@ export function buildGraphAlertTemplateContext({
       timePeriodLabel: timePeriodLabel(condition.timePeriodMinutes),
     },
     currentValue,
-    occurredAt: occurredAt.toISOString(),
+    occurredAt: toDate(occurredAt).toISOString(),
     reason,
     history: historyPoints,
     sparkline: buildSparkline(historyPoints.map((point) => point.value)),
@@ -405,9 +406,9 @@ export function buildExampleGraphAlertTemplateContext({
     timePeriodMinutes?: number;
   };
 }): GraphAlertTemplateContext {
-  const occurredAt = new Date();
+  const occurredAt = nowInstant();
   const exampleHistory = [4, 5, 4, 6, 7, 9, 12].map((value, i) => ({
-    timestamp: new Date(occurredAt.getTime() - (6 - i) * 5 * 60 * 1000),
+    timestamp: occurredAt.subtract({ milliseconds: (6 - i) * 5 * 60 * 1000 }),
     value,
   }));
   return buildGraphAlertTemplateContext({
@@ -466,7 +467,7 @@ export function buildTemplateContext({
   project: { name: string; slug: string };
   baseHost: string;
   matches: TemplateMatchInput[];
-  window?: { start?: Date | null; end?: Date | null };
+  window?: { start?: Instant | null; end?: Instant | null };
 }): TemplateContext {
   const mapped: TemplateMatchVars[] = matches.map((match) => ({
     trace: {
@@ -499,8 +500,8 @@ export function buildTemplateContext({
     },
     digest: {
       count: matches.length,
-      windowStart: window?.start ? window.start.toISOString() : null,
-      windowEnd: window?.end ? window.end.toISOString() : null,
+      windowStart: window?.start ? toDate(window.start).toISOString() : null,
+      windowEnd: window?.end ? toDate(window.end).toISOString() : null,
     },
     match: mapped[0] ?? null,
     matches: mapped,
@@ -651,7 +652,7 @@ export function buildExampleReportTemplateContext({
   /** Real panel names when the author has already picked a graph/dashboard. */
   chartTitles?: string[];
 }): ReportTemplateContext {
-  const occurredAt = new Date();
+  const occurredAt = nowInstant();
   const projectSlug = project.slug;
   const exampleTraces: ReportTraceRow[] =
     sourceKind === "traceQuery"
@@ -686,7 +687,9 @@ export function buildExampleReportTemplateContext({
         ].map((trace, index) => ({
           ...trace,
           url: `${baseHost}/${projectSlug}/traces/${trace.traceId}`,
-          timestamp: new Date(occurredAt.getTime() - (index + 1) * 60 * 60 * 1000).toISOString(),
+          timestamp: toDate(
+            occurredAt.subtract({ milliseconds: (index + 1) * 60 * 60 * 1000 }),
+          ).toISOString(),
           status: trace.status as ReportTraceRow["status"],
         }))
       : [];
@@ -775,7 +778,7 @@ export function buildReportTemplateContext({
   viewUrl: string;
   traces?: ReportTraceRow[];
   charts?: ReportChart[];
-  occurredAt: Date;
+  occurredAt: Instant;
   project: { id: string; name: string; slug: string };
   baseHost: string;
 }): ReportTemplateContext {
@@ -804,7 +807,7 @@ export function buildReportTemplateContext({
     traces,
     charts,
     rows: traces.map(formatReportRowLine),
-    occurredAt: occurredAt.toISOString(),
+    occurredAt: toDate(occurredAt).toISOString(),
     project: {
       id: project.id,
       name: project.name,

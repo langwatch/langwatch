@@ -11,7 +11,8 @@ import {
   PrismaTenancyGuardService,
   type PrismaConnection,
 } from "@langwatch/prisma-client";
-import type { BugReport, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { BugReport } from "@langwatch/ops-contract";
 import type { ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";

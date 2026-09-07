@@ -19,7 +19,7 @@ import {
   type InviteServiceDependencies,
 } from "../rules/invite-contracts.rules.ts";
 import { InviteCreationService } from "./invite-creation.service.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:invites:lifecycle");
 
@@ -64,7 +64,7 @@ export class InviteLifecycleService {
     }
 
     const freshCode = nanoid();
-    const freshExpiration = new Date(nowInstant().epochMilliseconds + INVITE_EXPIRATION_MS);
+    const freshExpiration = toDate(nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS }));
     const claimed = await this.invites.rotateInviteCode({
       inviteId: existing.id,
       organizationId,
@@ -233,7 +233,7 @@ export class InviteLifecycleService {
       const updatedInvite = await this.invites.approvePaymentPendingInvite({
         inviteId: invite.id,
         organizationId,
-        expiration: new Date(nowInstant().epochMilliseconds + INVITE_EXPIRATION_MS),
+        expiration: toDate(nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS })),
       });
 
       if (invite.organization) {

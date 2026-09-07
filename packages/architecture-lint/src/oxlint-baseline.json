@@ -9246,134 +9246,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/authz/contract/src/authz.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/adapters/eventing.authz-audit.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/adapters/eventing.authz-ledger.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/projections/authz-grant.projection.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/repositories/authz-read.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/repositories/eventing/eventing.authz-listing.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/repositories/eventing/eventing.authz-read.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/rules/role-binding-read-back.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/services/authz-collector.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/services/authz.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/transport/api-rest/role-binding.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/contract/src/automation.queries.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/contract/src/automation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/contract/src/report.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/contract/src/templating/template-context.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/contract/src/trigger-policies.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/app/automation.app.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/fixtures/graph-activity.fixture.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/intents/graph-alert-sweep.intent.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/ports/automation-clock.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/ports/automation-scheduled-intent.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/ports/automation-settlement-ledger.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/repositories/webhook-delivery.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/services/automation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/services/graph-trigger-heartbeat.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/services/trigger-graph.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/web/src/behavior/automation-api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/web/src/features/authoring/ui/sections/view-automation-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/web/src/features/overview/ui/elements/automation-history.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/web/src/features/overview/ui/elements/automation-table-cells.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/web/src/model/relative-time.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/web/src/screens/automations/automations.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/gateway/contract/src/gateway-cache-rule.ts",
       "measured": "2026-09-06"
     },
@@ -9582,27 +9454,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/ops/contract/src/ops-bug-report.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/contract/src/ops-snapshot.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/app/ops.app.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/ports/ops-worker.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/ops/server/src/ports/scheduler-audit-sink.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/repositories/admin-backoffice.repository.ts",
       "measured": "2026-09-06"
     },
     {
@@ -9610,35 +9462,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/ops/server/src/rules/system-migration-support.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/admin-backoffice.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/event-explorer.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/impersonation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/ops-snapshot-reader.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/ops/server/src/services/scheduler-ops.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/storage-stats-collection.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/usage-stats-collection.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -9647,82 +9471,6 @@
     },
     {
       "key": "temporal-only|packages/features/organization/contract/src/organization.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/ports/organization.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/repositories/organization-invite.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/repositories/organization-membership.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/repositories/team.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/rules/invite-display-status.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/services/invite-creation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/services/invite-lifecycle.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/services/organization-membership.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/transport/api-rest/organization-provisioning.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/transport/api-rest/organization.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/transport/api-rest/team.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/transport/api-trpc/join-request.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/transport/api-trpc/organization.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/web/src/behavior/organization-api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/web/src/model/audit-log-export.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/web/src/model/audit-period.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/web/src/screens/organization/audit-log.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/web/src/ui/blocks/join-requests-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/web/src/ui/sections/invites-table.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -9967,50 +9715,6 @@
     },
     {
       "key": "temporal-only|packages/features/scenario/web/src/ui/sections/use-scenario-target.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/adapters/azure-blob.stored-object-driver.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/migrations/clickhouse-import.stored-object.migration.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/ports/stored-object.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/repositories/clickhouse/stored-objects.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/services/object-storage-migration.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/services/stored-object-upload.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/services/stored-object.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/services/stored-objects.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/stores/postgres/postgres.stored-object.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/stores/stored-object.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/testing.ts",
       "measured": "2026-09-06"
     },
     {

@@ -159,7 +159,7 @@ export function createAdminRestApp(options: {
     if (!authSession) throw new AdminSessionExpiredError();
 
     if (method === "DELETE") {
-      await ops.operations.stopImpersonation({ sessionId: authSession.id });
+      await ops.stopImpersonation({ sessionId: authSession.id });
       return c.json({ message: "Impersonation ended" });
     }
 
@@ -178,7 +178,7 @@ export function createAdminRestApp(options: {
       });
     }
 
-    await ops.operations.startImpersonation({
+    await ops.startImpersonation({
       sessionId: authSession.id,
       impersonatorUserId: user.id,
       userIdToImpersonate,
@@ -219,7 +219,7 @@ export function createAdminRestApp(options: {
       });
     }
 
-    const result = await ops.operations.adminOperation({
+    const result = await ops.adminOperation({
       ...parsed.data,
       actorId: user.id,
       req: auditRequestFrom(c.req.raw),

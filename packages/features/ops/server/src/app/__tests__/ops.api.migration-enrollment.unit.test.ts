@@ -9,6 +9,7 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -93,23 +94,28 @@ const router = OpsTrpcApi.create(
  */
 function buildApp(): OpsApp {
   return OpsApp.create({
-    ops: {} as OpsCapability,
-    featureFlags: {} as FeatureFlagService,
-    projects: { searchByQuery: async () => [] },
-    eventingIntrospection: new (class extends OpsEventingIntrospectionPort {
-      projections() {
-        return [];
-      }
-      killSwitches() {
-        return [];
-      }
-      processManagers() {
-        return [];
-      }
-      dejaViewProjections() {
-        return [];
-      }
-    })(),
+    infrastructure: {
+      ops: {} as OpsCapability,
+      featureFlags: {} as FeatureFlagService,
+      projects: { searchByQuery: async () => [] },
+      eventingIntrospection: new (class extends OpsEventingIntrospectionPort {
+        projections() {
+          return [];
+        }
+        killSwitches() {
+          return [];
+        }
+        processManagers() {
+          return [];
+        }
+        dejaViewProjections() {
+          return [];
+        }
+      })(),
+    },
+    dependencies: {},
+    config: undefined,
+    resources: new ResourceScope(),
   });
 }
 

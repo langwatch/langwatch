@@ -8,6 +8,7 @@ import { generate } from "@langwatch/ksuid";
 import type { BugReport, BugReportCreateInput } from "@langwatch/ops-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { BugReportRepositoryPort } from "../../ports/bug-report.port.ts";
+import { type Instant, fromDate } from "@langwatch/time";
 
 /**
  * The id prefix every report carries.
@@ -28,19 +29,21 @@ export class PrismaBugReportRepository extends BugReportRepositoryPort {
     super();
   }
 
-  create({ data }: { data: BugReportCreateInput }): Promise<BugReport> {
-    return this.prisma.bugReport.create({
-      data: {
-        ...data,
-        // The Json column is written from a value this feature's own contract
-        // shapes, so it is narrowed to Prisma's input JSON at the write.
-        metadata: (data.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
-        id: generate(BUG_REPORT_KSUID_RESOURCE).toString(),
-      },
-    });
+  async create({ data }: { data: BugReportCreateInput }): Promise<BugReport> {
+    return withInstantCreatedAt(
+      await this.prisma.bugReport.create({
+        data: {
+          ...data,
+          // The Json column is written from a value this feature's own contract
+          // shapes, so it is narrowed to Prisma's input JSON at the write.
+          metadata: (data.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
+          id: generate(BUG_REPORT_KSUID_RESOURCE).toString(),
+        },
+      }),
+    );
   }
 
-  findAll({
+  async findAll({
     page,
     pageSize,
     search,
@@ -49,7 +52,7 @@ export class PrismaBugReportRepository extends BugReportRepositoryPort {
     pageSize: number;
     search?: string | undefined;
   }): Promise<Omit<BugReport, "sessionData">[]> {
-    return this.prisma.bugReport.findMany({
+    const rows = await this.prisma.bugReport.findMany({
       where: buildSearchWhere(search),
       select: {
         id: true,
@@ -69,15 +72,26 @@ export class PrismaBugReportRepository extends BugReportRepositoryPort {
       skip: page * pageSize,
       take: pageSize,
     });
+
+    return rows.map(withInstantCreatedAt);
   }
 
-  tryFindById({ id }: { id: string }): Promise<BugReport | null> {
-    return this.prisma.bugReport.findUnique({ where: { id } });
+  async tryFindById({ id }: { id: string }): Promise<BugReport | null> {
+    const row = await this.prisma.bugReport.findUnique({ where: { id } });
+
+    return row ? withInstantCreatedAt(row) : null;
   }
 
   count({ search }: { search?: string | undefined } = {}): Promise<number> {
     return this.prisma.bugReport.count({ where: buildSearchWhere(search) });
   }
+}
+
+/** The one place a stored row's `createdAt` becomes the instant the contract declares. */
+function withInstantCreatedAt<TRow extends { createdAt: Date }>(
+  row: TRow,
+): Omit<TRow, "createdAt"> & { createdAt: Instant } {
+  return { ...row, createdAt: fromDate(row.createdAt) };
 }
 
 function buildSearchWhere(search: string | undefined): Prisma.BugReportWhereInput | undefined {

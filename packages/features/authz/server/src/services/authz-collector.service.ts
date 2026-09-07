@@ -16,11 +16,12 @@ import type {
   CustomRolePermissionsRow,
   ShareLinkRow,
 } from "../repositories/authz-read.repository.ts";
+import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 
 export type AuthzCollectorOptions = {
   reader: AuthzReadRepository;
   /** Injected so share-link liveness is testable at its exact boundary. */
-  now?: () => Date;
+  now?: () => Instant;
 };
 
 export class AuthzCollectorService {
@@ -28,12 +29,12 @@ export class AuthzCollectorService {
     return new AuthzCollectorService(options);
   }
 
-  private readonly now: () => Date;
+  private readonly now: () => Instant;
   private readonly reader: AuthzReadRepository;
 
   private constructor(options: AuthzCollectorOptions) {
     this.reader = options.reader;
-    this.now = options.now ?? (() => new Date());
+    this.now = options.now ?? nowInstant;
   }
 
   /**
@@ -379,8 +380,8 @@ export class AuthzCollectorService {
     return map;
   }
 
-  private isLiveShareLink(row: ShareLinkRow, now: Date): boolean {
-    if (row.expiresAt != null && row.expiresAt <= now) {
+  private isLiveShareLink(row: ShareLinkRow, now: Instant): boolean {
+    if (row.expiresAt != null && Temporal.Instant.compare(row.expiresAt, now) <= 0) {
       return false;
     }
 

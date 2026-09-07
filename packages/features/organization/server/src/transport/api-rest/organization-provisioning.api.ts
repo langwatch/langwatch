@@ -21,13 +21,14 @@ import {
   GET_ORGANIZATION,
   LIST_ORGANIZATIONS,
 } from "../../rules/organization-provisioning-openapi.rules.ts";
+import type { Organization } from "@langwatch/organization-contract";
 
 /** One organization as the instance-admin surface reports it. */
 export interface OrganizationProvisioningSummary {
   id: string;
   name: string;
   slug: string;
-  createdAt: Date;
+  createdAt: Organization["createdAt"];
 }
 
 /**

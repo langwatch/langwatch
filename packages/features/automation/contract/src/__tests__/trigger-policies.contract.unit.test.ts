@@ -4,6 +4,7 @@ import {
   hasActionableTriggerFilters,
   isMatchEverythingTrigger,
 } from "../trigger-policies.ts";
+import { Temporal } from "@langwatch/time";
 
 const trigger = (overrides: Record<string, unknown> = {}) => ({
   triggerKind: "AUTOMATION" as const,
@@ -15,10 +16,10 @@ const trigger = (overrides: Record<string, unknown> = {}) => ({
 
 describe("automation trigger policies", () => {
   it("keeps notification digests at a shared next window while persist actions dispatch now", () => {
-    const now = new Date("2026-05-29T12:02:17.456Z");
+    const now = Temporal.Instant.from("2026-05-29T12:02:17.456Z");
 
     expect(computeScheduledFor({ action: "SEND_EMAIL", cadence: "5min_digest", now })).toEqual(
-      new Date("2026-05-29T12:05:00.000Z"),
+      Temporal.Instant.from("2026-05-29T12:05:00.000Z"),
     );
     expect(
       computeScheduledFor({ action: "ADD_TO_DATASET", cadence: "hourly_digest", now }),

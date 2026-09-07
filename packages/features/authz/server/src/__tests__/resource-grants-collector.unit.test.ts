@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthzCollectorService } from "../services/authz-collector.service.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 import { liveShareLinkRow, ORG, PROJECT, TEAM, traceScope } from "./support/resource-fixtures.ts";
+import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 
 const customRoleBinding = [
   {
@@ -233,7 +234,7 @@ describe("collector at the resource tier", () => {
         findShareLinks: vi
           .fn()
           .mockResolvedValue([
-            { ...liveShareLinkRow, expiresAt: new Date(Date.now() - 1000) },
+            { ...liveShareLinkRow, expiresAt: nowInstant().subtract({ milliseconds: 1000 }) },
             { ...liveShareLinkRow, maxViews: 1, viewCount: 1 },
             liveShareLinkRow,
           ]),
@@ -249,8 +250,8 @@ describe("collector at the resource tier", () => {
   });
 
   describe("given an injected clock at the expiry boundary", () => {
-    const now = new Date("2026-08-13T12:00:00.000Z");
-    const collectAt = async (expiresAt: Date) => {
+    const now = Temporal.Instant.from("2026-08-13T12:00:00.000Z");
+    const collectAt = async (expiresAt: Instant) => {
       const reader = makeReader({
         findShareLinks: vi.fn().mockResolvedValue([{ ...liveShareLinkRow, expiresAt }]),
       });
@@ -263,11 +264,11 @@ describe("collector at the resource tier", () => {
     };
 
     it("drops a link expiring exactly now", async () => {
-      expect(await collectAt(new Date(now.getTime()))).toEqual([]);
+      expect(await collectAt(now)).toEqual([]);
     });
 
     it("keeps a link expiring one millisecond from now", async () => {
-      expect(await collectAt(new Date(now.getTime() + 1))).toHaveLength(1);
+      expect(await collectAt(now.add({ milliseconds: 1 }))).toHaveLength(1);
     });
   });
 });

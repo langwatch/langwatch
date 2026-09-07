@@ -19,6 +19,7 @@ import {
   CSV_JSON_CAP,
   truncateJsonForCsv,
 } from "../audit-log-export.ts";
+import { Temporal } from "@langwatch/time";
 
 function row(overrides: Partial<EnrichedAuditLog> = {}): EnrichedAuditLog {
   return {
@@ -127,7 +128,7 @@ describe("given a report and the day it was taken", () => {
   describe("when the file is named", () => {
     /** @scenario An exported report carries the same columns the table shows */
     it("dates it so two exports never collide", () => {
-      expect(auditLogFileName(new Date("2026-03-04T23:59:00.000Z"))).toBe(
+      expect(auditLogFileName(Temporal.Instant.from("2026-03-04T23:59:00.000Z"))).toBe(
         "audit_logs_2026-03-04.csv",
       );
     });

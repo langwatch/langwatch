@@ -433,7 +433,7 @@ export class TriggerSettlementNotificationService {
       headers: this.composition.webhooks.decryptHeaders(params),
       signingSecrets: this.composition.webhooks.decryptSigningSecrets(
         params,
-        fromDate(this.composition.clock.now()),
+        this.composition.clock.now(),
       ),
       body: rendered.body,
       triggerName: input.trigger.name,

@@ -12,6 +12,7 @@ import {
   StoredObjectService,
 } from "../index.ts";
 import { InMemoryStoredObjectStore } from "../testing.ts";
+import { Temporal } from "@langwatch/time";
 
 const sha256 = "a".repeat(64);
 const address: StoredObjectStorageAddress = {
@@ -104,7 +105,7 @@ function fixture() {
     },
     maximumUploadBytes: 1024,
     uploadExpiryMs: 300_000,
-    now: () => new Date("2026-08-22T00:00:00.000Z"),
+    now: () => Temporal.Instant.from("2026-08-22T00:00:00.000Z"),
     operationId: () => "upload_1",
   });
   return { service, storage, store };
@@ -148,7 +149,7 @@ describe("StoredObjectService", () => {
       store.tryFind({ tenantId: "project_1", id: "so_aaaaaaaa" }),
     ).resolves.toMatchObject({
       status: "pending",
-      expiresAt: expect.any(Date),
+      expiresAt: Temporal.Instant.from("2026-08-22T00:05:00.000Z"),
     });
 
     const confirmed = await service.confirmUpload({

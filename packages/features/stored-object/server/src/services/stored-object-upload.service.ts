@@ -25,23 +25,24 @@ import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import type { StoredObjectUploadTokenClaims } from "../ports/stored-object.port.ts";
 import type { StoredObjectRecord } from "../stores/stored-object.store.ts";
 import type { StoredObjectServiceOptions } from "./stored-object.service.ts";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 export class StoredObjectUploadService {
   static create(
     options: StoredObjectServiceOptions & {
-      now: () => Date;
+      now: () => Instant;
       operationId: () => string;
     },
   ): StoredObjectUploadService {
     return new StoredObjectUploadService(options);
   }
 
-  private readonly now: () => Date;
+  private readonly now: () => Instant;
   private readonly operationId: () => string;
 
   private constructor(
     private readonly options: StoredObjectServiceOptions & {
-      now: () => Date;
+      now: () => Instant;
       operationId: () => string;
     },
   ) {
@@ -177,7 +178,7 @@ export class StoredObjectUploadService {
 
     const operationId = this.operationId();
     const now = this.now();
-    const expiresAt = new Date(now.getTime() + this.options.uploadExpiryMs);
+    const expiresAt = now.add({ milliseconds: this.options.uploadExpiryMs });
     const upload = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.tryCreateUpload({
         projectId: input.projectId,
@@ -213,7 +214,7 @@ export class StoredObjectUploadService {
       operationId,
       address: upload.address,
       reference,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: toDate(expiresAt).toISOString(),
     });
 
     return {
@@ -243,7 +244,7 @@ export class StoredObjectUploadService {
       throw new UploadIncompleteError(claims.operationId);
     }
 
-    if (value.expiresAt === null || value.expiresAt.getTime() <= this.now().getTime()) {
+    if (value.expiresAt === null || Temporal.Instant.compare(value.expiresAt, this.now()) <= 0) {
       throw new UploadExpiredError(claims.operationId);
     }
 
@@ -321,8 +322,8 @@ function pendingUploadRecord({
   input: CreateStoredObjectUploadInput;
   id: StoredObjectRecord["id"];
   upload: { address: StoredObjectRecord["storage"] };
-  expiresAt: Date;
-  now: Date;
+  expiresAt: Instant;
+  now: Instant;
   existing: StoredObjectRecord | null;
 }): StoredObjectRecord {
   return {

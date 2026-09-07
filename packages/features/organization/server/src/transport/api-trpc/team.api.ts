@@ -24,14 +24,14 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import type { OrganizationApp } from "#app/organization.app";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 /**
  * The process supplies authentication; authorization arrives as `policy`. `app` is the slice of
  * the process's application this feature reaches, since a shared tRPC root carries every feature.
  */
 export type TeamTrpcContext = Readonly<{
-  app: Readonly<{ organizations: OrganizationApp }>;
+  app: Readonly<{ organizations: OrganizationApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 

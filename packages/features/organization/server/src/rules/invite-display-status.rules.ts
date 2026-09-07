@@ -1,4 +1,6 @@
 import { nowInstant } from "@langwatch/time";
+import type { OrganizationInvite } from "@langwatch/organization-contract";
+
 /**
  * What an invitation IS, as a person sees it, separate from the service that mints/mails/spends
  * one. EXPIRED is derived from `expiration` rather than stored, so there's no sweeper to forget.
@@ -16,7 +18,7 @@ export type InviteDisplayStatus =
   | "PAYMENT_PENDING";
 
 export function resolveInviteDisplayStatus(
-  invite: { status: string; expiration: Date | null },
+  invite: { status: string; expiration: OrganizationInvite["expiration"] },
   nowMs: number = nowInstant().epochMilliseconds,
 ): InviteDisplayStatus {
   if (

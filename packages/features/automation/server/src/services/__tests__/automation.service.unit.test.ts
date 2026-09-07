@@ -26,7 +26,7 @@ import { AutomationTemplateService } from "../automation-template.service.ts";
 import { AutomationPersistCapService } from "../persist-cap.service.ts";
 import type { WebhookDeliveryInput, WebhookDeliveryRow } from "@langwatch/automation-contract";
 import { createAutomationTestRuntime } from "../../testing.ts";
-import { Temporal, fromDate, toDate, type Instant } from "@langwatch/time";
+import { type Instant, Temporal, fromDate, toDate } from "@langwatch/time";
 
 class EmptyGraphTriggerSent extends GraphTriggerSentRepository {
   findProjectsWithGraphTriggers = async () => [];
@@ -153,7 +153,7 @@ class Jobs extends ScheduledJobStorePort {
 }
 class Clock extends AutomationClockPort {
   now() {
-    return new Date("2026-01-01T00:00:00Z");
+    return Temporal.Instant.from("2026-01-01T00:00:00Z");
   }
 }
 class Wake extends SchedulerWakePort {
@@ -374,7 +374,7 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
   it("records scheduled fires through the automation-owned history repository", async () => {
     const history = new Fires();
     const service = makeService(new Triggers(), history);
-    const firedAt = new Date("2026-01-01T09:00:00Z");
+    const firedAt = Temporal.Instant.from("2026-01-01T09:00:00Z");
 
     await service.recordFire({
       projectId: "p",
@@ -388,8 +388,8 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
       triggerId: "report",
       traceId: null,
       customGraphId: null,
-      createdAt: fromDate(firedAt),
-      resolvedAt: fromDate(firedAt),
+      createdAt: firedAt,
+      resolvedAt: firedAt,
     });
   });
 

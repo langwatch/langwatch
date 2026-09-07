@@ -16,6 +16,7 @@ import type {
   TestFireResult,
   TriggerAction,
   TriggerFire,
+  Trigger,
   TriggerFireStats,
   TriggerKind,
   TriggerTemplateDraft,
@@ -46,15 +47,15 @@ export type AutomationRow = {
   filterQuery: string | null;
   active: boolean;
   pausedReason: string | null;
-  pausedAt: Date | null;
+  pausedAt: Trigger["pausedAt"];
   message: string | null;
   alertType: AlertType | null;
   customGraphId: string | null;
   notificationCadence: NotificationCadence;
   traceDebounceMs: number;
-  createdAt: Date;
-  updatedAt: Date;
-  lastRunAt: Date | null;
+  createdAt: Trigger["createdAt"];
+  updatedAt: Trigger["updatedAt"];
+  lastRunAt: Trigger["lastRunAt"];
   /** The monitors named by the row's `evaluations.*` filters. */
   checks?: Array<Monitor | undefined>;
   /** The watched graph's name, for an alert. */

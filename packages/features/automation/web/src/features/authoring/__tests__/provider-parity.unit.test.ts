@@ -14,7 +14,11 @@ import {
   CLIENT_PROVIDERS,
   NOTIFY_PROVIDERS,
 } from "../ui/sections/client-providers.ts";
-import { SLACK_BLOCK_KIT_TEMPLATES, type SlackBlockKitTemplateOption } from "../../slack-templates/index.ts";
+import {
+  SLACK_BLOCK_KIT_TEMPLATES,
+  type SlackBlockKitTemplateOption,
+} from "../../slack-templates/index.ts";
+import { Temporal } from "@langwatch/time";
 
 /**
  * The browser provider registry enforces its client-facing invariants here.
@@ -80,8 +84,8 @@ describe("provider registry parity", () => {
       digest: buildTemplateContext({
         ...baseContext,
         window: {
-          start: new Date("2026-01-01T10:00:00Z"),
-          end: new Date("2026-01-01T11:00:00Z"),
+          start: Temporal.Instant.from("2026-01-01T10:00:00Z"),
+          end: Temporal.Instant.from("2026-01-01T11:00:00Z"),
         },
       }),
     } as const;
@@ -139,7 +143,7 @@ describe("provider registry parity", () => {
           durationMs: 920,
         },
       ],
-      occurredAt: new Date("2026-01-05T09:00:00Z"),
+      occurredAt: Temporal.Instant.from("2026-01-05T09:00:00Z"),
       project: { id: "p1", name: "Acme", slug: "acme" },
       baseHost: "https://app.langwatch.ai",
     });
@@ -186,7 +190,7 @@ describe("provider registry parity", () => {
             isEmpty: false,
           },
         ],
-        occurredAt: new Date("2026-01-05T09:00:00Z"),
+        occurredAt: Temporal.Instant.from("2026-01-05T09:00:00Z"),
         project: { id: "p1", name: "Acme", slug: "acme" },
         baseHost: "https://app.langwatch.ai",
       });
@@ -273,8 +277,8 @@ describe("provider registry parity", () => {
       baseHost: "https://app.langwatch.ai",
       matches: EXAMPLE_MATCHES,
       window: {
-        start: new Date("2026-01-01T10:00:00Z"),
-        end: new Date("2026-01-01T11:00:00Z"),
+        start: Temporal.Instant.from("2026-01-01T10:00:00Z"),
+        end: Temporal.Instant.from("2026-01-01T11:00:00Z"),
       },
     });
     const modernExamples: Record<string, () => Record<string, unknown>> = {

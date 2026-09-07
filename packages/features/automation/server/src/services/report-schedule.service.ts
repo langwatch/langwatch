@@ -51,7 +51,7 @@ export class ReportScheduleService {
   }): Promise<void> {
     const nextRunAt = ReportScheduleService.computeNextRunAt({
       ...input.schedule,
-      after: fromDate(this.clock.now()),
+      after: this.clock.now(),
     });
     await this.jobs.upsertForTarget({
       projectId: input.projectId,

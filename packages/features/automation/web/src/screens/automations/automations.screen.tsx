@@ -14,7 +14,10 @@ import { Calendar, Edit2, Eye, Filter, MoreVertical, Trash, TrendingUp, Zap } fr
 import { FilterDisplay } from "../../ui/elements/filter-display.tsx";
 import { ClampedText } from "../../ui/elements/clamped-text.tsx";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { AutomationsLayout, type AutomationSection } from "../../ui/sections/automations-layout.tsx";
+import {
+  AutomationsLayout,
+  type AutomationSection,
+} from "../../ui/sections/automations-layout.tsx";
 import { Link } from "../../ui/elements/automation-link.tsx";
 import { Menu } from "@langwatch/design-system/menu";
 import { Switch } from "@langwatch/design-system/switch";
@@ -47,6 +50,7 @@ import { useOrganizationTeamProject } from "../../behavior/automation-session.ts
 import { useAutomationToaster } from "../../behavior/automation-feedback.ts";
 import { api, type RouterOutputs } from "../../behavior/automation-api.ts";
 import { formatTimeAgo } from "../../model/relative-time.ts";
+import { toEpochMs } from "@langwatch/time";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
@@ -480,7 +484,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
     const next = (reportSchedules.data ?? [])
       .filter((schedule) => schedule.nextRunAt)
       .map((schedule) => ({
-        at: new Date(schedule.nextRunAt!).getTime(),
+        at: toEpochMs(schedule.nextRunAt!),
         triggerId: schedule.triggerId,
       }))
       .sort((left, right) => left.at - right.at)[0];

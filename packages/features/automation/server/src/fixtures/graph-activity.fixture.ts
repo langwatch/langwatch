@@ -5,6 +5,7 @@ import {
   AutomationLoggerPort,
 } from "../ports/automation-graph.port.ts";
 import { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 /**
  * The rows and collaborators the graph-alert vertical touches, and nothing
@@ -19,10 +20,13 @@ import { AutomationNotificationDeliveryPort } from "../ports/automation-notifica
 
 export type TriggerRow = Record<string, unknown>;
 
-export const FROZEN_NOW = new Date("2026-09-02T12:00:00.000Z");
+export const FROZEN_NOW = Temporal.Instant.from("2026-09-02T12:00:00.000Z");
+
+/** The same moment as a stored column hands it back, for the row doubles. */
+const FROZEN_ROW_AT = toDate(FROZEN_NOW);
 
 export class FrozenClock extends AutomationClockPort {
-  now(): Date {
+  now(): Instant {
     return FROZEN_NOW;
   }
 }
@@ -128,8 +132,8 @@ export function graphTriggerRow(over: Partial<TriggerRow> = {}): TriggerRow {
     slackTemplate: null,
     emailSubjectTemplate: null,
     emailBodyTemplate: null,
-    createdAt: FROZEN_NOW,
-    updatedAt: FROZEN_NOW,
+    createdAt: FROZEN_ROW_AT,
+    updatedAt: FROZEN_ROW_AT,
     lastRunAt: null,
     ...over,
   };
@@ -231,7 +235,7 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
       findMany: async ({ where }: { where: Record<string, unknown> }) =>
         suppressions
           .filter((row) => matches(row, where))
-          .map((row) => ({ ...row, id: "suppression", reason: "unsubscribed", createdAt: FROZEN_NOW })),
+          .map((row) => ({ ...row, id: "suppression", reason: "unsubscribed", createdAt: FROZEN_ROW_AT })),
     },
     triggerSent: {
       findFirst: async ({ where }: { where: Record<string, unknown> }) =>
@@ -239,7 +243,7 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
       findMany: async ({ where }: { where: Record<string, unknown> }) =>
         triggerSent.filter((row) => matches(row, where)),
       create: async ({ data }: { data: Record<string, unknown> }) => {
-        const row = { id: `sent-${nextId++}`, createdAt: FROZEN_NOW, ...data };
+        const row = { id: `sent-${nextId++}`, createdAt: FROZEN_ROW_AT, ...data };
         triggerSent.push(row);
         return row;
       },
@@ -253,7 +257,7 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
               row.traceId === entry.traceId,
           );
           if (duplicate) continue;
-          triggerSent.push({ id: `sent-${nextId++}`, createdAt: FROZEN_NOW, ...entry });
+          triggerSent.push({ id: `sent-${nextId++}`, createdAt: FROZEN_ROW_AT, ...entry });
           count += 1;
         }
         return { count };

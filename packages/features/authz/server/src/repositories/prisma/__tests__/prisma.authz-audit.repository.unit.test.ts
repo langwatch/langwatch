@@ -5,10 +5,11 @@ import {
   type AuthzAuditInsert,
   PrismaAuthzAuditRepository,
 } from "../prisma.authz-audit.repository.ts";
+import { Temporal, toDate } from "@langwatch/time";
 
 const ROW: AuthzAuditRow = {
   id: "authz-evt-event_1",
-  createdAt: new Date("2026-08-23T12:00:00.000Z"),
+  createdAt: Temporal.Instant.from("2026-08-23T12:00:00.000Z"),
   userId: "user_1",
   organizationId: "org_1",
   action: "authz.grants.attach",
@@ -51,13 +52,14 @@ describe("PrismaAuthzAuditRepository", () => {
       action: "authz.grants.revoke",
     });
 
+    const WRITTEN = { ...ROW, createdAt: toDate(ROW.createdAt) };
     expect(auditLog.writes).toEqual([
-      { data: [ROW], skipDuplicates: true },
+      { data: [WRITTEN], skipDuplicates: true },
       {
-        data: [{ ...ROW, action: "authz.grants.revoke" }],
+        data: [{ ...WRITTEN, action: "authz.grants.revoke" }],
         skipDuplicates: true,
       },
     ]);
-    expect([...auditLog.rows.values()]).toEqual([ROW]);
+    expect([...auditLog.rows.values()]).toEqual([WRITTEN]);
   });
 });

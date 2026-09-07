@@ -2,13 +2,21 @@ import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { TriggerKind } from "@langwatch/automation-contract";
 import { AlertTriangle, Calendar, CheckCircle, Zap } from "lucide-react";
 import { useMemo } from "react";
+import {
+  type Instant,
+  Temporal,
+  type TimeInput,
+  nowInstant,
+  toDate,
+  toEpochMs,
+} from "@langwatch/time";
 
 export type AutomationActivityFire = {
   id: string;
   triggerId: string;
   customGraphId: string | null;
-  createdAt: Date | string;
-  resolvedAt: Date | string | null;
+  createdAt: TimeInput;
+  resolvedAt: TimeInput | null;
 };
 
 export type AutomationActivityTrigger = {
@@ -24,7 +32,7 @@ export type AutomationActivityEntry = {
   triggerId: string;
   name: string;
   kind: ActivityKind;
-  at: Date;
+  at: Instant;
 };
 
 const KIND_META: Record<ActivityKind, { label: string; icon: typeof Zap; palette: string }> = {
@@ -34,17 +42,17 @@ const KIND_META: Record<ActivityKind, { label: string; icon: typeof Zap; palette
   reportSent: { label: "Sent", icon: Calendar, palette: "purple" },
 };
 
-function dayKeyOf(date: Date): string {
-  return date.toLocaleDateString(undefined, {
+function dayKeyOf(at: Instant): string {
+  return toDate(at).toLocaleDateString(undefined, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
 }
 
-function dayLabelOf(date: Date): string {
-  const today = new Date();
-  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+function dayLabelOf(date: Instant): string {
+  const today = nowInstant();
+  const yesterday = today.subtract({ milliseconds: 24 * 60 * 60 * 1000 });
 
   if (dayKeyOf(date) === dayKeyOf(today)) {
     return "Today";
@@ -54,7 +62,7 @@ function dayLabelOf(date: Date): string {
     return "Yesterday";
   }
 
-  return date.toLocaleDateString(undefined, {
+  return toDate(date).toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -93,7 +101,7 @@ export function toAutomationActivityEntries({
       triggerId: fire.triggerId,
       name,
       kind: activityKind({ isAlert, isReport }),
-      at: new Date(fire.createdAt),
+      at: Temporal.Instant.fromEpochMilliseconds(toEpochMs(fire.createdAt)),
     });
 
     if (isAlert && fire.resolvedAt) {
@@ -102,12 +110,12 @@ export function toAutomationActivityEntries({
         triggerId: fire.triggerId,
         name,
         kind: "alertRecovered",
-        at: new Date(fire.resolvedAt),
+        at: Temporal.Instant.fromEpochMilliseconds(toEpochMs(fire.resolvedAt)),
       });
     }
   }
 
-  return entries.sort((a, b) => b.at.getTime() - a.at.getTime());
+  return entries.sort((a, b) => b.at.epochMilliseconds - a.at.epochMilliseconds);
 }
 
 export function AutomationHistory({
@@ -233,8 +241,13 @@ function ActivityRow({
         {meta.label}
       </Badge>
       <Box flex="1" />
-      <Text textStyle="xs" color="fg.muted" flexShrink={0} title={entry.at.toLocaleString()}>
-        {formatTimeAgo(entry.at.getTime()) ?? "—"}
+      <Text
+        textStyle="xs"
+        color="fg.muted"
+        flexShrink={0}
+        title={toDate(entry.at).toLocaleString()}
+      >
+        {formatTimeAgo(entry.at.epochMilliseconds) ?? "—"}
       </Text>
     </HStack>
   );

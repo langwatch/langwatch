@@ -15,6 +15,7 @@ import {
   type GrantProjectionWrite,
   GrantProjectionWriteStore,
 } from "../authz-grant.projection.ts";
+import { Temporal } from "@langwatch/time";
 
 const TENANT_ID = "org_acme";
 const ACTOR = { type: "user", id: "user_admin" } as const;
@@ -167,7 +168,7 @@ describe("AuthzGrantProjection", () => {
       kind: "grant.setRole",
       grantId: "grant_1",
       roleKey: "admin",
-      occurredAt: new Date(2),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(2),
     });
   });
 
@@ -243,7 +244,7 @@ describe("AuthzGrantProjection", () => {
       kind: "grant.setRole",
       grantId: "grant_1",
       roleKey: "custom:cr_sre",
-      occurredAt: new Date(2),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(2),
     });
   });
 });

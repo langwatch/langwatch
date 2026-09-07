@@ -4,6 +4,7 @@ import type {
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
 import { StoredObjectStore, type StoredObjectRecord } from "./stores/stored-object.store.ts";
+import { type Instant, Temporal } from "@langwatch/time";
 
 export class InMemoryStoredObjectStore extends StoredObjectStore {
   static create(values: readonly StoredObjectRecord[] = []): InMemoryStoredObjectStore {
@@ -45,7 +46,7 @@ export class InMemoryStoredObjectStore extends StoredObjectStore {
     tenantId: StoredObjectProjectId;
     afterId?: StoredObjectId;
     status?: StoredObjectLifecycleStatus;
-    expiresBefore?: Date;
+    expiresBefore?: Instant;
     limit: number;
   }): Promise<StoredObjectRecord[]> {
     return [...this.values.values()]
@@ -55,7 +56,8 @@ export class InMemoryStoredObjectStore extends StoredObjectStore {
           (!input.afterId || value.id > input.afterId) &&
           (!input.status || value.status === input.status) &&
           (!input.expiresBefore ||
-            (value.expiresAt !== null && value.expiresAt <= input.expiresBefore)),
+            (value.expiresAt !== null &&
+              Temporal.Instant.compare(value.expiresAt, input.expiresBefore) <= 0)),
       )
       .sort((left, right) => left.id.localeCompare(right.id))
       .slice(0, input.limit);

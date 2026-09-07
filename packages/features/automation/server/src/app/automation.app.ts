@@ -45,10 +45,46 @@ import {
   type AutomationPersistCapCount,
   TriggerFiltersRequiredError,
 } from "@langwatch/automation-contract";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import {
+  FeatureFlagApi,
+  type FeatureFlagApi as FeatureFlagApiContract,
+} from "@langwatch/feature-flag-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import type { Monitor, MonitorService } from "@langwatch/monitor-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import {
+  MonitorApi,
+  type Monitor,
+  type MonitorApi as MonitorApiContract,
+} from "@langwatch/monitor-contract";
+import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
+import {
+  AutomationApi as AutomationApiToken,
+  type AutomationApi,
+  type AutomationServerConfig,
+} from "@langwatch/automation-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { AutomationPersistCapRedisPort } from "../services/persist-cap.service.ts";
+import {
+  PostgresAutomationAdapter,
+  type AutomationDatabase,
+} from "../adapters/postgres.automation.adapter.ts";
+import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
+import type { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port.ts";
+import type { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
+import type {
+  AutomationGraphNotifierPort,
+  AutomationLoggerPort,
+  AutomationSlackBotTokenDecryptorPort,
+  AutomationDispatchErrorPort,
+  AutomationHeartbeatPort,
+} from "../ports/automation-graph.port.ts";
+import type { AutomationRunawayPort } from "../ports/automation-runaway.port.ts";
+import type { AutomationTestFirePort } from "../ports/automation-test-fire.port.ts";
+import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { automationServerConfigSchema } from "@langwatch/automation-contract";
+import type { Instant } from "@langwatch/time";
 
 // ---------------------------------------------------------------------------
 // The refusals this feature names.
@@ -267,10 +303,41 @@ export class UnsubscribeLinkInvalidError extends HandledError {
 /** What the process composes this feature's application from. */
 export interface AutomationAppDependencies {
   automation: AutomationService;
-  monitors: MonitorService;
-  projects: ProjectService;
-  featureFlags: FeatureFlagService;
+  monitors: MonitorApiContract;
+  projects: ProjectApiContract;
+  featureFlags: FeatureFlagApiContract;
 }
+
+export type AutomationInfrastructure = Readonly<{
+  database: AutomationDatabase;
+  verifier: UnsubscribeTokenVerifierPort;
+  jobs: ScheduledJobStorePort;
+  clock: AutomationClockPort;
+  wake: SchedulerWakePort;
+  notifier: AutomationGraphNotifierPort;
+  logger: AutomationLoggerPort;
+  slackTokens: AutomationSlackBotTokenDecryptorPort;
+  dispatchErrors: AutomationDispatchErrorPort;
+  heartbeat: AutomationHeartbeatPort;
+  runaway: AutomationRunawayPort;
+  testFire: AutomationTestFirePort;
+  redis: AutomationPersistCapRedisPort | null;
+  // Peer APIs are resolved from setup.dependencies; infrastructure contains technical ports only.
+}>;
+
+type AutomationDependencies = Readonly<{
+  analytics: typeof AnalyticsApi;
+  monitors: typeof MonitorApi;
+  featureFlags: typeof FeatureFlagApi;
+  entitlement: typeof EntitlementApi;
+  projects: typeof ProjectApi;
+}>;
+
+type AutomationSetup = FeatureSetup<
+  AutomationDependencies,
+  AutomationInfrastructure,
+  AutomationServerConfig
+>;
 
 /** The project an automation names, as a test fire renders it. */
 export interface AutomationProjectIdentity {
@@ -278,23 +345,71 @@ export interface AutomationProjectIdentity {
   readonly slug: string;
 }
 
-export class AutomationApp {
-  static create(dependencies: AutomationAppDependencies): AutomationApp {
-    return new AutomationApp(dependencies);
+export class AutomationApp implements AutomationApi {
+  static readonly contract = AutomationApiToken;
+  static readonly dependencies = {
+    analytics: AnalyticsApi,
+    monitors: MonitorApi,
+    featureFlags: FeatureFlagApi,
+    entitlement: EntitlementApi,
+    projects: ProjectApi,
+  };
+  static readonly configSchema: { parse(value: unknown): AutomationServerConfig } =
+    automationServerConfigSchema;
+
+  static create(setup: AutomationSetup): AutomationApp {
+    const persistCaps = AutomationPersistCapService.create({
+      projects: setup.dependencies.projects,
+      planProvider: setup.dependencies.entitlement,
+      config: {
+        free: setup.config.persistDailyCapFree,
+        paid: setup.config.persistDailyCapPaid,
+        enterprise: setup.config.persistDailyCapEnterprise,
+      },
+      redis: setup.infrastructure.redis,
+    });
+    const automation = PostgresAutomationAdapter.create({
+      database: setup.infrastructure.database,
+      verifier: setup.infrastructure.verifier,
+      jobs: setup.infrastructure.jobs,
+      clock: setup.infrastructure.clock,
+      wake: setup.infrastructure.wake,
+      projects: setup.dependencies.projects,
+      analytics: setup.dependencies.analytics,
+      notifier: setup.infrastructure.notifier,
+      baseHost: setup.config.baseHost,
+      logger: setup.infrastructure.logger,
+      slackTokens: setup.infrastructure.slackTokens,
+      dispatchErrors: setup.infrastructure.dispatchErrors,
+      heartbeat: setup.infrastructure.heartbeat,
+      runaway: setup.infrastructure.runaway,
+      testFire: setup.infrastructure.testFire,
+      persistCaps,
+    }).build();
+    return new AutomationApp({
+      automation,
+      monitors: setup.dependencies.monitors,
+      projects: setup.dependencies.projects,
+      featureFlags: setup.dependencies.featureFlags,
+    });
   }
 
-  private constructor(private readonly dependencies: AutomationAppDependencies) {}
+  #dependencies: AutomationAppDependencies;
+
+  private constructor(dependencies: AutomationAppDependencies) {
+    this.#dependencies = dependencies;
+  }
 
   // -- reads -----------------------------------------------------------------
 
   /** Every automation in the project, deleted rows excluded by the service. */
   getAllForProject(input: { projectId: string }): Promise<Trigger[]> {
-    return this.dependencies.automation.getAllForProject(input);
+    return this.#dependencies.automation.getAllForProject(input);
   }
 
   /** One automation, or null when the project does not have it. */
   tryGetById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
-    return this.dependencies.automation.tryGetById(input);
+    return this.#dependencies.automation.tryGetById(input);
   }
 
   /**
@@ -308,7 +423,7 @@ export class AutomationApp {
    * decided here.
    */
   async tryGetLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
-    const trigger = await this.dependencies.automation.tryGetById(input);
+    const trigger = await this.#dependencies.automation.tryGetById(input);
     return !trigger || trigger.deleted ? null : trigger;
   }
 
@@ -324,7 +439,11 @@ export class AutomationApp {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null> {
-    return this.dependencies.automation.tryGetByCustomGraphId(input);
+    return this.#dependencies.automation.tryGetByCustomGraphId(input);
+  }
+
+  getByCustomGraphIds(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]> {
+    return this.#dependencies.automation.getByCustomGraphIds(input);
   }
 
   /**
@@ -338,7 +457,7 @@ export class AutomationApp {
     customGraphId: string;
     projectId: string;
   }): Promise<void> {
-    const exists = await this.dependencies.automation.customGraphExistsInProject(input);
+    const exists = await this.#dependencies.automation.customGraphExistsInProject(input);
     if (!exists) throw new GraphNotInProjectError(input.customGraphId, input.projectId);
   }
 
@@ -347,32 +466,32 @@ export class AutomationApp {
     customGraphIds: string[];
     projectId: string;
   }): Promise<CustomGraphNameRef[]> {
-    return this.dependencies.automation.getCustomGraphNamesByIds(input);
+    return this.#dependencies.automation.getCustomGraphNamesByIds(input);
   }
 
   /** The monitors an automation's conditions name. */
   getMonitorsByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
-    return this.dependencies.monitors.getAllByIds(input);
+    return this.#dependencies.monitors.getAllByIds(input);
   }
 
   /** The plan's daily ceiling on persist actions. */
   resolvePersistDailyCap(projectId: string): Promise<number> {
-    return this.dependencies.automation.resolvePersistDailyCap(projectId);
+    return this.#dependencies.automation.resolvePersistDailyCap(projectId);
   }
 
   /** Today's confirmed-match and skipped counts, per automation. */
   readPersistCapCounts(input: {
     projectId: string;
     triggerIds: readonly string[];
-    now: Date;
+    now: Instant;
     cap: number;
   }): Promise<Record<string, AutomationPersistCapCount>> {
-    return this.dependencies.automation.readPersistCapCounts(input);
+    return this.#dependencies.automation.readPersistCapCounts(input);
   }
 
   /** How often each automation has fired. */
   getFireStats(input: { projectId: string }): Promise<TriggerFireStats[]> {
-    return this.dependencies.automation.getFireStats(input);
+    return this.#dependencies.automation.getFireStats(input);
   }
 
   /** The activity feed, for one automation or for the whole project. */
@@ -381,7 +500,7 @@ export class AutomationApp {
     triggerId?: string;
     limit: number;
   }): Promise<TriggerFire[]> {
-    return this.dependencies.automation.getRecentFires(input);
+    return this.#dependencies.automation.getRecentFires(input);
   }
 
   /** The per-attempt webhook delivery log for one automation (ADR-040 §6). */
@@ -390,12 +509,12 @@ export class AutomationApp {
     triggerId: string;
     limit: number;
   }): Promise<WebhookDeliveryRow[]> {
-    return this.dependencies.automation.getRecentWebhookDeliveries(input);
+    return this.#dependencies.automation.getRecentWebhookDeliveries(input);
   }
 
   /** When each report next runs and last ran, as the scheduler knows it. */
   getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]> {
-    return this.dependencies.automation.getReportSchedules(input);
+    return this.#dependencies.automation.getReportSchedules(input);
   }
 
   // -- writes ----------------------------------------------------------------
@@ -405,7 +524,7 @@ export class AutomationApp {
    * cache as part of the write, so nothing here has to remember to.
    */
   create(command: CreateTriggerCommand): Promise<Trigger> {
-    return this.dependencies.automation.create(command);
+    return this.#dependencies.automation.create(command);
   }
 
   /**
@@ -424,7 +543,7 @@ export class AutomationApp {
 
   /** Updates an automation. The service invalidates as part of the write. */
   update(command: UpdateTriggerCommand): Promise<Trigger> {
-    return this.dependencies.automation.update(command);
+    return this.#dependencies.automation.update(command);
   }
 
   /**
@@ -437,8 +556,8 @@ export class AutomationApp {
    * a report, which costs one no-op deactivate.
    */
   async delete(input: { triggerId: string; projectId: string }): Promise<void> {
-    await this.dependencies.automation.softDeleteById(input);
-    await this.dependencies.automation.removeReportSchedule({
+    await this.#dependencies.automation.softDeleteById(input);
+    await this.#dependencies.automation.removeReportSchedule({
       projectId: input.projectId,
       triggerId: input.triggerId,
     });
@@ -451,17 +570,17 @@ export class AutomationApp {
     cron: string;
     timezone: string;
   }): Promise<void> {
-    return this.dependencies.automation.syncReportSchedule(input);
+    return this.#dependencies.automation.syncReportSchedule(input);
   }
 
   /** Retires one report's calendar entry. Idempotent. */
   removeReportSchedule(input: { projectId: string; triggerId: string }): Promise<void> {
-    return this.dependencies.automation.removeReportSchedule(input);
+    return this.#dependencies.automation.removeReportSchedule(input);
   }
 
   /** Flushes the project's dispatch cache. */
   invalidate(projectId: string): Promise<void> {
-    return this.dependencies.automation.invalidate(projectId);
+    return this.#dependencies.automation.invalidate(projectId);
   }
 
   // -- rules -----------------------------------------------------------------
@@ -500,7 +619,7 @@ export class AutomationApp {
 
   /** The template draft an author is about to save. Throws on a bad template. */
   validateTemplateDraft(draft: TestFireTemplateDraft): void {
-    this.dependencies.automation.validateTemplateDraft(draft);
+    this.#dependencies.automation.validateTemplateDraft(draft);
   }
 
   /**
@@ -511,7 +630,7 @@ export class AutomationApp {
    * so the flag cannot be bypassed by calling the API directly.
    */
   async assertWebhookChannelEnabled(input: { projectId: string; userId: string }): Promise<void> {
-    const allowed = await this.dependencies.featureFlags.isEnabled("release_webhook_automations", {
+    const allowed = await this.#dependencies.featureFlags.isEnabled("release_webhook_automations", {
       kind: "project",
       userId: input.userId,
       projectId: input.projectId,
@@ -523,7 +642,7 @@ export class AutomationApp {
 
   /** The project's name and slug, as a rendered notification quotes them. */
   async getProjectIdentity(projectId: string): Promise<AutomationProjectIdentity> {
-    const project = await this.dependencies.projects.tryGetSummaryById(projectId);
+    const project = await this.#dependencies.projects.tryGetSummaryById(projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
     return { name: project.name, slug: project.slug };
   }
@@ -532,7 +651,7 @@ export class AutomationApp {
 
   /** Renders and delivers one test notification (ADR-031). */
   testFire(input: TestFireInput): Promise<TestFireResult> {
-    return this.dependencies.automation.testFire(input);
+    return this.#dependencies.automation.testFire(input);
   }
 
   // -- email suppression (ADR-031) -------------------------------------------
@@ -543,23 +662,23 @@ export class AutomationApp {
     triggerName: string | null;
     email: string;
   } | null> {
-    return this.dependencies.automation.tryResolveUnsubscribeView(input);
+    return this.#dependencies.automation.tryResolveUnsubscribeView(input);
   }
 
   /** Records the unsubscribe. Idempotent — the upsert collapses duplicates. */
   confirmUnsubscribe(input: { token: string; scope: "trigger" | "project" }): Promise<void> {
-    return this.dependencies.automation.confirmUnsubscribe(input);
+    return this.#dependencies.automation.confirmUnsubscribe(input);
   }
 
   /** The operator-facing suppression list, each row with its automation's name. */
   getSuppressionsEnriched(input: {
     projectId: string;
   }): Promise<Array<EmailSuppression & { triggerName: string | null }>> {
-    return this.dependencies.automation.getAllEnriched(input);
+    return this.#dependencies.automation.getAllEnriched(input);
   }
 
   /** Removing a suppression resumes delivery — a deliberate operator action. */
   removeSuppression(input: { id: string; projectId: string }): Promise<void> {
-    return this.dependencies.automation.removeSuppression(input);
+    return this.#dependencies.automation.removeSuppression(input);
   }
 }

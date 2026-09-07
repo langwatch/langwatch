@@ -1,10 +1,11 @@
 import type {
-  PersonalFeatures,
-  PersonalWorkspace,
-  PersonalWorkspaceInput,
+  Organization,
   OrganizationBillingProfile,
   OrganizationIntent,
   OrganizationSettings,
+  PersonalFeatures,
+  PersonalWorkspace,
+  PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 
 export type PersonalWorkspaceResourceIds = {
@@ -35,8 +36,8 @@ export type StoredOrganizationSettings = {
   s3Endpoint: string | null;
   s3AccessKeyId: string | null;
   s3Bucket: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Organization["createdAt"];
+  updatedAt: Organization["updatedAt"];
 };
 
 export abstract class OrganizationRepository {

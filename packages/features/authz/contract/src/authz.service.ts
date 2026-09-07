@@ -48,6 +48,7 @@ import type {
   AuthzTeamMemberBinding,
   PermissionDecision,
 } from "./authz.queries.ts";
+import type { Instant } from "@langwatch/time";
 
 /**
  * The complete portable read and decision capability. Concrete server
@@ -193,7 +194,7 @@ export abstract class AuthzService {
   abstract isOnEngine(args: AuthzListOrganizationBindingsInput): Promise<boolean>;
 
   /** Finalized migration time for compatibility facts, or null before cutover. */
-  abstract tryGetEngineCutoverAt(args: AuthzListOrganizationBindingsInput): Promise<Date | null>;
+  abstract tryGetEngineCutoverAt(args: AuthzListOrganizationBindingsInput): Promise<Instant | null>;
 }
 
 /** Useful structural union for adapters that accept either typed path form. */

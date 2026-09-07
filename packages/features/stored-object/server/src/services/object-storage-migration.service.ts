@@ -11,15 +11,18 @@ import {
   paginate,
   sha256OfStream,
 } from "../rules/object-storage-migration-transfer.rules.ts";
+import { type Instant, Temporal, fromDate, nowInstant, toDate } from "@langwatch/time";
 
 /**
  * The later of two version timestamps, nudged a millisecond past `previous`
  * so a re-run of the same instant still advances the row's version. Kept
- * beside the service (not the rules module) because it constructs a `Date`,
- * which the rules module may not do even for a pure computation like this.
+ * beside the service (not the rules module) because it mints a moment, which
+ * the rules module may not do even for a pure computation like this.
  */
-function newerVersionTimestamp(previous: Date, candidate: Date): Date {
-  return new Date(Math.max(candidate.getTime(), previous.getTime() + 1));
+function newerVersionTimestamp(previous: Instant, candidate: Instant): Instant {
+  return Temporal.Instant.fromEpochMilliseconds(
+    Math.max(candidate.epochMilliseconds, previous.epochMilliseconds + 1),
+  );
 }
 
 export type MigrationProvider = "s3" | "azure";
@@ -126,7 +129,7 @@ export type ObjectStorageMigrationDeps = {
   auditQueues(): Promise<QueueMigrationBlocker[]>;
   writesPaused(): boolean;
   readsPaused(): boolean;
-  now?: () => Date;
+  now?: () => Instant;
 };
 
 type EligibleScope = {
@@ -144,14 +147,14 @@ export class ObjectStorageMigrationService {
     return new ObjectStorageMigrationService(deps);
   }
 
-  private readonly now: () => Date;
+  private readonly now: () => Instant;
 
   private constructor(private readonly deps: ObjectStorageMigrationDeps) {
     if (deps.source.provider === deps.destination.provider) {
       throw new Error("Migration source and destination providers must differ");
     }
 
-    this.now = deps.now ?? (() => new Date());
+    this.now = deps.now ?? nowInstant;
   }
 
   async plan(): Promise<MigrationPlan> {
@@ -307,11 +310,11 @@ export class ObjectStorageMigrationService {
         continue;
       }
 
-      const insertedAt = newerVersionTimestamp(row.inserted_at, this.now());
+      const insertedAt = newerVersionTimestamp(fromDate(row.inserted_at), this.now());
       await this.deps.publishStoredObject({
         ...row,
         storage_uri: destinationUri,
-        inserted_at: insertedAt,
+        inserted_at: toDate(insertedAt),
       });
       publishedStoredObjects += 1;
     }

@@ -41,7 +41,7 @@ import { AutomationGraphService } from "./trigger-graph.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import { AutomationTemplateService } from "./automation-template.service.ts";
 import type { AutomationPersistCapService } from "./persist-cap.service.ts";
-import { fromDate } from "@langwatch/time";
+import { type Instant, fromDate } from "@langwatch/time";
 
 const normalize = (email: string): string => email.trim().toLowerCase();
 export class AutomationService extends AutomationCapability {
@@ -110,7 +110,9 @@ export class AutomationService extends AutomationCapability {
     return this.graph.evaluate(input);
   }
 
-  async decideGraphTriggerHeartbeat(input: { now: Date }): Promise<GraphTriggerSweepCandidate[]> {
+  async decideGraphTriggerHeartbeat(input: {
+    now: Instant;
+  }): Promise<GraphTriggerSweepCandidate[]> {
     return this.graph.decideHeartbeat(input);
   }
 
@@ -125,20 +127,20 @@ export class AutomationService extends AutomationCapability {
   consumePersistCapSlot(input: {
     projectId: string;
     triggerId: string;
-    now: Date;
+    now: Instant;
     cap: number;
     dedupKey: string;
   }): Promise<AutomationPersistCapDecision> {
-    return this.persistCaps.consumePersistCapSlot({ ...input, now: fromDate(input.now) });
+    return this.persistCaps.consumePersistCapSlot(input);
   }
 
   readPersistCapCounts(input: {
     projectId: string;
     triggerIds: readonly string[];
-    now: Date;
+    now: Instant;
     cap: number;
   }): Promise<Record<string, AutomationPersistCapCount>> {
-    return this.persistCaps.readPersistCapCounts({ ...input, now: fromDate(input.now) });
+    return this.persistCaps.readPersistCapCounts(input);
   }
 
   getById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
@@ -268,7 +270,7 @@ export class AutomationService extends AutomationCapability {
   getFireStats(input: { projectId: string }): Promise<TriggerFireStats[]> {
     return this.history.findAllStatsForProject({
       projectId: input.projectId,
-      firesSince: fromDate(this.clock.now()).subtract({ milliseconds: 30 * 24 * 60 * 60 * 1000 }),
+      firesSince: this.clock.now().subtract({ milliseconds: 30 * 24 * 60 * 60 * 1000 }),
     });
   }
 
@@ -294,16 +296,16 @@ export class AutomationService extends AutomationCapability {
     triggerId: string;
     traceId?: string | null;
     customGraphId?: string | null;
-    createdAt: Date;
-    resolvedAt?: Date | null;
+    createdAt: Instant;
+    resolvedAt?: Instant | null;
   }): Promise<TriggerFire> {
     return this.history.create({
       projectId: input.projectId,
       triggerId: input.triggerId,
       traceId: input.traceId ?? null,
       customGraphId: input.customGraphId ?? null,
-      createdAt: fromDate(input.createdAt),
-      resolvedAt: input.resolvedAt ? fromDate(input.resolvedAt) : null,
+      createdAt: input.createdAt,
+      resolvedAt: input.resolvedAt ?? null,
     });
   }
 
@@ -424,7 +426,7 @@ export class AutomationService extends AutomationCapability {
     return this.webhookDeliveries.findAllRecentByTriggerId(input);
   }
 
-  pruneWebhookDeliveries(now?: Date): Promise<number> {
+  pruneWebhookDeliveries(now?: Instant): Promise<number> {
     return this.webhookDeliveries.pruneExpired(now);
   }
 }

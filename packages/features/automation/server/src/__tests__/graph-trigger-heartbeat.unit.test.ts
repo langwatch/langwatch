@@ -10,6 +10,7 @@ import {
   HeartbeatTriggerRepository,
   SilentAutomationLogger,
 } from "../repositories/__tests__/support/heartbeat.fakes.ts";
+import { type Instant, Temporal } from "@langwatch/time";
 
 const TriggerAction = { SEND_EMAIL: "SEND_EMAIL" } as const;
 const TriggerKind = { ALERT: "ALERT" } as const;
@@ -21,7 +22,7 @@ type HeartbeatCandidateSources = {
 async function decideGraphTriggerHeartbeat(input: {
   deps: GraphTriggerHeartbeatDeps;
   sources: HeartbeatCandidateSources;
-  now: Date;
+  now: Instant;
 }) {
   input.deps.triggerSent.findProjectsWithGraphTriggers =
     input.sources.loadProjectsWithGraphTriggers;
@@ -117,7 +118,7 @@ function makeClickHouseStub(maxOccurredAtMsByProject: Record<string, number | nu
 }
 
 describe("decideGraphTriggerHeartbeat", () => {
-  const now = new Date("2026-06-20T12:00:00Z");
+  const now = Temporal.Instant.from("2026-06-20T12:00:00Z");
 
   let triggerSentStub: GraphTriggerSentRepository;
   let chStub: ReturnType<typeof makeClickHouseStub>;
@@ -210,7 +211,7 @@ describe("decideGraphTriggerHeartbeat", () => {
 
   describe("given a no-data trigger but the project has very recent activity", () => {
     it("skips the enqueue — real-time path handles it", async () => {
-      const recentMs = now.getTime() - 30_000;
+      const recentMs = now.epochMilliseconds - 30_000;
       chStub = makeClickHouseStub({ [PROJECT_A]: recentMs });
       const triggers = makeTriggersService({
         [PROJECT_A]: [

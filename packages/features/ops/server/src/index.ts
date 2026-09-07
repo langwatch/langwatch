@@ -168,6 +168,7 @@ export {
 } from "./rules/ops-system-migration-cohort.rules.ts";
 export {
   PostgresSystemMigrationsAdapter,
+  UserStartupMigrationsUnsupportedError,
   type PostgresSystemMigrationsAdapterOptions,
 } from "./adapters/postgres.system-migrations.adapter.ts";
 // The state rows on their own, for a reader that is not the runner: the
@@ -234,3 +235,4 @@ export {
   createOpsClickHouseExplainRestApp,
   type OpsClickHouseExplainRestPorts,
 } from "./transport/api-rest/ops-clickhouse-explain.api.ts";
+export { opsServer } from "./ops.server.ts";

@@ -6,10 +6,19 @@
  * inputs / "All time" did not travel — the audit trail always has a window.
  */
 
-import { differenceInCalendarDays, startOfDay, subDays, toEpochMs } from "@langwatch/time";
+import {
+  differenceInCalendarDays,
+  fromDate,
+  type Instant,
+  startOfDay,
+  subDays,
+  Temporal,
+  toDate,
+  toEpochMs,
+} from "@langwatch/time";
 
 /** The window a read is taken over. */
-export type AuditPeriod = { startDate: Date; endDate: Date };
+export type AuditPeriod = { startDate: Instant; endDate: Instant };
 
 /**
  * Relative range presets. The key is what is serialised into the URL as
@@ -48,13 +57,18 @@ const isReadableDate = (value: string): boolean => !isNaN(toEpochMs(value));
  * "Last 7 days" mean seven whole days rather than a hundred and sixty-eight
  * hours ending at an arbitrary minute.
  */
-export function computeAuditWindow(presetKey: AuditPeriodPresetKey, now: Date): AuditPeriod {
+export function computeAuditWindow(presetKey: AuditPeriodPresetKey, now: Instant): AuditPeriod {
   const preset = PRESETS_BY_KEY.get(presetKey);
-  if (!preset) return { startDate: startOfDay(subDays(now, 29)), endDate: now };
+  const dayStart = (daysBack: number) => fromDate(startOfDay(subDays(toDate(now), daysBack)));
+  if (!preset) return { startDate: dayStart(29), endDate: now };
   if (preset.minutes !== null) {
-    return { startDate: new Date(now.getTime() - preset.minutes * 60 * 1000), endDate: now };
+    return {
+      startDate: now.subtract({ milliseconds: preset.minutes * 60 * 1000 }),
+      endDate: now,
+    };
   }
-  return { startDate: startOfDay(subDays(now, preset.days - 1)), endDate: now };
+
+  return { startDate: dayStart(preset.days - 1), endDate: now };
 }
 
 /** How the window on screen was arrived at. */
@@ -77,15 +91,18 @@ const DEFAULT_PRESET: AuditPeriodPresetKey = "30d";
  */
 export function readAuditPeriod(
   query: Readonly<Record<string, string | undefined>>,
-  now: Date,
+  now: Instant,
 ): AuditPeriodReading {
   const start = query.startDate;
   const end = query.endDate;
   if (start && end && isReadableDate(start) && isReadableDate(end)) {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const startDate = Temporal.Instant.fromEpochMilliseconds(toEpochMs(start));
+    const endDate = Temporal.Instant.fromEpochMilliseconds(toEpochMs(end));
     return {
-      period: { startDate: startDate > endDate ? endDate : startDate, endDate },
+      period: {
+        startDate: Temporal.Instant.compare(startDate, endDate) > 0 ? endDate : startDate,
+        endDate,
+      },
       mode: "absolute",
     };
   }
@@ -115,15 +132,15 @@ export function auditPeriodQuery(
 export function auditPeriodLabel(
   { startDate, endDate }: AuditPeriod,
   mode: AuditPeriodMode,
-  now: Date,
+  now: Instant,
 ): string {
   if (mode === "relative") {
-    const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+    const minutes = Math.round((endDate.epochMilliseconds - startDate.epochMilliseconds) / 60000);
     const subDay = AUDIT_PERIOD_PRESETS.find((preset) => preset.minutes === minutes);
     if (subDay) return subDay.label;
 
-    const days = differenceInCalendarDays(endDate, startDate) + 1;
-    const fromToday = differenceInCalendarDays(now, endDate) + 1;
+    const days = differenceInCalendarDays(toDate(endDate), toDate(startDate)) + 1;
+    const fromToday = differenceInCalendarDays(toDate(now), toDate(endDate)) + 1;
     if (fromToday <= 1) {
       const byDays = AUDIT_PERIOD_PRESETS.find(
         (preset) => preset.minutes === null && preset.days === days,
@@ -131,5 +148,5 @@ export function auditPeriodLabel(
       if (byDays) return byDays.label;
     }
   }
-  return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+  return `${toDate(startDate).toLocaleDateString()} - ${toDate(endDate).toLocaleDateString()}`;
 }

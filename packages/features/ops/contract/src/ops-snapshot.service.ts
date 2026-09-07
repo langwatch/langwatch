@@ -1,5 +1,6 @@
 import type { DashboardData } from "./ops-dashboard.ts";
 import type { DetailSnapshot, LiveSnapshot } from "./ops-snapshot.ts";
+import type { OpsApiGetBadgeCountsOutput } from "./ops.responses.ts";
 
 export interface OpsSnapshotLease {
   isHeld: boolean;
@@ -10,7 +11,7 @@ export interface OpsSnapshotLease {
 export interface OpsBadgeCounts {
   blockedCount: number;
   dlqCount: number;
-  computedAt: Date;
+  computedAt: NonNullable<OpsApiGetBadgeCountsOutput["computedAt"]>;
 }
 
 export interface OpsSnapshotAbortSignal {

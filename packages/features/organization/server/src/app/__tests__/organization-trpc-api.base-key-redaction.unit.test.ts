@@ -1,3 +1,4 @@
+import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  *
@@ -22,17 +23,27 @@ import {
   OrganizationTrpcApi,
   type OrganizationTrpcPorts,
 } from "../../transport/api-trpc/organization.api.ts";
-import { OrganizationApp, type OrganizationAppDependencies } from "../organization.app.ts";
+import {
+  ServerOrganizationApp,
+  createOrganizationAppForTesting,
+  type ServerOrganizationAppDependencies,
+} from "../organization.app.ts";
 
 type TestContext = {
-  app: { organizations: OrganizationApp };
+  app: { organizations: ServerOrganizationApp };
   session: { user: { id: string; name?: string | null; email?: string | null } } | null;
 };
 
-function application(organizations: Record<string, unknown>): OrganizationApp {
-  return OrganizationApp.create({
-    organizations: organizations as unknown as OrganizationAppDependencies["organizations"],
-    projects: {} as unknown as OrganizationAppDependencies["projects"],
+function application(organizations: Record<string, unknown>): ServerOrganizationApp {
+  return createOrganizationAppForTesting({
+    infrastructure: {
+      organizations: organizations as unknown as ServerOrganizationAppDependencies["organizations"],
+      membership: organizations as unknown as ServerOrganizationAppDependencies["membership"],
+      projects: {} as unknown as ServerOrganizationAppDependencies["projects"],
+    },
+    dependencies: { projects: {} as unknown as ProjectApiContract },
+    config: undefined,
+    resources: { own: () => undefined },
   });
 }
 

@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
 import { GraphAlertDispatchService } from "../graph-alert-dispatch.service.ts";
+import { Temporal } from "@langwatch/time";
 
 /** A real alert context, built the way the evaluator builds one. */
 const CONTEXT = buildGraphAlertTemplateContext({
@@ -25,7 +26,7 @@ const CONTEXT = buildGraphAlertTemplateContext({
   metric: { label: "Latency p95", seriesName: "0/duration/p95" },
   condition: { operator: "gt", threshold: 500, timePeriodMinutes: 60 },
   currentValue: 712,
-  occurredAt: new Date("2026-06-21T10:00:00.000Z"),
+  occurredAt: Temporal.Instant.from("2026-06-21T10:00:00.000Z"),
   reason: "real-time",
   project: { id: "project-1", name: "Acme", slug: "acme" },
   baseHost: "https://app.langwatch.ai",
@@ -84,7 +85,7 @@ function dispatcherWith(
       },
     },
     webhooks: {},
-    clock: { now: () => new Date("2026-01-01T00:00:00.000Z") },
+    clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00.000Z") },
     emailHourlyCap: 10,
     tenantDailyCap: 100,
   } as never);

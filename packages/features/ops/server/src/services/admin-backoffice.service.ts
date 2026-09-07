@@ -11,6 +11,7 @@ import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contrac
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
 import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository.ts";
 import type { AdminAuditSink } from "./impersonation.service.ts";
+import { Temporal, toEpochMs } from "@langwatch/time";
 
 const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "deleteMany"]);
 
@@ -84,10 +85,13 @@ export class AdminBackofficeService {
         await this.users.deactivate({ id: userId });
         delete data.deactivatedAt;
         handledSideEffect = true;
-        const pickedDate = value instanceof Date ? value : new Date(value);
-        const isValidPickedDate = !Number.isNaN(pickedDate.getTime());
+        const pickedMs = toEpochMs(value);
+        const isValidPickedDate = !Number.isNaN(pickedMs);
         if (isValidPickedDate) {
-          await this.repository.setUserDeactivatedAt(userId, pickedDate);
+          await this.repository.setUserDeactivatedAt(
+            userId,
+            Temporal.Instant.fromEpochMilliseconds(pickedMs),
+          );
         }
 
         sideEffectAudits.push({
@@ -95,7 +99,13 @@ export class AdminBackofficeService {
           payload: {
             id: userId,
             deactivate: true,
-            ...(isValidPickedDate ? { pickedDate: pickedDate.toISOString() } : {}),
+            ...(isValidPickedDate
+              ? {
+                  pickedDate: Temporal.Instant.fromEpochMilliseconds(pickedMs).toString({
+                    fractionalSecondDigits: 3,
+                  }),
+                }
+              : {}),
           },
         });
       }

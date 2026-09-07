@@ -28,30 +28,28 @@ export const formatTimeAgo = (
   dateFormat = "dd/MMM HH:mm",
   maxHours = 24,
 ): string | undefined => {
-  const timestampDate = timestamp ? new Date(timestamp) : undefined;
-  return timestampDate
-    ? timestampDate.getTime() < nowInstant().epochMilliseconds - 1000 * 60 * 60 * maxHours
-      ? format(timestampDate, dateFormat)
-      : formatDistanceToNow(timestampDate, { addSuffix: true })
-    : undefined;
+  if (!timestamp) return undefined;
+
+  return timestamp < nowInstant().epochMilliseconds - 1000 * 60 * 60 * maxHours
+    ? format(timestamp, dateFormat)
+    : formatDistanceToNow(timestamp, { addSuffix: true });
 };
 
 /** The same instant in the space a preview row has: "2m ago", "1h ago". */
 export function formatTimeAgoCompact(timestamp: number, nowMs?: number): string {
-  const date = new Date(timestamp);
-  const now = nowMs ? new Date(nowMs) : new Date();
+  const now = nowMs ?? nowInstant().epochMilliseconds;
 
-  const minutes = differenceInMinutes(now, date);
+  const minutes = differenceInMinutes(now, timestamp);
   if (minutes < 1) return "now";
   if (minutes < 60) return `${minutes}m ago`;
 
-  const hours = differenceInHours(now, date);
+  const hours = differenceInHours(now, timestamp);
   if (hours < 24) return `${hours}h ago`;
 
-  const days = differenceInDays(now, date);
+  const days = differenceInDays(now, timestamp);
   if (days < 7) return `${days}d ago`;
 
-  const weeks = differenceInWeeks(now, date);
+  const weeks = differenceInWeeks(now, timestamp);
   if (days < 30) return `${weeks}w ago`;
 
   return `${Math.floor(days / 30)}mo ago`;

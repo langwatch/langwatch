@@ -1,5 +1,6 @@
 import { CADENCE_WINDOW_MS, type NotificationCadence } from "./cadences.ts";
 import type { TriggerAction } from "./trigger.ts";
+import { type Instant, Temporal } from "@langwatch/time";
 
 export const NOTIFY_TRIGGER_ACTIONS = new Set<TriggerAction>([
   "SEND_EMAIL",
@@ -15,15 +16,17 @@ export const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
 export function computeScheduledFor(input: {
   action: TriggerAction;
   cadence: NotificationCadence;
-  now: Date;
-}): Date {
+  now: Instant;
+}): Instant {
   if (PERSIST_TRIGGER_ACTIONS.has(input.action) || input.cadence === "immediate") {
     return input.now;
   }
 
   const windowMs = CADENCE_WINDOW_MS[input.cadence];
 
-  return new Date((Math.floor(input.now.getTime() / windowMs) + 1) * windowMs);
+  return Temporal.Instant.fromEpochMilliseconds(
+    (Math.floor(input.now.epochMilliseconds / windowMs) + 1) * windowMs,
+  );
 }
 
 /**

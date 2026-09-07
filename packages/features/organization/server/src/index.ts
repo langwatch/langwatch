@@ -17,6 +17,7 @@ export {
   type OrganizationSeatDecision,
 } from "./ports/organization-membership.port.ts";
 export { OrganizationMembershipService } from "./services/organization-membership.service.ts";
+export { OrganizationGroupScopeService } from "./services/organization-group-scope.service.ts";
 export {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
@@ -76,12 +77,14 @@ export {
   type PersonalWorkspaceResourceIds,
 } from "./ports/organization.port.ts";
 export {
-  OrganizationApp,
+  ServerOrganizationApp,
+  type OrganizationInfrastructure,
   type FullyLoadedOrganization,
-  type OrganizationAppDependencies,
+  type ServerOrganizationAppDependencies,
   type OrganizationCaller,
   type OrganizationWithMembersAndTheirTeams,
 } from "./app/organization.app.ts";
+export { organizationFeature } from "./organization.server.ts";
 export {
   createOrganizationRestApp,
   type OrganizationRestInviteService,

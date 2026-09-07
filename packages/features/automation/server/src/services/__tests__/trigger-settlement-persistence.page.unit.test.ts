@@ -15,6 +15,7 @@ vi.mock("@langwatch/observability", () => ({
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { TriggerSettlementPersistenceService } from "../trigger-settlement-persistence.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const trigger: TriggerSummary = {
   id: "trigger-1",
@@ -78,7 +79,7 @@ function runtime(
     traces: { tryGetSummary: vi.fn().mockResolvedValue(fold) } as never,
     confirmation: { confirms: vi.fn().mockResolvedValue(true) } as never,
     persistActions: { dispatch } as never,
-    clock: { now: () => new Date("2026-01-01T00:00:00Z") } as never,
+    clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,
     observability: { recordOverflow: vi.fn(), capture } as never,
   });
 

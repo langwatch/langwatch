@@ -5,6 +5,7 @@ import {
   type MigrationPassSummary,
   type SystemMigration,
   SystemMigrationRunnerService,
+  runSystemMigrationsAtStartup,
 } from "@langwatch/system-migrations";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -22,6 +23,18 @@ import { PrismaSystemMigrationEnrollmentRepository } from "../repositories/prism
 import { PrismaSystemMigrationStateRepository } from "../repositories/prisma/prisma.system-migration-state.repository.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations:pass");
+
+export class UserStartupMigrationsUnsupportedError extends Error {
+  readonly migrationNames: readonly string[];
+
+  constructor(migrationNames: readonly string[]) {
+    super(
+      `User-rooted migrations cannot run in startup mode: ${migrationNames.join(", ")}. Run them in background mode.`,
+    );
+    this.name = "UserStartupMigrationsUnsupportedError";
+    this.migrationNames = migrationNames;
+  }
+}
 
 /** Both legs count into one summary: the convergence loop stops when a whole
  *  pass moved nothing, so one leg still advancing has to keep it non-zero. */
@@ -78,32 +91,59 @@ export class PostgresSystemMigrationsAdapter {
 
   private constructor(private readonly options: PostgresSystemMigrationsAdapterOptions) {}
 
+  async runStartup({
+    signal,
+    maxPasses,
+    pollDelayMs,
+  }: {
+    signal?: AbortSignal;
+    maxPasses?: number;
+    pollDelayMs?: number;
+  } = {}): Promise<void> {
+    const isSaaS = this.options.isSaaS();
+    const startupUserMigrations = this.released({
+      migrations: this.options.userMigrations(),
+      isSaaS,
+    }).filter((migration) => (migration.executionMode ?? "background") === "startup");
+    if (startupUserMigrations.length > 0) {
+      throw new UserStartupMigrationsUnsupportedError(
+        startupUserMigrations.map((migration) => migration.name),
+      );
+    }
+
+    const organization = await this.organizationRunner({
+      isSaaS,
+      executionMode: "startup",
+    });
+    await runSystemMigrationsAtStartup({
+      runPass: ({ signal: passSignal }) => organization.runner.runPass({ signal: passSignal }),
+      state: organization.state,
+      tenants: organization.tenants,
+      migrations: organization.migrations,
+      cohort: organization.cohort,
+      signal,
+      maxPasses,
+      pollDelayMs,
+    });
+  }
+
   async runPass({ signal }: { signal?: AbortSignal }): Promise<MigrationPassSummary> {
     const isSaaS = this.options.isSaaS();
-    const state = PrismaSystemMigrationStateRepository.create({ prisma: this.options.database });
-    const lease = RedisMigrationLeaseRepository.create({ redis: this.options.redis });
     const enrollments = PrismaSystemMigrationEnrollmentRepository.create({
       prisma: this.options.database,
     });
 
-    const migrations = this.released({ migrations: this.options.migrations(), isSaaS });
+    const organization = await this.organizationRunner({ isSaaS, enrollments });
     const userMigrations = this.released({ migrations: this.options.userMigrations(), isSaaS });
     // Both legs' cohorts resolve BEFORE either pass starts, so the two legs
     // read enrollment at the same moment: an operator enrolling mid-pass moves
     // both legs on the next pass, never one leg now and the other later.
-    const cohort = await this.cohort({ isSaaS, enrollments, migrations });
     const userCohort =
       userMigrations.length === 0
         ? null
         : await this.userCohort({ isSaaS, enrollments, migrations: userMigrations });
 
-    const summary = await new SystemMigrationRunnerService({
-      state,
-      lease,
-      tenants: PrismaOrganizationTenantSourceRepository.create({ prisma: this.options.database }),
-      cohort,
-      migrations,
-    }).runPass({ signal });
+    const summary = await organization.runner.runPass({ signal });
 
     const merged =
       userCohort === null
@@ -111,8 +151,8 @@ export class PostgresSystemMigrationsAdapter {
         : mergeSummaries(
             summary,
             await new SystemMigrationRunnerService({
-              state,
-              lease,
+              state: organization.state,
+              lease: organization.lease,
               tenants: PrismaUserTenantSourceRepository.create({ prisma: this.options.database }),
               cohort: userCohort,
               migrations: userMigrations,
@@ -121,6 +161,37 @@ export class PostgresSystemMigrationsAdapter {
 
     await this.sweepAbandonedNewborns();
     return merged;
+  }
+
+  private async organizationRunner({
+    isSaaS,
+    enrollments = PrismaSystemMigrationEnrollmentRepository.create({
+      prisma: this.options.database,
+    }),
+    executionMode,
+  }: {
+    isSaaS: boolean;
+    enrollments?: PrismaSystemMigrationEnrollmentRepository;
+    executionMode?: "background" | "startup";
+  }) {
+    const state = PrismaSystemMigrationStateRepository.create({ prisma: this.options.database });
+    const lease = RedisMigrationLeaseRepository.create({ redis: this.options.redis });
+    const migrations = this.released({ migrations: this.options.migrations(), isSaaS }).filter(
+      (migration) =>
+        executionMode === void 0 || (migration.executionMode ?? "background") === executionMode,
+    );
+    const cohort = await this.cohort({ isSaaS, enrollments, migrations });
+    const tenants = PrismaOrganizationTenantSourceRepository.create({
+      prisma: this.options.database,
+    });
+    return {
+      state,
+      lease,
+      tenants,
+      migrations,
+      cohort,
+      runner: new SystemMigrationRunnerService({ state, lease, tenants, cohort, migrations }),
+    };
   }
 
   /**

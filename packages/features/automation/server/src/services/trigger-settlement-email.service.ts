@@ -118,7 +118,7 @@ export class TriggerSettlementEmailService {
     const hourly = await this.composition.emailCaps.consumeHourly({
       projectId: input.projectId,
       triggerId: input.triggerId,
-      now: fromDate(this.composition.clock.now()),
+      now: this.composition.clock.now(),
       cap: this.composition.emailHourlyCap,
       dedupKey: `${input.projectId}/${input.triggerId}:digest:${input.digest}`,
     });
@@ -128,7 +128,7 @@ export class TriggerSettlementEmailService {
 
     const daily = await this.composition.emailCaps.consumeDaily({
       projectId: input.projectId,
-      now: fromDate(this.composition.clock.now()),
+      now: this.composition.clock.now(),
       cap: this.composition.tenantDailyCap,
       recipientCount: recipients.length,
       dedupKey: `${input.projectId}:tenant:${input.triggerId}:${input.digest}`,

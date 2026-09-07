@@ -1,4 +1,8 @@
-export { PostgresAutomationAdapter } from "./adapters/postgres.automation.adapter.ts";
+export {
+  PostgresAutomationAdapter,
+  type AutomationDatabase,
+} from "./adapters/postgres.automation.adapter.ts";
+export { automationServer } from "./automation.server.ts";
 export { PostgresAutomationGraphDeliveryAdapter } from "./adapters/postgres.automation-graph-delivery.adapter.ts";
 export { SlackWebhookDeliveryAdapter } from "./adapters/slack-webhook.delivery.adapter.ts";
 export type {

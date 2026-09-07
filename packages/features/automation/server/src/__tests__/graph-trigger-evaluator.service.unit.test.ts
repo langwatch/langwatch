@@ -19,7 +19,7 @@ import {
   type OpenGraphTriggerSent,
 } from "../repositories/graph-trigger-sent.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
-import type { Instant } from "@langwatch/time";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 class DispatchError extends Error {
   constructor(options: { message: string; retryable: boolean }) {
@@ -44,7 +44,7 @@ const evaluateGraphTrigger = (input: {
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";
 const GRAPH_ID = "graph-1";
-const NOW = new Date("2026-06-20T12:00:00Z");
+const NOW = Temporal.Instant.from("2026-06-20T12:00:00Z");
 
 function makeTrigger(overrides: Partial<Trigger> = {}): Trigger {
   return {
@@ -511,8 +511,8 @@ describe("evaluateGraphTrigger", () => {
       // (NOW - timePeriod → NOW), not "now".
       expect(arg.context.graph.url).toBe(
         "https://app.langwatch.test/demo/analytics/custom/graph-1" +
-          `?startDate=${encodeURIComponent(new Date(NOW.getTime() - 60 * 60 * 1000).toISOString())}` +
-          `&endDate=${encodeURIComponent(NOW.toISOString())}`,
+          `?startDate=${encodeURIComponent(toDate(NOW.subtract({ milliseconds: 60 * 60 * 1000 })).toISOString())}` +
+          `&endDate=${encodeURIComponent(toDate(NOW).toISOString())}`,
       );
       expect(arg.context.metric.label).toBe("Trace count");
       expect(arg.context.metric.seriesName).toBe("0/metadata.trace_id/cardinality");
@@ -522,7 +522,7 @@ describe("evaluateGraphTrigger", () => {
       expect(arg.context.condition.timePeriodMinutes).toBe(60);
       expect(arg.context.condition.timePeriodLabel).toBe("last 1 hour");
       expect(arg.context.currentValue).toBe(15);
-      expect(arg.context.occurredAt).toBe(NOW.toISOString());
+      expect(arg.context.occurredAt).toBe(toDate(NOW).toISOString());
       expect(arg.context.reason).toBe("real-time");
       // Graph data for templates: the buckets the threshold read, plus the
       // prebuilt sparkline; previousValue is null (harness has no previous
