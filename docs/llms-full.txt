@@ -10630,7 +10630,7 @@ langwatch vk enable <vk_id>
 langwatch vk revoke <vk_id>
 ```
 
-`vk create` also takes `--scope org:<id>`, `--scope team:<id>`, `--trace-project <id>`, `--routing-policy <id>`, `--routing-mode none|fallback_all|policy`, `--principal-user <user_id>` and `--providers-allowed <ids>`. `vk update <id>` changes the name, description, scopes, trace project, routing and budget, with `--clear-description`, `--clear-trace-project`, `--clear-routing-policy` and `--clear-budget` to unset them, and `--config-json <json>` or `--config-file <path>` to set the key's configuration.
+`vk create` also takes `--scope org:<id>`, `--scope team:<id>`, `--trace-project <id>`, `--routing-policy <id>`, `--routing-mode none|fallback_all|policy`, `--principal-user <user_id>`, `--providers-allowed <ids>` and `--reveal-once`, which keeps the secret out of the output and returns a `reveal_id` the app reads exactly once, within 24 hours. `vk update <id>` changes the name, description, scopes, trace project, routing and budget, with `--clear-description`, `--clear-trace-project`, `--clear-routing-policy` and `--clear-budget` to unset them, and `--config-json <json>` or `--config-file <path>` to set the key's configuration.
 
 ## Manage keys over REST
 
@@ -19343,7 +19343,7 @@ uv add langwatch langchain langgraph langchain-openai
 The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
-Use LangWatch's callback handler to instrument your LangGraph agents. Pass the callback to model invocations within your graph nodes to capture LLM calls and tool usage as spans.
+Use LangWatch's callback handler to instrument your LangGraph agents. Pass the callback to the graph invocation, not to a model call inside a node: LangGraph then propagates it to everything the run touches, so every node becomes a span, including tool nodes and plain Python nodes.
 
 ```python
 import langwatch
@@ -19392,9 +19392,6 @@ def llm_call(state: dict):
             )
         ]
         + state["messages"],
-        config=RunnableConfig(
-            callbacks=[langwatch.get_current_trace().get_langchain_callback()]  # +
-        ),
     )
     return {"messages": [msg]}
 
@@ -19431,7 +19428,12 @@ agent = agent_builder.compile()
 
 @langwatch.trace(name="LangGraph - Calculator Agent")
 def main(user_question: str) -> str:
-    result = agent.invoke({"messages": [HumanMessage(content=user_question)]})
+    result = agent.invoke(
+        {"messages": [HumanMessage(content=user_question)]},
+        config=RunnableConfig(
+            callbacks=[langwatch.get_current_trace().get_langchain_callback()]  # +
+        ),
+    )
     final_msg = result["messages"][-1]  # assistant reply
     return getattr(final_msg, "content", str(final_msg))
 
@@ -19440,7 +19442,9 @@ if __name__ == "__main__":
     print(main("Add 13 and 37."))
 ```
 
-The `@langwatch.trace()` decorator creates a parent trace for your graph execution. Within each node that makes LLM calls, use `get_langchain_callback()` and pass it to the model's `RunnableConfig` to capture those calls as spans within the trace.
+The `@langwatch.trace()` decorator creates a parent trace for your graph execution. `get_langchain_callback()` goes in the config of `agent.invoke()`, and the same config argument works for `ainvoke()` and `stream()`. From there LangGraph passes it down: each node becomes a chain span named after the node, model calls become LLM spans, and tool calls become tool spans.
+
+A callback attached only to the model call inside one node produces LLM spans and nothing else. The tool nodes and the plain function nodes never appear, so nothing in the trace shows which step the graph actually ran.
 
 ## Related
 
@@ -31771,6 +31775,7 @@ Rules for the connect function:
 - Change nothing about how the service starts. The connect function runs on the startup path, and the start command stays the same.
 - **Turn fields** are what the platform sends on every call: `messages` (the whole conversation, OpenAI-style), `new_messages` (`newMessages`, the delta since the last turn), `thread_id` (`threadId`), `session`, `trace_id` (`traceId`). In Python, declare only the ones you use and the SDK passes exactly those. In TypeScript, they arrive as one object, so destructure what you need.
 - Return a string, one message, a list of messages, or `langwatch.AgentReply(output, session=...)` (`{ output, session }` in TypeScript).
+- The connect function is the adapter, and only it carries the decorator. Never place the decorator on a function the app already has when that function returns its own result, for example a dict with the output, a thread id and an order number: the SDK cannot turn that into a reply, and every turn of the run times out. Call that function from the connect function and return its reply text.
 - Do not change the agent's own code to fit the connect function. Map the turn onto the agent's existing call in the connect function instead.
 - Do NOT add a `traceparent` middleware. The SDK adopts the turn's trace context before it calls the function, so the agent's spans land in the turn's trace and the judge reads them.
 
@@ -32042,6 +32047,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 ## Common Mistakes
 
 - Do NOT reimplement the agent inside the connect function, and do NOT point it at a simplified copy. It calls the agent the product already runs, so the simulation exercises the real code path.
+- Do NOT decorate a function the app already has when it returns its own result object instead of reply text. Write the connect function beside it, call it, and return the text.
 - Do NOT add a runner script or a second start command when the service already has one. The connect function goes on the existing startup path.
 - Do NOT add a `traceparent` middleware for a connected agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
 - Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.
@@ -47588,6 +47594,33 @@ const langwatch = new LangWatch();
 
 The exact pattern depends on the framework, so follow the docs, not these examples.
 
+**A graph takes the callback at the graph, not at a model call inside it.** LangChain propagates a callback down from wherever it is attached, so in LangGraph the callback goes in the config of the graph invocation:
+
+```python
+graph.invoke(state, config={"callbacks": [langwatch.get_current_trace().get_langchain_callback()]})
+```
+
+The same config argument works on `ainvoke` and `stream`. Every node the run touches then becomes a span under the trace: a chain span named after the node, LLM spans for the model calls and tool spans for the tool calls. Attached only to the model call inside one node, the trace holds LLM spans and nothing else, so the tool nodes and the plain function nodes are missing and a check for whether the graph reached its payment step has no span to read.
+
+**The environment loads before LangWatch initialises.** `langwatch.setup()` and `new LangWatch()` read `LANGWATCH_API_KEY` from the process environment the moment they run, and a `.env` file is not the environment until something loads it. A filmed run put `langwatch.setup()` at the top of the entry file, above the import that called `load_dotenv()`, and the process died at import with "LangWatch API key is required but not provided".
+
+- Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
+- TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
+
+Before you start the process, check that the key is visible to it the way the project reads it. This is the first and only check: copy the command for the language as written, run it once from the project root, and read the answer. No variant before it (a probe such as `import langwatch` with no loader reads the bare process and always answers missing on a dotenv project) and none after it.
+
+```bash
+uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
+```
+
+`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. Always `-c`, never `python -` with a heredoc: python-dotenv's loader looks for its caller's file and fails on standard input. TypeScript:
+
+```bash
+node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"
+```
+
+The command prints only whether `LANGWATCH_API_KEY` is set, never its value. Swap the loader for the project's own when it is not dotenv. `False` means the file is not where the loader looks or the order above is wrong: fix that, never retry the check with another path.
+
 ## Step 4: Verify
 
 Do NOT consider the work complete without verifying. In order:
@@ -47602,6 +47635,8 @@ Do NOT consider the work complete without verifying. In order:
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
+- Do NOT call `langwatch.setup()` above the import that loads the environment: the key is read when `setup()` runs
+- Do NOT attach the LangChain callback only to a model call inside a graph node: it belongs on the graph invocation, or the nodes never become spans
 - Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly
 ````
 
@@ -49522,6 +49557,7 @@ Rules for the connect function:
 - Change nothing about how the service starts. The connect function runs on the startup path, and the start command stays the same.
 - **Turn fields** are what the platform sends on every call: `messages` (the whole conversation, OpenAI-style), `new_messages` (`newMessages`, the delta since the last turn), `thread_id` (`threadId`), `session`, `trace_id` (`traceId`). In Python, declare only the ones you use and the SDK passes exactly those. In TypeScript, they arrive as one object, so destructure what you need.
 - Return a string, one message, a list of messages, or `langwatch.AgentReply(output, session=...)` (`{ output, session }` in TypeScript).
+- The connect function is the adapter, and only it carries the decorator. Never place the decorator on a function the app already has when that function returns its own result, for example a dict with the output, a thread id and an order number: the SDK cannot turn that into a reply, and every turn of the run times out. Call that function from the connect function and return its reply text.
 - Do not change the agent's own code to fit the connect function. Map the turn onto the agent's existing call in the connect function instead.
 - Do NOT add a `traceparent` middleware. The SDK adopts the turn's trace context before it calls the function, so the agent's spans land in the turn's trace and the judge reads them.
 
@@ -49793,6 +49829,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 ## Common Mistakes
 
 - Do NOT reimplement the agent inside the connect function, and do NOT point it at a simplified copy. It calls the agent the product already runs, so the simulation exercises the real code path.
+- Do NOT decorate a function the app already has when it returns its own result object instead of reply text. Write the connect function beside it, call it, and return the text.
 - Do NOT add a runner script or a second start command when the service already has one. The connect function goes on the existing startup path.
 - Do NOT add a `traceparent` middleware for a connected agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
 - Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.
@@ -50992,6 +51029,33 @@ const langwatch = new LangWatch();
 
 The exact pattern depends on the framework, so follow the docs, not these examples.
 
+**A graph takes the callback at the graph, not at a model call inside it.** LangChain propagates a callback down from wherever it is attached, so in LangGraph the callback goes in the config of the graph invocation:
+
+```python
+graph.invoke(state, config={"callbacks": [langwatch.get_current_trace().get_langchain_callback()]})
+```
+
+The same config argument works on `ainvoke` and `stream`. Every node the run touches then becomes a span under the trace: a chain span named after the node, LLM spans for the model calls and tool spans for the tool calls. Attached only to the model call inside one node, the trace holds LLM spans and nothing else, so the tool nodes and the plain function nodes are missing and a check for whether the graph reached its payment step has no span to read.
+
+**The environment loads before LangWatch initialises.** `langwatch.setup()` and `new LangWatch()` read `LANGWATCH_API_KEY` from the process environment the moment they run, and a `.env` file is not the environment until something loads it. A filmed run put `langwatch.setup()` at the top of the entry file, above the import that called `load_dotenv()`, and the process died at import with "LangWatch API key is required but not provided".
+
+- Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
+- TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
+
+Before you start the process, check that the key is visible to it the way the project reads it. This is the first and only check: copy the command for the language as written, run it once from the project root, and read the answer. No variant before it (a probe such as `import langwatch` with no loader reads the bare process and always answers missing on a dotenv project) and none after it.
+
+```bash
+uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
+```
+
+`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. Always `-c`, never `python -` with a heredoc: python-dotenv's loader looks for its caller's file and fails on standard input. TypeScript:
+
+```bash
+node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"
+```
+
+The command prints only whether `LANGWATCH_API_KEY` is set, never its value. Swap the loader for the project's own when it is not dotenv. `False` means the file is not where the loader looks or the order above is wrong: fix that, never retry the check with another path.
+
 ## Step 4: Verify
 
 Do NOT consider the work complete without verifying. In order:
@@ -51006,6 +51070,8 @@ Do NOT consider the work complete without verifying. In order:
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
+- Do NOT call `langwatch.setup()` above the import that loads the environment: the key is read when `setup()` runs
+- Do NOT attach the LangChain callback only to a model call inside a graph node: it belongs on the graph invocation, or the nodes never become spans
 - Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly
 
 ---
@@ -56279,7 +56345,7 @@ Langy asks which way to use the first time a request needs a code change. Reques
     ![The code access card in the Langy chat, with the options Share my local folder and Use GitHub](/images/langy/local-development/code-access-card.png)
   </Step>
   <Step title="Run the command in the folder">
-    Pick **Share my local folder**. The card shows one command. Run it in the folder you want Langy to work in:
+    Pick **Share local folder**. The card shows one command. Run it in the folder you want Langy to work in:
 
     ```bash
     npx langwatch@latest langy --share-control

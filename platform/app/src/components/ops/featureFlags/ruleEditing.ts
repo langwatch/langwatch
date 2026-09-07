@@ -1,6 +1,7 @@
-import type {
-  FeatureFlagRuleMatch,
-  FeatureFlagRules,
+import {
+  emailDomainsOf,
+  type FeatureFlagRuleMatch,
+  type FeatureFlagRules,
 } from "~/server/featureFlag";
 
 /**
@@ -19,7 +20,11 @@ export type ScopeKind =
   | "ORGANIZATION"
   | "PROJECT"
   /** Organizations created on or after a date — shown as "New users". */
-  | "NEW_USERS";
+  | "NEW_USERS"
+  /** A stable share of users, in percent — shown as "Percentage of users". */
+  | "PERCENTAGE"
+  /** Signed-in users at one or more email domains, shown as "Email domain". */
+  | "EMAIL_DOMAIN";
 
 export interface UIRule {
   /**
@@ -30,7 +35,10 @@ export interface UIRule {
    */
   id: string;
   scopeKind: ScopeKind;
-  /** An organization or project id, or a date for `NEW_USERS`. */
+  /**
+   * An organization or project id, a date for `NEW_USERS`, a number of
+   * percent for `PERCENTAGE`, or comma-separated domains for `EMAIL_DOMAIN`.
+   */
   target: string;
   enabled: boolean;
   /**
@@ -94,6 +102,25 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         }),
       };
     }
+    if (rule.match.percentageRollout !== undefined) {
+      return {
+        ...base,
+        scopeKind: "PERCENTAGE" as const,
+        target: String(rule.match.percentageRollout),
+        otherConditions: without({
+          match: rule.match,
+          key: "percentageRollout",
+        }),
+      };
+    }
+    if (rule.match.emailDomain !== undefined) {
+      return {
+        ...base,
+        scopeKind: "EMAIL_DOMAIN" as const,
+        target: emailDomainsOf(rule.match.emailDomain).join(", "),
+        otherConditions: without({ match: rule.match, key: "emailDomain" }),
+      };
+    }
     return {
       ...base,
       scopeKind: "EVERYONE" as const,
@@ -110,23 +137,45 @@ export function uiToRules(rules: UIRule[]): FeatureFlagRules {
     // choosing it is the operator saying the rule matches every context, and
     // a leftover condition would quietly make that untrue.
     const rest = rule.scopeKind === "EVERYONE" ? {} : rule.otherConditions;
-    if (rule.scopeKind === "ORGANIZATION") {
-      return {
-        match: { ...rest, organizationId: target },
-        enabled: rule.enabled,
-      };
-    }
-    if (rule.scopeKind === "PROJECT") {
-      return { match: { ...rest, projectId: target }, enabled: rule.enabled };
-    }
-    if (rule.scopeKind === "NEW_USERS") {
-      return {
-        match: { ...rest, organizationCreatedAfter: target },
-        enabled: rule.enabled,
-      };
-    }
-    return { match: {}, enabled: rule.enabled };
+    return {
+      match: { ...rest, ...OWNED_CONDITION[rule.scopeKind](target) },
+      enabled: rule.enabled,
+    };
   });
+}
+
+/** The one condition each scope owns, from the field beside the picker. */
+const OWNED_CONDITION: Record<
+  ScopeKind,
+  (target: string) => FeatureFlagRuleMatch
+> = {
+  EVERYONE: () => ({}),
+  ORGANIZATION: (target) => ({ organizationId: target }),
+  PROJECT: (target) => ({ projectId: target }),
+  NEW_USERS: (target) => ({ organizationCreatedAfter: target }),
+  PERCENTAGE: (target) => ({ percentageRollout: Number(target) }),
+  EMAIL_DOMAIN: (target) => ({
+    emailDomain: singleOrList(parseEmailDomains(target)),
+  }),
+};
+
+/**
+ * The domains typed into the email domain field, in their stored form:
+ * split on commas, lowercased, without padding or a leading `@`, empties
+ * dropped. An operator pastes "@Acme.com, acme.io" and the rule stores
+ * `["acme.com", "acme.io"]`.
+ */
+export function parseEmailDomains(target: string): string[] {
+  return target
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
+    .filter((domain) => domain !== "");
+}
+
+/** One domain is stored as a string, several as a list. */
+function singleOrList(domains: string[]): string | string[] {
+  const [only] = domains;
+  return domains.length === 1 && only !== undefined ? only : domains;
 }
 
 /** The rule's other conditions: its match without the one the scope owns. */
@@ -178,13 +227,29 @@ export function withRuleMoved(
 
 /**
  * The rule this operator has left unfillable, or undefined when every rule
- * can match something. A scoped rule with no target and a new-users
- * rule with no date are both rules the operator believes are live.
+ * can match something. A scoped rule with no target, a new-users rule with
+ * no date and a domain rule with an `@` in it are all rules the operator
+ * believes are live.
  */
 export function findUnfillableRule(rules: UIRule[]): UIRule | undefined {
-  return rules.find(
-    (rule) => rule.scopeKind !== "EVERYONE" && rule.target.trim() === "",
-  );
+  return rules.find((rule) => {
+    if (rule.scopeKind === "EVERYONE") return false;
+    const target = rule.target.trim();
+    if (target === "") return true;
+    if (rule.scopeKind === "PERCENTAGE") return !isPercentage(target);
+    if (rule.scopeKind === "EMAIL_DOMAIN") return !areEmailDomains(target);
+    return false;
+  });
+}
+
+function isPercentage(target: string): boolean {
+  const percentage = Number(target);
+  return Number.isFinite(percentage) && percentage >= 0 && percentage <= 100;
+}
+
+function areEmailDomains(target: string): boolean {
+  const domains = parseEmailDomains(target);
+  return domains.length > 0 && domains.every((d) => !/[@\s]/.test(d));
 }
 
 /**

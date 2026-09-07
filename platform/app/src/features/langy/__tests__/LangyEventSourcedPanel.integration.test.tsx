@@ -151,6 +151,7 @@ vi.mock("@ai-sdk/react", async () => {
           notifyEngine();
         },
         regenerate: () => undefined,
+        resumeStream: () => Promise.resolve(),
       };
     },
   };

@@ -1,6 +1,6 @@
 /**
- * The local workspace tools: `code_access` and the seven `local_*` mirrors of
- * pi's built-ins (ADR-129).
+ * The local workspace tools: `code_access`, the seven `local_*` mirrors of
+ * pi's built-ins and the credentials call (ADR-129).
  *
  * A `local_*` call does not run in the worker. It is posted to the app, which
  * hands it to `langwatch langy --share-control` on the developer's machine and
@@ -13,10 +13,42 @@
  */
 
 import { Type } from "typebox";
-import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import {
+  createBashTool,
+  type ExtensionAPI,
+  type InlineExtension,
+} from "@earendil-works/pi-coding-agent";
 import { callIds, conversationId, type TurnContext } from "./turn-context.js";
 
 export const CODE_ACCESS_TOOL_NAME = "code_access";
+
+/**
+ * The shell the model reaches for by its standard name. Registered by this
+ * extension in place of pi's built-in, so that while the developer's folder is
+ * connected a command lands in that folder, through the local_bash path with
+ * its permission card, and a `langwatch` command still runs here, where the
+ * CLI is provisioned with this conversation's login. With no folder
+ * connected it is the sandbox shell it always was.
+ */
+export const BASH_TOOL_NAME = "bash";
+
+/**
+ * Is this command an invocation of the langwatch CLI? Leading environment
+ * assignments are skipped, and `npx langwatch` counts. The CLI runs in the
+ * sandbox whatever the folder's state: its cards, its navigate opens and its
+ * login belong to this conversation, not to the developer's machine.
+ */
+export function isLangwatchCliCommand(command: string): boolean {
+  const words = command.trim().split(/\s+/);
+  let index = 0;
+  while (index < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index] ?? "")) {
+    index += 1;
+  }
+  const head = words[index];
+  const next = words[index + 1] ?? "";
+  if (head === "langwatch") return true;
+  return head === "npx" && (next === "langwatch" || next.startsWith("langwatch@"));
+}
 
 export const LOCAL_TOOL_NAMES = [
   "local_read",
@@ -26,8 +58,46 @@ export const LOCAL_TOOL_NAMES = [
   "local_grep",
   "local_find",
   "local_ls",
+  "local_langwatch_env",
 ] as const;
 export type LocalToolName = (typeof LOCAL_TOOL_NAMES)[number];
+
+/**
+ * pi's own file tools, the ones that read and write the worker's sandbox.
+ *
+ * While the developer's folder is connected these are withdrawn from the
+ * turn's tool set: the folder is the one place the user's project exists, and
+ * a model offered both sets picks the sandbox one often enough. A sandbox
+ * `edit` on a file it had just read through `local_read` answers ENOENT, and
+ * a model reads that as the share being broken and stops the whole path.
+ * `bash` stays: it runs the `langwatch` CLI.
+ */
+export const SANDBOX_FILE_TOOL_NAMES = [
+  "read",
+  "edit",
+  "write",
+  "grep",
+  "find",
+  "ls",
+] as const;
+
+/**
+ * The turn's tool set, given the folder's state: the sandbox file tools are
+ * out while a folder is connected and back when none is. Every other tool,
+ * `bash` and the `local_*` mirrors included, is kept as it stands.
+ */
+export function activeToolsFor({
+  connected,
+  active,
+}: {
+  connected: boolean;
+  active: readonly string[];
+}): string[] {
+  const sandbox = new Set<string>(SANDBOX_FILE_TOOL_NAMES);
+  if (connected) return active.filter((name) => !sandbox.has(name));
+  const present = new Set(active);
+  return [...active, ...SANDBOX_FILE_TOOL_NAMES.filter((name) => !present.has(name))];
+}
 
 /** How long one long poll may take. The app holds each poll up to 20 s. */
 const POLL_REQUEST_TIMEOUT_MS = 40_000;
@@ -80,6 +150,31 @@ export const CANCELLED_PUSHBACK =
 /** What `code_access` says when the app does not answer. */
 const STATUS_UNAVAILABLE_PUSHBACK =
   "LangWatch did not answer the code access check. Tell the user in one line and end your turn.";
+
+/**
+ * How long the folder-state read waits out a "not found" on the worker's own
+ * conversation.
+ *
+ * The conversation this worker runs on was accepted before the worker was
+ * created, but the app answers its reads from a projection that is folded
+ * asynchronously, so in the first seconds of a conversation the row may not
+ * be there yet and the read says "not found". Under load that fold has taken
+ * over ten seconds. A "not found" on this worker's own conversation inside
+ * this window means "not yet", never "no such conversation", so `code_access`
+ * repeats the read, and only that read: a 404 on a call envelope still means
+ * the app lost the call, and the folder check behind a lost call is
+ * mid-conversation, long after the fold. After the window the answer is the
+ * usual pushback.
+ */
+export const WORKSPACE_READ_NOT_FOUND_WINDOW_MS = 30_000;
+const WORKSPACE_READ_RETRY_MS = 2_000;
+
+/** The bounded wait for the folder-state read, overridable by tests. */
+export type WorkspaceReadRetry = { windowMs: number; beatMs: number };
+const CODE_ACCESS_READ_RETRY: WorkspaceReadRetry = {
+  windowMs: WORKSPACE_READ_NOT_FOUND_WINDOW_MS,
+  beatMs: WORKSPACE_READ_RETRY_MS,
+};
 
 type BashOutput = {
   exitCode: number | null;
@@ -141,6 +236,31 @@ export class CallLostError extends AppUnreachableError {}
 /** The turn was stopped while the call was on the machine. */
 export class CallCancelledError extends Error {}
 
+/**
+ * The app refused the call before it reached the machine, naming what was
+ * wrong with the parameters. The message is the tool result: the model fixes
+ * the call, nothing was lost and nothing is retried as it was.
+ */
+export class CallRejectedError extends Error {}
+
+type ApiErrorBody = {
+  error?: {
+    code?: string;
+    message?: string;
+    meta?: { issues?: { path?: (string | number)[]; message?: string }[] };
+  };
+};
+
+/** The refusal's issues, one line each, so the model can see the parameter. */
+function rejectionText(body: ApiErrorBody): string {
+  const issues = body.error?.meta?.issues ?? [];
+  const lines = issues.map(
+    (issue) => `${(issue.path ?? []).join(".")}: ${issue.message ?? "invalid"}`,
+  );
+  const detail = lines.length > 0 ? lines.join("; ") : (body.error?.message ?? "invalid request");
+  return `LangWatch refused this call before it reached the machine: ${detail}. Fix the parameters and call the tool again.`;
+}
+
 function endpoint(): string {
   return (process.env.LANGWATCH_ENDPOINT ?? "").replace(/\/+$/, "");
 }
@@ -185,6 +305,18 @@ export async function callApp<T>({
   }
   if (response.status === 404) {
     throw new CallLostError("the LangWatch app does not hold this call any more");
+  }
+  if (response.status === 400) {
+    let body: ApiErrorBody = {};
+    try {
+      body = (await response.json()) as ApiErrorBody;
+    } catch {
+      body = {};
+    }
+    if (body.error?.code === "langy_api_request_invalid") {
+      throw new CallRejectedError(rejectionText(body));
+    }
+    throw new AppUnreachableError("the LangWatch app did not answer");
   }
   if (!response.ok) throw new AppUnreachableError("the LangWatch app did not answer");
   try {
@@ -261,6 +393,41 @@ export function renderWorkspaceFacts(workspace: WorkspaceInfo): string {
 }
 
 /**
+ * The folder's state for this worker's own conversation. With `retry`, a
+ * "not found" inside the window is read again, see
+ * `WORKSPACE_READ_NOT_FOUND_WINDOW_MS`; without it, and for any other failure,
+ * the error is thrown as it is.
+ */
+async function readWorkspaceStatus({
+  signal,
+  retry,
+}: {
+  signal?: AbortSignal;
+  retry?: WorkspaceReadRetry;
+}): Promise<WorkspaceStatus> {
+  const path = `/api/langy/local/workspace?conversationId=${encodeURIComponent(conversationId())}`;
+  const deadline = retry === undefined ? 0 : Date.now() + retry.windowMs;
+  for (;;) {
+    try {
+      return await callApp<WorkspaceStatus>({
+        path,
+        method: "GET",
+        signal,
+        timeoutMs: REQUEST_TIMEOUT_MS,
+      });
+    } catch (error) {
+      const notFolded =
+        retry !== undefined &&
+        error instanceof CallLostError &&
+        !signal?.aborted &&
+        Date.now() < deadline;
+      if (!notFolded) throw error;
+      await sleep(retry.beatMs, signal);
+    }
+  }
+}
+
+/**
  * The folder's own state, read from the app. False when the app could not
  * answer at all, so a failed read never claims the folder is there.
  */
@@ -270,12 +437,7 @@ async function isWorkspaceConnected({
   signal?: AbortSignal;
 }): Promise<boolean> {
   try {
-    const status = await callApp<WorkspaceStatus>({
-      path: `/api/langy/local/workspace?conversationId=${encodeURIComponent(conversationId())}`,
-      method: "GET",
-      signal,
-      timeoutMs: REQUEST_TIMEOUT_MS,
-    });
+    const status = await readWorkspaceStatus({ signal });
     return status.connected === true;
   } catch {
     return false;
@@ -374,18 +536,22 @@ export async function runLocalCall({
 /** What `code_access` returns, in the three states the folder can be in. */
 export async function readCodeAccess({
   signal,
+  offerDescribe = false,
+  retry = CODE_ACCESS_READ_RETRY,
 }: {
   signal?: AbortSignal;
+  /** The bounded wait for the folder-state read; the default is the window above. */
+  retry?: WorkspaceReadRetry;
+  /**
+   * The card also offers "I'd rather describe it". A skill that asks for it
+   * has already said its opener, so the turn ends on the card without a word.
+   */
+  offerDescribe?: boolean;
 }): Promise<string> {
   const conversation = conversationId();
   let status: WorkspaceStatus;
   try {
-    status = await callApp<WorkspaceStatus>({
-      path: `/api/langy/local/workspace?conversationId=${encodeURIComponent(conversation)}`,
-      method: "GET",
-      signal,
-      timeoutMs: REQUEST_TIMEOUT_MS,
-    });
+    status = await readWorkspaceStatus({ signal, retry });
   } catch (error) {
     if (error instanceof CallCancelledError) throw error;
     return STATUS_UNAVAILABLE_PUSHBACK;
@@ -415,9 +581,13 @@ export async function readCodeAccess({
   return [
     "The code access card is shown to the user.",
     `The card shows this command: ${created.command}`,
-    "Say in one line what you will change and that you can do it on their machine or through GitHub, then END YOUR TURN.",
+    offerDescribe
+      ? "END YOUR TURN now, without another word: the card already says what happens next."
+      : "Say in one line what you will change and that you can do it on their machine or through GitHub, then END YOUR TURN.",
     "Do not list manual steps.",
-    "The next turn starts when the folder connects or when the user picks GitHub.",
+    offerDescribe
+      ? "The next turn starts when the folder connects, when the user picks GitHub, or when they would rather describe the agent."
+      : "The next turn starts when the folder connects or when the user picks GitHub.",
   ].join("\n");
 }
 
@@ -426,6 +596,12 @@ const MACHINE_NOTE = "Runs on the user's machine, inside the folder they shared.
 const codeAccessParams = Type.Object({
   reason: Type.Optional(
     Type.String({ description: "One short line about the change you want to make." }),
+  ),
+  offer_describe: Type.Optional(
+    Type.Boolean({
+      description:
+        "Also offer a quiet third way out, \"I'd rather describe it\". The pick arrives as the next message. Off unless a skill asks for it.",
+    }),
   ),
 });
 
@@ -443,11 +619,21 @@ const localWriteParams = Type.Object({
 const localEditParams = Type.Object({
   path: Type.String({ description: "File path in the shared folder." }),
   edits: Type.Array(
-    Type.Object({
-      oldText: Type.String({ description: "The text to replace. It must be unique in the file." }),
-      newText: Type.String({ description: "The new text." }),
-    }),
-    { description: "The replacements to make, in order." },
+    Type.Union([
+      Type.Object({
+        oldText: Type.String({
+          description: "The text to replace. It must be unique in the file and cannot be empty.",
+        }),
+        newText: Type.String({ description: "The new text." }),
+      }),
+      Type.Object({
+        append: Type.String({
+          description:
+            "Text added at the end of the file, on its own line. Use it to add a line at the end instead of an empty oldText. Creates the file when there is none.",
+        }),
+      }),
+    ]),
+    { description: "The edits to make, in order: a replacement or an append." },
   ),
 });
 
@@ -482,6 +668,14 @@ const localLsParams = Type.Object({
   limit: Type.Optional(Type.Number({ description: "The largest number of entries to return." })),
 });
 
+const localLangwatchEnvParams = Type.Object({
+  path: Type.Optional(
+    Type.String({
+      description: "The env file the app loads, relative to the shared folder. Default is .env.",
+    }),
+  ),
+});
+
 const localToolDescriptions: Record<LocalToolName, string> = {
   local_read: `Read a file on the user's machine. ${MACHINE_NOTE}`,
   local_write: `Write a file on the user's machine. It replaces the whole file. ${MACHINE_NOTE}`,
@@ -490,6 +684,7 @@ const localToolDescriptions: Record<LocalToolName, string> = {
   local_grep: `Search file contents on the user's machine. ${MACHINE_NOTE}`,
   local_find: `Find files by name on the user's machine. ${MACHINE_NOTE}`,
   local_ls: `List a directory on the user's machine. ${MACHINE_NOTE}`,
+  local_langwatch_env: `Write this project's LangWatch credentials into the app's env file on the user's machine: LANGWATCH_API_KEY and LANGWATCH_ENDPOINT. The command line fetches the key with the user's own login and writes it there; the key never reaches you. Call it once, after the tracing edit, with the env file the app loads (default .env next to the manifest). ${MACHINE_NOTE}`,
 };
 
 const localToolLabels: Record<LocalToolName, string> = {
@@ -500,6 +695,7 @@ const localToolLabels: Record<LocalToolName, string> = {
   local_grep: "Search on your machine",
   local_find: "Find on your machine",
   local_ls: "List on your machine",
+  local_langwatch_env: "LangWatch credentials on your machine",
 };
 
 const localToolParams = {
@@ -510,6 +706,7 @@ const localToolParams = {
   local_grep: localGrepParams,
   local_find: localFindParams,
   local_ls: localLsParams,
+  local_langwatch_env: localLangwatchEnvParams,
 } as const;
 
 /** Text result in the shape pi expects. */
@@ -519,21 +716,96 @@ function textResult(text: string) {
 
 export function createLocalWorkspaceExtension({
   turnContext,
+  sandboxCwd,
 }: {
   turnContext: TurnContext;
+  /** Where the sandbox shell runs when no folder is connected. */
+  sandboxCwd: string;
 }): InlineExtension {
   return {
     name: "langy-local-workspace",
     factory: (pi: ExtensionAPI) => {
+      /** The folder's state as of the start of the turn in flight. */
+      const folder = { connected: false };
+
+      // The folder's state is read at the start of every turn, and the turn's
+      // tool set follows it. A turn that starts because the folder connected
+      // is a new prompt, so it already runs without the sandbox file tools;
+      // a folder that goes away mid-turn is answered by the local tools' own
+      // pushback until the next turn puts the sandbox tools back.
+      pi.on("before_agent_start", async () => {
+        folder.connected = await isWorkspaceConnected({});
+        pi.setActiveTools(
+          activeToolsFor({ connected: folder.connected, active: pi.getActiveTools() }),
+        );
+      });
+
+      /** One local call as a tool result, with the pushbacks the model acts on. */
+      async function runLocalTool({
+        tool,
+        params,
+        toolCallId,
+        signal,
+      }: {
+        tool: LocalToolName;
+        params: unknown;
+        toolCallId: string;
+        signal?: AbortSignal;
+      }) {
+        try {
+          return textResult(await runLocalCall({ tool, params, turnContext, toolCallId, signal }));
+        } catch (error) {
+          // A call that did not run is a pushback the model acts on, not a
+          // failure. Which pushback depends on the folder, which is read
+          // rather than guessed: a lost call is retried, a folder that is
+          // gone is offered the two ways on.
+          if (error instanceof AppUnreachableError) {
+            return textResult(await localCallPushback({ signal }));
+          }
+          // A refusal names the parameter, so the model corrects the call.
+          if (error instanceof CallRejectedError) {
+            return textResult(error.message);
+          }
+          throw error;
+        }
+      }
+
+      const sandboxBash = createBashTool(sandboxCwd);
+      pi.registerTool({
+        name: BASH_TOOL_NAME,
+        label: sandboxBash.label,
+        description: `${sandboxBash.description} While the user's folder is connected the command runs there, on their machine, as local_bash does; a langwatch command runs here either way.`,
+        parameters: sandboxBash.parameters,
+        async execute(toolCallId, params, signal, onUpdate) {
+          if (folder.connected && !isLangwatchCliCommand(params.command)) {
+            return runLocalTool({
+              tool: "local_bash",
+              params: {
+                command: params.command,
+                ...(params.timeout !== undefined ? { timeout: params.timeout } : {}),
+              },
+              toolCallId,
+              signal,
+            });
+          }
+          return sandboxBash.execute(toolCallId, params, signal, onUpdate);
+        },
+      });
+
       pi.registerTool({
         name: CODE_ACCESS_TOOL_NAME,
         label: "Code access",
         description:
           "Ask for a way to reach the user's code before you change their program. Call it once, before the first edit. It answers at once when a folder is already shared or when the user remembered GitHub. If it does not, it shows a card and you must end your turn.",
         parameters: codeAccessParams,
-        async execute(_toolCallId, _params, signal) {
+        async execute(_toolCallId, params, signal) {
           try {
-            return textResult(await readCodeAccess({ signal }));
+            return textResult(
+              await readCodeAccess({
+                signal,
+                offerDescribe: params.offer_describe === true,
+              }),
+            );
           } catch (error) {
             if (error instanceof CallCancelledError) throw error;
             return textResult(STATUS_UNAVAILABLE_PUSHBACK);
@@ -548,20 +820,7 @@ export function createLocalWorkspaceExtension({
           description: localToolDescriptions[name],
           parameters: localToolParams[name],
           async execute(toolCallId, params, signal) {
-            try {
-              return textResult(
-                await runLocalCall({ tool: name, params, turnContext, toolCallId, signal }),
-              );
-            } catch (error) {
-              // A call that did not run is a pushback the model acts on, not a
-              // failure. Which pushback depends on the folder, which is read
-              // rather than guessed: a lost call is retried, a folder that is
-              // gone is offered the two ways on.
-              if (error instanceof AppUnreachableError) {
-                return textResult(await localCallPushback({ signal }));
-              }
-              throw error;
-            }
+            return runLocalTool({ tool: name, params, toolCallId, signal });
           },
         });
       }

@@ -90,6 +90,8 @@ export const READ_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "tr",
   "diff",
   "cmp",
+  "true",
+  "false",
 ]);
 
 /** The git subcommands that only read the repository. */
@@ -103,8 +105,17 @@ export const READ_ONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
   "blame",
   "remote",
   "rev-parse",
+  "rev-list",
   "describe",
   "tag",
+  "cat-file",
+  "ls-tree",
+  "show-ref",
+  "for-each-ref",
+  "merge-base",
+  "name-rev",
+  "shortlog",
+  "check-ignore",
 ]);
 
 /**
@@ -113,17 +124,22 @@ export const READ_ONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
  * The subcommand alone is not the answer: `git branch` lists the branches and
  * `git branch new-name` creates one, `git tag` lists the tags and `git tag v1`
  * writes one, `git remote show origin` reaches the network. Each subcommand
- * here reads in its bare form, when `bare` is true, and with the verbs named
- * here. Every other operand asks.
+ * here reads in its bare form, when `bare` is true, with the verbs named
+ * here, and with up to `refs` reference operands: `git symbolic-ref HEAD`
+ * prints where HEAD points and `git symbolic-ref HEAD refs/heads/main` moves
+ * it, `git config user.name` prints the value and `git config user.name x`
+ * sets it. Every other operand asks.
  */
 const GIT_OPERAND_RULES: ReadonlyMap<
   string,
-  { bare: boolean; verbs: ReadonlySet<string>; lists?: boolean }
+  { bare: boolean; verbs: ReadonlySet<string>; lists?: boolean; refs?: number }
 > = new Map([
   ["branch", { bare: true, verbs: new Set<string>(), lists: true }],
   ["tag", { bare: true, verbs: new Set<string>(), lists: true }],
   ["remote", { bare: true, verbs: new Set(["get-url"]) }],
   ["worktree", { bare: false, verbs: new Set(["list"]) }],
+  ["symbolic-ref", { bare: false, verbs: new Set<string>(), refs: 1 }],
+  ["config", { bare: false, verbs: new Set<string>(), lists: true, refs: 1 }],
 ]);
 
 /**
@@ -170,6 +186,14 @@ const GIT_WRITE_ARGUMENTS: ReadonlySet<string> = new Set([
   "set-url",
   "set-head",
   "set-branches",
+  "--unset",
+  "--unset-all",
+  "--add",
+  "--replace-all",
+  "--edit",
+  "-e",
+  "--remove-section",
+  "--rename-section",
 ]);
 
 /**
@@ -364,6 +388,62 @@ export interface ParsedCommand {
 
 const OPERATORS = ["&&", "||", ";", "|", "&", "\n"];
 
+/** A here-document opened on the current line, read once the line ends. */
+interface PendingHeredoc {
+  delimiter: string;
+  /** `<<-` strips the tabs that indent the body and the delimiter. */
+  stripTabs: boolean;
+}
+
+/** Where a `<<` operator's delimiter word ends, and the word itself. */
+function readHeredocOpener(
+  command: string,
+  index: number,
+): { heredoc: PendingHeredoc; end: number } | null {
+  let cursor = index + 2;
+  const stripTabs = command[cursor] === "-";
+  if (stripTabs) cursor += 1;
+  while (cursor < command.length && (command[cursor] === " " || command[cursor] === "\t")) {
+    cursor += 1;
+  }
+  const quote = command[cursor];
+  let delimiter = "";
+  if (quote === "'" || quote === '"') {
+    const close = command.indexOf(quote, cursor + 1);
+    if (close === -1) return null;
+    delimiter = command.slice(cursor + 1, close);
+    cursor = close + 1;
+  } else {
+    while (cursor < command.length && !/[\s;&|<>()]/.test(command[cursor]!)) {
+      delimiter += command[cursor];
+      cursor += 1;
+    }
+  }
+  if (delimiter === "") return null;
+  return { heredoc: { delimiter, stripTabs }, end: cursor };
+}
+
+/**
+ * Where a here-document's body ends: the index just past its delimiter line,
+ * or the end of the command when the delimiter never comes.
+ */
+function readHeredocBody(
+  command: string,
+  start: number,
+  heredoc: PendingHeredoc,
+): number {
+  let cursor = start;
+  while (cursor < command.length) {
+    const newline = command.indexOf("\n", cursor);
+    const lineEnd = newline === -1 ? command.length : newline;
+    const line = command.slice(cursor, lineEnd);
+    const word = heredoc.stripTabs ? line.replace(/^\t+/, "") : line;
+    if (word === heredoc.delimiter) return lineEnd;
+    cursor = lineEnd + 1;
+  }
+  return command.length;
+}
+
 /**
  * Splits a command into its parts and their tokens.
  *
@@ -371,10 +451,18 @@ const OPERATORS = ["&&", "||", ";", "|", "&", "\n"];
  * single-quoted string is not a command. A substitution is reported rather
  * than parsed: what it expands to is not knowable here, so the whole command
  * asks.
+ *
+ * A here-document is the text the program reads from its standard input, so
+ * its lines are neither commands of the chain nor arguments of the program:
+ * `python - <<'PY'` followed by a script is one part with the tokens
+ * `python -`, and the script stays in the part's text for the card to show.
+ * Before this, every line of the script was a segment of its own, and the
+ * session grant named one pattern per line of python.
  */
 export function parseCommand(command: string): ParsedCommand {
   const parts: CommandPart[] = [];
   let hasSubstitution = false;
+  let heredocs: PendingHeredoc[] = [];
 
   let partStart = 0;
   let tokens: string[] = [];
@@ -471,6 +559,16 @@ export function parseCommand(command: string): ParsedCommand {
       continue;
     }
 
+    if (char === "<" && command[index + 1] === "<" && command[index + 2] !== "<") {
+      const opener = readHeredocOpener(command, index);
+      if (opener) {
+        endToken();
+        heredocs.push(opener.heredoc);
+        index = opener.end;
+        continue;
+      }
+    }
+
     if (char === ">" || char === "<") {
       endToken();
       hasRedirect = true;
@@ -488,6 +586,16 @@ export function parseCommand(command: string): ParsedCommand {
     }
 
     const operator = OPERATORS.find((entry) => command.startsWith(entry, index));
+    if (operator === "\n" && heredocs.length > 0) {
+      // The line ends and the bodies it announced follow, one after another.
+      let end = index + 1;
+      for (const heredoc of heredocs) end = readHeredocBody(command, end, heredoc);
+      heredocs = [];
+      endPart(end);
+      index = Math.min(end + 1, command.length);
+      partStart = index;
+      continue;
+    }
     if (operator) {
       endPart(index);
       index += operator.length;
@@ -687,6 +795,7 @@ export function isReadOnlyGit(args: string[]): boolean {
       return true;
     }
     if (operands.length === 0) return rule.bare;
+    if (rule.refs !== undefined && operands.length <= rule.refs) return true;
     return operands.length <= 2 && rule.verbs.has(operands[0]!);
   }
   return READ_ONLY_GIT_SUBCOMMANDS.has(subcommand);
@@ -793,6 +902,7 @@ const GIT_NETWORK_SUBCOMMANDS: ReadonlySet<string> = new Set([
   "fetch",
   "clone",
   "submodule",
+  "ls-remote",
 ]);
 
 /** Commands whose whole purpose is a request to another machine. */
@@ -1077,6 +1187,19 @@ const TOOL_VERBS: Record<LocalToolCall["tool"], string> = {
   local_grep: "grep",
   local_find: "find",
   local_ls: "ls",
+  local_langwatch_env: "write",
+};
+
+/** The same verbs as the reason sentence reads them: "it is not written". */
+const TOOL_VERBS_DONE: Record<LocalToolCall["tool"], string> = {
+  local_read: "read",
+  local_write: "written",
+  local_edit: "edited",
+  local_bash: "run",
+  local_grep: "searched",
+  local_find: "listed",
+  local_ls: "listed",
+  local_langwatch_env: "written",
 };
 
 /** The paths one call touches, in the order they were written. */
@@ -1090,6 +1213,8 @@ function pathsOf(call: LocalToolCall): string[] {
     case "local_find":
     case "local_ls":
       return call.params.path === undefined ? [] : [call.params.path];
+    case "local_langwatch_env":
+      return [call.params.path ?? ".env"];
     case "local_bash":
       return [];
   }
@@ -1130,7 +1255,7 @@ function decideFileTool({
         summary: `${verb} ${target}`,
         pattern: `${call.tool} ${target}`,
         patterns: [`${call.tool} ${target}`],
-        reason: `${name} may hold secrets, so it is not read for you without an answer.`,
+        reason: `${name} may hold secrets, so it is not ${TOOL_VERBS_DONE[call.tool]} for you without an answer.`,
       };
     }
   }

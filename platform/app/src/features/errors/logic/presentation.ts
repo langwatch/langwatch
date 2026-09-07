@@ -561,7 +561,7 @@ const presentations = {
     // The function's own error text rides on `meta.message` for the CLI and
     // the run drawer's envelope; relayed prose is never rendered here.
     describe: () =>
-      "The decorated function raised an error. The process logs carry the stack, and the run shows what it said.",
+      "The decorated function raised an error, or answered with something the platform cannot read. The process logs carry the stack, and the run shows what it said.",
   },
   agent_disconnected: {
     title: "The agent disconnected mid-call",
@@ -1914,6 +1914,17 @@ const presentations = {
       return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
     },
   },
+  // ---- one-time secret reveal ----
+  // Both say the same thing to do, because the reader's next move is the
+  // same either way: the value is gone, so a new key is the only way to one.
+  secret_already_revealed: {
+    title: "This key was shown once and cannot be shown again",
+    describe: () => "Create a new key if you did not save it.",
+  },
+  secret_reveal_expired: {
+    title: "This key can no longer be shown",
+    describe: () => "Create a new key if you did not save it.",
+  },
   scenario_field_unknown: {
     // The names are our own identifiers, not free text: the editor shows the
     // refused name beside the ones the suite declares so the typo is visible.
@@ -3082,6 +3093,11 @@ const presentations = {
   guardrail_attach_forbidden: {
     title: "You don't have permission to attach guardrails",
     describe: () => "Ask an admin on your team for access to this project.",
+  },
+  guided_onboarding_path_unknown: {
+    title: "That onboarding path doesn't exist",
+    describe: () =>
+      "Pick one of Evals & LLM Ops, Coding Agent Tracking, Gateway or Governance.",
   },
   github_not_connected: {
     title: "GitHub is not connected",

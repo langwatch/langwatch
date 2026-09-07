@@ -34,6 +34,7 @@ import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
+import { app as onboardingApp } from "../app/api/onboarding/[[...route]]/app";
 import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
 import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
@@ -201,6 +202,7 @@ export function createApiRouter() {
   api.route("/", langyUiActionsApp); // /api/langy/ui/actions — agent-to-page dispatch
   api.route("/", langyLocalApp); // /api/langy/local, /api/langy/waits — the worker's door onto the developer's folder
   api.route("/", langyControlApp); // /api/v1/langy/control — control requests and the long-poll transport
+  api.route("/", onboardingApp); // /api/v1/onboarding/guided — the guided onboarding state through a project key
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
   api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId

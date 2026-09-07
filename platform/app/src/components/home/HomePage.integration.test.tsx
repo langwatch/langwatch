@@ -44,6 +44,12 @@ vi.mock("./dev/homeDevState", () => ({
   useHomeDevState: () => null,
   chartVariantFor: () => "strip",
 }));
+// The guided onboarding offer reads its flag and state over tRPC; this
+// suite covers the page, not the offer.
+vi.mock("~/features/guided-onboarding/home/GuidedOnboardingOffer", () => ({
+  GuidedOnboardingOffer: () => null,
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ organization: { id: "org-1" } }),
 }));

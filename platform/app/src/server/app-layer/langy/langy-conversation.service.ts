@@ -170,23 +170,25 @@ const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
  * How long a read will wait out the dispatch window — the gap between a
  * create command being ACCEPTED and its projection row landing.
  *
- * 1.5s was not enough. A turn that has to wake a cold worker takes far longer
- * than the projector's usual few hundred milliseconds, and the read landed a
- * beat before the row did — so the reader was told their conversation did not
- * exist, and then it did.
+ * The projector usually folds the row within a few hundred milliseconds, but
+ * under load it has taken over ten seconds, and every read in that gap told
+ * the reader their conversation did not exist, and then it did. The window is
+ * ten seconds; a read that beats an even slower fold still ends in not-found,
+ * and the worker's own reads wait longer on their side.
  */
-const DISPATCH_LAG_ATTEMPTS = 12;
+const DISPATCH_LAG_ATTEMPTS = 25;
 const DISPATCH_LAG_RETRY_MS = 400;
 /**
- * How many attempts may pass with NO pending handoff before we conclude the id
+ * How many attempts may pass with NO turn receipt before we conclude the id
  * is simply unknown.
  *
- * It cannot be zero, which is the second half of the same bug: the handoff row
- * is written by the very dispatch we are waiting on, so a read that arrives
- * before IT lands found no evidence, took the fast path, and returned "not
- * found" without ever retrying. A couple of beats of grace is the difference
- * between "no create is in flight" and "the create is a few milliseconds
- * younger than this read".
+ * The receipt is the evidence that a create is in flight: it is written in the
+ * turn admission transaction at send time, before any event is folded. It is
+ * the ONLY such evidence. The projection row and the handoff fields on it are
+ * folded from events, so before the fold there is no row and no handoff, and
+ * a read that keyed on the handoff never waited at all. The grace cannot be
+ * zero either: the receipt lands in the same beat as the create, so a read a
+ * few milliseconds older than the send finds nothing and must look again.
  */
 const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
 
@@ -391,16 +393,17 @@ export class LangyConversationService {
   /**
    * The visibility read, tolerant of the DISPATCH window.
    *
-   * A conversation whose create was just accepted has a pending handoff —
-   * written synchronously at dispatch — before its projection row lands, so
-   * "missing row + pending handoff" means NOT YET, never "never". In that
-   * window this retries briefly instead of reporting the very lie the
-   * `getById` doc below spends three paragraphs on: the panel used to render
-   * "conversation not found" moments before the same conversation's turn was
-   * accepted. A miss with NO handoff stays an immediate not-found — an
-   * unknown id must not grow a probe-friendly delay, and the retried read
-   * still enforces visibility, so the handoff's existence never widens
-   * access.
+   * A conversation whose create was just accepted has a turn receipt, written
+   * in the admission transaction at send time, before its projection row
+   * lands, so "missing row + receipt" means NOT YET, never "never". In that
+   * window this retries instead of reporting the very lie the `getById` doc
+   * below spends three paragraphs on: the panel used to render "conversation
+   * not found" moments before the same conversation's turn was accepted, and
+   * the worker's first `code_access` read got the same answer and ended the
+   * turn without its card. A miss with NO receipt stays a quick not-found: an
+   * unknown id must not grow a probe-friendly delay. The receipt is read for
+   * this user, and the retried read still enforces visibility, so the
+   * receipt's existence never widens access.
    */
   private async findVisibleToleratingDispatchLag({
     id,
@@ -419,13 +422,13 @@ export class LangyConversationService {
       });
       if (row) return row;
 
-      // Re-asked every beat, not once up front: the handoff row lands on the
-      // same dispatch we are waiting for, so "no handoff yet" early on means
-      // "too soon to tell", not "no such conversation".
-      const handoff = await this.repository
-        .findPendingHandoff({ projectId, conversationId: id })
-        .catch(() => null);
-      if (!handoff && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) return null;
+      // Re-asked every beat, not once up front: the receipt lands on the same
+      // send we are waiting for, so "no receipt yet" early on means "too soon
+      // to tell", not "no such conversation".
+      const admitted = await this.repository
+        .hasAdmittedTurn({ projectId, conversationId: id, userId })
+        .catch(() => false);
+      if (!admitted && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) return null;
 
       if (attempt === DISPATCH_LAG_ATTEMPTS) return null;
       await new Promise((resolve) =>

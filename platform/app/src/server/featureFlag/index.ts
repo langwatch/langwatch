@@ -30,6 +30,7 @@ export type {
   RuleEvaluationContext,
 } from "./rules";
 export {
+  emailDomainsOf,
   evaluateRules,
   featureFlagRuleSchema,
   featureFlagRulesSchema,

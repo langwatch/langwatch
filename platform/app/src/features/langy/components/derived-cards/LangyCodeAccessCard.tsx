@@ -32,10 +32,11 @@ import type {
   LangyChoiceSelection,
   LangyDerivedChoicesCard,
 } from "@langwatch/langy";
-import { Check, FolderCode, GitPullRequest } from "lucide-react";
+import { Check, FolderCode, FolderOpen, GitPullRequest } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { CopyButton } from "~/components/CopyButton";
+import { GitHub } from "~/components/icons/GitHub";
 import { describeError } from "~/features/errors";
 import { SHARE_CONTROL_COMMAND } from "~/server/langy-local-control/constants";
 import { api } from "~/utils/api";
@@ -51,13 +52,16 @@ import { LangyGitHubConnectCard } from "../github/LangyGitHubConnectCard";
 export const LANGY_CODE_ACCESS_OPTIONS = {
   LOCAL: "local",
   GITHUB: "github",
+  DESCRIBE: "describe",
 } as const;
 
-const LOCAL_LABEL = "Share my local folder";
+const LOCAL_LABEL = "Share local folder";
 const LOCAL_SUBTITLE = "Fastest: I run the toolchain you already have";
-const GITHUB_LABEL = "Use GitHub";
+const GITHUB_LABEL = "Connect to GitHub";
 const GITHUB_SUBTITLE =
   "I open a pull request through the LangWatch GitHub App";
+/** The quiet third way out, offered only when the tool asked for it. */
+export const LANGY_CODE_ACCESS_DESCRIBE_LABEL = "I'd rather describe it";
 
 /**
  * The choices card the GitHub selection binds to. The panel answers it through
@@ -66,6 +70,7 @@ const GITHUB_SUBTITLE =
  */
 export function langyCodeAccessChoicesCard(
   callId: string,
+  { offerDescribe = false }: { offerDescribe?: boolean } = {},
 ): LangyDerivedChoicesCard {
   return {
     blockId: `code-access:${callId}`,
@@ -82,21 +87,35 @@ export function langyCodeAccessChoicesCard(
         label: GITHUB_LABEL,
         description: GITHUB_SUBTITLE,
       },
+      ...(offerDescribe
+        ? [
+            {
+              id: LANGY_CODE_ACCESS_OPTIONS.DESCRIBE,
+              label: LANGY_CODE_ACCESS_DESCRIBE_LABEL,
+              quiet: true,
+            },
+          ]
+        : []),
     ],
   };
 }
 
-/** The GitHub pick, as the choices path carries it. */
-function githubSelection(callId: string): {
+/** One pick, as the choices path carries it. */
+function codeAccessSelection({
+  callId,
+  optionId,
+  offerDescribe,
+}: {
+  callId: string;
+  optionId: string;
+  offerDescribe: boolean;
+}): {
   selection: LangyChoiceSelection;
   card: LangyDerivedChoicesCard;
 } {
-  const card = langyCodeAccessChoicesCard(callId);
+  const card = langyCodeAccessChoicesCard(callId, { offerDescribe });
   return {
-    selection: {
-      blockId: card.blockId,
-      optionIds: [LANGY_CODE_ACCESS_OPTIONS.GITHUB],
-    },
+    selection: { blockId: card.blockId, optionIds: [optionId] },
     card,
   };
 }
@@ -126,6 +145,11 @@ export interface LangyCodeAccessCardProps {
    * reader is being asked now.
    */
   superseded?: boolean;
+  /**
+   * The tool asked for the quiet third way out, "I'd rather describe it".
+   * Off by default: only a skill that has a fallback for it passes it.
+   */
+  offerDescribe?: boolean;
   /** Test seam: the clock the countdown reads. */
   now?: () => number;
 }
@@ -402,6 +426,7 @@ function AskingState({
   organizationId,
   onChoiceSelect,
   onPickLocal,
+  offerDescribe = false,
 }: LangyCodeAccessCardProps & { onPickLocal: () => void }) {
   const github = api.github.getConnectionStatus.useQuery(
     { organizationId: organizationId ?? "" },
@@ -415,7 +440,22 @@ function AskingState({
   const installations = github.data?.installations ?? [];
   const installed = installations.length > 0;
 
-  const answerWithGithub = () => onChoiceSelect?.(githubSelection(callId));
+  const answerWithGithub = () =>
+    onChoiceSelect?.(
+      codeAccessSelection({
+        callId,
+        optionId: LANGY_CODE_ACCESS_OPTIONS.GITHUB,
+        offerDescribe,
+      }),
+    );
+  const answerWithDescribe = () =>
+    onChoiceSelect?.(
+      codeAccessSelection({
+        callId,
+        optionId: LANGY_CODE_ACCESS_OPTIONS.DESCRIBE,
+        offerDescribe: true,
+      }),
+    );
 
   const rememberThen = (next: () => void) => {
     if (!remember) {
@@ -458,14 +498,14 @@ function AskingState({
           How should I reach your code?
         </Text>
         <OptionRow
-          icon={<FolderCode size={14} />}
+          icon={<FolderOpen size={15} strokeWidth={1.9} />}
           label={LOCAL_LABEL}
           subtitle={LOCAL_SUBTITLE}
           disabled={!onChoiceSelect}
           onClick={onPickLocal}
         />
         <OptionRow
-          icon={<GitPullRequest size={14} />}
+          icon={<GitHub size={15} />}
           label={GITHUB_LABEL}
           subtitle={GITHUB_SUBTITLE}
           note={githubInstallNote({
@@ -486,6 +526,26 @@ function AskingState({
               answerWithGithub();
             }}
           />
+        ) : null}
+        {offerDescribe ? (
+          <chakra.button
+            type="button"
+            data-testid="langy-code-access-describe"
+            disabled={!onChoiceSelect}
+            onClick={answerWithDescribe}
+            alignSelf="flex-start"
+            paddingX={1}
+            paddingTop={0.5}
+            textStyle="xs"
+            textDecoration="underline"
+            textUnderlineOffset="2px"
+            background="transparent"
+            color="fg.muted"
+            cursor={onChoiceSelect ? "pointer" : "default"}
+            _hover={onChoiceSelect ? { color: "fg" } : undefined}
+          >
+            {LANGY_CODE_ACCESS_DESCRIBE_LABEL}
+          </chakra.button>
         ) : null}
         <RememberBox
           checked={remember}

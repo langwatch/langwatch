@@ -324,6 +324,7 @@ function BuildSection({
       showExpanded={showExpanded}
       defaultExpanded={false}
       projectId={project?.id}
+      tourId="nav-group-build"
     >
       <PageMenuLink
         path={projectRoutes.prompts.path}

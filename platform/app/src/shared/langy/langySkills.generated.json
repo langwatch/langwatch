@@ -103,6 +103,12 @@
 		"category": "skill"
 	},
 	{
+		"id": "guided-onboarding",
+		"label": "Guided onboarding",
+		"description": "Take over from the sign-up tour and set up the path the user picked (Evals & LLM Ops, Coding agents, Gateway or Governance) inside the Langy panel. Use when a user message starts with \"Guided onboarding kickoff\" or with \"Let's set up ... then.\", and never otherwise.",
+		"category": "skill"
+	},
+	{
 		"id": "level-up",
 		"label": "Level up",
 		"description": "Take your AI agent to the next level with full LangWatch integration. Adds tracing, prompt versioning, evaluation experiments, and simulation tests in one go. Use when the user wants comprehensive observability, testing, and prompt management for their agent.",

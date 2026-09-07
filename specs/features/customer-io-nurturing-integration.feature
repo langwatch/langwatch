@@ -184,6 +184,14 @@ Feature: Customer.io nurturing integration
     When the first trace is processed
     Then the Customer.io calls are made immediately without delay
 
+  # Langy's own turns trace into the project with origin "langy"; they are
+  # not the customer's traces and never reach the CRM as one.
+  @unit
+  Scenario: Langy's own turn does not reach Customer.io as a first trace
+    Given a project that has never received a trace
+    When one of Langy's own turns is processed
+    Then no Customer.io identify or track call is made
+
   @integration
   Scenario: Subsequent traces update count and timestamp with debouncing
     Given a project that already has traces

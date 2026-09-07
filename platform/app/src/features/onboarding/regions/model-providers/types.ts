@@ -20,7 +20,9 @@ export type ModelProviderSurface =
   | "evaluations"
   | "prompts"
   | "langy"
-  | "onboarding";
+  | "onboarding"
+  /** The guided onboarding's provider screen: one row of marks, one connect panel. */
+  | "guided";
 
 export interface FieldMetadata {
   label: string;

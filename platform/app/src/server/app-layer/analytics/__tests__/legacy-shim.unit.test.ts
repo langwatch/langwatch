@@ -65,6 +65,17 @@ describe("ClickHouseLegacyAnalyticsShim", () => {
     });
   });
 
+  describe("when the request leaves out trace origins", () => {
+    /** @scenario Leaving out an origin keeps the rest of the count intact */
+    it("forwards excludeOrigins to the query builder", async () => {
+      await shim.run(makeInput({ excludeOrigins: ["langy"] }));
+
+      expect(buildTimeseriesQueryMock).toHaveBeenCalledWith(
+        expect.objectContaining({ excludeOrigins: ["langy"] }),
+      );
+    });
+  });
+
   describe("when the request is scoped to explicit trace ids", () => {
     /** @scenario A graph scoped to specific traces reads only those traces */
     it("forwards traceIds to the query builder", async () => {

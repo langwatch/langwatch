@@ -206,6 +206,59 @@ describe("LangyTokenBuffer hybrid flush", () => {
         expect(entries.at(-1)?.type).toBe("end");
       });
 
+      /** @scenario "A turn whose lines were all said with the say tool is not an empty turn" */
+      it("stays quiet when the turn said its lines through the say tool", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "start",
+          input: {
+            text: "All ready! Let me know if there is anything I can help with.",
+          },
+        });
+        await buffer.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "end",
+          output: "Said.",
+        });
+        const { backstopped } = await buffer.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+        expect(entries.at(-1)?.type).toBe("end");
+      });
+
+      /** @scenario "A turn whose lines were all said with the say tool is not an empty turn" */
+      it("reads the said line off the stream when the ending buffer never saw it", async () => {
+        const { redis, entries } = makeRedis();
+        const starting = new LangyTokenBuffer({ redis });
+        await starting.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "start",
+          input: { text: "Running it against your agent now." },
+        });
+
+        const ending = new LangyTokenBuffer({ redis });
+        const { backstopped } = await ending.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+      });
+
       /** @scenario "A turn that ends on a card says what the card is waiting for" */
       it("says what the card is waiting for when the turn ends on one", async () => {
         const { redis, entries } = makeRedis();
@@ -386,6 +439,97 @@ describe("LangyTokenBuffer hybrid flush", () => {
         kind: "workbench.duplicateTarget",
         payload: { targetId: "t1" },
       });
+    });
+  });
+});
+
+/**
+ * A redis double that actually expires. The fake above answers `expire` with 1
+ * and never drops anything, which makes any assertion about the buffer's TTL a
+ * test of the fake, the whole point here is what a key does when its TTL runs
+ * out.
+ */
+function makeExpiringRedis(clock: { now: number }): LangyStreamRedis {
+  const streams = new Map<
+    string,
+    { rows: Array<[string, string[]]>; expiresAt: number | null }
+  >();
+  let seq = 0;
+  const liveStream = (key: string) => {
+    const stream = streams.get(key);
+    if (!stream) return undefined;
+    if (stream.expiresAt !== null && stream.expiresAt <= clock.now) {
+      streams.delete(key);
+      return undefined;
+    }
+    return stream;
+  };
+  return {
+    xadd: async (key, ...args) => {
+      const payload = String(args[args.length - 1]);
+      const stream = liveStream(key) ?? { rows: [], expiresAt: null };
+      const id = `${clock.now}-${++seq}`;
+      stream.rows.push([id, ["p", payload]]);
+      streams.set(key, stream);
+      return id;
+    },
+    xrange: async (key) => liveStream(key)?.rows ?? [],
+    expire: async (key, seconds) => {
+      const stream = liveStream(key);
+      if (!stream) return 0;
+      stream.expiresAt = clock.now + seconds * 1000;
+      return 1;
+    },
+    set: async () => "OK",
+    get: async () => null,
+  };
+}
+
+/**
+ * A tool call the agent waits on, a suite run, a build, produces no frames
+ * for as long as it takes. The worker keeps beating throughout, and the buffer
+ * has to keep the turn's live edge alive on that proof alone: with the TTL
+ * moving on appends only, a turn quiet for longer than STREAM_TTL_SECONDS lost
+ * its whole buffer, so a tab attaching after the wait replayed nothing and the
+ * instruction the agent issued on the far side of the wait reached no one.
+ *
+ * @see specs/langy/langy-dual-stream.feature
+ */
+describe("LangyTokenBuffer under a silent tool call", () => {
+  const silenceMs = LANGY_STREAMING.STREAM_TTL_SECONDS * 1000 + 60_000;
+  const beatMs = 5_000;
+
+  describe("given the worker keeps beating through a tool call longer than the stream TTL", () => {
+    /** @scenario "A turn that goes quiet inside one tool call keeps its live edge" */
+    it("replays the whole turn, the far side of the wait included, to a tab attaching after it", async () => {
+      const clock = { now: 1_000 };
+      const buffer = new LangyTokenBuffer({ redis: makeExpiringRedis(clock) });
+
+      await buffer.appendChunk({ ...ids, text: "Running the suite now." });
+      for (let waited = 0; waited < silenceMs; waited += beatMs) {
+        clock.now += beatMs;
+        await buffer.heartbeat({ ...ids, now: clock.now });
+      }
+      await buffer.appendNavigate({ ...ids, href: "/demo/simulations/run_1" });
+
+      const { reads } = await buffer.readTail({ ...ids });
+      expect(reads.map((read) => read.entry)).toEqual([
+        { type: "delta", text: "Running the suite now." },
+        { type: "navigate", href: "/demo/simulations/run_1" },
+      ]);
+    });
+  });
+
+  describe("given nothing at all proves the turn is alive", () => {
+    it("lets the buffer lapse, so an abandoned turn still self-cleans", async () => {
+      const clock = { now: 1_000 };
+      const buffer = new LangyTokenBuffer({ redis: makeExpiringRedis(clock) });
+
+      await buffer.appendChunk({ ...ids, text: "Running the suite now." });
+      clock.now += silenceMs;
+
+      const { reads } = await buffer.readTail({ ...ids });
+      expect(reads).toEqual([]);
     });
   });
 });

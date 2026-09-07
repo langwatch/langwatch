@@ -316,3 +316,29 @@ regexes = [
 description = "Documented `vk-lw-YOUR_VIRTUAL_KEY` placeholder in the AI Gateway docs, not a credential"
 targetRules = ["curl-auth-header"]
 regexes = ['''^vk-lw-YOUR_VIRTUAL_KEY$''']
+
+# `vk-lw-01HZX9NABCDEFGHJKMNPQRSTVW`, the one-time-reveal fixture secret shared
+# by the tests that cover the reveal store, the CLI's `--reveal-once` create,
+# the snippet projection and the two card components. It has to be shaped like
+# a real virtual key, because the tests assert on the display prefix cut from
+# it and on the snippet the card renders with it filled in, and that shape is
+# what makes `generic-api-key` fire.
+#
+# The two shorter values are that fixture's display prefix, `vk-lw-01HZX9N`,
+# and the masked snippet the card renders once the secret is gone,
+# `vk-lw-01HZX9N...`. A prefix is what the product shows in place of a secret,
+# so allowing it gives away nothing the UI does not already print.
+#
+# None of the three is minted by a gateway, hashed into a database or able to
+# authenticate anything, so there is nothing to revoke. Scoped by VALUE and
+# ANCHORED, for the reason given above the block before it: a substring
+# allowlist would also permit a real virtual key that merely starts with this
+# prefix.
+[[allowlists]]
+description = "One-time-reveal fixture secret and its display prefix in the virtual-key snippet tests"
+targetRules = ["generic-api-key"]
+regexes = [
+  '''^vk-lw-01HZX9NABCDEFGHJKMNPQRSTVW$''',
+  '''^vk-lw-01HZX9N$''',
+  '''^vk-lw-01HZX9N\.\.\.$''',
+]

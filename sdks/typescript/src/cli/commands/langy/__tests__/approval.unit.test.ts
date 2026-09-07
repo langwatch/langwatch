@@ -450,9 +450,11 @@ describe("the card a file call produces", () => {
     ["local_bash", "Langy wants to run in acme"],
     ["local_edit", "Langy wants to change a file in acme"],
     ["local_read", "Langy wants to read a file in acme"],
+    ["local_langwatch_env", "Langy wants to write a file in acme"],
   ];
   for (const [tool, title] of titles) {
     describe(`when the call is ${tool}`, () => {
+      /** @scenario "The credentials write says it writes" */
       it(`the heading reads ${title}`, () => {
         const call = {
           ...envelope,

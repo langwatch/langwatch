@@ -118,6 +118,7 @@ function createMockProjectService() {
       userId: "admin-user-1",
       organizationId: "org-1",
       firstMessage: false,
+      onboardingVariant: null,
     }),
     repo: {} as any,
   };
@@ -223,6 +224,7 @@ describe("createProjectMetadataHandler()", () => {
         userId: null,
         organizationId: null,
         firstMessage: false,
+        onboardingVariant: null,
       });
       const subscriber = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
@@ -230,6 +232,40 @@ describe("createProjectMetadataHandler()", () => {
       await subscriber(event, createContext(tenantId, createFoldState()));
 
       expect(mockTrackServerEvent).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "first_trace_integrated carries the onboarding variant of the organization" */
+    it("carries the onboarding variant of the organization", async () => {
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: "admin-user-1",
+        organizationId: "org-1",
+        firstMessage: false,
+        onboardingVariant: "guided",
+      });
+      const subscriber = createProjectMetadataHandler(deps);
+      const event = createEvent(tenantId);
+
+      await subscriber(event, createContext(tenantId, createFoldState()));
+
+      expect(mockTrackServerEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: "first_trace_integrated",
+          properties: expect.objectContaining({ onboarding_variant: "guided" }),
+        }),
+      );
+    });
+
+    /** @scenario "first_trace_integrated carries no onboarding variant when the organization recorded none" */
+    it("carries no onboarding_variant when the organization recorded none", async () => {
+      const subscriber = createProjectMetadataHandler(deps);
+      const event = createEvent(tenantId);
+
+      await subscriber(event, createContext(tenantId, createFoldState()));
+
+      expect(mockTrackServerEvent).toHaveBeenCalledTimes(1);
+      expect(
+        mockTrackServerEvent.mock.calls[0]![0].properties,
+      ).not.toHaveProperty("onboarding_variant");
     });
   });
 
@@ -655,6 +691,42 @@ describe("createProjectMetadataHandler()", () => {
 
         expect(isRealFirstIngest(state)).toBe(false);
       });
+    });
+
+    describe("when the trace is one of Langy's own turns", () => {
+      /** @scenario "Langy's own turn is not the project's first trace" */
+      it("returns false", () => {
+        const state = createFoldState({
+          attributes: { "langwatch.origin": "langy" },
+        });
+
+        expect(isRealFirstIngest(state)).toBe(false);
+      });
+    });
+  });
+
+  describe("when the first trace to arrive is one of Langy's own turns", () => {
+    beforeEach(() => {
+      mockProjects.getById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: false,
+        integrated: false,
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
+    });
+
+    /** @scenario "Langy's own turn is not the project's first trace" */
+    it("leaves firstMessage unset and tracks no milestone", async () => {
+      const subscriber = createProjectMetadataHandler(deps);
+      const context = createContext(
+        tenantId,
+        createFoldState({ attributes: { "langwatch.origin": "langy" } }),
+      );
+
+      await subscriber(createEvent(tenantId), context);
+
+      expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
+      expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });
   });
 });

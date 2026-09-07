@@ -57,6 +57,13 @@ import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { readHandledError, showErrorToast } from "~/features/errors";
+import {
+  guidedPathInProgress,
+  guidedPullRequestFromMessages,
+  isGuidedConversation,
+} from "~/features/guided-onboarding/guidedConversation";
+import { planGuidedKickoffSend } from "~/features/guided-onboarding/kickoff";
+import { useGuidedTourStore } from "~/features/guided-onboarding/tour/guidedTourStore";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -94,6 +101,10 @@ import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
 import { useLangyWarmWorker } from "../hooks/useLangyWarmWorker";
 import { useLingeringDodge } from "../hooks/useLingeringDodge";
 import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
+import {
+  shouldRefetchHistoryForAdoptedTurn,
+  shouldResumeAdoptedTurn,
+} from "../logic/adoptedTurnResume";
 import { syncLangyAfterDefaultModelWrite } from "../logic/codingDefaultSync";
 import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
@@ -183,6 +194,7 @@ import {
   ConversationSkeleton,
   skeletonMessageCount,
 } from "./ConversationSkeleton";
+import { GuidedTourCard } from "./derived-cards/GuidedTourCard";
 import { LANGY_CODE_ACCESS_ASK_AGAIN } from "./derived-cards/LangyCodeAccessCard";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
 import { EmptyState } from "./EmptyState";
@@ -671,6 +683,13 @@ function LangyPanel({
   // The command bar's "Ask Langy" hands a question over via the store; the panel
   // opens itself and auto-sends it (see the pendingPrompt effect below).
   const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
+  const pendingKickoff = useLangyStore((s) => s.pendingKickoff);
+  // The guided tour runs before its kickoff message exists. While it does,
+  // and while the kickoff it queued waits to be sent, the panel shows the
+  // tour card in place of the empty state, so the row is there for the
+  // whole tour and the kickoff message takes over without a flash.
+  const guidedTourRunning = useGuidedTourStore((s) => s.running);
+  const consumePendingKickoff = useLangyStore((s) => s.consumePendingKickoff);
   const consumePendingPrompt = useLangyStore((s) => s.consumePendingPrompt);
   const appliedOutcomes = useLangyStore((s) => s.appliedOutcomes);
   const discardedProposalIds = useLangyStore((s) => s.discardedProposalIds);
@@ -884,10 +903,27 @@ function LangyPanel({
   // "a double-fire must not repeat the effect" shape.
   const navigatedInstructionsRef = useRef<Set<string>>(new Set());
 
+  // The turn this tab's own send started, and the adopted turn this tab
+  // already reattached to. A turn the durable record names that is neither
+  // has no stream open here, and the resume effect below opens one.
+  const dispatchedTurnIdRef = useRef<string | null>(null);
+  const resumedTurnIdRef = useRef<string | null>(null);
+
   // UI actions already claimed or dropped on this client, keyed by
   // turnId+actionId (`uiActionDedupKey`) — the same replay problem, and the
   // same per-turn reset, as the navigate dedup above.
   const uiActionSeenRef = useRef<Set<string>>(new Set());
+
+  // The organization a fresh guided onboarding kickoff belongs to. Set when
+  // the kickoff is sent into a new conversation, read once the transport
+  // names that conversation (`onIds`), so the organization records the id
+  // the Home offer continues later. A kickoff into an attached conversation
+  // sets nothing: the id is already recorded.
+  const kickoffAttachOrganizationRef = useRef<string | null>(null);
+  const attachGuidedConversation =
+    api.onboarding.attachConversation.useMutation();
+  const attachGuidedConversationRef = useRef(attachGuidedConversation);
+  attachGuidedConversationRef.current = attachGuidedConversation;
 
   // The rollback lever for agent-driven page control: with the flag off this
   // page ignores `ui` stream entries, so switching it off during a live turn
@@ -929,6 +965,7 @@ function LangyPanel({
           // The turn was dispatched: adopt the conversation + turn and enter the
           // `active` phase (which also clears the previous turn's live signals).
           useLangyStore.getState().beginTurn({ conversationId, turnId });
+          dispatchedTurnIdRef.current = turnId;
           // The words are a bubble on screen now, so they are no longer a
           // draft to hand back. Without this, a failure LATER in the turn put
           // the question the reader had already asked back in the composer,
@@ -937,6 +974,25 @@ function LangyPanel({
           // A fresh turn — clear the previous turn's navigate dedup too.
           navigatedInstructionsRef.current = new Set();
           uiActionSeenRef.current = new Set();
+          const attachToOrganizationId = kickoffAttachOrganizationRef.current;
+          if (attachToOrganizationId) {
+            kickoffAttachOrganizationRef.current = null;
+            attachGuidedConversationRef.current.mutate({
+              organizationId: attachToOrganizationId,
+              conversationId,
+            });
+          }
+        },
+        getResumeTarget: () => {
+          const projectId = turnContextRef.current?.projectId;
+          const store = useLangyStore.getState();
+          if (!projectId || !store.activeConversationId || !store.activeTurnId)
+            return null;
+          return {
+            projectId,
+            conversationId: store.activeConversationId,
+            turnId: store.activeTurnId,
+          };
         },
         onNavigate: (entry) => {
           // Internal-target guard, mirroring MessageContent's isInternalHref:
@@ -1203,6 +1259,7 @@ function LangyPanel({
     status,
     error,
     regenerate,
+    resumeStream,
     applyHistoryToEngine,
     resetEngine,
     clearError,
@@ -1586,6 +1643,73 @@ function LangyPanel({
     historyMessages,
     messages.length,
     applyHistoryToEngine,
+  ]);
+
+  // The fold adopted a turn the transcript snapshot has never seen (the server
+  // starting one when the shared folder connects, another tab's send). The
+  // transcript is not refreshed by the freshness signal, that drives the
+  // event fold instead, and its own in-flight poll is armed by a flag the
+  // stale snapshot does not carry, so without this read the engine never gains
+  // the turn's user message and the resume below stays blocked on its
+  // engine-ready guard for the turn's whole run. One read per adopted turn:
+  // it lands that message and re-arms the poll for the rest of the turn.
+  const refetchedForTurnRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !shouldRefetchHistoryForAdoptedTurn({
+        turnActive,
+        activeTurnId: localTurnId,
+        dispatchedTurnId: dispatchedTurnIdRef.current,
+        foldInFlightTurnId,
+        refetchedTurnId: refetchedForTurnRef.current,
+        hasHistory: historyMessages.length > 0,
+        isFetchingHistory,
+      })
+    ) {
+      return;
+    }
+    refetchedForTurnRef.current = localTurnId;
+    refetchHistory();
+  }, [
+    turnActive,
+    localTurnId,
+    foldInFlightTurnId,
+    historyMessages.length,
+    isFetchingHistory,
+    refetchHistory,
+  ]);
+
+  // Reattach to a turn this tab did not dispatch. The durable fold adopts it
+  // (the store's `activeTurnId`) and the rehydration above puts its user
+  // message in the engine, but the text as it is written and the live-only
+  // instructions (navigate, ui) only reach a tab through the turn stream, so
+  // the engine resumes: the transport's `getResumeTarget` names the turn and
+  // the subscription replays what the turn already wrote. The turn a send from
+  // this tab started already has its stream, and never resumes.
+  const lastEngineRole = messages.at(-1)?.role ?? null;
+  useEffect(() => {
+    if (
+      !shouldResumeAdoptedTurn({
+        turnActive,
+        activeTurnId: localTurnId,
+        dispatchedTurnId: dispatchedTurnIdRef.current,
+        resumedTurnId: resumedTurnIdRef.current,
+        isStreaming: isBusy,
+        isHistoryLoadPending: historyLoadConversationId !== null,
+        lastEngineRole,
+      })
+    ) {
+      return;
+    }
+    resumedTurnIdRef.current = localTurnId;
+    void resumeStream();
+  }, [
+    turnActive,
+    localTurnId,
+    isBusy,
+    historyLoadConversationId,
+    lastEngineRole,
+    resumeStream,
   ]);
 
   // A failed recents list surfaces INSIDE the panel as a dismissable Langy
@@ -1990,6 +2114,55 @@ function LangyPanel({
     // deps (matching this file's other one-shot effects).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPrompt, projectId, isBusy]);
+
+  // The guided onboarding kickoff, drained like `pendingPrompt`: consumed
+  // first so it sends once, gated on an idle panel with a model to run on
+  // and, for an attached conversation, on its history having loaded. A
+  // takeover that skipped the provider lands on the model setup screen; the
+  // kickoff waits there until a model is picked, then sends. The message
+  // carries the typed kickoff part beside the model brief (see
+  // `buildGuidedKickoffParts`).
+  useEffect(() => {
+    if (
+      !pendingKickoff ||
+      !projectId ||
+      isBusy ||
+      isRestoringConversation ||
+      !modelQueriesSettled ||
+      langyNeedsModel
+    )
+      return;
+    const kickoff = pendingKickoff;
+    consumePendingKickoff();
+    const plan = planGuidedKickoffSend({
+      kickoff,
+      organizationId: organizationId ?? null,
+    });
+    if (!plan.continuing) resetChatEngine({ clearMessages: true });
+    kickoffAttachOrganizationRef.current = plan.attachToOrganizationId;
+    recovery.reset();
+    useLangyStore.getState().beginSend();
+    useLangyDevLog
+      .getState()
+      .recordOutbound("send", `guided onboarding kickoff: ${kickoff.path}`, {
+        text: plan.brief,
+        conversationId: useLangyStore.getState().activeConversationId,
+      });
+    void sendMessage({
+      role: "user",
+      // The kickoff part rides beside its brief; the engine's part union has
+      // no custom members, the same cast the choice selection send makes.
+      parts: plan.parts as unknown as UIMessage["parts"],
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    pendingKickoff,
+    projectId,
+    isBusy,
+    isRestoringConversation,
+    modelQueriesSettled,
+    langyNeedsModel,
+  ]);
 
   const handleSelectConversation = (id: string) => {
     // Messages are replaced by the selected conversation's history, so don't
@@ -2411,8 +2584,11 @@ function LangyPanel({
   // says while that is true is not what it says while Langy is working: the
   // waiting line points at the card, and the composer stops claiming Langy is
   // busy (ADR-129).
+  const awaitingPermission = permissionCards.some(
+    (card) => card.status === "pending",
+  );
   const awaitingAnswer =
-    permissionCards.some((card) => card.status === "pending") ||
+    awaitingPermission ||
     [...questionWaits.values()].some((wait) => wait.status === "pending");
 
   // The live entries belong to one conversation; opening another drops them.
@@ -2767,6 +2943,26 @@ function LangyPanel({
       ? [...(localCards ?? []), ...(openQuestionCards ?? [])]
       : null;
 
+  // A guided conversation tells its pull request as a sentence before the
+  // proposal and as one card after the closing line, so the step-by-step
+  // progress receipt stays out, and the feedback ask waits for the path to
+  // close.
+  const guidedConversation = useMemo(
+    () => isGuidedConversation(displayMessages),
+    [displayMessages],
+  );
+  const guidedPullRequest = useMemo(
+    () =>
+      guidedConversation
+        ? guidedPullRequestFromMessages(displayMessages)
+        : null,
+    [guidedConversation, displayMessages],
+  );
+  const guidedInProgress = useMemo(
+    () => guidedConversation && guidedPathInProgress(displayMessages),
+    [guidedConversation, displayMessages],
+  );
+
   // Where those cards sit in the column.
   //
   // While the turn runs they belong at the live edge, beside the working line:
@@ -2884,6 +3080,8 @@ function LangyPanel({
       />
       <MotionBox
         ref={panelRef}
+        // The guided tour's handoff spotlight finds the panel by this.
+        data-tour="langy-panel"
         {...contextDropProps}
         // Capture phase, at the root: a link that leaves LangWatch is caught
         // here before whatever rendered it can act on the click.
@@ -3487,6 +3685,20 @@ function LangyPanel({
                             dense={!floating}
                           />
                         </VStack>
+                      ) : isEmpty && (guidedTourRunning || pendingKickoff) ? (
+                        // The tour card, before the kickoff message exists:
+                        // in progress while the tour runs, settled once the
+                        // tour ended and the kickoff is only waiting to send.
+                        <VStack
+                          align="stretch"
+                          paddingX={floating ? "19px" : "14px"}
+                          paddingTop={floating ? "19px" : "14px"}
+                        >
+                          <GuidedTourCard
+                            kickoff={pendingKickoff ?? null}
+                            organizationId={organizationId ?? null}
+                          />
+                        </VStack>
                       ) : isEmpty && !pendingPrompt ? (
                         // A queued question counts as content: showing the empty
                         // state's "How can I help?" over a question the reader
@@ -3538,6 +3750,8 @@ function LangyPanel({
                                   onApply={applyProposal}
                                   onDiscard={discardProposalInStore}
                                   conversationId={activeConversationId}
+                                  hideGithubProgress={guidedConversation}
+                                  guidedPullRequest={guidedPullRequest}
                                   isStreaming={
                                     displayBusy &&
                                     index === displayMessages.length - 1 &&
@@ -3570,6 +3784,10 @@ function LangyPanel({
                                     !turnActive &&
                                     !turnError &&
                                     !recovery.isRecovering &&
+                                    // Never during a guided path: the ask
+                                    // comes once, after the card that
+                                    // closes it.
+                                    !guidedInProgress &&
                                     message.role === "assistant" &&
                                     index === displayMessages.length - 1
                                   }
@@ -3657,10 +3875,16 @@ function LangyPanel({
                                   metrics={displaySignals.metrics}
                                   segment={displaySignals.segment}
                                 />
-                              ) : !hasInlineProgressOwner ? (
+                              ) : (
                                 <LangyThinkingLine
                                   messages={displayMessages}
                                   hasLiveReasoning={!!displaySignals.reasoning}
+                                  // The turn's durable record: a tab that
+                                  // adopted the turn, and a command running
+                                  // on the developer's machine, name their
+                                  // work from here.
+                                  toolCalls={turnToolCalls}
+                                  awaitingPermission={awaitingPermission}
                                   // A card is holding the turn: the line says
                                   // so and points at it, rather than
                                   // escalating toward "Langy may be stuck"
@@ -3688,7 +3912,7 @@ function LangyPanel({
                                         pendingConversationId)
                                   }
                                 />
-                              ) : null}
+                              )}
                             </VStack>
                           ) : null}
                           {/* Recovering beats failing. While the policy has a retry

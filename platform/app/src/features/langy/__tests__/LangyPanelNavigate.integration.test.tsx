@@ -16,7 +16,22 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import type { ChatTransport, UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
+const { pushMock, historyRef, refetchHistoryMock } = vi.hoisted(() => ({
+  pushMock: vi.fn(),
+  // The durable transcript snapshot `langy.messages` hands the panel. Mutable
+  // so a test can move it the way a refetch would.
+  historyRef: {
+    current: undefined as
+      | {
+          messages: Array<{ id: string; role: string; parts: unknown[] }>;
+          isTurnInFlight: boolean;
+          inFlightTurnId: string | null;
+          currentTurnId: string | null;
+        }
+      | undefined,
+  },
+  refetchHistoryMock: vi.fn(),
+}));
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: pushMock,
@@ -34,6 +49,12 @@ const projectRef = {
     slug: string;
   } | null,
 };
+
+// The guided tour host reads the guided onboarding state over tRPC; this
+// suite covers the panel, not the tour.
+vi.mock("~/features/guided-onboarding/tour/GuidedOnboardingHost", () => ({
+  GuidedOnboardingHost: () => null,
+}));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
@@ -67,6 +88,7 @@ const chatRef = {
   stop: vi.fn(),
   status: "ready" as "ready" | "submitted" | "streaming" | "error",
   setMessages: vi.fn(),
+  resumeStream: vi.fn(),
 };
 
 const transportRef = {
@@ -82,6 +104,7 @@ vi.mock("@ai-sdk/react", () => ({
       stop: chatRef.stop,
       status: chatRef.status,
       setMessages: chatRef.setMessages,
+      resumeStream: chatRef.resumeStream,
     };
   },
 }));
@@ -114,6 +137,11 @@ vi.mock("~/utils/api", () => ({
     },
   },
   api: {
+    onboarding: {
+      attachConversation: {
+        useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+      },
+    },
     useUtils: () => ({
       langy: {
         list: { invalidate: () => Promise.resolve() },
@@ -146,10 +174,16 @@ vi.mock("~/utils/api", () => ({
     langy: {
       messages: {
         useQuery: () => ({
-          data: undefined,
+          data: historyRef.current,
           isLoading: false,
           isFetching: false,
           isError: false,
+          isSuccess: !!historyRef.current,
+          error: null,
+          refetch: () => {
+            refetchHistoryMock();
+            return Promise.resolve();
+          },
         }),
       },
       modelsAllowed: {
@@ -253,6 +287,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+import { initialLangyTurnProjection } from "@langwatch/langy";
 import { LangySidecar } from "../components/LangyPanel";
 import { LangyProvider } from "../LangyContext";
 import { useLangyStore } from "../stores/langyStore";
@@ -283,16 +318,23 @@ beforeEach(() => {
   chatRef.status = "ready";
   chatRef.sendMessage.mockReset();
   chatRef.setMessages.mockReset();
+  chatRef.resumeStream.mockReset();
   transportRef.current = null;
   mutation.mockReset();
   mutation.mockResolvedValue({ conversationId: "conv-1", turnId: "turn-1" });
   subscription.mockClear();
   pushMock.mockClear();
+  historyRef.current = undefined;
+  refetchHistoryMock.mockClear();
   window.localStorage.clear();
   useLangyStore.setState({
     isOpen: true,
     activeConversationId: null,
     historyLoadConversationId: null,
+    activeTurnId: null,
+    settledTurnId: null,
+    turnPhase: "idle",
+    turnProjection: initialLangyTurnProjection,
   });
 });
 
@@ -481,6 +523,208 @@ describe("Feature: Langy opens the resource it surfaced in the browser", () => {
 
         expect(pushMock).toHaveBeenCalledTimes(2);
       });
+    });
+  });
+
+  describe("Rule: a turn this tab did not start reattaches to its stream", () => {
+    // The durable fold hands a tab the turn it did not dispatch (the server
+    // starts one when the shared folder connects; a refresh mid-turn lands
+    // here too), but navigate is a live-only entry: it reaches a tab through
+    // the turn stream alone. Adopting the turn must open that stream.
+    const adoptedTurnHistory = [
+      {
+        id: "message-1",
+        role: "user",
+        parts: [{ type: "text", text: "Local folder connected" }],
+      },
+    ];
+
+    function adoptTurnFromDurableRecord(turnId: string) {
+      act(() => {
+        useLangyStore.getState().seedTurnProjection({
+          cursor: { acceptedAt: 1, eventId: "event-1" },
+          currentTurnId: turnId,
+        });
+      });
+    }
+
+    /** @scenario "A turn started by the shared folder connecting reaches the open tab" */
+    it("resumes the adopted turn and routes its navigate through the SPA router", async () => {
+      useLangyStore.setState({ activeConversationId: "conv-1" });
+      chatRef.messages = adoptedTurnHistory;
+      renderPanel();
+      await waitFor(() => expect(transportRef.current).not.toBeNull());
+      expect(chatRef.resumeStream).not.toHaveBeenCalled();
+
+      adoptTurnFromDurableRecord("turn-9");
+
+      await waitFor(() =>
+        expect(chatRef.resumeStream).toHaveBeenCalledTimes(1),
+      );
+
+      // useChat's resume asks the transport to reconnect; the transport
+      // subscribes to the adopted turn, not to one of its own.
+      let stream: ReadableStream | null = null;
+      await act(async () => {
+        stream = await transportRef.current!.reconnectToStream({
+          chatId: "chat-1",
+        });
+      });
+      expect(stream).not.toBeNull();
+      expect(subscription).toHaveBeenCalledTimes(1);
+      expect(subscription.mock.calls[0]![1]).toEqual({
+        projectId: "project-demo",
+        conversationId: "conv-1",
+        turnId: "turn-9",
+      });
+
+      act(() => {
+        latestOnData()({
+          type: "navigate",
+          href: "/demo/simulations/set_1/batch_1?openRun=run_1",
+        });
+      });
+      expect(pushMock).toHaveBeenCalledWith(
+        "/demo/simulations/set_1/batch_1?openRun=run_1",
+      );
+    });
+
+    /** @scenario "A turn in flight resumes after a page refresh" */
+    it("resumes once per adopted turn, and never the turn this tab sent itself", async () => {
+      useLangyStore.setState({ activeConversationId: "conv-1" });
+      chatRef.messages = adoptedTurnHistory;
+      renderPanel();
+      await waitFor(() => expect(transportRef.current).not.toBeNull());
+
+      adoptTurnFromDurableRecord("turn-9");
+      await waitFor(() =>
+        expect(chatRef.resumeStream).toHaveBeenCalledTimes(1),
+      );
+
+      // The same durable turn re-asserted (a refetch, a fresher cursor) is not
+      // a second resume.
+      act(() => {
+        useLangyStore.getState().seedTurnProjection({
+          cursor: { acceptedAt: 2, eventId: "event-2" },
+          currentTurnId: "turn-9",
+        });
+      });
+      expect(chatRef.resumeStream).toHaveBeenCalledTimes(1);
+
+      // A turn this tab dispatches has its stream from the send itself.
+      act(() => {
+        useLangyStore.getState().settleTurn("turn-9");
+      });
+      mutation.mockResolvedValueOnce({
+        conversationId: "conv-1",
+        turnId: "turn-10",
+      });
+      await act(async () => {
+        await transportRef.current!.sendMessages(sendOptions);
+      });
+      await waitFor(() => expect(subscription).toHaveBeenCalledTimes(1));
+      expect(useLangyStore.getState().activeTurnId).toBe("turn-10");
+      expect(chatRef.resumeStream).toHaveBeenCalledTimes(1);
+    });
+
+    // The panel had answered a turn of its own before the folder connected, so
+    // the engine's last message is that answer and the transcript snapshot
+    // predates the new turn entirely. Nothing refreshes that snapshot on its
+    // own, the freshness signal drives the event fold, and the transcript's
+    // in-flight poll is armed by a flag the stale snapshot does not carry, so
+    // the panel used to sit on the previous turn's transcript for the whole
+    // run, never ready to resume and never subscribed, and every live-only
+    // entry the turn issued (both of the take's navigates) reached no reader.
+    /** @scenario "A folder-connected turn reaches a tab that already answered one" */
+    it("re-reads the transcript, then resumes and navigates", async () => {
+      useLangyStore.setState({ activeConversationId: "conv-1" });
+      const answered = [
+        {
+          id: "message-1",
+          role: "user",
+          parts: [{ type: "text", text: "set up my agent" }],
+        },
+        {
+          id: "message-2",
+          role: "assistant",
+          parts: [{ type: "text", text: "Can I access your code?" }],
+        },
+      ];
+      historyRef.current = {
+        messages: answered,
+        isTurnInFlight: false,
+        inFlightTurnId: null,
+        currentTurnId: null,
+      };
+      chatRef.messages = answered as typeof chatRef.messages;
+      const { rerender } = renderPanel();
+      await waitFor(() => expect(transportRef.current).not.toBeNull());
+      refetchHistoryMock.mockClear();
+
+      adoptTurnFromDurableRecord("turn-9");
+
+      // The fold is ahead of the transcript: read it again.
+      await waitFor(() => expect(refetchHistoryMock).toHaveBeenCalledTimes(1));
+
+      // …which lands the new turn's own user message.
+      const withFolderNotice = [
+        ...answered,
+        {
+          id: "message-3",
+          role: "user",
+          parts: [{ type: "text", text: "Local folder connected" }],
+        },
+      ];
+      historyRef.current = {
+        messages: withFolderNotice,
+        isTurnInFlight: true,
+        inFlightTurnId: "turn-9",
+        currentTurnId: "turn-9",
+      };
+      await act(async () => {
+        rerender(<LangySidecar />);
+      });
+      await waitFor(() => expect(chatRef.setMessages).toHaveBeenCalled());
+
+      // The engine takes it, which is what readies the resume.
+      chatRef.messages = withFolderNotice as typeof chatRef.messages;
+      await act(async () => {
+        rerender(<LangySidecar />);
+      });
+      await waitFor(() =>
+        expect(chatRef.resumeStream).toHaveBeenCalledTimes(1),
+      );
+
+      await act(async () => {
+        await transportRef.current!.reconnectToStream({ chatId: "chat-1" });
+      });
+      expect(subscription.mock.calls[0]![1]).toEqual({
+        projectId: "project-demo",
+        conversationId: "conv-1",
+        turnId: "turn-9",
+      });
+
+      act(() => {
+        latestOnData()({
+          type: "navigate",
+          href: "/demo/simulations/set_1/batch_1?openRun=run_1",
+        });
+      });
+      expect(pushMock).toHaveBeenCalledWith(
+        "/demo/simulations/set_1/batch_1?openRun=run_1",
+      );
+
+      // One read per adopted turn, not one per render.
+      expect(refetchHistoryMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("reconnects to nothing when no adopted turn is in flight", async () => {
+      renderPanel();
+      await waitFor(() => expect(transportRef.current).not.toBeNull());
+      await expect(
+        transportRef.current!.reconnectToStream({ chatId: "chat-1" }),
+      ).resolves.toBeNull();
+      expect(subscription).not.toHaveBeenCalled();
     });
   });
 

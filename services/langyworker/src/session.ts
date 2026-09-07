@@ -33,6 +33,11 @@ import {
   createLocalWorkspaceExtension,
 } from "./tools/local-workspace.js";
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
+import { SAY_TOOL_NAME, createSayExtension } from "./tools/say.js";
+import {
+  SECRET_SNIPPET_TOOL_NAME,
+  createSecretSnippetExtension,
+} from "./tools/secret-snippet.js";
 import { SKILL_TOOL_NAME, createSkillExtension } from "./tools/skill.js";
 import { TODOWRITE_TOOL_NAME, createTodowriteExtension } from "./tools/todowrite.js";
 import type { TurnContext } from "./tools/turn-context.js";
@@ -48,6 +53,8 @@ export const ENABLED_TOOLS = [
   TODOWRITE_TOOL_NAME,
   SKILL_TOOL_NAME,
   QUESTION_TOOL_NAME,
+  SAY_TOOL_NAME,
+  SECRET_SNIPPET_TOOL_NAME,
   CODE_ACCESS_TOOL_NAME,
   ...LOCAL_TOOL_NAMES,
 ] as const;
@@ -160,7 +167,11 @@ export async function createLangySession({
       createTodowriteExtension(),
       createSkillExtension(config.skillsDir),
       createQuestionExtension({ turnContext }),
-      createLocalWorkspaceExtension({ turnContext }),
+      createSayExtension(),
+      createSecretSnippetExtension(),
+      // Registers `bash` in place of pi's built-in: the extension's tool wins
+      // the name in the session's registry.
+      createLocalWorkspaceExtension({ turnContext, sandboxCwd: home }),
     ],
   });
   await resourceLoader.reload();

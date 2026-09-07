@@ -10,8 +10,13 @@ import { deriveLangyChoicesLockState } from "@langwatch/langy";
 import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";
-import { memo, useMemo } from "react";
+import { Fragment, memo, type ReactNode, useMemo } from "react";
 import { isInternalHref, Markdown } from "~/components/Markdown";
+import {
+  type GuidedPullRequest,
+  guidedPathCompletedIn,
+} from "~/features/guided-onboarding/guidedConversation";
+import { guidedKickoffPartOf } from "~/features/guided-onboarding/kickoff";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { githubProgressFromToolParts } from "~/server/app-layer/langy/execution/githubCommand";
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
@@ -22,7 +27,10 @@ import {
   langyAnswerSegments,
   langyAnswerSegmentsFromText,
 } from "../logic/langyAnswerSegments";
-import { codeAccessCallId } from "../logic/langyCodeAccessTool";
+import {
+  codeAccessCallId,
+  codeAccessOffersDescribe,
+} from "../logic/langyCodeAccessTool";
 import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
@@ -42,16 +50,21 @@ import {
   foldReasoningTitles,
   stripReasoningTitles,
 } from "../logic/langyReasoningTitles";
+import { sayToolText } from "../logic/langySayTool";
+import { secretSnippetCalls } from "../logic/langySecretSnippetTool";
 import { stripToolNarration } from "../logic/langyToolNarration";
 import { langyRunText, langyTranscriptRuns } from "../logic/langyTranscript";
 import { useSpaLinkClick } from "../logic/spaLink";
 import { useLangyStore } from "../stores/langyStore";
+import { GuidedTourCard } from "./derived-cards/GuidedTourCard";
 import { LangyCodeAccessCard } from "./derived-cards/LangyCodeAccessCard";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
 import { LangyFailedCard } from "./derived-cards/LangyFailedCard";
+import { LangySecretSnippetCard } from "./derived-cards/LangySecretSnippetCard";
 import { StreamingAnswerWithCards } from "./derived-cards/StreamingAnswerWithCards";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { LangyGuidedPrCard } from "./github/LangyGuidedPrCard";
 import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyFeedback } from "./LangyFeedback";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
@@ -98,9 +111,23 @@ function MessageContentImpl({
   onAskCodeAccessAgain,
   liveCodeAccessCallId,
   questionWaits,
+  hideGithubProgress = false,
+  guidedPullRequest = null,
 }: {
   message: UIMessage;
   organizationId?: string | null;
+  /**
+   * Leave the PR-flow progress card out. A guided conversation tells the
+   * pull request as a sentence with a link and, at the end of the path, as
+   * one PR card; the step-by-step receipt would say the same thing a third
+   * time.
+   */
+  hideGithubProgress?: boolean;
+  /**
+   * The pull request a guided path opened (or the branch alone), drawn once
+   * after the closing line of the reply that completed the path.
+   */
+  guidedPullRequest?: GuidedPullRequest | null;
   appliedOutcomes: Record<
     string,
     { href?: string; label?: string; onOpen?: () => void }
@@ -212,7 +239,9 @@ function MessageContentImpl({
   // the turn went on to answer after, which is what makes a failure in it a
   // step the turn RECOVERED from rather than the story of the turn.
   const lastAnswerRunIndex = runs.findLastIndex(
-    (run) => run.kind === "answer" && langyRunText(run.parts).trim().length > 0,
+    (run) =>
+      run.kind === "say" ||
+      (run.kind === "answer" && langyRunText(run.parts).trim().length > 0),
   );
 
   // The agent's `question` TOOL call, mapped onto the choices contract
@@ -256,6 +285,15 @@ function MessageContentImpl({
   const progressEvents = isPlainText
     ? []
     : githubProgressFromToolParts(message.parts);
+  // The run after which the cumulative progress card sits: the last one whose
+  // calls moved the PR flow on.
+  const lastProgressRunIndex = runs.findLastIndex(
+    (run) =>
+      run.kind === "activity" &&
+      githubProgressFromToolParts(
+        run.parts as Parameters<typeof githubProgressFromToolParts>[0],
+      ).length > 0,
+  );
 
   // Strip the hidden [langy:feedback:...] directive: when present, Langy asked
   // for feedback at a high-signal moment — surface the affordance regardless of
@@ -275,6 +313,113 @@ function MessageContentImpl({
   // still gives the blur-reveal while `isStreaming`.
 
   const proposals = extractProposals(message);
+  const seenPullRequests = new Set<string>();
+
+  /**
+   * The cards one tool call raised, rendered where the call ran. Each kind
+   * keeps the mapping it always had; only the position changed, from a pile
+   * under the whole reply to the run the call belongs to.
+   */
+  const renderCallCards = (part: unknown, key: string) => {
+    const cards: ReactNode[] = [];
+    for (const pr of githubPrsFromToolParts([
+      part as Parameters<typeof githubPrsFromToolParts>[0][number],
+    ])) {
+      const prKey = `${pr.owner}/${pr.repo}#${pr.number}`;
+      if (seenPullRequests.has(prKey)) continue;
+      seenPullRequests.add(prKey);
+      cards.push(
+        <LangyCardBoundary key={prKey} scope="this pull request card">
+          <LangyGitHubPrCard {...pr} />
+        </LangyCardBoundary>,
+      );
+    }
+    const proposal = proposalOfPart(part, `${message.id}:${key}`);
+    if (proposal) {
+      const { id } = proposal;
+      cards.push(
+        <LangyCardBoundary key={id} scope="this proposal">
+          <ProposalCard
+            proposal={proposal.proposal}
+            appliedOutcome={appliedOutcomes[id]}
+            isDiscarded={discardedProposals.has(id)}
+            isApplying={applyingProposals.has(id)}
+            onApply={() => void onApply(id, proposal.proposal)}
+            onDiscard={() => onDiscard(id)}
+          />
+        </LangyCardBoundary>,
+      );
+    }
+    // The question the agent is waiting on: the interactive choices card.
+    // Lock state derives from the same recorded timeline as a stamped
+    // choices block, so an answered question stays marked forever and a
+    // moved-on conversation closes it.
+    for (const questionPart of questionToolCardParts(part)) {
+      cards.push(
+        <LangyCardBoundary key={questionPart.blockId} scope="this question">
+          <LangyDerivedCardView
+            card={questionPart.card}
+            projectSlug={project?.slug ?? null}
+            choicesLockState={
+              questionWaitLockState({
+                blockId: questionPart.blockId,
+                card: questionPart.card,
+                waits: questionWaits,
+              }) ??
+              deriveLangyChoicesLockState({
+                blockId: questionPart.blockId,
+                timeline: choicesTimeline ?? [],
+              })
+            }
+            onChoiceSelect={onChoiceSelect}
+          />
+        </LangyCardBoundary>,
+      );
+    }
+    // How Langy reaches this person's code (ADR-129). Asked once per
+    // conversation, by the tool, and answered here: the message's LAST ask
+    // is the card, an earlier one asked the same question.
+    if (
+      codeAccessCall &&
+      conversationId &&
+      project?.id &&
+      codeAccessCallId([part]) === codeAccessCall
+    ) {
+      cards.push(
+        <LangyCardBoundary key="code-access" scope="the code access card">
+          <LangyCodeAccessCard
+            projectId={project.id}
+            conversationId={conversationId}
+            callId={codeAccessCall}
+            organizationId={organizationId ?? null}
+            offerDescribe={codeAccessOffersDescribe(message.parts)}
+            superseded={
+              liveCodeAccessCallId != null &&
+              liveCodeAccessCallId !== codeAccessCall
+            }
+            {...(onChoiceSelect ? { onChoiceSelect } : {})}
+            {...(onAskCodeAccessAgain
+              ? { onAskAgain: onAskCodeAccessAgain }
+              : {})}
+          />
+        </LangyCardBoundary>,
+      );
+    }
+    // A secret shown once, where it can be copied. The card is the only
+    // place the value ever appears: it reads it on first render and the
+    // server refuses every later read.
+    for (const call of secretSnippetCalls([part])) {
+      cards.push(
+        <LangyCardBoundary key={call.callId} scope="the secret snippet card">
+          <LangySecretSnippetCard
+            organizationId={organizationId ?? null}
+            call={call}
+          />
+        </LangyCardBoundary>,
+      );
+    }
+    return cards;
+  };
   // The PR cards, read off the message's TOOL PARTS — not scraped from the
   // model's text. This was the LAST thing in Langy's UI steered by regexing the
   // assistant's prose: any github.com/…/pull/N URL in the reply drew a card, so
@@ -400,6 +545,17 @@ function MessageContentImpl({
   }
 
   if (isUser) {
+    // The guided onboarding kickoff is a user message on the wire and the tour
+    // card on screen: the brief it carries is for the model, never a bubble.
+    const kickoff = guidedKickoffPartOf(message.parts);
+    if (kickoff) {
+      return (
+        <GuidedTourCard
+          kickoff={kickoff}
+          organizationId={organizationId ?? null}
+        />
+      );
+    }
     return (
       <Box alignSelf="flex-end" maxWidth="85%">
         <Box
@@ -451,26 +607,45 @@ function MessageContentImpl({
             mapping still lives in LangyToolActivity. */}
         {runs.map((run, index) =>
           run.kind === "activity" ? (
-            <LangyCardBoundary
-              key={`activity-${index}`}
-              scope="the tool activity"
-            >
-              <LangyActivityParts
-                parts={run.parts}
-                // The receipt's thinking headlines belong to the turn, not to
-                // one run of it, so they ride the last activity run.
-                reasoningTitles={
-                  index === lastActivityRunIndex ? reasoningFold.titles : []
-                }
-                // A call is only ever closed by its own output, so a stopped or
-                // dead turn leaves its open calls looking like they still run.
-                // Off the streaming turn, an open call is an interrupted one.
-                live={isStreaming}
-                // The turn answered after this run, so a failure inside it is
-                // one the turn recovered from.
-                answeredAfter={index < lastAnswerRunIndex}
-              />
-            </LangyCardBoundary>
+            <Fragment key={`activity-${index}`}>
+              <LangyCardBoundary scope="the tool activity">
+                <LangyActivityParts
+                  parts={run.parts}
+                  // The receipt's thinking headlines belong to the turn, not to
+                  // one run of it, so they ride the last activity run.
+                  reasoningTitles={
+                    index === lastActivityRunIndex ? reasoningFold.titles : []
+                  }
+                  // A call is only ever closed by its own output, so a stopped or
+                  // dead turn leaves its open calls looking like they still run.
+                  // Off the streaming turn, an open call is an interrupted one.
+                  live={isStreaming}
+                  // The turn answered after this run, so a failure inside it is
+                  // one the turn recovered from.
+                  answeredAfter={index < lastAnswerRunIndex}
+                />
+              </LangyCardBoundary>
+              {/* The cards the calls of this run raised, where the calls ran.
+                  A question, a pull request, a proposal or a secret belongs
+                  between the paragraph before its call and the paragraph
+                  after it: piled under the whole reply, the closing line of
+                  a turn sat above the question the turn asked. */}
+              {run.parts.map((part, partIndex) =>
+                renderCallCards(part, `${index}-${partIndex}`),
+              )}
+              {/* The PR-flow progress card is cumulative, so it sits once,
+                  after the last run that moved the flow on. */}
+              {index === lastProgressRunIndex && !hideGithubProgress ? (
+                <LangyCardBoundary scope="the progress card">
+                  <LangyGitHubProgressCard
+                    events={progressEvents}
+                    live={isStreaming}
+                  />
+                </LangyCardBoundary>
+              ) : null}
+            </Fragment>
+          ) : run.kind === "say" ? (
+            <SayRun key={`say-${index}`} parts={run.parts} />
           ) : (
             <AnswerRun
               key={`answer-${index}`}
@@ -486,77 +661,13 @@ function MessageContentImpl({
             />
           ),
         )}
-        {progressEvents.length > 0 && (
-          <LangyCardBoundary scope="the progress card">
-            <LangyGitHubProgressCard
-              events={progressEvents}
-              live={isStreaming}
-            />
-          </LangyCardBoundary>
-        )}
-        {prs.map((pr) => (
-          <LangyCardBoundary
-            key={`${pr.owner}/${pr.repo}#${pr.number}`}
-            scope="this pull request card"
-          >
-            <LangyGitHubPrCard {...pr} />
-          </LangyCardBoundary>
-        ))}
-        {proposals.map(({ id, proposal }) => (
-          <LangyCardBoundary key={id} scope="this proposal">
-            <ProposalCard
-              proposal={proposal}
-              appliedOutcome={appliedOutcomes[id]}
-              isDiscarded={discardedProposals.has(id)}
-              isApplying={applyingProposals.has(id)}
-              onApply={() => void onApply(id, proposal)}
-              onDiscard={() => onDiscard(id)}
-            />
-          </LangyCardBoundary>
-        ))}
-        {/* The question the agent is waiting on — the interactive choices
-            card, after the prose so the ask reads as the turn's closing line.
-            Lock state derives from the same recorded timeline as a stamped
-            choices block, so an answered question stays marked forever and a
-            moved-on conversation closes it. */}
-        {questionCards.map((part) => (
-          <LangyCardBoundary key={part.blockId} scope="this question">
-            <LangyDerivedCardView
-              card={part.card}
-              projectSlug={project?.slug ?? null}
-              choicesLockState={
-                questionWaitLockState({
-                  blockId: part.blockId,
-                  card: part.card,
-                  waits: questionWaits,
-                }) ??
-                deriveLangyChoicesLockState({
-                  blockId: part.blockId,
-                  timeline: choicesTimeline ?? [],
-                })
-              }
-              onChoiceSelect={onChoiceSelect}
-            />
-          </LangyCardBoundary>
-        ))}
-        {/* How Langy reaches this person's code (ADR-129). Asked once per
-            conversation, by the tool, and answered here. */}
-        {codeAccessCall && conversationId && project?.id ? (
-          <LangyCardBoundary scope="the code access card">
-            <LangyCodeAccessCard
-              projectId={project.id}
-              conversationId={conversationId}
-              callId={codeAccessCall}
-              organizationId={organizationId ?? null}
-              superseded={
-                liveCodeAccessCallId != null &&
-                liveCodeAccessCallId !== codeAccessCall
-              }
-              {...(onChoiceSelect ? { onChoiceSelect } : {})}
-              {...(onAskCodeAccessAgain
-                ? { onAskAgain: onAskCodeAccessAgain }
-                : {})}
-            />
+        {/* The card that closes a guided path, after the closing line: the
+            pull request with the tracing change, or the branch holding it. */}
+        {guidedPullRequest &&
+        !isPlainText &&
+        guidedPathCompletedIn(message.parts) ? (
+          <LangyCardBoundary scope="the pull request card">
+            <LangyGuidedPrCard {...guidedPullRequest} />
           </LangyCardBoundary>
         ) : null}
         {/* WHEN to ask is the backend's call (langy.messages `shouldAskFeedback` —
@@ -639,6 +750,45 @@ interface AnswerBlockContext {
  * smaller than the user's `sm` bubble and a step dimmer than `fg`, so a glance
  * separates "what I said" from "what it said".
  */
+/**
+ * Lines said with the `say` tool: Langy's own words, drawn where they were
+ * said, in the reply's own prose style. No frame, no activity row, and never
+ * folded into the receipt: the line was for the reader, at that moment, and
+ * it stays there on reload.
+ */
+function SayRun({ parts }: { parts: readonly unknown[] }) {
+  const lines = parts
+    .map((part) => sayToolText(part))
+    .filter((line): line is string => line !== null);
+  if (lines.length === 0) return null;
+  return (
+    <Box
+      data-langy-say
+      paddingX="2px"
+      display="flex"
+      flexDirection="column"
+      gap={2}
+      css={{
+        "& > div > :first-child": { marginTop: 0 },
+        "& > div > :last-child": { marginBottom: 0 },
+        "& table": { display: "block", overflowX: "auto" },
+      }}
+    >
+      {lines.map((line, index) => (
+        <Markdown
+          // A said line has no id of its own; its place in the run is stable.
+          key={`${index}-${line.length}`}
+          fontSize="langyAnswer"
+          linkVariant="langy"
+          color="langy.answerFg"
+        >
+          {line}
+        </Markdown>
+      ))}
+    </Box>
+  );
+}
+
 function AnswerRun({
   parts,
   isStreaming,
@@ -1068,15 +1218,21 @@ function extractProposals(
 ): Array<{ id: string; proposal: LangyProposal }> {
   const result: Array<{ id: string; proposal: LangyProposal }> = [];
   for (const part of message.parts) {
-    if (!part.type?.startsWith("tool-")) continue;
-    const output = (part as { output?: unknown }).output;
-    if (!isLangyProposal(output)) continue;
-    const id =
-      (part as { toolCallId?: string }).toolCallId ??
-      `${message.id}:${result.length}`;
-    result.push({ id, proposal: output });
+    const found = proposalOfPart(part, `${message.id}:${result.length}`);
+    if (found) result.push(found);
   }
   return result;
+}
+
+/** The proposal one tool part carries as its output, if it carries one. */
+function proposalOfPart(
+  part: unknown,
+  fallbackId: string,
+): { id: string; proposal: LangyProposal } | null {
+  const p = part as { type?: string; output?: unknown; toolCallId?: string };
+  if (!p?.type?.startsWith("tool-")) return null;
+  if (!isLangyProposal(p.output)) return null;
+  return { id: p.toolCallId ?? fallbackId, proposal: p.output };
 }
 
 function isLangyProposal(value: unknown): value is LangyProposal {

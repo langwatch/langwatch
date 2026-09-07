@@ -30,7 +30,11 @@ import { DatasetService } from "~/server/datasets/dataset.service";
 import { prisma } from "~/server/db";
 import { EvaluatorService } from "~/server/evaluators/evaluator.service";
 import { PromptService } from "~/server/prompt-config/prompt.service";
-import { readTestingInterface } from "~/server/suites/platform-path";
+import { ScenarioService } from "~/server/scenarios/scenario.service";
+import {
+  readTestingInterface,
+  scenarioEditorPath,
+} from "~/server/suites/platform-path";
 
 type UrlForProjectSlug = (projectSlug: string) => string;
 
@@ -57,6 +61,7 @@ const NAVIGATE_PAGES: Record<string, string> = {
   analytics: "/analytics",
   annotations: "/annotations",
   automations: "/automations",
+  "governance-sources": "/governance/inventory?tab=sources",
 };
 
 /**
@@ -93,7 +98,7 @@ const evaluatorPath = (evaluatorId: string): string =>
  * remembered link, mapped to its tenancy-scoped lookup and the platform's own
  * address for the resource: the same paths the REST APIs hand out as
  * `platformUrl` (datasets, workflows/studio, monitors, evaluators, agents,
- * scenario runs) or the app's own drawer deep links (prompts). Order is not
+ * scenarios, scenario runs) or the app's own drawer deep links (prompts). Order is not
  * significant: no prefix here is a prefix of another. (`prompt_version_` ids
  * fall into `prompt_` and miss the prompt lookup, correctly dropping.)
  */
@@ -107,6 +112,20 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
     const ui = await readTestingInterface({ projectId });
     return (projectSlug) =>
       scenarioRunPlatformUrl({ projectSlug, scenarioRunId: resourceId, ui });
+  },
+
+  scenario_: async ({ projectId, resourceId }) => {
+    const scenario = await ScenarioService.create(prisma).getById({
+      id: resourceId,
+      projectId,
+    });
+    if (!scenario) return null;
+    const ui = await readTestingInterface({ projectId });
+    return (projectSlug) =>
+      platformUrl({
+        projectSlug,
+        path: scenarioEditorPath({ ui, scenarioId: resourceId }),
+      });
   },
 
   prompt_: async ({ projectId, resourceId }) => {

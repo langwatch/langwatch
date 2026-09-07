@@ -76,6 +76,7 @@ const variantToDocsMapping: Record<ModelProviderSurface, string> = {
   prompts: "/prompt-management/overview",
   langy: "/introduction",
   onboarding: "/introduction",
+  guided: "/introduction",
 };
 
 export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({

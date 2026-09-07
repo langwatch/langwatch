@@ -752,6 +752,25 @@ const registry = {
     tips: ["An update interrupted this reply; resend the message"],
   },
 
+  // ---- guided onboarding ----
+  guided_onboarding_path_unknown: {
+    tips: [
+      "Use one of the paths in meta.knownPaths: llmops, coding, gateway or governance",
+    ],
+  },
+
+  // ---- one-time secret reveal ----
+  secret_already_revealed: {
+    tips: [
+      "The reveal id was already read and the secret is gone; create a new key with `langwatch virtual-keys create --reveal-once` when the value was not saved",
+    ],
+  },
+  secret_reveal_expired: {
+    tips: [
+      "A reveal id serves its secret for 24 hours after the key is created; create a new key with `langwatch virtual-keys create --reveal-once` when the value was not saved",
+    ],
+  },
+
   // ---- licensing ----
   license_signing_key_not_pem: {
     tips: [

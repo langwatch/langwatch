@@ -1,3 +1,4 @@
+import { withHiddenOrigins } from "./hidden-origins";
 import type {
   SessionGroupRow,
   SessionGroupSortColumn,
@@ -140,6 +141,8 @@ interface SessionGroupsParams {
   pageSize: number;
   cursor?: string;
   filterWhere?: { sql: string; params: Record<string, unknown> };
+  /** Origins left out on top of the filter, see `explorerHiddenOrigins`. */
+  hiddenOrigins?: readonly string[];
   contentTerms?: string[];
   /**
    * Visibility gate: sessions whose last activity is older than this cutoff
@@ -239,7 +242,7 @@ export class SessionGroupsService {
         sortColumn,
         sortDirection,
       }),
-      filterWhere: params.filterWhere,
+      filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
       contentTerms: params.contentTerms,
     });
 

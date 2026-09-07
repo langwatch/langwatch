@@ -7,6 +7,7 @@ import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggesti
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useHomeDevState } from "./dev/homeDevState";
 import "./homeHeroScroll.css";
+import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
 import { OnboardAgentPill } from "./OnboardAgentPill";
 import { useProjectReach } from "./useProjectReach";
 import { WelcomeHeader } from "./WelcomeHeader";
@@ -226,6 +227,7 @@ export function LangyHomeHero() {
           {!leadWithOnboarding && reachKnown ? (
             <OnboardAgentPill onAskLangy={canAsk ? askLangy : undefined} />
           ) : null}
+          <GuidedOnboardingOffer space="project" />
         </VStack>
 
         {!canAsk ? (

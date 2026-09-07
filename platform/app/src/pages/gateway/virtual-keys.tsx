@@ -48,6 +48,8 @@ import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
+import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
+import { useRegisterTourActions } from "~/features/guided-onboarding/tour/tourRegistry";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -179,6 +181,13 @@ function VirtualKeysPage() {
   });
 
   const [createOpen, setCreateOpen] = useState(false);
+  // The guided tour opens the create drawer through this, the same state the
+  // New key button flips. Spec: specs/features/onboarding/guided-tour.feature
+  const tourActions = useMemo(
+    () => ({ openVirtualKeyCreate: () => setCreateOpen(true) }),
+    [],
+  );
+  useRegisterTourActions(tourActions);
   const [revealSecret, setRevealSecret] = useState<CreatedSecret | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
   const [rotating, setRotating] = useState<{ id: string; name: string } | null>(
@@ -264,12 +273,14 @@ function VirtualKeysPage() {
             <Button
               variant="outline"
               size="sm"
+              data-tour="gw-new-key"
               onClick={() => setCreateOpen(true)}
             >
               <Plus size={14} /> New virtual key
             </Button>
           )}
         </PageLayout.Header>
+        <GuidedOnboardingOffer space="gateway" />
 
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           {listQuery.isLoading ? (

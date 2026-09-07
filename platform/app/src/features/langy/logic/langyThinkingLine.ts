@@ -1,3 +1,4 @@
+import { resolveCapabilityProgress } from "../components/capabilities/capabilityRegistry";
 import { LANGY_ANSWER_HERE_OR_TERMINAL } from "./langyLocalWaits";
 import { describeToolCall, effectiveToolName } from "./langyToolLabel";
 
@@ -21,21 +22,25 @@ import { describeToolCall, effectiveToolName } from "./langyToolLabel";
  *
  * The line may only say things that are TRUE at the moment it says them.
  *
- *   1. A tool is running    → say what it is. We know: it is on the tool stream.
+ *   1. A tool is running    → say what it is, in the reader's words. We know:
+ *                              it is on the tool stream, or in the turn's
+ *                              durable record.
  *   2. Tokens are arriving  → say NOTHING. The streaming answer is on screen
  *                              and speaks for itself; a line under it reads
- *                              as still waiting for the visible reply.
+ *                              as still waiting for the visible reply. The
+ *                              row comes back once the text has been quiet
+ *                              for `TEXT_QUIET_MS`, because a pause between
+ *                              paragraphs is the model working.
  *   3. Reasoning is arriving → "Thinking…". The model IS working — live
  *                              reasoning deltas are on the wire — so it must
  *                              never read as a startup wait.
- *   4. None of those        → we are waiting for a worker that has not started.
+ *   4. The turn has produced something and is between steps → a cycling verb.
+ *   5. None of those        → we are waiting for a worker that has not started.
  *                              Say so, plainly, and let it ESCALATE with time. A
  *                              turn that is stuck must eventually look stuck.
  *
- * Whimsy survives, because whimsy was never the problem — a joke about the
- * model's character ("Bribing the GPUs", "Blaming the NS") claims nothing about
- * the work. It is allowed ONLY while the model is genuinely working, and only
- * from the non-claiming pool. Cycling itself implies progress, so it never runs
+ * The cycling verbs (`langyThinkingVerbs.ts`) are allowed ONLY while the model
+ * is genuinely working. Cycling itself implies progress, so it never runs
  * while we are waiting.
  */
 
@@ -51,6 +56,23 @@ export type LangyThinkingTone =
 /** What the line says while a card is holding the turn (ADR-129). */
 export const LANGY_AWAITING_ANSWER_LINE =
   "Waiting for your answer on the card above";
+
+/**
+ * What the line says while a permission ask is open in the terminal that
+ * shares the folder. The developer is looking at that terminal, and the ask
+ * is one they approve there.
+ */
+export const LANGY_AWAITING_APPROVAL_TERMINAL_LINE =
+  "Waiting for your approval in the terminal";
+
+/**
+ * How long the text has to be quiet before the activity row shows again.
+ *
+ * While tokens arrive the answer is its own status, and a row flickering in
+ * and out between two deltas reads as broken. A pause longer than this is the
+ * model working on the next paragraph or the next call, and the row says so.
+ */
+export const TEXT_QUIET_MS = 1_000;
 
 export interface LangyThinkingLine {
   /** The line to render. Always true at the moment it is produced. */
@@ -134,6 +156,78 @@ export function runningTool(
       part.state !== "output-error",
   );
   return running ?? null;
+}
+
+/**
+ * A tool call off the turn's durable record. This is what a tab that adopted
+ * the turn, or reloaded during it, holds before its stream is back, and it is
+ * where a command running on the developer's machine is recorded.
+ */
+export interface RecordedToolCall {
+  toolCallId: string;
+  toolName: string;
+  command?: string;
+  input?: unknown;
+  status: string;
+}
+
+/** The last recorded call that has not finished. */
+export function runningRecordedTool(
+  toolCalls: readonly RecordedToolCall[] | null | undefined,
+): RecordedToolCall | null {
+  return toolCalls?.findLast((call) => call.status === "initiated") ?? null;
+}
+
+/** The tools that read code, on the developer's machine or in the sandbox. */
+const READING_TOOLS = new Set([
+  "local_read",
+  "local_grep",
+  "local_find",
+  "local_ls",
+  "read",
+  "grep",
+  "glob",
+  "list",
+]);
+
+/** The tools that change code, on the developer's machine or in the sandbox. */
+const EDITING_TOOLS = new Set([
+  "local_write",
+  "local_edit",
+  "write",
+  "edit",
+  "multiedit",
+  "patch",
+]);
+
+/**
+ * What a running tool is doing, in the reader's words.
+ *
+ * The activity cards name the mechanism in full ("Reading a file on your
+ * machine: router.ts"); the row under the transcript names the act the reader
+ * is waiting on, one short line. A LangWatch CLI call is worded by the same
+ * registry as its card, so the two never disagree. Anything else keeps the
+ * card's own label, with its detail, so an unknown command is shown rather
+ * than guessed at.
+ */
+export function customerToolLine({
+  name,
+  input,
+}: {
+  name: string;
+  input: unknown;
+}): string {
+  const lower = name.toLowerCase();
+  if (lower === "local_bash") return "Running the command in your terminal";
+  if (lower === "local_langwatch_env")
+    return "Writing your LangWatch credentials";
+  if (READING_TOOLS.has(lower)) return "Reading the code";
+  if (EDITING_TOOLS.has(lower)) return "Editing the code";
+  if (lower === "skill" || lower === "use_skill") return "Loading a skill";
+  const capability = resolveCapabilityProgress(effectiveToolName(name, input));
+  if (capability) return capability.headline;
+  const { title, detail } = describeToolCall({ name, input });
+  return detail ? `${title}: ${detail}` : title;
 }
 
 /** Has any tool call on this turn already finished, well or badly? */
@@ -322,9 +416,29 @@ export function langyThinkingLine({
   workerReady = false,
   pageActivity = null,
   awaitingAnswer = false,
+  awaitingPermission = false,
   terminalConnected = false,
+  proseArriving = false,
+  toolCalls = null,
 }: {
   messages: ThinkingMessage[];
+  /**
+   * A text token arrived within the last `TEXT_QUIET_MS`. The streaming
+   * answer is its own status then, and the row renders nothing. The caller
+   * measures it: the parts say what has arrived, not when.
+   */
+  proseArriving?: boolean;
+  /**
+   * The turn's tool calls off its durable record. A tab that adopted the turn
+   * reads its running command from here, and a local command on the
+   * developer's machine is recorded here whether or not the stream is open.
+   */
+  toolCalls?: readonly RecordedToolCall[] | null;
+  /**
+   * The card holding the turn is a permission ask. With a terminal connected
+   * the line says the approval is waited for there.
+   */
+  awaitingPermission?: boolean;
   /**
    * How long the turn has been SILENT: the time since it last produced
    * anything (`langyTurnActivityKey`), which on a turn that has produced
@@ -378,13 +492,12 @@ export function langyThinkingLine({
   //    every line below, including the tool that reads as still running: that
   //    tool IS the card.
   if (awaitingAnswer) {
-    return {
-      text: terminalConnected
-        ? LANGY_ANSWER_HERE_OR_TERMINAL
-        : LANGY_AWAITING_ANSWER_LINE,
-      tone: "waiting",
-      allowWhimsy: false,
-    };
+    const text = !terminalConnected
+      ? LANGY_AWAITING_ANSWER_LINE
+      : awaitingPermission
+        ? LANGY_AWAITING_APPROVAL_TERMINAL_LINE
+        : LANGY_ANSWER_HERE_OR_TERMINAL;
+    return { text, tone: "waiting", allowWhimsy: false };
   }
 
   // 0b. THE PAGE IS DOING SOMETHING. It reports its own work, so this is both
@@ -395,17 +508,27 @@ export function langyThinkingLine({
     return { text: reported, tone: "working", allowWhimsy: false };
   }
 
-  // 1. A TOOL IS RUNNING. We know exactly what it is — it is on the tool stream,
-  //    with its command in the input. Say the true thing.
+  // 1. A TOOL IS RUNNING. We know exactly what it is: it is on the tool
+  //    stream with its command in the input, or in the turn's durable record.
+  //    Say the true thing, in the reader's words.
   const tool = runningTool(last);
   if (tool?.type) {
-    const rawName = tool.type.slice("tool-".length);
-    const { title, detail } = describeToolCall({
-      name: effectiveToolName(rawName, tool.input),
-      input: tool.input,
-    });
     return {
-      text: detail ? `${title}: ${detail}` : title,
+      text: customerToolLine({
+        name: tool.type.slice("tool-".length),
+        input: tool.input,
+      }),
+      tone: "working",
+      allowWhimsy: false,
+    };
+  }
+  const recorded = runningRecordedTool(toolCalls);
+  if (recorded) {
+    return {
+      text: customerToolLine({
+        name: recorded.toolName,
+        input: recorded.input ?? { command: recorded.command },
+      }),
       tone: "working",
       allowWhimsy: false,
     };
@@ -414,8 +537,9 @@ export function langyThinkingLine({
   // 2. TOKENS ARE ARRIVING. The streaming prose is on screen right above this
   //    line, so the answer itself is the status — a second line under it
   //    ("Writing…", or any status orb) reads as the panel still waiting for
-  //    the reply that is visibly arriving. Render nothing.
-  if (hasTokens(last)) {
+  //    the reply that is visibly arriving. Render nothing until the text has
+  //    been quiet for TEXT_QUIET_MS.
+  if (proseArriving) {
     return null;
   }
 
@@ -427,12 +551,14 @@ export function langyThinkingLine({
     return { text: "Thinking…", tone: "working", allowWhimsy: false };
   }
 
-  // 4. THE TURN IS BETWEEN STEPS. Nothing is running right now, but tool calls
-  //    have already SETTLED on this turn — so the worker demonstrably started,
-  //    and the startup ladder below would be a plain lie (a startup line under
+  // 4. THE TURN IS BETWEEN STEPS. Nothing is running right now, but the turn
+  //    has already produced something: a settled tool call, a recorded call,
+  //    or a paragraph that has gone quiet. The worker demonstrably started,
+  //    so the startup ladder below would be a plain lie (a startup line under
   //    four completed actions). The model is choosing its next move, which is
-  //    the same state as case 3 and reads the same way.
-  if (settledTool(last)) {
+  //    the same state as case 3 and reads the same way, with the verbs
+  //    cycling.
+  if (settledTool(last) || hasTokens(last) || (toolCalls?.length ?? 0) > 0) {
     return { text: "Thinking…", tone: "working", allowWhimsy: true };
   }
 

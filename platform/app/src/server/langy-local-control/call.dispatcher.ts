@@ -526,7 +526,11 @@ export function callActivityLine({
         : command;
     return `Running on ${machine}: ${shown}`;
   }
-  if (call.tool === "local_write" || call.tool === "local_edit") {
+  if (
+    call.tool === "local_write" ||
+    call.tool === "local_edit" ||
+    call.tool === "local_langwatch_env"
+  ) {
     return `Editing on ${machine}`;
   }
   return `Reading on ${machine}`;

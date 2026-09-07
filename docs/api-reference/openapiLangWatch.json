@@ -6734,6 +6734,12 @@
                   "negateFilters": {
                     "type": "boolean"
                   },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "series": {
                     "type": "array",
                     "items": {
@@ -19353,6 +19359,12 @@
                   "negateFilters": {
                     "type": "boolean"
                   },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "series": {
                     "type": "array",
                     "items": {
@@ -23301,7 +23313,7 @@
       "post": {
         "operationId": "postApiGatewayV1VirtualKeys",
         "summary": "Create virtual key",
-        "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+        "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app, so a caller that only relays the key (an agent printing a snippet) never holds it. `scopes` defaults to the caller's project, where `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
         "tags": [
           "Virtual Keys"
         ],
@@ -23499,12 +23511,20 @@
                       ]
                     },
                     "secret": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "The secret, absent when `reveal_once` was set."
+                    },
+                    "reveal_id": {
+                      "type": "string",
+                      "description": "With `reveal_once`: the id that serves the secret once, through the app."
+                    },
+                    "preview": {
+                      "type": "string",
+                      "description": "With `reveal_once`: the key's display prefix, safe to show in place of the secret."
                     }
                   },
                   "required": [
-                    "virtual_key",
-                    "secret"
+                    "virtual_key"
                   ]
                 }
               }
@@ -23599,7 +23619,7 @@
             }
           },
           "403": {
-            "description": "Caller lacks virtualKeys:manage at a requested scope",
+            "description": "Caller lacks virtualKeys:create on its own project, or virtualKeys:manage at a scope beyond it",
             "content": {
               "application/json": {
                 "schema": {
@@ -23751,6 +23771,9 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "reveal_once": {
+                    "type": "boolean"
                   },
                   "scopes": {
                     "type": "array",
@@ -35458,19 +35481,35 @@
                                               "edits": {
                                                 "type": "array",
                                                 "items": {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "oldText": {
-                                                      "type": "string",
-                                                      "minLength": 1
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "oldText": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        },
+                                                        "newText": {
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "oldText",
+                                                        "newText"
+                                                      ]
                                                     },
-                                                    "newText": {
-                                                      "type": "string"
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "append": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "append"
+                                                      ]
                                                     }
-                                                  },
-                                                  "required": [
-                                                    "oldText",
-                                                    "newText"
                                                   ]
                                                 },
                                                 "minItems": 1,
@@ -35624,6 +35663,29 @@
                                                 "type": "integer",
                                                 "exclusiveMinimum": 0,
                                                 "maximum": 20000
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_langwatch_env"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "path": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 4096
                                               }
                                             }
                                           }
@@ -36049,7 +36111,8 @@
                                     "cancelled",
                                     "timeout",
                                     "exec_failed",
-                                    "not_found"
+                                    "not_found",
+                                    "key_refused"
                                   ]
                                 },
                                 "message": {
@@ -36297,7 +36360,7 @@
             }
           }
         },
-        "description": "List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
+        "description": "List the open requests Langy made for a folder of mine, on every project I can read. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
         "tags": [
           "Langy"
         ],
@@ -65744,6 +65807,12 @@
                   },
                   "negateFilters": {
                     "type": "boolean"
+                  },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   },
                   "pageOffset": {
                     "type": "number",

@@ -77,6 +77,7 @@ onto an intent and replace the outer container with `LangyCard`:
 | `LangyPlanCard`                                                   | `progress` (done — the reference)          |
 | `LangyCapabilityPendingCard`                                      | `progress`                                 |
 | `LangyToolActivity` lines                                         | `activity`                                 |
+| `LangyThinkingLine` (the activity row under the transcript)       | `activity` (done: spinner, verb or tool)   |
 | `LangyCapabilityCard` (tone `read`)                               | `change` (neutral dot)                     |
 | `LangyCapabilityCard` (tone `created` / `updated` / `removed`)    | `change`                                   |
 | `LangyError` (card mode) / `LangyToolErrorCard`                   | `change` (rust dot, `role="alert"`) — done |

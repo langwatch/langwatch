@@ -38,9 +38,9 @@ import { questionToolCardParts } from "../logic/langyQuestionTool";
 
 afterEach(cleanup);
 
-/** The frame the choices card renders inside — the ADR-060 provenance mark. */
-const derivedFrames = () =>
-  document.querySelectorAll("[data-derived-by-langy]");
+/** The choices cards on screen. A question is an ask, so it wears no derived frame. */
+const choicesCards = () =>
+  document.querySelectorAll("[data-langy-choices-card]");
 
 /** A `question` tool part exactly as the stream delivers one — and leaves it. */
 function questionToolPart(over: Record<string, unknown> = {}) {
@@ -98,16 +98,105 @@ function renderMessage(
 describe("the question tool card", () => {
   describe("given an assistant turn waiting on its question tool call", () => {
     describe("when the message renders", () => {
-      it("draws the interactive choices card, titled by the question itself", () => {
+      /** @scenario "A question is an ask, not a view Langy composed" */
+      it("draws the interactive choices card, titled by the question itself, without the derived frame", () => {
         renderMessage(assistantMessage([questionToolPart()]));
 
-        expect(derivedFrames().length).toBe(1);
+        expect(choicesCards().length).toBe(1);
         expect(
           screen.getByText("Which agent should the scenario run against?"),
         ).toBeInTheDocument();
         expect(screen.getByText("Staging agent")).toBeInTheDocument();
         expect(screen.getByText("The safe one")).toBeInTheDocument();
         expect(screen.getByText("Production agent")).toBeInTheDocument();
+        // The dashed provenance chrome is for the cards Langy composed from
+        // the project's data; a question is not one.
+        expect(document.querySelector("[data-derived-by-langy]")).toBeNull();
+        expect(screen.queryByText("Made by Langy")).toBeNull();
+      });
+
+      /** @scenario "A bare question draws its words as prose above the options" */
+      it("draws the question as reply prose, not a title, when the question is bare", () => {
+        const proposal =
+          "Now that your agent is integrated, I think we should write some tests for it. The first one I'd write is **Guest completes checkout**, because it is the golden path.";
+        renderMessage(
+          assistantMessage([
+            questionToolPart({
+              input: {
+                questions: [
+                  {
+                    question: proposal,
+                    bare: true,
+                    options: [
+                      {
+                        label:
+                          'Create "Guest completes checkout" as your first scenario test',
+                      },
+                      { label: "Chat about this", quiet: true },
+                    ],
+                  },
+                ],
+              },
+            }),
+          ]),
+          // Open, so the Other row would be drawn if the card offered it.
+          { onChoiceSelect: vi.fn() },
+        );
+
+        const card = choicesCards()[0]!;
+        expect(choicesCards().length).toBe(1);
+        expect(card.getAttribute("data-choices-bare")).toBe("true");
+
+        // The words render as markdown prose inside the card, above the
+        // options, with no title element carrying them.
+        const prose = card.querySelector("[data-langy-choices-prose]");
+        expect(prose).not.toBeNull();
+        expect(prose!.textContent).toContain(
+          "Now that your agent is integrated, I think we should write some tests for it.",
+        );
+        expect(prose!.querySelector("strong")?.textContent).toBe(
+          "Guest completes checkout",
+        );
+        const options = card.querySelectorAll(
+          "[data-testid='langy-choice-option']",
+        );
+        expect(options.length).toBe(2);
+        expect(
+          prose!.compareDocumentPosition(options[0]!) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+
+        // The prose is no part of what a button is called.
+        expect(
+          screen.getByRole("button", {
+            name: 'Create "Guest completes checkout" as your first scenario test',
+          }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Chat about this" }),
+        ).toBeInTheDocument();
+        // The free-text route of a bare question is the quiet option the ask
+        // provides, so there is no third row under the two.
+        expect(screen.queryByRole("button", { name: "Other…" })).toBeNull();
+      });
+
+      /** @scenario "A bare question offers no Other row" */
+      it("keeps the Other row on a question that is not bare", () => {
+        renderMessage(assistantMessage([questionToolPart()]), {
+          onChoiceSelect: vi.fn(),
+        });
+
+        expect(
+          screen.getByRole("button", { name: "Other…" }),
+        ).toBeInTheDocument();
+      });
+
+      it("keeps the title for a question that is not bare", () => {
+        renderMessage(assistantMessage([questionToolPart()]));
+
+        const card = choicesCards()[0]!;
+        expect(card.querySelector("[data-langy-choices-prose]")).toBeNull();
+        expect(card.getAttribute("data-choices-bare")).toBeNull();
       });
 
       it("never renders the tool as raw activity — no dead 'Question…' card, no JSON", () => {
@@ -230,7 +319,7 @@ describe("the question tool card", () => {
         ]),
       );
 
-      expect(derivedFrames().length).toBe(0);
+      expect(choicesCards().length).toBe(0);
       // The honest fallback: the tool surfaces as ordinary activity.
       expect(screen.getByLabelText("Langy activity")).toBeInTheDocument();
     });

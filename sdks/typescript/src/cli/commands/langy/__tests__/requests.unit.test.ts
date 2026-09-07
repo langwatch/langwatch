@@ -27,6 +27,9 @@ import type { UiWriter } from "../ui";
 
 const ENDPOINT = "https://app.langwatch.test";
 
+const ANSI_SEQUENCE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+const stripAnsi = (text: string): string => text.replace(ANSI_SEQUENCE, "");
+
 const requestNamed = (id: string, title: string): ControlRequest => ({
   id,
   conversationId: `conv_${id}`,
@@ -103,20 +106,90 @@ describe("given the share-control command", () => {
     });
   });
 
+  describe("when the machine has a device session and the folder has a project key", () => {
+    /** @scenario "The login answers before a project key found in the folder" */
+    /** @scenario "The command names the login it uses" */
+    it("resolves the login's key on the personal project, never the folder's key", async () => {
+      const login = vi.fn(async () => undefined);
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "langy-login-"));
+      const configPath = path.join(dir, "config.json");
+      fs.writeFileSync(
+        configPath,
+        JSON.stringify({
+          gateway_url: ENDPOINT,
+          control_plane_url: ENDPOINT,
+          access_token: "session-token",
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          cli_api_key: "sk-lw-login-key",
+          user: { id: "user_1", email: "riley@acme.test", name: "Riley" },
+          organization: { id: "org_1", slug: "acme", name: "ACME" },
+          personal_project: {
+            id: "project_personal",
+            slug: "riley-personal",
+            api_key: "sk-lw-personal-key",
+            validated_at: Math.floor(Date.now() / 1000),
+          },
+        }),
+      );
+      const before = {
+        config: process.env.LANGWATCH_CLI_CONFIG,
+        key: process.env.LANGWATCH_API_KEY,
+      };
+      process.env.LANGWATCH_CLI_CONFIG = configPath;
+      process.env.LANGWATCH_API_KEY = "sk-lw-folder-project-key";
+      const printed: string[] = [];
+      const log = vi
+        .spyOn(console, "log")
+        .mockImplementation((text) => printed.push(String(text)));
+      const error = vi
+        .spyOn(console, "error")
+        .mockImplementation((text) => printed.push(String(text)));
+      try {
+        const credentials = await ensureSignedIn({ login });
+        expect(login).not.toHaveBeenCalled();
+        expect(credentials.apiKey).toBe("sk-lw-login-key");
+        expect(credentials.projectId).toBe("project_personal");
+      } finally {
+        log.mockRestore();
+        error.mockRestore();
+        if (before.config === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+        else process.env.LANGWATCH_CLI_CONFIG = before.config;
+        if (before.key === undefined) delete process.env.LANGWATCH_API_KEY;
+        else process.env.LANGWATCH_API_KEY = before.key;
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+      expect(printed.map(stripAnsi)).toContain(
+        "Using your login as Riley at ACME.",
+      );
+      const wrong = printed.filter(
+        (line) => line.includes("--project") || line.includes("personal project"),
+      );
+      expect(wrong).toEqual([]);
+    });
+  });
+
   describe("when the machine has no device session", () => {
     /** @scenario "The command signs in when there is no session" */
     it("runs the login flow first and then resolves the credentials", async () => {
       const login = vi.fn(async () => undefined);
-      const before = process.env.LANGWATCH_API_KEY;
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "langy-nologin-"));
+      const before = {
+        config: process.env.LANGWATCH_CLI_CONFIG,
+        key: process.env.LANGWATCH_API_KEY,
+      };
+      // No config file at this path: the machine has no session, so the key
+      // in the environment is the credential. Never the developer's own login.
+      process.env.LANGWATCH_CLI_CONFIG = path.join(dir, "config.json");
       process.env.LANGWATCH_API_KEY = "sk-lw-test-key";
       try {
-        // With a key in the environment the resolver never reaches the config,
-        // so this proves the order: login first, credentials after.
         const credentials = await ensureSignedIn({ login });
         expect(credentials.apiKey).toBe("sk-lw-test-key");
       } finally {
-        if (before === undefined) delete process.env.LANGWATCH_API_KEY;
-        else process.env.LANGWATCH_API_KEY = before;
+        if (before.config === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+        else process.env.LANGWATCH_CLI_CONFIG = before.config;
+        if (before.key === undefined) delete process.env.LANGWATCH_API_KEY;
+        else process.env.LANGWATCH_API_KEY = before.key;
+        fs.rmSync(dir, { recursive: true, force: true });
       }
     });
   });
@@ -174,6 +247,31 @@ describe("given the share-control command", () => {
       });
       await expect(api.list()).rejects.toThrow(
         "This request was cancelled. Ask Langy again.",
+      );
+    });
+
+    /** @scenario "A refusal with several tips prints as sentences" */
+    it("ends every tip with a stop before joining them", async () => {
+      const { impl } = fakeFetch({
+        "/api/v1/langy/control/requests": {
+          status: 404,
+          body: {
+            code: "langy_local_request_invalid",
+            message: "langy_local_request_invalid",
+            tips: [
+              "Only the person Langy asked can approve a request; ask Langy for the code change again to get your own",
+              "A request is single use, so a second approval of the same one is refused",
+            ],
+          },
+        },
+      });
+      const api = createControlApi({
+        endpoint: ENDPOINT,
+        apiKey: "sk-lw-abc",
+        fetchImpl: impl,
+      });
+      await expect(api.list()).rejects.toThrow(
+        "Only the person Langy asked can approve a request; ask Langy for the code change again to get your own. A request is single use, so a second approval of the same one is refused.",
       );
     });
   });
@@ -274,11 +372,26 @@ describe("given the share-control command", () => {
           : { action: "approve" };
       }) as never;
 
+      // The picker lists the newest first, so the two need timestamps of their
+      // own: built from the clock they land in the same millisecond most of the
+      // time, and the run where they do not reverses the list.
+      const now = Date.parse("2026-01-01T12:00:00.000Z");
       const requests = [
-        requestNamed("req_1", "Instrument tracing"),
-        requestNamed("req_2", "Fix the refund scenario"),
+        {
+          ...requestNamed("req_1", "Instrument tracing"),
+          createdAt: new Date(now - 20_000).toISOString(),
+        },
+        {
+          ...requestNamed("req_2", "Fix the refund scenario"),
+          createdAt: new Date(now - 3 * 60_000).toISOString(),
+        },
       ];
-      const choice = await chooseRequest({ requests, root: "/work/acme", ask });
+      const choice = await chooseRequest({
+        requests,
+        root: "/work/acme",
+        ask,
+        now,
+      });
 
       const picker = asked[0]!.choices as Array<{
         title: string;

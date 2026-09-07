@@ -120,7 +120,18 @@ export const SESSION_REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 export const resolveCredentials = async (
-  opts: { apiKey?: string; project?: string } = {},
+  opts: {
+    apiKey?: string;
+    project?: string;
+    /**
+     * Resolve the device session before a key from the environment or the
+     * folder's .env. For a command that acts as a person: a control request
+     * is addressed to the developer who asked, and the project key Langy
+     * wrote into the folder's .env carries no person, so it can never answer
+     * one. The flag key still wins, since it was typed on this command.
+     */
+    preferSession?: boolean;
+  } = {},
 ): Promise<ResolvedCredentials> => {
   // Load environment variables from .env file (scoped, see above)
   loadEnvFileScoped();
@@ -130,6 +141,11 @@ export const resolveCredentials = async (
   // would be sent to the cloud default. `??=` keeps an explicit env value
   // authoritative, matching the 4-source resolver's order (env above config).
   process.env.LANGWATCH_ENDPOINT ??= endpoint;
+
+  if (opts.preferSession && !opts.apiKey?.trim()) {
+    const session = await resolveFromSession({ opts, endpoint });
+    if (session) return session;
+  }
 
   const flagKey = opts.apiKey?.trim();
   if (flagKey) {
@@ -160,6 +176,23 @@ export const resolveCredentials = async (
     return { apiKey: envKey, source: "env", endpoint, projectId };
   }
 
+  const session = await resolveFromSession({ opts, endpoint });
+  if (session) return session;
+
+  return reportMissingCredentials(endpoint);
+};
+
+/**
+ * The device session's credential, published into the request-scoped store,
+ * or nothing when the machine holds no live session.
+ */
+async function resolveFromSession({
+  opts,
+  endpoint,
+}: {
+  opts: { project?: string; preferSession?: boolean };
+  endpoint: string;
+}): Promise<ResolvedCredentials | undefined> {
   // Stored state. Re-read from disk on every call, never cached in-process
   // (the daemon identity boundary again; loadConfig is built for this).
   let cfg: GovernanceConfig | undefined;
@@ -168,32 +201,31 @@ export const resolveCredentials = async (
   } catch {
     cfg = undefined;
   }
-  if (cfg && isLoggedIn(cfg)) {
-    const session = await resolveSessionCredential(cfg);
-    if (session) {
-      setResolvedApiKey(session.apiKey);
-      // `--project` decides the target BEFORE anything is published: the
-      // personal project is the default only when no flag says otherwise,
-      // and a flag that does not resolve must leave no target behind at all.
-      const projectId =
-        (await applyProjectScope({ project: opts.project, cfg })) ??
-        session.projectId;
-      setResolvedProjectId(projectId);
-      // An explicit --project names the identity on the command line, so
-      // there is nothing implicit left to warn about.
-      if (opts.project === undefined) {
-        await maybePrintIdentityNotice({
-          mode: session.isLoginKey ? "device-login-key" : "device",
-          apiKey: session.apiKey,
-          endpoint,
-        });
-      }
-      return { apiKey: session.apiKey, source: "session", endpoint, projectId };
-    }
-  }
+  if (!cfg || !isLoggedIn(cfg)) return undefined;
+  const session = await resolveSessionCredential(cfg);
+  if (!session) return undefined;
 
-  return reportMissingCredentials(endpoint);
-};
+  setResolvedApiKey(session.apiKey);
+  // `--project` decides the target BEFORE anything is published: the
+  // personal project is the default only when no flag says otherwise,
+  // and a flag that does not resolve must leave no target behind at all.
+  const projectId =
+    (await applyProjectScope({ project: opts.project, cfg })) ??
+    session.projectId;
+  setResolvedProjectId(projectId);
+  // An explicit --project names the identity on the command line, so
+  // there is nothing implicit left to warn about. A command that acts as
+  // the person reads no project either way, so the notice about which
+  // project it reads would be wrong; that command names its own login.
+  if (opts.project === undefined && !opts.preferSession) {
+    await maybePrintIdentityNotice({
+      mode: session.isLoginKey ? "device-login-key" : "device",
+      apiKey: session.apiKey,
+      endpoint,
+    });
+  }
+  return { apiKey: session.apiKey, source: "session", endpoint, projectId };
+}
 
 /**
  * Resolve `--project` into the request's target project and publish it.

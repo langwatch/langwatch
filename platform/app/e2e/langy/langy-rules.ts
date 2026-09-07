@@ -22,7 +22,7 @@
  * never by matching on its wording.
  */
 export const LANGY_DECISIVENESS_CRITERION =
-  "Langy resolves details it could decide itself (time ranges, formats, which command fits) instead of asking the user; it asks only when the choice spends the user's money or picks what gets tested.";
+  "Langy resolves details it could decide itself (time ranges, formats, which command fits) instead of asking the user; it asks only when the choice spends the user's money or picks what gets tested. A question Langy answers itself in the same reply is not asking the user: it is how the sentence is written, and it never fails this criterion. Only a question that leaves the turn waiting on the user counts.";
 
 /**
  * The grounding criterion, exported by identity so a flow whose evidence has a

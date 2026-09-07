@@ -87,10 +87,41 @@ describe("given a folder shared with a Langy conversation", () => {
         "which node",
         "git status && git diff",
         "cat package.json | wc -l",
+        "git config --get remote.origin.url",
+        "git rev-list --count HEAD",
+        "git symbolic-ref --short HEAD",
+        "true",
       ];
       for (const command of commands) {
         expect(bash(command), command).toEqual({ kind: "run" });
       }
+    });
+
+    /** @scenario "A git chain that only reads runs at once" */
+    it("runs a git chain that only reads, and still asks when a reference or a value is written", () => {
+      expect(
+        bash(
+          "git status --porcelain && git remote -v && git symbolic-ref --short refs/remotes/origin/HEAD || true",
+        ),
+      ).toEqual({ kind: "run" });
+
+      const writes = [
+        "git symbolic-ref HEAD refs/heads/main",
+        "git symbolic-ref --delete refs/remotes/origin/HEAD",
+        "git config user.name Riley",
+        "git config --unset user.name",
+      ];
+      for (const command of writes) {
+        const decision = bash(command);
+        expect(decision.kind, command).toBe("ask");
+        if (decision.kind !== "ask") continue;
+        expect(decision.reason, command).toBe("This changes the git repository.");
+      }
+
+      const remote = bash("git ls-remote origin");
+      expect(remote.kind).toBe("ask");
+      if (remote.kind !== "ask") return;
+      expect(remote.reason).toBe("This reaches the network.");
     });
 
     /** @scenario "The GitHub CLI sign-in check runs at once" */
@@ -194,6 +225,42 @@ describe("given a folder shared with a Langy conversation", () => {
         "git push",
         "gh pr",
       ]);
+    });
+
+    /** @scenario "A here-document is one command" */
+    it("reads a here-document as the text of one command, with one grant", () => {
+      const script = [
+        "python - <<'PY'",
+        "import socket",
+        "s = socket.socket()",
+        "print(s)",
+        "PY",
+      ].join("\n");
+      const decision = bash(script);
+      expect(decision.kind).toBe("ask");
+      if (decision.kind !== "ask") return;
+      expect(decision.pattern).toBe("python -");
+      expect(decision.patterns).toEqual(["python -"]);
+      expect(decision.segments).toEqual([
+        { command: script, pattern: "python -", readOnly: false },
+      ]);
+      expect(decision.reason).toBe("This runs a program that is not read-only.");
+      expect(bash(script, { grants: ["python -"] })).toEqual({ kind: "run" });
+
+      // A command after the body is a segment of its own, and the body's
+      // lines never are.
+      const chained = bash(`${script}\necho done`);
+      expect(chained.kind).toBe("ask");
+      if (chained.kind !== "ask") return;
+      expect(chained.segments?.map((segment) => segment.command)).toEqual([
+        script,
+        "echo done",
+      ]);
+
+      // A read-only program fed a here-document still reads only, and `<<-`
+      // strips the tabs before the closing word.
+      expect(bash("cat <<EOF\nhello\nEOF")).toEqual({ kind: "run" });
+      expect(bash("cat <<-EOF\n\thello\n\tEOF")).toEqual({ kind: "run" });
     });
 
     /** @scenario "A pattern grant covers exactly the segments the card named" */
@@ -696,6 +763,20 @@ describe("given a folder shared with a Langy conversation", () => {
       }
       expect(isSecretFileName("app.py")).toBe(false);
       expect(isSecretFileName(".env")).toBe(true);
+    });
+
+    /** @scenario "The credentials write says it writes" */
+    it("says the credentials file is written, not read", () => {
+      const decision = at({
+        tool: "local_langwatch_env",
+        params: { path: ".env" },
+      });
+      expect(decision.kind).toBe("ask");
+      if (decision.kind !== "ask") return;
+      expect(decision.summary).toBe("write .env");
+      expect(decision.reason).toBe(
+        ".env may hold secrets, so it is not written for you without an answer.",
+      );
     });
 
     /** @scenario "A committed example environment file is not a secret" */

@@ -1,5 +1,6 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildGuidedKickoffParts } from "~/features/guided-onboarding/kickoff";
 import { featureFlagService } from "~/server/featureFlag";
 import {
   LangyAgentUnavailableError,
@@ -168,6 +169,105 @@ describe("LangyTurnService.startConversationTurn", () => {
 
   beforeEach(() => {
     ({ deps, mocks } = makeDeps());
+  });
+
+  describe("given a guided onboarding kickoff composed before the tour's key was recorded", () => {
+    const kickoff = buildGuidedKickoffParts({
+      input: {
+        path: "gateway",
+        paths: ["gateway"],
+        orgName: "ACME",
+        tourStatus: "completed",
+        gatewayUrl: "https://gateway.acme.example/v1",
+      },
+    });
+
+    /** @scenario "The brief's state lines are settled on the server from the stored guided state" */
+    it("records and asks the model the brief settled from the stored state, not the panel's snapshot", async () => {
+      const guidedKickoffFacts = vi.fn(async () => ({
+        paths: ["gateway" as const],
+        provider: undefined,
+        providerModel: undefined,
+        gatewayUrl: "https://gateway.acme.example/v1",
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-01M1X40",
+        virtualKeyRevealId: "rvl_late",
+      }));
+      ({ deps, mocks } = makeDeps({ guidedKickoffFacts }));
+
+      await LangyTurnService.create(deps).startConversationTurn(
+        input({ messages: [{ role: "user", parts: kickoff }] }),
+      );
+
+      expect(guidedKickoffFacts).toHaveBeenCalledWith({
+        organizationId: "org-1",
+      });
+      const accepted = mocks.acceptTurn.mock.calls[0]?.[0] as unknown as {
+        questionParts: Array<{ text?: string }>;
+        userMessage: { parts: Array<Record<string, unknown>> };
+      };
+      const settledLine =
+        "Virtual key: production-app is live (preview vk-lw-01M1X40, reveal id rvl_late). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.";
+      expect(accepted.questionParts[1]?.text).toContain(settledLine);
+      expect(accepted.userMessage.parts[1]?.text).toContain(settledLine);
+      expect(accepted.userMessage.parts[0]).toMatchObject({
+        virtualKeyRevealId: "rvl_late",
+      });
+      expect(JSON.stringify(accepted)).not.toContain("none minted by the tour");
+    });
+
+    /** @scenario "The prompt the model reads is the settled brief, not the panel's snapshot" */
+    it("hands the worker the settled brief as the prompt, not the panel's snapshot", async () => {
+      const guidedKickoffFacts = vi.fn(async () => ({
+        paths: ["gateway" as const],
+        provider: undefined,
+        providerModel: undefined,
+        gatewayUrl: "https://gateway.acme.example/v1",
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-01M1X40",
+        virtualKeyRevealId: "rvl_late",
+      }));
+      ({ deps, mocks } = makeDeps({ guidedKickoffFacts }));
+
+      await LangyTurnService.create(deps).startConversationTurn(
+        input({ messages: [{ role: "user", parts: kickoff }] }),
+      );
+
+      const [[stashed]] = mocks.stash.mock.calls as unknown as [
+        [{ prompt: string }],
+      ];
+      expect(stashed.prompt).toContain(
+        "Virtual key: production-app is live (preview vk-lw-01M1X40, reveal id rvl_late). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.",
+      );
+      expect(stashed.prompt).not.toContain("none minted by the tour");
+      expect(stashed.prompt.startsWith("Guided onboarding kickoff.")).toBe(
+        true,
+      );
+    });
+
+    it("records the kickoff as sent when nothing reads the state", async () => {
+      await LangyTurnService.create(deps).startConversationTurn(
+        input({ messages: [{ role: "user", parts: kickoff }] }),
+      );
+      const accepted = mocks.acceptTurn.mock.calls[0]?.[0] as unknown as {
+        userMessage: { parts: unknown[] };
+      };
+      expect(accepted.userMessage.parts).toEqual(kickoff);
+    });
+
+    it("never reads the state for a message that is not a kickoff", async () => {
+      const guidedKickoffFacts = vi.fn(async () => {
+        throw new Error("not to be read");
+      });
+      ({ deps, mocks } = makeDeps({ guidedKickoffFacts }));
+      await LangyTurnService.create(deps).startConversationTurn(input());
+      expect(guidedKickoffFacts).not.toHaveBeenCalled();
+      expect(mocks.acceptTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          questionParts: [{ type: "text", text: "hi" }],
+        }),
+      );
+    });
   });
 
   it("commits one atomic message + acceptance command and fast-dispatches it", async () => {

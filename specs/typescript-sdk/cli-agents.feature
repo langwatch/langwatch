@@ -30,6 +30,28 @@ Feature: The agent commands show connected agents and run them through the relay
       Then the first row names the user
       And the second row names the host label
 
+    # A process that has just started takes a few seconds to register. The
+    # wait lives in the command so no caller scripts a loop of its own around
+    # it: Langy once wrote such a loop, misread the document it got back and
+    # gave up on an agent that was online the whole time.
+    Scenario: The list can wait for an agent to come online
+      Given a connected agent that registers a few seconds after its process starts
+      When I run "langwatch agent list --wait-online acme-checkout"
+      Then the list is read again every few seconds until that agent reports online
+      And the list is printed once it does
+      And the command fails when the timeout passes with the agent still offline
+
+    # Under --format json the spinner is silent, so the timeout used to leave
+    # only the identity notice ("... Switch: langwatch login ...") and a gray
+    # hint on stderr; a model read that as the command line asking for a
+    # login, on a command line that was signed in.
+    Scenario: The wait's timeout names the agent, the wait and the credentials, never a login
+      Given a connected agent that never reports online
+      When I run "langwatch agent list --wait-online acme-checkout --format json" and the timeout passes
+      Then stderr says which agent it waited for, for how many seconds, and which credentials the listing was read with
+      And the line is printed in every output format, not through the spinner
+      And no line of the failure mentions a login command
+
     Scenario: A row the key cannot choose reads as not selectable
       Given a personal development agent owned by another person
       When I run "langwatch agent list"

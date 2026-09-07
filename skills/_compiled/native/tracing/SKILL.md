@@ -74,6 +74,33 @@ const langwatch = new LangWatch();
 
 The exact pattern depends on the framework, so follow the docs, not these examples.
 
+**A graph takes the callback at the graph, not at a model call inside it.** LangChain propagates a callback down from wherever it is attached, so in LangGraph the callback goes in the config of the graph invocation:
+
+```python
+graph.invoke(state, config={"callbacks": [langwatch.get_current_trace().get_langchain_callback()]})
+```
+
+The same config argument works on `ainvoke` and `stream`. Every node the run touches then becomes a span under the trace: a chain span named after the node, LLM spans for the model calls and tool spans for the tool calls. Attached only to the model call inside one node, the trace holds LLM spans and nothing else, so the tool nodes and the plain function nodes are missing and a check for whether the graph reached its payment step has no span to read.
+
+**The environment loads before LangWatch initialises.** `langwatch.setup()` and `new LangWatch()` read `LANGWATCH_API_KEY` from the process environment the moment they run, and a `.env` file is not the environment until something loads it. A filmed run put `langwatch.setup()` at the top of the entry file, above the import that called `load_dotenv()`, and the process died at import with "LangWatch API key is required but not provided".
+
+- Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
+- TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
+
+Before you start the process, check that the key is visible to it the way the project reads it. This is the first and only check: copy the command for the language as written, run it once from the project root, and read the answer. No variant before it (a probe such as `import langwatch` with no loader reads the bare process and always answers missing on a dotenv project) and none after it.
+
+```bash
+uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
+```
+
+`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. Always `-c`, never `python -` with a heredoc: python-dotenv's loader looks for its caller's file and fails on standard input. TypeScript:
+
+```bash
+node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"
+```
+
+The command prints only whether `LANGWATCH_API_KEY` is set, never its value. Swap the loader for the project's own when it is not dotenv. `False` means the file is not where the loader looks or the order above is wrong: fix that, never retry the check with another path.
+
 ## Step 4: Verify
 
 Do NOT consider the work complete without verifying. In order:
@@ -88,4 +115,6 @@ Do NOT consider the work complete without verifying. In order:
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
+- Do NOT call `langwatch.setup()` above the import that loads the environment: the key is read when `setup()` runs
+- Do NOT attach the LangChain callback only to a model call inside a graph node: it belongs on the graph invocation, or the nodes never become spans
 - Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly

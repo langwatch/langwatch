@@ -80,6 +80,15 @@ Feature: Langy renders domain-capability cards for tool calls
     And the card shows the scenario status when the payload carries one
     And the card shows no line of the serialised payload
 
+  # The agent's document is a machine contract: ids, timestamps and a host
+  # label that the skills read. The card names the catalog's fields instead
+  # of printing the row.
+  @integration
+  Scenario: An agent card reads in customer copy
+    When Langy reads one connected agent, or lists them
+    Then the card shows its status as Online or Offline, its environment and its host
+    And it shows no id, type, timestamp or host label field
+
   @integration
   Scenario: Every LangWatch action Langy takes shows a result card
     When Langy runs any LangWatch action and it returns a result
@@ -336,6 +345,17 @@ Feature: Langy renders domain-capability cards for tool calls
       Given a turn that wrote text and ran tools in turn
       When it settles
       Then the settled turn keeps the order the reader watched it arrive in
+
+    # The cards a call raises (a question, a pull request, a proposal, the
+    # code access ask, a secret) rendered in a pile under the whole reply, so
+    # the closing line of a guided path sat above the question the path had
+    # asked three steps earlier, and above the commit receipt.
+    @integration
+    Scenario: A card raised by a call sits where the call ran
+      Given Langy asked a question with a tool call and went on to write a closing line
+      Then the question card is shown before the closing line
+      And the pull request progress card sits after the call that committed, not under the closing line
+      And a guided conversation leaves the progress card out
 
     # The record was built as every tool call first and the reply after them,
     # from the text the agent wrote after its LAST call. Everything written

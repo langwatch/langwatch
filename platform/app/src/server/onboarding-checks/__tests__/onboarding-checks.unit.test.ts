@@ -127,5 +127,64 @@ describe("OnboardingChecksService", () => {
         expect(result.onlineEvaluations).toBe(0);
       });
     });
+
+    describe("given the organization went through the guided onboarding", () => {
+      const projectWith = (signupData: unknown) => ({
+        workflows: [],
+        customGraphs: [],
+        datasets: [],
+        checks: [],
+        triggers: [],
+        teamId: "team-1",
+        team: {
+          organizationId: "organization-1",
+          organization: { signupData },
+          members: [],
+        },
+        firstMessage: false,
+        integrated: false,
+      });
+
+      /** @scenario "the onboarding checks expose the guided state of the organization" */
+      it("exposes the variant, the paths, the current path and the done paths", async () => {
+        mockFindUniqueProject.mockResolvedValue(
+          projectWith({
+            onboardingVariant: "guided",
+            guidedOnboarding: {
+              paths: ["gateway", "llmops"],
+              currentPath: "llmops",
+              donePaths: ["gateway"],
+            },
+          }),
+        );
+        mockGetScenarioSetsData.mockResolvedValue([]);
+
+        const result = await service.getCheckStatus("project-1");
+
+        expect(result.guidedOnboarding).toEqual({
+          variant: "guided",
+          paths: ["gateway", "llmops"],
+          currentPath: "llmops",
+          donePaths: ["gateway"],
+        });
+      });
+
+      /** @scenario "the onboarding checks expose the empty guided state for an organization that recorded none" */
+      it("exposes the empty guided state when the organization predates the experiment", async () => {
+        mockFindUniqueProject.mockResolvedValue(
+          projectWith({ companyType: "company" }),
+        );
+        mockGetScenarioSetsData.mockResolvedValue([]);
+
+        const result = await service.getCheckStatus("project-1");
+
+        expect(result.guidedOnboarding).toEqual({
+          variant: null,
+          paths: [],
+          currentPath: undefined,
+          donePaths: [],
+        });
+      });
+    });
   });
 });

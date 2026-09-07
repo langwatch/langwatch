@@ -307,4 +307,96 @@ describe("ensureUserSyncedToCio()", () => {
       });
     });
   });
+
+  describe("given a user whose organization went through the guided onboarding", () => {
+    const setupGuidedOrg = () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        email: "jane@example.com",
+        name: "Jane Doe",
+        createdAt: new Date("2025-01-15T10:00:00.000Z"),
+      });
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        userId: "user-1",
+        organizationId: "org-1",
+        role: "ADMIN",
+      });
+      mockPrisma.organization.findUnique.mockResolvedValue({
+        id: "org-1",
+        name: "Acme Corp",
+        signupData: {
+          companySize: "11-50",
+          onboardingVariant: "guided",
+          guidedOnboarding: {
+            paths: ["gateway", "llmops"],
+            currentPath: "llmops",
+            donePaths: ["gateway"],
+            provider: "openai",
+            providerModel: "gpt-5",
+            tourCompletedAt: "2026-09-05T10:00:00.000Z",
+          },
+        },
+      });
+      mockPrisma.project.findMany.mockResolvedValue([
+        { id: "proj-1", firstMessage: true, integrated: true },
+      ]);
+      mockPrisma.subscription.findFirst.mockResolvedValue(null);
+    };
+
+    describe("when the auth session callback fires", () => {
+      /** @scenario 'the first login backfill carries the onboarding traits' */
+      it("carries the onboarding traits on the identify call and the organization group", async () => {
+        setupGuidedOrg();
+
+        ensureUserSyncedToCio({ userId: "user-1", hasOrganization: true });
+
+        await vi.waitFor(() => {
+          expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+            userId: "user-1",
+            traits: expect.objectContaining({
+              onboarding_variant: "guided",
+              onboarding_paths: "gateway,llmops",
+              onboarding_primary_path: "gateway",
+              guided_onboarding_provider: "openai",
+              guided_onboarding_tour: "completed",
+              guided_onboarding_completed_paths: "gateway",
+            }),
+          });
+          expect(mockNurturing.groupUser).toHaveBeenCalledWith({
+            userId: "user-1",
+            groupId: "org-1",
+            traits: expect.objectContaining({
+              onboarding_variant: "guided",
+              onboarding_paths: "gateway,llmops",
+              onboarding_primary_path: "gateway",
+              guided_onboarding_completed_paths: "gateway",
+            }),
+          });
+        });
+      });
+    });
+  });
+
+  describe("given a user whose organization recorded no onboarding variant", () => {
+    describe("when the auth session callback fires", () => {
+      /** @scenario 'the first login backfill of an organization that predates the experiment carries no onboarding traits' */
+      it("carries no onboarding trait", async () => {
+        setupPrismaForFullSync();
+
+        ensureUserSyncedToCio({ userId: "user-1", hasOrganization: true });
+
+        await vi.waitFor(() => {
+          expect(mockNurturing.identifyUser).toHaveBeenCalledTimes(1);
+        });
+        const traits = mockNurturing.identifyUser.mock.calls[0]![0].traits;
+        expect(
+          Object.keys(traits).filter((k) => k.includes("onboarding")),
+        ).toEqual([]);
+        const orgTraits = mockNurturing.groupUser.mock.calls[0]![0].traits;
+        expect(
+          Object.keys(orgTraits).filter((k) => k.includes("onboarding")),
+        ).toEqual([]);
+      });
+    });
+  });
 });

@@ -234,6 +234,13 @@ export function OnboardingProgress() {
       // Use project_id as the grouping dimension
       project_id: project.id,
 
+      // Which onboarding the organization went through, so the A/B reads
+      // this view split by variant. Absent for organizations that predate
+      // the experiment.
+      ...(checkStatus.guidedOnboarding?.variant
+        ? { onboarding_variant: checkStatus.guidedOnboarding.variant }
+        : {}),
+
       // Overall metrics
       completion_percentage: completionPercentage,
       completed_tasks_count: completedSteps.length,

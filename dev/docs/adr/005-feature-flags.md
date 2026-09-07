@@ -50,6 +50,30 @@ Two properties are load-bearing:
   — every kill switch on the per-event hot path — reads exactly what it read
   before, with no extra query.
 
+## Amendment (2026-09-07): targeting by email domain
+
+A flag under QA in production has to reach the team's own accounts and no one
+else. A rule may name an email domain, or a list of them:
+
+```json
+{ "match": { "emailDomain": "acme.com" }, "enabled": true }
+{ "match": { "emailDomain": ["acme.com", "acme.io"] }, "enabled": true }
+```
+
+It matches every signed-in user whose email is at one of those domains. The
+comparison is on the part after the last `@`, case-insensitive and exact, so a
+subdomain only matches when it is listed. Domains are stored lowercase without
+the `@`; the write schema rejects anything else. `/ops/feature-flags` writes it
+as the **Email domain** scope, one comma-separated field.
+
+The email comes from the session. `FeatureFlagEvaluateOptions.userEmail` is
+optional, and every caller that resolves a flag on behalf of a session passes
+`session.user.email`: the frontend flag procedures, the automations webhook
+gates, the device-login governance gate, the Langy access gate and the member
+budget overview. A read without a session, from a job, an API key or a
+sign-up, passes nothing, and no domain rule matches it, for the same reason
+the age and percentage rules fail closed.
+
 ## Context
 
 We need feature flags to control UI features, enable gradual rollouts, and provide kill switches for the LangWatch platform. The system must support flexible targeting at multiple levels:
@@ -134,9 +158,10 @@ FeatureFlagService                                 env override
 
 ## Targeting
 
-Rules on a flag row name a project, an organization, or an organization
-creation date (see the 2026-08-31 amendment). The read states both ids, so a
-rule written for either one can match:
+Rules on a flag row name a project, an organization, an organization
+creation date (see the 2026-08-31 amendment) or an email domain (see the
+2026-09-07 amendment). The read states both ids, so a rule written for either
+one can match:
 
 ```typescript
 await featureFlagService.isEnabled("release_ui_simulations_menu_enabled", {

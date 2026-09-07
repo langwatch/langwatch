@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
+  ANSWERED_CONTINUE_LINE,
   askQuestions,
   NO_ANSWER_PUSHBACK,
   QUESTION_TOOL_NAME,
   WAIT_MAX_MS,
   createQuestionExtension,
+  renderAnswers,
 } from "./question.js";
 import { createTurnContext, type TurnContext } from "./turn-context.js";
 
@@ -88,6 +90,7 @@ describe("the question tool", () => {
       };
       expect(Object.keys(questions.items.properties).sort()).toEqual([
         "allowOther",
+        "bare",
         "header",
         "multiple",
         "options",
@@ -96,7 +99,11 @@ describe("the question tool", () => {
       const options = questions.items.properties.options as {
         items: { properties: Record<string, unknown> };
       };
-      expect(Object.keys(options.items.properties).sort()).toEqual(["description", "label"]);
+      expect(Object.keys(options.items.properties).sort()).toEqual([
+        "description",
+        "label",
+        "quiet",
+      ]);
       expect(tool.description).toContain("Decide routine things alone");
       expect(tool.description).toContain("differ for the user");
     });
@@ -139,6 +146,67 @@ describe("the question tool", () => {
       });
       expect(text).toContain("Q: Which file owns the tracing setup?");
       expect(text).toContain("A: src/index.ts");
+    });
+
+    /** @scenario "The tool result carries the go" */
+    it("tells the model, after the answer, to continue the work in this turn", async () => {
+      fakeApp({
+        "/api/langy/waits": [{ waitId: "wait_6" }],
+        "/api/langy/waits/wait_6": [
+          {
+            waitId: "wait_6",
+            state: "answered",
+            answers: [
+              {
+                question: "Now that your agent is integrated, I think we should write some tests for it.",
+                selected: ['Create "Guest completes checkout" as your first scenario test'],
+              },
+            ],
+          },
+        ],
+      });
+
+      const text = textOf(
+        await questionTool().execute("t6", {
+          questions: [
+            {
+              question:
+                "Now that your agent is integrated, I think we should write some tests for it.",
+              bare: true,
+              options: [
+                { label: 'Create "Guest completes checkout" as your first scenario test' },
+                { label: "Chat about this", quiet: true },
+              ],
+            },
+          ],
+        }),
+      );
+
+      expect(text).toBe(
+        [
+          "Q: Now that your agent is integrated, I think we should write some tests for it.",
+          'A: Create "Guest completes checkout" as your first scenario test',
+          "",
+          ANSWERED_CONTINUE_LINE,
+        ].join("\n"),
+      );
+      expect(ANSWERED_CONTINUE_LINE).toBe(
+        "The user has answered. Continue with the work that follows this answer in this turn.",
+      );
+    });
+
+    /** @scenario "The tool result carries the go" */
+    it("renders the go once, after every answer, and never on an empty answer set", () => {
+      expect(
+        renderAnswers([
+          { question: "Which one?", selected: ["a"] },
+          { question: "And this?", selected: [], other: "b" },
+        ]),
+      ).toBe(
+        `Q: Which one?\nA: a\n\nQ: And this?\nA: in their own words: b\n\n${ANSWERED_CONTINUE_LINE}`,
+      );
+      expect(renderAnswers([])).toBe(NO_ANSWER_PUSHBACK);
+      expect(NO_ANSWER_PUSHBACK).not.toContain(ANSWERED_CONTINUE_LINE);
     });
   });
 
@@ -194,6 +262,7 @@ describe("the question tool", () => {
 
       expect(text).toBe(NO_ANSWER_PUSHBACK);
       expect(text).toContain("End your turn");
+      expect(text).not.toContain(ANSWERED_CONTINUE_LINE);
     });
   });
 

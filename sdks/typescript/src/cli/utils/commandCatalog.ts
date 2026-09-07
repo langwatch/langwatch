@@ -70,6 +70,11 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   // control-plane relay to intercept and move the user's browser — it fetches
   // no platform data and returns no result of its own.
   "navigate",
+  // Agent-only onboarding signal: `onboarding complete-path <path>` and
+  // `onboarding state` read and write the organization's guided onboarding
+  // state so the Home offer and the campaigns see a path finish. Runs at the
+  // end of a guided setup, never as a user-facing resource with a card.
+  "onboarding",
   // Agent-only page control: `ui call` dispatches a typed action to the page
   // the user has open and `workbench get-state` reads it live. Only works
   // mid-turn over the turn's own stream, so it is channel plumbing, not a

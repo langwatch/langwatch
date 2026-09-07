@@ -51,6 +51,7 @@ import {
 } from "~/server/gateway/resourceMetadata";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
 import {
+  assertActorCanCreateScopes,
   assertActorCanManageAllScopes,
   assertActorCanOperateOnAnyScope,
   assertGuardrailAttachmentsAllowed,
@@ -91,6 +92,7 @@ import {
   PAGE_LIMIT_DEFAULT,
   PAGE_LIMIT_MAX,
 } from "~/server/gateway/wirePagination";
+import { OneTimeRevealService } from "~/server/secrets/oneTimeReveal.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
   canonicalBaseResponses,
@@ -474,6 +476,12 @@ const createVirtualKeySchema = z.object({
   name: z.string().min(1).max(128),
   description: z.string().optional(),
   principal_user_id: z.string().nullable().optional(),
+  /**
+   * Withhold the secret from this response and park it under a one-time
+   * reveal id instead. The reveal id is read once, by the person the key is
+   * for, through the app; the caller never holds the secret.
+   */
+  reveal_once: z.boolean().optional(),
   /**
    * Visibility set. Defaults to the caller's own project when omitted, so
    * the plain reseller flow (mint a key for this project) needs no ids.
@@ -964,12 +972,121 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
   },
 );
 
+/**
+ * The read-only checks a virtual-key create passes before anything is written.
+ *
+ * The SAME pre-flight sequence the tRPC create runs, with the actor swapped for
+ * the API credential: the scope gate (create on the caller's own project,
+ * manage at every scope beyond it), scopes inside the caller's org, guardrail
+ * refs project-local.
+ */
+async function preflightVirtualKeyCreate({
+  actor,
+  organizationId,
+  callerProjectId,
+  scopes,
+  traceProjectId,
+  guardrailAttachments,
+}: {
+  actor: Parameters<typeof assertActorCanCreateScopes>[0]["actor"];
+  organizationId: string;
+  callerProjectId: string;
+  scopes: Parameters<typeof assertActorCanCreateScopes>[1]["scopes"];
+  traceProjectId: string | null | undefined;
+  guardrailAttachments: Parameters<typeof assertGuardrailAttachmentsAllowed>[2];
+}): Promise<void> {
+  await assertActorCanCreateScopes(
+    { prisma, actor },
+    { scopes, callerProjectId },
+  );
+  await assertScopesBelongToOrg(prisma, organizationId, scopes);
+  await assertTraceProjectBelongsToOrg(prisma, organizationId, traceProjectId);
+  // The destination routes traces AND budget debits into that project, so
+  // choosing it needs the same manage grant the old PROJECT scope enforced.
+  if (traceProjectId) {
+    await assertActorCanManageAllScopes({ prisma, actor }, [
+      { scopeType: "PROJECT", scopeId: traceProjectId },
+    ]);
+  }
+  const vkProjectId = await resolveVkProjectId(prisma, organizationId, {
+    vkId: null,
+    inputScopes: scopes,
+    traceProjectId: traceProjectId ?? null,
+  });
+  await assertGuardrailAttachmentsAllowed(
+    { prisma, actor },
+    vkProjectId,
+    guardrailAttachments,
+  );
+}
+
+type CreateVirtualKeyResponse = {
+  virtual_key: VirtualKeySnakeDto;
+  secret?: string;
+  reveal_id?: string;
+  preview?: string;
+};
+
+/**
+ * The idempotent half of the create: everything a replay has to answer
+ * identically, and nothing that a replay should re-check.
+ */
+async function mintVirtualKey({
+  service,
+  input,
+  organizationId,
+  projectId,
+  revealOnce,
+}: {
+  service: ReturnType<typeof VirtualKeyService.create>;
+  input: CreateVirtualKeyInput;
+  organizationId: string;
+  projectId: string;
+  revealOnce: boolean;
+}): Promise<{ status: 201; body: CreateVirtualKeyResponse }> {
+  const { virtualKey, secret } = await service.create(input);
+  logger.info(
+    { projectId, vkId: virtualKey.id },
+    "Created virtual key via REST",
+  );
+  // With reveal_once the secret goes to the one-time store and the response
+  // carries the id that reads it; the receipt then holds no secret either,
+  // and a replay answers with the same reveal id.
+  if (revealOnce) {
+    const { revealId } = await OneTimeRevealService.create().stash({
+      organizationId,
+      kind: "virtual_key",
+      keyId: virtualKey.id,
+      preview: virtualKey.displayPrefix,
+      secret,
+    });
+    return {
+      status: 201,
+      body: {
+        virtual_key: await toVkDto(virtualKey),
+        reveal_id: revealId,
+        preview: virtualKey.displayPrefix,
+      },
+    };
+  }
+  // The secret is minted once and stored only as a hash, so a caller that
+  // loses this response has no second way to read it. That is the whole
+  // reason this route takes an idempotency key, and the reason the receipt
+  // holding this response is encrypted at rest: a replay that withheld the
+  // secret would hand back a key nobody can ever use, so the secret has to
+  // transit the receipt.
+  return {
+    status: 201,
+    body: { virtual_key: await toVkDto(virtualKey), secret },
+  };
+}
+
 secured.access(apiKeyPermission("virtualKeys:create")).post(
   "/virtual-keys",
   describeRoute({
     summary: "Create virtual key",
     description:
-      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app, so a caller that only relays the key (an agent printing a snippet) never holds it. `scopes` defaults to the caller's project, where `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
     tags: ["Virtual Keys"],
     parameters: [idempotencyKeyParameter],
     responses: {
@@ -983,7 +1100,22 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
             schema: resolver(
               z.object({
                 virtual_key: virtualKeyDtoSchema,
-                secret: z.string(),
+                secret: z
+                  .string()
+                  .optional()
+                  .describe("The secret, absent when `reveal_once` was set."),
+                reveal_id: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "With `reveal_once`: the id that serves the secret once, through the app.",
+                  ),
+                preview: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "With `reveal_once`: the key's display prefix, safe to show in place of the secret.",
+                  ),
               }),
             ),
           },
@@ -996,7 +1128,8 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
         },
       },
       403: {
-        description: "Caller lacks virtualKeys:manage at a requested scope",
+        description:
+          "Caller lacks virtualKeys:create on its own project, or virtualKeys:manage at a scope beyond it",
         content: {
           "application/json": { schema: resolver(apiErrorSchema) },
         },
@@ -1015,34 +1148,14 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
     const scopes = scopesFromWire(body.data.scopes, project.id);
     const service = VirtualKeyService.create(prisma);
     try {
-      // The SAME pre-flight sequence the tRPC create runs, with the actor
-      // swapped for the API credential: manage at every requested scope,
-      // scopes inside the caller's org, guardrail refs project-local.
-      await assertActorCanManageAllScopes({ prisma, actor }, scopes);
-      await assertScopesBelongToOrg(prisma, organizationId, scopes);
-      await assertTraceProjectBelongsToOrg(
-        prisma,
+      await preflightVirtualKeyCreate({
+        actor,
         organizationId,
-        body.data.trace_project_id,
-      );
-      // The destination routes traces AND budget debits into that
-      // project, so choosing it needs the same manage grant the old
-      // PROJECT scope enforced.
-      if (body.data.trace_project_id) {
-        await assertActorCanManageAllScopes({ prisma, actor }, [
-          { scopeType: "PROJECT", scopeId: body.data.trace_project_id },
-        ]);
-      }
-      const vkProjectId = await resolveVkProjectId(prisma, organizationId, {
-        vkId: null,
-        inputScopes: scopes,
-        traceProjectId: body.data.trace_project_id ?? null,
+        callerProjectId: project.id,
+        scopes,
+        traceProjectId: body.data.trace_project_id,
+        guardrailAttachments: body.data.config?.guardrailAttachments,
       });
-      await assertGuardrailAttachmentsAllowed(
-        { prisma, actor },
-        vkProjectId,
-        body.data.config?.guardrailAttachments,
-      );
       const input: CreateVirtualKeyInput = {
         organizationId,
         name: body.data.name,
@@ -1063,29 +1176,20 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
       // Only the create is inside the idempotent section. The pre-flight
       // above is read-only, so leaving it out means a replay still re-checks
       // the caller's scopes rather than trusting a grant it held yesterday.
-      const outcome = await withIdempotency({
+      const outcome = await withIdempotency<CreateVirtualKeyResponse>({
         prisma,
         operation: "gateway.v1.virtual-keys.create",
         scopeId: project.id,
         key: idempotencyKey,
         validatedBody: body.data,
-        handler: async () => {
-          const { virtualKey, secret } = await service.create(input);
-          logger.info(
-            { projectId: project.id, vkId: virtualKey.id },
-            "Created virtual key via REST",
-          );
-          // The secret is minted once and stored only as a hash, so a caller
-          // that loses this response has no second way to read it. That is the
-          // whole reason this route takes an idempotency key, and the reason
-          // the receipt holding this response is encrypted at rest: a replay
-          // that withheld the secret would hand back a key nobody can ever
-          // use, so the secret has to transit the receipt.
-          return {
-            status: 201,
-            body: { virtual_key: await toVkDto(virtualKey), secret },
-          };
-        },
+        handler: () =>
+          mintVirtualKey({
+            service,
+            input,
+            organizationId,
+            projectId: project.id,
+            revealOnce: body.data.reveal_once === true,
+          }),
       });
       return idempotentJson({ c, outcome });
     } catch (error) {

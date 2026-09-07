@@ -98,6 +98,17 @@ export type CapabilityIconName =
 /** The verb tones a body override can key on (mirrors `CliVerbTone`). */
 type CatalogTone = "read" | "created" | "updated" | "removed";
 
+/**
+ * One row of a resource's facts grid: the field it reads, the label it reads
+ * under, and, for a field whose values are a fixed vocabulary, the word each
+ * value reads as.
+ */
+export interface CapabilityFact {
+  key: string;
+  label: string;
+  values?: Record<string, string>;
+}
+
 export interface CapabilityCatalogEntry {
   /** The platform surface this resource's cards belong to and deep-link into. */
   surface: CapabilitySurface;
@@ -126,6 +137,14 @@ export interface CapabilityCatalogEntry {
    * reads ("Virtual keys").
    */
   noun: { singular: string; plural: string };
+  /**
+   * The fields a single resource's card shows, in this order, and nothing
+   * else. A resource without this shows every primitive field under its own
+   * name, which is right for most and wrong for one whose document is a
+   * machine contract: the agent's carries ids, timestamps and a host label,
+   * and a card that printed them read as a database row.
+   */
+  facts?: readonly CapabilityFact[];
   /** Overline icon override when the surface icon isn't right. */
   icon?: CapabilityIconName;
   /**
@@ -222,6 +241,16 @@ export const CAPABILITY_CATALOG = {
     surface: "agents",
     digestStrategy: "id-ref",
     noun: { singular: "agent", plural: "agents" },
+    facts: [
+      { key: "name", label: "name" },
+      {
+        key: "status",
+        label: "status",
+        values: { online: "Online", offline: "Offline" },
+      },
+      { key: "environment", label: "environment" },
+      { key: "hostLabel", label: "host" },
+    ],
   },
   workflow: {
     surface: "workflows",
@@ -403,6 +432,16 @@ export const CAPABILITY_CATALOG = {
         health: "stats",
       },
     },
+  },
+  // ── Guided onboarding ──────────────────────────────────────────────────────
+  // `onboarding complete-path` is the panel's done marker at the end of a
+  // guided path: its result is one line, drawn as text. `onboarding state` is
+  // the organization's picks in customer copy, drawn as facts.
+  onboarding: {
+    surface: "platform",
+    digestStrategy: "reduced",
+    noun: { singular: "guided onboarding", plural: "guided onboarding" },
+    body: { byVerb: { "complete-path": "text" } },
   },
 } as const satisfies Record<string, CapabilityCatalogEntry>;
 

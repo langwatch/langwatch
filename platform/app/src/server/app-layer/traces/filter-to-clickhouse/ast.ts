@@ -131,6 +131,50 @@ export function extractFreeTextTerms(queryText: string): string[] {
   return terms;
 }
 
+/**
+ * Whether the query names `fieldName` as a structured term anywhere, negated
+ * or not, at any depth. Empty and unparsable input names nothing (the
+ * translator rejects the latter first anyway).
+ */
+export function queryNamesField(queryText: string, fieldName: string): boolean {
+  const trimmed = normalizeQuery(queryText);
+  if (!trimmed) return false;
+
+  let ast: LiqeQuery;
+  try {
+    ast = parse(trimmed);
+  } catch {
+    return false;
+  }
+
+  return namesField(ast, fieldName);
+}
+
+function namesField(node: LiqeQuery, fieldName: string): boolean {
+  switch (node.type) {
+    case "Tag": {
+      const tag = node as TagToken;
+      return tag.field.type !== "ImplicitField" && tag.field.name === fieldName;
+    }
+    case "LogicalExpression": {
+      const logExpr = node as LogicalExpressionToken;
+      return (
+        namesField(logExpr.left, fieldName) ||
+        namesField(logExpr.right, fieldName)
+      );
+    }
+    case "UnaryOperator":
+      return namesField((node as UnaryOperatorToken).operand, fieldName);
+    case "ParenthesizedExpression":
+      return namesField(
+        (node as ParenthesizedExpressionToken).expression,
+        fieldName,
+      );
+    default:
+      return false;
+  }
+}
+
 /** Whether an OR joins any two branches of the query, at any depth. */
 function containsOrOperator(node: LiqeQuery): boolean {
   switch (node.type) {

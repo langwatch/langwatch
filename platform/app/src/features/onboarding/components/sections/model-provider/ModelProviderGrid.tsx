@@ -1,13 +1,10 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
-import {
-  getModelProvider,
-  modelProviderRegistry,
-} from "~/features/onboarding/regions/model-providers/registry";
+import { providersForSurface } from "~/features/onboarding/regions/model-providers/providersForSurface";
+import { getModelProvider } from "~/features/onboarding/regions/model-providers/registry";
 import type {
   ModelProviderKey,
-  ModelProviderSpec,
   ModelProviderSurface,
 } from "~/features/onboarding/regions/model-providers/types";
 import { SelectableIconCard } from "../shared/SelectableIconCard";
@@ -27,24 +24,11 @@ const variantDescriptions: Record<ModelProviderSurface, string> = {
     "Langy uses this model to chat with you and help you work across the platform.",
   onboarding:
     "The model LangWatch's AI assistant and AI assists run on. You can add more providers later in Settings.",
+  // The guided screen renders its own marks row and never this grid; the
+  // surface exists so the registry's per-surface rules apply to it.
+  guided:
+    "The model LangWatch's AI assistant and AI assists run on. You can add more providers later in Settings.",
 };
-
-/**
- * The providers this surface offers, in the order this surface wants:
- * providers the surface recommends lead (badged), the rest keep registry
- * order, and providers the surface must not offer are gone entirely.
- */
-export function providersForSurface(
-  variant: ModelProviderSurface,
-): ModelProviderSpec[] {
-  const offered = modelProviderRegistry.filter(
-    (mp) => !mp.hiddenOn?.includes(variant),
-  );
-  return [
-    ...offered.filter((mp) => mp.recommendedOn?.includes(variant)),
-    ...offered.filter((mp) => !mp.recommendedOn?.includes(variant)),
-  ];
-}
 
 export function ModelProviderGrid({
   variant,

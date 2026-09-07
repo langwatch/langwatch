@@ -218,6 +218,17 @@ Feature: Python SDK connect_agent decorator
     Then the result frame carries output and session
 
   @unit
+  Scenario: A dict without a role is refused as a reply
+    When the function returns a dict of fields, such as {"output": "...", "thread_id": "..."}
+    Then coercion raises AgentReplyInvalid
+    And the error names the accepted shapes: a string, a message dict with a role, a list of such messages, or AgentReply
+
+  @unit
+  Scenario: A list with an item that is not a message is refused as a reply
+    When the function returns a list holding a string or a dict without a role
+    Then coercion raises AgentReplyInvalid
+
+  @unit
   Scenario: The session is echoed on the next turn of the same thread
     Given a function that declares session
     When a call arrives with the session the function returned before
@@ -308,6 +319,14 @@ Feature: Python SDK connect_agent decorator
     When the function raises
     Then a result frame with error code agent_call_failed is sent
     And the connection stays open
+
+  @unit
+  Scenario: A reply the platform cannot read answers agent_call_failed instead of silence
+    Given a function that returns a dict without a role
+    When a call frame arrives
+    Then a result frame with error code agent_call_failed is sent
+    And its message names the agent and the accepted return shapes
+    And the connection stays open and the next call is answered
 
   @unit
   Scenario: The deadline of a call is read as epoch milliseconds

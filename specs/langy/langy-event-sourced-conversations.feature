@@ -119,6 +119,30 @@ Feature: Langy conversations are an event-sourced projection
 
   # ============================================================================
   # Reading conversations (projections)
+
+  # The dispatch window: a send is admitted, and its turn receipt written, in
+  # one transaction before any event is folded. The conversation projection
+  # row, and the handoff fields on it, are folded from events afterwards, so
+  # a read between the two finds no row. The receipt is the only evidence in
+  # that window that the conversation is being created. The turn projection
+  # is folded by the same pipeline, so the durable turn-result ingest, which
+  # checks the turn row before writing, races the same fold; the relay path
+  # completes the turn regardless, and that ingest is left for a follow-up.
+
+  @unit
+  Scenario: A read in the dispatch window waits for the projection row
+    Given a conversation whose first send was admitted a moment ago
+    And its projection row has not been folded yet
+    When the conversation is read by the user who sent the turn
+    Then the read waits for the row instead of answering not found
+    And it answers with the conversation once the row lands
+
+  @unit
+  Scenario: An unknown conversation id is answered quickly
+    Given a conversation id with no turn receipt for the user
+    When the conversation is read
+    Then the read answers not found after a short grace, not the whole window
+
   # ============================================================================
 
   Scenario: Listing conversations reads the operational projection, newest activity first

@@ -173,6 +173,21 @@ export function langyEmptyTurnLine(
   return LANGY_EMPTY_TURN_FALLBACK;
 }
 
+/** The worker tool that says a line to the reader where the call happens. */
+export const SAY_TOOL = "say";
+
+/**
+ * The words a `say` tool entry carries, or "" for any other entry. The panel
+ * draws them as reply prose, so a turn that said a line this way has spoken
+ * even when it wrote no delta.
+ */
+export function sayEntryText(entry: LangyStreamEntry): string {
+  if (entry.type !== "tool" || entry.name !== SAY_TOOL) return "";
+  const input = entry.input as { text?: unknown } | undefined;
+  const text = typeof input?.text === "string" ? input.text : "";
+  return text.trim() === "" ? "" : text;
+}
+
 /** An entry paired with the Redis stream id it was read at. */
 export interface LangyStreamRead {
   id: string;
@@ -650,6 +665,11 @@ export class LangyTokenBuffer {
     result?: CliToolResult;
   }): Promise<void> {
     await this.flush({ conversationId, turnId });
+    // A line said through the `say` tool is words the reader sees, so the
+    // turn is not silent once one has been said.
+    if (sayEntryText({ type: "tool", id, name, phase, input }) !== "") {
+      this.sawVisibleText.add(this.pendingKey(conversationId, turnId));
+    }
     await this.append(conversationId, turnId, {
       type: "tool",
       id,
@@ -708,7 +728,9 @@ export class LangyTokenBuffer {
       const { reads } = await this.readTail({ conversationId, turnId });
       const entries = reads.map((read) => read.entry);
       const visible = entries.some(
-        (entry) => entry.type === "delta" && entry.text.trim() !== "",
+        (entry) =>
+          (entry.type === "delta" && entry.text.trim() !== "") ||
+          sayEntryText(entry) !== "",
       );
       if (!visible) {
         backstopped = true;
@@ -739,7 +761,21 @@ export class LangyTokenBuffer {
     await this.append(conversationId, turnId, { type: "error", error });
   }
 
-  /** Refresh the per-turn liveness key. TTL = 2× the heartbeat interval. */
+  /**
+   * Refresh the per-turn liveness key AND the stream's TTL. The liveness key
+   * gets 2× the heartbeat interval; the stream key gets a full
+   * STREAM_TTL_SECONDS from now.
+   *
+   * The stream TTL used to move on `append` alone, so a turn that spent longer
+   * than STREAM_TTL_SECONDS inside one tool call, a suite run waited on, a
+   * long build, lost its whole buffer while the worker was provably alive and
+   * still beating. A reader attaching after that replayed an empty tail, and
+   * the turn-order reader at finalize recorded the turn's parts with no order.
+   * A heartbeat IS the statement that this turn is still live, and the stream
+   * is that turn's live edge, so it carries the same proof: one EXPIRE, no
+   * entry, so the buffer's content and its MAXLEN are untouched. A turn with no
+   * stream key yet is a no-op (EXPIRE on a missing key returns 0).
+   */
   async heartbeat({
     conversationId,
     turnId,
@@ -754,6 +790,10 @@ export class LangyTokenBuffer {
       String(now),
       "EX",
       LANGY_LIVENESS.heartbeatTtlSeconds(),
+    );
+    await this.redis.expire(
+      this.streamKey(conversationId, turnId),
+      LANGY_STREAMING.STREAM_TTL_SECONDS,
     );
   }
 
