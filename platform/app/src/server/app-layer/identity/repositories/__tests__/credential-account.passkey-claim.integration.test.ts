@@ -18,7 +18,7 @@ describe("passkey sign-up claim concurrency", () => {
   });
 
   /** @scenario Concurrent browsers cannot both claim one free address */
-  it("allows exactly one distinct browser claim to create the pending account", async () => {
+  it("allows exactly one distinct browser claim to create the verified account", async () => {
     const claims = [hashClaim("browser-a"), hashClaim("browser-b")];
 
     const attempts = await Promise.allSettled(
@@ -35,10 +35,17 @@ describe("passkey sign-up claim concurrency", () => {
     ).toHaveLength(1);
     const users = await prisma.user.findMany({
       where: { email },
-      select: { signupConfirmationPending: true, passkeySignupClaimHash: true },
+      select: {
+        emailVerified: true,
+        signupConfirmationPending: true,
+        passkeySignupClaimHash: true,
+      },
     });
     expect(users).toHaveLength(1);
-    expect(users[0]).toMatchObject({ signupConfirmationPending: true });
+    expect(users[0]).toMatchObject({
+      emailVerified: true,
+      signupConfirmationPending: false,
+    });
     expect(claims).toContain(users[0]?.passkeySignupClaimHash);
   });
 });

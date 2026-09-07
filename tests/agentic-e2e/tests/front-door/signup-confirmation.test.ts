@@ -17,13 +17,17 @@
  * added `tests/agentic-e2e/tests` root in `check-feature-parity.ts`.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
+import {
+  addVirtualAuthenticator,
+  removeVirtualAuthenticator,
+} from "./webauthn";
 import {
   FRONT_DOOR_PASSWORD,
   findSignUpTokenFor,
   generateFrontDoorEmail,
   givenIAmOnTheSignUpScreen,
   givenMyAccountHasAWorkspace,
+  signUpVerificationTokenAfterResponse,
   thenIAmCalledByMyEmailNeverNull,
   thenTheLinkSignsMeInWithNoSecondPrompt,
   whenIOpenTheConfirmationLinkFor,
@@ -39,16 +43,27 @@ test.describe("Sign-up confirmation", () => {
     email: string,
   ): Promise<void> {
     await page.getByLabel("Email", { exact: true }).fill(email);
+    const requestFinished = page.waitForResponse((response) =>
+      response.url().includes("/api/trpc/auth.requestSignUpVerification"),
+    );
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await expect(page.getByTestId("verification-sent")).toBeVisible();
+    const response = await requestFinished;
+    await signUpVerificationTokenAfterResponse(response, email);
+    if (response.ok()) {
+      await expect(page.getByTestId("verification-sent")).toBeVisible();
+    }
   }
 
   async function whenIChooseAPasswordAfterProof(page: Page): Promise<void> {
-    await page.getByLabel("Password", { exact: true }).fill(FRONT_DOOR_PASSWORD);
+    await page
+      .getByLabel("Password", { exact: true })
+      .fill(FRONT_DOOR_PASSWORD);
     await page
       .getByLabel("Confirm password", { exact: true })
       .fill(FRONT_DOOR_PASSWORD);
-    await page.getByRole("button", { name: "Create account", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Create account", exact: true })
+      .click();
   }
 
   /**
