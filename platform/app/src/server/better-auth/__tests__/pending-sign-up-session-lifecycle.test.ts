@@ -64,7 +64,21 @@ describe("real BetterAuth pending sign-up session gate", () => {
               const permitted = await beforeSessionCreate({
                 prisma: {
                   user: {
-                    findUnique: async () => users[0] ?? null,
+                    findUnique: async () => {
+                      const user = users[0];
+                      if (!user) {
+                        return null;
+                      }
+
+                      return {
+                        deactivatedAt:
+                          user.deactivatedAt instanceof Date
+                            ? user.deactivatedAt
+                            : null,
+                        signupConfirmationPending:
+                          user.signupConfirmationPending === true,
+                      };
+                    },
                   },
                 },
                 session: { userId: session.userId },
@@ -85,6 +99,10 @@ describe("real BetterAuth pending sign-up session gate", () => {
       );
 
     const pending = await signIn();
+    expect(pending.status).toBe(401);
+    await expect(pending.json()).resolves.toMatchObject({
+      code: "FAILED_TO_CREATE_SESSION",
+    });
     expect(pending.headers.get("set-cookie")).toBeNull();
     expect(sessions).toHaveLength(0);
 

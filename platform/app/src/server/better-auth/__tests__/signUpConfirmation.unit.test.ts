@@ -41,12 +41,14 @@ const fakeContext = ({ token }: { token: string }) => {
     body,
     status: init?.status ?? 200,
   }));
+  const setStatus = vi.fn();
   const ctx = {
     body: { token },
     json,
+    setStatus,
     context: { internalAdapter: { createSession, findUserById } },
   };
-  return { ctx, createSession, findUserById, json };
+  return { ctx, createSession, findUserById, json, setStatus };
 };
 
 const run = async (ctx: ReturnType<typeof fakeContext>["ctx"]) =>
@@ -183,11 +185,11 @@ describe("given the sign-up confirmation endpoint", () => {
       completeVerification.mockRejectedValue(
         new IdentityVerificationExpiredError(),
       );
-      const { ctx, createSession } = fakeContext({ token: "stale" });
+      const { ctx, createSession, setStatus } = fakeContext({ token: "stale" });
 
       const answer = await run(ctx);
 
-      expect(answer.status).toBe(410);
+      expect(setStatus).toHaveBeenCalledWith(410);
       expect(answer.body).toMatchObject({
         error: "identity_verification_expired",
       });
