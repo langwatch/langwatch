@@ -80,9 +80,32 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
 
   @integration
   Scenario: A successful reset revokes all of the user's existing sessions
-    Given a user completes a password reset
-    Then every existing session for that user is revoked
-    And only then is the one new session for the resetting device opened
+    Given a credential user is signed in on two devices
+    When the user completes a password reset on a third device
+    Then both existing session cookies no longer identify a session
+    And the reset response opens one usable session on the third device
+    And the old password is refused while the new password can sign in
+
+  @integration
+  Scenario: A consumed reset token cannot change credentials or mint a session
+    Given a reset token has already changed the user's password
+    When the same token is submitted again with a different password
+    Then the reset is refused as an invalid token
+    And neither the credential nor the set of sessions changes
+
+  @integration
+  Scenario: An expired reset token cannot change credentials or mint a session
+    Given a reset token for a credential user has expired
+    When the token is submitted with a new password
+    Then the reset is refused as an invalid token
+    And neither the credential nor the set of sessions changes
+
+  @integration
+  Scenario: Wrong-password and unknown-email attempts have one backend refusal
+    Given one submitted email has a credential account and one has no account
+    When the existing email uses a wrong password and the unknown email uses any password
+    Then both handlers refuse with the same generic email-or-password error
+    And neither handler creates or changes an account or session
 
   @integration
   Scenario: Password reset endpoints are rate-limited to five attempts per hour
