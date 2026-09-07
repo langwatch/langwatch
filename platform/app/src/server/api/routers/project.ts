@@ -211,9 +211,27 @@ export const projectRouter = createTRPCRouter({
    */
   getProjectAPIKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:manage")
+    .authorizeInService({
+      reason:
+        "the permissions service masks projects outside the signed-in user's organization before the key is read",
+      permissions: ["project:manage"],
+    })
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+      const authorized = await (
+        ctx.app ?? getApp()
+      ).permissions.tryAuthorizeMemberProjectPermission({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        permission: "project:manage",
+      });
+
+      if (!authorized) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
 
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
