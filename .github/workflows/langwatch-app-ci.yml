@@ -1093,6 +1093,16 @@ jobs:
       - name: Check feature-file parity
         run: pnpm --filter @langwatch/architecture-lint run check:feature-parity
 
+      # tsc resolves a relative or deep-package specifier by its own rules,
+      # which are more forgiving than node's. Every backend process runs on
+      # `node --experimental-transform-types` now, so a barrel or deep import
+      # that only TypeScript can resolve passes typecheck and then breaks the
+      # process at boot. This runs node's real resolver against every feature
+      # package barrel and the process entrypoints, in the same fast job as
+      # the other whole-repo raw-TypeScript checks.
+      - name: Check node module resolution
+        run: node dev/scripts/check-node-resolution.mjs
+
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:

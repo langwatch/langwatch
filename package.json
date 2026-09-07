@@ -33,6 +33,7 @@
     "typecheck:one": "node dev/scripts/typecheck-one.mjs",
     "typecheck:all": "pnpm --workspace-concurrency=1 -r --filter \"!@langwatch/server\" typecheck",
     "check:ts-budget": "pnpm --filter @langwatch/architecture-lint check:ts-budget",
+    "check:node-resolution": "node dev/scripts/check-node-resolution.mjs",
     "lint": "node dev/scripts/check-queue.mjs pnpm lint:architecture",
     "lint:oxlint": "oxlint --quiet --config .oxlintrc.architecture.json apps packages/features packages/enterprise packages/config packages/design-system packages/handled-error/src packages/prisma-client/src packages/runtime-composition/src packages/api/src packages/eventing/src packages/observability/src packages/mail/src packages/group-queue/src packages/test-harness/src packages/architecture-lint/src sdks/typescript/src mcp/typescript/src",
     "lint:architecture": "pnpm lint:oxlint && pnpm --filter @langwatch/architecture-lint lint",
