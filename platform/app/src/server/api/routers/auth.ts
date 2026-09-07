@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { normalizeIdentifierValue } from "@langwatch/identity";
 import { z } from "zod";
 import {
+  localSignUpDecision,
   signInRouter,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
@@ -56,6 +57,29 @@ function addressBudgetId(identifier: string): string {
 }
 
 export const authRouter = createTRPCRouter({
+  signUpEnrollment: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        addressProof: z.string().min(1),
+      }),
+    )
+    .noPermission({
+      reason:
+        "returns enrollment methods only to a visitor holding this address's proof",
+    })
+    .mutation(async ({ input }) => {
+      const valid = await signUpVerification().validateAddressProof({
+        token: input.addressProof,
+        email: input.email,
+      });
+      if (!valid) {
+        throw new NoAddressToConfirmError();
+      }
+
+      return localSignUpDecision(input.email);
+    }),
+
   /**
    * Where this address signs in. The decision object IS the contract: the
    * screen renders `methodSet` and keys its guidance off `reasonCode`.

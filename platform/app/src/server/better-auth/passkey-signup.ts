@@ -62,7 +62,9 @@ export interface PasskeySignUpVerificationPort {
 }
 
 export interface PasskeySignUpRegistrationDeps {
-  eligibility: { isAllowed(email: string): Promise<boolean> };
+  eligibility: {
+    isAllowed(email: string, method: "passkey"): Promise<boolean>;
+  };
   directory: PasskeySignUpDirectoryPort;
   accounts: PasskeySignUpAccountsPort;
   verification: PasskeySignUpVerificationPort;
@@ -195,7 +197,7 @@ export class PasskeySignUpRegistration {
     context?: string | null | undefined;
   }): Promise<{ id: string; name: string; displayName: string }> {
     const { email, addressProof } = requireSignUpContext(context);
-    if (!(await this.deps.eligibility.isAllowed(email))) {
+    if (!(await this.deps.eligibility.isAllowed(email, "passkey"))) {
       throw new APIError("FORBIDDEN", {
         code: "REGISTRATION_NOT_ALLOWED",
         message: "This address must use its organization's sign-in method.",
@@ -267,7 +269,7 @@ export class PasskeySignUpRegistration {
     }
 
     const { email, claimHash, addressProof } = requireSignUpContext(context);
-    if (!(await this.deps.eligibility.isAllowed(email))) {
+    if (!(await this.deps.eligibility.isAllowed(email, "passkey"))) {
       throw new APIError("FORBIDDEN", {
         code: "REGISTRATION_NOT_ALLOWED",
         message: "This address must use its organization's sign-in method.",

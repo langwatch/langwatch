@@ -428,7 +428,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
      * ceremony is the bug this pins: the hand-rolled mint that predated
      * better-auth 1.7 would now run beside the plugin's.
      */
-    /** @scenario Signing up with a passkey creates a pending account until the address is confirmed */
+    /** @scenario A verified address can enroll a passkey and continue into its new session */
     it("leaves the session to the transaction that writes the credential", async () => {
       const { ctx, createSession } = fakeContext();
 
@@ -455,7 +455,8 @@ describe("given passkey sign-up, which creates an account with no session", () =
         email: "someone@example.com",
       });
       expect(claimAddressProof.mock.invocationCallOrder[0]).toBeLessThan(
-        createPasskeyUser.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+        createPasskeyUser.mock.invocationCallOrder[0] ??
+          Number.MAX_SAFE_INTEGER,
       );
     });
 
