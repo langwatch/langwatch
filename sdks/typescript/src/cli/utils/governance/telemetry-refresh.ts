@@ -80,6 +80,7 @@ import {
 	telemetryEnvVarNames,
 } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
+import { runningCodeRestartNotice } from "./running-code";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
 	buildScopedToolFunction,
@@ -547,6 +548,8 @@ export interface LoginTelemetryRefreshResult {
 	 * cfg.default_personal_ingest_keys) - the caller should saveConfig.
 	 */
 	mintedAny: boolean;
+	/** Restart advice when a live launcher predates successfully changed wiring. */
+	warnings?: string[];
 }
 
 /**
@@ -567,6 +570,7 @@ export async function refreshTelemetryWiringForLogin(
 ): Promise<LoginTelemetryRefreshResult> {
 	const labels: string[] = [];
 	let mintedAny = false;
+	const warnings: string[] = [];
 	const expectedEndpoint = otlpEndpointFor(cfg.control_plane_url);
 
 	for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
@@ -619,7 +623,12 @@ export async function refreshTelemetryWiringForLogin(
 				});
 				if (label) labels.push(label);
 			} else {
-				labels.push(...refreshScopedShellFunctions({ tool, vars }));
+				const refreshed = refreshScopedShellFunctions({ tool, vars });
+				labels.push(...refreshed);
+				if (tool === "code" && refreshed.length > 0) {
+					const notice = runningCodeRestartNotice();
+					if (notice) warnings.push(notice);
+				}
 			}
 		} catch {
 			// Best-effort per tool: one failed mint must not block the login
@@ -641,5 +650,5 @@ export async function refreshTelemetryWiringForLogin(
 		// Best-effort, same as above.
 	}
 
-	return { labels, mintedAny };
+	return { labels, mintedAny, ...(warnings.length > 0 ? { warnings } : {}) };
 }

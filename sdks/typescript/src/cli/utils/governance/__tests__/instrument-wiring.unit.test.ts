@@ -6,13 +6,19 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { appSettingsTargetFor } from "../app-settings";
 import { installTelemetryWiring } from "../instrument-wiring";
-import { baseCfg, installTempHomeAndCwd } from "./telemetry-refresh-test-helpers";
+import { runningCodeRestartNotice } from "../running-code";
+import {
+	baseCfg,
+	installTempHomeAndCwd,
+} from "./telemetry-refresh-test-helpers";
 
 const temp = installTempHomeAndCwd();
+
+vi.mock("../running-code", () => ({ runningCodeRestartNotice: vi.fn() }));
 
 const ENDPOINT = "http://app.example.com/api/otel";
 const TOKEN = "ik-lw-wiring0000000000_secret";
@@ -30,6 +36,77 @@ afterEach(() => {
 });
 
 describe("installTelemetryWiring", () => {
+	describe("when langwatch code is running", () => {
+		const notice =
+			"Restart `langwatch code` to apply the updated telemetry settings.";
+		const install = (token = TOKEN) =>
+			installTelemetryWiring({
+				cfg: baseCfg(),
+				tool: "code",
+				endpoint: ENDPOINT,
+				token,
+			});
+
+		beforeEach(() => {
+			vi.mocked(runningCodeRestartNotice).mockReturnValue(notice);
+		});
+
+		it("reports restart advice after changing the ingest key", () => {
+			install();
+			expect(install("ik-lw-replacement_secret").warnings).toContain(notice);
+		});
+
+		it("reports restart advice after changing the endpoint", () => {
+			install();
+			const result = installTelemetryWiring({
+				cfg: baseCfg(),
+				tool: "code",
+				endpoint: "https://new.example.com/api/otel",
+				token: TOKEN,
+			});
+			expect(result.warnings).toContain(notice);
+		});
+
+		it("stays quiet when no LangWatch code launcher is detected", () => {
+			install();
+			vi.mocked(runningCodeRestartNotice).mockReturnValue(undefined);
+			expect(install("ik-lw-replacement_secret").warnings).toEqual([]);
+		});
+
+		it("does not inspect processes or advise restarting unchanged wiring", () => {
+			install();
+			vi.mocked(runningCodeRestartNotice).mockClear();
+			expect(install().warnings).toEqual([]);
+			expect(runningCodeRestartNotice).not.toHaveBeenCalled();
+		});
+
+		it("does not report a restart when the wiring write fails", () => {
+			fs.mkdirSync(path.join(temp.home, ".zshrc"));
+			expect(install().warnings).not.toContain(notice);
+		});
+
+		it.skipIf(process.platform === "win32")(
+			"does not report a restart when VS Code's companion write fails",
+			() => {
+				const settingsParent =
+					process.platform === "darwin"
+						? path.join(
+								temp.home,
+								"Library",
+								"Application Support",
+								"Code",
+								"User",
+							)
+						: path.join(temp.home, ".config", "Code", "User");
+				fs.mkdirSync(path.join(settingsParent, "settings.json"), {
+					recursive: true,
+				});
+				const result = install();
+				expect(result.requiredFailures).not.toEqual([]);
+				expect(result.warnings).not.toContain(notice);
+			},
+		);
+	});
 	describe("when the tool is claude", () => {
 		/** @scenario "The wiring targets are the same files a wrapped run manages" */
 		it("writes the OTel env into the user settings.json on a fresh machine", () => {

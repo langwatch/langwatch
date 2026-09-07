@@ -14,6 +14,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as cliApi from "../cli-api";
 import * as configMod from "../config";
 import type { GovernanceConfig } from "../config";
+import { runningCodeRestartNotice } from "../running-code";
+import { buildOtelEnvBlock } from "../otel-env-block";
+import { buildScopedToolFunction, persistBlockToRc, toolMarkers } from "../shell-rc";
+
+vi.mock("../running-code", () => ({ runningCodeRestartNotice: vi.fn() }));
 
 vi.mock("../cli-api", async () => {
 	const actual = await vi.importActual<typeof cliApi>("../cli-api");
@@ -41,6 +46,7 @@ let originalUserprofile: string | undefined;
 let originalCodexHome: string | undefined;
 
 beforeEach(() => {
+	vi.mocked(runningCodeRestartNotice).mockReset();
 	tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-wrapper-mode-"));
 	originalHome = process.env.HOME;
 	originalUserprofile = process.env.USERPROFILE;
@@ -91,6 +97,44 @@ function baseCfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
 }
 
 describe("resolveWrapperMode", () => {
+	describe("when a project switch changes code telemetry while another launcher is running", () => {
+		const restartNotice =
+			"Restart `langwatch code` to apply the updated telemetry settings.";
+		const endpoint = "http://app.example.com/api/otel";
+		const replacementKey = "ik-lw-projectb_secret";
+		const persistCode = (token: string) =>
+			persistBlockToRc(
+				"zsh",
+				buildScopedToolFunction("code", buildOtelEnvBlock("code", endpoint, token), "zsh"),
+				toolMarkers("code"),
+			);
+		const pinnedConfig = () =>
+			baseCfg({
+				tool_project_keys: {
+					code: { secret: replacementKey, project_slug: "project-b" },
+				},
+			});
+
+		beforeEach(() => {
+			vi.mocked(runningCodeRestartNotice).mockReturnValue(restartNotice);
+		});
+
+		it("returns restart advice alongside the refreshed wiring", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			persistCode("ik-lw-projecta_secret");
+			const result = await resolveWrapperMode(pinnedConfig(), "code", {});
+			expect(result.refreshedWiring).toContain("code shell function (~/.zshrc)");
+			expect(result.notice).toContain(restartNotice);
+		});
+
+		it("does not inspect processes when the wiring already matches", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			persistCode(replacementKey);
+			const result = await resolveWrapperMode(pinnedConfig(), "code", {});
+			expect(result.notice ?? "").not.toContain(restartNotice);
+			expect(runningCodeRestartNotice).not.toHaveBeenCalled();
+		});
+	});
 	describe("when a personal VK is configured", () => {
 		it("returns gateway mode with the gateway env vars unchanged", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");

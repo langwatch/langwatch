@@ -97,6 +97,19 @@ afterEach(() => {
 });
 
 describe("instrumentCommand", () => {
+
+  describe("given changed wiring and a running langwatch code launcher", () => {
+    it("prints the restart advice returned by the installer", async () => {
+      const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
+      asMock(installTelemetryWiring).mockReturnValue({
+        labels: ["~/.zshrc"], warnings: [notice], requiredFailures: [],
+      });
+
+      await instrumentCommand("code", {});
+
+      expect(writtenTo(stderrSpy)).toContain(notice);
+    });
+  });
   describe("given a companion write the wiring depends on failed", () => {
     it("fails instead of reporting a wired tool", async () => {
       asMock(installTelemetryWiring).mockReturnValue({
