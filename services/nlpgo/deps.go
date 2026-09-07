@@ -71,6 +71,11 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 		OpsHeaders:             opsHeaders,
 		DebugCollectorEndpoint: debugEndpoint,
 		DebugCollectorHeaders:  debugHeaders,
+		// The same switch every service built through OTel.Configure honours.
+		// nlpgo builds its Options by hand (its spans route per tenant), and
+		// without this line it was the one Go lane still posting metrics to a
+		// debug collector a developer had not started.
+		MetricsDisabled: cfg.OTel.MetricsExportDisabled(),
 	})
 }
 

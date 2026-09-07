@@ -8,10 +8,14 @@ import (
 func TestObservabilityEnvIsEmittedOnlyWhenTheStackIsUp(t *testing.T) {
 	st := Stack{Slug: "portless", APIPort: 4000, Services: []Service{{Name: "app", Port: 3001, URL: "https://app.portless.langwatch.localhost"}}}
 
-	for _, key := range []string{"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_DEBUG_COLLECTOR_ENDPOINT", "PINO_OTEL_ENABLED", "OTEL_METRICS_ENABLED"} {
+	for _, key := range []string{"OTEL_EXPORTER_OTLP_ENDPOINT", "PINO_OTEL_ENABLED"} {
 		if got := valueOf(st.OverlayEnv(), key); got != "" {
 			t.Errorf("with no collector running, %s must be unset; got %q", key, got)
 		}
+	}
+	// Absence is stated, not implied: a stale shell endpoint must not become a sink.
+	if got := valueOf(st.OverlayEnv(), "OTEL_METRICS_ENABLED"); got != "false" {
+		t.Errorf("with no collector running, OTEL_METRICS_ENABLED = %q, want false", got)
 	}
 
 	st.ObservabilityOTLPPort = 4318

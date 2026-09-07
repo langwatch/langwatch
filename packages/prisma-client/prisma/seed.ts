@@ -68,15 +68,19 @@ import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-server/testing";
+import { runScript, writeScriptWarning } from "@langwatch/observability";
 import { PrismaClient, RoleBindingScopeType, TeamUserRole } from "../src/generated/client.ts";
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
 import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
 import { modelProviders } from "@langwatch/model-provider-contract";
 import { ROLE_KIND } from "@langwatch/role-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import { SecretEnvironmentService } from "@langwatch/secrets";
 import { PrismaDriverAdapterService } from "../src/driver-adapter.ts";
+import { resolveApiKeyPepper } from "./api-key-pepper.ts";
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
+
+/** The lane name haven runs this under, and what its structured lines carry. */
+const SEED_LANE = "seed";
 
 const prisma = new PrismaClient({
   adapter: PrismaDriverAdapterService.create().createOwnedAdapter(process.env.DATABASE_URL ?? ""),
@@ -117,23 +121,18 @@ const MODEL_DEFAULT_CONFIG_ID = "local-dev-model-default-config";
 const DEFAULT_PROMPT_TAG = "production";
 const DEFAULT_PROMPT_TAG_ID = "local-dev-prompt-tag-production";
 
-/**
- * The hashing and encryption pepper, resolved through the same ordered source
- * chain every process boots with (ADR-132), so the seed writes hashes the
- * application can verify.
- */
-async function resolveApiKeyPepper(): Promise<string> {
-  const { environment } = await SecretEnvironmentService.create({ source: process.env }).resolve();
-  const pepper = environment.CREDENTIALS_SECRET ?? environment.NEXTAUTH_SECRET;
-  if (typeof pepper !== "string") {
-    throw new Error("CREDENTIALS_SECRET or NEXTAUTH_SECRET is required to seed API keys");
-  }
-
-  return pepper;
-}
-
 async function main() {
-  const apiKeyPepper = await resolveApiKeyPepper();
+  // Both pepper keys are optional in development. Absent, the seed says which
+  // ones it looked for, once, and goes on to seed everything that does not
+  // need one — never a stack trace, and never a failed `haven up`.
+  const { pepper: apiKeyPepper, absent } = await resolveApiKeyPepper({ source: process.env });
+  if (apiKeyPepper === undefined) {
+    writeScriptWarning({
+      name: SEED_LANE,
+      msg: "no API-key pepper is configured — seeding the local identity without its access tokens",
+      fields: { absent },
+    });
+  }
   // Prefer the haven-injected local credential (HAVEN_SEED_LANGWATCH_API_KEY); the
   // platform never carries LANGWATCH_API_KEY anymore, but keep it as a fallback for
   // non-haven flows that still pass one explicitly.
@@ -299,88 +298,17 @@ async function main() {
     ],
   });
 
-  // Private access token: sk-lw- full-access personal access token, owned by
-  // the admin user, ORGANIZATION-scope ADMIN — the ApiKey-table equivalent of
-  // a GitHub PAT.
-  const privateApiKey = await prisma.apiKey.upsert({
-    where: { lookupId: PRIVATE_TOKEN_LOOKUP_ID },
-    create: {
-      name: "Local Dev Private Access Token",
-      description: "Static local-dev personal access token seeded by prisma/seed.ts",
-      lookupId: PRIVATE_TOKEN_LOOKUP_ID,
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
-      permissionMode: "all",
+  // The two ApiKey rows are the only seeded state that needs the pepper, so a
+  // checkout without one still gets its organization, team, project and admin
+  // login — it just cannot write a hash the applications would verify.
+  if (apiKeyPepper !== undefined) {
+    await seedAccessTokens({
+      apiKeyPepper,
+      organizationId: organization.id,
+      projectId: project.id,
       userId: user.id,
-      createdByUserId: user.id,
-      organizationId: organization.id,
-    },
-    update: {
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
-      userId: user.id,
-      organizationId: organization.id,
-      revokedAt: null,
-    },
-  });
-  await prisma.roleBinding.deleteMany({
-    where: { apiKeyId: privateApiKey.id },
-  });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId: organization.id,
-      apiKeyId: privateApiKey.id,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organization.id,
-    },
-  });
-
-  // Public access token: ik-lw- ingestion-only token, PROJECT-scoped, CUSTOM
-  // role restricted to traces:create — mirrors what ApiKeyService.create()
-  // mints for a real ingestion key, just with a fixed token.
-  const ingestionRole = await prisma.customRole.upsert({
-    where: {
-      organizationId_name: {
-        organizationId: organization.id,
-        name: PUBLIC_TOKEN_ROLE_NAME,
-      },
-    },
-    create: {
-      organizationId: organization.id,
-      name: PUBLIC_TOKEN_ROLE_NAME,
-      description:
-        "Restricted role for the static local-dev public ingestion token (traces:create only)",
-      permissions: ["traces:create"],
-      kind: ROLE_KIND.SYSTEM_API_KEY,
-    },
-    update: { permissions: ["traces:create"] },
-  });
-  const publicApiKey = await prisma.apiKey.upsert({
-    where: { lookupId: PUBLIC_TOKEN_LOOKUP_ID },
-    create: {
-      name: "Local Dev Public Ingestion Token",
-      description: "Static local-dev ingestion-only token (traces:create) seeded by prisma/seed.ts",
-      lookupId: PUBLIC_TOKEN_LOOKUP_ID,
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
-      permissionMode: "restricted",
-      organizationId: organization.id,
-    },
-    update: {
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
-      organizationId: organization.id,
-      revokedAt: null,
-    },
-  });
-  await prisma.roleBinding.deleteMany({ where: { apiKeyId: publicApiKey.id } });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId: organization.id,
-      apiKeyId: publicApiKey.id,
-      role: TeamUserRole.CUSTOM,
-      customRoleId: ingestionRole.id,
-      scopeType: RoleBindingScopeType.PROJECT,
-      scopeId: project.id,
-    },
-  });
+    });
+  }
 
   // Default-model config at the organization scope so prompt-create +
   // workflow runs in e2e tests resolve a model without requiring CI to also
@@ -416,7 +344,11 @@ async function main() {
     update: {},
   });
 
-  await seedModelProvidersFromEnv(organization.id, apiKeyPepper);
+  // Provider credentials are stored AES-GCM-encrypted under the same pepper,
+  // so they are skipped for the same reason the access tokens are.
+  if (apiKeyPepper !== undefined) {
+    await seedModelProvidersFromEnv(organization.id, apiKeyPepper);
+  }
 
   if (process.env.HAVEN_SEED_PRESET === "demo") {
     await seedDemoPlatform({
@@ -436,8 +368,109 @@ async function main() {
   const displayApiKey =
     project.apiKey === DEFAULT_INGESTION_KEY ? project.apiKey : `${project.apiKey.slice(0, 8)}…`;
   console.log(`✅ Ingestion key:        ${displayApiKey}`);
-  console.log(`✅ Private access token: ${PRIVATE_ACCESS_TOKEN}`);
-  console.log(`✅ Public access token:  ${PUBLIC_ACCESS_TOKEN}`);
+  if (apiKeyPepper !== undefined) {
+    console.log(`✅ Private access token: ${PRIVATE_ACCESS_TOKEN}`);
+    console.log(`✅ Public access token:  ${PUBLIC_ACCESS_TOKEN}`);
+  }
+}
+
+/**
+ * The two static access tokens, written under the resolved pepper. Split out
+ * because they are the one part of the seed a checkout with no pepper skips.
+ */
+async function seedAccessTokens({
+  apiKeyPepper,
+  organizationId,
+  projectId,
+  userId,
+}: {
+  apiKeyPepper: string;
+  organizationId: string;
+  projectId: string;
+  userId: string;
+}) {
+  // Private access token: sk-lw- full-access personal access token, owned by
+  // the admin user, ORGANIZATION-scope ADMIN — the ApiKey-table equivalent of
+  // a GitHub PAT.
+  const privateApiKey = await prisma.apiKey.upsert({
+    where: { lookupId: PRIVATE_TOKEN_LOOKUP_ID },
+    create: {
+      name: "Local Dev Private Access Token",
+      description: "Static local-dev personal access token seeded by prisma/seed.ts",
+      lookupId: PRIVATE_TOKEN_LOOKUP_ID,
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
+      permissionMode: "all",
+      userId: userId,
+      createdByUserId: userId,
+      organizationId: organizationId,
+    },
+    update: {
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
+      userId: userId,
+      organizationId: organizationId,
+      revokedAt: null,
+    },
+  });
+  await prisma.roleBinding.deleteMany({
+    where: { apiKeyId: privateApiKey.id },
+  });
+  await prisma.roleBinding.create({
+    data: {
+      organizationId: organizationId,
+      apiKeyId: privateApiKey.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
+    },
+  });
+
+  // Public access token: ik-lw- ingestion-only token, PROJECT-scoped, CUSTOM
+  // role restricted to traces:create — mirrors what ApiKeyService.create()
+  // mints for a real ingestion key, just with a fixed token.
+  const ingestionRole = await prisma.customRole.upsert({
+    where: {
+      organizationId_name: {
+        organizationId: organizationId,
+        name: PUBLIC_TOKEN_ROLE_NAME,
+      },
+    },
+    create: {
+      organizationId: organizationId,
+      name: PUBLIC_TOKEN_ROLE_NAME,
+      description:
+        "Restricted role for the static local-dev public ingestion token (traces:create only)",
+      permissions: ["traces:create"],
+      kind: ROLE_KIND.SYSTEM_API_KEY,
+    },
+    update: { permissions: ["traces:create"] },
+  });
+  const publicApiKey = await prisma.apiKey.upsert({
+    where: { lookupId: PUBLIC_TOKEN_LOOKUP_ID },
+    create: {
+      name: "Local Dev Public Ingestion Token",
+      description: "Static local-dev ingestion-only token (traces:create) seeded by prisma/seed.ts",
+      lookupId: PUBLIC_TOKEN_LOOKUP_ID,
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
+      permissionMode: "restricted",
+      organizationId: organizationId,
+    },
+    update: {
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
+      organizationId: organizationId,
+      revokedAt: null,
+    },
+  });
+  await prisma.roleBinding.deleteMany({ where: { apiKeyId: publicApiKey.id } });
+  await prisma.roleBinding.create({
+    data: {
+      organizationId: organizationId,
+      apiKeyId: publicApiKey.id,
+      role: TeamUserRole.CUSTOM,
+      customRoleId: ingestionRole.id,
+      scopeType: RoleBindingScopeType.PROJECT,
+      scopeId: projectId,
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -573,12 +606,13 @@ async function seedModelProvidersFromEnv(organizationId: string, pepper: string)
   }
 }
 
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+await runScript({
+  name: SEED_LANE,
+  main: async () => {
+    try {
+      await main();
+    } finally {
+      await prisma.$disconnect();
+    }
+  },
+});

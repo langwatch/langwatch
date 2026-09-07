@@ -421,6 +421,11 @@ func (c proc) stream(r io.Reader) {
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\r\n")
 	c.sink.writeLine(line)
+	// Captured first, echoed second: a tool banner is still in the log file
+	// `haven logs --raw` replays, it just does not reach the terminal.
+	if logfmt.Muted(c.name, line) {
+		return
+	}
 	rendered := logfmt.Render(line, logfmt.Options{
 		Lane:      c.name,
 		LaneColor: c.color,

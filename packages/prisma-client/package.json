@@ -40,7 +40,7 @@
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "db:seed": "node --experimental-transform-types prisma/seed.ts"
+    "db:seed": "node --experimental-transform-types --env-file-if-exists=../../.env prisma/seed.ts"
   },
   "dependencies": {
     "@langwatch/api-key-contract": "workspace:*",

@@ -129,3 +129,31 @@ Feature: One log format across every dev lane
     When each is written
     Then an informational record is informational and a warning is a warning
     And the driver's own error is dropped, because only the wrapper around the call knows whether it was retried
+
+  # --- A wrapped error is still one line ---
+
+  # The Go pretty console rendered an error by expanding its Unwrap chain as an
+  # indented tree — `↳ error=failed to upload metrics` over `.cause=reader
+  # collect and export timeout` over `.cause.cause=Post "http://…"` — so one
+  # failed metrics upload took four lines in the nlp lane while every other Go
+  # lane spent one. A reader scanning the column loses the message.
+  @unit
+  Scenario: A wrapped error is one line, not a tree
+    Given a Go service logging an error that wraps two causes
+    When the line is written to the console
+    Then it is a single line
+    And it carries the outermost message and one entry per cause, innermost last
+    And no cause repeats the words of the cause below it
+
+  # --- The one-shot lanes ---
+
+  # The seed and prepare lanes died with Node's own stack trace, which the
+  # supervisor could only indent line by line: fifteen lines about a failure
+  # that every service says in one.
+  @unit
+  Scenario: A one-shot lane that fails prints one structured line, not a stack
+    Given a one-shot script that throws
+    When it fails
+    Then one structured line is written, naming the error and its code
+    And the stack is left off unless the process asked for debug
+    And the script exits unsuccessfully

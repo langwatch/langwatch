@@ -206,6 +206,7 @@ func (s Stack) OverlayEnv() []string {
 		env = append(env, fmt.Sprintf("REDIS_URL=redis://127.0.0.1:%d", s.RedisPort))
 	}
 	env = append(env, s.observabilityEnv()...)
+	env = append(env, NodeOptionsEnvFromProcess())
 	return env
 }
 
@@ -224,7 +225,7 @@ func (s Stack) OverlayEnv() []string {
 // lost, just relocated.
 func (s Stack) observabilityEnv() []string {
 	if s.ObservabilityOTLPPort == 0 {
-		return nil
+		return TelemetryOffEnv()
 	}
 	otlp := fmt.Sprintf("http://127.0.0.1:%d", s.ObservabilityOTLPPort)
 	env := []string{

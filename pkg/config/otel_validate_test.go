@@ -280,3 +280,29 @@ func TestAccessorsPanicBeforeResolve(t *testing.T) {
 	assert.Panics(t, func() { o.SamplerChoice() })
 	assert.Panics(t, func() { o.PrimaryOTLP() })
 }
+
+// TestMetricsExportDisabled pins the switch nlpgo and every Configure caller
+// reads: only an explicit off turns metric export off, so no deployment loses
+// metrics by leaving the variable unset.
+//
+/** @scenario "A stack without the observability container exports no metrics" */
+func TestMetricsExportDisabled(t *testing.T) {
+	for _, value := range []string{"false", "0", "no", "off", "FALSE", " false "} {
+		o := OTel{MetricsEnabled: value}
+		assert.True(t, o.MetricsExportDisabled(), "MetricsEnabled=%q should disable export", value)
+	}
+	for _, value := range []string{"", "true", "1", "yes", "on"} {
+		o := OTel{MetricsEnabled: value}
+		assert.False(t, o.MetricsExportDisabled(), "MetricsEnabled=%q should leave export on", value)
+	}
+}
+
+// TestResolve_RejectsUnreadableMetricsSwitch pins that a typo is a boot error
+// rather than a switch that silently did nothing.
+//
+/** @scenario "A stack without the observability container exports no metrics" */
+func TestResolve_RejectsUnreadableMetricsSwitch(t *testing.T) {
+	o := OTel{MetricsEnabled: "sometimes"}
+
+	require.Error(t, o.Resolve())
+}

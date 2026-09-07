@@ -140,3 +140,45 @@ Feature: A dev stack boots quiet
     When it stops
     Then the failure is logged as a warning
     And the service exits successfully, because nothing it was asked to do failed
+
+  # --- A tool announcing its own configuration ---
+
+  # Every Node lane runs TypeScript through `--experimental-transform-types`,
+  # and Node announces the flag on stderr on every start, twice — the warning
+  # and the line telling you how to trace it. It is said once, in the
+  # environment haven hands its children, rather than in the nine package
+  # manifests that spell the same invocation.
+  @unit
+  Scenario: A Node lane does not announce the flag it always runs with
+    Given a lane started by haven
+    When Node starts
+    Then the experimental-feature warning is not printed
+    And a warning the developer did not ask to hide still is
+    And a NODE_OPTIONS value the developer set themselves is kept
+
+  # Prisma 7.9.1 prints the config it loaded and the schema it loaded on every
+  # generate, one of them on stderr, and offers no flag that quiets either —
+  # only `--no-hints`, which is about hint messages. So the lane that runs it
+  # drops them, and keeps the line saying what was generated.
+  @unit
+  Scenario: The codegen lane prints what a generator did, not what it loaded
+    Given the codegen lane running a generator that announces its configuration
+    When the lane echoes its output
+    Then the "loaded" banners and the blank lines around them are not shown
+    And the line saying what was generated is
+    And the raw capture still holds every line the tool wrote
+
+  # --- Exporting to a collector nobody started ---
+
+  # With the observability container down, haven emitted no collector variables
+  # at all, so a lane inherited whatever OTEL_* the developer's shell carried —
+  # usually a stale localhost endpoint from a session when it was up. The nlp
+  # lane exported metrics to a port that accepts the connection and never
+  # answers, and reported the timeout on every collection interval.
+  @unit
+  Scenario: A stack without the observability container exports no metrics
+    Given a stack whose observability container is not running
+    When its services start
+    Then they are told metrics are off, rather than told nothing
+    And no metric reader is installed however the endpoints were inherited
+    And a stack that unset the switch keeps exporting exactly as before

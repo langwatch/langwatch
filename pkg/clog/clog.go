@@ -217,7 +217,8 @@ var prettyMessageMarker = regexp.MustCompile(
 	"(?:\x1b\\[[0-9;]*m)*\\s(?:\x1b\\[[0-9;]*m)*\x1b\\[1m(?:\x1b\\[[0-9;]*m)*>(?:\x1b\\[[0-9;]*m)*",
 )
 
-// prettyConsoleEncoder is prettyconsole's encoder with that marker removed.
+// prettyConsoleEncoder is prettyconsole's encoder with that marker removed and
+// error chains flattened onto the line (see error_fields.go).
 func prettyConsoleEncoder() zapcore.Encoder {
 	return markerlessEncoder{Encoder: prettyconsole.NewEncoder(prettyEncoderConfig())}
 }
@@ -231,7 +232,7 @@ func (e markerlessEncoder) Clone() zapcore.Encoder {
 }
 
 func (e markerlessEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
-	encoded, err := e.Encoder.EncodeEntry(entry, fields)
+	encoded, err := e.Encoder.EncodeEntry(entry, flattenErrorFields(fields))
 	if err != nil || encoded == nil {
 		return encoded, err
 	}

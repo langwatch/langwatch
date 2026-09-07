@@ -22,6 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { runScript } from "@langwatch/observability";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../../../../..");
@@ -96,22 +97,29 @@ export function deriveSetupSkillBodies(repoRoot: string): Record<string, string>
 const entry = process.argv[1];
 const isMain = !!entry && import.meta.url === pathToFileURL(entry).href;
 if (isMain) {
-  // The published @langwatch/server artifact excludes the skills tree,
-  // so the committed bodies are the source there.
-  if (!fs.existsSync(SKILLS_DIR) && fs.existsSync(OUT)) {
-    console.log(
-      "skills/_compiled/native not in this tree (published artifact), keeping the committed setup skill bodies.",
-    );
-    process.exit(0);
-  }
-  const bodies = deriveSetupSkillBodies(REPO_ROOT);
-  fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  // Tab indentation matches the checked-in artifact, so a regenerated file
-  // is byte-identical whenever nothing changed.
-  fs.writeFileSync(OUT, HEADER + JSON.stringify(bodies, null, "\t") + " as const;\n");
-  const bytes = Object.values(bodies).reduce((sum, b) => sum + b.length, 0);
-  console.log(
-    `Generated ${Object.keys(bodies).length} setup skill bodies ` +
-      `(${Math.round(bytes / 1024)} kB) -> ${path.relative(REPO_ROOT, OUT)}`,
-  );
+  // Through the shared runner so a failure in the codegen lane is the one
+  // structured line every other lane writes, not a Node stack trace.
+  await runScript({
+    name: "codegen",
+    main: () => {
+      // The published @langwatch/server artifact excludes the skills tree,
+      // so the committed bodies are the source there.
+      if (!fs.existsSync(SKILLS_DIR) && fs.existsSync(OUT)) {
+        console.log(
+          "skills/_compiled/native not in this tree (published artifact), keeping the committed setup skill bodies.",
+        );
+        return;
+      }
+      const bodies = deriveSetupSkillBodies(REPO_ROOT);
+      fs.mkdirSync(path.dirname(OUT), { recursive: true });
+      // Tab indentation matches the checked-in artifact, so a regenerated file
+      // is byte-identical whenever nothing changed.
+      fs.writeFileSync(OUT, HEADER + JSON.stringify(bodies, null, "\t") + " as const;\n");
+      const bytes = Object.values(bodies).reduce((sum, b) => sum + b.length, 0);
+      console.log(
+        `Generated ${Object.keys(bodies).length} setup skill bodies ` +
+          `(${Math.round(bytes / 1024)} kB) -> ${path.relative(REPO_ROOT, OUT)}`,
+      );
+    },
+  });
 }

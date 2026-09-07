@@ -73,3 +73,25 @@ func TestInstallMetrics_MeterProviderWiring(t *testing.T) {
 		}
 	})
 }
+
+// TestInstallMetrics_DisabledInstallsNoReader pins the explicit off switch: a
+// stack whose observability container is not running says so, and no lane
+// exports metrics to an endpoint it inherited from a shell.
+//
+/** @scenario "A stack without the observability container exports no metrics" */
+func TestInstallMetrics_DisabledInstallsNoReader(t *testing.T) {
+	ctx := context.Background()
+
+	p, err := New(ctx, Options{
+		OTLPEndpoint:           "http://localhost:1/v1/traces",
+		DebugCollectorEndpoint: "http://localhost:1",
+		MetricsDisabled:        true,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = p.Shutdown(ctx) })
+	if p.mp != nil {
+		t.Fatal("expected no MeterProvider when metrics are disabled by name")
+	}
+}

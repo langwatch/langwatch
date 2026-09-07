@@ -73,6 +73,15 @@ type OTel struct {
 	// not a license to keep broken telemetry config around.
 	SDKDisabled bool `env:"SDK_DISABLED"`
 
+	// MetricsEnabled is OTEL_METRICS_ENABLED, the switch the TypeScript spine
+	// already reads (packages/config). Unset leaves metric export decided by
+	// whether a sink is configured, which is what every deployment relies on;
+	// an explicit off turns the readers off even when one is. haven sets the
+	// off value for a stack it is not running the observability container for,
+	// so a stale endpoint inherited from a shell cannot leave a lane posting
+	// metrics into a socket that accepts them and never answers.
+	MetricsEnabled string `env:"METRICS_ENABLED"`
+
 	// OTLPEndpoint / OTLPHeaders / SampleRatio are the DEPRECATED
 	// LangWatch-only names (OTEL_OTLP_ENDPOINT, OTEL_OTLP_HEADERS,
 	// OTEL_SAMPLE_RATIO). Still honored so existing deployments keep tracing;
@@ -330,6 +339,9 @@ func (o *OTel) validateFixedVocabulary() error {
 	if t := strings.ToLower(strings.TrimSpace(o.TracesExporter)); t != "" && t != "otlp" && t != "none" {
 		return fmt.Errorf("OTEL_TRACES_EXPORTER %q is not supported — use \"otlp\" or \"none\"", o.TracesExporter)
 	}
+	if m := strings.ToLower(strings.TrimSpace(o.MetricsEnabled)); m != "" && !metricsOn[m] && !metricsOff[m] {
+		return fmt.Errorf("OTEL_METRICS_ENABLED %q is not a boolean — use \"true\" or \"false\"", o.MetricsEnabled)
+	}
 	return nil
 }
 
@@ -440,6 +452,21 @@ func (o *OTel) SamplerChoice() otelsetup.SamplerChoice {
 	return o.resolved.sampler
 }
 
+// metricsOn and metricsOff are the spellings OTEL_METRICS_ENABLED accepts.
+// Anything else is a boot error rather than a switch that silently did
+// nothing.
+var (
+	metricsOn  = map[string]bool{"true": true, "1": true, "yes": true, "on": true}
+	metricsOff = map[string]bool{"false": true, "0": true, "no": true, "off": true}
+)
+
+// MetricsExportDisabled reports whether metric export was turned off by name.
+// Only an explicit off counts: an unset variable keeps the behaviour every
+// deployment has today, where a configured sink is a sink that gets metrics.
+func (o *OTel) MetricsExportDisabled() bool {
+	return metricsOff[strings.ToLower(strings.TrimSpace(o.MetricsEnabled))]
+}
+
 // DebugCollector returns the debug-collector base endpoint (no signal
 // path) and its parsed headers. An empty endpoint means the debug
 // collector is disabled. Exposed for services (e.g. nlpgo) that build
@@ -479,6 +506,7 @@ func (o *OTel) Configure(ctx context.Context, nodeID string) (*otelsetup.Provide
 		Sampler:                o.resolved.sampler,
 		DebugCollectorEndpoint: debugEndpoint,
 		DebugCollectorHeaders:  debugHeaders,
+		MetricsDisabled:        o.MetricsExportDisabled(),
 	})
 }
 

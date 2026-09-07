@@ -288,6 +288,11 @@ type Options struct {
 	// DebugCollectorHeaders carries optional auth headers for the debug
 	// collector exporters.
 	DebugCollectorHeaders map[string]string
+	// MetricsDisabled turns metric export off outright, whatever sinks are
+	// configured (OTEL_METRICS_ENABLED=false). Traces and logs are untouched:
+	// the switch exists for a stack whose collector is not answering, where
+	// the metric readers are the ones that retry on a timer forever.
+	MetricsDisabled bool
 }
 
 // Provider holds the configured OTel SDK providers.
@@ -580,11 +585,18 @@ func installDebugLogs(ctx context.Context, opts Options, res *resource.Resource,
 //     only a TracerProvider, leaving the global MeterProvider a no-op in prod.
 //   - the DEBUG collector, when a developer opted into the local stack.
 //
+// OTEL_METRICS_ENABLED=false turns every reader off before any of that, which
+// is how a development stack with no observability container running stops its
+// services exporting to whatever endpoint the shell happened to carry.
+//
 // MultiTenant services (nlpgo) opt OUT of the primary reader: a metric stream
 // has no per-tenant routing analog to the span TenantRouter, so there is no
 // single correct static destination. When no sink applies (noop, or multi-tenant
 // with no debug collector) the global MeterProvider is left as the SDK no-op.
 func installMetrics(ctx context.Context, opts Options, res *resource.Resource, provider *Provider) error {
+	if opts.MetricsDisabled {
+		return nil
+	}
 	var readers []sdkmetric.Reader
 	if opts.OTLPEndpoint != "" && !opts.MultiTenant {
 		metricsURL := opts.MetricsEndpoint
