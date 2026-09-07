@@ -19,11 +19,11 @@ import { PrismaIdentityUsersRepository } from "../identity-users.prisma.reposito
 import { LegacySsoDomainRoutingRepository } from "../legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "../legacy-sso-organization.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "../sso-connection-projection.prisma.repository";
-import { PrismaSsoConnectionRegistrationRepository } from "../sso-connection-registration.prisma.repository";
 import {
   PrismaSsoConnectionReadRepository,
   PrismaSsoConnectionStrandingRepository,
 } from "../sso-connection-reads.prisma.repository";
+import { PrismaSsoConnectionRegistrationRepository } from "../sso-connection-registration.prisma.repository";
 import { SsoConnectionDomainRoutingRepository } from "../sso-connection-routing.prisma.repository";
 
 /**

@@ -202,17 +202,6 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     });
   }
 
-  async clearSignUpConfirmationPending({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<void> {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { signupConfirmationPending: false },
-    });
-  }
-
   /**
    * Marks the address confirmed on whoever holds it.
    *
