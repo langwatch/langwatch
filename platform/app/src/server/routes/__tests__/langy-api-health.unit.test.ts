@@ -139,19 +139,21 @@ describe("GET /api/langy/health", () => {
       mockExtractCredentials.mockReturnValue(null);
     });
 
-    /** @scenario "A request with no credential is refused before any turn is started" */
-    it("responds 401 and starts no turn", async () => {
-      const res = await getHealth();
+    describe("when GET /api/langy/health is called", () => {
+      /** @scenario "A request with no credential is refused before any turn is started" */
+      it("responds 401 and starts no turn", async () => {
+        const res = await getHealth();
 
-      expect(res.status).toBe(401);
-      expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
-    });
+        expect(res.status).toBe(401);
+        expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
+      });
 
-    /** @scenario "Every health response is uncacheable" */
-    it("still carries Cache-Control: no-store", async () => {
-      const res = await getHealth();
+      /** @scenario "Every health response is uncacheable" */
+      it("still carries Cache-Control: no-store", async () => {
+        const res = await getHealth();
 
-      expect(res.headers.get("cache-control")).toBe("no-store");
+        expect(res.headers.get("cache-control")).toBe("no-store");
+      });
     });
   });
 
@@ -160,16 +162,18 @@ describe("GET /api/langy/health", () => {
       mockIsEnabled.mockResolvedValue(false);
     });
 
-    /** @scenario "A switched-off surface answers the health check as a route that does not exist" */
-    it("answers byte-identically to an unmounted path and starts no turn", async () => {
-      const dark = await describeResponse(await getHealth());
-      const unmounted = await describeResponse(
-        await testApp.request(UNMOUNTED_URL, { method: "GET" }),
-      );
+    describe("when GET /api/langy/health is called", () => {
+      /** @scenario "A switched-off surface answers the health check as a route that does not exist" */
+      it("answers byte-identically to an unmounted path and starts no turn", async () => {
+        const dark = await describeResponse(await getHealth());
+        const unmounted = await describeResponse(
+          await testApp.request(UNMOUNTED_URL, { method: "GET" }),
+        );
 
-      expect(dark).toEqual(unmounted);
-      expect(dark.status).toBe(404);
-      expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
+        expect(dark).toEqual(unmounted);
+        expect(dark.status).toBe(404);
+        expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -183,12 +187,14 @@ describe("GET /api/langy/health", () => {
       );
     });
 
-    /** @scenario "A key without langy:create is refused" */
-    it("responds 403 and starts no turn", async () => {
-      const res = await getHealth();
+    describe("when GET /api/langy/health is called", () => {
+      /** @scenario "A key without langy:create is refused" */
+      it("responds 403 and starts no turn", async () => {
+        const res = await getHealth();
 
-      expect(res.status).toBe(403);
-      expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
+        expect(res.status).toBe(403);
+        expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -201,42 +207,45 @@ describe("GET /api/langy/health", () => {
       });
     });
 
-    /** @scenario "A key whose owner is outside the Langy cohort is refused" */
-    it("responds 403 with the cohort denial code and starts no turn", async () => {
-      const res = await getHealth();
+    describe("when GET /api/langy/health is called", () => {
+      /** @scenario "A key whose owner is outside the Langy cohort is refused" */
+      it("responds 403 with the cohort denial code and starts no turn", async () => {
+        const res = await getHealth();
 
-      expect(res.status).toBe(403);
-      expect(JSON.stringify(await res.json())).toContain(
-        "langy_api_key_no_langy_access",
-      );
-      expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { error: { code: string } };
+        expect(body.error.code).toBe("langy_api_key_no_langy_access");
+        expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe("given the canary reports healthy", () => {
-    /** @scenario "A healthy run answers 200 with the turn's ids" */
-    it("responds 200 with status ok and the turn's ids, as the key's owner", async () => {
-      const res = await getHealth();
+    describe("when GET /api/langy/health is called", () => {
+      /** @scenario "A healthy run answers 200 with the turn's ids" */
+      it("responds 200 with status ok and the turn's ids, as the key's owner", async () => {
+        const res = await getHealth();
 
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({
-        status: "ok",
-        conversationId: "conv-1",
-        turnId: "turn-1",
-        durationMs: 1234,
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({
+          status: "ok",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          durationMs: 1234,
+        });
+        expect(mockRunLangyHealthCanary).toHaveBeenCalledWith({
+          projectId: "project-123",
+          session: SESSION,
+        });
+        expect(mockMarkUsed).toHaveBeenCalledWith({ apiKeyId: "key-1" });
       });
-      expect(mockRunLangyHealthCanary).toHaveBeenCalledWith({
-        projectId: "project-123",
-        session: SESSION,
+
+      /** @scenario "Every health response is uncacheable" */
+      it("carries Cache-Control: no-store", async () => {
+        const res = await getHealth();
+
+        expect(res.headers.get("cache-control")).toBe("no-store");
       });
-      expect(mockMarkUsed).toHaveBeenCalledWith({ apiKeyId: "key-1" });
-    });
-
-    /** @scenario "Every health response is uncacheable" */
-    it("carries Cache-Control: no-store", async () => {
-      const res = await getHealth();
-
-      expect(res.headers.get("cache-control")).toBe("no-store");
     });
   });
 
@@ -251,25 +260,27 @@ describe("GET /api/langy/health", () => {
       });
     });
 
-    /** @scenario "An unhealthy run answers 503 with its reason" */
-    it("responds 503 with status unhealthy and the reason", async () => {
-      const res = await getHealth();
+    describe("when GET /api/langy/health is called", () => {
+      /** @scenario "An unhealthy run answers 503 with its reason" */
+      it("responds 503 with status unhealthy and the reason", async () => {
+        const res = await getHealth();
 
-      expect(res.status).toBe(503);
-      expect(await res.json()).toEqual({
-        status: "unhealthy",
-        reason: "empty_reply",
-        conversationId: "conv-1",
-        turnId: "turn-1",
-        durationMs: 4321,
+        expect(res.status).toBe(503);
+        expect(await res.json()).toEqual({
+          status: "unhealthy",
+          reason: "empty_reply",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          durationMs: 4321,
+        });
       });
-    });
 
-    /** @scenario "Every health response is uncacheable" */
-    it("carries Cache-Control: no-store", async () => {
-      const res = await getHealth();
+      /** @scenario "Every health response is uncacheable" */
+      it("carries Cache-Control: no-store", async () => {
+        const res = await getHealth();
 
-      expect(res.headers.get("cache-control")).toBe("no-store");
+        expect(res.headers.get("cache-control")).toBe("no-store");
+      });
     });
   });
 
@@ -278,31 +289,35 @@ describe("GET /api/langy/health", () => {
       mockRunLangyHealthCanary.mockResolvedValue({ busy: true });
     });
 
-    /** @scenario "A busy probe answers 429" */
-    it("responds 429 with status busy", async () => {
-      const res = await getHealth();
+    describe("when GET /api/langy/health is called", () => {
+      /** @scenario "A busy probe answers 429" */
+      it("responds 429 with status busy", async () => {
+        const res = await getHealth();
 
-      expect(res.status).toBe(429);
-      expect(await res.json()).toEqual({ status: "busy" });
+        expect(res.status).toBe(429);
+        expect(await res.json()).toEqual({ status: "busy" });
+      });
     });
   });
 
   describe("given the Langy API app is loaded", () => {
-    /** @scenario "The health route is registered under the same policy as the turn routes" */
-    it("registers GET /api/langy/health under the same handler-managed langy:create policy as the turn route", async () => {
-      const { getRoutePolicy } = await import(
-        "~/server/api/security/route-registry"
-      );
+    describe("when the health route's policy is looked up", () => {
+      /** @scenario "The health route is registered under the same policy as the turn routes" */
+      it("registers GET /api/langy/health under the same handler-managed langy:create policy as the turn route", async () => {
+        const { getRoutePolicy } = await import(
+          "~/server/api/security/route-registry"
+        );
 
-      const health = getRoutePolicy("GET", "/api/langy/health");
-      const turn = getRoutePolicy("POST", "/api/langy/conversations");
+        const health = getRoutePolicy("GET", "/api/langy/health");
+        const turn = getRoutePolicy("POST", "/api/langy/conversations");
 
-      expect(health?.policy).toMatchObject({
-        kind: "handlerManaged",
-        credential: "apiKey",
-        permissions: ["langy:create"],
+        expect(health?.policy).toMatchObject({
+          kind: "handlerManaged",
+          credential: "apiKey",
+          permissions: ["langy:create"],
+        });
+        expect(health?.policy).toEqual(turn?.policy);
       });
-      expect(health?.policy).toEqual(turn?.policy);
     });
   });
 });
