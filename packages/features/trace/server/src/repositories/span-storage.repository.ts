@@ -1,5 +1,7 @@
 import type {
   DerivedTraceEvent,
+  ModelSpanSampleRow,
+  ModelUsageStatsRow,
   SpanResourceInfo,
   SpanSummaryRow,
   TraceEventRollup,
@@ -7,6 +9,8 @@ import type {
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
 import type { SpanInsertData } from "@langwatch/trace-contract";
+
+export type { ModelSpanSampleRow, ModelUsageStatsRow } from "@langwatch/trace-contract";
 
 /**
  * Per-trace safety ceiling for read-time derivation queries (trace events + scenario role costs). Production p999 span-count per trace is 312, so this covers >99.9% of real traces; exists only so a pathological leaked/looping trace_id (seen up to ~27k spans) can't make a derivation read unbounded. Below the ceiling derivations are exact; above it only the hoisted event list/scenario metrics truncate — the paginated span detail view is a separate, complete query.
@@ -73,35 +77,6 @@ export interface NormalizedSpanByIdParams {
   spanId: string;
   /** Centre of the partition window: the SPAN'S OWN start, epoch ms. */
   occurredAtMs: number;
-}
-
-/**
- * Per-model usage rollup over a recent window, feeds the model cost rule
- * preview ("which models would this regex match, and how much traffic do
- * they carry").
- */
-export interface ModelUsageStatsRow {
-  model: string;
-  spanCount: number;
-  lastSeenMs: number;
-}
-
-/**
- * Light per-span sample for the model cost rule preview list. Token counts
- * are null when the span carries no usage attributes.
- */
-export interface ModelSpanSampleRow {
-  traceId: string;
-  spanId: string;
-  spanName: string;
-  model: string;
-  inputTokens: number | null;
-  outputTokens: number | null;
-  cacheReadTokens: number | null;
-  cacheCreationTokens: number | null;
-  /** The portion of the writes that bought an hour-long cache entry. */
-  cacheCreation1hTokens: number | null;
-  startTimeMs: number;
 }
 
 export abstract class SpanStorageRepository {

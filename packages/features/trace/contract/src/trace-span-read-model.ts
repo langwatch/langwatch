@@ -92,3 +92,25 @@ export const traceLogRecordDtoSchema = z.object({
 });
 
 export type TraceLogRecordDto = z.infer<typeof traceLogRecordDtoSchema>;
+
+/** Per-model usage for the model cost rule preview. */
+export interface ModelUsageStatsRow {
+  model: string;
+  spanCount: number;
+  lastSeenMs: number;
+}
+
+/** A span sample for cost previews; missing usage attributes remain null. */
+export interface ModelSpanSampleRow {
+  traceId: string;
+  spanId: string;
+  spanName: string;
+  model: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheCreationTokens: number | null;
+  /** The portion of the writes that bought an hour-long cache entry. */
+  cacheCreation1hTokens: number | null;
+  startTimeMs: number;
+}
