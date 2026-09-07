@@ -97,8 +97,12 @@ jobs:
       # It also fixes the draft case, which was silently wrong: a draft got
       # `shards: [1]` and still ran `--shard=1/4`, so it executed a quarter of
       # its files while reporting a pass over all of them.
-      unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
-      unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
+      # PR2's full 2,513-file run reached only 426/628 files on its slowest
+      # healthy shard before the four-minute floor. At that measured rate,
+      # eight shards put about 315 files and three minutes on each runner,
+      # preserving the floor's intended minute of headroom.
+      unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5,6,7,8]' || '[1]' }}
+      unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '8' || '1' }}
       # Six became four when the component lane took the files that never
       # needed a datastore. 540 of the 1017 integration files declare jsdom and
       # name no database, queue or cache; they now run on `test-component`
