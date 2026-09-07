@@ -2,7 +2,7 @@
  * LangWatchQL analytics SQL — PostgreSQL-resident data, reached through
  * server-side named collections.
  *
- * `provisioning.ts` builds the ClickHouse access model over objects that
+ * `accessModel.ts` builds the ClickHouse access model over objects that
  * already exist. Some LangWatchQL datasets do not live in ClickHouse at all: they
  * are rows in the application's own PostgreSQL primary. This module provisions
  * the path to them, which has a half on each side of the wire:
@@ -13,28 +13,28 @@
  *  - **On ClickHouse** — a named collection holding the credentials
  *    server-side, and one PostgreSQL-engine table per dataset in the LangWatchQL
  *    database. Those tables are ordinary LangWatchQL objects: the row policies
- *    from `./provisioning.ts` apply to them exactly as they do to a fact table.
+ *    from `./accessModel.ts` apply to them exactly as they do to a fact table.
  *
  * The tenant column is `TenantId` on both sides by the time a LangWatchQL query
  * sees it — the approved view is where the application's `projectId` takes that
  * name, which is what lets one row-policy shape serve every LangWatchQL object.
  *
  * Every name emitted below is interpolated into SQL text, so it goes through
- * `./sqlText.ts`: `postgresQuoted` on the PostgreSQL side, `assertIdentifier`
+ * `../sqlText.ts`: `postgresQuoted` on the PostgreSQL side, `assertIdentifier`
  * on the ClickHouse side, and the literal escapers for values.
  *
- * @see ./provisioning.ts — the ClickHouse access model applied over these tables
- * @see ./sqlText.ts — the escaping and identifier rules these statements obey
+ * @see ./accessModel.ts — the ClickHouse access model applied over these tables
+ * @see ../sqlText.ts — the escaping and identifier rules these statements obey
  * @see specs/analytics/lwql-api.feature
  */
 
-import { assertNames, type LangWatchQLNames, qualified } from "./provisioning";
 import {
   assertIdentifier,
   clickHouseLiteral,
   postgresLiteral,
   postgresQuoted,
-} from "./sqlText";
+} from "../sqlText";
+import { assertNames, type LangWatchQLNames, qualified } from "./accessModel";
 
 /** Connection details of the named collection ClickHouse dials PostgreSQL with. */
 export interface PostgresNamedCollection {
@@ -58,10 +58,12 @@ export interface PostgresNamedCollection {
  * Dropped first rather than `IF NOT EXISTS`, so re-provisioning against a host
  * whose address has changed converges instead of silently keeping the old one.
  *
- * Not called from any production path in this repo: the real objects are owned
- * by infra (langwatch-saas#1126). This is the reference implementation that
- * terraform must match — keep it and its tests in sync, do not delete as dead
- * code.
+ * Two callers, two ownership models. Self-hosted deployments run this for
+ * real via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635),
+ * so it is a production path. On cloud the same objects are
+ * owned by infra (langwatch-saas#1126) and this stays the reference
+ * implementation terraform must match — keep it and its tests in sync with
+ * both.
  */
 export function postgresNamedCollectionStatements({
   connection,
@@ -233,11 +235,12 @@ export interface PostgresReaderRole {
  * `connectionLimit` is a *floor for a one-table deployment* and is not the
  * number a real catalog should use: the demand is per mapped table, so the cap
  * has to be derived from how many there are. Use
- * `lwqlPostgresReaderConnectionLimit` from `../views.ts`, which does that —
+ * `lwqlPostgresReaderConnectionLimit` from `./catalogStatements.ts`, which does that —
  * this constant is what a caller mapping a single table by hand would want.
  *
- * No production caller in this repo — input to the infra-owned reader role
- * (langwatch-saas#1126); reference implementation, not dead code.
+ * Called for real by self-hosted provisioning (`selfProvisioning.ts`, issue
+ * #6635); on cloud the same reader role is infra-owned (langwatch-saas#1126) and this
+ * is the reference implementation terraform must match.
  */
 export const DEFAULT_POSTGRES_READER_LIMITS = {
   connectionLimit: 5,
@@ -261,10 +264,11 @@ export const DEFAULT_POSTGRES_READER_LIMITS = {
  * Idempotent: existence is settled once, then every property is converged with
  * `ALTER`, so re-provisioning an already-configured server is a no-op.
  *
- * Not called from any production path in this repo: the real role is owned by
- * infra (langwatch-saas#1126). This is the reference implementation that
- * terraform must match — keep it and its tests in sync, do not delete as dead
- * code.
+ * Two callers, two ownership models. Self-hosted deployments run this for real
+ * via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635), so it is
+ * a production path. On cloud the same role is owned by infra
+ * (langwatch-saas#1126) and this stays the reference implementation terraform
+ * must match — so keep it and its tests in sync with both.
  */
 export function postgresReaderRoleStatements({
   reader,
