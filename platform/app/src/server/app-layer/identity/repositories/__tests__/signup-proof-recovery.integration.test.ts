@@ -10,7 +10,7 @@ import {
 } from "../signup-verification.prisma.repository";
 
 describe("sign-up proof recovery after enrollment failure", () => {
-  const namespace = nanoid(8);
+  const namespace = nanoid(8).toLowerCase();
   const email = `signup-proof-recovery-${namespace}@example.com`;
   const issuedTokens: string[] = [];
   const sentLinks: string[] = [];
