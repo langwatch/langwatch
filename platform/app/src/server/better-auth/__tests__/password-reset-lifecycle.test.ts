@@ -292,6 +292,7 @@ describe("better-auth password reset token lifecycle", () => {
 
 describe("better-auth generic password refusal", () => {
   /** @scenario Wrong-password and unknown-email attempts have one backend refusal */
+  /** @scenario A refused credential still refuses in one way */
   it("gives wrong-password and unknown-email attempts the same refusal and writes nothing", async () => {
     const harness = buildHarness();
     await signUp(harness);
