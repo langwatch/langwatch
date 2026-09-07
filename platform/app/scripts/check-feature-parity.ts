@@ -1168,7 +1168,10 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
       continue;
     }
     const rest = src.slice(i);
-    const m = rest.match(/^(?:it|test)(?:\.[a-zA-Z]+)?\s*\(/);
+    // Vitest's typed table form is still a test call: `it.each<T>([...])`.
+    // Keep the type argument narrow and line-local so proximity remains a
+    // lexical check rather than attempting to parse arbitrary TypeScript.
+    const m = rest.match(/^(?:it|test)(?:\.[a-zA-Z]+)?(?:<[^>\n]+>)?\s*\(/);
     return m !== null;
   }
   return false;

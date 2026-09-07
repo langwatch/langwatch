@@ -88,6 +88,7 @@ describe("the enrollment gate on the way into an organization's data", () => {
 
   describe("given a member who cannot prove a second factor", () => {
     describe("when they reach the requiring organization's data", () => {
+      /** @scenario "A member who cannot prove one is held out of that organization alone" */
       it("refuses with the code the enrollment gate renders copy for", async () => {
         const { deps } = gateOver({ satisfied: false });
         const error = await assertSecondFactorSatisfied({
