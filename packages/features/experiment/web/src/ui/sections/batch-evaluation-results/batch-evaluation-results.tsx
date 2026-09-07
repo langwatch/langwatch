@@ -610,15 +610,13 @@ export function BatchEvaluationResults({
         )}
 
         {/* Table container - fills remaining space */}
-        {runsQuery.isLoading && (
+        {runsQuery.isLoading ? (
           <Box flex={1} minHeight="300px" overflow="auto" paddingX={2} paddingBottom={2}>
             <TableSkeleton withCard />
           </Box>
-        )}
-        {!runsQuery.isLoading && sidebarRuns.length === 0 && (
+        ) : sidebarRuns.length === 0 ? (
           <Text padding={4}>Waiting for results...</Text>
-        )}
-        {!runsQuery.isLoading && sidebarRuns.length > 0 && (
+        ) : (
           <Box flex={1} minHeight="300px" paddingX={2} paddingBottom={2}>
             <Card.Root width="100%" height="100%" overflow="hidden">
               <Card.Body padding={0} height="100%">

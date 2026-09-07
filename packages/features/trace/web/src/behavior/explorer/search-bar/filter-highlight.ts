@@ -163,110 +163,6 @@ function isPositionCoveredBySlot(slots: DecorationSlot[], from: number, to: numb
   return false;
 }
 
-function walkTagNode(
-  node: LiqeQuery,
-  negated: boolean,
-  baseOffset: number,
-  plan: DecorationPlan,
-): void {
-  const tag = node as TagToken;
-  const start = baseOffset + tag.location.start;
-  const end = baseOffset + tag.location.end;
-  const isImplicit = tag.field.type === "ImplicitField";
-  const fieldName = isImplicit ? "" : (tag.field as { name: string }).name;
-  const value = tag.expression.type === "LiteralExpression" ? String(tag.expression.value) : null;
-
-  if (isImplicit) return; // free text — no chip, no X widget.
-  // Token coords are in @-stripped trimmed-string space — same as what
-  // `removeNodeAtLocation` will see when it re-parses the query.
-  plan.tokens.push({
-    start: tag.location.start,
-    end: tag.location.end,
-    field: fieldName,
-    value,
-    kind: "ast",
-  });
-  plan.slots.push({
-    from: start,
-    to: end,
-    className: tagClassName({ fieldName, negated }),
-    // Carry the parsed token coords through to the inline
-    // decoration so the editor's mousedown delegate can open the
-    // value picker without re-walking the AST. Only categorical
-    // (literal-value) chips qualify — range chips have no
-    // single-value picker.
-    chipToken:
-      value !== null
-        ? {
-            start: tag.location.start,
-            end: tag.location.end,
-            field: fieldName,
-            value,
-          }
-        : undefined,
-  });
-}
-
-function walkUnaryOperatorNode(
-  node: LiqeQuery,
-  negated: boolean,
-  baseOffset: number,
-  plan: DecorationPlan,
-): void {
-  const unary = node as UnaryOperatorToken;
-  const isNeg = unary.operator === "NOT" || unary.operator === "-";
-  const kwLen = unary.operator === "NOT" ? 3 : 1;
-  plan.slots.push({
-    from: baseOffset + unary.location.start,
-    to: baseOffset + unary.location.start + kwLen,
-    className: "filter-keyword filter-keyword-not",
-  });
-  walkAst(unary.operand, negated !== isNeg, baseOffset, plan);
-}
-
-function walkLogicalExpressionNode(
-  node: LiqeQuery,
-  negated: boolean,
-  baseOffset: number,
-  plan: DecorationPlan,
-): void {
-  const logic = node as LogicalExpressionToken;
-  walkAst(logic.left, negated, baseOffset, plan);
-  if (logic.operator.type === "BooleanOperator") {
-    const op = logic.operator;
-    plan.slots.push({
-      from: baseOffset + op.location.start,
-      to: baseOffset + op.location.end,
-      className: `filter-keyword filter-keyword-${op.operator.toLowerCase()} filter-keyword-clickable`,
-      // Carry the liqe-text coordinates through to the inline
-      // decoration so the editor's click delegate can call
-      // `swapOperatorAtLocation` without re-walking the AST.
-      opLoc: { start: op.location.start, end: op.location.end },
-    });
-  }
-  walkAst(logic.right, negated, baseOffset, plan);
-}
-
-function walkParenthesizedExpressionNode(
-  node: LiqeQuery,
-  negated: boolean,
-  baseOffset: number,
-  plan: DecorationPlan,
-): void {
-  const paren = node as ParenthesizedExpressionToken;
-  plan.slots.push({
-    from: baseOffset + paren.location.start,
-    to: baseOffset + paren.location.start + 1,
-    className: "filter-paren",
-  });
-  plan.slots.push({
-    from: baseOffset + paren.location.end - 1,
-    to: baseOffset + paren.location.end,
-    className: "filter-paren",
-  });
-  walkAst(paren.expression, negated, baseOffset, plan);
-}
-
 function walkAst(
   node: LiqeQuery,
   negated: boolean,
@@ -274,14 +170,91 @@ function walkAst(
   plan: DecorationPlan,
 ): void {
   switch (node.type) {
-    case "Tag":
-      return walkTagNode(node, negated, baseOffset, plan);
-    case "UnaryOperator":
-      return walkUnaryOperatorNode(node, negated, baseOffset, plan);
-    case "LogicalExpression":
-      return walkLogicalExpressionNode(node, negated, baseOffset, plan);
-    case "ParenthesizedExpression":
-      return walkParenthesizedExpressionNode(node, negated, baseOffset, plan);
+    case "Tag": {
+      const tag = node as TagToken;
+      const start = baseOffset + tag.location.start;
+      const end = baseOffset + tag.location.end;
+      const isImplicit = tag.field.type === "ImplicitField";
+      const fieldName = isImplicit ? "" : (tag.field as { name: string }).name;
+      const value =
+        tag.expression.type === "LiteralExpression" ? String(tag.expression.value) : null;
+
+      if (isImplicit) return; // free text — no chip, no X widget.
+      // Token coords are in @-stripped trimmed-string space — same as what
+      // `removeNodeAtLocation` will see when it re-parses the query.
+      plan.tokens.push({
+        start: tag.location.start,
+        end: tag.location.end,
+        field: fieldName,
+        value,
+        kind: "ast",
+      });
+      plan.slots.push({
+        from: start,
+        to: end,
+        className: tagClassName({ fieldName, negated }),
+        // Carry the parsed token coords through to the inline
+        // decoration so the editor's mousedown delegate can open the
+        // value picker without re-walking the AST. Only categorical
+        // (literal-value) chips qualify — range chips have no
+        // single-value picker.
+        chipToken:
+          value !== null
+            ? {
+                start: tag.location.start,
+                end: tag.location.end,
+                field: fieldName,
+                value,
+              }
+            : undefined,
+      });
+      return;
+    }
+    case "UnaryOperator": {
+      const unary = node as UnaryOperatorToken;
+      const isNeg = unary.operator === "NOT" || unary.operator === "-";
+      const kwLen = unary.operator === "NOT" ? 3 : 1;
+      plan.slots.push({
+        from: baseOffset + unary.location.start,
+        to: baseOffset + unary.location.start + kwLen,
+        className: "filter-keyword filter-keyword-not",
+      });
+      walkAst(unary.operand, negated !== isNeg, baseOffset, plan);
+      return;
+    }
+    case "LogicalExpression": {
+      const logic = node as LogicalExpressionToken;
+      walkAst(logic.left, negated, baseOffset, plan);
+      if (logic.operator.type === "BooleanOperator") {
+        const op = logic.operator;
+        plan.slots.push({
+          from: baseOffset + op.location.start,
+          to: baseOffset + op.location.end,
+          className: `filter-keyword filter-keyword-${op.operator.toLowerCase()} filter-keyword-clickable`,
+          // Carry the liqe-text coordinates through to the inline
+          // decoration so the editor's click delegate can call
+          // `swapOperatorAtLocation` without re-walking the AST.
+          opLoc: { start: op.location.start, end: op.location.end },
+        });
+      }
+      walkAst(logic.right, negated, baseOffset, plan);
+      return;
+    }
+    case "ParenthesizedExpression": {
+      const paren = node as ParenthesizedExpressionToken;
+      plan.slots.push({
+        from: baseOffset + paren.location.start,
+        to: baseOffset + paren.location.start + 1,
+        className: "filter-paren",
+      });
+      plan.slots.push({
+        from: baseOffset + paren.location.end - 1,
+        to: baseOffset + paren.location.end,
+        className: "filter-paren",
+      });
+      walkAst(paren.expression, negated, baseOffset, plan);
+      return;
+    }
   }
 }
 
@@ -440,55 +413,47 @@ export function chipOverlayLabel({
   return `${field}:${label}`;
 }
 
-function pushSlotDecorations(plan: DecorationPlan, decorations: Decoration[]): void {
-  for (const slot of plan.slots) {
-    const attrs: Record<string, string> = { class: slot.className };
-    if (slot.opLoc) {
-      attrs["data-filter-op-start"] = String(slot.opLoc.start);
-      attrs["data-filter-op-end"] = String(slot.opLoc.end);
-      attrs.title = "Click to switch AND ↔ OR";
-    }
-    if (slot.chipToken) {
-      attrs["data-filter-chip-start"] = String(slot.chipToken.start);
-      attrs["data-filter-chip-end"] = String(slot.chipToken.end);
-      attrs["data-filter-chip-field"] = slot.chipToken.field;
-      attrs["data-filter-chip-value"] = slot.chipToken.value;
-      const overlay = chipOverlayLabel({
-        field: slot.chipToken.field,
-        value: slot.chipToken.value,
-        label: chipLabelLookup[slot.chipToken.field]?.[slot.chipToken.value],
-      });
-      if (overlay) attrs["data-filter-chip-label"] = overlay;
-    }
-    decorations.push(Decoration.inline(slot.from, slot.to, attrs));
-  }
-}
-
-function pushTokenDecorations(plan: DecorationPlan, pos: number, decorations: Decoration[]): void {
-  for (const token of plan.tokens) {
-    // AST tokens carry liqe's trimmed-text coords, so we translate by `leadingWs` to
-    // get a normalised-text offset. Fallback tokens were already collected against
-    // the normalised text, so they need only the text-node base position.
-    const widgetPos = token.kind === "ast" ? pos + plan.leadingWs + token.end : pos + token.end;
-    decorations.push(
-      Decoration.widget(widgetPos, () => createDeleteWidget(token), {
-        side: 1,
-        ignoreSelection: true,
-        // Without an explicit key, ProseMirror's DecorationSet diff compared widget
-        // specs by render-function reference equality.
-        key: `del:${token.kind}:${token.field}:${token.start}:${token.end}:${token.value ?? ""}`,
-      }),
-    );
-  }
-}
-
 function computeDecorations(doc: ProseMirrorNode): DecorationSet {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isText || !node.text) return;
     const plan = buildDecorationPlan(node.text, pos);
-    pushSlotDecorations(plan, decorations);
-    pushTokenDecorations(plan, pos, decorations);
+    for (const slot of plan.slots) {
+      const attrs: Record<string, string> = { class: slot.className };
+      if (slot.opLoc) {
+        attrs["data-filter-op-start"] = String(slot.opLoc.start);
+        attrs["data-filter-op-end"] = String(slot.opLoc.end);
+        attrs.title = "Click to switch AND ↔ OR";
+      }
+      if (slot.chipToken) {
+        attrs["data-filter-chip-start"] = String(slot.chipToken.start);
+        attrs["data-filter-chip-end"] = String(slot.chipToken.end);
+        attrs["data-filter-chip-field"] = slot.chipToken.field;
+        attrs["data-filter-chip-value"] = slot.chipToken.value;
+        const overlay = chipOverlayLabel({
+          field: slot.chipToken.field,
+          value: slot.chipToken.value,
+          label: chipLabelLookup[slot.chipToken.field]?.[slot.chipToken.value],
+        });
+        if (overlay) attrs["data-filter-chip-label"] = overlay;
+      }
+      decorations.push(Decoration.inline(slot.from, slot.to, attrs));
+    }
+    for (const token of plan.tokens) {
+      // AST tokens carry liqe's trimmed-text coords, so we translate by `leadingWs` to
+      // get a normalised-text offset. Fallback tokens were already collected against
+      // the normalised text, so they need only the text-node base position.
+      const widgetPos = token.kind === "ast" ? pos + plan.leadingWs + token.end : pos + token.end;
+      decorations.push(
+        Decoration.widget(widgetPos, () => createDeleteWidget(token), {
+          side: 1,
+          ignoreSelection: true,
+          // Without an explicit key, ProseMirror's DecorationSet diff compared widget
+          // specs by render-function reference equality.
+          key: `del:${token.kind}:${token.field}:${token.start}:${token.end}:${token.value ?? ""}`,
+        }),
+      );
+    }
   });
   return DecorationSet.create(doc, decorations);
 }

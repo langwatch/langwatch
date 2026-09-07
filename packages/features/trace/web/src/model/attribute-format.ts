@@ -49,7 +49,23 @@ export function safeDetectFormat(value: unknown): AttributeFormat {
   }
 }
 
-function detectStringFormat(trimmed: string): AttributeFormat {
+export function detectFormat(value: unknown): AttributeFormat {
+  if (value === null || value === void 0) {
+    return "leaf";
+  }
+
+  if (typeof value === "object") {
+    if (looksLikeChatArray(value)) {
+      return "chat";
+    }
+    return "json";
+  }
+
+  if (typeof value !== "string") {
+    return "leaf";
+  }
+
+  const trimmed = value.trim();
   if (trimmed.length === 0) {
     return "leaf";
   }
@@ -74,22 +90,6 @@ function detectStringFormat(trimmed: string): AttributeFormat {
   }
 
   return "text";
-}
-
-export function detectFormat(value: unknown): AttributeFormat {
-  if (value === null || value === void 0) {
-    return "leaf";
-  }
-
-  if (typeof value === "object") {
-    return looksLikeChatArray(value) ? "chat" : "json";
-  }
-
-  if (typeof value !== "string") {
-    return "leaf";
-  }
-
-  return detectStringFormat(value.trim());
 }
 
 function looksJsonShaped(s: string): boolean {
@@ -193,52 +193,43 @@ export function normaliseChat(items: unknown[]): AttributeChatMessage[] {
 }
 
 // `depth` bounds recursion against pathological nested content arrays.
-function extractStringMessageContent(content: string): string {
-  const trimmed = content.trim();
-  if (trimmed.startsWith('{"type":"text"')) {
-    const inner = textPartSchema.safeParse(tryParseJson(trimmed));
-    if (inner.success) {
-      return inner.data.text;
-    }
-  }
-  return content;
-}
-
-/** Appends the text of one array content part to `parts`, recursing into nested content. */
-function collectMessageContentPart(part: unknown, depth: number, parts: string[]): void {
-  if (typeof part === "string") {
-    parts.push(part);
-    return;
-  }
-  const parsedPart = contentPartSchema.safeParse(part);
-  if (!parsedPart.success) {
-    return;
-  }
-  const textPart = textPartSchema.safeParse(part);
-  if (textPart.success) {
-    parts.push(textPart.data.text);
-    return;
-  }
-  const nestedParts = z.array(z.unknown()).safeParse(parsedPart.data.content);
-  if (nestedParts.success) {
-    parts.push(extractMessageContent(nestedParts.data, depth + 1));
-  }
-}
-
 function extractMessageContent(content: unknown, depth: number): string {
   if (depth >= MAX_CONTENT_DEPTH) {
     return "";
   }
   if (typeof content === "string") {
-    return extractStringMessageContent(content);
+    const trimmed = content.trim();
+    if (trimmed.startsWith('{"type":"text"')) {
+      const inner = textPartSchema.safeParse(tryParseJson(trimmed));
+      if (inner.success) {
+        return inner.data.text;
+      }
+    }
+    return content;
   }
   const parsedParts = z.array(z.unknown()).safeParse(content);
-  if (!parsedParts.success) {
-    return "";
+  if (parsedParts.success) {
+    const parts: string[] = [];
+    for (const part of parsedParts.data) {
+      if (typeof part === "string") {
+        parts.push(part);
+        continue;
+      }
+      const parsedPart = contentPartSchema.safeParse(part);
+      if (!parsedPart.success) {
+        continue;
+      }
+      const textPart = textPartSchema.safeParse(part);
+      if (textPart.success) {
+        parts.push(textPart.data.text);
+        continue;
+      }
+      const nestedParts = z.array(z.unknown()).safeParse(parsedPart.data.content);
+      if (nestedParts.success) {
+        parts.push(extractMessageContent(nestedParts.data, depth + 1));
+      }
+    }
+    return parts.join("\n");
   }
-  const parts: string[] = [];
-  for (const part of parsedParts.data) {
-    collectMessageContentPart(part, depth, parts);
-  }
-  return parts.join("\n");
+  return "";
 }

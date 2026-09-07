@@ -190,8 +190,7 @@ export const advance = (game: SnakeGame, random: () => number): SnakeGame => {
   const body = ate ? game.snake : game.snake.slice(0, -1);
   const snake = [head, ...body];
 
-  const ateItself = body.some((node) => samePoint(node, head));
-  if (ateItself) {
+  if (body.some((node) => samePoint(node, head))) {
     return { ...moved({ game, snake, direction }), ending: "ate-itself" };
   }
 
@@ -208,8 +207,7 @@ export const advance = (game: SnakeGame, random: () => number): SnakeGame => {
  * makes it escapable: a turn always buys a node.
  */
 const pursue = ({ dx, dy }: { dx: number; dy: number }): Direction => {
-  const horizontalGapIsWider = Math.abs(dx) >= Math.abs(dy);
-  if (dx !== 0 && horizontalGapIsWider) {
+  if (dx !== 0 && Math.abs(dx) >= Math.abs(dy)) {
     return dx > 0 ? "right" : "left";
   }
   if (dy !== 0) return dy > 0 ? "down" : "up";

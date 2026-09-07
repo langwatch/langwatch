@@ -127,8 +127,7 @@ function classify({
     return Number.isFinite(value) ? "plottable" : "non-finite";
   }
   if (typeof value === "bigint") {
-    const numericValue = Number(value);
-    return Number.isSafeInteger(numericValue) ? "plottable" : "wide-integer";
+    return Number.isSafeInteger(Number(value)) ? "plottable" : "wide-integer";
   }
   // ClickHouse returns 64-bit and decimal columns as strings so no digits are
   // lost on the wire. Vega parses them to doubles, which is where they are.

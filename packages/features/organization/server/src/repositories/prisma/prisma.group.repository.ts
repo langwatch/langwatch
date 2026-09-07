@@ -264,11 +264,12 @@ export class PrismaGroupRepository extends GroupRepository {
         select: { id: true, scimSource: true },
       });
       if (!group) throw new GroupNotFoundError(input.groupId);
-      const requestsManualEdit =
-        input.rename ||
-        input.memberUserIdsToAdd.length > 0 ||
-        input.memberUserIdsToRemove.length > 0;
-      if (group.scimSource && requestsManualEdit) {
+      if (
+        group.scimSource &&
+        (input.rename ||
+          input.memberUserIdsToAdd.length > 0 ||
+          input.memberUserIdsToRemove.length > 0)
+      ) {
         throw new ScimManagedGroupError(input.groupId);
       }
       if (input.rename) {

@@ -6,70 +6,6 @@ import {
 } from "../../model/flame/constants.ts";
 import type { Viewport } from "./types.ts";
 
-/** Computes the next viewport for one wheel tick: shift-pan or scroll-zoom toward the cursor. */
-function wheelPanOrZoom({
-  prev,
-  isPan,
-  delta,
-  x,
-  width,
-  clampViewport,
-}: {
-  prev: Viewport;
-  isPan: boolean;
-  delta: number;
-  x: number;
-  width: number;
-  clampViewport: (v: Viewport) => Viewport;
-}): Viewport {
-  const dur = prev.endMs - prev.startMs;
-  if (isPan) {
-    const dt = (delta / width) * dur;
-    return clampViewport({
-      startMs: prev.startMs + dt,
-      endMs: prev.endMs + dt,
-    });
-  }
-  const cursorTime = prev.startMs + x * dur;
-  const factor = Math.exp(delta * WHEEL_ZOOM_SENSITIVITY);
-  const newDur = dur * factor;
-  const newStart = cursorTime - x * newDur;
-  return clampViewport({
-    startMs: newStart,
-    endMs: newStart + newDur,
-  });
-}
-
-/** Builds the rAF tick for animating from `from` toward `clamped` over `ZOOM_ANIMATION_MS`. */
-function createViewportAnimationTick({
-  from,
-  clamped,
-  startTime,
-  setViewport,
-  animationRef,
-}: {
-  from: Viewport;
-  clamped: Viewport;
-  startTime: number;
-  setViewport: React.Dispatch<React.SetStateAction<Viewport>>;
-  animationRef: React.MutableRefObject<number | null>;
-}): (now: number) => void {
-  const tick = (now: number) => {
-    const t = Math.min(1, (now - startTime) / ZOOM_ANIMATION_MS);
-    const e = 1 - Math.pow(1 - t, 3);
-    setViewport({
-      startMs: from.startMs + (clamped.startMs - from.startMs) * e,
-      endMs: from.endMs + (clamped.endMs - from.endMs) * e,
-    });
-    if (t < 1) {
-      animationRef.current = requestAnimationFrame(tick);
-    } else {
-      animationRef.current = null;
-    }
-  };
-  return tick;
-}
-
 export interface UseFlameViewportResult {
   viewport: Viewport;
   setViewport: React.Dispatch<React.SetStateAction<Viewport>>;
@@ -137,13 +73,20 @@ export function useFlameViewport({
       cancelAnimation();
       const clamped = clampViewport(target);
       const from = viewportRef.current;
-      const tick = createViewportAnimationTick({
-        from,
-        clamped,
-        startTime: performance.now(),
-        setViewport,
-        animationRef,
-      });
+      const startTime = performance.now();
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - startTime) / ZOOM_ANIMATION_MS);
+        const e = 1 - Math.pow(1 - t, 3);
+        setViewport({
+          startMs: from.startMs + (clamped.startMs - from.startMs) * e,
+          endMs: from.endMs + (clamped.endMs - from.endMs) * e,
+        });
+        if (t < 1) {
+          animationRef.current = requestAnimationFrame(tick);
+        } else {
+          animationRef.current = null;
+        }
+      };
       animationRef.current = requestAnimationFrame(tick);
     },
     [cancelAnimation, clampViewport],
@@ -160,9 +103,24 @@ export function useFlameViewport({
       const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
       const isPan = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
       const delta = isPan ? e.deltaX || e.deltaY : e.deltaY;
-      setViewport((prev) =>
-        wheelPanOrZoom({ prev, isPan, delta, x, width: rect.width, clampViewport }),
-      );
+      setViewport((prev) => {
+        const dur = prev.endMs - prev.startMs;
+        if (isPan) {
+          const dt = (delta / rect.width) * dur;
+          return clampViewport({
+            startMs: prev.startMs + dt,
+            endMs: prev.endMs + dt,
+          });
+        }
+        const cursorTime = prev.startMs + x * dur;
+        const factor = Math.exp(delta * WHEEL_ZOOM_SENSITIVITY);
+        const newDur = dur * factor;
+        const newStart = cursorTime - x * newDur;
+        return clampViewport({
+          startMs: newStart,
+          endMs: newStart + newDur,
+        });
+      });
     };
     el.addEventListener("wheel", handleWheel, { passive: false });
     return () => el.removeEventListener("wheel", handleWheel);

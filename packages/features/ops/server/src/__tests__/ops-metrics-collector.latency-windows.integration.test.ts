@@ -120,10 +120,8 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
           // cycle; poll until the artifact lands.
           await collector.collect();
           const start = Date.now();
-          let stillWaiting = !collector.tryGetLatestDetail() && Date.now() - start < 5000;
-          while (stillWaiting) {
+          while (!collector.tryGetLatestDetail() && Date.now() - start < 5000) {
             await new Promise((r) => setTimeout(r, 50));
-            stillWaiting = !collector.tryGetLatestDetail() && Date.now() - start < 5000;
           }
 
           const windows = collector.tryGetLatestDetail()?.latencyWindows;

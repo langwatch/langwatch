@@ -24,16 +24,11 @@ interface SelectionState {
  */
 const addressesATrace = (traceId: string): boolean => traceId.trim().length > 0;
 
-type SelectionSet = (
-  partial:
-    | SelectionState
-    | Partial<SelectionState>
-    | ((state: SelectionState) => SelectionState | Partial<SelectionState>),
-  replace?: false,
-) => void;
+export const useSelectionStore = create<SelectionState>((set, get) => ({
+  mode: "explicit",
+  traceIds: new Set<string>(),
 
-function toggleAction(set: SelectionSet): SelectionState["toggle"] {
-  return (traceId) =>
+  toggle: (traceId) =>
     set((state) => {
       if (!addressesATrace(traceId)) {
         return state;
@@ -51,11 +46,9 @@ function toggleAction(set: SelectionSet): SelectionState["toggle"] {
         next.add(traceId);
       }
       return { traceIds: next };
-    });
-}
+    }),
 
-function setManyAction(set: SelectionSet): SelectionState["setMany"] {
-  return (traceIds, checked) =>
+  setMany: (traceIds, checked) =>
     set((state) => {
       const next = state.mode === "all-matching" ? new Set<string>() : new Set(state.traceIds);
       // Only an id that addresses a trace may enter; anything at all may leave,
@@ -68,16 +61,7 @@ function setManyAction(set: SelectionSet): SelectionState["setMany"] {
         }
       }
       return { mode: "explicit", traceIds: next };
-    });
-}
-
-export const useSelectionStore = create<SelectionState>((set, get) => ({
-  mode: "explicit",
-  traceIds: new Set<string>(),
-
-  toggle: toggleAction(set),
-
-  setMany: setManyAction(set),
+    }),
 
   enableAllMatching: () => set({ mode: "all-matching", traceIds: new Set<string>() }),
 

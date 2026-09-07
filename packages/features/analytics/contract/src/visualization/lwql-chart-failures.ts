@@ -33,9 +33,7 @@ function isVegaValidationError(value: unknown): value is VegaValidationError {
  * something" and "this chart did not compile" call for different next steps.
  */
 export function lwqlRenderFailure(error: unknown): VegaValidationError {
-  const errorRecord = isRecord(error) ? error : undefined;
-  const detail =
-    errorRecord && isVegaValidationError(errorRecord.detail) ? errorRecord.detail : void 0;
+  const detail = isRecord(error) && isVegaValidationError(error.detail) ? error.detail : void 0;
   if (detail?.rule === "loader.blocked") return detail;
 
   const reason =

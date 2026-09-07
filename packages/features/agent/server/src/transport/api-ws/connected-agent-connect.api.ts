@@ -231,8 +231,7 @@ export class ConnectGateway {
     // The call counts as in flight only once the frame is written. A socket
     // that went away between the nudge and the write never carried it, so the
     // dispatcher is told to place the call again rather than to give up.
-    const frameSent = this.send(session.socket, this.core.callFrame(stored));
-    if (!frameSent) {
+    if (!this.send(session.socket, this.core.callFrame(stored))) {
       await this.core.undeliver(session.info, callId);
       return;
     }

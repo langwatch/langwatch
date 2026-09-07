@@ -416,8 +416,7 @@ export class LongPollTransportService {
     }
 
     for (const callId of inFlight) {
-      const callStillPending = await store.tryGet(callKey(session.projectId, callId));
-      if (callStillPending) {
+      if (await store.tryGet(callKey(session.projectId, callId))) {
         continue;
       }
 

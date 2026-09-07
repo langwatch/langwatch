@@ -111,8 +111,7 @@ export function tryCreateApiStaticSurface(options: {
   const { environment } = options;
   const clientDistDir = resolveClientDistDir(environment);
 
-  const hasIndexHtml = fs.existsSync(path.join(clientDistDir, "index.html"));
-  if (!hasIndexHtml) {
+  if (!fs.existsSync(path.join(clientDistDir, "index.html"))) {
     options.report(
       "API serves no browser bundle: no index.html under the resolved apps/ui build output. " +
         "Set LANGWATCH_UI_DIST_DIR, or run the apps/ui build.",

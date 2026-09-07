@@ -22,13 +22,13 @@ export function identityEventsFor({
   const { userId, tenantId, commandId, occurredAtMs } = command.data;
   // The ceremony context the adapter stamped (ADR-101 §2: why the row was
   // written) rides as metadata on the attach - never in the fact itself.
-  const ceremonyRequestId =
-    command.type === ATTACH_IDENTIFIER_COMMAND_TYPE ? command.data.ceremony.requestId : undefined;
   const metadata =
     command.type === ATTACH_IDENTIFIER_COMMAND_TYPE
       ? {
           ceremonyFlow: command.data.ceremony.flow,
-          ...(ceremonyRequestId ? { requestId: ceremonyRequestId } : {}),
+          ...(command.data.ceremony.requestId
+            ? { requestId: command.data.ceremony.requestId }
+            : {}),
         }
       : {};
   return facts.map(

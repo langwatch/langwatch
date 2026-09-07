@@ -462,8 +462,8 @@ export function CommandPalette({
         size={inline ? "hero" : "dialog"}
       />
 
-      {inline &&
-        active && (
+      {inline ? (
+        active ? (
           // Overlaid, never in the flow: the home's results are a temporary
           // layer over the page, so opening them cannot push the figures and
           // recent work down and closing them cannot pull them back up.
@@ -490,7 +490,7 @@ export function CommandPalette({
             flexDirection="column"
           >
             {/* The list is the part that scrolls; the footer stays put, since
-              a legend you have to scroll to reach teaches nobody anything. */}
+                a legend you have to scroll to reach teaches nobody anything. */}
             <Box overflowY="auto" minHeight={0} flex="1 1 auto">
               {results}
             </Box>
@@ -498,8 +498,8 @@ export function CommandPalette({
               <CommandBarFooter isMac={isMac} />
             </Box>
           </Box>
-        )}
-      {!inline && (
+        ) : null
+      ) : (
         <>
           {results}
           <HintsSection />

@@ -465,11 +465,11 @@ export class DatasetChunkService {
       }
 
       for (const line of rows) {
-        if (!isChunkLine(line)) continue;
-        if (!remaining.has(line.id)) continue;
-        affected.add(index);
-        locatedIds.add(line.id);
-        remaining.delete(line.id);
+        if (isChunkLine(line) && remaining.has(line.id)) {
+          affected.add(index);
+          locatedIds.add(line.id);
+          remaining.delete(line.id);
+        }
       }
     }
 

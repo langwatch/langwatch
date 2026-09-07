@@ -45,16 +45,6 @@ import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { PageErrorFallback } from "../elements/page-error-fallback.tsx";
 
-/** The banner's alert tone for the message-limit status. */
-function messageLimitAlertStatus(status: string): "error" | "warning" {
-  return status === "exceeded" ? "error" : "warning";
-}
-
-/** The banner's border color for the message-limit status. */
-function messageLimitBorderColor(status: string): string {
-  return status === "exceeded" ? "red.300" : "yellow.300";
-}
-
 export type ShellPageBodyProps = {
   /** Personal-scope routes count the viewer as on their own team. */
   personalScope?: boolean;
@@ -113,14 +103,13 @@ export const ShellPageBody = ({
   // banner even when the team is still resolved from a project visited
   // earlier.
   const isProjectAnchoredRoute = !!project && pathname.startsWith(`/${project.slug}`);
-  const isAdminViewingSomeoneElsesPersonalTeam =
+  const adminViewingAs: { label: string } | null =
     isProjectAnchoredRoute &&
     organizationRole === ORGANIZATION_ADMIN_ROLE &&
-    !!team?.isPersonal &&
-    team.ownerUserId !== user?.id;
-  const adminViewingAs: { label: string } | null = isAdminViewingSomeoneElsesPersonalTeam
-    ? { label: team.name }
-    : null;
+    team?.isPersonal &&
+    team.ownerUserId !== user?.id
+      ? { label: team.name }
+      : null;
   const isPersonalScopeRoute =
     personalScope || pathname.startsWith("/me") || isOnOwnPersonalProject;
 
@@ -134,8 +123,7 @@ export const ShellPageBody = ({
   const isRecording = recordWorkspaceView.isPending;
   const record = recordWorkspaceView.mutate;
   useEffect(() => {
-    const cannotRecordYet = !targetTeamId || !organizationId || !workspaceLabel || isRecording;
-    if (cannotRecordYet) return;
+    if (!targetTeamId || !organizationId || !workspaceLabel || isRecording) return;
     record({
       organizationId,
       targetTeamId,
@@ -191,10 +179,12 @@ export const ShellPageBody = ({
       )}
       {usage.data?.messageLimitInfo && usage.data.messageLimitInfo.status !== "ok" && (
         <Alert.Root
-          status={messageLimitAlertStatus(usage.data.messageLimitInfo.status)}
+          status={usage.data.messageLimitInfo.status === "exceeded" ? "error" : "warning"}
           width="full"
           borderBottom="1px solid"
-          borderBottomColor={messageLimitBorderColor(usage.data.messageLimitInfo.status)}
+          borderBottomColor={
+            usage.data.messageLimitInfo.status === "exceeded" ? "red.300" : "yellow.300"
+          }
         >
           <Alert.Indicator />
           <Alert.Content>

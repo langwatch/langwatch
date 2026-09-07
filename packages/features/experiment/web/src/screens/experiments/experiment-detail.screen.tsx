@@ -63,32 +63,24 @@ export default function ExperimentPage() {
     );
   }
 
-  const isDspy = !!project && experiment.data?.type === ExperimentType.DSPY;
-  const isBatchEvaluation = !!project && experiment.data?.type === ExperimentType.BATCH_EVALUATION;
-  const showsBatchEvaluationResults =
-    !isDspy &&
-    !isBatchEvaluation &&
-    (!project ||
-      experiment.data === undefined ||
-      experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
-      experiment.data.type === ExperimentType.EVALUATIONS_V3);
-
   return (
     <Box width="full">
-      {isDspy && project && <DSPyExperiment project={project} experiment={experiment.data} />}
-      {isBatchEvaluation && project && (
+      {project && experiment.data?.type === ExperimentType.DSPY ? (
+        <DSPyExperiment project={project} experiment={experiment.data} />
+      ) : project && experiment.data?.type === ExperimentType.BATCH_EVALUATION ? (
         <BatchEvaluation project={project} experiment={experiment.data} />
-      )}
-      {showsBatchEvaluationResults && (
+      ) : !project ||
+        experiment.data === undefined ||
+        experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
+        experiment.data.type === ExperimentType.EVALUATIONS_V3 ? (
         <BatchEvaluationResults project={project} experiment={experiment.data} />
-      )}
-      {!isDspy && !isBatchEvaluation && !showsBatchEvaluationResults && (
+      ) : (
         <Box padding={6}>
           <Alert.Root status="warning">
             <Alert.Indicator />
             <Alert.Title>Unknown experiment type</Alert.Title>
             <Alert.Description>
-              This experiment has an unrecognized type: {experiment.data?.type}
+              This experiment has an unrecognized type: {experiment.data.type}
             </Alert.Description>
           </Alert.Root>
         </Box>

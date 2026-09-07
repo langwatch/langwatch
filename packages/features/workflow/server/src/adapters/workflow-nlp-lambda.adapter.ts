@@ -86,8 +86,7 @@ export class NlpInvokeTransportAdapter {
   ) {}
 
   async send(request: NlpInvokeRequest): Promise<NlpInvokeResponse> {
-    const target = this.options.target;
-    if (target.startsWith("arn:aws:lambda")) {
+    if (this.options.target.startsWith("arn:aws:lambda")) {
       return this.invokeLambda(request);
     }
 
@@ -126,11 +125,10 @@ export class NlpInvokeTransportAdapter {
     // actionable error rather than left to OOM the Lambda.
     if (request.body !== undefined) {
       const bodyBytes = Buffer.byteLength(request.body, "utf-8");
-      const maxPayloadBytes = this.options.config.maxPayloadBytes;
-      if (bodyBytes > maxPayloadBytes) {
+      if (bodyBytes > this.options.config.maxPayloadBytes) {
         throw new InvokePayloadTooLargeError({
           bytes: bodyBytes,
-          limit: maxPayloadBytes,
+          limit: this.options.config.maxPayloadBytes,
           path: request.path,
         });
       }

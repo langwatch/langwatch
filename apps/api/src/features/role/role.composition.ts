@@ -182,8 +182,7 @@ function composeTeamPorts(
         // list carrying none never touches the Enterprise capability, and
         // refusing it would break team editing on every deployment that
         // composes no billing store.
-        const assignsCustomRole = input.members.some((member) => isCustomRole(member.role));
-        if (!assignsCustomRole) return;
+        if (!input.members.some((member) => isCustomRole(member.role))) return;
         logger.warn(
           { organizationId: input.organizationId },
           "no Enterprise plan gate is composed: refusing a member list that assigns a custom role",

@@ -20,84 +20,73 @@ const USER_GESTURE_WINDOW_MS = 700;
 /** The keys that move a scroller upward. */
 const UPWARD_KEYS = new Set(["ArrowUp", "PageUp", "Home"]);
 
-/** Mutable tracking state for one scroller's gesture watch. */
-interface GestureState {
-  lastUpwardAt: number;
-  touchY: number | null;
-  drag: { isOnScrollbar: boolean; topEdge: number; pointerId: number } | null;
-}
-
-function markUpward(state: GestureState): void {
-  state.lastUpwardAt = nowInstant().epochMilliseconds;
-}
-
-function onGestureWheel(event: WheelEvent, state: GestureState): void {
-  if (event.deltaY < 0) markUpward(state);
-}
-
-function onGestureKeyDown(event: KeyboardEvent, state: GestureState): void {
-  if (UPWARD_KEYS.has(event.key)) markUpward(state);
-}
-
-function onGestureTouchStart(event: TouchEvent, state: GestureState): void {
-  state.touchY = event.touches[0]?.clientY ?? null;
-}
-
-function onGestureTouchMove(event: TouchEvent, state: GestureState): void {
-  const y = event.touches[0]?.clientY;
-  if (y === undefined) return;
-  // A finger travelling DOWN the glass drags the column up.
-  if (state.touchY !== null && y > state.touchY) markUpward(state);
-  state.touchY = y;
-}
-
-// Touch reports its own direction above, so a resting finger is not a drag.
-function onGesturePointerDown(event: PointerEvent, state: GestureState, el: HTMLElement): void {
-  if (event.pointerType === "touch") return;
-  state.drag = {
-    isOnScrollbar: event.target === el,
-    topEdge: el.getBoundingClientRect().top,
-    pointerId: event.pointerId,
-  };
-}
-
-// `drag` is tested on its own rather than through `drag?.pointerId`, which reads
-// the same and is not: the types promise every pointer event carries a
-// `pointerId`, a synthetic one need not, and two undefineds comparing equal
-// walks straight into the null.
-function onGesturePointerMove(event: PointerEvent, state: GestureState): void {
-  const drag = state.drag;
-  if (!drag || event.pointerId !== drag.pointerId) return;
-  if (drag.isOnScrollbar || event.clientY < drag.topEdge) markUpward(state);
-}
-
-function onGesturePointerUp(event: PointerEvent, state: GestureState): void {
-  if (state.drag && event.pointerId === state.drag.pointerId) state.drag = null;
-}
-
 /**
  * Answers one question about a scroller: could the reader be the cause of the upward
  * movement being reported right now?
  */
 function trackReaderGestures(el: HTMLElement) {
   const controller = new AbortController();
-  const state: GestureState = { lastUpwardAt: 0, touchY: null, drag: null };
-  const opts = { passive: true, signal: controller.signal };
+  let lastUpwardAt = 0;
+  let touchY: number | null = null;
+  let drag: {
+    isOnScrollbar: boolean;
+    topEdge: number;
+    pointerId: number;
+  } | null = null;
 
-  el.addEventListener("wheel", (event) => onGestureWheel(event, state), opts);
-  el.addEventListener("keydown", (event) => onGestureKeyDown(event, state), opts);
-  el.addEventListener("touchstart", (event) => onGestureTouchStart(event, state), opts);
-  el.addEventListener("touchmove", (event) => onGestureTouchMove(event, state), opts);
-  el.addEventListener("pointerdown", (event) => onGesturePointerDown(event, state, el), opts);
+  const onWheel = (event: WheelEvent) => {
+    if (event.deltaY < 0) lastUpwardAt = nowInstant().epochMilliseconds;
+  };
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (UPWARD_KEYS.has(event.key)) lastUpwardAt = nowInstant().epochMilliseconds;
+  };
+  const onTouchStart = (event: TouchEvent) => {
+    touchY = event.touches[0]?.clientY ?? null;
+  };
+  const onTouchMove = (event: TouchEvent) => {
+    const y = event.touches[0]?.clientY;
+    if (y === undefined) return;
+    // A finger travelling DOWN the glass drags the column up.
+    if (touchY !== null && y > touchY) lastUpwardAt = nowInstant().epochMilliseconds;
+    touchY = y;
+  };
+  // Touch reports its own direction above, so a resting finger is not a drag.
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.pointerType === "touch") return;
+    drag = {
+      isOnScrollbar: event.target === el,
+      topEdge: el.getBoundingClientRect().top,
+      pointerId: event.pointerId,
+    };
+  };
+  // `drag` is tested on its own rather than through `drag?.pointerId`, which
+  // reads the same and is not: the types promise every pointer event carries a
+  // `pointerId`, a synthetic one need not, and two undefineds comparing equal
+  // walks straight into the null.
+  const onPointerMove = (event: PointerEvent) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (drag.isOnScrollbar || event.clientY < drag.topEdge) {
+      lastUpwardAt = nowInstant().epochMilliseconds;
+    }
+  };
+  const onPointerUp = (event: PointerEvent) => {
+    if (drag && event.pointerId === drag.pointerId) drag = null;
+  };
+
+  const opts = { passive: true, signal: controller.signal };
+  el.addEventListener("wheel", onWheel, opts);
+  el.addEventListener("keydown", onKeyDown, opts);
+  el.addEventListener("touchstart", onTouchStart, opts);
+  el.addEventListener("touchmove", onTouchMove, opts);
+  el.addEventListener("pointerdown", onPointerDown, opts);
   // On the window: only the PRESS has to land on the column, and the rest of
   // the drag is followed wherever it goes.
-  window.addEventListener("pointermove", (event) => onGesturePointerMove(event, state), opts);
-  window.addEventListener("pointerup", (event) => onGesturePointerUp(event, state), opts);
-  window.addEventListener("pointercancel", (event) => onGesturePointerUp(event, state), opts);
+  window.addEventListener("pointermove", onPointerMove, opts);
+  window.addEventListener("pointerup", onPointerUp, opts);
+  window.addEventListener("pointercancel", onPointerUp, opts);
 
   return {
-    droveTheColumnUp: () =>
-      nowInstant().epochMilliseconds - state.lastUpwardAt <= USER_GESTURE_WINDOW_MS,
+    droveTheColumnUp: () => nowInstant().epochMilliseconds - lastUpwardAt <= USER_GESTURE_WINDOW_MS,
     dispose: () => controller.abort(),
   };
 }
@@ -115,136 +104,6 @@ export interface LangyStickToBottom {
   canScroll: boolean;
   /** Return to the live edge and re-engage auto-follow. */
   jumpToLatest: () => void;
-}
-
-type MeasureFn = (el: HTMLElement) => { atBottom: boolean; overflows: boolean };
-
-/**
- * The instant path never needs `scrollIntoView` — assigning `scrollTop` is exactly as
- * correct, has no dependency on the element being laid out, and is the only thing that
- * works when the platform has no smooth scrolling to offer. Reduced-motion users and
- * non-browser environments land here.
- */
-function performScrollToEnd(
-  el: HTMLElement,
-  end: HTMLElement | null,
-  behavior: ScrollBehavior,
-): void {
-  if (behavior !== "smooth" || !end?.scrollIntoView) {
-    el.scrollTop = el.scrollHeight;
-    return;
-  }
-  end.scrollIntoView({ behavior: "smooth", block: "end", inline: "nearest" });
-}
-
-/**
- * The pin is RELEASED by scrolling up, and RE-ENGAGED by arriving at the bottom. Nothing
- * else touches it.
- */
-function attachScrollPinTracking(
-  el: HTMLElement,
-  measure: MeasureFn,
-  setPinned: (next: boolean) => void,
-  setCanScroll: (next: boolean) => void,
-): () => void {
-  let lastTop = el.scrollTop;
-  const gestures = trackReaderGestures(el);
-
-  const onScroll = () => {
-    const { atBottom, overflows } = measure(el);
-    const movedUp = el.scrollTop < lastTop - 1;
-    lastTop = el.scrollTop;
-
-    setCanScroll(overflows);
-    if (atBottom) setPinned(true);
-    else if (movedUp && gestures.droveTheColumnUp()) setPinned(false);
-  };
-
-  onScroll();
-  el.addEventListener("scroll", onScroll, { passive: true });
-  return () => {
-    gestures.dispose();
-    el.removeEventListener("scroll", onScroll);
-  };
-}
-
-/** Content got taller (a token, a card, a status line, anything) — follow it, but only
- *  if we still hold the pin. */
-function attachResizeFollow({
-  el,
-  content,
-  measure,
-  setCanScroll,
-  enabled,
-  pinnedRef,
-  scrollToEnd,
-  reduceMotion,
-}: {
-  el: HTMLElement;
-  content: HTMLElement;
-  measure: MeasureFn;
-  setCanScroll: (next: boolean) => void;
-  enabled: boolean;
-  pinnedRef: React.RefObject<boolean>;
-  scrollToEnd: (behavior: ScrollBehavior) => void;
-  reduceMotion: boolean;
-}): (() => void) | undefined {
-  if (typeof ResizeObserver === "undefined") return undefined;
-  const observer = new ResizeObserver(() => {
-    setCanScroll(measure(el).overflows);
-    if (!enabled || !pinnedRef.current) return;
-    scrollToEnd(reduceMotion ? "auto" : "smooth");
-  });
-  observer.observe(content);
-  return () => observer.disconnect();
-}
-
-function computeScrollMeasure(el: HTMLElement): { atBottom: boolean; overflows: boolean } {
-  const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-  return {
-    atBottom: distanceFromBottom <= BOTTOM_THRESHOLD_PX,
-    overflows: el.scrollHeight - el.clientHeight > 1,
-  };
-}
-
-// The ref is what the ResizeObserver reads (it fires outside React's render, and
-// must see the CURRENT value, not one closed over at subscribe time); the state
-// is what the UI renders. Kept in lockstep here.
-function updatePinnedState(
-  pinnedRef: React.RefObject<boolean>,
-  setIsPinned: (updater: (prev: boolean) => boolean) => void,
-  next: boolean,
-): void {
-  pinnedRef.current = next;
-  setIsPinned((prev) => (prev === next ? prev : next));
-}
-
-/**
- * Bring the live edge into view, smoothly. The guard is a SEPARATE flag, not
- * `frameRef.current !== null`, and it is raised BEFORE the rAF is requested.
- */
-function scheduleScrollToEnd({
-  frameRef,
-  scheduledRef,
-  scrollRef,
-  endRef,
-  behavior,
-}: {
-  frameRef: React.RefObject<number | null>;
-  scheduledRef: React.RefObject<boolean>;
-  scrollRef: React.RefObject<HTMLDivElement | null>;
-  endRef: React.RefObject<HTMLDivElement | null>;
-  behavior: ScrollBehavior;
-}): void {
-  if (scheduledRef.current) return;
-  scheduledRef.current = true;
-  frameRef.current = requestAnimationFrame(() => {
-    scheduledRef.current = false;
-    frameRef.current = null;
-    const el = scrollRef.current;
-    if (!el) return;
-    performScrollToEnd(el, endRef.current, behavior);
-  });
 }
 
 export function useLangyStickToBottom({
@@ -272,18 +131,49 @@ export function useLangyStickToBottom({
   const [isPinned, setIsPinned] = useState(true);
   const [canScroll, setCanScroll] = useState(false);
 
-  const setPinned = useCallback(
-    (next: boolean) => updatePinnedState(pinnedRef, setIsPinned, next),
-    [],
-  );
+  const setPinned = useCallback((next: boolean) => {
+    pinnedRef.current = next;
+    setIsPinned((prev) => (prev === next ? prev : next));
+  }, []);
 
-  const measure = useCallback(computeScrollMeasure, []);
+  const measure = useCallback((el: HTMLElement) => {
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    return {
+      atBottom: distanceFromBottom <= BOTTOM_THRESHOLD_PX,
+      overflows: el.scrollHeight - el.clientHeight > 1,
+    };
+  }, []);
 
-  const scrollToEnd = useCallback(
-    (behavior: ScrollBehavior) =>
-      scheduleScrollToEnd({ frameRef, scheduledRef, scrollRef, endRef, behavior }),
-    [],
-  );
+  /**
+   * Bring the live edge into view, smoothly.
+   */
+  const scrollToEnd = useCallback((behavior: ScrollBehavior) => {
+    // The guard is a SEPARATE flag, not `frameRef.current !== null`, and it is raised
+    // BEFORE the rAF is requested.
+    if (scheduledRef.current) return;
+    scheduledRef.current = true;
+    frameRef.current = requestAnimationFrame(() => {
+      scheduledRef.current = false;
+      frameRef.current = null;
+      const el = scrollRef.current;
+      const end = endRef.current;
+      if (!el) return;
+
+      // The instant path never needs `scrollIntoView` — assigning `scrollTop` is
+      // exactly as correct, has no dependency on the element being laid out, and
+      // is the only thing that works when the platform has no smooth scrolling
+      // to offer. Reduced-motion users and non-browser environments land here.
+      if (behavior !== "smooth" || !end?.scrollIntoView) {
+        el.scrollTop = el.scrollHeight;
+        return;
+      }
+      end.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+        inline: "nearest",
+      });
+    });
+  }, []);
 
   useEffect(
     () => () => {
@@ -297,26 +187,48 @@ export function useLangyStickToBottom({
     scrollToEnd(reduceMotion ? "auto" : "smooth");
   }, [reduceMotion, scrollToEnd, setPinned]);
 
+  /**
+   * The pin is RELEASED by scrolling up, and RE-ENGAGED by arriving at the bottom.
+   * Nothing else touches it.
+   */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    return attachScrollPinTracking(el, measure, setPinned, setCanScroll);
+    let lastTop = el.scrollTop;
+    const gestures = trackReaderGestures(el);
+
+    const onScroll = () => {
+      const { atBottom, overflows } = measure(el);
+      const movedUp = el.scrollTop < lastTop - 1;
+      lastTop = el.scrollTop;
+
+      setCanScroll(overflows);
+      if (atBottom) setPinned(true);
+      else if (movedUp && gestures.droveTheColumnUp()) setPinned(false);
+    };
+
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      gestures.dispose();
+      el.removeEventListener("scroll", onScroll);
+    };
   }, [measure, setPinned]);
 
+  // Content got taller (a token, a card, a status line, anything) — follow it,
+  // but only if we still hold the pin.
   useEffect(() => {
     const el = scrollRef.current;
     const content = contentRef.current;
-    if (!el || !content) return;
-    return attachResizeFollow({
-      el,
-      content,
-      measure,
-      setCanScroll,
-      enabled,
-      pinnedRef,
-      scrollToEnd,
-      reduceMotion,
+    if (!el || !content || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      setCanScroll(measure(el).overflows);
+      if (!enabled || !pinnedRef.current) return;
+      scrollToEnd(reduceMotion ? "auto" : "smooth");
     });
+    observer.observe(content);
+    return () => observer.disconnect();
   }, [measure, reduceMotion, scrollToEnd, enabled]);
 
   return { scrollRef, contentRef, endRef, isPinned, canScroll, jumpToLatest };

@@ -37,8 +37,7 @@ function fakeRedis(): GithubRedisPort & { store: Map<string, string> } {
     },
     async trySet(k, v, ...args) {
       // NX semantics for the lock path: refuse if present.
-      const nxRefused = args.includes("NX") && store.has(k);
-      if (nxRefused) return null;
+      if (args.includes("NX") && store.has(k)) return null;
       store.set(k, String(v));
       return "OK";
     },
@@ -362,8 +361,7 @@ describe("listPullRequestsForHead", () => {
     it("mints a repository-scoped token that can only read pull requests", async () => {
       const svc = GithubAppTokenAdapter.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
-        const isAccessTokenRequest = String(url).includes("/access_tokens");
-        if (isAccessTokenRequest) {
+        if (String(url).includes("/access_tokens")) {
           return new Response(
             JSON.stringify({
               token: "ghs_read",
@@ -397,8 +395,7 @@ describe("listPullRequestsForHead", () => {
     it("asks for the branch's pull requests in any state", async () => {
       const svc = GithubAppTokenAdapter.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
-        const isAccessTokenRequest = String(url).includes("/access_tokens");
-        if (isAccessTokenRequest) {
+        if (String(url).includes("/access_tokens")) {
           return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
             status: 201,
             headers: { "Content-Type": "application/json" },
@@ -456,8 +453,7 @@ describe("listPullRequestsForHead", () => {
     it("reports a rate limit, not a permission failure", async () => {
       const svc = GithubAppTokenAdapter.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
-        const isAccessTokenRequest = String(url).includes("/access_tokens");
-        if (isAccessTokenRequest) {
+        if (String(url).includes("/access_tokens")) {
           return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
             status: 201,
             headers: { "Content-Type": "application/json" },
@@ -489,8 +485,7 @@ describe("listPullRequestsForHead", () => {
     it("reports it as unreachable rather than as an unknown failure", async () => {
       const svc = GithubAppTokenAdapter.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
-        const isAccessTokenRequest = String(url).includes("/access_tokens");
-        if (isAccessTokenRequest) {
+        if (String(url).includes("/access_tokens")) {
           return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
             status: 201,
             headers: { "Content-Type": "application/json" },

@@ -58,8 +58,7 @@ function collectPackageSources(root: string): string[] {
       found.push(...collectPackageSources(full));
       continue;
     }
-    const isSourceFile = entry.name.endsWith(".ts") || entry.name.endsWith(".tsx");
-    if (isSourceFile) found.push(full);
+    if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) found.push(full);
   }
   return found;
 }

@@ -52,8 +52,7 @@ class FakeRedis {
   }
 
   async sismember(key: string, member: string): Promise<number> {
-    const isMember = (this.sets.get(key) ?? []).includes(member);
-    return isMember ? 1 : 0;
+    return (this.sets.get(key) ?? []).includes(member) ? 1 : 0;
   }
 
   async hget(key: string, field: string): Promise<string | null> {

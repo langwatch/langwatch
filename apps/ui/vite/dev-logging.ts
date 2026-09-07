@@ -48,8 +48,7 @@ export function devLogLine({
 function proxyFailurePath(message: string): string | null {
   const http = /http proxy error: (\S*)/.exec(stripAnsi(message));
   if (http) return http[1] ?? "";
-  const isWsProxyError = /\bws proxy (socket )?error\b/.test(stripAnsi(message));
-  if (isWsProxyError) return "the websocket upgrade";
+  if (/\bws proxy (socket )?error\b/.test(stripAnsi(message))) return "the websocket upgrade";
   return null;
 }
 

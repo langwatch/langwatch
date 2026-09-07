@@ -30,21 +30,6 @@ function findJsonObjectEnd(text: string, start: number): number {
   return -1;
 }
 
-/** Parses one inline-scanned JSON slice into a block, or null when it's not a real block. */
-function tryConsumeInlineJsonBlock(slice: string): ContentBlock | null {
-  try {
-    const parsed: unknown = JSON.parse(slice);
-    if (isRecord(parsed) && typeof parsed.type === "string") {
-      const blocks = parseContentBlocks([parsed]);
-      const block = blocks[0];
-      if (block && block.kind !== "raw") return block;
-    }
-  } catch {
-    // Keep malformed inline objects as text.
-  }
-  return null;
-}
-
 export function extractInlineBlocks(content: string): ContentBlock[] {
   if (!content) return [];
   const out: ContentBlock[] = [];
@@ -78,12 +63,24 @@ export function extractInlineBlocks(content: string): ContentBlock[] {
       continue;
     }
 
-    const block = tryConsumeInlineJsonBlock(slice);
-    if (block) {
-      textBuffer += content.slice(cursor, nextBrace);
-      flushText();
-      out.push(block);
-    } else {
+    let consumed = false;
+    try {
+      const parsed: unknown = JSON.parse(slice);
+      if (isRecord(parsed) && typeof parsed.type === "string") {
+        const blocks = parseContentBlocks([parsed]);
+        const block = blocks[0];
+        if (block && block.kind !== "raw") {
+          textBuffer += content.slice(cursor, nextBrace);
+          flushText();
+          out.push(block);
+          consumed = true;
+        }
+      }
+    } catch {
+      // Keep malformed inline objects as text.
+    }
+
+    if (!consumed) {
       textBuffer += content.slice(cursor, end + 1);
     }
     cursor = end + 1;
@@ -94,9 +91,7 @@ export function extractInlineBlocks(content: string): ContentBlock[] {
 }
 
 /**
- * Parses `trimmed` (already known to look like a JSON object or array) into content
- * blocks, but only when doing so actually produces structure worth having — a real
- * block type, or a single non-raw record.
+ * Parses `trimmed` (already known to look like a JSON object or array) into content blocks, but only when doing so actually produces structure worth having — a real block type, or a single non-raw record.
  */
 function tryParseNestedJsonTextBlock(trimmed: string): ContentBlock[] | null {
   try {
@@ -131,107 +126,37 @@ function tryParseJsonContentBlocks(trimmed: string): ContentBlock[] | null {
   }
 }
 
-function parseTextPart(obj: Record<string, unknown>): ContentBlock[] {
-  const text = typeof obj.text === "string" ? obj.text : "";
-  if (!text) return [];
-  const trimmed = text.trim();
-  const isBracedObject =
-    trimmed.length > 0 && trimmed[0] === "{" && trimmed[trimmed.length - 1] === "}";
-  if (isBracedObject && trimmed.includes('"type":"')) {
-    const nestedBlocks = tryParseNestedJsonTextBlock(trimmed);
-    if (nestedBlocks) return nestedBlocks;
-  }
-  return [{ kind: "text", text }];
-}
+export function parseContentBlocks(content: ChatMessage["content"]): ContentBlock[] {
+  if (content == null) return [];
+  if (typeof content === "string") {
+    if (content.length === 0) return [];
+    const trimmed = content.trim();
 
-function parseThinkingPart(obj: Record<string, unknown>): ContentBlock[] {
-  const text =
-    (typeof obj.thinking === "string" && obj.thinking) ||
-    (typeof obj.text === "string" && obj.text) ||
-    "";
-  return text ? [{ kind: "thinking", text }] : [];
-}
-
-function parseToolUsePart(obj: Record<string, unknown>): ContentBlock[] {
-  return [
-    {
-      kind: "tool_use",
-      id: typeof obj.id === "string" ? obj.id : undefined,
-      name: typeof obj.name === "string" ? obj.name : "tool",
-      input: obj.input,
-    },
-  ];
-}
-
-function parseToolResultPart(obj: Record<string, unknown>): ContentBlock[] {
-  return [
-    {
-      kind: "tool_result",
-      toolUseId: typeof obj.tool_use_id === "string" ? obj.tool_use_id : undefined,
-      content: obj.content,
-      isError: obj.is_error === true,
-    },
-  ];
-}
-
-function parseMediaPart(obj: Record<string, unknown>): ContentBlock[] {
-  const media = mediaPartToMediaData(obj);
-  return media ? [{ kind: "media", part: media }] : [{ kind: "raw", data: obj }];
-}
-
-const MEDIA_PART_TYPES = new Set([
-  "input_audio",
-  "audio",
-  "file",
-  "binary",
-  "image_url",
-  "image",
-  "video",
-  "document",
-]);
-
-/** Parses one typed content-part record into the zero or more blocks it produces. */
-function parseOneContentPart(obj: Record<string, unknown>): ContentBlock[] {
-  const type = typeof obj.type === "string" ? obj.type : "";
-  switch (type) {
-    case "text":
-      return parseTextPart(obj);
-    case "thinking":
-    case "reasoning":
-      return parseThinkingPart(obj);
-    case "tool_use":
-      return parseToolUsePart(obj);
-    case "tool_result":
-      return parseToolResultPart(obj);
-    default:
-      return MEDIA_PART_TYPES.has(type) ? parseMediaPart(obj) : [{ kind: "raw", data: obj }];
-  }
-}
-
-function parseStringContentBlocks(content: string): ContentBlock[] {
-  if (content.length === 0) return [];
-  const trimmed = content.trim();
-
-  const looksLikeObject = trimmed.startsWith("{") && trimmed.endsWith("}");
-  const looksLikeArray = trimmed.startsWith("[") && trimmed.endsWith("]");
-  if (looksLikeObject || looksLikeArray) {
-    const jsonBlocks = tryParseJsonContentBlocks(trimmed);
-    if (jsonBlocks) {
-      return jsonBlocks;
+    const looksLikeObject = trimmed.startsWith("{") && trimmed.endsWith("}");
+    const looksLikeArray = trimmed.startsWith("[") && trimmed.endsWith("]");
+    if (looksLikeObject || looksLikeArray) {
+      const jsonBlocks = tryParseJsonContentBlocks(trimmed);
+      if (jsonBlocks) {
+        return jsonBlocks;
+      }
     }
-  }
 
-  if (content.includes('"type":"')) {
-    const inline = extractInlineBlocks(content);
-    if (inline.some((b) => b.kind !== "text" && b.kind !== "raw")) {
-      return inline;
+    if (content.includes('"type":"')) {
+      const inline = extractInlineBlocks(content);
+      if (inline.some((b) => b.kind !== "text" && b.kind !== "raw")) {
+        return inline;
+      }
     }
+
+    return [{ kind: "text", text: content }];
+  }
+  if (!Array.isArray(content)) {
+    if (isRecord(content)) {
+      return parseContentBlocks([content]);
+    }
+    return [];
   }
 
-  return [{ kind: "text", text: content }];
-}
-
-function parseArrayContentBlocks(content: unknown[]): ContentBlock[] {
   const out: ContentBlock[] = [];
   for (const part of content) {
     if (typeof part === "string") {
@@ -239,16 +164,72 @@ function parseArrayContentBlocks(content: unknown[]): ContentBlock[] {
       continue;
     }
     if (!isRecord(part)) continue;
-    out.push(...parseOneContentPart(part));
+
+    const obj = part;
+    const type = typeof obj.type === "string" ? obj.type : "";
+    switch (type) {
+      case "text": {
+        const text = typeof obj.text === "string" ? obj.text : "";
+        if (!text) break;
+        const trimmed = text.trim();
+        const isBracedObject =
+          trimmed.length > 0 && trimmed[0] === "{" && trimmed[trimmed.length - 1] === "}";
+        if (isBracedObject && trimmed.includes('"type":"')) {
+          const nestedBlocks = tryParseNestedJsonTextBlock(trimmed);
+          if (nestedBlocks) {
+            out.push(...nestedBlocks);
+            break;
+          }
+        }
+        out.push({ kind: "text", text });
+        break;
+      }
+      case "thinking":
+      case "reasoning": {
+        const text =
+          (typeof obj.thinking === "string" && obj.thinking) ||
+          (typeof obj.text === "string" && obj.text) ||
+          "";
+        if (text) out.push({ kind: "thinking", text });
+        break;
+      }
+      case "tool_use": {
+        out.push({
+          kind: "tool_use",
+          id: typeof obj.id === "string" ? obj.id : undefined,
+          name: typeof obj.name === "string" ? obj.name : "tool",
+          input: obj.input,
+        });
+        break;
+      }
+      case "tool_result": {
+        out.push({
+          kind: "tool_result",
+          toolUseId: typeof obj.tool_use_id === "string" ? obj.tool_use_id : undefined,
+          content: obj.content,
+          isError: obj.is_error === true,
+        });
+        break;
+      }
+      case "input_audio":
+      case "audio":
+      case "file":
+      case "binary":
+      case "image_url":
+      case "image":
+      case "video":
+      case "document": {
+        const media = mediaPartToMediaData(obj);
+        if (media) {
+          out.push({ kind: "media", part: media });
+          break;
+        }
+        out.push({ kind: "raw", data: obj });
+        break;
+      }
+      default:
+        out.push({ kind: "raw", data: obj });
+    }
   }
   return out;
-}
-
-export function parseContentBlocks(content: ChatMessage["content"]): ContentBlock[] {
-  if (content == null) return [];
-  if (typeof content === "string") return parseStringContentBlocks(content);
-  if (!Array.isArray(content)) {
-    return isRecord(content) ? parseContentBlocks([content]) : [];
-  }
-  return parseArrayContentBlocks(content);
 }

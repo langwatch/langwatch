@@ -116,11 +116,8 @@ function walk(dir: string, out: string[] = []): string[] {
     if (entry.isDirectory()) {
       if (entry.name === "node_modules") continue;
       walk(path, out);
-    } else {
-      const isSourceFile = /\.tsx?$/.test(entry.name) && !isTestFile(path);
-      if (isSourceFile) {
-        out.push(path);
-      }
+    } else if (/\.tsx?$/.test(entry.name) && !isTestFile(path)) {
+      out.push(path);
     }
   }
   return out;

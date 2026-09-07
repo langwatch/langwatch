@@ -30,13 +30,6 @@ function donatedMessage(cause: unknown): string | undefined {
   return typeof message === "string" && message.length > 0 ? message : undefined;
 }
 
-/** The handled error a cause carries, either directly or as a validation failure. */
-function handledErrorFrom(cause: unknown) {
-  if (HandledError.isHandled(cause)) return cause;
-  if (isZodLikeError(cause)) return ValidationError.fromZodError(cause);
-  return null;
-}
-
 function isInheritedFromCause(message: string, cause: unknown): boolean {
   let current = cause;
   for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth++) {
@@ -64,15 +57,18 @@ export function createTrpcErrorFormatter(
     shape: TRPCDefaultErrorShape;
     error: { cause?: unknown; message?: string; code?: string };
   }) {
-    const handled = handledErrorFrom(error.cause);
+    const handled = HandledError.isHandled(error.cause)
+      ? error.cause
+      : isZodLikeError(error.cause)
+        ? ValidationError.fromZodError(error.cause)
+        : null;
     const isInternalServerError =
       error.code === "INTERNAL_SERVER_ERROR" || shape?.data?.code === "INTERNAL_SERVER_ERROR";
-    let message = shape.message;
-    if (handled) {
-      message = handled.code;
-    } else if (isInternalServerError) {
-      message = HandledError.toUserMessage(error.cause);
-    }
+    const message = handled
+      ? handled.code
+      : isInternalServerError
+        ? HandledError.toUserMessage(error.cause)
+        : shape.message;
     const isAuthoredMessage =
       !handled &&
       !isInternalServerError &&

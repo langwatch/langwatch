@@ -348,9 +348,9 @@ export function AnnotationList({
         </Button>
       </HStack>
 
-      {isLoading && <AnnotationTableSkeleton />}
-
-      {!isLoading && pageRows.length === 0 && (
+      {isLoading ? (
+        <AnnotationTableSkeleton />
+      ) : pageRows.length === 0 ? (
         <NoDataInfoBlock
           title={copy.noDataTitle}
           description={copy.noDataDescription}
@@ -369,9 +369,7 @@ export function AnnotationList({
           }
           icon={<SquarePen />}
         />
-      )}
-
-      {!isLoading && pageRows.length > 0 && (
+      ) : (
         <>
           {/* The one element that scrolls sideways: the header controls above
               and the pager below stay put however wide the columns get. */}

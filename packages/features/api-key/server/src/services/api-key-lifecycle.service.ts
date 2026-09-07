@@ -118,9 +118,10 @@ export class ApiKeyLifecycleService {
 
   async update(input: UpdateApiKeyInput): Promise<ApiKey> {
     const existing = await this.getInOrganization(input.id, input.organizationId);
-    const touchesSystemName =
-      SYSTEM_NAMES.has(existing.name) || (input.name !== void 0 && SYSTEM_NAMES.has(input.name));
-    if (touchesSystemName) {
+    if (
+      SYSTEM_NAMES.has(existing.name) ||
+      (input.name !== void 0 && SYSTEM_NAMES.has(input.name))
+    ) {
       throw new ApiKeyNotFoundError(input.id);
     }
 

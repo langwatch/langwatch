@@ -34,8 +34,7 @@ function locatePackageSource(): string | null {
   // already been downloaded.
   let dir = __dirname;
   for (let i = 0; i < 6; i++) {
-    const hasApiPackageJson = existsSync(join(dir, "apps", "api", "package.json"));
-    if (hasApiPackageJson) return dir;
+    if (existsSync(join(dir, "apps", "api", "package.json"))) return dir;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -140,9 +139,8 @@ export function restoreShellScriptBits(root: string): number {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (entry.name === "node_modules" || entry.name === ".git") continue;
       const p = join(dir, entry.name);
-      const isShellScript = entry.isFile() && entry.name.endsWith(".sh");
       if (entry.isDirectory()) walk(p);
-      else if (isShellScript) {
+      else if (entry.isFile() && entry.name.endsWith(".sh")) {
         chmodSync(p, 0o755);
         restored++;
       }
@@ -162,8 +160,7 @@ export function appRoot(): string {
   // (i.e. there's a version marker). Otherwise fall back to the source —
   // either dev mode (no relocation needed) or pre-relocation lookup
   // during the install phase itself.
-  const hasRelocatedVersionMarker = existsSync(join(paths.app, ".installed-version"));
-  if (hasRelocatedVersionMarker) {
+  if (existsSync(join(paths.app, ".installed-version"))) {
     return paths.app;
   }
   const src = locatePackageSource();

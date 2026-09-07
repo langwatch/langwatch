@@ -31,13 +31,6 @@ interface CompatSession {
   expires: string;
 }
 
-/** The session's expiry as the compat shape wants it: an ISO-ish string. */
-function expiresAtDisplay(expiresAt: unknown): string {
-  if (expiresAt instanceof Date) return expiresAt.toISOString();
-  if (typeof expiresAt === "string") return expiresAt;
-  return nowInstant().toString({ fractionalSecondDigits: 3 });
-}
-
 const adaptSession = (data: unknown): CompatSession | null => {
   if (!data || typeof data !== "object") return null;
   const raw = data as {
@@ -59,7 +52,12 @@ const adaptSession = (data: unknown): CompatSession | null => {
       pendingSsoSetup: (user.pendingSsoSetup as boolean | undefined) ?? false,
       impersonator: user.impersonator as CompatSession["user"]["impersonator"],
     },
-    expires: expiresAtDisplay(expiresAt),
+    expires:
+      expiresAt instanceof Date
+        ? expiresAt.toISOString()
+        : typeof expiresAt === "string"
+          ? expiresAt
+          : nowInstant().toString({ fractionalSecondDigits: 3 }),
   };
 };
 
@@ -137,12 +135,7 @@ export const useSession = (
     };
   }, []);
 
-  let status: SessionStatus = "unauthenticated";
-  if (isPending) {
-    status = "loading";
-  } else if (data) {
-    status = "authenticated";
-  }
+  const status: SessionStatus = isPending ? "loading" : data ? "authenticated" : "unauthenticated";
 
   useEffect(() => {
     if (options?.required && status === "unauthenticated" && options.onUnauthenticated) {
@@ -252,8 +245,7 @@ export const signIn = async (
   }
   // For providers where BetterAuth returned a redirect URL but didn't
   // auto-navigate (some fetch modes), follow it ourselves.
-  const dataHasUrl = !!result.data && typeof result.data === "object" && "url" in result.data;
-  if (shouldRedirect && dataHasUrl) {
+  if (shouldRedirect && result.data && typeof result.data === "object" && "url" in result.data) {
     const url = (result.data as { url?: string }).url;
     if (url) {
       navigate(url);

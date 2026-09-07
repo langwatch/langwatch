@@ -31,8 +31,9 @@ export function getTokenType(token: string): ApiKeyTokenType {
   if (token.startsWith(INGEST_KEY_PREFIX)) return "apiKey";
   if (!token.startsWith(API_KEY_PREFIX)) return "unknown";
 
-  const hasValidBody = API_KEY_BODY_REGEX.test(token.slice(API_KEY_PREFIX.length));
-  return hasValidBody ? "apiKey" : "legacyProjectKey";
+  return API_KEY_BODY_REGEX.test(token.slice(API_KEY_PREFIX.length))
+    ? "apiKey"
+    : "legacyProjectKey";
 }
 
 export const apiKeyTokenResolutionInputSchema = z

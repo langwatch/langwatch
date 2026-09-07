@@ -165,26 +165,24 @@ export function WorkflowAutosave({
 
   return (
     <Box paddingLeft={2}>
-      {isSaving && (
+      {isSaving ? (
         <HStack>
           <Spinner size="xs" />
           <Text fontSize="13px">Saving...</Text>
         </HStack>
-      )}
-      {!isSaving && hasSaveError && (
+      ) : hasSaveError ? (
         <HStack color="status.error">
           <X size={16} />
           <Text fontSize="13px">Failed to autosave</Text>
         </HStack>
-      )}
-      {!isSaving && !hasSaveError && recentlySaved && (
+      ) : recentlySaved ? (
         <HStack>
           <Box color="status.success">
             <Check width="16px" height="16px" />
           </Box>
           <Text fontSize="13px">Saved</Text>
         </HStack>
-      )}
+      ) : null}
     </Box>
   );
 }

@@ -15,8 +15,7 @@ export function canonicalV1Path(path: string): string | null {
   const rest = path.slice("/api".length);
   if (rest === "" || rest === "/") return null;
   const segments = rest.split("/").filter((segment) => segment.length > 0);
-  const hasVersionSegment = segments.some((segment) => VERSION_SEGMENT.test(segment));
-  if (hasVersionSegment) return null;
+  if (segments.some((segment) => VERSION_SEGMENT.test(segment))) return null;
   return `${V1_PREFIX}${rest}`;
 }
 

@@ -177,13 +177,12 @@ export class GithubBranchMappingService {
   }
 
   private tryScope(address: BranchAddress): BranchScope | null {
-    const host = this.deps.host;
-    const isUnscopable =
-      !host.isMappable(address.repositoryHost) ||
+    if (
+      !this.deps.host.isMappable(address.repositoryHost) ||
       !address.headBranch ||
       !address.repositoryOwner ||
-      !address.repositoryName;
-    if (isUnscopable) {
+      !address.repositoryName
+    ) {
       return null;
     }
 

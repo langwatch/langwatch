@@ -95,8 +95,7 @@ export function readAuditPeriod(
 ): AuditPeriodReading {
   const start = query.startDate;
   const end = query.endDate;
-  const hasExplicitRange = !!start && !!end && isReadableDate(start) && isReadableDate(end);
-  if (hasExplicitRange && start && end) {
+  if (start && end && isReadableDate(start) && isReadableDate(end)) {
     const startDate = Temporal.Instant.fromEpochMilliseconds(toEpochMs(start));
     const endDate = Temporal.Instant.fromEpochMilliseconds(toEpochMs(end));
     return {

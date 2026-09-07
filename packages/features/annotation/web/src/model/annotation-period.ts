@@ -102,8 +102,7 @@ export function readAnnotationPeriod({
 }): AnnotationPeriodReading {
   const start = query.startDate;
   const end = query.endDate;
-  const hasExplicitRange = !!start && !!end && isValidDateString(start) && isValidDateString(end);
-  if (hasExplicitRange && start && end) {
+  if (start && end && isValidDateString(start) && isValidDateString(end)) {
     const startDate = readableDate(start);
     const endDate = readableDate(end);
     return {
@@ -133,10 +132,8 @@ export function absolutePeriodAddress({
   startDate: AnnotationPeriodMoment;
   endDate: AnnotationPeriodMoment;
 }): Record<string, string | undefined> {
-  const endDateInvalid = Number.isNaN(endDate.getTime());
-  const safeEnd = endDateInvalid ? toDate(nowInstant()) : endDate;
-  const startDateInvalid = Number.isNaN(startDate.getTime());
-  const candidate = startDateInvalid ? toDate(nowInstant()) : startDate;
+  const safeEnd = Number.isNaN(endDate.getTime()) ? toDate(nowInstant()) : endDate;
+  const candidate = Number.isNaN(startDate.getTime()) ? toDate(nowInstant()) : startDate;
   const safeStart = candidate > safeEnd ? safeEnd : candidate;
   return {
     ...current,

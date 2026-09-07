@@ -154,13 +154,11 @@ export class VerificationCeremonyService {
       throw new IdentityVerificationExpiredError();
     }
 
-    const tokenHashMatches = safeEqual(sha256Hex(token), record.tokenHash);
-    if (!tokenHashMatches) {
+    if (!safeEqual(sha256Hex(token), record.tokenHash)) {
       refuse("token hash mismatch");
     }
 
-    const pkceChallengeMatches = safeEqual(s256Challenge(codeVerifier), record.codeChallenge);
-    if (!pkceChallengeMatches) {
+    if (!safeEqual(s256Challenge(codeVerifier), record.codeChallenge)) {
       refuse("PKCE verifier does not match the bound challenge");
     }
 

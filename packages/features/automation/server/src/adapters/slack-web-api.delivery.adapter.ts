@@ -151,8 +151,9 @@ async function postSlackChatMessage(
   if (body.ok) return;
 
   const code = body.error ?? "unknown_error";
-  const responseMessages = body.response_metadata?.messages;
-  const detail = responseMessages?.length ? ` (${responseMessages.join("; ")})` : "";
+  const detail = body.response_metadata?.messages?.length
+    ? ` (${body.response_metadata.messages.join("; ")})`
+    : "";
   const explanation = explainSlackPostError(code);
   throw new DispatchError({
     message: `${label}: ${explanation ?? `Slack rejected the message: ${code}`}${detail}`,

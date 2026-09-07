@@ -158,8 +158,7 @@ export function authoredMessage(error: unknown): string | undefined {
 
   const message = (error as { message?: unknown } | null)?.message;
   if (typeof message !== "string" || message.length === 0) return void 0;
-  const looksLikeMachineCode = SLUG_SHAPED.test(message) || SCREAMING_CASE.test(message);
-  if (looksLikeMachineCode) return void 0;
+  if (SLUG_SHAPED.test(message) || SCREAMING_CASE.test(message)) return void 0;
   if (message.length > MAX_AUTHORED_LENGTH) return void 0;
   if (MACHINE_PROSE.test(message)) return void 0;
 

@@ -63,6 +63,5 @@ export async function startLangevals(
 
 function locateProject(name: string): string | null {
   const dir = join(appRoot(), name);
-  const hasProjectFile = existsSync(join(dir, "pyproject.toml"));
-  return hasProjectFile ? dir : null;
+  return existsSync(join(dir, "pyproject.toml")) ? dir : null;
 }

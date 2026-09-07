@@ -160,9 +160,8 @@ export class GraphAlertDispatchService {
   }
 
   private async sendSlack(input: GraphAlertDispatchInput): Promise<GraphAlertDispatchResult> {
-    const slackTemplateType = input.trigger.templates.slackTemplateType;
     const templateType: SlackTemplateType =
-      slackTemplateType === "block_kit" ? "block_kit" : "string";
+      input.trigger.templates.slackTemplateType === "block_kit" ? "block_kit" : "string";
 
     if (input.botDestination) {
       const destination = `slack-bot:${input.botDestination.channel}`;

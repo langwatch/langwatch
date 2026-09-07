@@ -111,9 +111,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
   // maxMessagesPerMonth check also covers metered plans that now return a real
   // count.
   const currentCount = usage.data.currentMonthMessagesCount;
-  const maxMessagesPerMonth = usage.data.activePlan.maxMessagesPerMonth;
-  const hasNoBar = currentCount === null || maxMessagesPerMonth >= UNLIMITED_MESSAGES;
-  if (hasNoBar) {
+  if (currentCount === null || usage.data.activePlan.maxMessagesPerMonth >= UNLIMITED_MESSAGES) {
     return null;
   }
 

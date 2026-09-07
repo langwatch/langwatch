@@ -149,8 +149,7 @@ const workerManagedClickHouseClientFactory: ClickHouseClientFactory<
 export class WorkerClickHouseInfrastructure {
   static create(options: WorkerClickHouseInfrastructureOptions): WorkerClickHouseInfrastructure {
     const sharedUrl = options.clickhouse.url?.trim();
-    const hasNoPrivateRoutes = options.clickhouse.privateRoutes.length === 0;
-    if (!sharedUrl && hasNoPrivateRoutes) {
+    if (!sharedUrl && options.clickhouse.privateRoutes.length === 0) {
       throw new Error(
         "Worker ClickHouse infrastructure requires a configured endpoint: set CLICKHOUSE_URL, or a CLICKHOUSE_URL__<label>__<organizationId> route.",
       );

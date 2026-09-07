@@ -123,11 +123,11 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
     workflow: ServerWorkflow,
     resolutions: readonly WorkflowLlmParameterResolution[],
   ): StudioClientEvent {
-    if (event.type === "execute_optimization") {
-      const llm = event.payload.params.llm;
-      if (llm) {
-        event.payload.params.llm = this.enrichLlm({ llm, resolutions });
-      }
+    if (event.type === "execute_optimization" && event.payload.params.llm) {
+      event.payload.params.llm = this.enrichLlm({
+        llm: event.payload.params.llm,
+        resolutions,
+      });
     }
 
     return this.attachWorkflow(event, workflow);
@@ -165,15 +165,12 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
       }),
     );
 
-    if (event.type === "execute_optimization") {
-      const optimizationLlm = event.payload.params.llm;
-      if (optimizationLlm) {
-        if (!optimizationLlm.model) {
-          throw new LlmModelNotSetError();
-        }
-
-        parameters.push({ llm: optimizationLlm });
+    if (event.type === "execute_optimization" && event.payload.params.llm) {
+      if (!event.payload.params.llm.model) {
+        throw new LlmModelNotSetError();
       }
+
+      parameters.push({ llm: event.payload.params.llm });
     }
 
     return parameters;

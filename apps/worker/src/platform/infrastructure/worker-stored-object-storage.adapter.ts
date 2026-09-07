@@ -240,8 +240,7 @@ function parseFileUri(uri: string): string {
     throw new Error(`Worker filesystem storage received a non-file URI: "${uri}"`);
   }
   const decoded = decodeURIComponent(new URL(uri).pathname);
-  const hasParentSegment = decoded.split("/").includes("..");
-  if (hasParentSegment) {
+  if (decoded.split("/").includes("..")) {
     throw new Error("Worker filesystem storage refuses a path containing a '..' segment");
   }
   return path.resolve(decoded);

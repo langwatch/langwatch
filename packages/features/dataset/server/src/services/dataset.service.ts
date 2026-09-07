@@ -112,11 +112,11 @@ export class DatasetService extends DatasetServiceContract {
         slug,
         columnTypes: parsed.columnTypes,
       };
-      const columnTypesChanged =
-        JSON.stringify(existing.columnTypes) !== JSON.stringify(parsed.columnTypes);
-      const needsContentMigration =
-        existing.contentLayout === "s3_jsonl" && this.options.content && columnTypesChanged;
-      if (needsContentMigration) {
+      if (
+        existing.contentLayout === "s3_jsonl" &&
+        this.options.content &&
+        JSON.stringify(existing.columnTypes) !== JSON.stringify(parsed.columnTypes)
+      ) {
         return this.options.content.updateColumns({
           dataset: existing,
           projectId: parsed.projectId,

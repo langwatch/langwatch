@@ -115,24 +115,6 @@ export type ApiAuthCliDeviceFlowOptions = Readonly<{
   refreshTokenTtlSeconds?: number | undefined;
 }>;
 
-type RequiredDeviceFlowPorts = {
-  redis: RedisConnection;
-  prisma: PrismaClient;
-  session: (request: Request) => Promise<{ id: string } | null>;
-  apiKeys: ApiKeyService;
-  organizations: OrganizationApp;
-  authz: AuthzService;
-  featureFlags: FeatureFlagService;
-};
-
-/** Narrows to the device-grant ports only when every one of them is present. */
-function hasAllDeviceFlowPorts(
-  options: ApiAuthCliDeviceFlowOptions,
-): options is ApiAuthCliDeviceFlowOptions & RequiredDeviceFlowPorts {
-  const { redis, prisma, session, apiKeys, organizations, authz, featureFlags } = options;
-  return Boolean(redis && prisma && session && apiKeys && organizations && authz && featureFlags);
-}
-
 /**
  * Composes the device-grant ports, or none.
  *
@@ -144,10 +126,10 @@ function hasAllDeviceFlowPorts(
 export function composeApiAuthCliDeviceFlow(
   options: ApiAuthCliDeviceFlowOptions,
 ): AuthCliDeviceFlowRestPorts | undefined {
-  if (!hasAllDeviceFlowPorts(options)) {
+  const { redis, prisma, session, apiKeys, organizations, authz, featureFlags } = options;
+  if (!redis || !prisma || !session || !apiKeys || !organizations || !authz || !featureFlags) {
     return undefined;
   }
-  const { redis, prisma, session, apiKeys, organizations, authz, featureFlags } = options;
 
   const resolveSession: CliBrowserSessionPort = async (request) => {
     const actor = await session(request);

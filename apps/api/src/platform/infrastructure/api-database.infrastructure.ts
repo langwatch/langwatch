@@ -51,8 +51,7 @@ export class ApiDatabaseInfrastructure {
   static tryCreate(
     options: ApiDatabaseInfrastructureOptions & { report?: ApiDatabaseAbsenceReportPort },
   ): ApiDatabaseInfrastructure | undefined {
-    const hasUrl = Boolean(options.database.url?.trim());
-    if (!hasUrl) {
+    if (!options.database.url?.trim()) {
       options.report?.absent();
       return undefined;
     }

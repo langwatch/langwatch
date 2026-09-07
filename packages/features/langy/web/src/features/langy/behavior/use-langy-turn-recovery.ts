@@ -53,114 +53,6 @@ export function turnHadSideEffects(messages: ToolBearingMessage[]): boolean {
   );
 }
 
-interface RecoveryRefs {
-  attemptsUsedRef: React.RefObject<number>;
-  handledFailureRef: React.RefObject<{ kind: string; id: unknown } | null>;
-  timerRef: React.RefObject<ReturnType<typeof setTimeout> | null>;
-  onRetryRef: React.RefObject<() => void>;
-  sideEffectsObservedRef: React.RefObject<boolean>;
-}
-
-/**
- * Decides and arms (or clears) the retry timer for the current failure. See the "NO
- * CLEANUP, on purpose" note at the call site — this function's job ends the moment it
- * returns; every legitimate cancellation path clears the timer by hand instead.
- */
-function runRecoveryEffect({
-  errorKind,
-  errorId,
-  enabled,
-  refs,
-  clearTimer,
-  setPending,
-}: {
-  errorKind: string | null;
-  errorId: unknown;
-  enabled: boolean;
-  refs: RecoveryRefs;
-  clearTimer: () => void;
-  setPending: (next: { kind: string; attempt: number } | null) => void;
-}): void {
-  // The failure cleared (the retry got going, or the user moved on): drop the
-  // pending state but KEEP the attempt count — the chain is still open until
-  // the user sends something new, so a policy of "2 attempts" stays 2.
-  if (!errorKind || !enabled) {
-    clearTimer();
-    refs.handledFailureRef.current = null;
-    setPending(null);
-    return;
-  }
-
-  // Same failure, same classification: we already decided what to do with it,
-  // so don't re-arm on every render. A CHANGED kind is a different decision
-  // even on the same Error object — see `handledFailureRef`.
-  const handled = refs.handledFailureRef.current;
-  if (handled && handled.id === errorId && handled.kind === errorKind) return;
-  refs.handledFailureRef.current = { kind: errorKind, id: errorId };
-
-  const attemptsUsed = refs.attemptsUsedRef.current;
-  if (
-    !canAutoRecover({
-      kind: errorKind,
-      attemptsUsed,
-      sideEffectsObserved: refs.sideEffectsObservedRef.current,
-    })
-  ) {
-    // Terminal kind, exhausted budget, or a turn that already changed
-    // something: the caller falls through to the error card.
-    clearTimer();
-    setPending(null);
-    return;
-  }
-
-  const policy = langyRecoveryPolicy(errorKind);
-  const attempt = attemptsUsed + 1;
-
-  clearTimer();
-  setPending({ kind: errorKind, attempt });
-  refs.timerRef.current = setTimeout(() => {
-    clearTimer();
-    // LAST-MOMENT SAFETY RE-READ. Everything else the policy weighs was settled when
-    // the timer armed; this one was not.
-    if (refs.sideEffectsObservedRef.current) {
-      setPending(null);
-      return;
-    }
-    refs.attemptsUsedRef.current = attempt;
-    setPending(null);
-    // `regenerate` clears useChat's error and flips status to "submitted", so
-    // the panel hands straight over to its normal thinking indicator.
-    refs.onRetryRef.current();
-  }, policy.delayMs(attempt));
-}
-
-function buildTurnRecoveryHandle(
-  pending: { kind: string; attempt: number } | null,
-  willAutoRecover: boolean,
-  errorKind: string | null,
-  reset: () => void,
-): LangyTurnRecovery {
-  if (!pending) {
-    return {
-      isRecovering: false,
-      willAutoRecover,
-      message: null,
-      attempt: 0,
-      attempts: errorKind ? langyRecoveryPolicy(errorKind).attempts : 0,
-      reset,
-    };
-  }
-  const policy = langyRecoveryPolicy(pending.kind);
-  return {
-    isRecovering: true,
-    willAutoRecover,
-    message: policy.recoveringMessage,
-    attempt: pending.attempt,
-    attempts: policy.attempts,
-    reset,
-  };
-}
-
 export function useLangyTurnRecovery({
   errorKind,
   errorId,
@@ -217,14 +109,57 @@ export function useLangyTurnRecovery({
   }, [clearTimer]);
 
   useEffect(() => {
-    const refs: RecoveryRefs = {
-      attemptsUsedRef,
-      handledFailureRef,
-      timerRef,
-      onRetryRef,
-      sideEffectsObservedRef,
-    };
-    runRecoveryEffect({ errorKind, errorId, enabled, refs, clearTimer, setPending });
+    // The failure cleared (the retry got going, or the user moved on): drop the
+    // pending state but KEEP the attempt count — the chain is still open until
+    // the user sends something new, so a policy of "2 attempts" stays 2.
+    if (!errorKind || !enabled) {
+      clearTimer();
+      handledFailureRef.current = null;
+      setPending(null);
+      return;
+    }
+
+    // Same failure, same classification: we already decided what to do with it,
+    // so don't re-arm on every render. A CHANGED kind is a different decision
+    // even on the same Error object — see `handledFailureRef`.
+    const handled = handledFailureRef.current;
+    if (handled && handled.id === errorId && handled.kind === errorKind) return;
+    handledFailureRef.current = { kind: errorKind, id: errorId };
+
+    const attemptsUsed = attemptsUsedRef.current;
+    if (
+      !canAutoRecover({
+        kind: errorKind,
+        attemptsUsed,
+        sideEffectsObserved: sideEffectsObservedRef.current,
+      })
+    ) {
+      // Terminal kind, exhausted budget, or a turn that already changed
+      // something: the caller falls through to the error card.
+      clearTimer();
+      setPending(null);
+      return;
+    }
+
+    const policy = langyRecoveryPolicy(errorKind);
+    const attempt = attemptsUsed + 1;
+
+    clearTimer();
+    setPending({ kind: errorKind, attempt });
+    timerRef.current = setTimeout(() => {
+      clearTimer();
+      // LAST-MOMENT SAFETY RE-READ. Everything else the policy weighs was settled when
+      // the timer armed; this one was not.
+      if (sideEffectsObservedRef.current) {
+        setPending(null);
+        return;
+      }
+      attemptsUsedRef.current = attempt;
+      setPending(null);
+      // `regenerate` clears useChat's error and flips status to "submitted", so
+      // the panel hands straight over to its normal thinking indicator.
+      onRetryRef.current();
+    }, policy.delayMs(attempt));
 
     // NO CLEANUP, on purpose. An armed timer belongs to the FAILURE (identified
     // by kind + `errorId`), not to this effect instance, and every way a retry
@@ -258,8 +193,26 @@ export function useLangyTurnRecovery({
     });
 
   // MEMOISED so the handle is as stable as the state behind it.
-  return useMemo(
-    () => buildTurnRecoveryHandle(pending, willAutoRecover, errorKind, reset),
-    [pending, willAutoRecover, errorKind, reset],
-  );
+  return useMemo(() => {
+    if (!pending) {
+      return {
+        isRecovering: false,
+        willAutoRecover,
+        message: null,
+        attempt: 0,
+        attempts: errorKind ? langyRecoveryPolicy(errorKind).attempts : 0,
+        reset,
+      };
+    }
+
+    const policy = langyRecoveryPolicy(pending.kind);
+    return {
+      isRecovering: true,
+      willAutoRecover,
+      message: policy.recoveringMessage,
+      attempt: pending.attempt,
+      attempts: policy.attempts,
+      reset,
+    };
+  }, [pending, willAutoRecover, errorKind, reset]);
 }

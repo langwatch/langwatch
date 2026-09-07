@@ -152,8 +152,7 @@ export class GraphTriggerAlertDeliveryService {
   }
 
   private async rollbackRetryableClaim(plan: GraphEvaluationPlan, claimId: string, error: unknown) {
-    const dispatchErrors = plan.request.deps.dispatchErrors;
-    if (dispatchErrors.isTerminal(error)) {
+    if (plan.request.deps.dispatchErrors.isTerminal(error)) {
       return;
     }
 

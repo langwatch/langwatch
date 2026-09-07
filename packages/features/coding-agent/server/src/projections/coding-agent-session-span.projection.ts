@@ -201,16 +201,15 @@ export class CodingAgentSessionSpanProjection {
     traceCanonicalisation: TraceCanonicalisationService,
   ): Record<string, unknown> {
     const cacheWriteTokens = this.stateProjection.number(attrs.cache_creation_tokens);
-    const { cacheWritesLongLived } = traceCanonicalisation.classifyClaudeCall({
-      llmRequestContext: this.stateProjection.string(attrs["llm_request.context"]),
-      querySource: this.stateProjection.string(attrs.query_source),
-    });
-    const hasLongLivedCacheWrites = cacheWriteTokens > 0 && cacheWritesLongLived;
     return {
       ...attrs,
       "gen_ai.usage.cache_read.input_tokens": this.stateProjection.number(attrs.cache_read_tokens),
       "gen_ai.usage.cache_creation.input_tokens": cacheWriteTokens,
-      ...(hasLongLivedCacheWrites
+      ...(cacheWriteTokens > 0 &&
+      traceCanonicalisation.classifyClaudeCall({
+        llmRequestContext: this.stateProjection.string(attrs["llm_request.context"]),
+        querySource: this.stateProjection.string(attrs.query_source),
+      }).cacheWritesLongLived
         ? { "gen_ai.usage.cache_creation_1h.input_tokens": cacheWriteTokens }
         : {}),
     };

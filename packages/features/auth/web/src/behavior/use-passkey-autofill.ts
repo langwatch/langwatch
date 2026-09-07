@@ -112,9 +112,7 @@ export function usePasskeyAutofill({
       interacted = true;
       // A click straight into the field, or a keystroke while already in it
       // (the entrance autofocuses, so typing is often the FIRST gesture).
-      const inWebauthnField =
-        isWebauthnField(event.target) || isWebauthnField(document.activeElement);
-      if (inWebauthnField) {
+      if (isWebauthnField(event.target) || isWebauthnField(document.activeElement)) {
         offerOnce();
       }
     };

@@ -53,8 +53,7 @@ export function getStaticModelCostRates(): readonly ModelCostRate[] {
 
   const rates = Object.entries(llmModels.models)
     .flatMap(([modelId, model]): ModelCostRate[] => {
-      const isExcludedFromRates = isCodexModel(modelId) || !hasPrice(model.pricing);
-      if (isExcludedFromRates) {
+      if (isCodexModel(modelId) || !hasPrice(model.pricing)) {
         return [];
       }
 

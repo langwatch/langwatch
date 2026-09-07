@@ -26,9 +26,11 @@ export function ProjectPullRequestsScreen() {
         </Text>
       </VStack>
 
-      {!isResolved && <Skeleton height="180px" borderRadius="md" />}
-      {isResolved && project && <PullRequestsTable projectId={project.id} />}
-      {isResolved && !project && (
+      {!isResolved ? (
+        <Skeleton height="180px" borderRadius="md" />
+      ) : project ? (
+        <PullRequestsTable projectId={project.id} />
+      ) : (
         <Text fontSize="sm" color="fg.muted">
           No pull requests yet
         </Text>

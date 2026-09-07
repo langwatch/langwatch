@@ -184,10 +184,7 @@ export class LangyTurnSettlementWaiterService {
       conversationId: input.conversationId,
       turnId: input.turnId,
     });
-    const hasTerminalFrame = reads.some(({ entry }) =>
-      LangyTurnSettlementWaiterService.isTerminalFrame(entry),
-    );
-    if (hasTerminalFrame) {
+    if (reads.some(({ entry }) => LangyTurnSettlementWaiterService.isTerminalFrame(entry))) {
       return;
     }
 

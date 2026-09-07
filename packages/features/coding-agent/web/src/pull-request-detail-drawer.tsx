@@ -115,19 +115,17 @@ export function PullRequestDetailDrawer({
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          {detailQuery.isLoading && (
+          {detailQuery.isLoading ? (
             <VStack align="stretch" gap={4}>
               <Skeleton height="72px" borderRadius="md" />
               <Skeleton height="160px" borderRadius="md" />
               <Skeleton height="160px" borderRadius="md" />
             </VStack>
-          )}
-          {!detailQuery.isLoading && (detailQuery.isError || !detail) && (
+          ) : detailQuery.isError || !detail ? (
             <Text fontSize="sm" color="fg.error">
               Couldn&apos;t load this pull request
             </Text>
-          )}
-          {!detailQuery.isLoading && !detailQuery.isError && detail && (
+          ) : (
             <VStack align="stretch" gap={6}>
               <SummaryRow detail={detail} />
               <ContributorsSection contributors={detail.contributors} />
@@ -150,48 +148,6 @@ const Stat: React.FC<{ label: string; children: React.ReactNode }> = ({ label, c
   </VStack>
 );
 
-const TokenCostStat: React.FC<{
-  totals: DetailPayload["totals"];
-  isBundled: boolean;
-  nonBilled: number;
-}> = ({ totals, isBundled, nonBilled }) => {
-  if (totals.costUsd === null) {
-    return (
-      <Text fontSize="lg" fontWeight="medium" color="fg.subtle">
-        {MISSING_VALUE}
-      </Text>
-    );
-  }
-
-  if (isBundled) {
-    // Bundled money is the same list price as any other, so it reads
-    // the same and explains itself on hover instead.
-    return (
-      <Tooltip
-        content={
-          <CostBreakdownTooltipContent
-            isBundled
-            billedCost={totals.billedCostUsd ?? 0}
-            nonBilledCost={nonBilled}
-            grandCost={totals.costUsd}
-          />
-        }
-      >
-        {/* The split lives only in the hover, so it gets a tab stop. */}
-        <Text fontSize="lg" fontWeight="medium" cursor="help" tabIndex={0}>
-          {formatCost(totals.costUsd)}
-        </Text>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <Text fontSize="lg" fontWeight="medium">
-      {formatCost(totals.costUsd)}
-    </Text>
-  );
-};
-
 const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
   const totals = detail.totals;
   const nonBilled = totals.nonBilledCostUsd ?? 0;
@@ -211,7 +167,33 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
           </Text>
         </Stat>
         <Stat label="Token cost">
-          <TokenCostStat totals={totals} isBundled={isBundled} nonBilled={nonBilled} />
+          {totals.costUsd === null ? (
+            <Text fontSize="lg" fontWeight="medium" color="fg.subtle">
+              {MISSING_VALUE}
+            </Text>
+          ) : isBundled ? (
+            // Bundled money is the same list price as any other, so it reads
+            // the same and explains itself on hover instead.
+            <Tooltip
+              content={
+                <CostBreakdownTooltipContent
+                  isBundled
+                  billedCost={totals.billedCostUsd ?? 0}
+                  nonBilledCost={nonBilled}
+                  grandCost={totals.costUsd}
+                />
+              }
+            >
+              {/* The split lives only in the hover, so it gets a tab stop. */}
+              <Text fontSize="lg" fontWeight="medium" cursor="help" tabIndex={0}>
+                {formatCost(totals.costUsd)}
+              </Text>
+            </Tooltip>
+          ) : (
+            <Text fontSize="lg" fontWeight="medium">
+              {formatCost(totals.costUsd)}
+            </Text>
+          )}
         </Stat>
         <Stat label="Opened">
           <Text fontSize="lg" fontWeight="medium">

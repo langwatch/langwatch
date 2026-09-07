@@ -40,16 +40,9 @@ let pulseClearTimer: ReturnType<typeof setTimeout> | null = null;
 const REFRESH_REQUEST_TIMEOUT_MS = 15_000;
 let refreshRequestTimer: ReturnType<typeof setTimeout> | null = null;
 
-type RefreshUISet = (
-  partial:
-    | RefreshUIState
-    | Partial<RefreshUIState>
-    | ((state: RefreshUIState) => RefreshUIState | Partial<RefreshUIState>),
-  replace?: false,
-) => void;
-
-function pulseAction(set: RefreshUISet): RefreshUIState["pulse"] {
-  return (durationMs = 900) => {
+export const useRefreshUIStore = create<RefreshUIState>((set) => ({
+  isRefreshing: false,
+  pulse: (durationMs = 900) => {
     if (pulseClearTimer) {
       clearTimeout(pulseClearTimer);
     }
@@ -58,11 +51,12 @@ function pulseAction(set: RefreshUISet): RefreshUIState["pulse"] {
       pulseClearTimer = null;
       set({ isRefreshing: false });
     }, durationMs);
-  };
-}
-
-function requestRefreshAction(set: RefreshUISet): RefreshUIState["requestRefresh"] {
-  return () => {
+  },
+  isReplacingData: false,
+  setReplacingData: (value) => set({ isReplacingData: value }),
+  refreshRequested: false,
+  refreshSawFetch: false,
+  requestRefresh: () => {
     if (refreshRequestTimer) {
       clearTimeout(refreshRequestTimer);
     }
@@ -71,11 +65,8 @@ function requestRefreshAction(set: RefreshUISet): RefreshUIState["requestRefresh
       refreshRequestTimer = null;
       set((s) => (s.refreshRequested ? { refreshRequested: false, refreshSawFetch: false } : s));
     }, REFRESH_REQUEST_TIMEOUT_MS);
-  };
-}
-
-function observeFetchingAction(set: RefreshUISet): RefreshUIState["observeFetching"] {
-  return (fetching) =>
+  },
+  observeFetching: (fetching) =>
     set((s) => {
       if (!s.refreshRequested) {
         return s;
@@ -91,16 +82,5 @@ function observeFetchingAction(set: RefreshUISet): RefreshUIState["observeFetchi
         return { refreshRequested: false, refreshSawFetch: false };
       }
       return s;
-    });
-}
-
-export const useRefreshUIStore = create<RefreshUIState>((set) => ({
-  isRefreshing: false,
-  pulse: pulseAction(set),
-  isReplacingData: false,
-  setReplacingData: (value) => set({ isReplacingData: value }),
-  refreshRequested: false,
-  refreshSawFetch: false,
-  requestRefresh: requestRefreshAction(set),
-  observeFetching: observeFetchingAction(set),
+    }),
 }));

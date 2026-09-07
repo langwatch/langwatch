@@ -46,8 +46,7 @@ export class GithubBranchDemandService {
   private constructor(private readonly deps: GithubBranchDemandDeps) {}
 
   async request(request: BranchMappingRequest): Promise<void> {
-    const host = this.deps.host;
-    if (!host.isMappable(request.repositoryHost)) {
+    if (!this.deps.host.isMappable(request.repositoryHost)) {
       return;
     }
 

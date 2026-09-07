@@ -27,8 +27,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const parametersOf = (node: MigrationNode): MigrationParameter[] | undefined => {
   const { parameters } = node.data;
-  const isValidParameterArray = Array.isArray(parameters) && parameters.every(isRecord);
-  return isValidParameterArray ? parameters : undefined;
+  return Array.isArray(parameters) && parameters.every(isRecord) ? parameters : undefined;
 };
 
 const updateParameters = (

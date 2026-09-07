@@ -192,8 +192,9 @@ export function GroupDetailDialog({
         </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body pb={6}>
-          {detail.isLoading && <Spinner />}
-          {!detail.isLoading && d && (
+          {detail.isLoading ? (
+            <Spinner />
+          ) : !d ? null : (
             <VStack gap={5} align="stretch">
               {canManage && !d.scimSource && (
                 <Input

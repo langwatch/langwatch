@@ -875,19 +875,13 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
         if (normalized1.prompt !== normalized2.prompt) {
           differences.push("prompt content differs");
         }
-        const messagesDiffer =
-          JSON.stringify(normalized1.messages) !== JSON.stringify(normalized2.messages);
-        if (messagesDiffer) {
+        if (JSON.stringify(normalized1.messages) !== JSON.stringify(normalized2.messages)) {
           differences.push("messages differ");
         }
-        const inputsDiffer =
-          JSON.stringify(normalized1.inputs) !== JSON.stringify(normalized2.inputs);
-        if (inputsDiffer) {
+        if (JSON.stringify(normalized1.inputs) !== JSON.stringify(normalized2.inputs)) {
           differences.push("inputs differ");
         }
-        const outputsDiffer =
-          JSON.stringify(normalized1.outputs) !== JSON.stringify(normalized2.outputs);
-        if (outputsDiffer) {
+        if (JSON.stringify(normalized1.outputs) !== JSON.stringify(normalized2.outputs)) {
           differences.push("outputs differ");
         }
         if (normalized1.temperature !== normalized2.temperature) {

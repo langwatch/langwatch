@@ -69,9 +69,7 @@ export function evaluateGatewayReuse({
     };
   }
 
-  const matchesExpectedControlPlane =
-    normalizeUrl(probe.controlPlaneBaseUrl) === normalizeUrl(expectedControlPlaneUrl);
-  if (matchesExpectedControlPlane) {
+  if (normalizeUrl(probe.controlPlaneBaseUrl) === normalizeUrl(expectedControlPlaneUrl)) {
     return { verdict: "ok", warning: null };
   }
 

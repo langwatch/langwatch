@@ -137,9 +137,9 @@ const DEFAULT_PERSISTED: PersistedShape = {
 };
 
 /**
- * Resolve the global first-trace-tour flag from a persisted blob, migrating the old
- * per-project map: "fired in any project" reads as globally seen, so existing users
- * aren't re-toured after the migration.
+ * Resolve the global first-trace-tour flag from a persisted blob, migrating the old per-project map: if the
+ * stored shape predates the global flag, treat "fired in any project" as globally seen so existing users on this
+ * browser aren't re-toured after the migration.
  */
 function firstTraceFiredFrom(raw: unknown): boolean {
   if (typeof raw !== "object" || raw === null) return false;
@@ -155,59 +155,49 @@ function firstTraceFiredFrom(raw: unknown): boolean {
   );
 }
 
-/** Parses the current-shape storage key, or `null` when absent/unrecognized. */
-function parseCurrentShape(stored: string | null): PersistedShape | null {
-  if (!stored) return null;
-  const parsed = JSON.parse(stored) as Partial<PersistedShape>;
-  if (!parsed.setupDismissedByProject || typeof parsed.setupDismissedByProject !== "object") {
-    return null;
-  }
-  return {
-    setupDismissedByProject: parsed.setupDismissedByProject,
-    integrationCtaDismissedAtByProject:
-      parsed.integrationCtaDismissedAtByProject &&
-      typeof parsed.integrationCtaDismissedAtByProject === "object"
-        ? parsed.integrationCtaDismissedAtByProject
-        : {},
-    firstTraceSpotlightFired: firstTraceFiredFrom(parsed),
-    seenDrawerSpotlights:
-      parsed.seenDrawerSpotlights && typeof parsed.seenDrawerSpotlights === "object"
-        ? parsed.seenDrawerSpotlights
-        : {},
-  };
-}
-
-/**
- * Migrates from the old uiStore shape. The old shape was `{ sidebarCollapsed,
- * setupDismissedByProject }`; we pull just the dismissal map and leave
- * `sidebarCollapsed` alone for `uiStore` to keep using.
- */
-function parseLegacyShape(legacy: string | null): PersistedShape | null {
-  if (!legacy) return null;
-  const parsed = JSON.parse(legacy) as Partial<PersistedShape>;
-  if (!parsed.setupDismissedByProject || typeof parsed.setupDismissedByProject !== "object") {
-    return null;
-  }
-  return {
-    setupDismissedByProject: parsed.setupDismissedByProject,
-    integrationCtaDismissedAtByProject: {},
-    firstTraceSpotlightFired: false,
-    seenDrawerSpotlights: {},
-  };
-}
-
 function loadPersisted(): PersistedShape {
   if (typeof window === "undefined") return DEFAULT_PERSISTED;
   try {
-    return (
-      parseCurrentShape(localStorage.getItem(STORAGE_KEY)) ??
-      parseLegacyShape(localStorage.getItem(LEGACY_UI_STORE_KEY)) ??
-      DEFAULT_PERSISTED
-    );
+    // Prefer the new key.
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Partial<PersistedShape>;
+      if (parsed.setupDismissedByProject && typeof parsed.setupDismissedByProject === "object") {
+        return {
+          setupDismissedByProject: parsed.setupDismissedByProject,
+          integrationCtaDismissedAtByProject:
+            parsed.integrationCtaDismissedAtByProject &&
+            typeof parsed.integrationCtaDismissedAtByProject === "object"
+              ? parsed.integrationCtaDismissedAtByProject
+              : {},
+          firstTraceSpotlightFired: firstTraceFiredFrom(parsed),
+          seenDrawerSpotlights:
+            parsed.seenDrawerSpotlights && typeof parsed.seenDrawerSpotlights === "object"
+              ? parsed.seenDrawerSpotlights
+              : {},
+        };
+      }
+    }
+    // Migrate from the old uiStore shape on first load. The old
+    // shape was `{ sidebarCollapsed, setupDismissedByProject }`; we
+    // pull just the dismissal map and leave sidebarCollapsed alone
+    // for `uiStore` to keep using.
+    const legacy = localStorage.getItem(LEGACY_UI_STORE_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy) as Partial<PersistedShape>;
+      if (parsed.setupDismissedByProject && typeof parsed.setupDismissedByProject === "object") {
+        return {
+          setupDismissedByProject: parsed.setupDismissedByProject,
+          integrationCtaDismissedAtByProject: {},
+          firstTraceSpotlightFired: false,
+          seenDrawerSpotlights: {},
+        };
+      }
+    }
   } catch {
     // storage parse failure — fall through to defaults
-    return DEFAULT_PERSISTED;
   }
+  return DEFAULT_PERSISTED;
 }
 
 function persist({
@@ -234,33 +224,22 @@ function persist({
 
 const initial = loadPersisted();
 
-type OnboardingSet = (
-  partial:
-    | OnboardingState
-    | Partial<OnboardingState>
-    | ((state: OnboardingState) => OnboardingState | Partial<OnboardingState>),
-  replace?: false,
-) => void;
-type OnboardingGet = () => OnboardingState;
+export const useOnboardingStore = create<OnboardingState>((set, get) => ({
+  stage: INITIAL_STAGE,
+  arrivedAt: null,
+  history: [],
+  replayToken: 0,
+  setupDismissedByProject: initial.setupDismissedByProject,
+  setupDisengaged: false,
+  tourActive: false,
+  integrationCtaDismissedAtByProject: initial.integrationCtaDismissedAtByProject,
+  showSamplePreview: false,
+  spotlightsActive: false,
+  currentSpotlightId: null,
+  firstTraceSpotlightFired: initial.firstTraceSpotlightFired,
+  seenDrawerSpotlights: initial.seenDrawerSpotlights,
 
-type OnboardingActionKeys =
-  | "setStage"
-  | "goBack"
-  | "replayStage"
-  | "reset"
-  | "setSetupDismissedForProject"
-  | "setSetupDisengaged"
-  | "setTourActive"
-  | "setIntegrationCtaDismissedAt"
-  | "clearIntegrationCtaDismissed"
-  | "setShowSamplePreview"
-  | "setSpotlightsActive"
-  | "setCurrentSpotlightId"
-  | "markFirstTraceSpotlightFired"
-  | "markDrawerSpotlightSeen";
-
-function setStageAction(set: OnboardingSet): OnboardingState["setStage"] {
-  return (stage) =>
+  setStage: (stage) =>
     set((s) =>
       stage === s.stage
         ? s
@@ -272,11 +251,9 @@ function setStageAction(set: OnboardingSet): OnboardingState["setStage"] {
                 ? nowInstant().epochMilliseconds
                 : s.arrivedAt,
           },
-    );
-}
+    ),
 
-function goBackAction(set: OnboardingSet): OnboardingState["goBack"] {
-  return () =>
+  goBack: () =>
     set((s) => {
       const previous = s.history[s.history.length - 1];
       if (!previous) return s;
@@ -288,14 +265,13 @@ function goBackAction(set: OnboardingSet): OnboardingState["goBack"] {
         // shouldn't re-fire the row arrivals either.
         arrivedAt: s.arrivedAt,
       };
-    });
-}
+    }),
 
-function setSetupDismissedForProjectAction(
-  set: OnboardingSet,
-  get: OnboardingGet,
-): OnboardingState["setSetupDismissedForProject"] {
-  return (projectId, dismissed) => {
+  replayStage: () => set((s) => ({ replayToken: s.replayToken + 1 })),
+
+  reset: () => set({ stage: INITIAL_STAGE, arrivedAt: null, history: [], replayToken: 0 }),
+
+  setSetupDismissedForProject: (projectId, dismissed) => {
     const next = { ...get().setupDismissedByProject };
     if (dismissed) {
       next[projectId] = true;
@@ -314,14 +290,13 @@ function setSetupDismissedForProjectAction(
       firstTraceSpotlightFired: get().firstTraceSpotlightFired,
       seenDrawerSpotlights: get().seenDrawerSpotlights,
     });
-  };
-}
+  },
 
-function setIntegrationCtaDismissedAtAction(
-  set: OnboardingSet,
-  get: OnboardingGet,
-): OnboardingState["setIntegrationCtaDismissedAt"] {
-  return (projectId, ts) => {
+  setSetupDisengaged: (disengaged) => set({ setupDisengaged: disengaged }),
+
+  setTourActive: (active) => set({ tourActive: active }),
+
+  setIntegrationCtaDismissedAt: (projectId, ts) => {
     const next = {
       ...get().integrationCtaDismissedAtByProject,
       [projectId]: ts,
@@ -333,14 +308,9 @@ function setIntegrationCtaDismissedAtAction(
       firstTraceSpotlightFired: get().firstTraceSpotlightFired,
       seenDrawerSpotlights: get().seenDrawerSpotlights,
     });
-  };
-}
+  },
 
-function clearIntegrationCtaDismissedAction(
-  set: OnboardingSet,
-  get: OnboardingGet,
-): OnboardingState["clearIntegrationCtaDismissed"] {
-  return (projectId) => {
+  clearIntegrationCtaDismissed: (projectId) => {
     const next = { ...get().integrationCtaDismissedAtByProject };
     delete next[projectId];
     set({ integrationCtaDismissedAtByProject: next });
@@ -350,14 +320,14 @@ function clearIntegrationCtaDismissedAction(
       firstTraceSpotlightFired: get().firstTraceSpotlightFired,
       seenDrawerSpotlights: get().seenDrawerSpotlights,
     });
-  };
-}
+  },
 
-function markFirstTraceSpotlightFiredAction(
-  set: OnboardingSet,
-  get: OnboardingGet,
-): OnboardingState["markFirstTraceSpotlightFired"] {
-  return () => {
+  setShowSamplePreview: (show) => set({ showSamplePreview: show }),
+
+  setSpotlightsActive: (active) => set({ spotlightsActive: active }),
+  setCurrentSpotlightId: (id) => set({ currentSpotlightId: id }),
+
+  markFirstTraceSpotlightFired: () => {
     if (get().firstTraceSpotlightFired) return;
     set({ firstTraceSpotlightFired: true });
     persist({
@@ -366,14 +336,9 @@ function markFirstTraceSpotlightFiredAction(
       firstTraceSpotlightFired: true,
       seenDrawerSpotlights: get().seenDrawerSpotlights,
     });
-  };
-}
+  },
 
-function markDrawerSpotlightSeenAction(
-  set: OnboardingSet,
-  get: OnboardingGet,
-): OnboardingState["markDrawerSpotlightSeen"] {
-  return (id) => {
+  markDrawerSpotlightSeen: (id) => {
     const current = get().seenDrawerSpotlights;
     if (current[id]) return;
     const next = { ...current, [id]: true };
@@ -384,51 +349,7 @@ function markDrawerSpotlightSeenAction(
       firstTraceSpotlightFired: get().firstTraceSpotlightFired,
       seenDrawerSpotlights: next,
     });
-  };
-}
-
-/**
- * Builds the onboarding store's action methods, kept out of the `create()` literal
- * so its complexity is measured on its own.
- */
-function createOnboardingActions(
-  set: OnboardingSet,
-  get: OnboardingGet,
-): Pick<OnboardingState, OnboardingActionKeys> {
-  return {
-    setStage: setStageAction(set),
-    goBack: goBackAction(set),
-    replayStage: () => set((s) => ({ replayToken: s.replayToken + 1 })),
-    reset: () => set({ stage: INITIAL_STAGE, arrivedAt: null, history: [], replayToken: 0 }),
-    setSetupDismissedForProject: setSetupDismissedForProjectAction(set, get),
-    setSetupDisengaged: (disengaged) => set({ setupDisengaged: disengaged }),
-    setTourActive: (active) => set({ tourActive: active }),
-    setIntegrationCtaDismissedAt: setIntegrationCtaDismissedAtAction(set, get),
-    clearIntegrationCtaDismissed: clearIntegrationCtaDismissedAction(set, get),
-    setShowSamplePreview: (show) => set({ showSamplePreview: show }),
-    setSpotlightsActive: (active) => set({ spotlightsActive: active }),
-    setCurrentSpotlightId: (id) => set({ currentSpotlightId: id }),
-    markFirstTraceSpotlightFired: markFirstTraceSpotlightFiredAction(set, get),
-    markDrawerSpotlightSeen: markDrawerSpotlightSeenAction(set, get),
-  };
-}
-
-export const useOnboardingStore = create<OnboardingState>((set, get) => ({
-  stage: INITIAL_STAGE,
-  arrivedAt: null,
-  history: [],
-  replayToken: 0,
-  setupDismissedByProject: initial.setupDismissedByProject,
-  setupDisengaged: false,
-  tourActive: false,
-  integrationCtaDismissedAtByProject: initial.integrationCtaDismissedAtByProject,
-  showSamplePreview: false,
-  spotlightsActive: false,
-  currentSpotlightId: null,
-  firstTraceSpotlightFired: initial.firstTraceSpotlightFired,
-  seenDrawerSpotlights: initial.seenDrawerSpotlights,
-
-  ...createOnboardingActions(set, get),
+  },
 }));
 
 // ---------------------------------------------------------------------------

@@ -196,8 +196,7 @@ function readMoment(value: TimeInput | null | undefined): DisplayMoment | null {
     return null;
   }
   const date = readableDate(value);
-  const dateIsInvalid = Number.isNaN(date.getTime());
-  return dateIsInvalid ? null : date;
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export function lastAnnotatedAt(annotations: AnnotationWithUser[]): DisplayMoment | null {

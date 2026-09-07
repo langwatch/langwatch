@@ -270,7 +270,7 @@ export function SignUpCredentialForm({
           </FrontDoorField>
         ) : null}
         <FormServerError form={form} />
-        {submitError && (
+        {submitError ? (
           <Alert.Root
             status="error"
             borderStartWidth="4px"
@@ -281,10 +281,9 @@ export function SignUpCredentialForm({
               <Alert.Description>{submitError}</Alert.Description>
             </Alert.Content>
           </Alert.Root>
-        )}
-        {!submitError && register.error && !serverErrorIsOnTheForm && (
+        ) : register.error && !serverErrorIsOnTheForm ? (
           <HandledErrorAlert error={register.error} fallbackTitle="Couldn't create your account" />
-        )}
+        ) : null}
         {/* Arrives with the confirmation. Before that the passkey button IS
             the call to action, and a second primary button under an empty
             field only competes with it. */}

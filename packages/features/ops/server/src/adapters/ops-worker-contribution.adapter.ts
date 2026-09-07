@@ -100,8 +100,7 @@ export class UsageStatsWorkerContributionAdapter {
   }
 
   start(): OpsWorkerHandle | undefined {
-    const config = this.options.config;
-    if (config.disabled) {
+    if (this.options.config.disabled) {
       usageStatsLogger.info("usage stats disabled, skipping usage stats worker");
       return void 0;
     }

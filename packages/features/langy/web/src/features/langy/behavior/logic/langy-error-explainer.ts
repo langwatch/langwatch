@@ -415,90 +415,6 @@ export function isLangyConversationPending({
   return code === "langy_conversation_not_found" && unconfirmed && !graceIsOver;
 }
 
-const RETRY_ACTION: LangyErrorAction = { label: "Try again", kind: "retry" };
-const CONFIGURE_MODEL_ACTION: LangyErrorAction = {
-  label: "Configure model",
-  kind: "configure-model",
-};
-
-/** The render + action every code in {@link CODE_ACTION_TABLE} shares its `copy` and
- *  `debug` fields with — the uniform shape most domain codes present as. */
-interface CodeActionSpec {
-  render: LangyErrorRender;
-  action?: LangyErrorAction;
-}
-
-/**
- * Every domain code whose presentation is exactly `{ ...copy, render, action?, ...debug }`
- * — everything EXCEPT `langy_rate_limited`, `unknown` and the unregistered-code fallback,
- * which build their own title/description and so stay in {@link explainLangyError} below.
- */
-const CODE_ACTION_TABLE: Partial<Record<string, CodeActionSpec>> = {
-  langy_conversation_not_found: { render: "card" },
-  langy_conversation_not_owned: { render: "card" },
-  langy_agent_unavailable: { render: "card", action: RETRY_ACTION },
-  langy_agent_at_capacity: { render: "card", action: RETRY_ACTION },
-  langy_agent_session_lost: { render: "card", action: RETRY_ACTION },
-  langy_turn_timeout: { render: "card", action: RETRY_ACTION },
-  // The worker stopped mid-reply (its process died, or the liveness sweep
-  // re-dispatched it and it never came back) — a hiccup with a retry, not a fault.
-  langy_worker_stopped: { render: "card", action: RETRY_ACTION },
-  // The agent reported its own failure — usually the model call was rejected
-  // upstream. Nothing crashed and nothing was lost. Deterministic, so no
-  // auto-retry — the user decides.
-  langy_agent_errored: { render: "card", action: RETRY_ACTION },
-  // The manager tried to start a worker for this turn and it never came up.
-  // Nothing the user did is wrong and nothing is lost — their message is on
-  // record — so this reads as a hiccup with a retry, not a fault.
-  langy_worker_spawn_failed: { render: "card", action: RETRY_ACTION },
-  langy_worker_restarting: { render: "card", action: RETRY_ACTION },
-  // The ONLY suppressed kind, and the reason the mode exists.
-  langy_github_not_connected: {
-    render: "suppress",
-    action: { label: "Install GitHub App", kind: "connect-github" },
-  },
-  // GitHub access exists; the specific repository isn't covered by the app
-  // installation. Deterministic — the identical request 404s identically —
-  // so no retry: the fix is granting the app access to that repository on
-  // GitHub (Settings → Integrations → Configure deep-links there).
-  langy_github_repo_not_accessible: { render: "card" },
-  // A prerequisite, not a fault, and deterministic — the identical request
-  // fails again — so this offers the setup action rather than a retry. The
-  // allowlist is the only runnable-set gate: any model on it runs, so the fix
-  // is setting or swapping the model. `meta.model` rides along (via `debug`)
-  // so the user sees which one was rejected.
-  langy_model_not_configured: { render: "card", action: CONFIGURE_MODEL_ACTION },
-  langy_model_not_allowed: { render: "card", action: CONFIGURE_MODEL_ACTION },
-  // A model IS chosen, and the project cannot serve it. Sits beside
-  // `langy_model_not_configured`, which is the other half: there nothing is
-  // chosen at all.
-  langy_model_unavailable: { render: "card", action: CONFIGURE_MODEL_ACTION },
-  // Fail-closed network policy: Langy refuses to run rather than leak. Not a
-  // user error and not a retry — an admin has to fix the policy.
-  langy_egress_misconfigured: { render: "card" },
-  // The caller holds none of Langy's permissions in this project. A
-  // permissions gap an admin resolves — retrying won't change it.
-  langy_insufficient_scope: { render: "card" },
-  // The stored OpenAI session could not be refreshed. A setup step, not a
-  // fault: the fix is signing in again (the action opens the inline Codex
-  // sign-in), or picking another configured model from the composer. The
-  // words come from the registry under `codex_session_expired` — see
-  // REGISTRY_CODE_ALIASES.
-  langy_codex_session_expired: {
-    render: "card",
-    action: { label: "Sign in to Codex", kind: "reconnect-codex" },
-  },
-  // OpenAI's plan limit refused the turn. Deterministic until the window
-  // resets, so the useful moves are waiting or switching models; retry is
-  // still offered for after the reset.
-  langy_codex_plan_limit: { render: "card", action: RETRY_ACTION },
-  // One turn at a time per conversation. A retry would just 409 again, so
-  // there's no retry action — the answer is to wait for the reply to finish.
-  // It is a WAIT, not a turn failure, so it rides above the composer as a
-  // dismissable notice that keeps the user's draft — not a red history card.
-  langy_turn_in_progress: { render: "composer-notice" },
-};
-
 export function explainLangyError(received: LangyDomainError): LangyErrorPresentation {
   // Order matters: the narrower promotions run first, so a codex session that
   // also carries an upstream status keeps its own card. "Not reachable at all"
@@ -514,57 +430,159 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
 
   const { title, description, isRegistered } = registryCopy(domain);
   const copy = { kind: domain.code, title, description };
+  const retry = { label: "Try again", kind: "retry" } as const;
 
-  const tableEntry = CODE_ACTION_TABLE[domain.code];
-  if (tableEntry) {
-    return {
-      ...copy,
-      render: tableEntry.render,
-      ...(tableEntry.action ? { action: tableEntry.action } : {}),
-      ...debug,
-    };
+  switch (domain.code) {
+    case "langy_conversation_not_found":
+    case "langy_conversation_not_owned":
+      return { ...copy, render: "card", ...debug };
+
+    case "langy_agent_unavailable":
+    case "langy_agent_at_capacity":
+    case "langy_agent_session_lost":
+    case "langy_turn_timeout":
+      return { ...copy, render: "card", action: retry, ...debug };
+
+    case "langy_worker_stopped":
+      // The worker stopped mid-reply (its process died, or the liveness sweep
+      // re-dispatched it and it never came back).
+      return { ...copy, render: "card", action: retry, ...debug };
+
+    case "langy_agent_errored": {
+      // The agent reported its own failure — usually the model call was rejected
+      // upstream. Nothing crashed and nothing was lost. Deterministic, so no auto-retry
+      // — the user decides.
+      return { ...copy, render: "card", action: retry, ...debug };
+    }
+
+    case "langy_worker_spawn_failed":
+      // The manager tried to start a worker for this turn and it never came up.
+      // Nothing the user did is wrong and nothing is lost — their message is on
+      // record — so this reads as a hiccup with a retry, not a fault.
+      return { ...copy, render: "card", action: retry, ...debug };
+
+    case "langy_worker_restarting":
+      return { ...copy, render: "card", action: retry, ...debug };
+
+    case "langy_github_not_connected":
+      // The ONLY suppressed kind, and the reason the mode exists.
+      return {
+        ...copy,
+        render: "suppress",
+        action: { label: "Install GitHub App", kind: "connect-github" },
+        ...debug,
+      };
+
+    case "langy_github_repo_not_accessible":
+      // GitHub access exists; the specific repository isn't covered by the app
+      // installation. Deterministic — the identical request 404s identically —
+      // so no retry: the fix is granting the app access to that repository on
+      // GitHub (Settings → Integrations → Configure deep-links there).
+      return { ...copy, render: "card", ...debug };
+
+    case "langy_model_not_configured":
+    case "langy_model_not_allowed":
+      // A prerequisite, not a fault, and deterministic — the identical request
+      // fails again — so this offers the setup action rather than a retry. The
+      // allowlist is the only runnable-set gate: any model on it runs, so the
+      // fix is setting or swapping the model. `meta.model` rides along so the
+      // user sees which one was rejected.
+      return {
+        ...copy,
+        render: "card",
+        action: { label: "Configure model", kind: "configure-model" },
+        ...debug,
+      };
+
+    case "langy_model_unavailable":
+      // A model IS chosen, and the project cannot serve it. Deterministic, so
+      // the card offers the model settings rather than a retry that would fail
+      // the same way. Sits beside `langy_model_not_configured`, which is the
+      // other half: there nothing is chosen at all.
+      return {
+        ...copy,
+        render: "card",
+        action: { label: "Configure model", kind: "configure-model" },
+        ...debug,
+      };
+
+    case "langy_egress_misconfigured":
+      // Fail-closed network policy: Langy refuses to run rather than leak. Not a
+      // user error and not a retry — an admin has to fix the policy.
+      return { ...copy, render: "card", ...debug };
+
+    case "langy_insufficient_scope":
+      // The caller holds none of Langy's permissions in this project. A
+      // permissions gap an admin resolves — retrying won't change it.
+      return { ...copy, render: "card", ...debug };
+
+    case "langy_codex_session_expired":
+      // The stored OpenAI session could not be refreshed. A setup step, not a
+      // fault: the fix is signing in again (the action opens the inline Codex
+      // sign-in), or picking another configured model from the composer. The
+      // words come from the registry under `codex_session_expired` — see
+      // REGISTRY_CODE_ALIASES.
+      return {
+        ...copy,
+        render: "card",
+        action: { label: "Sign in to Codex", kind: "reconnect-codex" },
+        ...debug,
+      };
+
+    case "langy_codex_plan_limit":
+      // OpenAI's plan limit refused the turn. Deterministic until the window
+      // resets, so the useful moves are waiting or switching models; retry is
+      // still offered for after the reset.
+      return { ...copy, render: "card", action: retry, ...debug };
+
+    case "langy_turn_in_progress":
+      // One turn at a time per conversation. A retry would just 409 again, so
+      // there's no retry action — the answer is to wait for the reply to finish.
+      // It is a WAIT, not a turn failure, so it rides above the composer as a
+      // dismissable notice that keeps the user's draft — not a red history card.
+      return { ...copy, render: "composer-notice", ...debug };
+
+    case "langy_rate_limited":
+      // Throttled, not broken. Nothing failed, nothing was lost, and the only fix is a
+      // few seconds of patience — so there is no "Try again" action, which would be an
+      // invitation to walk straight back into the limit.
+      return {
+        kind: domain.code,
+        title: "You're sending messages too quickly",
+        description: "Send this again in a few seconds. Your message is still in the box.",
+        render: "composer-notice",
+        ...debug,
+      };
+
+    case "unknown":
+      // NO `code`. `unknown` is the explainer's own "this was never a handled error"
+      // discriminant, not a domain code, so printing it under the message gives support
+      // and the reader the literal word "unknown" and nothing else.
+      return {
+        kind: "unknown",
+        title: UNKNOWN_ERROR_PRESENTATION.title,
+        description: domain.traceId
+          ? "Langy hit an unexpected error. Try again, and if it keeps happening, share the id below with support."
+          : "Langy hit an unexpected error. Try again.",
+        render: "card",
+        action: retry,
+        traceId: domain.traceId,
+        ...debug,
+      };
+
+    default: {
+      // A code with no registered copy: still useful, never a raw string, and its meta
+      // + reasons are surfaced for debugging.
+      return {
+        kind: domain.code,
+        title: isRegistered ? title : "Langy couldn't finish that",
+        description: description || "The request was rejected. Try rephrasing or start again.",
+        render: "card",
+        action: retry,
+        traceId: domain.traceId,
+        code: domain.code,
+        ...debug,
+      };
+    }
   }
-
-  // Throttled, not broken. Nothing failed, nothing was lost, and the only fix is a
-  // few seconds of patience — so there is no "Try again" action, which would be an
-  // invitation to walk straight back into the limit.
-  if (domain.code === "langy_rate_limited") {
-    return {
-      kind: domain.code,
-      title: "You're sending messages too quickly",
-      description: "Send this again in a few seconds. Your message is still in the box.",
-      render: "composer-notice",
-      ...debug,
-    };
-  }
-
-  // NO `code`. `unknown` is the explainer's own "this was never a handled error"
-  // discriminant, not a domain code, so printing it under the message gives support
-  // and the reader the literal word "unknown" and nothing else.
-  if (domain.code === "unknown") {
-    return {
-      kind: "unknown",
-      title: UNKNOWN_ERROR_PRESENTATION.title,
-      description: domain.traceId
-        ? "Langy hit an unexpected error. Try again, and if it keeps happening, share the id below with support."
-        : "Langy hit an unexpected error. Try again.",
-      render: "card",
-      action: RETRY_ACTION,
-      traceId: domain.traceId,
-      ...debug,
-    };
-  }
-
-  // A code with no registered copy: still useful, never a raw string, and its meta
-  // + reasons are surfaced for debugging.
-  return {
-    kind: domain.code,
-    title: isRegistered ? title : "Langy couldn't finish that",
-    description: description || "The request was rejected. Try rephrasing or start again.",
-    render: "card",
-    action: RETRY_ACTION,
-    traceId: domain.traceId,
-    code: domain.code,
-    ...debug,
-  };
 }

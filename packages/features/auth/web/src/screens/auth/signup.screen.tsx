@@ -290,7 +290,7 @@ function SignUpForm() {
                   `register.error` is a tRPC handled error whose wire message
                   IS the code slug since #5984 — so it goes through the
                   registry rather than being printed. */}
-              {submitError && (
+              {submitError ? (
                 <Alert.Root
                   borderStartWidth="4px"
                   borderStartColor="colorPalette.solid"
@@ -300,13 +300,12 @@ function SignUpForm() {
                     <Alert.Description>{submitError}</Alert.Description>
                   </Alert.Content>
                 </Alert.Root>
-              )}
-              {!submitError && register.error && (
+              ) : register.error ? (
                 <HandledErrorAlert
                   error={register.error}
                   fallbackTitle="Couldn't create your account"
                 />
-              )}
+              ) : null}
               {/* Shown only once the sign-in this screen ran on the customer's
                   behalf came back with the wrong password for an account that
                   does exist. The copy above names the situation; these are the

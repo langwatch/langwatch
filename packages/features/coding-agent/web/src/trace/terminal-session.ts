@@ -87,15 +87,6 @@ export function isDiffTool(name: string): boolean {
  * and the common `file_path` carrier. Returns null when the shape doesn't
  * carry a diffable pair.
  */
-/** The first of the given fields that holds a string, in order. */
-function firstStringField(obj: Record<string, unknown>, keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = obj[key];
-    if (typeof value === "string") return value;
-  }
-  return undefined;
-}
-
 export function extractDiffFromToolInput(input: unknown): {
   oldText: string;
   newText: string;
@@ -103,7 +94,12 @@ export function extractDiffFromToolInput(input: unknown): {
 } | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) return null;
   const obj = input as Record<string, unknown>;
-  const filePath = firstStringField(obj, ["file_path", "path"]);
+  const filePath =
+    typeof obj.file_path === "string"
+      ? obj.file_path
+      : typeof obj.path === "string"
+        ? obj.path
+        : undefined;
 
   const oldString = typeof obj.old_string === "string" ? obj.old_string : null;
   const newString = typeof obj.new_string === "string" ? obj.new_string : null;
@@ -112,7 +108,12 @@ export function extractDiffFromToolInput(input: unknown): {
   }
 
   // Write / create: whole file content is one big addition.
-  const content = firstStringField(obj, ["content", "file_text"]);
+  const content =
+    typeof obj.content === "string"
+      ? obj.content
+      : typeof obj.file_text === "string"
+        ? obj.file_text
+        : null;
   if (content != null) {
     return { oldText: "", newText: content, filePath };
   }

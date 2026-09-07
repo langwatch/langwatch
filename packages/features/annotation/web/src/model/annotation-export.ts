@@ -144,7 +144,6 @@ export function allAnnotationsExport({
     rows: annotations.map((annotation) => {
       const trace = traceById.get(annotation.traceId);
       const createdAt = annotation.createdAt ? readableDate(annotation.createdAt) : null;
-      const createdAtIsValid = createdAt !== null && !Number.isNaN(createdAt.getTime());
       return [
         annotation.user?.name ?? "",
         trace?.input?.value ?? "",
@@ -154,7 +153,7 @@ export function allAnnotationsExport({
         annotation.traceId ?? "",
         annotationRatingExportLabel(annotation.isThumbsUp),
         JSON.stringify(annotation.scoreOptions ?? {}),
-        createdAtIsValid && createdAt ? createdAt.toLocaleString() : "",
+        createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString() : "",
       ];
     }),
   };

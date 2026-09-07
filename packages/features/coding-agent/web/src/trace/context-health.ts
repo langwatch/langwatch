@@ -34,8 +34,9 @@ const EXTENDED_CONTEXT_MARKER = /\[1m\]/i;
  * earlier calls used the standard window.
  */
 export function contextWindowCeiling(models: string[]): number {
-  const usedExtendedContext = models.some((model) => EXTENDED_CONTEXT_MARKER.test(model));
-  return usedExtendedContext ? EXTENDED_CONTEXT_WINDOW_TOKENS : STANDARD_CONTEXT_WINDOW_TOKENS;
+  return models.some((model) => EXTENDED_CONTEXT_MARKER.test(model))
+    ? EXTENDED_CONTEXT_WINDOW_TOKENS
+    : STANDARD_CONTEXT_WINDOW_TOKENS;
 }
 
 /**

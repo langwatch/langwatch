@@ -144,8 +144,7 @@ function extractPasswordPolicyMessage(
     "PasswordDictionaryError",
     "PasswordNoUserInfoError",
   ];
-  const isPolicyError = policyPrefixes.some((prefix) => message.startsWith(prefix));
-  if (!isPolicyError) {
+  if (!policyPrefixes.some((p) => message.startsWith(p))) {
     return null;
   }
 
@@ -359,11 +358,11 @@ export class Auth0PasswordService {
     // The M2M app doesn't have the Password grant enabled. Surface a
     // setup-fixable error so callers don't show "wrong password" when
     // the real problem is configuration.
-    const lowercasedDescription =
-      typeof body?.error_description === "string" ? body.error_description.toLowerCase() : "";
-    const isPasswordGrantDisabled =
-      body?.error === "unauthorized_client" && lowercasedDescription.includes("password");
-    if (isPasswordGrantDisabled) {
+    if (
+      body?.error === "unauthorized_client" &&
+      typeof body.error_description === "string" &&
+      body.error_description.toLowerCase().includes("password")
+    ) {
       logger.error(
         { status: res.status, body },
         "Auth0 Password grant is not enabled on the Management M2M application",

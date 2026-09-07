@@ -204,8 +204,7 @@ export const modelProviders = {
         GEMINI_LOCATION: z.string().trim().nullable().optional(),
       })
       .superRefine((data, context) => {
-        const bothOrNeitherSet = Boolean(data.GEMINI_PROJECT) === Boolean(data.GEMINI_LOCATION);
-        if (bothOrNeitherSet) {
+        if (Boolean(data.GEMINI_PROJECT) === Boolean(data.GEMINI_LOCATION)) {
           return;
         }
 

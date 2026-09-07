@@ -58,8 +58,7 @@ export function IdentifierStepForm({
     },
     onChange: () => {
       // Clearing only: typing can lift a rejection, never earn one.
-      const emailError = form.formState.errors.email;
-      if (!emailError) return;
+      if (!form.formState.errors.email) return;
       const parsed = identifierSchema.safeParse({
         email: form.getValues("email"),
       });

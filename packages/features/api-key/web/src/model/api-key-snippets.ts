@@ -110,8 +110,7 @@ export function findLangwatchEnvLines(json: string): number[] {
   const KEYS = ["LANGWATCH_API_KEY", "LANGWATCH_PROJECT_ID", "LANGWATCH_ENDPOINT"];
   const out: number[] = [];
   json.split("\n").forEach((line, idx) => {
-    const mentionsLangwatchKey = KEYS.some((k) => line.includes(k));
-    if (mentionsLangwatchKey) out.push(idx + 1);
+    if (KEYS.some((k) => line.includes(k))) out.push(idx + 1);
   });
   return out;
 }

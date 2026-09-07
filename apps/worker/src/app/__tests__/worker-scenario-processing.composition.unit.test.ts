@@ -108,8 +108,7 @@ function registeredKeys(definition: BuiltDefinition): Set<string> {
   for (const name of definition.mapSubscribers.keys()) keys.add(`reactor:${name}`);
   for (const name of definition.eventSubscribers.keys()) keys.add(`subscriber:${name}`);
   for (const [name, manager] of definition.processManagers) {
-    const hasEventTypes = manager.config.eventTypes.length > 0;
-    if (hasEventTypes) keys.add(`subscriber:pm:${name}`);
+    if (manager.config.eventTypes.length > 0) keys.add(`subscriber:pm:${name}`);
   }
   return keys;
 }

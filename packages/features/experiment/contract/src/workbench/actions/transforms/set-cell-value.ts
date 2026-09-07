@@ -12,8 +12,7 @@ export const setCellValue: Transform<
   const { datasetId, rowIndex, columnId, value } = setCellValuePayloadSchema.parse(payload);
   const dataset = requireInlineDataset({ state, datasetId });
 
-  const columnExists = dataset.inline.columns.some((column) => column.id === columnId);
-  if (!columnExists) {
+  if (!dataset.inline.columns.some((column) => column.id === columnId)) {
     throw new TransformError({
       code: "column_not_found",
       message: `Dataset ${datasetId} has no column ${columnId}`,

@@ -740,9 +740,12 @@ function mountTeams(): { api: MountedRestFamily; directory: TeamDirectory } {
   const apiKeys: ApiKeyService = namedAbsences(
     {
       resolveOrganizationToken: async (input: { token: string }) => {
-        let apiKeyId: string | null = null;
-        if (input.token === ADMIN_TOKEN) apiKeyId = ADMIN_KEY_ID;
-        else if (input.token === VIEWER_TOKEN) apiKeyId = VIEWER_KEY_ID;
+        const apiKeyId =
+          input.token === ADMIN_TOKEN
+            ? ADMIN_KEY_ID
+            : input.token === VIEWER_TOKEN
+              ? VIEWER_KEY_ID
+              : null;
         if (!apiKeyId) return { ok: false as const, reason: "unusable_credential" as const };
         return {
           ok: true as const,

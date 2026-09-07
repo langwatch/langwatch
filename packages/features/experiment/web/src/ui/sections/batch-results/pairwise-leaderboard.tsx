@@ -9,18 +9,6 @@ import {
   usePairwiseSort,
 } from "../../../behavior/use-pairwise-sort.ts";
 
-/** Icon for a sortable column header: neutral, or pointing the active sort direction. */
-function sortArrowIcon(active: boolean, sortDir: SortDir) {
-  if (!active) return LuArrowUpDown;
-  return sortDir === "asc" ? LuArrowUp : LuArrowDown;
-}
-
-/** `aria-sort` value for a sortable column header. */
-function ariaSortValue(active: boolean, sortDir: SortDir): "ascending" | "descending" | "none" {
-  if (!active) return "none";
-  return sortDir === "asc" ? "ascending" : "descending";
-}
-
 /**
  * Bradley-Terry leaderboard panel for the Comparison evaluator (#5103). Purely
  * presentational — caller computes `leaderboard` via `computeBTLeaderboard` and passes
@@ -244,14 +232,16 @@ function SortableHeader({
   onSort: (k: SortKey) => void;
 }) {
   const active = sortKey === col;
-  const ArrowIcon = sortArrowIcon(active, sortDir);
+  const ArrowIcon = !active ? LuArrowUpDown : sortDir === "asc" ? LuArrowUp : LuArrowDown;
   return (
     // `aria-sort` on the header itself, not just a keyboard handler on the
     // control inside it: the arrow icon communicates the sort state visually,
     // and this is the only thing that communicates it to a screen reader.
     // Keyboard reachability without it would let someone sort the table and
     // have no way to learn that they had.
-    <Table.ColumnHeader aria-sort={ariaSortValue(active, sortDir)}>
+    <Table.ColumnHeader
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+    >
       <HStack
         gap={1}
         cursor="pointer"
@@ -284,8 +274,7 @@ function formatScoreWithCI(score: number, ci: [number, number] | null): string {
   // interval. Printing "46.96 ± Infinity" tells the reader nothing and
   // reads as a bug; the score alone is the honest thing to show, and the
   // trust step already explains that the sample is too small.
-  const isUnbounded = !Number.isFinite(ci[0]) || !Number.isFinite(ci[1]);
-  if (isUnbounded) return rounded;
+  if (!Number.isFinite(ci[0]) || !Number.isFinite(ci[1])) return rounded;
   // Symmetric half-width for display; close enough for power-user judgment
   // and matches the "1.42 ± 0.18" shape in the issue mockup. The raw CI is
   // still in props for anyone who wants the asymmetric range.

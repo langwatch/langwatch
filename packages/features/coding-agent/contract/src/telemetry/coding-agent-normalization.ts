@@ -509,22 +509,24 @@ export function liftCodingAgentLogFacts({
   attributes: Record<string, unknown>;
 }): Record<string, string | number | boolean> | null {
   const eventName = attributes["event.name"];
-  const recordName = typeof eventName === "string" ? eventName : null;
-  const isUnrecognizedEvent =
+  if (
     eventName !== SESSION_CONTEXT_EVENT_NAME &&
-    detectCodingAgent({ scopeName, recordName }) === "unknown";
-  if (isUnrecognizedEvent) {
+    detectCodingAgent({
+      scopeName,
+      recordName: typeof eventName === "string" ? eventName : null,
+    }) === "unknown"
+  ) {
     return null;
   }
 
   const facts: Record<string, string | number | boolean> = {};
   for (const key of CODING_AGENT_CONTRIBUTION_KEYS) {
     const value = attributes[key];
-    const isNonEmptyPrimitive =
+    if (
       (typeof value === "string" && value.length > 0) ||
       typeof value === "number" ||
-      typeof value === "boolean";
-    if (isNonEmptyPrimitive) {
+      typeof value === "boolean"
+    ) {
       facts[key] = value;
     }
   }

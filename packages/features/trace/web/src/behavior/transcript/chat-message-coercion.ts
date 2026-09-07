@@ -31,23 +31,6 @@ function coerceDeclaredChatMessages(value: unknown[]): ChatMessage[] | null {
   return messages.length > 0 ? messages : null;
 }
 
-const COERCIBLE_KEYS = ["messages", "input", "history", "output", "data", "value", "events"];
-
-/** Tries the declared-envelope shape, then each well-known field, in order. */
-function coerceFromRecord(obj: Record<string, unknown>): ChatMessage[] | null {
-  if (obj.type === "chat_messages" && Array.isArray(obj.value)) {
-    const declared = coerceDeclaredChatMessages(obj.value);
-    if (declared) return declared;
-  }
-  for (const key of COERCIBLE_KEYS) {
-    const candidate = obj[key];
-    if (candidate === undefined) continue;
-    const result = coerceToChatMessages(candidate);
-    if (result) return result;
-  }
-  return null;
-}
-
 export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
   if (typeof data === "string") {
     const parsed = tryParseJSON(data);
@@ -58,26 +41,20 @@ export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
   }
   if (isChatMessagesArray(data)) return data;
   if (isOneChatMessage(data)) return [data];
-  if (isRecord(data)) return coerceFromRecord(data);
+  if (isRecord(data)) {
+    const obj = data;
+    if (obj.type === "chat_messages" && Array.isArray(obj.value)) {
+      const declared = coerceDeclaredChatMessages(obj.value);
+      if (declared) return declared;
+    }
+    for (const key of ["messages", "input", "history", "output", "data", "value", "events"]) {
+      const candidate = obj[key];
+      if (candidate === undefined) continue;
+      const result = coerceToChatMessages(candidate);
+      if (result) return result;
+    }
+  }
   return null;
-}
-
-/** Records a leaf for each renderable part of an array `content` field. */
-function collectContentPartLeaves(
-  content: Array<Record<string, unknown> | string>,
-  msgIdx: number,
-  leaves: Record<string, string>,
-): void {
-  content.forEach((part, partIdx) => {
-    if (typeof part === "string") {
-      if (part.length > 0) leaves[`${msgIdx}.${partIdx}`] = part;
-      return;
-    }
-    if (!part || typeof part !== "object") return;
-    if (part.type === "text" && typeof part.text === "string" && part.text.length > 0) {
-      leaves[`${msgIdx}.${partIdx}`] = part.text;
-    }
-  });
 }
 
 export function collectChatTextLeaves(messages: ChatMessage[]): Record<string, string> {
@@ -92,36 +69,18 @@ export function collectChatTextLeaves(messages: ChatMessage[]): Record<string, s
       return;
     }
     if (!Array.isArray(content)) return;
-    collectContentPartLeaves(content, msgIdx, leaves);
+    content.forEach((part, partIdx) => {
+      if (typeof part === "string") {
+        if (part.length > 0) leaves[`${msgIdx}.${partIdx}`] = part;
+        return;
+      }
+      if (!part || typeof part !== "object") return;
+      if (part.type === "text" && typeof part.text === "string" && part.text.length > 0) {
+        leaves[`${msgIdx}.${partIdx}`] = part.text;
+      }
+    });
   });
   return leaves;
-}
-
-/** Applies edited leaf texts to one message's array `content`, if any changed. */
-function applyTextLeavesToArrayContent(
-  message: ChatMessage,
-  content: Array<Record<string, unknown> | string>,
-  msgIdx: number,
-  texts: Record<string, string>,
-): ChatMessage {
-  let changed = false;
-  const parts = content.map((part, partIdx) => {
-    const text = texts[`${msgIdx}.${partIdx}`];
-    if (text === undefined) return part;
-    if (typeof part === "string") {
-      if (text === part) return part;
-      changed = true;
-      return text;
-    }
-    const isTextPart = !!part && typeof part === "object" && part.type === "text";
-    const carriesOtherText = isTextPart && typeof part.text === "string" && part.text !== text;
-    if (carriesOtherText) {
-      changed = true;
-      return { ...part, text };
-    }
-    return part;
-  });
-  return changed ? { ...message, content: parts } : message;
 }
 
 export function applyChatTextLeaves(
@@ -136,6 +95,23 @@ export function applyChatTextLeaves(
         : message;
     }
     if (!Array.isArray(message.content)) return message;
-    return applyTextLeavesToArrayContent(message, message.content, msgIdx, texts);
+    let changed = false;
+    const parts = message.content.map((part, partIdx) => {
+      const text = texts[`${msgIdx}.${partIdx}`];
+      if (text === undefined) return part;
+      if (typeof part === "string") {
+        if (text === part) return part;
+        changed = true;
+        return text;
+      }
+      const isTextPart = !!part && typeof part === "object" && part.type === "text";
+      const carriesOtherText = isTextPart && typeof part.text === "string" && part.text !== text;
+      if (carriesOtherText) {
+        changed = true;
+        return { ...part, text };
+      }
+      return part;
+    });
+    return changed ? { ...message, content: parts } : message;
   });
 }

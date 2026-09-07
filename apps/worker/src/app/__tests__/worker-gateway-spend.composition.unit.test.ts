@@ -130,8 +130,7 @@ function registeredKeys(definition: BuiltDefinition): Set<string> {
   for (const [name, manager] of definition.processManagers) {
     // The runtime's own rule: a schedule-only process manager registers no
     // live subscriber, so it stages no routing key.
-    const hasEventTypes = manager.config.eventTypes.length > 0;
-    if (hasEventTypes) keys.add(`subscriber:pm:${name}`);
+    if (manager.config.eventTypes.length > 0) keys.add(`subscriber:pm:${name}`);
   }
   return keys;
 }

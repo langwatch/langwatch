@@ -12,16 +12,14 @@ export function extractApiKeyRequestCredentials(request: Request): ApiKeyRequest
   const xAuthToken = request.headers.get("x-auth-token");
   const xProjectId = request.headers.get("x-project-id");
 
-  const isBasicAuth = authorization?.toLowerCase().startsWith("basic ") ?? false;
-  if (isBasicAuth && authorization) {
+  if (authorization?.toLowerCase().startsWith("basic ")) {
     const parsed = parseBasicCredentials(authorization.slice(6));
     if (parsed) {
       return parsed;
     }
   }
 
-  const isBearerAuth = authorization?.toLowerCase().startsWith("bearer ") ?? false;
-  if (isBearerAuth && authorization) {
+  if (authorization?.toLowerCase().startsWith("bearer ")) {
     const token = authorization.slice(7).trim();
     if (token) {
       return { token, projectId: xProjectId };

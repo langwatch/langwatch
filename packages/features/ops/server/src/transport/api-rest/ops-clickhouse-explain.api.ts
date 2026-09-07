@@ -69,8 +69,7 @@ export function createOpsClickHouseExplainRestApp(options: {
       "/ops/clickhouse/explain",
       MANAGEMENT_API_VERSION,
       async (c: ServiceContext<EndpointVariables>) => {
-        const isAuthorized = bearerTokenMatches(c.req.header("authorization"), ports.opsApiKey());
-        if (!isAuthorized) {
+        if (!bearerTokenMatches(c.req.header("authorization"), ports.opsApiKey())) {
           return c.json({ message: "Unauthorized" }, 401);
         }
 

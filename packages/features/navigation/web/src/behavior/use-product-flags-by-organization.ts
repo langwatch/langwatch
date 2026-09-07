@@ -45,12 +45,10 @@ export function useProductFlagsByOrganization({
   return {
     reachableProductsIn: (organizationId: string) => {
       const products: ProductId[] = ["llm-ops"];
-      const governanceEnabled = governanceByOrg.data?.enabledByOrganizationId?.[organizationId];
-      if (governanceEnabled) {
+      if (governanceByOrg.data?.enabledByOrganizationId?.[organizationId]) {
         products.push("me", "governance");
       }
-      const gatewayEnabled = gatewayByOrg.data?.enabledByOrganizationId?.[organizationId];
-      if (gatewayEnabled) {
+      if (gatewayByOrg.data?.enabledByOrganizationId?.[organizationId]) {
         products.push("gateway");
       }
       return products;

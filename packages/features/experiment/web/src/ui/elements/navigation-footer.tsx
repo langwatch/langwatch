@@ -28,134 +28,6 @@ const parseQueryNumber = (value: string | string[] | undefined, fallback: number
   return fallback;
 };
 
-/** Formats the pagination summary text shown next to the page-size selector. */
-function formatPaginationLabel(params: {
-  isCursorMode: boolean;
-  isPastFirstPage: boolean;
-  isPositionUnknown: boolean;
-  estimatedTotalPages: number;
-  cursorPageNumber: number;
-  totalHits: number;
-  pageOffset: number;
-  pageSize: number;
-}): string {
-  const {
-    isCursorMode,
-    isPastFirstPage,
-    isPositionUnknown,
-    estimatedTotalPages,
-    cursorPageNumber,
-    totalHits,
-    pageOffset,
-    pageSize,
-  } = params;
-
-  if (!isCursorMode || !isPastFirstPage) {
-    return `${pageOffset + 1}-${Math.min(pageOffset + pageSize, totalHits)} of ${totalHits} items`;
-  }
-  if (isPositionUnknown) {
-    return `Resumed from a link, in about ${estimatedTotalPages} pages (${totalHits} total items)`;
-  }
-  return `Page ${cursorPageNumber} of about ${estimatedTotalPages} (${totalHits} total items)`;
-}
-
-interface NextPageNavigation {
-  action: "none" | "cursor-forward" | "offset-forward";
-  /** Non-null only for `cursor-forward`, when there is a scrollId to remember. */
-  pushToStack: string | null;
-  scrollId: string;
-  pageOffset: number;
-}
-
-/** Decides what nextPage should do, without touching state or the router. */
-function planNextPage(params: {
-  currentResponseScrollId?: string | null;
-  urlScrollId: string | null;
-  isCursorMode: boolean;
-  pageOffset: number;
-  pageSize: number;
-}): NextPageNavigation {
-  const { currentResponseScrollId, urlScrollId, isCursorMode, pageOffset, pageSize } = params;
-  if (currentResponseScrollId) {
-    return {
-      action: "cursor-forward",
-      scrollId: currentResponseScrollId,
-      pushToStack: urlScrollId,
-      pageOffset,
-    };
-  }
-  // In cursor mode, no cursor in the response means there is no next page.
-  if (isCursorMode) return { action: "none", scrollId: "", pushToStack: null, pageOffset };
-  return {
-    action: "offset-forward",
-    pageOffset: pageOffset + pageSize,
-    scrollId: "",
-    pushToStack: null,
-  };
-}
-
-type PrevPageNavigation =
-  | { action: "cursor-back"; scrollId: string }
-  | { action: "cursor-reset" }
-  | { action: "offset-back"; pageOffset: number }
-  | { action: "none" };
-
-/** Decides what prevPage should do, without touching state or the router. */
-function planPrevPage(params: {
-  isCursorMode: boolean;
-  cursorStack: string[];
-  pageOffset: number;
-  pageSize: number;
-}): PrevPageNavigation {
-  const { isCursorMode, cursorStack, pageOffset, pageSize } = params;
-  if (isCursorMode) {
-    const top = cursorStack.at(-1);
-    if (top !== undefined) return { action: "cursor-back", scrollId: top };
-    return { action: "cursor-reset" };
-  }
-  if (pageOffset > 0)
-    return { action: "offset-back", pageOffset: Math.max(0, pageOffset - pageSize) };
-  return { action: "none" };
-}
-
-/**
- * Builds a query object with pagination params, stripping defaults. In cursor
- * mode `pageOffset` is stripped and never written back.
- */
-function buildPaginationQueryParams(params: {
-  currentQuery: Record<string, string | string[] | undefined>;
-  pageOffset: number;
-  pageSize: number;
-  isCursorMode: boolean;
-  overrides: { pageOffset?: number; pageSize?: number; scrollId?: string | null };
-}): Record<string, string | string[] | undefined> {
-  const { currentQuery, pageOffset, pageSize, isCursorMode, overrides } = params;
-  const { pageOffset: _po, pageSize: _ps, scrollId: _si, ...rest } = currentQuery;
-
-  const query: Record<string, string | string[] | undefined> = { ...rest };
-
-  const offset = overrides.pageOffset ?? pageOffset;
-  const size = overrides.pageSize ?? pageSize;
-  const scroll = overrides.scrollId;
-
-  if (!isCursorMode && offset !== 0) query.pageOffset = offset.toString();
-  if (size !== DEFAULT_PAGE_SIZE) query.pageSize = size.toString();
-  if (scroll) query.scrollId = scroll;
-
-  return query;
-}
-
-/** Syncs `setTotalHits` from a TRPC query result once it has fetched. */
-function useSyncTotalHits(
-  queryResult: { isFetched?: boolean; data?: { totalHits?: number } },
-  setTotalHits: (value: number) => void,
-): void {
-  useEffect(() => {
-    if (!queryResult.isFetched) return;
-    setTotalHits(queryResult.data?.totalHits ?? 0);
-  }, [queryResult.data?.totalHits, queryResult.isFetched, queryResult.data, setTotalHits]);
-}
-
 /**
  * Decodes a base64-encoded cursor string into pagination information
  */
@@ -221,15 +93,26 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
     }
   }, [urlScrollId]);
 
+  // Build a query object with pagination params, stripping defaults to keep
+  // the URL clean and avoid clobbering other params (like saved view filters).
+  // In cursor mode `pageOffset` is stripped and never written back, so an old
+  // link loses it rather than carrying a value the server will reject.
   const buildPaginationQuery = useCallback(
-    (overrides: { pageOffset?: number; pageSize?: number; scrollId?: string | null }) =>
-      buildPaginationQueryParams({
-        currentQuery: router.query,
-        pageOffset,
-        pageSize,
-        isCursorMode,
-        overrides,
-      }),
+    (overrides: { pageOffset?: number; pageSize?: number; scrollId?: string | null }) => {
+      const { pageOffset: _po, pageSize: _ps, scrollId: _si, ...rest } = router.query;
+
+      const query: Record<string, string | string[] | undefined> = { ...rest };
+
+      const offset = overrides.pageOffset ?? pageOffset;
+      const size = overrides.pageSize ?? pageSize;
+      const scroll = overrides.scrollId;
+
+      if (!isCursorMode && offset !== 0) query.pageOffset = offset.toString();
+      if (size !== DEFAULT_PAGE_SIZE) query.pageSize = size.toString();
+      if (scroll) query.scrollId = scroll;
+
+      return query;
+    },
     [router.query, pageOffset, pageSize, isCursorMode],
   );
 
@@ -239,38 +122,42 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
    */
   const nextPage = useCallback(
     (currentResponseScrollId?: string | null) => {
-      const plan = planNextPage({
-        currentResponseScrollId,
-        urlScrollId,
-        isCursorMode,
-        pageOffset,
-        pageSize,
-      });
-      // Push the current scrollId onto the stack before navigating forward so
-      // prevPage can pop it to go back. Only ever set for cursor-forward.
-      if (plan.pushToStack) cursorStackRef.current.push(plan.pushToStack);
-      switch (plan.action) {
-        case "none":
-          return;
-        case "cursor-forward":
-          setCursorPageNumber((prev) => prev + 1);
-          void router.push(
-            { pathname: router.pathname, query: buildPaginationQuery({ scrollId: plan.scrollId }) },
-            undefined,
-            { shallow: true },
-          );
-          return;
-        case "offset-forward":
-          void router.push(
-            {
-              pathname: router.pathname,
-              query: buildPaginationQuery({ pageOffset: plan.pageOffset }),
-            },
-            undefined,
-            { shallow: true },
-          );
-          return;
+      if (currentResponseScrollId) {
+        // Push the current scrollId onto the stack before navigating forward
+        // so prevPage can pop it to go back.
+        if (urlScrollId) {
+          cursorStackRef.current.push(urlScrollId);
+        }
+        setCursorPageNumber((prev) => prev + 1);
+        void router.push(
+          {
+            pathname: router.pathname,
+            query: buildPaginationQuery({
+              scrollId: currentResponseScrollId,
+            }),
+          },
+          undefined,
+          { shallow: true },
+        );
+        return;
       }
+
+      // In cursor mode, no cursor in the response means there is no next page.
+      // The button is disabled in that state, so this is only reachable by a
+      // stale click — and advancing an offset here is exactly the bug: the
+      // trace API would return page one again, silently.
+      if (isCursorMode) return;
+
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: buildPaginationQuery({
+            pageOffset: pageOffset + pageSize,
+          }),
+        },
+        undefined,
+        { shallow: true },
+      );
     },
     [router, pageOffset, pageSize, isCursorMode, urlScrollId, buildPaginationQuery],
   );
@@ -279,45 +166,48 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
    * Navigate to the previous page
    */
   const prevPage = useCallback(() => {
-    const plan = planPrevPage({
-      isCursorMode,
-      cursorStack: cursorStackRef.current,
-      pageOffset,
-      pageSize,
-    });
-    switch (plan.action) {
-      case "none":
-        return;
-      case "cursor-back":
+    if (isCursorMode) {
+      const stack = cursorStackRef.current;
+      if (stack.length > 0) {
         // Pop the cursor this scroll came from and navigate back to it.
-        cursorStackRef.current.pop();
+        const previousScrollId = stack.pop()!;
         setCursorPageNumber((prev) => Math.max(1, prev - 1));
-        void router.push(
-          { pathname: router.pathname, query: buildPaginationQuery({ scrollId: plan.scrollId }) },
-          undefined,
-          { shallow: true },
-        );
-        return;
-      case "cursor-reset":
-        // Nothing walked yet — drop the cursor and land on the first page. Keyset
-        // pagination has no way back other than replaying from the start.
-        setCursorPageNumber(1);
-        void router.push(
-          { pathname: router.pathname, query: buildPaginationQuery({ scrollId: null }) },
-          undefined,
-          { shallow: true },
-        );
-        return;
-      case "offset-back":
         void router.push(
           {
             pathname: router.pathname,
-            query: buildPaginationQuery({ pageOffset: plan.pageOffset }),
+            query: buildPaginationQuery({ scrollId: previousScrollId }),
           },
           undefined,
           { shallow: true },
         );
         return;
+      }
+
+      // Nothing walked yet — drop the cursor and land on the first page. Keyset
+      // pagination has no way back other than replaying from the start.
+      setCursorPageNumber(1);
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: buildPaginationQuery({ scrollId: null }),
+        },
+        undefined,
+        { shallow: true },
+      );
+      return;
+    }
+
+    if (pageOffset > 0) {
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: buildPaginationQuery({
+            pageOffset: Math.max(0, pageOffset - pageSize),
+          }),
+        },
+        undefined,
+        { shallow: true },
+      );
     }
   }, [router, pageOffset, pageSize, isCursorMode, buildPaginationQuery]);
 
@@ -354,14 +244,22 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
   const useUpdateTotalHits = (queryResult: {
     isFetched?: boolean;
     data?: { totalHits?: number };
-  }) => useSyncTotalHits(queryResult, setTotalHits);
+  }) => {
+    useEffect(() => {
+      if (queryResult.isFetched) {
+        const totalHits: number = queryResult.data?.totalHits ?? 0;
+        setTotalHits(totalHits);
+      }
+    }, [queryResult.data?.totalHits, queryResult.isFetched, queryResult.data]);
+  };
 
   // Reset pagination when search query changes
   const prevQueryRef = useRef(router.query.query);
   useEffect(() => {
-    // Skip when there is no project yet, or the search query hasn't actually
-    // changed (e.g. initial mount).
-    if (!router.query.project || prevQueryRef.current === router.query.query) return;
+    if (!router.query.project) return;
+
+    // Skip if the search query hasn't actually changed (e.g. initial mount)
+    if (prevQueryRef.current === router.query.query) return;
     prevQueryRef.current = router.query.query;
 
     void router.push(
@@ -480,16 +378,14 @@ export function MessagesNavigationFooter({
 
       <HStack gap={3} paddingRight={3}>
         <Text flexShrink={0}>
-          {formatPaginationLabel({
-            isCursorMode,
-            isPastFirstPage,
-            isPositionUnknown,
-            estimatedTotalPages,
-            cursorPageNumber,
-            totalHits,
-            pageOffset,
-            pageSize,
-          })}
+          {isCursorMode && isPastFirstPage
+            ? isPositionUnknown
+              ? `Resumed from a link, in about ${estimatedTotalPages} pages (${totalHits} total items)`
+              : `Page ${cursorPageNumber} of about ${estimatedTotalPages} (${totalHits} total items)`
+            : `${pageOffset + 1}-${Math.min(
+                pageOffset + pageSize,
+                totalHits,
+              )} of ${totalHits} items`}
         </Text>
         <HStack gap={0}>
           <Button

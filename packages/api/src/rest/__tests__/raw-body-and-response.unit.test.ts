@@ -274,8 +274,7 @@ describe("an any-method route that declines", () => {
         "2026-08-07",
         async (c) => {
           seen.push(c.req.path);
-          const isKnownPath = c.req.path.endsWith("/known");
-          if (!isKnownPath) return declined();
+          if (!c.req.path.endsWith("/known")) return declined();
           return new Response("rewritten", { status: 200 });
         },
         (b) => b.withoutPermission("the alias terminates nothing; it rewrites and forwards"),

@@ -44,8 +44,7 @@ export class RestVersionSelector {
     if (new Set(versions).size !== versions.length) {
       throw new Error("REST version selector versions must be unique");
     }
-    const hasBlankVersion = versions.some((version) => version.trim() === "");
-    if (hasBlankVersion) {
+    if (versions.some((version) => version.trim() === "")) {
       throw new Error("REST version selector versions must not be blank");
     }
     if (!versions.includes(latestVersion)) {
