@@ -288,7 +288,8 @@ describe("self-serve single sign-on setup", () => {
       ]);
     });
 
-    it("uses the licence only for entitlement and issues an ownership record", async () => {
+    /** @scenario "A licensed installation still needs domain-ownership evidence" */
+    it("does not qualify an unproven domain merely because the installation serves a licence", async () => {
       await register();
       await selfServe.claimDomain({
         organizationId: ORG,
@@ -309,6 +310,14 @@ describe("self-serve single sign-on setup", () => {
       expect(state?.state).toBe("VERIFICATION_PENDING");
       expect(state?.verifiedDomains).toEqual([]);
       expect(state?.domainVerifications).toEqual([]);
+      expect(
+        await connections.findDomainOwner({ domain: "acme.com" }),
+      ).toBeNull();
+      expect(
+        committed
+          .flatMap((entry) => entry.facts)
+          .some((fact) => fact.type === "lw.identity.domain_verified"),
+      ).toBe(false);
       expect(proofs.asked).toEqual([]);
     });
 
