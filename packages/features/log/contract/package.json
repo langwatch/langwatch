@@ -22,6 +22,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
