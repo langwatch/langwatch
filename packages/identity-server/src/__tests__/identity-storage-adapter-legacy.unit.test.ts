@@ -231,33 +231,40 @@ describe("better-auth over the identity storage adapter", () => {
       ]);
     });
 
-    it("finds a built-in provider's account by the real issuer it was linked under", async () => {
+    /** @scenario "A connection is found by its own issuer, not refused for it" */
+    it("finds a connection account by the real issuer it was linked under", async () => {
       // The case nothing covered, and the reason it mattered: the OAuth
-      // callback looks an account up by `(issuer, accountId)`, and Google's
-      // issuer is its own URL rather than a synthetic one. While the write
-      // stripped the column and the read answered "no rows" for an issuer it
-      // could not decode, every returning Google sign-in failed to find its
-      // own row — and better-auth created it again, into the unique
-      // constraint on (provider, providerAccountId).
+      // callback looks an account up by `(issuer, accountId)`, and a
+      // connection's issuer is its own URL rather than a synthetic one. When
+      // the read answered "no rows" for an issuer it could not decode, every
+      // returning connection sign-in failed to find its own row and
+      // better-auth tried to create it again into the account uniqueness
+      // constraint.
       const cookie = await signUp(identity.auth, EMAIL);
       const context = await identity.auth.$context;
       const userId = identity.db.user?.[0]?.id as string;
 
       await context.internalAdapter.linkAccount({
         userId,
-        providerId: "google",
-        issuer: "https://accounts.google.com",
-        accountId: "sub-google-real",
+        providerId: "connection-acme",
+        issuer: "https://login.acme.example",
+        accountId: "subject-olga",
       });
 
-      const found = await context.adapter.findOne<{ userId: string }>({
+      const found = await context.adapter.findOne<{
+        userId: string;
+        issuer: string;
+      }>({
         model: "account",
         where: [
-          { field: "issuer", value: "https://accounts.google.com" },
-          { field: "accountId", value: "sub-google-real" },
+          { field: "issuer", value: "https://login.acme.example" },
+          { field: "accountId", value: "subject-olga" },
         ],
       });
-      expect(found?.userId).toBe(userId);
+      expect(found).toMatchObject({
+        userId,
+        issuer: "https://login.acme.example",
+      });
 
       // And the row kept the issuer it was linked under, rather than being
       // handed back a synthetic one 1.7's own comparison would reject.
@@ -265,8 +272,8 @@ describe("better-auth over the identity storage adapter", () => {
         headers: new Headers({ cookie }),
       });
       expect(listed.map((row) => row.providerId).sort()).toEqual([
+        "connection-acme",
         "credential",
-        "google",
       ]);
     });
 

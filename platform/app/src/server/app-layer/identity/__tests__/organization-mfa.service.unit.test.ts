@@ -37,7 +37,7 @@ const fixture = ({
     storedRequired = args.mfaRequired;
   });
   const notify = vi.fn<OrganizationMfaServiceDeps["notifier"]["requirementTurnedOn"]>(
-    async () => undefined,
+    async () => void 0,
   );
   const entitlement = vi.fn(async () => entitled);
   const sessionReads = vi.fn(async ({ sessionId }: { sessionId: string }) =>
@@ -151,6 +151,17 @@ describe("OrganizationMfaService requirement lifecycle", () => {
     expect(subject.required()).toBe(false);
     expect(subject.write).not.toHaveBeenCalled();
     expect(subject.notify).not.toHaveBeenCalled();
+
+    const releasing = fixture({ required: true, entitled: false });
+    await expect(
+      releasing.service.setRequirement({
+        organizationId,
+        mfaRequired: false,
+        actorUserId: "admin-sam",
+      }),
+    ).resolves.toEqual({ previous: true, next: false });
+    expect(releasing.entitlement).not.toHaveBeenCalled();
+    expect(releasing.required()).toBe(false);
   });
 
   /** @scenario "Turning the flag off leaves people who set one up signed in" */
