@@ -74,12 +74,71 @@ const isRepositoryTier = (file: string) =>
 const QUERY =
   /\b(?:prisma|tx)\.(?:\$transaction|\$queryRaw|\$executeRaw|[a-z][A-Za-z]*\.(?:find|count|create|update|upsert|delete|aggregate|group))/;
 
-const linesMatching = (source: string, pattern: RegExp) =>
+const linesMatching = (
+  source: string,
+  pattern: RegExp,
+  ignoredLines = new Set<number>(),
+) =>
   source
     .split("\n")
     .map((line, index) => ({ line, index }))
-    .filter(({ line }) => pattern.test(line))
+    .filter(({ line, index }) => pattern.test(line) && !ignoredLines.has(index))
     .map(({ line, index }) => `L${index + 1} ${line.trim()}`);
+
+/**
+ * A repository may expose a private constructor through its own static
+ * factory. That is composition, not a satellite construction: the class owns
+ * the factory and the factory constructs only that class. Keep this exception
+ * structural and local rather than adding a file to the ratchet.
+ */
+function ownStaticFactoryLines(source: string): Set<number> {
+  const lines = source.split("\n");
+  const ignored = new Set<number>();
+  const braceDelta = (line: string): number =>
+    [...line.matchAll(/[{}]/g)].reduce(
+      (delta, match) => delta + (match[0] === "{" ? 1 : -1),
+      0,
+    );
+
+  for (let classLine = 0; classLine < lines.length; classLine++) {
+    const className = lines[classLine]?.match(/\bclass\s+([A-Z]\w*)\b/)?.[1];
+    if (!className) {
+      continue;
+    }
+
+    let depth = 0;
+    let factoryDepth: number | undefined;
+    let factoryPending = false;
+    for (let lineIndex = classLine; lineIndex < lines.length; lineIndex++) {
+      const line = lines[lineIndex] ?? "";
+      const before = depth;
+      const delta = braceDelta(line);
+
+      if (/\bstatic\s+create\s*\(/.test(line)) {
+        factoryPending = true;
+      }
+      if (factoryPending && factoryDepth === undefined && delta > 0) {
+        factoryDepth = before + delta;
+        factoryPending = false;
+      }
+      if (
+        factoryDepth !== undefined &&
+        new RegExp(`\\bnew\\s+${className}\\s*\\(`).test(line)
+      ) {
+        ignored.add(lineIndex);
+      }
+
+      depth += delta;
+      if (factoryDepth !== undefined && depth < factoryDepth) {
+        factoryDepth = undefined;
+      }
+      if (lineIndex > classLine && depth <= 0) {
+        break;
+      }
+    }
+  }
+  return ignored;
+}
 
 /** `{ file: [why, why] }` for every file with at least one finding. */
 const offendersOf = (
@@ -204,7 +263,9 @@ describe("identity service layering", () => {
         /\bnew\s+(?:Prisma[A-Z]\w*|\w+Service|\w+LedgerWriter|\w+Hooks|\w+Minter|\w+Registration|\w+Endpoint|\w+Guard|\w+Bridge|RegisteredIssuers|BornFinalizedOptIn)\(/;
       const files = [...sourceFiles(BETTER_AUTH), ...sourceFiles(IDENTITY)];
       const offenders = offendersOf(files, (file, source) =>
-        file === RUNTIME ? [] : linesMatching(source, CONSTRUCTION),
+        file === RUNTIME
+          ? []
+          : linesMatching(source, CONSTRUCTION, ownStaticFactoryLines(source)),
       );
       expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
