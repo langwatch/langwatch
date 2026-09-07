@@ -58,10 +58,12 @@ export function publicNamespaceFromUnknown(feature: unknown): string {
     return `${feature.slice(0, -1)}ies`;
   }
 
-  if (["s", "x", "z"].some((suffix) => feature.endsWith(suffix))) {
+  const sibilantEnding = ["s", "x", "z"].some((suffix) => feature.endsWith(suffix));
+  if (sibilantEnding) {
     return `${feature}es`;
   }
-  if (feature.endsWith("ch") || feature.endsWith("sh")) {
+  const digraphEnding = feature.endsWith("ch") || feature.endsWith("sh");
+  if (digraphEnding) {
     return `${feature}es`;
   }
   return `${feature}s`;

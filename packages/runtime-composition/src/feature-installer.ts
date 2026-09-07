@@ -1,0 +1,819 @@
+/** One feature installer. A feature declares its config, the contract services */
+import type { DependencyToken, ResolvedTokens, TokenMap } from "./dependency-token.ts";
+import type { FeatureName, PublicNamespace } from "./feature-namespace.ts";
+import { publicNamespace, publicNamespaceFromUnknown } from "./feature-namespace.ts";
+import type { ResourceOwnership } from "./resource-scope.ts";
+import { FeatureConfigError } from "./boot-errors.ts";
+
+/** Which process is booting. A role hosts only the work that role owns. */
+export type ServerRole = "api" | "worker" | "task";
+
+/** As much of Zod as a feature's config needs, so this package depends on none. */
+export interface FeatureConfigSchema<Config> {
+  parse(value: unknown): Config;
+}
+
+/** The complete context supplied to a server app's static factory. */
+export interface FeatureSetup<Dependencies extends TokenMap, Infrastructure, Config> {
+  readonly dependencies: ResolvedTokens<Dependencies>;
+  readonly infrastructure: Infrastructure;
+  readonly config: Config;
+  readonly resources: ResourceOwnership;
+}
+
+/** Static construction metadata owned by a server app implementation. */
+export type AppDefinition<Dependencies extends TokenMap, Infrastructure, Config, App> = Readonly<{
+  readonly contract: DependencyToken<App>;
+  readonly dependencies: Dependencies;
+  readonly configSchema: FeatureConfigSchema<Config>;
+  readonly create: (
+    setup: FeatureSetup<NoInfer<Dependencies>, Infrastructure, NoInfer<Config>>,
+  ) => NoInfer<App>;
+}>;
+
+/** Static construction metadata for an app with no semantic configuration. */
+export type AppDefinitionWithoutConfig<
+  Dependencies extends TokenMap,
+  Infrastructure,
+  App,
+> = Readonly<{
+  readonly contract: DependencyToken<App>;
+  readonly dependencies: Dependencies;
+  readonly create: (
+    setup: FeatureSetup<NoInfer<Dependencies>, Infrastructure, undefined>,
+  ) => NoInfer<App>;
+}>;
+
+/** An inert API descriptor retained for the process root to mount later. */
+export type FeatureApiDescriptor = Readonly<{
+  readonly protocol: "rest" | "trpc";
+  readonly router: (...args: never[]) => object;
+}>;
+
+/** What a setup is handed, once per process. */
+export interface FeatureSetupArguments<Config, Infrastructure, Dependencies> {
+  readonly resources: ResourceOwnership;
+  readonly config: Config;
+  readonly infrastructure: Infrastructure;
+  readonly dependencies: Dependencies;
+}
+
+/** What the one transport assembly is handed, in a role that serves doors. */
+export interface FeatureTransportSetupArguments<
+  Config,
+  Infrastructure,
+  Dependencies,
+  TransportDependencies,
+  Provided,
+> extends FeatureSetupArguments<Config, Infrastructure, Dependencies> {
+  /** The tokens this feature needs only where it serves a transport. */
+  readonly transportDependencies: TransportDependencies;
+  /** Whatever the setup returned. */
+  readonly provided: Provided;
+}
+
+/** What a door's contribution is handed, after the transport assembly ran. */
+export interface FeatureTransportArguments<
+  Config,
+  Infrastructure,
+  Dependencies,
+  TransportDependencies,
+  Provided,
+  Transport,
+> extends FeatureTransportSetupArguments<
+  Config,
+  Infrastructure,
+  Dependencies,
+  TransportDependencies,
+  Provided
+> {
+  /** What the doors share: constructed once, by the transport assembly. */
+  readonly transport: Transport;
+}
+
+/** What a background contribution is handed, after the setup ran. */
+export interface FeatureWorkerArguments<
+  Config,
+  Infrastructure,
+  Dependencies,
+  Provided,
+> extends FeatureSetupArguments<Config, Infrastructure, Dependencies> {
+  readonly provided: Provided;
+}
+
+/** One token this feature answers for, and the instance behind it. */
+export interface FeatureProvider<Provided> {
+  readonly token: DependencyToken<unknown>;
+  read(provided: Provided): unknown;
+}
+
+/** What one installed feature holds, with its own types erased. */
+export interface InstalledFeatureState {
+  readonly provided: unknown;
+  /** Bound contribution readers; absent where the feature declared none. */
+  readonly rest: (() => unknown) | undefined;
+  readonly trpc: (() => unknown) | undefined;
+  readonly worker: (() => unknown) | undefined;
+}
+
+/** What `install` is handed by the application root. */
+export interface FeatureInstallArguments<Infrastructure> {
+  readonly resources: ResourceOwnership;
+  readonly config: unknown;
+  readonly infrastructure: Infrastructure;
+  readonly role: ServerRole;
+  /** The instance the graph resolved for one token. */
+  resolve(token: DependencyToken<unknown>): unknown;
+}
+
+/**
+ * A declaration as the application root holds it: every type parameter but the
+ * infrastructure erased, because the root installs features it knows nothing
+ * else about.
+ */
+export interface InstallableServerFeature<Infrastructure> {
+  readonly name: string;
+  readonly dependencies: TokenMap;
+  readonly transportDependencies: TokenMap;
+  readonly providers: readonly FeatureProvider<never>[];
+  readonly contributesWorkerWork: boolean;
+  readonly install: (args: FeatureInstallArguments<Infrastructure>) => InstalledFeatureState;
+}
+
+/** A built declaration, with the types its own call sites read back. */
+export interface ServerFeatureDeclaration<
+  Config,
+  Infrastructure,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+  Provided,
+  Transport,
+  Rest,
+  Trpc,
+  Worker,
+> extends InstallableServerFeature<Infrastructure> {
+  /** Present only so the declaration's types are reachable from a runtime read. */
+  readonly reads: {
+    config: Config;
+    dependencies: ResolvedTokens<Dependencies>;
+    transportDependencies: ResolvedTokens<TransportDependencies>;
+    provided: Provided;
+    transport: Transport;
+    rest: Rest;
+    trpc: Trpc;
+    worker: Worker;
+  };
+}
+
+/** What the declaration stage accumulates before a setup exists. */
+interface FeatureShape<
+  Config,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+> {
+  readonly name: string;
+  readonly configSchema: FeatureConfigSchema<Config> | undefined;
+  readonly dependencies: Dependencies;
+  readonly transportDependencies: TransportDependencies;
+}
+
+/**
+ * The first stage: everything a feature states before it says how it is built.
+ * Nothing here depends on anything else here, which is why one class can carry
+ * all of it without an assertion when a type parameter changes.
+ */
+export class ServerFeatureBuilder<
+  Config,
+  Infrastructure,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+> {
+  constructor(private readonly shape: FeatureShape<Config, Dependencies, TransportDependencies>) {}
+
+  /** The typed config slice `boot({ config })` must carry for this feature. */
+  withConfig<NextConfig>(
+    schema: FeatureConfigSchema<NextConfig>,
+  ): ServerFeatureBuilder<NextConfig, Infrastructure, Dependencies, TransportDependencies> {
+    return new ServerFeatureBuilder({ ...this.shape, configSchema: schema });
+  }
+
+  /** The contract services this feature needs in EVERY role it is installed in. */
+  withDependencies<NextDependencies extends TokenMap>(
+    dependencies: NextDependencies,
+  ): ServerFeatureBuilder<Config, Infrastructure, NextDependencies, TransportDependencies> {
+    return new ServerFeatureBuilder({ ...this.shape, dependencies });
+  }
+
+  /** The tokens this feature needs only where it serves a transport. They are */
+  withTransportDependencies<NextTransportDependencies extends TokenMap>(
+    transportDependencies: NextTransportDependencies,
+  ): ServerFeatureBuilder<Config, Infrastructure, Dependencies, NextTransportDependencies> {
+    return new ServerFeatureBuilder({ ...this.shape, transportDependencies });
+  }
+
+  /** Ordinary code, run once per process, that constructs what this feature owns. */
+  withSetup<Provided>(
+    setup: (
+      args: FeatureSetupArguments<Config, Infrastructure, ResolvedTokens<Dependencies>>,
+    ) => Provided,
+  ): ServerFeatureAssembly<
+    Config,
+    Infrastructure,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    undefined,
+    undefined,
+    undefined,
+    undefined
+  > {
+    return new ServerFeatureAssembly({
+      ...this.shape,
+      setup,
+      providers: [],
+      transport: undefined,
+      rest: undefined,
+      trpc: undefined,
+      worker: undefined,
+      close: undefined,
+    });
+  }
+}
+
+/** What the assembly stage accumulates once a setup exists. */
+interface FeatureAssemblyState<
+  Config,
+  Infrastructure,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+  Provided,
+  Transport,
+  Rest,
+  Trpc,
+  Worker,
+> extends FeatureShape<Config, Dependencies, TransportDependencies> {
+  readonly setup: (
+    args: FeatureSetupArguments<Config, Infrastructure, ResolvedTokens<Dependencies>>,
+  ) => Provided;
+  readonly providers: readonly FeatureProvider<Provided>[];
+  readonly transport:
+    | ((
+        args: FeatureTransportSetupArguments<
+          Config,
+          Infrastructure,
+          ResolvedTokens<Dependencies>,
+          ResolvedTokens<TransportDependencies>,
+          Provided
+        >,
+      ) => Transport)
+    | undefined;
+  readonly rest: DoorContribution<
+    Config,
+    Infrastructure,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest
+  >;
+  readonly trpc: DoorContribution<
+    Config,
+    Infrastructure,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Trpc
+  >;
+  readonly worker:
+    | ((
+        args: FeatureWorkerArguments<
+          Config,
+          Infrastructure,
+          ResolvedTokens<Dependencies>,
+          Provided
+        >,
+      ) => Worker)
+    | undefined;
+  readonly close: ((provided: Provided) => void | Promise<void>) | undefined;
+}
+
+/** One door's contribution, or nothing where the feature declared no such door. */
+type DoorContribution<
+  Config,
+  Infrastructure,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+  Provided,
+  Transport,
+  Result,
+> =
+  | ((
+      args: FeatureTransportArguments<
+        Config,
+        Infrastructure,
+        ResolvedTokens<Dependencies>,
+        ResolvedTokens<TransportDependencies>,
+        Provided,
+        Transport
+      >,
+    ) => Result)
+  | undefined;
+
+/**
+ * The second stage: what the feature exposes and contributes. Each method
+ * replaces exactly one field, so the type parameter it changes is the only one
+ * the new state names differently.
+ */
+export class ServerFeatureAssembly<
+  Config,
+  Infrastructure,
+  Dependencies extends TokenMap,
+  TransportDependencies extends TokenMap,
+  Provided,
+  Transport,
+  Rest,
+  Trpc,
+  Worker,
+> {
+  constructor(
+    private readonly state: FeatureAssemblyState<
+      Config,
+      Infrastructure,
+      Dependencies,
+      TransportDependencies,
+      Provided,
+      Transport,
+      Rest,
+      Trpc,
+      Worker
+    >,
+  ) {}
+
+  /** Publishes the setup result as the feature’s single public app contract. */
+  provides<Instance>(
+    token: DependencyToken<Instance> & ([Provided] extends [Instance] ? unknown : never),
+  ): ServerFeatureAssembly<
+    Config,
+    Infrastructure,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    Worker
+  > {
+    const alreadyProvidesApp = this.state.providers.length !== 0;
+    if (alreadyProvidesApp) {
+      throw new Error(
+        `Feature "${this.state.name}" already provides its app. Expose services as readonly app members.`,
+      );
+    }
+
+    return new ServerFeatureAssembly({
+      ...this.state,
+      providers: [{ token, read: (app: Provided) => app }],
+    });
+  }
+
+  /** What both doors share, constructed once in a role that serves doors. */
+  withTransport<NextTransport>(
+    create: (
+      args: FeatureTransportSetupArguments<
+        Config,
+        Infrastructure,
+        ResolvedTokens<Dependencies>,
+        ResolvedTokens<TransportDependencies>,
+        Provided
+      >,
+    ) => NextTransport,
+  ): ServerFeatureAssembly<
+    Config,
+    Infrastructure,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    NextTransport,
+    undefined,
+    undefined,
+    Worker
+  > {
+    return new ServerFeatureAssembly({
+      ...this.state,
+      transport: create,
+      rest: undefined,
+      trpc: undefined,
+    });
+  }
+
+  /** What this feature contributes to the process's REST surface. */
+  withRest<NextRest>(
+    create: (
+      args: FeatureTransportArguments<
+        Config,
+        Infrastructure,
+        ResolvedTokens<Dependencies>,
+        ResolvedTokens<TransportDependencies>,
+        Provided,
+        Transport
+      >,
+    ) => NextRest,
+  ): ServerFeatureAssembly<
+    Config,
+    Infrastructure,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    NextRest,
+    Trpc,
+    Worker
+  > {
+    return new ServerFeatureAssembly({ ...this.state, rest: create });
+  }
+
+  /** What this feature contributes to the process's tRPC surface. */
+  withTrpc<NextTrpc>(
+    create: (
+      args: FeatureTransportArguments<
+        Config,
+        Infrastructure,
+        ResolvedTokens<Dependencies>,
+        ResolvedTokens<TransportDependencies>,
+        Provided,
+        Transport
+      >,
+    ) => NextTrpc,
+  ): ServerFeatureAssembly<
+    Config,
+    Infrastructure,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    NextTrpc,
+    Worker
+  > {
+    return new ServerFeatureAssembly({ ...this.state, trpc: create });
+  }
+
+  /** The consumers and schedulers this feature contributes to a worker. */
+  withWorker<NextWorker>(
+    create: (
+      args: FeatureWorkerArguments<Config, Infrastructure, ResolvedTokens<Dependencies>, Provided>,
+    ) => NextWorker,
+  ): ServerFeatureAssembly<
+    Config,
+    Infrastructure,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    NextWorker
+  > {
+    return new ServerFeatureAssembly({ ...this.state, worker: create });
+  }
+
+  /** Releases what the setup acquired. Runs in reverse construction order. */
+  withClose(
+    close: (provided: Provided) => void | Promise<void>,
+  ): ServerFeatureAssembly<
+    Config,
+    Infrastructure,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    Worker
+  > {
+    return new ServerFeatureAssembly({ ...this.state, close });
+  }
+
+  /** The immutable declaration. Building it constructs nothing. */
+  build(): ServerFeatureDeclaration<
+    Config,
+    Infrastructure,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    Worker
+  > {
+    const state = this.state;
+    const declaration = {
+      name: state.name,
+      dependencies: state.dependencies,
+      transportDependencies: state.transportDependencies,
+      providers: state.providers as readonly FeatureProvider<never>[],
+      contributesWorkerWork: state.worker !== undefined,
+      reads: undefined as never,
+
+      install: (args: FeatureInstallArguments<Infrastructure>): InstalledFeatureState => {
+        const config = parseFeatureConfig(state.name, state.configSchema, args.config);
+        const dependencies = resolveTokens(
+          state.dependencies,
+          args.resolve,
+        ) as ResolvedTokens<Dependencies>;
+        const setupArguments = {
+          config,
+          infrastructure: args.infrastructure,
+          dependencies,
+          resources: args.resources,
+        };
+        const provided = state.setup(setupArguments);
+        const { worker, close } = state;
+        if (close) {
+          args.resources.own(state.name, () => close(provided));
+        }
+        const workerResult =
+          args.role === "worker" && worker ? worker({ ...setupArguments, provided }) : void 0;
+
+        const doors =
+          args.role === "api"
+            ? this.bindTransports(setupArguments, provided, args)
+            : { rest: void 0, trpc: void 0 };
+        return {
+          provided,
+          rest: doors.rest,
+          trpc: doors.trpc,
+          worker: args.role === "worker" && worker ? () => workerResult : undefined,
+        };
+      },
+    };
+    return Object.freeze(declaration);
+  }
+
+  private bindTransports(
+    setupArguments: FeatureSetupArguments<Config, Infrastructure, ResolvedTokens<Dependencies>>,
+    provided: Provided,
+    args: FeatureInstallArguments<Infrastructure>,
+  ): { rest: (() => unknown) | undefined; trpc: (() => unknown) | undefined } {
+    const state = this.state;
+    const { rest, trpc } = state;
+    const transportDependencies = resolveTokens(
+      state.transportDependencies,
+      args.resolve,
+    ) as ResolvedTokens<TransportDependencies>;
+    const transportSetupArguments = {
+      ...setupArguments,
+      transportDependencies,
+      provided,
+    };
+    // Both transports share this single adapter assembly.
+    const transport = state.transport
+      ? state.transport(transportSetupArguments)
+      : (undefined as Transport);
+    const doorArguments = { ...transportSetupArguments, transport };
+    const restResult = rest ? rest(doorArguments) : undefined;
+    const trpcResult = trpc ? trpc(doorArguments) : undefined;
+    return {
+      rest: rest ? () => restResult : undefined,
+      trpc: trpc ? () => trpcResult : undefined,
+    };
+  }
+}
+
+/**
+ * Names one feature installer. The infrastructure type is stated here because
+ * it is what the application root must be able to supply, and stating it at the
+ * end would let a feature declare a need no root could see.
+ */
+export function serverFeature<Infrastructure>(
+  name: string,
+): ServerFeatureBuilder<undefined, Infrastructure, Record<never, never>, Record<never, never>> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("A feature installer needs a name.");
+  return new ServerFeatureBuilder({
+    name: trimmed,
+    configSchema: undefined,
+    dependencies: {},
+    transportDependencies: {},
+  });
+}
+
+/**
+ * Names a feature whose server app owns its construction metadata.
+ *
+ * `withApp` is the new declaration path. The existing `serverFeature` builder
+ * remains available for features that still expose the older transport stages.
+ */
+export function defineFeature<const Name extends FeatureName>(
+  name: Name,
+): DefinedFeatureBuilder<Name> {
+  publicNamespaceFromUnknown(name);
+  return new DefinedFeatureBuilder(name);
+}
+
+class DefinedFeatureBuilder<Name extends FeatureName> {
+  constructor(private readonly name: Name) {}
+
+  withApp<Dependencies extends TokenMap, Infrastructure, Config, App>(
+    app: AppDefinition<Dependencies, Infrastructure, Config, App>,
+  ): ConfiguredAppBuilder<Name, Dependencies, Infrastructure, Config, App>;
+  withApp<Dependencies extends TokenMap, Infrastructure, App>(
+    app: AppDefinitionWithoutConfig<Dependencies, Infrastructure, App>,
+  ): UnconfiguredAppBuilder<Name, Dependencies, Infrastructure, App>;
+  withApp(
+    app:
+      | AppDefinition<TokenMap, unknown, unknown, unknown>
+      | AppDefinitionWithoutConfig<TokenMap, unknown, unknown>,
+  ):
+    | ConfiguredAppBuilder<Name, TokenMap, unknown, unknown, unknown>
+    | UnconfiguredAppBuilder<Name, TokenMap, unknown, unknown> {
+    if ("configSchema" in app) {
+      return new ConfiguredAppBuilder(this.name, app);
+    }
+    return new UnconfiguredAppBuilder(this.name, app);
+  }
+}
+
+class ConfiguredAppBuilder<
+  Name extends FeatureName,
+  Dependencies extends TokenMap,
+  Infrastructure,
+  Config,
+  App,
+> {
+  constructor(
+    private readonly name: Name,
+    private readonly app: AppDefinition<Dependencies, Infrastructure, Config, App>,
+  ) {}
+
+  withTransports<const Apis extends readonly FeatureApiDescriptor[]>(
+    ...apis: Apis
+  ): ConfiguredAppWithApisBuilder<Name, Dependencies, Infrastructure, Config, App, Apis> {
+    return new ConfiguredAppWithApisBuilder(this.name, this.app, apis);
+  }
+
+  build(): ServerFeatureDeclaration<
+    Config,
+    Infrastructure,
+    Dependencies,
+    Record<never, never>,
+    App,
+    undefined,
+    undefined,
+    undefined,
+    undefined
+  > {
+    const app = this.app;
+    const declaration = serverFeature<Infrastructure>(this.name)
+      .withConfig(app.configSchema)
+      .withDependencies(app.dependencies)
+      .withSetup(({ dependencies, infrastructure, config, resources }) =>
+        app.create({
+          dependencies,
+          infrastructure,
+          config,
+          resources,
+        }),
+      )
+      .provides(app.contract)
+      .build();
+    return declaration;
+  }
+}
+
+class UnconfiguredAppBuilder<
+  Name extends FeatureName,
+  Dependencies extends TokenMap,
+  Infrastructure,
+  App,
+> {
+  constructor(
+    private readonly name: Name,
+    private readonly app: AppDefinitionWithoutConfig<Dependencies, Infrastructure, App>,
+  ) {}
+
+  withTransports<const Apis extends readonly FeatureApiDescriptor[]>(
+    ...apis: Apis
+  ): UnconfiguredAppWithApisBuilder<Name, Dependencies, Infrastructure, App, Apis> {
+    return new UnconfiguredAppWithApisBuilder(this.name, this.app, apis);
+  }
+
+  build(): ServerFeatureDeclaration<
+    undefined,
+    Infrastructure,
+    Dependencies,
+    Record<never, never>,
+    App,
+    undefined,
+    undefined,
+    undefined,
+    undefined
+  > {
+    const app = this.app;
+    return serverFeature<Infrastructure>(this.name)
+      .withConfig({ parse: () => void 0 })
+      .withDependencies(app.dependencies)
+      .withSetup(({ dependencies, infrastructure, config, resources }) =>
+        app.create({
+          dependencies,
+          infrastructure,
+          config,
+          resources,
+        }),
+      )
+      .provides(app.contract)
+      .build();
+  }
+}
+
+class ConfiguredAppWithApisBuilder<
+  Name extends FeatureName,
+  Dependencies extends TokenMap,
+  Infrastructure,
+  Config,
+  App,
+  Apis extends readonly FeatureApiDescriptor[],
+> {
+  constructor(
+    private readonly name: Name,
+    private readonly app: AppDefinition<Dependencies, Infrastructure, Config, App>,
+    private readonly apis: Apis,
+  ) {}
+
+  build(): ServerFeatureDeclaration<
+    Config,
+    Infrastructure,
+    Dependencies,
+    Record<never, never>,
+    App,
+    undefined,
+    undefined,
+    undefined,
+    undefined
+  > & { readonly apis: Apis; readonly namespace: PublicNamespace<Name> } {
+    const declaration = new ConfiguredAppBuilder(this.name, this.app).build();
+    return {
+      ...declaration,
+      apis: this.apis,
+      namespace: publicNamespace(this.name),
+    };
+  }
+}
+
+class UnconfiguredAppWithApisBuilder<
+  Name extends FeatureName,
+  Dependencies extends TokenMap,
+  Infrastructure,
+  App,
+  Apis extends readonly FeatureApiDescriptor[],
+> {
+  constructor(
+    private readonly name: Name,
+    private readonly app: AppDefinitionWithoutConfig<Dependencies, Infrastructure, App>,
+    private readonly apis: Apis,
+  ) {}
+
+  build(): ServerFeatureDeclaration<
+    undefined,
+    Infrastructure,
+    Dependencies,
+    Record<never, never>,
+    App,
+    undefined,
+    undefined,
+    undefined,
+    undefined
+  > & { readonly apis: Apis; readonly namespace: PublicNamespace<Name> } {
+    const declaration = new UnconfiguredAppBuilder(this.name, this.app).build();
+    return {
+      ...declaration,
+      apis: this.apis,
+      namespace: publicNamespace(this.name),
+    };
+  }
+}
+
+function parseFeatureConfig<Config>(
+  feature: string,
+  schema: FeatureConfigSchema<Config> | undefined,
+  value: unknown,
+): Config {
+  if (schema === undefined) return void 0 as Config;
+  try {
+    return schema.parse(value);
+  } catch (error) {
+    throw new FeatureConfigError(feature, error instanceof Error ? error.message : String(error));
+  }
+}
+
+function resolveTokens(
+  tokens: TokenMap,
+  resolve: (token: DependencyToken<unknown>) => unknown,
+): Record<string, unknown> {
+  const resolved: Record<string, unknown> = {};
+  for (const [key, token] of Object.entries(tokens)) {
+    resolved[key] = resolve(token);
+  }
+  return resolved;
+}

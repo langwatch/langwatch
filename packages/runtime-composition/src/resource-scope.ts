@@ -1,5 +1,9 @@
 export type ResourceCloser = () => void | Promise<void>;
 
+export interface ResourceOwnership {
+  own(name: string, close: ResourceCloser): void;
+}
+
 /** Owns process resources and closes them once in reverse registration order. */
 export class ResourceScope {
   private readonly resources: Array<{ name: string; close: ResourceCloser }> = [];
@@ -17,7 +21,7 @@ export class ResourceScope {
   }
 
   close(): Promise<void> {
-    this.closeResult ??= this.closeOwnedResources();
+    this.closeResult ??= Promise.resolve().then(() => this.closeOwnedResources());
     return this.closeResult;
   }
 
