@@ -4,6 +4,7 @@ import { readHandledError, showErrorToast } from "../../errors/index.ts";
 import type { ExportProgressEvent } from "../../../../model/export-types.ts";
 import type { ExportFormat, ExportMode, ExportProgress } from "../../../../model/export-types.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import { nowInstant } from "@langwatch/time";
 
 interface ExportConfig {
   mode: ExportMode;
@@ -204,7 +205,7 @@ export function useExportTraces({
       };
 
       const fileExtension = config.format === "json" ? "jsonl" : "csv";
-      const today = new Date().toISOString().split("T")[0];
+      const today = nowInstant().toString().split("T")[0];
       const fallbackFilename = `${projectId} - Traces - ${today} - ${config.mode}.${fileExtension}`;
 
       // Capture this controller to detect staleness in async handlers.

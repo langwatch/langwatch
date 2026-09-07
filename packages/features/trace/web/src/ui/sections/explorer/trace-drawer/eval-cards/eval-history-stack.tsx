@@ -5,6 +5,13 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { truncateId } from "../../../../../model/display-formatters.ts";
 import { type EvalEntry, isNoVerdict, STATUS } from "./utils.ts";
 
+/** A history row's score, as the stack prints it: "true"/"false", 2dp, or an em dash. */
+function formatEntryScore(score: number | boolean | null): string {
+  if (typeof score === "boolean") return score ? "true" : "false";
+  return typeof score === "number" ? score.toFixed(2) : "—";
+}
+import { readableDate } from "../../../../../model/display-formatters.ts";
+
 export function EvalHistoryStack({
   entries,
   onSelectSpan,
@@ -60,16 +67,8 @@ function EvalHistoryRow({
 }) {
   const status = STATUS[entry.status as keyof typeof STATUS] ?? STATUS.warning;
   const noVerdict = isNoVerdict(entry.status);
-  const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : null;
-  const scoreLabel = noVerdict
-    ? null
-    : typeof entry.score === "boolean"
-      ? entry.score
-        ? "true"
-        : "false"
-      : typeof entry.score === "number"
-        ? entry.score.toFixed(2)
-        : "—";
+  const time = entry.timestamp ? readableDate(entry.timestamp).toLocaleTimeString() : null;
+  const scoreLabel = noVerdict ? null : formatEntryScore(entry.score);
   const canJump = !!entry.spanId && !!onSelectSpan;
   return (
     <HStack gap={2} paddingX={2} paddingY={1} borderRadius="sm" _hover={{ bg: "bg.muted" }}>

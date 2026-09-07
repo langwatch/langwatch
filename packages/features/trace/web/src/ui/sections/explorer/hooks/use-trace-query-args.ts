@@ -4,6 +4,7 @@ import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
 import { LIVE_WINDOW_MS } from "../../../../model/trace-freshness.ts";
 import { useTraceViewer } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 import { useDrawerProjectId } from "./use-drawer-project-id.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Shared base wiring for the per-trace tRPC queries fired off the open drawer (header,
@@ -19,7 +20,8 @@ export function useTraceQueryArgs() {
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
   const projectId = useDrawerProjectId();
 
-  const isLive = occurredAtMs !== null && Date.now() - occurredAtMs < LIVE_WINDOW_MS;
+  const isLive =
+    occurredAtMs !== null && nowInstant().epochMilliseconds - occurredAtMs < LIVE_WINDOW_MS;
 
   const queryArgs = {
     projectId,

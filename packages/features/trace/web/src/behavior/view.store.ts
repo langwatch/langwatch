@@ -10,6 +10,7 @@ import {
   reconcileSort,
 } from "./lens-capabilities.ts";
 import type { RowKind } from "../model/trace-row-kind.ts";
+import { nowInstant } from "@langwatch/time";
 
 export type GroupingMode = "flat" | "by-conversation" | "by-service" | "by-user" | "by-model";
 
@@ -462,7 +463,7 @@ function generateId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return `custom-${crypto.randomUUID()}`;
   }
-  return `custom-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `custom-${nowInstant().epochMilliseconds}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function setDraft(
@@ -610,13 +611,13 @@ export const useViewStore = create<ViewState>((set, get) => ({
 
   reorderColumns: (fromIndex, toIndex) =>
     set((s) => {
-      if (
-        fromIndex === toIndex ||
+      const sameSlot = fromIndex === toIndex;
+      const outOfRange =
         fromIndex < 0 ||
         toIndex < 0 ||
         fromIndex >= s.columnOrder.length ||
-        toIndex >= s.columnOrder.length
-      ) {
+        toIndex >= s.columnOrder.length;
+      if (sameSlot || outOfRange) {
         return s;
       }
       const order = [...s.columnOrder];

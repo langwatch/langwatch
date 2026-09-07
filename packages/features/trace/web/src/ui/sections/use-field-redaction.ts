@@ -2,7 +2,8 @@ import { api } from "../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 
 export const useFieldRedaction = (field: "input" | "output") => {
-  if (typeof window !== "undefined" && window.location.pathname.includes("/share/")) {
+  const isSharePage = typeof window !== "undefined" && window.location.pathname.includes("/share/");
+  if (isSharePage) {
     return {
       isRedacted: false,
       isLoading: false,

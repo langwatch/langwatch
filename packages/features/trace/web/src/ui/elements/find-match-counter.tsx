@@ -7,11 +7,8 @@ type FindMatchCounterProps = {
 };
 
 export function FindMatchCounter({ isSearching, matchCount, currentIndex }: FindMatchCounterProps) {
-  const label = isSearching
-    ? "…"
-    : matchCount === 0
-      ? "No matches"
-      : `${currentIndex + 1} of ${matchCount}`;
+  const foundLabel = matchCount === 0 ? "No matches" : `${currentIndex + 1} of ${matchCount}`;
+  const label = isSearching ? "…" : foundLabel;
 
   return (
     <Text textStyle="2xs" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">

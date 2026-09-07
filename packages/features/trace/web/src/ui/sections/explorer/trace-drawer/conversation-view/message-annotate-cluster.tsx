@@ -148,12 +148,13 @@ function TranslateAction({
   target: MessageAnnotateTarget;
   translation: MessageTranslation;
 }) {
+  const settledLabel = translation.isActive ? "Original" : "Translate";
+  const translationLabel = translation.isLoading ? "Translating…" : settledLabel;
+
   return (
     <HoverActionButton
       icon={Languages}
-      label={
-        translation.isLoading ? "Translating…" : translation.isActive ? "Original" : "Translate"
-      }
+      label={translationLabel}
       tooltip={
         translation.isActive ? "Show the original text" : ACTION_COPY[target.anchorPath].translate
       }

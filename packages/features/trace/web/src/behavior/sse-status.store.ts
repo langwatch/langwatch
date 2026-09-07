@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The connection lifecycle the live-updates subscription reports, mirrored here so the
@@ -84,7 +85,7 @@ export const useSseStatusStore = create<SseStatusState>((set) => ({
   lastEventAt: 0,
   setLastEventAt: (ts) => set({ lastEventAt: ts }),
   fastPollRequestedAt: 0,
-  requestFastPoll: () => set({ fastPollRequestedAt: Date.now() }),
+  requestFastPoll: () => set({ fastPollRequestedAt: nowInstant().epochMilliseconds }),
   liveUpdatesMode: initialMode,
   liveUpdatesEnabled: initialMode !== "paused",
   setLiveUpdatesMode: (mode) => {

@@ -8,6 +8,7 @@ import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
 import { formatAbsoluteTime } from "../../../../../model/display-formatters.ts";
 import { SegmentedToggle } from "../../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
 import { TraceEditDiffDialog } from "../trace-edit-diff-dialog.tsx";
+import { toEpochMs } from "@langwatch/time";
 
 const VIEW_OPTIONS = [
   { value: "edited", label: "Edited" },
@@ -42,7 +43,7 @@ export function EditedOriginalToggle() {
         />
         {author && (
           <Tooltip
-            content={formatAbsoluteTime(new Date(correction.updatedAt).getTime())}
+            content={formatAbsoluteTime(toEpochMs(correction.updatedAt))}
             positioning={{ placement: "bottom" }}
             openDelay={300}
           >

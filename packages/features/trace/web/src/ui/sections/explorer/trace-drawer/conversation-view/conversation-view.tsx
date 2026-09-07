@@ -26,7 +26,11 @@ import {
 import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation.ts";
 import type { TraceListItem } from "../../types/trace.ts";
 import { FormatSelect } from "../../../../blocks/explorer/trace-drawer/format-select.tsx";
-import { extractReadableText, extractReasoningText, extractSystemText } from "../transcript/index.ts";
+import {
+  extractReadableText,
+  extractReasoningText,
+  extractSystemText,
+} from "../transcript/index.ts";
 import { AnnotatedTurnRow } from "./annotated-turn-row.tsx";
 import { ConversationExpandContext } from "../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts";
 import {
@@ -639,12 +643,9 @@ const PlainTurnsView: React.FC<TurnsViewProps & { systemPrompt: string | null }>
         {parsedTurns.map((p, i) => {
           const isCurrent = p.turn.traceId === currentTraceId;
           const isFocused = p.turn.traceId === underReview;
+          const currentRef = isCurrent ? activeRef : undefined;
           return (
-            <Box
-              key={p.turn.traceId}
-              ref={isFocused ? focusedRef : isCurrent ? activeRef : undefined}
-              width="full"
-            >
+            <Box key={p.turn.traceId} ref={isFocused ? focusedRef : currentRef} width="full">
               <ConversationTurn
                 layout={layout}
                 parsed={p}

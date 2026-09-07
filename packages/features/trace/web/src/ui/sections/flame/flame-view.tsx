@@ -105,7 +105,8 @@ export const FlameView = memo(function FlameView({
       if (e.target !== e.currentTarget) {
         // Allow inner content box too (the absolute layer).
         if (!(e.target instanceof HTMLElement)) return;
-        if (e.target.dataset.flameLayer !== "true") return;
+        const isFlameLayer = e.target.dataset.flameLayer === "true";
+        if (!isFlameLayer) return;
       }
       onClearSpan();
     },

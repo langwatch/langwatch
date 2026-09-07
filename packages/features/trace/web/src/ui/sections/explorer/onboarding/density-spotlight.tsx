@@ -115,7 +115,7 @@ export function DensitySpotlight({
                     {choice.label}
                   </Text>
                 </HStack>
-                {isPicked ? (
+                {isPicked && (
                   <HStack
                     gap={1}
                     paddingX={1.5}
@@ -131,7 +131,8 @@ export function DensitySpotlight({
                       →
                     </Text>
                   </HStack>
-                ) : isActive ? (
+                )}
+                {!isPicked && isActive && (
                   <HStack
                     gap={1}
                     paddingX={1.5}
@@ -149,7 +150,7 @@ export function DensitySpotlight({
                       Current
                     </Text>
                   </HStack>
-                ) : null}
+                )}
               </HStack>
 
               <DensityRowsPreview choice={choice} active={isActive} />

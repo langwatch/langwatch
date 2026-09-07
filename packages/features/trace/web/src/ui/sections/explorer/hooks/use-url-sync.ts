@@ -265,7 +265,8 @@ export function useURLSync(): void {
     // `popstate` fires for every history entry this page owns, and the trace drawer
     // pushes one of its own — its state lives in the query string, which this hook
     // never reads.
-    if (!isFirstApply && targetLens && canonicalBody(applied) === liveBody(live)) {
+    const bodyUnchanged = canonicalBody(applied) === liveBody(live);
+    if (!isFirstApply && targetLens && bodyUnchanged) {
       return;
     }
 
@@ -308,7 +309,8 @@ export function useURLSync(): void {
     // BEFORE this one because `setUserLenses` restores the last-used lens in
     // the same write that hydrates the list, and that restore is a fallback
     // preference, not the user choosing anything — the URL outranks it.
-    if (liveBody(previousState.current) !== canonicalBody(pending.applied)) {
+    const bodyMoved = liveBody(previousState.current) !== canonicalBody(pending.applied);
+    if (bodyMoved) {
       return;
     }
     applyFromFragment();

@@ -11,8 +11,12 @@ import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
 } from "../../../../../behavior/annotation-queue-session.store.ts";
-import { openTraceEditorFromConversation, tracePartitionHint } from "../../utils/trace-edit-mode.ts";
+import {
+  openTraceEditorFromConversation,
+  tracePartitionHint,
+} from "../../utils/trace-edit-mode.ts";
 import { AnnotationPopover } from "./annotation-popover.tsx";
+import { readableDate } from "../../../../../model/display-formatters.ts";
 import {
   HoverActionButton,
   HoverActionCluster,
@@ -248,7 +252,7 @@ function AnnotationListRowSummary({ annotation }: { annotation: AnnotationItem }
           {annotation.expectedOutput && <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />}
           <Box flex={1} />
           <Text textStyle="2xs" color="fg.subtle">
-            {new Date(annotation.createdAt).toLocaleDateString()}
+            {readableDate(annotation.createdAt).toLocaleDateString()}
           </Text>
         </HStack>
         {annotation.comment && (

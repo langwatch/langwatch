@@ -282,19 +282,12 @@ export function TraceSummaryAccordions({
                     redacted={trace.inputRedacted ?? false}
                     visibleTo={trace.inputVisibleTo}
                   >
-                    {isEditing ? (
-                      <TraceEditableInput capturedText={trace.input ?? null} />
-                    ) : trace.input ? (
-                      inputCorrected ? (
-                        <CorrectedFieldFrame label="Input" original={capturedInput}>
-                          <IOViewer label="Input" content={trace.input} traceId={trace.traceId} />
-                        </CorrectedFieldFrame>
-                      ) : (
-                        <IOViewer label="Input" content={trace.input} traceId={trace.traceId} />
-                      )
-                    ) : (
-                      <MissingIORow label="Input" mode="input" />
-                    )}
+                    <TraceInputField
+                      capturedInput={capturedInput}
+                      inputCorrected={inputCorrected}
+                      isEditing={isEditing}
+                      trace={trace}
+                    />
                     <SummaryMediaStrip
                       refsJson={trace.attributes?.[RESERVED_INPUT_MEDIA_REFS]}
                       side="input"
@@ -305,29 +298,12 @@ export function TraceSummaryAccordions({
                     redacted={trace.outputRedacted ?? false}
                     visibleTo={trace.outputVisibleTo}
                   >
-                    {isEditing ? (
-                      <TraceEditableOutput capturedText={trace.output ?? null} />
-                    ) : trace.output ? (
-                      outputCorrected ? (
-                        <CorrectedFieldFrame label="Output" original={capturedOutput}>
-                          <IOViewer
-                            label="Output"
-                            content={trace.output}
-                            mode="output"
-                            traceId={trace.traceId}
-                          />
-                        </CorrectedFieldFrame>
-                      ) : (
-                        <IOViewer
-                          label="Output"
-                          content={trace.output}
-                          mode="output"
-                          traceId={trace.traceId}
-                        />
-                      )
-                    ) : (
-                      <MissingIORow label="Output" mode="output" />
-                    )}
+                    <TraceOutputField
+                      capturedOutput={capturedOutput}
+                      isEditing={isEditing}
+                      outputCorrected={outputCorrected}
+                      trace={trace}
+                    />
                     <SummaryMediaStrip
                       refsJson={trace.attributes?.[RESERVED_OUTPUT_MEDIA_REFS]}
                       side="output"
@@ -369,7 +345,7 @@ export function TraceSummaryAccordions({
                 isFirst={isFirst}
                 open={isOpen}
               >
-                {hasAttributes || isEditing ? (
+                {(hasAttributes || isEditing) && (
                   <AttributeTable
                     attributes={metadataEditing.baselineAttributes}
                     resourceAttributes={
@@ -380,9 +356,11 @@ export function TraceSummaryAccordions({
                     correctedFrom={metadataCorrected ? capturedAttributes : undefined}
                     comments={metadataComments}
                   />
-                ) : resources.isLoading ? (
+                )}
+                {!hasAttributes && !isEditing && resources.isLoading && (
                   <EmptyHint>Loading metadata…</EmptyHint>
-                ) : (
+                )}
+                {!hasAttributes && !isEditing && !resources.isLoading && (
                   <EmptyHint>No metadata recorded</EmptyHint>
                 )}
               </Section>
@@ -599,5 +577,57 @@ function MissingIORow({
         — no {mode} recorded
       </Text>
     </HStack>
+  );
+}
+
+/** The trace's input: the editor, the correction frame, the viewer, or nothing recorded. */
+function TraceInputField({
+  capturedInput,
+  inputCorrected,
+  isEditing,
+  trace,
+}: {
+  capturedInput: string | null | undefined;
+  inputCorrected: boolean;
+  isEditing: boolean;
+  trace: TraceHeader;
+}) {
+  if (isEditing) return <TraceEditableInput capturedText={trace.input ?? null} />;
+  if (!trace.input) return <MissingIORow label="Input" mode="input" />;
+
+  const viewer = <IOViewer label="Input" content={trace.input} traceId={trace.traceId} />;
+  if (!inputCorrected) return viewer;
+
+  return (
+    <CorrectedFieldFrame label="Input" original={capturedInput}>
+      {viewer}
+    </CorrectedFieldFrame>
+  );
+}
+
+/** The trace's output, in the same four shapes as the input above. */
+function TraceOutputField({
+  capturedOutput,
+  isEditing,
+  outputCorrected,
+  trace,
+}: {
+  capturedOutput: string | null | undefined;
+  isEditing: boolean;
+  outputCorrected: boolean;
+  trace: TraceHeader;
+}) {
+  if (isEditing) return <TraceEditableOutput capturedText={trace.output ?? null} />;
+  if (!trace.output) return <MissingIORow label="Output" mode="output" />;
+
+  const viewer = (
+    <IOViewer label="Output" content={trace.output} mode="output" traceId={trace.traceId} />
+  );
+  if (!outputCorrected) return viewer;
+
+  return (
+    <CorrectedFieldFrame label="Output" original={capturedOutput}>
+      {viewer}
+    </CorrectedFieldFrame>
   );
 }

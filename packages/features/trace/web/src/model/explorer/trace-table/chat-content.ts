@@ -65,8 +65,9 @@ export function contentToText(raw: string | null | undefined): string {
   if (parsed === undefined) return raw;
   if (isMessageArray(parsed)) {
     const last = parsed[parsed.length - 1]!;
-    if (last.tool_calls?.[0]?.function?.name) {
-      return `${last.tool_calls[0].function.name}(...)`;
+    const firstToolCallName = last.tool_calls?.[0]?.function?.name;
+    if (firstToolCallName) {
+      return `${firstToolCallName}(...)`;
     }
     return contentToString(last.content);
   }

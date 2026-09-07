@@ -3238,10 +3238,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/model/sdk-info.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/model/sequence/mermaid.ts",
       "measured": "2026-09-06"
     },
@@ -3259,14 +3255,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/blocks/trace-input-output.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/elements/errors/error-actions.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/elements/explorer/export-progress.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3578,10 +3566,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-drawer-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-header-chips.tsx",
       "measured": "2026-09-06"
     },
@@ -3638,10 +3622,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/model-cell.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/registry-row.tsx",
       "measured": "2026-09-06"
     },
@@ -3667,10 +3647,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/external-image.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/flame/flame-block.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -7678,202 +7654,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/drawer.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/pinned-attributes.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/preview-formatter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/shared/traces/media-parts.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/shared/traces/media-refs.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/time-range-presets.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/trace-edit.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/transcript/chat-message-coercion.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/transcript/content-parser.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/transcript/media-part.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/behavior/view.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/model/attribute-format.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/model/attribute-value-equality.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/model/explorer/search-bar/suggestion-items.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/model/explorer/trace-drawer/drawer-header/utils.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/model/explorer/trace-table/chat-content.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/model/is-json.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/model/terminal-origin.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/model/transcript/content-format.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/model/url-state.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/blocks/code/render-code.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/elements/explorer/filter-sidebar/range-controls.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/elements/explorer/trace-drawer/json-highlight.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/annotations/add-or-edit-annotation-score.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/add-to-annotation-queue-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/filter-sidebar/filter-sidebar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/hooks/use-lens-sync.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/hooks/use-span-tree.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-edit-session.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/hooks/use-url-sync.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/onboarding/hooks/use-first-trace-spotlight-trigger.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/onboarding/spotlights/spotlight-overlay.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/search-bar/auto-uppercase-operators.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/search-bar/placeholder-editor.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/search-bar/use-ask-langy-from-search.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/search-bar/use-filter-editor.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/toolbar/time-range-picker.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/attribute-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-context.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/markdown-view/build-trace-markdown.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/panes/pane-layout.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/tree.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/model-cell.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/traces-page/use-keyboard-shortcuts.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/explorer/utils/trace-edit-mode.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/flame/flame-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/markdown.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/presence/hooks/use-cursor-broadcast.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/trace/web/src/ui/sections/traces/span-details.tsx",
       "measured": "2026-09-06"
     },
@@ -7883,10 +7663,6 @@
     },
     {
       "key": "condition-shape|packages/features/trace/web/src/ui/sections/traces/traces-mapping.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/web/src/ui/sections/use-field-redaction.ts",
       "measured": "2026-09-06"
     },
     {
@@ -9678,30 +9454,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/trace/web/src/model/attribute-value-equality.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/model/duration-color.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/model/sdk-info.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/elements/errors/error-actions.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/elements/explorer/export-progress.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/elements/find-match-counter.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/trace/web/src/ui/sections/datasets/dataset-mapping-preview.tsx",
       "measured": "2026-09-06"
     },
@@ -9722,195 +9474,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/hooks/span-tree-paged-query.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-facets.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/onboarding/density-spotlight.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/onboarding/traces-empty-onboarding.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/search-bar/ai-shader-backdrop.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/search-bar/search-bar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/toolbar/live-indicator.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/attribute-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/attribute-value.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-context.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/chat-turn-row.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/conversation-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/message-annotate-cluster.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/turn-steps.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/metric-pill.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/trace-overflow-menu.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/eval-cards/eval-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/eval-cards/eval-history-stack.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/io-actions.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/io-toolbar-buttons.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/markdown-view/build-trace-markdown.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/mode-switch.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/prompts-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/raw-json-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/span-tab-bar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/event-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/span-accordions.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-drawer-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-header-chips.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/viz-placeholder.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/timeline-bar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/tree-row.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/waterfall-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/addons/conversation/compact-turns.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/conversation/simple-cells.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/select-cells.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/registry-row.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-table/select-header-checkbox.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/trace-table/trace-table-shell.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/explorer/traces-page/traces-page.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/flame/flame-block.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/hoverable-big-text.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/presence/presence-menu-item.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/sequence/sequence-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/simulations/media-part.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/traces/evaluation-status-item.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -9919,22 +9483,6 @@
     },
     {
       "key": "nested-ternary|packages/features/trace/web/src/ui/sections/traces/traces-mapping.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/transcript/conversation-turns-list.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/transcript/threaded-turn-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/transcript/tool-blocks.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/web/src/ui/sections/use-public-env.ts",
       "measured": "2026-09-06"
     },
     {
@@ -13218,162 +12766,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/trace/web/src/behavior/explorer/onboarding/store/onboarding-store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/behavior/filter.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/behavior/row-pulse.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/behavior/span-pulse.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/behavior/sse-status.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/behavior/time-range-presets.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/behavior/trace-api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/behavior/use-filter-params.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/behavior/view.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/model/display-formatters.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/model/evaluation-run-data.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/model/prisma-types.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/discover-cache.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-conversation-turns.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-export-traces.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-is-new-account.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-newly-arrived-trace-ids.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-list-refresh.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-new-count.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-query-args.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-visible-trace-ids.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/onboarding/data/sample-preview-traces.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/onboarding/hooks/use-trace-explorer-tour-preference.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/onboarding/integration-cta-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/onboarding/traces-empty-onboarding.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/toolbar/live-indicator.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/toolbar/time-range-picker.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/anchored-comments/anchor-comment-thread.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/anchored-comments/trace-comment-list.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/turn-annotations.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/utils.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/edited-original-toggle.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/eval-cards/eval-history-stack.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/markdown-view/build-trace-markdown.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-table/empty-filter-state.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-table/skeleton-placeholders.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/utils/use-relative-time.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/presence/hooks/use-peer-cursors.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/traces/evaluation-status-item.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/trace/web/src/ui/sections/traces/span-details.tsx",
       "measured": "2026-09-06"
     },
@@ -13383,18 +12775,6 @@
     },
     {
       "key": "temporal-only|packages/features/trace/web/src/ui/sections/traces/traces-mapping.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/use-project-event-types.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/use-project-span-names.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/web/src/ui/sections/use-trace-update-listener.ts",
       "measured": "2026-09-06"
     },
     {

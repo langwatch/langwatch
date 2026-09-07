@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { reservedTraceMetadataSchema } from "@langwatch/trace-contract";
 import { api } from "../../behavior/trace-api.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * @param projectId - The project ID to fetch field names from
@@ -15,7 +16,7 @@ export function useProjectSpanNames({
   enabled?: boolean;
 }) {
   // Use last 30 days as default date range
-  const endDate = useMemo(() => Date.now(), []);
+  const endDate = useMemo(() => nowInstant().epochMilliseconds, []);
   const startDate = useMemo(() => endDate - 30 * 24 * 60 * 60 * 1000, [endDate]);
 
   const fieldNames = api.traces.getFieldNames.useQuery(

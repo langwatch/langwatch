@@ -297,7 +297,7 @@ const TurnPreviewCell: React.FC<{
         limit={TEXT_TRUNCATE_LENGTH}
       />
     )}
-    {trace.output ? (
+    {trace.output && (
       <InlineMessage
         icon={<Bot />}
         iconColor="green.fg"
@@ -305,7 +305,8 @@ const TurnPreviewCell: React.FC<{
         text={trace.output}
         limit={TEXT_TRUNCATE_LENGTH}
       />
-    ) : trace.error ? (
+    )}
+    {!trace.output && trace.error && (
       <InlineMessage
         icon={<AlertTriangle />}
         iconColor="red.fg"
@@ -314,7 +315,7 @@ const TurnPreviewCell: React.FC<{
         limit={ERROR_TRUNCATE_LENGTH}
         textStyleOverride="xs"
       />
-    ) : null}
+    )}
     {trace.events.totalCount > 0 && (
       <CountChip icon={<Zap />} iconColor="orange.fg" value={trace.events.totalCount} />
     )}

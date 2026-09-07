@@ -187,14 +187,9 @@ function MarkdownLink({
       // Plain left click on an in-app link: SPA-navigate. Modified clicks
       // (cmd/ctrl/shift/middle) keep the real anchor behaviour — new tab,
       // "open in new tab", etc.
-      if (
-        isInternalHref(href) &&
-        event.button === 0 &&
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !event.shiftKey &&
-        !event.altKey
-      ) {
+      const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+      const isPlainLeftClick = event.button === 0 && !hasModifier;
+      if (isInternalHref(href) && isPlainLeftClick) {
         event.preventDefault();
         void router.push(href);
       }

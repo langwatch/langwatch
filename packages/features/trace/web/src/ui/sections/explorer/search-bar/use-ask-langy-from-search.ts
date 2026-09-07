@@ -34,7 +34,8 @@ export function useAskLangyFromSearch(): {
         // they may have opened the panel, begun a question, and come back for
         // the filter. Read at call time for the same reason the query is.
         seedDraft: (text) => {
-          if (useLangyStore.getState().draft.trim()) return;
+          const hasDraft = useLangyStore.getState().draft.trim();
+          if (hasDraft) return;
           useLangyStore.getState().setDraft(text);
         },
       });

@@ -41,7 +41,8 @@ export function spanTreeQueryKey(input: SpanTreeQueryInput) {
  */
 function bySpanTreeOrder(a: SpanTreeNode, b: SpanTreeNode): number {
   if (a.startTimeMs !== b.startTimeMs) return a.startTimeMs - b.startTimeMs;
-  return a.spanId < b.spanId ? -1 : a.spanId > b.spanId ? 1 : 0;
+  if (a.spanId < b.spanId) return -1;
+  return a.spanId > b.spanId ? 1 : 0;
 }
 
 export async function fetchSpanTreePages({

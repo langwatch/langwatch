@@ -44,8 +44,10 @@ export function rankByMatch<T extends { keys: string[] }>(
   const contains: T[] = [];
   for (const candidate of candidates) {
     const keys = candidate.keys.map((k) => k.toLowerCase());
-    if (keys.some((k) => k.startsWith(q))) prefix.push(candidate);
-    else if (keys.some((k) => k.includes(q))) contains.push(candidate);
+    const hasPrefixMatch = keys.some((k) => k.startsWith(q));
+    const hasSubstringMatch = keys.some((k) => k.includes(q));
+    if (hasPrefixMatch) prefix.push(candidate);
+    else if (hasSubstringMatch) contains.push(candidate);
   }
   const ranked = [...prefix, ...contains];
   return limit === null ? ranked : ranked.slice(0, limit);

@@ -114,14 +114,11 @@ function stripBackdropBg({
   const safeStyle = style
     ? { ...style, background: "transparent", backgroundColor: "transparent" }
     : undefined;
-  if (
-    isDevelopment &&
-    (bg !== undefined ||
-      background !== undefined ||
-      backgroundColor !== undefined ||
-      style?.background !== undefined ||
-      style?.backgroundColor !== undefined)
-  ) {
+  const setsPropBackground =
+    bg !== undefined || background !== undefined || backgroundColor !== undefined;
+  const setsStyleBackground =
+    style?.background !== undefined || style?.backgroundColor !== undefined;
+  if (isDevelopment && (setsPropBackground || setsStyleBackground)) {
     console.warn(
       "[Dialog] backdropProps.bg/background/backgroundColor is ignored — the backdrop is always transparent so the page behind stays visible. Adjust Dialog.Content surface instead.",
     );

@@ -16,7 +16,8 @@ interface AiShaderBackdropProps {
  */
 export const AiShaderBackdrop: React.FC<AiShaderBackdropProps> = ({ active = false }) => {
   const reduceMotion = useReducedMotion();
-  const speed = reduceMotion ? 0 : active ? 1.1 : 0.3;
+  const activeSpeed = active ? 1.1 : 0.3;
+  const speed = reduceMotion ? 0 : activeSpeed;
   return (
     <>
       <Box

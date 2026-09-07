@@ -2,14 +2,8 @@ import { Box, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatDuration } from "../../../model/display-formatters.ts";
 import { BlockLabel } from "./block-label.tsx";
-import {
-  DEPTH_FADE_FLOOR,
-  DEPTH_FADE_STEP,
-  MIN_BLOCK_PX,
-  ROW_HEIGHT,
-  TINY_BLOCK_ALPHA_FACTOR,
-  TINY_BLOCK_PCT,
-} from "../../../model/flame/constants.ts";
+import { MIN_BLOCK_PX, ROW_HEIGHT, TINY_BLOCK_PCT } from "../../../model/flame/constants.ts";
+import { flameBlockVisuals } from "../../../model/flame/block-visuals.ts";
 import { getSpanColor } from "../../../model/flame/colors.ts";
 import { formatPercent } from "../../../behavior/flame/tree.ts";
 import type { FlameNode, Viewport } from "../../../behavior/flame/types.ts";
@@ -75,7 +69,6 @@ export function FlameBlock({
   // reads as discrete events rather than one broken bar. Hover/selection
   // restores full treatment so targets still pop when picked.
   const isTiny = widthPct < TINY_BLOCK_PCT;
-  const depthAlpha = Math.max(DEPTH_FADE_FLOOR, 1 - depth * DEPTH_FADE_STEP);
   const isError = span.status === "error";
   const isSelected = span.spanId === selectedSpanId;
   const isHovered = span.spanId === hoveredSpanId;
@@ -84,82 +77,28 @@ export function FlameBlock({
   const isDirectChild = relatedSpanIds?.children.has(span.spanId) ?? false;
   const isDescendant = relatedSpanIds?.descendants.has(span.spanId) ?? false;
   const isRelated = isAncestor || isDescendant || isSelected || isHovered || isFocused;
-  const isEmphasized = isSelected || isHovered || isFocused;
   const isDimmed = dimOnHover && !!relatedSpanIds && !isRelated;
-  const bgAlphaPct = Math.round(
-    (isEmphasized
-      ? 1
-      : isAncestor
-        ? Math.max(depthAlpha, 0.85)
-        : isDirectChild
-          ? Math.max(depthAlpha, 0.8)
-          : isDimmed
-            ? depthAlpha * 0.3
-            : isTiny
-              ? depthAlpha * TINY_BLOCK_ALPHA_FACTOR
-              : depthAlpha) * 100,
-  );
-  // Light mode runs on a much stronger floor: alpha-tinted `.solid` tokens against a
-  // white surface produce pale fills that white text disappears into.
-  const lightBgAlphaPct = isEmphasized
-    ? 100
-    : isDimmed
-      ? 55
-      : isAncestor || isDirectChild
-        ? 95
-        : isTiny
-          ? Math.round(85 * TINY_BLOCK_ALPHA_FACTOR)
-          : 85;
-  const isZeroDuration = spanDur === 0;
-
-  const parentDurMs = node.parent
-    ? node.parent.span.endTimeMs - node.parent.span.startTimeMs
-    : null;
+  const { bgAlphaPct, borderColor, borderWidth, boxShadow, lightBgAlphaPct, zIndex } =
+    flameBlockVisuals({
+      depth,
+      emphasis: {
+        isAncestor,
+        isDirectChild,
+        isDimmed,
+        isError,
+        isFocused,
+        isHovered,
+        isSelected,
+        isTiny,
+      },
+    });
+  const parentDurMs = parentDurationOf(node);
   const pctOfParent =
     parentDurMs !== null && parentDurMs > 0 ? (spanDur / parentDurMs) * 100 : null;
-  const pctOfTrace = fullDur > 0 ? (spanDur / fullDur) * 100 : null;
-
-  const tooltipLines = [
-    span.name,
-    `Duration: ${isZeroDuration ? "<1ms" : formatDuration(spanDur)}`,
-    pctOfParent !== null && node.parent
-      ? `${formatPercent(pctOfParent)} of parent (${node.parent.span.name}, ${formatDuration(parentDurMs ?? 0)})`
-      : null,
-    pctOfTrace !== null ? `${formatPercent(pctOfTrace)} of trace` : null,
-    span.model ? `Model: ${span.model}` : null,
-  ].filter(Boolean);
-
-  // Visual hierarchy: selected > focused > hovered > ancestor/child > rest.
-  const borderWidth = isError
-    ? "1.5px"
-    : isSelected
-      ? "2px"
-      : isFocused
-        ? "1.5px"
-        : isAncestor || isDirectChild
-          ? "1px"
-          : isTiny
-            ? "0"
-            : "0.5px";
-  const borderColor = isError
-    ? "red.solid"
-    : isSelected
-      ? "fg"
-      : isFocused
-        ? "fg.muted"
-        : isAncestor
-          ? "fg.muted"
-          : isDirectChild
-            ? "border.emphasized"
-            : "border.muted";
-  const boxShadow = isSelected
-    ? "0 0 0 2px var(--chakra-colors-bg-panel), 0 2px 8px rgba(0,0,0,0.18)"
-    : isHovered
-      ? "sm"
-      : undefined;
+  const tooltip = blockTooltip({ fullDur, node, parentDurMs, pctOfParent, spanDur });
 
   return (
-    <Tooltip content={tooltipLines.join("\n")} positioning={{ placement: "top" }}>
+    <Tooltip content={tooltip} positioning={{ placement: "top" }}>
       <Box
         position="absolute"
         top={0}
@@ -179,7 +118,7 @@ export function FlameBlock({
         cursor="pointer"
         pointerEvents="auto"
         overflow="hidden"
-        zIndex={isSelected ? 3 : isFocused || isHovered ? 2 : 1}
+        zIndex={zIndex}
         onClick={(e) => {
           e.stopPropagation();
           onSpanClick(span.spanId);
@@ -233,4 +172,42 @@ export function FlameBlock({
       </Box>
     </Tooltip>
   );
+}
+
+/** How long the block's parent ran, or null at the root. */
+function parentDurationOf(node: FlameNode): number | null {
+  if (!node.parent) return null;
+  return node.parent.span.endTimeMs - node.parent.span.startTimeMs;
+}
+
+/** The multi-line tooltip a block shows: name, duration, and the two shares. */
+function blockTooltip({
+  fullDur,
+  node,
+  parentDurMs,
+  pctOfParent,
+  spanDur,
+}: {
+  fullDur: number;
+  node: FlameNode;
+  parentDurMs: number | null;
+  pctOfParent: number | null;
+  spanDur: number;
+}): string {
+  const { span } = node;
+  const pctOfTrace = fullDur > 0 ? (spanDur / fullDur) * 100 : null;
+  const parentShare =
+    pctOfParent !== null && node.parent
+      ? `${formatPercent(pctOfParent)} of parent (${node.parent.span.name}, ${formatDuration(parentDurMs ?? 0)})`
+      : null;
+
+  return [
+    span.name,
+    `Duration: ${spanDur === 0 ? "<1ms" : formatDuration(spanDur)}`,
+    parentShare,
+    pctOfTrace !== null ? `${formatPercent(pctOfTrace)} of trace` : null,
+    span.model ? `Model: ${span.model}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

@@ -25,6 +25,13 @@ import {
 } from "../../../../behavior/column-education.store.ts";
 import { ColumnResizeGrip } from "../../../elements/explorer/trace-table/column-resize-grip.tsx";
 import { SELECT_COLUMN_ID } from "./registry/cells/select-cells.tsx";
+
+/** Where a header's label sits for each column alignment. */
+const FLEX_JUSTIFY = {
+  center: "center",
+  left: "flex-start",
+  right: "flex-end",
+} as const;
 import {
   Table as TableEl,
   Th,
@@ -355,21 +362,19 @@ function HeaderCell<T>({
   const canSort = header.column.getCanSort();
   const sortDirection = header.column.getIsSorted();
   const isActiveSort = sortDirection !== false;
+  const unsortedAria = canSort ? "none" : undefined;
+  const descendingAria = sortDirection === "desc" ? "descending" : unsortedAria;
+  const ariaSort = sortDirection === "asc" ? "ascending" : descendingAria;
+  const draggingZIndex = isDragging ? 4 : undefined;
+  const stickyBg = isStickyFirst ? { base: "bg.subtle", _dark: "bg.surface" } : undefined;
+  const headerBg = isActiveSort ? { base: "bg.muted", _dark: "bg.muted" } : stickyBg;
 
   return (
     <Th
       // Expose sort state to assistive tech (the visual chevron alone is
       // invisible to screen readers). `none` only when the column is
       // sortable but unsorted; omitted entirely for non-sortable columns.
-      aria-sort={
-        sortDirection === "asc"
-          ? "ascending"
-          : sortDirection === "desc"
-            ? "descending"
-            : canSort
-              ? "none"
-              : undefined
-      }
+      aria-sort={ariaSort}
       ref={reorderable ? setNodeRef : undefined}
       // Apply ONLY the translation from the sortable transform — `CSS.Translate.toString` skips
       // the scaleX/scaleY that horizontalListSortingStrategy bakes in to fit the target slot.
@@ -399,14 +404,8 @@ function HeaderCell<T>({
       transition="none"
       position={isStickyFirst ? "sticky" : "relative"}
       left={isStickyFirst ? 0 : undefined}
-      zIndex={isStickyFirst ? 3 : isDragging ? 4 : undefined}
-      bg={
-        isActiveSort
-          ? { base: "bg.muted", _dark: "bg.muted" }
-          : isStickyFirst
-            ? { base: "bg.subtle", _dark: "bg.surface" }
-            : undefined
-      }
+      zIndex={isStickyFirst ? 3 : draggingZIndex}
+      bg={headerBg}
       // Vertical separator between TH cells + bottom border to separate the head from
       // the body rows. Under `border-collapse: separate` both edges paint cleanly per
       // cell (the TR-level border was being swallowed).
@@ -430,7 +429,7 @@ function HeaderCell<T>({
           own the cell's full width again, so narrow columns ("TIME")
           aren't squeezed by handle chrome. */}
       <Box flex={1} minWidth={0}>
-        {canSort ? (
+        {canSort && (
           <SortableHeaderButton
             align={align}
             sortDirection={sortDirection}
@@ -440,7 +439,8 @@ function HeaderCell<T>({
           >
             {flexRender(header.column.columnDef.header, header.getContext())}
           </SortableHeaderButton>
-        ) : reorderable ? (
+        )}
+        {!canSort && reorderable && (
           <Box
             data-column-drag-handle="true"
             cursor="grab"
@@ -451,9 +451,10 @@ function HeaderCell<T>({
           >
             {flexRender(header.column.columnDef.header, header.getContext())}
           </Box>
-        ) : (
-          flexRender(header.column.columnDef.header, header.getContext())
         )}
+        {!canSort &&
+          !reorderable &&
+          flexRender(header.column.columnDef.header, header.getContext())}
       </Box>
       <ColumnResizeGrip header={header} />
     </Th>
@@ -503,7 +504,7 @@ function SortableHeaderButton({
       // and non-sortable headers line up to the same grid.
       paddingX={0}
       paddingY={0}
-      justifyContent={align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start"}
+      justifyContent={FLEX_JUSTIFY[align]}
       color="inherit"
       userSelect="none"
       fontSize="inherit"

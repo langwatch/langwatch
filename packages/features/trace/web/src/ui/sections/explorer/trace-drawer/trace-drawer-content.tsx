@@ -11,14 +11,14 @@ import { PeerCursorOverlay } from "../../presence/peer-cursor-overlay.tsx";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useTraceEditSession } from "../hooks/use-trace-edit-session.ts";
 import { useTraceQueryArgs } from "../hooks/use-trace-query-args.ts";
-import { useDrawerStore, useShikiAdapter } from "../../../../index.ts";
+import { type DrawerViewMode, useDrawerStore, useShikiAdapter } from "../../../../index.ts";
 import { BlurredContentGate } from "../../../blocks/explorer/blurred-content-gate.tsx";
 import { ConversationContext } from "./conversation-context.tsx";
 import { ConversationView } from "./conversation-view/index.ts";
 import { DrawerHeader } from "./drawer-header/index.ts";
 import { EditModeBar } from "./edit-mode/edit-mode-bar.tsx";
 import { PaneLayout } from "./panes/pane-layout.tsx";
-import { usePaneLayout } from "./panes/use-pane-layout.ts";
+import { type DrawerLayout, usePaneLayout } from "./panes/use-pane-layout.ts";
 import { ScenarioRoleProvider } from "./scenario-roles.tsx";
 import { SessionTab } from "./session-view/index.ts";
 import { TraceDrawerSkeleton } from "../../../elements/explorer/trace-drawer/trace-drawer-skeleton.tsx";
@@ -70,9 +70,7 @@ export function TraceDrawerContent({
   // The open trace offers itself to Langy — the HEADER is the target, deliberately not
   // the whole surface.
   const langyTrace = useLangyContextTarget(
-    trace && !readOnly
-      ? traceContextChip(trace.traceId, traceChipDisplayName(trace))
-      : null,
+    trace && !readOnly ? traceContextChip(trace.traceId, traceChipDisplayName(trace)) : null,
   );
 
   const viewMode = useDrawerStore((s) => s.viewMode);
@@ -152,26 +150,15 @@ export function TraceDrawerContent({
                     protected tracesV2 session reads, so share viewers fall
                     through to the trace panes — same reasoning (and same
                     persisted-viewMode hole) as the conversation gate below. */}
-                {viewMode === "session" && !readOnly ? (
-                  <SessionModePane trace={trace} />
-                ) : viewMode === "terminal" && !readOnly ? (
-                  <TerminalModePane trace={trace} />
-                ) : viewMode === "conversation" && trace.conversationId && !readOnly ? (
-                  <ConversationModePane
-                    conversationId={trace.conversationId}
-                    traceId={trace.traceId}
-                  />
-                ) : viewMode === "summary" ? (
-                  <SummaryModePane trace={trace} spanTree={spanTree} />
-                ) : (
-                  <PaneLayout
-                    trace={trace}
-                    spans={spanTree}
-                    selectedSpan={selectedSpan}
-                    isSpansLoading={isSpansLoading}
-                    layout={layout}
-                  />
-                )}
+                <ViewModePane
+                  isSpansLoading={isSpansLoading}
+                  layout={layout}
+                  readOnly={readOnly}
+                  selectedSpan={selectedSpan}
+                  spanTree={spanTree}
+                  trace={trace}
+                  viewMode={viewMode}
+                />
               </ScenarioRoleProvider>
               {trace.redactedByVisibilityWindow ? <BlurredContentGate /> : null}
             </Flex>
@@ -324,5 +311,46 @@ function TerminalModePane({ trace }: { trace: TraceHeader }) {
         />
       </Box>
     </IsolatedErrorBoundary>
+  );
+}
+
+/** Which pane the drawer body shows for the current view mode. */
+function ViewModePane({
+  isSpansLoading,
+  layout,
+  readOnly,
+  selectedSpan,
+  spanTree,
+  trace,
+  viewMode,
+}: {
+  isSpansLoading: boolean;
+  layout: DrawerLayout;
+  readOnly: boolean;
+  selectedSpan: SpanTreeNode | null;
+  spanTree: SpanTreeNode[];
+  trace: TraceHeader;
+  viewMode: DrawerViewMode;
+}) {
+  // Usage/Terminal are coding-agent surfaces backed by the protected tracesV2
+  // session reads, so share viewers fall through to the trace panes — the same
+  // reasoning (and the same persisted-viewMode hole) as the conversation gate.
+  if (!readOnly) {
+    if (viewMode === "session") return <SessionModePane trace={trace} />;
+    if (viewMode === "terminal") return <TerminalModePane trace={trace} />;
+    if (viewMode === "conversation" && trace.conversationId) {
+      return <ConversationModePane conversationId={trace.conversationId} traceId={trace.traceId} />;
+    }
+  }
+  if (viewMode === "summary") return <SummaryModePane trace={trace} spanTree={spanTree} />;
+
+  return (
+    <PaneLayout
+      trace={trace}
+      spans={spanTree}
+      selectedSpan={selectedSpan}
+      isSpansLoading={isSpansLoading}
+      layout={layout}
+    />
   );
 }

@@ -7,6 +7,7 @@ import type { ConnectionState } from "../../../../behavior/use-sse-subscription.
 import { useTraceListRefresh } from "../hooks/use-trace-list-refresh.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { type LiveUpdatesMode, useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
+import { nowInstant } from "@langwatch/time";
 
 const SSE_STATE_STYLE: Record<ConnectionState, { dotColor: string; pulse: boolean }> = {
   connected: { dotColor: "green.solid", pulse: true },
@@ -43,6 +44,10 @@ export const LiveIndicator: React.FC = () => {
   // downstream). Disable it with a tooltip that names the reason
   // instead of letting the user wonder why nothing happened.
   const isSamplePreview = usePreviewTracesActive();
+  const liveRefreshTooltip = isRefreshing ? "Refreshing…" : "Refresh traces";
+  const refreshTooltip = isSamplePreview
+    ? "Refresh is disabled — sample data doesn't change."
+    : liveRefreshTooltip;
 
   // In `ask` mode the dot is solid blue: SSE is on (so we know new rows exist) but the
   // user is in charge of when to pull them in. In `live` mode the dot reflects the SSE
@@ -85,16 +90,7 @@ export const LiveIndicator: React.FC = () => {
         </Flex>
       </Tooltip>
 
-      <Tooltip
-        content={
-          isSamplePreview
-            ? "Refresh is disabled — sample data doesn't change."
-            : isRefreshing
-              ? "Refreshing…"
-              : "Refresh traces"
-        }
-        positioning={{ placement: "bottom" }}
-      >
+      <Tooltip content={refreshTooltip} positioning={{ placement: "bottom" }}>
         <IconButton
           aria-label="Refresh traces"
           variant={isRefreshing ? "subtle" : "ghost"}
@@ -164,7 +160,7 @@ const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 
 function formatTimeAgo(timestamp: number): string {
-  const elapsed = Date.now() - timestamp;
+  const elapsed = nowInstant().epochMilliseconds - timestamp;
   if (elapsed < 5 * SECOND) return "just now";
   if (elapsed < MINUTE) return `${Math.floor(elapsed / SECOND)}s ago`;
   if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m ago`;

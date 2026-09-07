@@ -2,6 +2,7 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { api } from "../../../../behavior/trace-api.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useViewStore } from "../../../../behavior/view.store.ts";
+import { toEpochMs } from "@langwatch/time";
 
 export interface VisibleTraceIds {
   /** Set of traceIds currently rendered in the list. */
@@ -70,7 +71,7 @@ export function useVisibleTraceIds(): VisibleTraceIds {
           const raw = items[0]?.startedAt;
           if (raw === null || raw === undefined) return undefined;
           if (typeof raw === "number") return raw;
-          const parsed = Date.parse(raw);
+          const parsed = toEpochMs(raw);
           return isNaN(parsed) ? undefined : parsed;
         })()
       : undefined;

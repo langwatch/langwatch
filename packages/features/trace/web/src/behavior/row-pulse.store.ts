@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * How long a pulse animation lasts. After this the traceId is evicted
@@ -43,7 +44,7 @@ export const useRowPulseStore = create<RowPulseState>((set, get) => ({
 
   pulse: (traceId) => {
     const state = get();
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const last = state.lastPulseAt.get(traceId) ?? 0;
 
     if (now - last < PULSE_COALESCE_MS) {

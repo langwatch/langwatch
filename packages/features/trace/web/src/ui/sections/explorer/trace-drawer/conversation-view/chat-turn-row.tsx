@@ -37,7 +37,11 @@ import {
   type MessageTranslation,
 } from "./message-annotate-cluster.tsx";
 import { MessageExpandToggle } from "../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx";
-import { TurnAnnotationBadges, TurnEditTraceAction, TurnSessionCheckbox } from "./turn-annotations.tsx";
+import {
+  TurnAnnotationBadges,
+  TurnEditTraceAction,
+  TurnSessionCheckbox,
+} from "./turn-annotations.tsx";
 import { TurnSteps, turnHasGenieSteps } from "./turn-steps.tsx";
 import type { TurnLayout } from "./types.ts";
 import { formatGap } from "./utils.ts";
@@ -240,6 +244,31 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
     ? toMessageTranslation(assistantTranslation)
     : undefined;
 
+  // The assistant slot in priority order: the reply itself, the error that
+  // replaced it, or a reasoning/media-only turn. All three render the same
+  // bubble, so only the tone, label, icon and text differ.
+  const spokenBody = assistantText
+    ? {
+        icon: <AssistantIcon />,
+        label: assistantLabel,
+        text: assistantText,
+        tone: assistantVisuals.displayRole,
+      }
+    : null;
+  const errorBody = turn.error
+    ? { icon: <AlertTriangle />, label: "Error", text: turn.error, tone: "error" as const }
+    : null;
+  const silentBody =
+    assistantReasoning || hasAssistantMedia
+      ? {
+          icon: <AssistantIcon />,
+          label: assistantLabel,
+          text: "",
+          tone: assistantVisuals.displayRole,
+        }
+      : null;
+  const assistantBody = spokenBody ?? errorBody ?? silentBody;
+
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
       {showGap && (
@@ -279,19 +308,21 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           annotate={userAnnotateTarget}
           translate={userTranslate}
         />
-      ) : turn.inputRedacted ? (
+      ) : (
         // Input hidden by a privacy rule — show the shared "Redacted" marker on
         // the user side rather than silently omitting the bubble, so a hidden
         // turn doesn't read as the user having said nothing.
-        <RedactedTurnLine
-          layout={layout}
-          side={userSide}
-          tone={userVisuals.displayRole}
-          label={userVisuals.bubbleLabel}
-          icon={<UserIcon />}
-          visibleTo={turn.inputVisibleTo}
-        />
-      ) : null}
+        turn.inputRedacted && (
+          <RedactedTurnLine
+            layout={layout}
+            side={userSide}
+            tone={userVisuals.displayRole}
+            label={userVisuals.bubbleLabel}
+            icon={<UserIcon />}
+            visibleTo={turn.inputVisibleTo}
+          />
+        )
+      )}
 
       {/*
         The loop that ran between the prompt and the reply. A coding-agent turn
@@ -316,14 +347,14 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         />
       )}
 
-      {assistantText ? (
+      {assistantBody && (
         <TurnMessage
           layout={layout}
           side={assistantSide}
-          tone={assistantVisuals.displayRole}
-          label={assistantLabel}
-          icon={<AssistantIcon />}
-          text={assistantText}
+          tone={assistantBody.tone}
+          label={assistantBody.label}
+          icon={assistantBody.icon}
+          text={assistantBody.text}
           reasoning={assistantReasoning}
           media={visibleAssistantMedia}
           isSelected={isCurrent}
@@ -332,50 +363,20 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           annotate={assistantAnnotateTarget}
           translate={assistantTranslate}
         />
-      ) : turn.error ? (
-        <TurnMessage
-          layout={layout}
-          side={assistantSide}
-          tone="error"
-          label="Error"
-          icon={<AlertTriangle />}
-          text={turn.error}
-          reasoning={assistantReasoning}
-          media={visibleAssistantMedia}
-          isSelected={isCurrent}
-          onClick={handleSelect}
-          annotation={assistantAnnotations}
-          annotate={assistantAnnotateTarget}
-          translate={assistantTranslate}
-        />
-      ) : assistantReasoning || hasAssistantMedia ? (
-        <TurnMessage
-          layout={layout}
-          side={assistantSide}
-          tone={assistantVisuals.displayRole}
-          label={assistantLabel}
-          icon={<AssistantIcon />}
-          text=""
-          reasoning={assistantReasoning}
-          media={visibleAssistantMedia}
-          isSelected={isCurrent}
-          onClick={handleSelect}
-          annotation={assistantAnnotations}
-          annotate={assistantAnnotateTarget}
-          translate={assistantTranslate}
-        />
-      ) : turn.outputRedacted ? (
-        // Output hidden by a privacy rule — the shared "Redacted" marker on the
-        // assistant side, so a hidden response isn't mistaken for an empty turn.
-        <RedactedTurnLine
-          layout={layout}
-          side={assistantSide}
-          tone={assistantVisuals.displayRole}
-          label={assistantLabel}
-          icon={<AssistantIcon />}
-          visibleTo={turn.outputVisibleTo}
-        />
-      ) : null}
+      )}
+      {!assistantBody &&
+        turn.outputRedacted && (
+          // Output hidden by a privacy rule — the shared "Redacted" marker on the
+          // assistant side, so a hidden response isn't mistaken for an empty turn.
+          <RedactedTurnLine
+            layout={layout}
+            side={assistantSide}
+            tone={assistantVisuals.displayRole}
+            label={assistantLabel}
+            icon={<AssistantIcon />}
+            visibleTo={turn.outputVisibleTo}
+          />
+        )}
     </VStack>
   );
 });

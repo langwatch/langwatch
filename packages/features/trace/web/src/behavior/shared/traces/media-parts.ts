@@ -226,7 +226,9 @@ export function audioPartToMediaData(part: unknown): MediaPartData | null {
   const media = mediaPartToMediaData(part);
   if (!media) return null;
   if (media.type === "audio") return media;
-  if (media.type === "binary" && media.mimeType.toLowerCase().startsWith("audio/")) {
+  const isAudioBinary =
+    media.type === "binary" && media.mimeType.toLowerCase().startsWith("audio/");
+  if (isAudioBinary) {
     return media;
   }
   return null;
@@ -337,7 +339,8 @@ function collectInto({
     }
     if (!containsRenderableMediaHints(value)) return;
     const trimmed = value.trim();
-    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return;
+    const looksJsonShaped = trimmed.startsWith("{") || trimmed.startsWith("[");
+    if (!looksJsonShaped) return;
     try {
       // The role carries across the nested-JSON hop: a message whose content
       // is a stringified array of parts is still that message's content.

@@ -32,8 +32,10 @@ function tolerantPrettyJson(content: string): string {
       out += ch;
       continue;
     }
-    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") continue;
-    if (ch === "{" || ch === "[") {
+    const isWhitespace = ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
+    if (isWhitespace) continue;
+    const opensContainer = ch === "{" || ch === "[";
+    if (opensContainer) {
       out += ch;
       depth += 1;
       out += "\n" + indent(depth);

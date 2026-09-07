@@ -38,7 +38,9 @@ export function useCursorBroadcast({
   sendRef.current = cursorMutation.mutateAsync;
 
   useEffect(() => {
-    if (!enabled || hidden || !projectId || !anchor || !sessionId) return;
+    const isBroadcasting = enabled && !hidden;
+    const hasTarget = !!projectId && !!anchor && !!sessionId;
+    if (!isBroadcasting || !hasTarget) return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -80,7 +82,8 @@ export function useCursorBroadcast({
       if (rect.width === 0 || rect.height === 0) return;
       const x = (event.clientX - rect.left) / rect.width;
       const y = (event.clientY - rect.top) / rect.height;
-      if (x < 0 || x > 1 || y < 0 || y > 1) return;
+      const isInsideContainer = x >= 0 && x <= 1 && y >= 0 && y <= 1;
+      if (!isInsideContainer) return;
       pending = { x, y };
       if (rafHandle == null) rafHandle = requestAnimationFrame(flush);
     };

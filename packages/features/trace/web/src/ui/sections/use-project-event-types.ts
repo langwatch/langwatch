@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { api } from "../../behavior/trace-api.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * @param projectId - The project ID to fetch event types for
@@ -13,7 +14,7 @@ export function useProjectEventTypes({
   projectId: string | undefined;
   enabled?: boolean;
 }) {
-  const endDate = useMemo(() => Date.now(), []);
+  const endDate = useMemo(() => nowInstant().epochMilliseconds, []);
   const startDate = useMemo(() => endDate - 30 * 24 * 60 * 60 * 1000, [endDate]);
 
   const query = api.analytics.dataForFilter.useQuery(

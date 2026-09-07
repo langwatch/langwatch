@@ -104,13 +104,9 @@ export function applyChatTextLeaves(
         changed = true;
         return text;
       }
-      if (
-        part &&
-        typeof part === "object" &&
-        part.type === "text" &&
-        typeof part.text === "string" &&
-        part.text !== text
-      ) {
+      const isTextPart = !!part && typeof part === "object" && part.type === "text";
+      const carriesOtherText = isTextPart && typeof part.text === "string" && part.text !== text;
+      if (carriesOtherText) {
         changed = true;
         return { ...part, text };
       }

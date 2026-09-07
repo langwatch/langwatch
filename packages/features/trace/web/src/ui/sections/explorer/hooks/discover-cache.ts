@@ -2,6 +2,7 @@
  * Per-project cache of the last successful `tracesV2.discover` response.
  */
 import type { RouterOutputs } from "../../../../behavior/trace-api.ts";
+import { nowInstant } from "@langwatch/time";
 
 const STORAGE_KEY = "langwatch:traces-v2:discoverCache";
 const TTL_MS = 24 * 60 * 60 * 1000;
@@ -59,7 +60,7 @@ export function getCachedDiscover(projectId: string): DiscoverDescriptors | null
     }
     return null;
   }
-  if (Date.now() - entry.savedAt > TTL_MS) {
+  if (nowInstant().epochMilliseconds - entry.savedAt > TTL_MS) {
     delete memory[projectId];
     persist(memory);
     return null;
@@ -74,6 +75,6 @@ export function setCachedDiscover({
   projectId: string;
   facets: DiscoverDescriptors;
 }): void {
-  memory[projectId] = { facets, savedAt: Date.now() };
+  memory[projectId] = { facets, savedAt: nowInstant().epochMilliseconds };
   persist(memory);
 }

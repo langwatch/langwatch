@@ -20,6 +20,13 @@ import { useLatestRef } from "../../../../behavior/use-latest-ref.ts";
 import { getSuggestionState } from "../../../../model/get-suggestion-state.ts";
 import { handleKey } from "../../../../model/handle-key.ts";
 import { searchBarPlaceholder } from "./placeholder-editor.tsx";
+
+/** The chip sub-controls a click may land on inside the filter editor. */
+const FILTER_CHIP_CONTROL_SELECTORS = [
+  "[data-filter-chip-start]",
+  "[data-filter-delete]",
+  "[data-filter-op-start]",
+] as const;
 import {
   buildSuggestionUI,
   CLOSED_SUGGESTION,
@@ -421,14 +428,10 @@ export function useFilterEditor({
         mousedown: (_view, event) => {
           const target = event.target as HTMLElement | null;
           if (!target) return false;
-          if (
-            target.closest("[data-filter-chip-start]") ||
-            target.closest("[data-filter-delete]") ||
-            target.closest("[data-filter-op-start]")
-          ) {
-            return true;
-          }
-          return false;
+          const isChipControl = FILTER_CHIP_CONTROL_SELECTORS.some(
+            (selector) => target.closest(selector) !== null,
+          );
+          return isChipControl;
         },
       },
       // Clicking in the editor's empty trailing area (the big blank space to the right
@@ -459,7 +462,8 @@ export function useFilterEditor({
         // modifier always wins, even mid-autocomplete. Without content
         // the shortcut still opens AI mode but with an empty seed (same
         // as clicking the Ask AI button).
-        if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && onAiShortcutRef.current) {
+        const isModEnter = event.key === "Enter" && (event.metaKey || event.ctrlKey);
+        if (isModEnter && onAiShortcutRef.current) {
           event.preventDefault();
           onAiShortcutRef.current(text);
           return true;
@@ -527,7 +531,8 @@ export function useFilterEditor({
             // "cursor stuck inside the chip" report).
             isProgrammaticRef.current = true;
             let submitTr = view.state.tr.setSelection(TextSelection.atEnd(view.state.doc));
-            if (!/\s$/.test(view.state.doc.textContent)) {
+            const endsWithSpace = /\s$/.test(view.state.doc.textContent);
+            if (!endsWithSpace) {
               submitTr = submitTr.insertText("\u00A0");
             }
             view.dispatch(submitTr.scrollIntoView());
@@ -591,7 +596,8 @@ export function useFilterEditor({
         const end = Number(chipEl.dataset.filterChipEnd);
         const field = chipEl.dataset.filterChipField ?? "";
         const value = chipEl.dataset.filterChipValue ?? "";
-        if (Number.isFinite(start) && Number.isFinite(end) && field && value) {
+        const hasLocation = Number.isFinite(start) && Number.isFinite(end);
+        if (hasLocation && field && value) {
           onTokenClick({
             rect: chipEl.getBoundingClientRect(),
             field,
@@ -612,7 +618,8 @@ export function useFilterEditor({
         event.stopPropagation();
         const start = Number(opEl.dataset.filterOpStart);
         const end = Number(opEl.dataset.filterOpEnd);
-        if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+        const hasLocation = Number.isFinite(start) && Number.isFinite(end);
+        if (!hasLocation) return;
         const current = editor.getText();
         const next = swapOperatorAtLocation({
           currentQuery: current,
@@ -634,7 +641,8 @@ export function useFilterEditor({
       event.stopPropagation();
       const start = Number(btn.dataset.locStart);
       const end = Number(btn.dataset.locEnd);
-      if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+      const hasLocation = Number.isFinite(start) && Number.isFinite(end);
+      if (!hasLocation) return;
       const kind = btn.dataset.kind === "fallback" ? "fallback" : "ast";
       const current = editor.getText();
       // AST-path widgets ride on liqe's trimmed-text locations and use
@@ -666,7 +674,8 @@ export function useFilterEditor({
     if (!editor || editor.isDestroyed) return;
     if (editor.isFocused) return;
     const normalize = (s: string): string => s.replace(/\u00A0/g, " ").trim();
-    if (normalize(editor.getText()) === normalize(queryText)) return;
+    const documentMatchesQuery = normalize(editor.getText()) === normalize(queryText);
+    if (documentMatchesQuery) return;
     isProgrammaticRef.current = true;
     editor.commands.setContent(buildDocument(queryText));
     const next = queryText.length > 0;

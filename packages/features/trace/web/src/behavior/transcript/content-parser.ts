@@ -132,10 +132,9 @@ export function parseContentBlocks(content: ChatMessage["content"]): ContentBloc
     if (content.length === 0) return [];
     const trimmed = content.trim();
 
-    if (
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"))
-    ) {
+    const looksLikeObject = trimmed.startsWith("{") && trimmed.endsWith("}");
+    const looksLikeArray = trimmed.startsWith("[") && trimmed.endsWith("]");
+    if (looksLikeObject || looksLikeArray) {
       const jsonBlocks = tryParseJsonContentBlocks(trimmed);
       if (jsonBlocks) {
         return jsonBlocks;
@@ -173,12 +172,9 @@ export function parseContentBlocks(content: ChatMessage["content"]): ContentBloc
         const text = typeof obj.text === "string" ? obj.text : "";
         if (!text) break;
         const trimmed = text.trim();
-        if (
-          trimmed.length > 0 &&
-          trimmed[0] === "{" &&
-          trimmed[trimmed.length - 1] === "}" &&
-          trimmed.includes('"type":"')
-        ) {
+        const isBracedObject =
+          trimmed.length > 0 && trimmed[0] === "{" && trimmed[trimmed.length - 1] === "}";
+        if (isBracedObject && trimmed.includes('"type":"')) {
           const nestedBlocks = tryParseNestedJsonTextBlock(trimmed);
           if (nestedBlocks) {
             out.push(...nestedBlocks);

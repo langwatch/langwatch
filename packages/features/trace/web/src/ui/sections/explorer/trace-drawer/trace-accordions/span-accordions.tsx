@@ -127,6 +127,7 @@ export function SpanAccordions({
     !!spanResource && Object.keys(spanResource.resourceAttributes).length > 0;
   const hasSpanAttrs = !!detail?.params && Object.keys(detail.params).length > 0;
   const hasAttributes = hasSpanAttrs || hasResourceAttrs;
+  const attributesStillLoading = resources.isLoading || detailQuery.isLoading;
   const hasScope = !!spanScope?.name;
   // Prompt section only when there's actual prompt metadata. The no-prompt
   // case is covered by the "Open in Playground" affordance on the IOViewer
@@ -271,59 +272,28 @@ export function SpanAccordions({
                         redacted={detail?.inputRedacted ?? false}
                         visibleTo={detail?.inputVisibleTo}
                       >
-                        {isEditing && detail ? (
-                          <SpanEditableIO
-                            spanId={detail.spanId}
-                            field="input"
-                            label="Input"
-                            capturedText={detail.input ?? null}
-                            capturedParams={detail.params}
-                          />
-                        ) : detail?.input != null ? (
-                          <MaybeCorrected
-                            label="Input"
-                            corrected={changedFields.includes("input")}
-                            original={captured?.input}
-                          >
-                            <IOViewer
-                              label="Input"
-                              content={detail.input}
-                              mode="input"
-                              traceId={traceId}
-                              spanId={detail.spanId}
-                              spanType={detail.type}
-                            />
-                          </MaybeCorrected>
-                        ) : null}
+                        <SpanIOField
+                          corrected={changedFields.includes("input")}
+                          detail={detail}
+                          isEditing={isEditing}
+                          mode="input"
+                          original={captured?.input}
+                          traceId={traceId}
+                        />
                       </RedactedField>
                       <RedactedField
                         field="output"
                         redacted={detail?.outputRedacted ?? false}
                         visibleTo={detail?.outputVisibleTo}
                       >
-                        {isEditing && detail ? (
-                          <SpanEditableIO
-                            spanId={detail.spanId}
-                            field="output"
-                            label="Output"
-                            capturedText={detail.output ?? null}
-                          />
-                        ) : detail?.output != null ? (
-                          <MaybeCorrected
-                            label="Output"
-                            corrected={changedFields.includes("output")}
-                            original={captured?.output}
-                          >
-                            <IOViewer
-                              label="Output"
-                              content={detail.output}
-                              mode="output"
-                              traceId={traceId}
-                              spanId={detail.spanId}
-                              spanType={detail.type}
-                            />
-                          </MaybeCorrected>
-                        ) : null}
+                        <SpanIOField
+                          corrected={changedFields.includes("output")}
+                          detail={detail}
+                          isEditing={isEditing}
+                          mode="output"
+                          original={captured?.output}
+                          traceId={traceId}
+                        />
                       </RedactedField>
                     </VStack>
                   )}
@@ -399,16 +369,14 @@ export function SpanAccordions({
                   title="Attributes"
                   count={attrCount}
                   commentCount={sectionComments.attributes}
-                  empty={
-                    !hasAttributes && !isEditing && !resources.isLoading && !detailQuery.isLoading
-                  }
+                  empty={!hasAttributes && !isEditing && !attributesStillLoading}
                   isFirst={isFirst}
                   open={isOpen}
                 >
                   {!detailQuery.isLoading && detail?.costSuggestion && (
                     <UnmappedCostSuggestion model={detail.costSuggestion.model} />
                   )}
-                  {hasAttributes || isEditing ? (
+                  {(hasAttributes || isEditing) && (
                     <AttributeTable
                       attributes={attributeEditing.baselineParams}
                       resourceAttributes={
@@ -425,9 +393,11 @@ export function SpanAccordions({
                       }
                       comments={attributeComments}
                     />
-                  ) : resources.isLoading || detailQuery.isLoading ? (
+                  )}
+                  {!hasAttributes && !isEditing && attributesStillLoading && (
                     <EmptyHint>Loading attributes…</EmptyHint>
-                  ) : (
+                  )}
+                  {!hasAttributes && !isEditing && !attributesStillLoading && (
                     <EmptyHint>No additional attributes recorded</EmptyHint>
                   )}
                 </Section>
@@ -536,5 +506,52 @@ export function SpanAccordions({
         </AccordionShell>
       )}
     </Box>
+  );
+}
+
+/** One side of a span's captured IO: the editor while editing, else the viewer. */
+function SpanIOField({
+  corrected,
+  detail,
+  isEditing,
+  mode,
+  original,
+  traceId,
+}: {
+  corrected: boolean;
+  detail: NonNullable<ReturnType<typeof useSpanDetail>["data"]> | undefined;
+  isEditing: boolean;
+  mode: "input" | "output";
+  original: string | null | undefined;
+  traceId: string;
+}) {
+  if (!detail) return null;
+  const label = mode === "input" ? "Input" : "Output";
+  const content = detail[mode];
+
+  if (isEditing) {
+    return (
+      <SpanEditableIO
+        spanId={detail.spanId}
+        field={mode}
+        label={label}
+        capturedText={content ?? null}
+        capturedParams={mode === "input" ? detail.params : void 0}
+      />
+    );
+  }
+  if (content == null) return null;
+
+  return (
+    <MaybeCorrected label={label} corrected={corrected} original={original}>
+      <IOViewer
+        label={label}
+        content={content}
+        mode={mode}
+        traceId={traceId}
+        spanId={detail.spanId}
+        spanType={detail.type}
+      />
+    </MaybeCorrected>
   );
 }

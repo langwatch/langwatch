@@ -1,3 +1,10 @@
+import { nowInstant, Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
+
+/** The moment a screen prints, as the `Date` the Intl formatters take. */
+export function readableDate(value: TimeInput) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
+}
+
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
@@ -6,7 +13,7 @@ const MS_PER_MONTH = 30 * MS_PER_DAY;
 const MS_PER_YEAR = 365 * MS_PER_DAY;
 
 export function formatRelativeTime(timestamp: number): string {
-  const diffMs = Date.now() - timestamp;
+  const diffMs = nowInstant().epochMilliseconds - timestamp;
   if (diffMs < MS_PER_MINUTE) return "now";
   if (diffMs < MS_PER_HOUR) return `${Math.floor(diffMs / MS_PER_MINUTE)}m`;
   if (diffMs < MS_PER_DAY) return `${Math.floor(diffMs / MS_PER_HOUR)}h`;
@@ -19,12 +26,12 @@ export function formatRelativeTime(timestamp: number): string {
  * `formatRelativeTime` stays the format for the narrow TIME column).
  */
 export function formatVerboseRelative(timestamp: number): string {
-  // Clock skew can produce `timestamp > Date.now()` for traces that arrive
+  // Clock skew can produce `timestamp > nowInstant().epochMilliseconds` for traces that arrive
   // a hair ahead of the viewer's clock. The narrow `formatRelativeTime`
   // clamps the same way; matching that behaviour here keeps the Since
   // column and the hover card from blinking "in the future" on traces
   // that are really just landing live.
-  const diffMs = Math.max(0, Date.now() - timestamp);
+  const diffMs = Math.max(0, nowInstant().epochMilliseconds - timestamp);
   if (diffMs < MS_PER_MINUTE) return "just now";
   const pick = (n: number, singular: string): string => `${n} ${singular}${n === 1 ? "" : "s"} ago`;
   if (diffMs < MS_PER_HOUR) {
@@ -51,7 +58,7 @@ export function formatVerboseRelative(timestamp: number): string {
  * queries / external tools without translating from a relative string.
  */
 export function formatISOTimestamp(timestamp: number): string {
-  return new Date(timestamp).toISOString();
+  return readableDate(timestamp).toISOString();
 }
 
 /**
@@ -60,7 +67,7 @@ export function formatISOTimestamp(timestamp: number): string {
  * `Intl` (SSR) — returns the bare locale string.
  */
 export function formatLocalWithZone(timestamp: number): string {
-  const d = new Date(timestamp);
+  const d = readableDate(timestamp);
   try {
     const formatter = new Intl.DateTimeFormat(void 0, {
       year: "numeric",
@@ -103,7 +110,7 @@ export function resolveViewerTimeZone(): string {
  */
 export function formatDayOfWeek(timestamp: number): string {
   try {
-    return new Intl.DateTimeFormat(void 0, { weekday: "long" }).format(new Date(timestamp));
+    return new Intl.DateTimeFormat(void 0, { weekday: "long" }).format(readableDate(timestamp));
   } catch {
     return "";
   }
@@ -114,7 +121,7 @@ export function formatDayOfWeek(timestamp: number): string {
  * detail surfaces.
  */
 export function formatRelativeTimeAgo(timestamp: number): string {
-  const diffMs = Date.now() - timestamp;
+  const diffMs = nowInstant().epochMilliseconds - timestamp;
   if (diffMs < MS_PER_MINUTE) return "just now";
   if (diffMs < MS_PER_HOUR) {
     return `${Math.floor(diffMs / MS_PER_MINUTE)}m ago`;
@@ -130,7 +137,7 @@ export function formatAbsoluteTime(timestamp: number): string {
   // line up timestamps against their server logs without doing the TZ
   // math in their heads. The previous `toLocaleString()` form rendered
   // in the viewer's local time without saying so, which was ambiguous.
-  const d = new Date(timestamp);
+  const d = readableDate(timestamp);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(
     d.getUTCDate(),

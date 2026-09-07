@@ -33,13 +33,13 @@ export function ConversationTurnsList({
     canCollapseEarlier && !showEarlier ? Math.max(0, turns.length - TAIL_VISIBLE_TURNS) : 0;
   const visibleTurns = hiddenCount > 0 ? turns.slice(hiddenCount) : turns;
 
-  const header = canCollapseEarlier ? (
+  const collapseControl =
     hiddenCount > 0 ? (
       <EarlierTurnsExpander hiddenCount={hiddenCount} onClick={() => setShowEarlier(true)} />
     ) : (
       <CollapseEarlierToggle onClick={() => setShowEarlier(false)} />
-    )
-  ) : null;
+    );
+  const header = canCollapseEarlier ? collapseControl : null;
 
   const list =
     visibleTurns.length >= VIRTUALIZE_AT ? (

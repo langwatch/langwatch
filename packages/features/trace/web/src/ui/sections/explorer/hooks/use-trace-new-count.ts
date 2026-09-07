@@ -6,6 +6,7 @@ import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 import { useTraceListRefresh } from "./use-trace-list-refresh.ts";
+import { nowInstant } from "@langwatch/time";
 
 const FAST_MS = 5_000;
 const SLOW_MS = 30_000;
@@ -33,7 +34,7 @@ export function useTraceNewCount(): TraceNewCountResult {
   const { project } = useOrganizationTeamProject();
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
   const queryText = useFilterStore((s) => s.debouncedQueryText);
-  const [since, setSince] = useState(() => Date.now());
+  const [since, setSince] = useState(() => nowInstant().epochMilliseconds);
   const { refresh } = useTraceListRefresh();
 
   const isVisible = usePageVisibility();
@@ -161,7 +162,7 @@ export function useTraceNewCount(): TraceNewCountResult {
   }, [errorUpdatedAt]);
 
   const acknowledge = useCallback(() => {
-    setSince(Date.now());
+    setSince(nowInstant().epochMilliseconds);
     consecutiveZerosRef.current = 0;
     setIntervalMs(FAST_MS);
     refresh();

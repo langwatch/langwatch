@@ -32,12 +32,9 @@ export function useFirstTraceSpotlightTrigger({
   const hasLegacyMigrationAttempted = useRef(false);
 
   useEffect(() => {
-    if (
-      hasLegacyMigrationAttempted.current ||
-      !isResolved ||
-      isDismissed ||
-      !hasLegacyTourHistoryOnMount
-    ) {
+    const alreadyHandled = hasLegacyMigrationAttempted.current || isDismissed;
+    const canMigrate = isResolved && hasLegacyTourHistoryOnMount;
+    if (alreadyHandled || !canMigrate) {
       return;
     }
     hasLegacyMigrationAttempted.current = true;

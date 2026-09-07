@@ -332,7 +332,9 @@ function filterAttributesBySearch(
   if (!term) return attrs;
   const result: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(attrs)) {
-    if (key.toLowerCase().includes(term) || formatValue(val).toLowerCase().includes(term)) {
+    const keyMatches = key.toLowerCase().includes(term);
+    const valueMatches = formatValue(val).toLowerCase().includes(term);
+    if (keyMatches || valueMatches) {
       result[key] = val;
     }
   }
@@ -578,12 +580,8 @@ function EditableValueCell({
   const display = formatValue(value);
   // `formatValue` is the read-only renderer and answers an em dash for an
   // empty value, which must never become text the reviewer is editing.
-  const editorText =
-    value === undefined || value === null
-      ? ""
-      : typeof value === "object"
-        ? JSON.stringify(value)
-        : String(value);
+  const writtenValue = typeof value === "object" ? JSON.stringify(value) : String(value);
+  const editorText = value === undefined || value === null ? "" : writtenValue;
 
   if (editing.isRemoved) {
     return (
@@ -1068,7 +1066,9 @@ function findNestedKeyConflict({
   existingKeys: Set<string>;
 }): string | undefined {
   for (const existingKey of existingKeys) {
-    if (existingKey.startsWith(`${key}.`) || key.startsWith(`${existingKey}.`)) {
+    const isChildOfKey = existingKey.startsWith(`${key}.`);
+    const isParentOfKey = key.startsWith(`${existingKey}.`);
+    if (isChildOfKey || isParentOfKey) {
       return existingKey;
     }
   }
@@ -1266,11 +1266,8 @@ export function AttributeTable({
   }, [flatResAttrs, searchTerm]);
 
   const hasResourceAttrs = !!filterResAttrs;
-  const spanAttrTitle = hasResourceAttrs
-    ? title === "Trace Attributes"
-      ? "Trace Attributes"
-      : "Span Attributes"
-    : "";
+  const scopedAttrTitle = title === "Trace Attributes" ? "Trace Attributes" : "Span Attributes";
+  const spanAttrTitle = hasResourceAttrs ? scopedAttrTitle : "";
 
   const copyPayload = useMemo(() => {
     const root: Record<string, unknown> = {

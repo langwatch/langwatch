@@ -595,7 +595,8 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       // same span the operator last inspected; clicking a new span
       // updates the selection and re-expands the pane in one step.
       const next: Partial<DrawerState> = { selectedSpanId: spanId };
-      if (s.paneState.spanDetail.collapsed) {
+      const detailCollapsed = s.paneState.spanDetail.collapsed;
+      if (detailCollapsed) {
         const updatedPanes: Record<PaneId, PaneState> = {
           ...s.paneState,
           spanDetail: { ...s.paneState.spanDetail, collapsed: false },

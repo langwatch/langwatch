@@ -10,6 +10,7 @@ import type { ConversationGroup } from "../../conversation-groups.ts";
 import { withoutPlaceholderTraceIds } from "../../skeleton-placeholders.ts";
 import type { CellDef } from "../types.ts";
 import type { TraceGroup } from "./group/types.ts";
+import { ariaCheckedFor, checkboxStateFor } from "../../../../../../model/tri-state-checkbox.ts";
 
 export const SELECT_COLUMN_ID = "select";
 
@@ -35,8 +36,7 @@ const RowCheckbox: React.FC<RowCheckboxProps> = ({ traceIds: candidateTraceIds, 
       ? totalCount
       : traceIds.reduce((n, id) => n + (traceIdSet.has(id) ? 1 : 0), 0);
 
-  const checked: boolean | "indeterminate" =
-    checkedCount === 0 ? false : checkedCount === totalCount ? true : "indeterminate";
+  const checked = checkboxStateFor({ selectedCount: checkedCount, total: totalCount });
 
   // Whole-cell hit target — the Td has padding=0 so this Box fills every
   // pixel of the cell. Native <button> guarantees click + keyboard
@@ -47,7 +47,7 @@ const RowCheckbox: React.FC<RowCheckboxProps> = ({ traceIds: candidateTraceIds, 
     <ChakraButton
       type="button"
       aria-label={ariaLabel}
-      aria-checked={checked === true ? "true" : checked === false ? "false" : "mixed"}
+      aria-checked={ariaCheckedFor(checked)}
       display="flex"
       alignItems="center"
       justifyContent="center"

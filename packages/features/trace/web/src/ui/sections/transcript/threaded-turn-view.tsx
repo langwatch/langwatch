@@ -43,12 +43,10 @@ export function ThreadedTurnView({
   // remapped via the scenario helper. The colour token still keys off the
   // *display* role under scenario so the chip lines up with whatever
   // bubble/card body it sits next to.
-  const sourceRole: string =
-    turn.kind === "user" ? "user" : turn.kind === "assistant" ? "assistant" : turn.role;
+  const isUserOrAssistant = turn.kind === "user" || turn.kind === "assistant";
+  const sourceRole: string = isUserOrAssistant ? turn.kind : turn.role;
   const scenarioVisuals =
-    isScenario && (turn.kind === "user" || turn.kind === "assistant")
-      ? getDisplayRoleVisuals(turn.kind, { isScenario: true })
-      : null;
+    isScenario && isUserOrAssistant ? getDisplayRoleVisuals(turn.kind, { isScenario: true }) : null;
   const colorKey = scenarioVisuals?.displayRole ?? sourceRole;
   const palette = getRolePalette(colorKey);
   const RoleIcon = scenarioVisuals?.Icon ?? ROLE_ICONS[sourceRole] ?? LuUser;

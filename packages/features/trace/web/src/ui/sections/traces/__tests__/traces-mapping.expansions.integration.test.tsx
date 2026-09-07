@@ -9,7 +9,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import type { MappingState } from "@langwatch/trace-contract";
+import type { MappingState } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({

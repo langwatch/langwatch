@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
-import { selectIsTraceEditDirty, useTraceEditStore } from "../../../../behavior/trace-edit.store.ts";
+import {
+  selectIsTraceEditDirty,
+  useTraceEditStore,
+} from "../../../../behavior/trace-edit.store.ts";
 import { useTraceEditOverlay } from "./use-trace-edit-overlay.ts";
 
 /**
@@ -19,7 +22,8 @@ export function useTraceEditSession(traceId: string | undefined): void {
   useEffect(() => {
     if (!isEditing) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!selectIsTraceEditDirty(useTraceEditStore.getState())) return;
+      const isDirty = selectIsTraceEditDirty(useTraceEditStore.getState());
+      if (!isDirty) return;
       // The browser shows its own wording here; assigning is what arms it.
       event.preventDefault();
       event.returnValue = "";

@@ -408,16 +408,18 @@ function PromptUsageCard({
         </Box>
       )}
 
-      {isLoadingSpans ? (
+      {isLoadingSpans && (
         <VStack align="stretch" gap={1}>
           <Skeleton height="20px" />
           <Skeleton height="20px" width="70%" />
         </VStack>
-      ) : spanIds.length === 0 ? (
+      )}
+      {!isLoadingSpans && spanIds.length === 0 && (
         <Text textStyle="xs" color="fg.subtle">
           Recorded from trace attributes; no span on this trace exposes the prompt id directly.
         </Text>
-      ) : (
+      )}
+      {!isLoadingSpans && spanIds.length > 0 && (
         <VStack align="stretch" gap={0}>
           {spanIds.map((spanId) => (
             <SpanRow

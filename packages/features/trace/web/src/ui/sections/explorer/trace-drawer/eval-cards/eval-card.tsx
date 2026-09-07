@@ -83,6 +83,8 @@ export function EvalCard({
   const primaryStatusText =
     eval_.reasoning ?? (status === "error" ? eval_.errorMessage : undefined);
   const showStatusMessage = noVerdict && !!primaryStatusText;
+  const nonErrorStatusIcon = status === "skipped" ? LuCircleSlash : LuQuote;
+  const statusIcon = status === "error" ? LuCircleAlert : nonErrorStatusIcon;
   // Whether the dedicated error-message panel should also appear (only when
   // reasoning was already shown above and we still have a separate error
   // message to surface).
@@ -164,9 +166,7 @@ export function EvalCard({
         >
           <HStack align="flex-start" gap={2}>
             <Icon
-              as={
-                status === "error" ? LuCircleAlert : status === "skipped" ? LuCircleSlash : LuQuote
-              }
+              as={statusIcon}
               boxSize={3}
               color={showStatusMessage ? tone.fg : "fg.subtle"}
               flexShrink={0}
@@ -180,28 +180,7 @@ export function EvalCard({
               fontStyle={showStatusMessage ? "normal" : "italic"}
               fontWeight={showStatusMessage ? "medium" : "normal"}
             >
-              {showStatusMessage ? (
-                primaryStatusText === AZURE_SAFETY_NOT_CONFIGURED_MESSAGE ? (
-                  <>
-                    Azure Safety provider not configured. Configure it in{" "}
-                    <chakra.a
-                      href="/settings/model-providers"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      color="blue.fg"
-                      textDecoration="underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Settings → Model Providers
-                    </chakra.a>{" "}
-                    to run this evaluator.
-                  </>
-                ) : (
-                  primaryStatusText
-                )
-              ) : (
-                eval_.reasoning
-              )}
+              {showStatusMessage ? <StatusMessage text={primaryStatusText} /> : eval_.reasoning}
             </Text>
           </HStack>
         </Box>
@@ -404,12 +383,13 @@ function EvalCardFooter({
           )}
           {mightHaveInputs && (
             <DetailRow label="Inputs">
-              {inputsLoading ? (
+              {inputsLoading && (
                 <HStack gap={2} color="fg.subtle">
                   <Spinner size="xs" />
                   <Text textStyle="2xs">Loading inputs…</Text>
                 </HStack>
-              ) : inputEntries.length > 0 ? (
+              )}
+              {!inputsLoading && inputEntries.length > 0 && (
                 <VStack align="stretch" gap={1}>
                   {inputEntries.map(([key, value]) => (
                     <HStack key={key} align="flex-start" gap={2} minWidth={0}>
@@ -432,7 +412,8 @@ function EvalCardFooter({
                     </HStack>
                   ))}
                 </VStack>
-              ) : (
+              )}
+              {!inputsLoading && inputEntries.length === 0 && (
                 <Text textStyle="2xs" color="fg.subtle" fontStyle="italic">
                   No inputs recorded
                 </Text>
@@ -464,5 +445,30 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
       </Text>
       {children}
     </Box>
+  );
+}
+
+/**
+ * The status line for a verdict-less evaluation. The unconfigured-Azure case
+ * gets a link to the settings page that fixes it; everything else prints as-is.
+ */
+function StatusMessage({ text }: { text: string | undefined }) {
+  if (text !== AZURE_SAFETY_NOT_CONFIGURED_MESSAGE) return <>{text}</>;
+
+  return (
+    <>
+      Azure Safety provider not configured. Configure it in{" "}
+      <chakra.a
+        href="/settings/model-providers"
+        target="_blank"
+        rel="noopener noreferrer"
+        color="blue.fg"
+        textDecoration="underline"
+        onClick={(e) => e.stopPropagation()}
+      >
+        Settings → Model Providers
+      </chakra.a>{" "}
+      to run this evaluator.
+    </>
   );
 }

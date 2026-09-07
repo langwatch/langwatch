@@ -57,6 +57,9 @@ export function ErrorActions({
 
   if (!docsUrl && !traceId) return null;
 
+  const copiedLabel = isCopied ? "Copied" : "Copy error ID";
+  const copyLabel = hasFailed ? "Couldn't copy" : copiedLabel;
+
   return (
     <HStack gap={3} marginTop={2} fontSize="11.5px" color={color}>
       {docsUrl && (
@@ -112,7 +115,7 @@ export function ErrorActions({
           // can see. Label and text must agree, so there is only one of them.
         >
           {isCopied ? <CheckIcon width={10} height={10} /> : <CopyIcon width={10} height={10} />}
-          {hasFailed ? "Couldn't copy" : isCopied ? "Copied" : "Copy error ID"}
+          {copyLabel}
         </chakra.button>
       )}
     </HStack>

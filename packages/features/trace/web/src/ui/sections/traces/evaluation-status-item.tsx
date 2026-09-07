@@ -17,22 +17,19 @@ import {
 import { HoverableBigText } from "../hoverable-big-text.tsx";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { readableDate } from "../../../model/display-formatters.ts";
 
 export function formatEvaluationSingleValue(evaluation: {
   score?: number | null;
   passed?: boolean | null;
   label?: string | null;
 }) {
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  return evaluation.label !== undefined && evaluation.label !== null
-    ? evaluation.label
-    : evaluation.score !== undefined && evaluation.score !== null
-      ? formatEvaluationScore(evaluation.score)
-      : evaluation.passed !== undefined && evaluation.passed !== null
-        ? evaluation.passed
-          ? "Pass"
-          : "Fail"
-        : "N/A";
+  if (evaluation.label !== undefined && evaluation.label !== null) return evaluation.label;
+  if (evaluation.score !== undefined && evaluation.score !== null) {
+    return formatEvaluationScore(evaluation.score);
+  }
+  if (evaluation.passed === undefined || evaluation.passed === null) return "N/A";
+  return evaluation.passed ? "Pass" : "Fail";
 }
 
 export function formatEvaluationScore(score: number | null | undefined) {
@@ -164,7 +161,7 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
               >
                 {check.name || evaluator?.name}
               </Text>
-              {customPrompt ? (
+              {customPrompt && (
                 <Text fontSize="xs" color="fg.subtle" lineClamp={1}>
                   <HoverableBigText expandedVersion={customPrompt} lineClamp={1}>
                     <Box as="span" whiteSpace="pre-wrap" wordBreak="break-word">
@@ -172,11 +169,12 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
                     </Box>
                   </HoverableBigText>
                 </Text>
-              ) : evaluator?.description ? (
+              )}
+              {!customPrompt && evaluator?.description && (
                 <Text fontSize="xs" color="fg.subtle" lineClamp={1}>
                   {evaluator.description}
                 </Text>
-              ) : null}
+              )}
             </VStack>
           </HStack>
         </EvaluatorInputsTooltip>
@@ -274,7 +272,7 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
 
         {/* Timestamp */}
         {check.timestamps.finished_at && (
-          <Tooltip content={new Date(check.timestamps.finished_at).toLocaleString()}>
+          <Tooltip content={readableDate(check.timestamps.finished_at).toLocaleString()}>
             <Text
               fontSize="xs"
               color="fg.subtle"
@@ -283,7 +281,7 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
               borderBottomColor="border.emphasized"
               borderBottomStyle="dashed"
             >
-              {formatDistanceToNow(new Date(check.timestamps.finished_at), {
+              {formatDistanceToNow(readableDate(check.timestamps.finished_at), {
                 addSuffix: true,
               })}
             </Text>

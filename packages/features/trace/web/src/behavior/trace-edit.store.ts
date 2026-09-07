@@ -246,8 +246,8 @@ function deepEqual(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
   if (Array.isArray(a)) return sameItems(a, b);
   if (Array.isArray(b)) return false;
-  if (isPlainObject(a) && isPlainObject(b)) return sameEntries(a, b);
-  return false;
+  const bothObjects = isPlainObject(a) && isPlainObject(b);
+  return bothObjects ? sameEntries(a, b) : false;
 }
 
 /**

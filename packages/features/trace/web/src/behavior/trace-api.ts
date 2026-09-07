@@ -34,6 +34,7 @@ import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-c
 import type { ConversationTurn } from "../model/explorer/conversation-turn.ts";
 import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload.ts";
 import type { ExportProgress, ExportProgressEvent } from "../model/export-types.ts";
+import { type TimeInput } from "@langwatch/time";
 import type {
   AiActionResult,
   ChangeTraceNameCommand,
@@ -81,7 +82,7 @@ export type TraceAccountInfo = {
   name: string | null;
   email: string | null;
   image: string | null;
-  createdAt: Date;
+  createdAt: TimeInput;
 };
 
 /** One saved lens. */
@@ -93,8 +94,8 @@ export type SavedViewRead = {
   query?: string | null;
   period?: { relativeDays?: number; startDate?: string; endDate?: string } | null;
   userId?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: TimeInput;
+  updatedAt: TimeInput;
 };
 
 /** One scenario run, as the trace header chip reads it. */
@@ -416,7 +417,7 @@ export type TraceApiMap = {
           resourceType: ShareResourceType;
           resourceId: string;
           visibility?: ShareVisibility;
-          expiresAt?: Date | null;
+          expiresAt?: TimeInput | null;
           maxViews?: number | null;
         };
         output: ShareLink;
@@ -721,13 +722,13 @@ export type TraceApiMap = {
     getTraceExplorerTourPreference: {
       query: {
         input: Record<string, never>;
-        output: { dismissed: boolean; dismissedAt: Date | null };
+        output: { dismissed: boolean; dismissedAt: TimeInput | null };
       };
     };
     dismissTraceExplorerTour: {
       mutation: {
         input: Record<string, never>;
-        output: { dismissed: boolean; dismissedAt: Date | null };
+        output: { dismissed: boolean; dismissedAt: TimeInput | null };
       };
     };
   };

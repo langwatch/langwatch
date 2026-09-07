@@ -95,6 +95,24 @@ function detectFamily(rawName: string): string | null {
   return null;
 }
 
+/** The long form of the instrumentation library's own name, without Scenario. */
+function longSdkLabel({
+  family,
+  language,
+  rawName,
+  rawVersion,
+}: {
+  family: string | null;
+  language: string;
+  rawName: string;
+  rawVersion: string | null;
+}): string {
+  if (family) {
+    return rawVersion ? `${language} ${family} SDK ${rawVersion}` : `${language} ${family} SDK`;
+  }
+  return rawVersion ? `${rawName} ${rawVersion}` : rawName;
+}
+
 export function parseSdkInfo(input: ParseSdkInputs): SdkInfo | null {
   const rawName = trimmedString(input.name);
   if (!rawName) return null;
@@ -112,35 +130,26 @@ export function parseSdkInfo(input: ParseSdkInputs): SdkInfo | null {
     : null;
 
   const languagePart = rawVersion ? `${language} · ${rawVersion}` : language;
-  const shortLabel = scenario
-    ? scenario.version
-      ? `Scenario ${scenario.version} · ${languagePart}`
-      : `Scenario · ${languagePart}`
-    : languagePart;
+  const scenarioShort = scenario?.version
+    ? `Scenario ${scenario.version} · ${languagePart}`
+    : `Scenario · ${languagePart}`;
+  const shortLabel = scenario ? scenarioShort : languagePart;
 
-  const baseLong = family
-    ? rawVersion
-      ? `${language} ${family} SDK ${rawVersion}`
-      : `${language} ${family} SDK`
-    : rawVersion
-      ? `${rawName} ${rawVersion}`
-      : rawName;
-  const longLabel = scenario
-    ? scenario.version
-      ? `Scenario SDK ${scenario.version} (on ${baseLong})`
-      : `Scenario SDK (on ${baseLong})`
-    : baseLong;
+  const baseLong = longSdkLabel({ family, language, rawName, rawVersion });
+  const scenarioLong = scenario?.version
+    ? `Scenario SDK ${scenario.version} (on ${baseLong})`
+    : `Scenario SDK (on ${baseLong})`;
+  const longLabel = scenario ? scenarioLong : baseLong;
 
   const baseDescription = family
     ? `Captured by the ${language} ${family} SDK — the library installed in your service that emits traces.`
     : `Captured by the ${rawName} instrumentation library running in your service.`;
   const familySuffix = family ? ` ${family}` : "";
   const versionSuffix = rawVersion ? ` ${rawVersion}` : "";
-  const description = scenario
-    ? scenario.version
-      ? `Emitted by Scenario SDK ${scenario.version} running on top of the ${language}${familySuffix} SDK${versionSuffix}. Scenario simulates user/assistant conversations to test your agent.`
-      : `Emitted while running under the Scenario SDK on top of the ${language}${familySuffix} SDK${versionSuffix}. Scenario simulates user/assistant conversations to test your agent.`
-    : baseDescription;
+  const scenarioDescription = scenario?.version
+    ? `Emitted by Scenario SDK ${scenario.version} running on top of the ${language}${familySuffix} SDK${versionSuffix}. Scenario simulates user/assistant conversations to test your agent.`
+    : `Emitted while running under the Scenario SDK on top of the ${language}${familySuffix} SDK${versionSuffix}. Scenario simulates user/assistant conversations to test your agent.`;
+  const description = scenario ? scenarioDescription : baseDescription;
 
   return {
     rawName,

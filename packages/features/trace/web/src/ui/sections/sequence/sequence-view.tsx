@@ -1,5 +1,5 @@
 import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuFilter, LuMaximize, LuMinus, LuPlus } from "react-icons/lu";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Menu } from "@langwatch/design-system/menu";
@@ -48,12 +48,8 @@ function countParticipants(spans: SequenceViewProps["spans"], types: ReadonlySet
   for (const span of spans) {
     if (!types.has(span.type ?? "span")) continue;
     if (span.type === "tool") continue;
-    const key =
-      span.type === "llm" && span.model
-        ? `llm:${span.model}`
-        : span.type === "agent"
-          ? `agent:${span.name}`
-          : `other:${span.name}`;
+    const namedKey = span.type === "agent" ? `agent:${span.name}` : `other:${span.name}`;
+    const key = span.type === "llm" && span.model ? `llm:${span.model}` : namedKey;
     set.add(key);
   }
   return set.size;
@@ -286,47 +282,13 @@ export function SequenceView({ spans, selectedSpanId, onSelectSpan, subMode }: S
         }}
       >
         {error ? (
-          <Flex align="center" justify="center" height="full" padding={4}>
-            <VStack gap={2}>
-              <Text textStyle="sm" color="fg.error">
-                Could not render sequence diagram
-              </Text>
-              <Text textStyle="xs" color="fg.muted">
-                {error}
-              </Text>
-            </VStack>
-          </Flex>
-        ) : !hasParticipants ? (
-          <Flex
-            align="center"
-            justify="center"
-            height="full"
-            padding={4}
-            direction="column"
-            gap={1}
-          >
-            <Text textStyle="sm" color="fg">
-              No interactions to plot
-            </Text>
-            <Text textStyle="xs" color="fg.subtle">
-              No agent, LLM, or tool spans match the current filters.
-            </Text>
-          </Flex>
+          <SequenceErrorState error={error} />
         ) : (
-          <Box
-            ref={stageRef}
-            position="absolute"
-            top="0"
-            left="0"
-            transformOrigin="0 0"
-            data-selected-span-id={selectedSpanId ?? ""}
-            style={{
-              transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.z})`,
-              willChange: "transform",
-            }}
-            css={{
-              "& svg": { display: "block" },
-            }}
+          <SequenceStage
+            hasParticipants={hasParticipants}
+            selectedSpanId={selectedSpanId}
+            stageRef={stageRef}
+            view={view}
           />
         )}
 
@@ -425,5 +387,68 @@ function ZoomButton({ label, icon, onClick }: ZoomButtonProps) {
         <Icon as={icon} boxSize={2.5} />
       </Flex>
     </Tooltip>
+  );
+}
+
+/** Shown when mermaid refused the diagram we built. */
+function SequenceErrorState({ error }: { error: string }) {
+  return (
+    <Flex align="center" justify="center" height="full" padding={4}>
+      <VStack gap={2}>
+        <Text textStyle="sm" color="fg.error">
+          Could not render sequence diagram
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
+          {error}
+        </Text>
+      </VStack>
+    </Flex>
+  );
+}
+
+/** Shown when the filters leave no span worth plotting. */
+function SequenceEmptyState() {
+  return (
+    <Flex align="center" justify="center" height="full" padding={4} direction="column" gap={1}>
+      <Text textStyle="sm" color="fg">
+        No interactions to plot
+      </Text>
+      <Text textStyle="xs" color="fg.subtle">
+        No agent, LLM, or tool spans match the current filters.
+      </Text>
+    </Flex>
+  );
+}
+
+/** The pannable diagram surface, or the empty state when nothing plots. */
+function SequenceStage({
+  hasParticipants,
+  selectedSpanId,
+  stageRef,
+  view,
+}: {
+  hasParticipants: boolean;
+  selectedSpanId: string | null | undefined;
+  stageRef: RefObject<HTMLDivElement | null>;
+  view: { x: number; y: number; z: number };
+}) {
+  if (!hasParticipants) return <SequenceEmptyState />;
+
+  return (
+    <Box
+      ref={stageRef}
+      position="absolute"
+      top="0"
+      left="0"
+      transformOrigin="0 0"
+      data-selected-span-id={selectedSpanId ?? ""}
+      style={{
+        transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.z})`,
+        willChange: "transform",
+      }}
+      css={{
+        "& svg": { display: "block" },
+      }}
+    />
   );
 }

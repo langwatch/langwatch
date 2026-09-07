@@ -4,6 +4,7 @@ import type { TimeRange } from "../../../../behavior/filter.store.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useViewStore } from "../../../../behavior/view.store.ts";
 import { QueryBreakdownChips } from "./query-breakdown-chips.tsx";
+import { nowInstant } from "@langwatch/time";
 
 const LangWatchMark: React.FC = () => (
   <Box color="fg.muted" opacity={0.55} css={{ filter: "grayscale(1)" }} aria-hidden="true">
@@ -86,7 +87,7 @@ interface ActionButton {
 }
 
 function rangePreset(days: number, label: string): TimeRange {
-  const now = Date.now();
+  const now = nowInstant().epochMilliseconds;
   return {
     from: now - days * MS_PER_DAY,
     to: now,

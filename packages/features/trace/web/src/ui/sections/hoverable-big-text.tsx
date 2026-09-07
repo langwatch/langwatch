@@ -7,6 +7,28 @@ import { Dialog } from "./dialog.tsx";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
+/** The dialog body: formatted JSON, rendered markdown, or the raw text. */
+function ExpandedTextBody({
+  isFormatted,
+  textExpanded,
+}: {
+  isFormatted: boolean;
+  textExpanded: string | undefined;
+}) {
+  if (!textExpanded) return null;
+  if (!isFormatted) {
+    return (
+      <Box whiteSpace="pre-wrap" fontFamily="mono">
+        {textExpanded}
+      </Box>
+    );
+  }
+  if (isJson(textExpanded)) {
+    return <RenderInputOutput value={textExpanded} showTools={"copy-only"} />;
+  }
+  return <Markdown>{textExpanded.replace(/(\n+)\\(\n+)/g, "$1$2")}</Markdown>;
+}
+
 export function ExpandedTextDialog({
   open,
   onOpenChange,
@@ -38,21 +60,7 @@ export function ExpandedTextDialog({
         </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body paddingY={6} paddingX={8} overflow="auto" maxHeight="calc(100vh - 200px)">
-          {open && textExpanded && isFormatted ? (
-            isJson(textExpanded) ? (
-              <RenderInputOutput value={textExpanded} showTools={"copy-only"} />
-            ) : (
-              <Markdown>
-                {typeof textExpanded === "string"
-                  ? textExpanded.replace(/(\n+)\\(\n+)/g, "$1$2")
-                  : JSON.stringify(textExpanded, null, 2)}
-              </Markdown>
-            )
-          ) : textExpanded ? (
-            <Box whiteSpace="pre-wrap" fontFamily="mono">
-              {textExpanded}
-            </Box>
-          ) : null}
+          <ExpandedTextBody isFormatted={open && isFormatted} textExpanded={textExpanded} />
         </Dialog.Body>
       </Dialog.Content>
     </Dialog.Root>

@@ -83,6 +83,7 @@ function ModeTab({
   presence,
   disabledReason,
 }: TabProps) {
+  const inactiveColor = disabled ? "fg.subtle" : "fg.muted";
   const tab = (
     <Flex
       as={disabled ? "div" : "button"}
@@ -91,7 +92,7 @@ function ModeTab({
       paddingX={0.5}
       paddingY={2}
       cursor={disabled ? "not-allowed" : "pointer"}
-      color={active ? "fg" : disabled ? "fg.subtle" : "fg.muted"}
+      color={active ? "fg" : inactiveColor}
       fontWeight={active ? "semibold" : "medium"}
       transition="color 0.12s ease"
       _hover={active || disabled ? undefined : { color: "fg" }}

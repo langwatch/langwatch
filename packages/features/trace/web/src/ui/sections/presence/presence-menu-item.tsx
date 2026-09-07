@@ -35,15 +35,17 @@ export function PresenceMenuItem({
   const visible = enabled && !hidden;
   const StatusIcon = visible ? Eye : EyeOff;
 
-  const label = !enabled ? "Presence off" : visible ? "Sharing presence" : "Presence hidden";
+  const enabledLabel = visible ? "Sharing presence" : "Presence hidden";
+  const label = enabled ? enabledLabel : "Presence off";
 
-  const tooltip = !enabled
-    ? disabledAt === "organization"
+  const disabledTooltip =
+    disabledAt === "organization"
       ? "Live presence has been disabled at the organization level. Ask an admin to enable it in Organization Settings."
-      : "Live presence has been disabled for this project. Ask an admin to enable it in Project Settings."
-    : visible
-      ? "Teammates can see your avatar and which view you're in. Click to hide your presence."
-      : "Your presence is hidden from teammates. Click to share it again.";
+      : "Live presence has been disabled for this project. Ask an admin to enable it in Project Settings.";
+  const enabledTooltip = visible
+    ? "Teammates can see your avatar and which view you're in. Click to hide your presence."
+    : "Your presence is hidden from teammates. Click to share it again.";
+  const tooltip = enabled ? enabledTooltip : disabledTooltip;
 
   return (
     <Tooltip content={tooltip} positioning={{ placement: "left" }} openDelay={250}>

@@ -230,6 +230,13 @@ export function VizPlaceholder({
   // rendering below behaves as if the panel were at its normal height.
   const isMinimized = fillParent ? false : height === 0;
   const isCollapsed = fillParent ? false : !isMinimized && height <= MIN_HEIGHT + 20;
+  const isExpanded = height >= EXPANDED_HEIGHT;
+  const expandedLabel = isExpanded ? "Minimize" : "Expand";
+  const resizeLabel = isMinimized ? "Show" : expandedLabel;
+  const ExpandedIcon = isExpanded ? LuMinus : LuChevronUp;
+  const ResizeIcon = isMinimized ? LuChevronDown : ExpandedIcon;
+
+  const heightTransition = isDragging.current ? "none" : "height 0.2s ease";
 
   const persistHeight = useCallback((h: number) => {
     localStorage.setItem(STORAGE_KEY, String(h));
@@ -435,10 +442,7 @@ export function VizPlaceholder({
 
           {!fillParent && (
             <HStack gap={1.5}>
-              <Tooltip
-                content={isMinimized ? "Show" : height >= EXPANDED_HEIGHT ? "Minimize" : "Expand"}
-                positioning={{ placement: "top" }}
-              >
+              <Tooltip content={resizeLabel} positioning={{ placement: "top" }}>
                 <Flex
                   as="button"
                   align="center"
@@ -452,16 +456,7 @@ export function VizPlaceholder({
                   transition="all 0.15s ease"
                   onClick={handleCycleSize}
                 >
-                  <Icon
-                    as={
-                      isMinimized
-                        ? LuChevronDown
-                        : height >= EXPANDED_HEIGHT
-                          ? LuMinus
-                          : LuChevronUp
-                    }
-                    boxSize={3.5}
-                  />
+                  <Icon as={ResizeIcon} boxSize={3.5} />
                 </Flex>
               </Tooltip>
             </HStack>
@@ -506,53 +501,22 @@ export function VizPlaceholder({
             flex={fillParent ? 1 : undefined}
             minHeight={0}
             overflow={fillParent ? "auto" : "hidden"}
-            transition={fillParent ? undefined : isDragging.current ? "none" : "height 0.2s ease"}
+            transition={fillParent ? undefined : heightTransition}
             onClick={isCollapsed ? handleExpandFromCollapsed : undefined}
             cursor={isCollapsed ? "pointer" : "default"}
             position="relative"
             style={fillParent ? { overflowAnchor: "none" } : undefined}
           >
-            {isLoading && spans.length === 0 ? (
-              <VizSkeleton vizTab={vizTab} />
-            ) : spans.length === 0 ? (
-              <Flex align="center" justify="center" height="full">
-                <Text textStyle="xs" color="fg.subtle">
-                  No span data available for this trace
-                </Text>
-              </Flex>
-            ) : isCollapsed ? (
-              <CollapsedOverview spans={spans} />
-            ) : vizTab === "topology" || vizTab === "sequence" ? (
-              <Suspense fallback={<VizSkeleton vizTab={vizTab} />}>
-                <SequenceView
-                  spans={spans}
-                  selectedSpanId={selectedSpanId}
-                  onSelectSpan={onSelectSpan}
-                  onClearSpan={onClearSpan}
-                  subMode={vizTab}
-                />
-              </Suspense>
-            ) : vizTab === "flame" ? (
-              <FlameView
-                spans={spans}
-                selectedSpanId={selectedSpanId}
-                onSelectSpan={onSelectSpan}
-                onClearSpan={onClearSpan}
-                renderShortcutKey={(label) => <Kbd>{label}</Kbd>}
-              />
-            ) : (
-              // Default — waterfall. Any unrecognised vizTab (e.g. a
-              // stale URL pointing at the retired "spanlist" tab) falls
-              // through here too so the user gets a usable view rather
-              // than a blank pane.
-              <WaterfallView
-                spans={spans}
-                selectedSpanId={selectedSpanId}
-                promptSpanIds={promptSpanIds}
-                onSelectSpan={onSelectSpan}
-                onClearSpan={onClearSpan}
-              />
-            )}
+            <VizBody
+              isCollapsed={isCollapsed}
+              isLoading={isLoading}
+              onClearSpan={onClearSpan}
+              onSelectSpan={onSelectSpan}
+              promptSpanIds={promptSpanIds}
+              selectedSpanId={selectedSpanId}
+              spans={spans}
+              vizTab={vizTab}
+            />
             {/*
               The "Click to interact" scrim used to sit here. With the
               pane layout giving each viz its own scroll container, the
@@ -682,5 +646,75 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
         Click to expand
       </Text>
     </Flex>
+  );
+}
+
+/** Whichever visualisation the current tab asks for, once spans have arrived. */
+function VizBody({
+  isCollapsed,
+  isLoading,
+  onClearSpan,
+  onSelectSpan,
+  promptSpanIds,
+  selectedSpanId,
+  spans,
+  vizTab,
+}: {
+  isCollapsed: boolean;
+  isLoading: boolean;
+  onClearSpan: () => void;
+  onSelectSpan: (spanId: string) => void;
+  promptSpanIds: Set<string>;
+  selectedSpanId: string | null;
+  spans: SpanTreeNode[];
+  vizTab: VizTab;
+}) {
+  if (spans.length === 0) {
+    if (isLoading) return <VizSkeleton vizTab={vizTab} />;
+    return (
+      <Flex align="center" justify="center" height="full">
+        <Text textStyle="xs" color="fg.subtle">
+          No span data available for this trace
+        </Text>
+      </Flex>
+    );
+  }
+  if (isCollapsed) return <CollapsedOverview spans={spans} />;
+  if (vizTab === "topology" || vizTab === "sequence") {
+    return (
+      <Suspense fallback={<VizSkeleton vizTab={vizTab} />}>
+        <SequenceView
+          spans={spans}
+          selectedSpanId={selectedSpanId}
+          onSelectSpan={onSelectSpan}
+          onClearSpan={onClearSpan}
+          subMode={vizTab}
+        />
+      </Suspense>
+    );
+  }
+  if (vizTab === "flame") {
+    return (
+      <FlameView
+        spans={spans}
+        selectedSpanId={selectedSpanId}
+        onSelectSpan={onSelectSpan}
+        onClearSpan={onClearSpan}
+        renderShortcutKey={(label) => <Kbd>{label}</Kbd>}
+      />
+    );
+  }
+
+  // Default — waterfall. Any unrecognised vizTab (e.g. a stale URL pointing at
+  // the retired "spanlist" tab) falls through here too, so the user gets a
+  // usable view rather than a blank pane.
+  return (
+    <WaterfallView
+      spans={spans}
+      selectedSpanId={selectedSpanId}
+      promptSpanIds={promptSpanIds}
+      onSelectSpan={onSelectSpan}
+      onClearSpan={onClearSpan}
+    />
   );
 }

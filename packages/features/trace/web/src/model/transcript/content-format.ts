@@ -39,10 +39,9 @@ export function tryPrettyJson(raw: string): string {
 export function tryParseJSON(s: string): unknown | null {
   try {
     const trimmed = s.trim();
-    if (
-      (trimmed.startsWith("{") || trimmed.startsWith("[")) &&
-      (trimmed.endsWith("}") || trimmed.endsWith("]"))
-    ) {
+    const opensJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+    const closesJson = trimmed.endsWith("}") || trimmed.endsWith("]");
+    if (opensJson && closesJson) {
       return JSON.parse(trimmed);
     }
     return null;

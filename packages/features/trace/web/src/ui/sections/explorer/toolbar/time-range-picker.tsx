@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { format } from "@langwatch/time";
+import { format, Temporal, toEpochMs } from "@langwatch/time";
 import { Check, Clock, Copy } from "lucide-react";
 import type React from "react";
 import { Fragment, useEffect, useMemo, useState } from "react";
@@ -18,6 +18,7 @@ import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TimeRange } from "../../../../behavior/filter.store.ts";
 import type { TimeRangePreset } from "../../../../behavior/time-range-presets.ts";
+import { readableDate } from "../../../../model/display-formatters.ts";
 import {
   getPresetById,
   matchPreset,
@@ -242,13 +243,13 @@ function formatTriggerLabel(range: TimeRange): string {
   // page; the trigger should read at a glance. Absolute ranges still
   // collapse to the date pair because no shorter form exists.
   if (preset) return preset.label;
-  const from = new Date(range.from);
-  const to = new Date(range.to);
+  const from = readableDate(range.from);
+  const to = readableDate(range.to);
   return `${format(from, "MMM d, HH:mm")} – ${format(to, "MMM d, HH:mm")}`;
 }
 
 function toDatetimeLocal(epochMs: number): string {
-  return format(new Date(epochMs), "yyyy-MM-dd'T'HH:mm");
+  return format(readableDate(epochMs), "yyyy-MM-dd'T'HH:mm");
 }
 
 function parseAbsoluteRange({
@@ -258,14 +259,17 @@ function parseAbsoluteRange({
   from: string;
   to: string;
 }): { from: number; to: number } | null {
-  const fromMs = new Date(from).getTime();
-  const toMs = new Date(to).getTime();
-  if (Number.isNaN(fromMs) || Number.isNaN(toMs) || fromMs >= toMs) return null;
+  const fromMs = toEpochMs(from);
+  const toMs = toEpochMs(to);
+  const bothParsed = !Number.isNaN(fromMs) && !Number.isNaN(toMs);
+  if (!bothParsed || fromMs >= toMs) return null;
   return { from: fromMs, to: toMs };
 }
 
+const NANOSECONDS_PER_MINUTE = 60_000_000_000;
+
 function formatTimezone(): string {
-  const offset = new Date().getTimezoneOffset();
+  const offset = -Temporal.Now.zonedDateTimeISO().offsetNanoseconds / NANOSECONDS_PER_MINUTE;
   const sign = offset <= 0 ? "+" : "-";
   const absMinutes = Math.abs(offset);
   const hours = Math.floor(absMinutes / 60);
@@ -276,7 +280,7 @@ function formatTimezone(): string {
 }
 
 function formatCopyText(range: TimeRange): string {
-  const from = format(new Date(range.from), "yyyy-MM-dd HH:mm");
-  const to = format(new Date(range.to), "yyyy-MM-dd HH:mm");
+  const from = format(readableDate(range.from), "yyyy-MM-dd HH:mm");
+  const to = format(readableDate(range.to), "yyyy-MM-dd HH:mm");
   return `${from} to ${to}`;
 }

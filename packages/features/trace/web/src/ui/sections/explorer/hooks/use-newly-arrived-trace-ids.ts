@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { TraceListItem } from "../types/trace.ts";
+import { nowInstant } from "@langwatch/time";
 
 const NEW_ID_TTL_MS = 3500;
 /** Cap the seen-ids memory in long sessions — old entries get evicted FIFO. */
@@ -11,7 +12,7 @@ const SEEN_IDS_CAP = 5_000;
  * backfilled trace pulse. Each new id self-evicts after `NEW_ID_TTL_MS`.
  */
 export function useNewlyArrivedTraceIds(traces: TraceListItem[]): Set<string> {
-  const mountedAtRef = useRef(Date.now());
+  const mountedAtRef = useRef(nowInstant().epochMilliseconds);
   // Insertion-ordered Map used as a bounded FIFO set.
   const seenIdsRef = useRef<Map<string, true>>(new Map());
   const expiryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());

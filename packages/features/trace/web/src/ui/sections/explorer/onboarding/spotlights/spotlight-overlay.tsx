@@ -523,10 +523,10 @@ export function SpotlightOverlay(): React.ReactElement | null {
       // (search bar, facet value inputs). Don't let an Escape meant to
       // clear/blur a field also tear the tour down.
       const target = e.target;
-      if (
+      const isTypingTarget =
         target instanceof HTMLElement &&
-        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-      ) {
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (isTypingTarget) {
         return;
       }
       handleDismiss();

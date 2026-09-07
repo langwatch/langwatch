@@ -2,6 +2,8 @@
  * The generated Prisma shapes this package names, restated.
  */
 
+import type { TimeInput } from "@langwatch/time";
+
 export const TeamUserRole = {
   ADMIN: "ADMIN",
   MEMBER: "MEMBER",
@@ -45,8 +47,8 @@ export type Project = {
   framework: string;
   firstMessage: boolean;
   integrated: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: TimeInput;
+  updatedAt: TimeInput;
   piiRedactionLevel?: string;
   s3Endpoint?: string | null;
   capturedInputVisibility?: string;

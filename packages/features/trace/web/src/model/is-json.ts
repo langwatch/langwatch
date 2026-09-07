@@ -1,8 +1,8 @@
 export const isJson = (input: string) => {
-  if (
-    typeof input !== "string" ||
-    (!input.trim().startsWith("{") && !input.trim().startsWith("["))
-  ) {
+  if (typeof input !== "string") return false;
+  const trimmed = input.trim();
+  const looksJsonShaped = trimmed.startsWith("{") || trimmed.startsWith("[");
+  if (!looksJsonShaped) {
     return false;
   }
   try {

@@ -90,6 +90,8 @@ export function TraceOverflowMenu({
   // mirror that in the menu so users see why the action is unavailable instead
   // of getting a surprise CONFLICT toast.
   const isSharePin = pinQuery.data?.source === "share";
+  const ownPinLabel = isPinned ? "Unpin trace" : "Pin trace";
+  const pinLabel = isSharePin ? "Pinned by share" : ownPinLabel;
 
   const pinMutation = api.pinnedTrace.pin.useMutation({
     onSuccess: () => {
@@ -226,7 +228,7 @@ export function TraceOverflowMenu({
           >
             <HStack gap={2}>
               <Icon as={isPinned ? LuPinOff : LuPin} boxSize={3.5} />
-              <Text>{isSharePin ? "Pinned by share" : isPinned ? "Unpin trace" : "Pin trace"}</Text>
+              <Text>{pinLabel}</Text>
             </HStack>
           </Menu.Item>
         )}

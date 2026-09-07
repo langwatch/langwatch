@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { api } from "../../../../../behavior/trace-api.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * User-scoped persistence for automatic Traces Explorer tours.
@@ -18,7 +19,7 @@ export function useTraceExplorerTourPreference() {
         {},
         {
           dismissed: true,
-          dismissedAt: new Date().toISOString(),
+          dismissedAt: nowInstant().toString({ smallestUnit: "millisecond" }),
         },
       );
       return { previous };

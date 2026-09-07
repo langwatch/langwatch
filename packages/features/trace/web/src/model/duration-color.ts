@@ -20,9 +20,8 @@ export const durationColor = (
   if (duration == null || duration === undefined) {
     return "gray.500";
   }
-  return duration > thresholds[metric].red
-    ? "red"
-    : duration > thresholds[metric].yellow
-      ? "yellow.600"
-      : "green";
+  const threshold = thresholds[metric];
+  if (duration > threshold.red) return "red";
+  if (duration > threshold.yellow) return "yellow.600";
+  return "green";
 };

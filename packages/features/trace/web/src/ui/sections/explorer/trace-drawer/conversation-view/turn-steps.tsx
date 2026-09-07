@@ -4,7 +4,11 @@ import { memo, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { api } from "../../../../../behavior/trace-api.ts";
-import { formatCost, formatDuration, formatTokens } from "../../../../../model/display-formatters.ts";
+import {
+  formatCost,
+  formatDuration,
+  formatTokens,
+} from "../../../../../model/display-formatters.ts";
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";
 const TOOL_SPAN = "claude_code.tool";
@@ -75,21 +79,24 @@ export const TurnSteps = memo(function TurnSteps({
 
       {isOpen && (
         <Box borderLeftWidth="1px" borderColor="border.muted" paddingLeft={3} paddingY={1}>
-          {query.isLoading ? (
+          {query.isLoading && (
             <VStack align="stretch" gap={1.5} aria-busy="true">
               {["55%", "70%", "40%"].map((w) => (
                 <Skeleton key={w} height="10px" width={w} borderRadius="sm" />
               ))}
             </VStack>
-          ) : query.isError ? (
+          )}
+          {!query.isLoading && query.isError && (
             <Text textStyle="2xs" color="fg.error">
               Couldn&apos;t load this turn&apos;s steps
             </Text>
-          ) : steps.length === 0 ? (
+          )}
+          {!query.isLoading && !query.isError && steps.length === 0 && (
             <Text textStyle="2xs" color="fg.subtle">
               No model or tool steps recorded
             </Text>
-          ) : (
+          )}
+          {!query.isLoading && !query.isError && steps.length > 0 && (
             <VStack align="stretch" gap={0.5}>
               {steps.map((step) => (
                 <StepRow key={step.spanId} step={step} />
@@ -137,11 +144,12 @@ function selectSteps(spans: SpanDetail[]): Step[] {
 
 function StepRow({ step }: { step: Step }) {
   const isTool = step.kind === "tool";
+  const kindColor = isTool ? "green.fg" : "blue.fg";
   return (
     <HStack gap={2} align="baseline">
       <Text
         {...CELL}
-        color={step.isError ? "red.fg" : isTool ? "green.fg" : "blue.fg"}
+        color={step.isError ? "red.fg" : kindColor}
         flexShrink={0}
         userSelect="none"
         aria-hidden

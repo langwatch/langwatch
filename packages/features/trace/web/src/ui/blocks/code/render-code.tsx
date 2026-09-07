@@ -68,13 +68,10 @@ export const RenderCode = ({
 
   // Compared against current inputs rather than cleared in the effect, since highlighting is async
   // and would otherwise flash the previous snippet while switching language tabs.
-  const html =
-    highlighted &&
-    highlighted.code === code &&
-    highlighted.language === language &&
-    highlighted.colorMode === colorMode
-      ? highlighted.html
-      : null;
+  const highlightMatchesInput =
+    !!highlighted && highlighted.code === code && highlighted.language === language;
+  const highlightIsCurrent = highlightMatchesInput && highlighted.colorMode === colorMode;
+  const html = highlightIsCurrent ? highlighted.html : null;
 
   return (
     <Box position="relative" className="group" style={propsStyle}>

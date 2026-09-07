@@ -651,6 +651,8 @@ export const WaterfallView = memo(function WaterfallView({
                   const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
                   const isLast = idx === visibleTimeMarkers.length - 1;
                   const isFirst = idx === 0;
+                  const innerTransform = isFirst ? "translateY(-50%)" : "translate(-50%, -50%)";
+                  const tickTransform = isLast ? "translate(-100%, -50%)" : innerTransform;
                   return (
                     <Text
                       key={idx}
@@ -659,13 +661,7 @@ export const WaterfallView = memo(function WaterfallView({
                       position="absolute"
                       top="50%"
                       left={`${pct}%`}
-                      transform={
-                        isLast
-                          ? "translate(-100%, -50%)"
-                          : isFirst
-                            ? "translateY(-50%)"
-                            : "translate(-50%, -50%)"
-                      }
+                      transform={tickTransform}
                       whiteSpace="nowrap"
                       userSelect="none"
                       lineHeight={1}

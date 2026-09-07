@@ -4,7 +4,10 @@
  */
 
 import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
-import { applyPreviewNewlineTreatment, stripPreviewMarkdownNoise } from "../model/preview-markdown.ts";
+import {
+  applyPreviewNewlineTreatment,
+  stripPreviewMarkdownNoise,
+} from "../model/preview-markdown.ts";
 import { pythonReprToJson } from "../model/python-repr.ts";
 import type { PreviewOptions, PreviewResult } from "../model/preview-types.ts";
 
@@ -61,10 +64,9 @@ export function formatPreview(
   // 1. JSON unwrap. Only attempt when the trimmed input *looks* like JSON,
   //    so we don't waste cycles on every plain-string preview.
   const trimmed = text.trim();
-  if (
-    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-    (trimmed.startsWith("[") && trimmed.endsWith("]"))
-  ) {
+  const looksLikeObject = trimmed.startsWith("{") && trimmed.endsWith("}");
+  const looksLikeArray = trimmed.startsWith("[") && trimmed.endsWith("]");
+  if (looksLikeObject || looksLikeArray) {
     const unwrap = unwrapJson(trimmed);
     if (unwrap) {
       text = unwrap.text;
@@ -238,7 +240,8 @@ function glyphForPartType(type: string): string {
   if (type.includes("audio")) return "\u{1F399}️"; // 🎙️
   if (type.includes("image")) return "\u{1F4F7}"; // 📷
   if (type.includes("video")) return "\u{1F3AC}"; // 🎬
-  if (type.includes("file") || type.includes("document")) return "\u{1F4CE}"; // 📎
+  const isAttachment = type.includes("file") || type.includes("document");
+  if (isAttachment) return "\u{1F4CE}"; // 📎
   return `<${type}>`;
 }
 
@@ -262,7 +265,8 @@ function unwrapObject(obj: Record<string, unknown>): UnwrapResult {
   const keys = Object.keys(obj);
   if (keys.length === 1) {
     const key = keys[0]!;
-    if (UNWRAP_KEY_ALLOWLIST.has(key.toLowerCase())) {
+    const isUnwrappableKey = UNWRAP_KEY_ALLOWLIST.has(key.toLowerCase());
+    if (isUnwrappableKey) {
       const value = obj[key];
       if (typeof value === "string") return { text: value };
       if (typeof value === "number" || typeof value === "boolean") {
@@ -292,7 +296,8 @@ function extractMessageContent(content: unknown): string {
         /* fall through */
       }
     }
-    if (t.startsWith('{"type":"') && !t.startsWith('{"type":"text"')) {
+    const isNonTextTypedBlock = t.startsWith('{"type":"') && !t.startsWith('{"type":"text"');
+    if (isNonTextTypedBlock) {
       // Non-text typed block — nothing readable.
       return "";
     }
@@ -303,13 +308,8 @@ function extractMessageContent(content: unknown): string {
     for (const part of content) {
       if (typeof part === "string") {
         parts.push(part);
-      } else if (
-        part &&
-        typeof part === "object" &&
-        (part as { type?: unknown }).type === "text" &&
-        typeof (part as { text?: unknown }).text === "string"
-      ) {
-        parts.push((part as { text: string }).text);
+      } else if (isTextPart(part)) {
+        parts.push(part.text);
       }
     }
     return parts.join(" ");
@@ -317,9 +317,18 @@ function extractMessageContent(content: unknown): string {
   return "";
 }
 
+/** An Anthropic-style `{ type: "text", text }` block, as a preview reads it. */
+function isTextPart(part: unknown): part is { text: string } {
+  if (!part || typeof part !== "object") return false;
+  const typed = part as { text?: unknown; type?: unknown };
+  return typed.type === "text" && typeof typed.text === "string";
+}
+
+const PREVIEW_ROLES = new Set(["assistant", "system", "tool", "user"]);
+
 function normaliseRole(role: unknown): PreviewResult["role"] {
-  if (role === "user" || role === "assistant" || role === "system" || role === "tool") {
-    return role;
+  if (typeof role === "string" && PREVIEW_ROLES.has(role)) {
+    return role as PreviewResult["role"];
   }
   return void 0;
 }

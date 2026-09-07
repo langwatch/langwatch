@@ -10,6 +10,11 @@ import type { CellDef } from "../../types.ts";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
 import { createCostCell, createDurationCell, createTokensCell } from "../shared-summary-cells.tsx";
 
+/** A reported peak of zero is a real answer, so it prints as "0", not "0 tokens". */
+function formatContextTokens(tokens: number): string {
+  return tokens === 0 ? "0" : formatTokens(tokens);
+}
+
 const STATUS_HEALTH_LABELS: Record<TraceStatus, string> = {
   ok: "Healthy",
   warning: "Warnings",
@@ -85,7 +90,7 @@ export const SessionContextSizeCell: CellDef<ConversationGroup> = {
     if (tokens == null) return <MonoCell>{dash}</MonoCell>;
     return (
       <Tooltip content={CONTEXT_SIZE_EXPLANATION} positioning={{ placement: "top" }}>
-        <MonoCell>{tokens === 0 ? "0" : formatTokens(tokens)}</MonoCell>
+        <MonoCell>{formatContextTokens(tokens)}</MonoCell>
       </Tooltip>
     );
   },
@@ -93,7 +98,7 @@ export const SessionContextSizeCell: CellDef<ConversationGroup> = {
     const tokens = row.contextSizeTokens;
     return (
       <Text textStyle="xs" color="fg.muted" textAlign="right">
-        {tokens == null ? dash : tokens === 0 ? "0" : formatTokens(tokens)}
+        {tokens == null ? dash : formatContextTokens(tokens)}
       </Text>
     );
   },

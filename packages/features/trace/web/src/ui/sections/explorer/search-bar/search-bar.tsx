@@ -146,6 +146,13 @@ export const SearchBar: React.FC = () => {
   // subsequent AI-mode entry (e.g. clicking the Ask AI button to start
   // fresh would auto-submit the now-applied filter as a prompt).
   const [aiAutoSubmitSeed, setAiAutoSubmitSeed] = useState<string | null>(null);
+  // Re-show the last natural-language prompt when it belongs to this project
+  // and produced exactly the query on screen; otherwise start from the query.
+  const lastTranslationMatchesQuery =
+    !!lastAiTranslation &&
+    lastAiTranslation.projectId === project?.id &&
+    lastAiTranslation.query === queryText;
+  const composerSeedPrompt = lastTranslationMatchesQuery ? lastAiTranslation.prompt : queryText;
   // Anchor info for the click-a-chip-to-edit-value popover. Lifted to
   // SearchBar so the popover can portal into document.body and share
   // the same instance whether the click came from PlaceholderEditor or
@@ -339,15 +346,7 @@ export const SearchBar: React.FC = () => {
             // outright (and the composer auto-submits below). Otherwise
             // fall through to the same "re-show last natural-language
             // prompt vs current query" logic the Ask AI button uses.
-            initialPrompt={
-              aiAutoSubmitSeed !== null
-                ? aiAutoSubmitSeed
-                : lastAiTranslation &&
-                    lastAiTranslation.projectId === project?.id &&
-                    lastAiTranslation.query === queryText
-                  ? lastAiTranslation.prompt
-                  : queryText
-            }
+            initialPrompt={aiAutoSubmitSeed ?? composerSeedPrompt}
             autoSubmit={aiAutoSubmitSeed !== null}
           />
         )}

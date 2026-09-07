@@ -2,6 +2,7 @@ import { useIsFetching } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Smallest gap (ms) between two manual refresh clicks.
@@ -78,7 +79,7 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
   const requestRefresh = useRefreshUIStore((s) => s.requestRefresh);
   const refreshRequested = useRefreshUIStore((s) => s.refreshRequested);
   const refresh = useCallback(() => {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     if (now - lastClickRef.current < REFRESH_DEBOUNCE_MS) return;
     lastClickRef.current = now;
     // Mark this as an *explicit* refresh so the aurora ribbon plays.

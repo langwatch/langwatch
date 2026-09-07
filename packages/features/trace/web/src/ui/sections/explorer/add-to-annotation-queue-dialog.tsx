@@ -69,12 +69,9 @@ function destinationFor({
     }
   }
 
-  if (
-    userIds.length === 1 &&
-    queueIds.length === 0 &&
-    !!sessionUserId &&
-    userIds[0] === sessionUserId
-  ) {
+  const onlyOneUserPicked = userIds.length === 1 && queueIds.length === 0;
+  const pickedSelf = !!sessionUserId && userIds[0] === sessionUserId;
+  if (onlyOneUserPicked && pickedSelf) {
     return { label: "View inbox", href: `/${projectSlug}/annotations/me` };
   }
 

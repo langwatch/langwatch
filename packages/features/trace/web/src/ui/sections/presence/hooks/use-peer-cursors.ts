@@ -3,6 +3,7 @@ import { useSSESubscription } from "../../../../behavior/use-sse-subscription.ts
 import type { PresenceCursorEvent } from "@langwatch/presence-contract";
 import { useTabSessionId } from "@langwatch/presence-web/surfaces/presence-state";
 import { api } from "../../../../behavior/trace-api.ts";
+import { nowInstant } from "@langwatch/time";
 
 const STALE_AFTER_MS = 3_000;
 const SWEEP_INTERVAL_MS = 750;
@@ -53,7 +54,7 @@ export function usePeerCursors({
       onData: (event) => {
         setCursors((prev) => {
           const next = new Map(prev);
-          next.set(event.sessionId, { ...event, receivedAt: Date.now() });
+          next.set(event.sessionId, { ...event, receivedAt: nowInstant().epochMilliseconds });
           return next;
         });
       },
@@ -71,7 +72,7 @@ export function usePeerCursors({
   useEffect(() => {
     if (!subscriptionEnabled) return;
     const timer = setInterval(() => {
-      const now = Date.now();
+      const now = nowInstant().epochMilliseconds;
       const current = cursorsRef.current;
       let mutated = false;
       const next = new Map(current);

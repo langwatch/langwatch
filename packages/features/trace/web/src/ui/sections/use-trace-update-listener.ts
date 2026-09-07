@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../behavior/trace-api.ts";
 import { useSSESubscription } from "../../behavior/use-sse-subscription.ts";
+import { nowInstant } from "@langwatch/time";
 
 interface UseTraceUpdateListenerOptions {
   projectId: string;
@@ -152,7 +153,7 @@ export function useTraceUpdateListener({
 
           if (traceId && payload.traceId !== traceId) return;
 
-          setLastEventAt(Date.now());
+          setLastEventAt(nowInstant().epochMilliseconds);
 
           if (payload.event === "span_stored") {
             scheduleSpanUpdate(payload.traceId);

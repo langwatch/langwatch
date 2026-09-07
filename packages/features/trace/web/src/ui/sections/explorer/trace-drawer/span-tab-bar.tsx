@@ -122,13 +122,9 @@ export const SpanTabBar = memo(function SpanTabBar({
   // Icon orientation tracks the pane's edge: horizontal layout docks the detail pane right
   // (LuPanelRight*), vertical docks it at the bottom (LuPanelBottom*).
   const isHorizontalSplit = collapsePosition === "leading";
-  const CollapseToggleIcon = isHorizontalSplit
-    ? detailCollapsed
-      ? LuPanelRightOpen
-      : LuPanelRightClose
-    : detailCollapsed
-      ? LuPanelBottomOpen
-      : LuPanelBottomClose;
+  const rightEdgeIcon = detailCollapsed ? LuPanelRightOpen : LuPanelRightClose;
+  const bottomEdgeIcon = detailCollapsed ? LuPanelBottomOpen : LuPanelBottomClose;
+  const CollapseToggleIcon = isHorizontalSplit ? rightEdgeIcon : bottomEdgeIcon;
 
   const collapseToggle = (
     <Tooltip

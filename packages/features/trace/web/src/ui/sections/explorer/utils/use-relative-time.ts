@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatRelativeTime, formatVerboseRelative } from "../../../../model/display-formatters.ts";
+import { nowInstant } from "@langwatch/time";
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
@@ -17,7 +18,7 @@ const MIN_TICK_MS = 1000;
  * changes, given the trace's timestamp.
  */
 function msUntilNextLabelChange(timestamp: number): number {
-  const diffMs = Math.max(0, Date.now() - timestamp);
+  const diffMs = Math.max(0, nowInstant().epochMilliseconds - timestamp);
   if (diffMs < MS_PER_MINUTE) {
     return Math.max(MIN_TICK_MS, MS_PER_MINUTE - diffMs);
   }

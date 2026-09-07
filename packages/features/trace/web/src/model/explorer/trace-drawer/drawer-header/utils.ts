@@ -41,7 +41,8 @@ function formatLabelsValue(value: unknown): string | null {
   let arr: unknown = value;
   if (typeof value === "string") {
     const trimmed = value.trim();
-    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    const looksLikeArray = trimmed.startsWith("[") && trimmed.endsWith("]");
+    if (looksLikeArray) {
       try {
         arr = JSON.parse(trimmed);
       } catch {

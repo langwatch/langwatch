@@ -5,7 +5,11 @@ import { api } from "../../../../behavior/trace-api.ts";
 import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sample-descriptors.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
-import { type DiscoverDescriptors, getCachedDiscover, setCachedDiscover } from "./discover-cache.ts";
+import {
+  type DiscoverDescriptors,
+  getCachedDiscover,
+  setCachedDiscover,
+} from "./discover-cache.ts";
 
 const EMPTY: never[] = [];
 const EMPTY_RESULT: { facets: never[]; pending: boolean } = {
@@ -108,14 +112,11 @@ export function useTraceFacets() {
   // the skeleton (EMPTY_RESULT) so we don't bleed project A's payload into project B's
   // render.
   const liveSettled = query.data && !query.data.pending ? query.data : undefined;
-  const result =
-    isFromOtherProject && !cachedFacets
-      ? EMPTY_RESULT
-      : liveSettled
-        ? liveSettled
-        : cachedFacets
-          ? { facets: cachedFacets, pending: false }
-          : (query.data ?? EMPTY_RESULT);
+  const cachedResult = cachedFacets
+    ? { facets: cachedFacets, pending: false }
+    : (query.data ?? EMPTY_RESULT);
+  const settledResult = liveSettled ?? cachedResult;
+  const result = isFromOtherProject && !cachedFacets ? EMPTY_RESULT : settledResult;
 
   // Loading reflects what the sidebar will see: if there's either
   // live or cached data driving `result`, the operator already has a

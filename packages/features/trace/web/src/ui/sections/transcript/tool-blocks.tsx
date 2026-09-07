@@ -106,12 +106,16 @@ export function ToolPairCard({
   // is unaffected — `hasAnsi` is false for it, so the render is unchanged.
   const resultHasAnsi = useMemo(() => hasAnsi(resultBody), [resultBody]);
   const isError = result?.isError === true;
+  const skillBorderColor = isSkill ? "purple.muted" : "border.muted";
+  const borderColor = isError ? "red.muted" : skillBorderColor;
+  const skillGlyphColor = isSkill ? "purple.fg" : "fg.subtle";
+  const glyphColor = isError ? "red.fg" : skillGlyphColor;
 
   return (
     <Box
       borderRadius="md"
       borderWidth="1px"
-      borderColor={isError ? "red.muted" : isSkill ? "purple.muted" : "border.muted"}
+      borderColor={borderColor}
       bg={isSkill ? "purple.subtle/40" : "bg.subtle"}
       overflow="hidden"
     >
@@ -129,12 +133,7 @@ export function ToolPairCard({
         transition="background 0.12s ease"
         textAlign="left"
       >
-        <Icon
-          as={isSkill ? LuSparkles : LuWrench}
-          boxSize={3}
-          color={isError ? "red.fg" : isSkill ? "purple.fg" : "fg.subtle"}
-          flexShrink={0}
-        />
+        <Icon as={isSkill ? LuSparkles : LuWrench} boxSize={3} color={glyphColor} flexShrink={0} />
         <Text
           textStyle="xs"
           fontFamily="mono"
@@ -144,9 +143,7 @@ export function ToolPairCard({
         >
           {isSkill && skill?.slug ? `Skill · ${skill.slug}` : name}
         </Text>
-        {isSkill ? (
-          <Box flex={1} />
-        ) : argSummary ? (
+        {!isSkill && argSummary ? (
           <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate flex={1} minWidth={0}>
             {argSummary}
           </Text>
@@ -180,33 +177,7 @@ export function ToolPairCard({
       {open && (
         <VStack align="stretch" gap={0} borderTopWidth="1px" borderTopColor="border.muted">
           <ToolPairSection label={id ? `Args · ${id}` : "Args"}>
-            {argEntries && argEntries.length > 0 ? (
-              <VStack align="stretch" gap={1}>
-                {argEntries.map(([key, value]) => (
-                  <ToolArgRow key={key} name={key} value={value} />
-                ))}
-              </VStack>
-            ) : argEntries && argEntries.length === 0 ? (
-              <Text textStyle="xs" color="fg.subtle" fontStyle="italic">
-                No arguments
-              </Text>
-            ) : (
-              <Box
-                as="pre"
-                textStyle="2xs"
-                fontFamily="mono"
-                color="fg"
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-                bg="bg.panel"
-                borderRadius="sm"
-                paddingX={2}
-                paddingY={1.5}
-                margin={0}
-              >
-                {fallbackJson || "—"}
-              </Box>
-            )}
+            <ToolArgsBody argEntries={argEntries} fallbackJson={fallbackJson} />
           </ToolPairSection>
           {result && (
             <ToolPairSection
@@ -234,6 +205,49 @@ export function ToolPairCard({
           )}
         </VStack>
       )}
+    </Box>
+  );
+}
+
+/** The Args section body: a row per named argument, or the raw JSON we fell back to. */
+function ToolArgsBody({
+  argEntries,
+  fallbackJson,
+}: {
+  argEntries: Array<[string, unknown]> | null;
+  fallbackJson: string;
+}) {
+  if (argEntries && argEntries.length > 0) {
+    return (
+      <VStack align="stretch" gap={1}>
+        {argEntries.map(([key, value]) => (
+          <ToolArgRow key={key} name={key} value={value} />
+        ))}
+      </VStack>
+    );
+  }
+  if (argEntries) {
+    return (
+      <Text textStyle="xs" color="fg.subtle" fontStyle="italic">
+        No arguments
+      </Text>
+    );
+  }
+  return (
+    <Box
+      as="pre"
+      textStyle="2xs"
+      fontFamily="mono"
+      color="fg"
+      whiteSpace="pre-wrap"
+      wordBreak="break-word"
+      bg="bg.panel"
+      borderRadius="sm"
+      paddingX={2}
+      paddingY={1.5}
+      margin={0}
+    >
+      {fallbackJson || "—"}
     </Box>
   );
 }

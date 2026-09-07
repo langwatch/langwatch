@@ -130,10 +130,10 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
     const handler = (event: KeyboardEvent) => {
       if (event.key !== "/") return;
       const target = event.target;
-      if (
+      const isTypingTarget =
         target instanceof HTMLElement &&
-        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-      ) {
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (isTypingTarget) {
         return;
       }
       event.preventDefault();

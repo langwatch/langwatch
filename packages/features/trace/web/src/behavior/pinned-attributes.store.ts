@@ -95,13 +95,10 @@ export const usePinnedAttributesStore = create<PinnedAttributesState>((set, get)
 
   reorder: (projectId, fromIndex, toIndex) => {
     const current = get().byProject[projectId] ?? readFromStorage(projectId);
-    if (
-      fromIndex === toIndex ||
-      fromIndex < 0 ||
-      toIndex < 0 ||
-      fromIndex >= current.length ||
-      toIndex >= current.length
-    ) {
+    const sameSlot = fromIndex === toIndex;
+    const outOfRange =
+      fromIndex < 0 || toIndex < 0 || fromIndex >= current.length || toIndex >= current.length;
+    if (sameSlot || outOfRange) {
       return;
     }
     const next = [...current];

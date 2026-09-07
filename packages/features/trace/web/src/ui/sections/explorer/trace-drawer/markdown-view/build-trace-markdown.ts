@@ -2,6 +2,7 @@ import type { SpanDetail as FullSpan, SpanTreeNode, TraceHeader } from "@langwat
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import { formatCost, formatDuration } from "../../../../../model/display-formatters.ts";
 import { type MarkdownConfig } from "../../../../../model/markdown/types.ts";
+import { readableDate } from "../../../../../model/display-formatters.ts";
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "rag", "tool", "evaluation"]);
 
@@ -11,7 +12,8 @@ function keepAiSpanAndAncestors(
   byId: Map<string, SpanTreeNode>,
   keep: Set<string>,
 ): void {
-  if (!AI_SPAN_TYPES.has((s.type ?? "span").toLowerCase())) {
+  const isAiSpan = AI_SPAN_TYPES.has((s.type ?? "span").toLowerCase());
+  if (!isAiSpan) {
     return;
   }
   keep.add(s.spanId);
@@ -204,6 +206,12 @@ function extractSystemMessages(trace: TraceHeader, fullSpans?: FullSpan[]): stri
   return out;
 }
 
+/** The tool a message names, either by its own name or by answering a call. */
+function toolNameOf(message: Record<string, unknown>): string | undefined {
+  if (typeof message.name === "string") return message.name;
+  return typeof message.tool_call_id === "string" ? "tool_result" : undefined;
+}
+
 function extractChatMessages(parsed: unknown): CompactMessage[] {
   if (!Array.isArray(parsed)) return [];
   const out: CompactMessage[] = [];
@@ -216,12 +224,7 @@ function extractChatMessages(parsed: unknown): CompactMessage[] {
       role,
       content: stringifyMessageContent(e.content),
       rawContent: e.content,
-      tool:
-        typeof e.name === "string"
-          ? (e.name as string)
-          : typeof e.tool_call_id === "string"
-            ? "tool_result"
-            : undefined,
+      tool: toolNameOf(e),
     });
   }
   return out;
@@ -590,7 +593,7 @@ export function buildTraceMarkdown(
   // markdown and stay structured for token-efficient extraction.
   const detail: string[] = [];
   detail.push(`**Trace ID** \`${trace.traceId}\``);
-  detail.push(`**Started** ${new Date(trace.timestamp).toISOString()}`);
+  detail.push(`**Started** ${readableDate(trace.timestamp).toISOString()}`);
   if (trace.totalTokens > 0) {
     detail.push(
       `**Tokens** ${trace.inputTokens ?? 0} in / ${trace.outputTokens ?? 0} out (${trace.totalTokens} total${trace.tokensEstimated ? ", estimated" : ""})`,

@@ -34,7 +34,8 @@ export const useFindShortcut = (): void => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
-      if (!isMod || e.key.toLowerCase() !== "f" || e.shiftKey || e.altKey) {
+      const isPlainModF = isMod && !e.shiftKey && !e.altKey;
+      if (!isPlainModF || e.key.toLowerCase() !== "f") {
         return;
       }
 
@@ -65,8 +66,8 @@ export const useFindShortcut = (): void => {
 const isInteractiveTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
   if (isTextInput(target)) return true;
-  if (target.closest("[role='dialog'], [role='textbox'], [data-find-bar]")) return true;
-  return false;
+  const insideOverlay = target.closest("[role='dialog'], [role='textbox'], [data-find-bar]");
+  return insideOverlay !== null;
 };
 
 /**

@@ -41,21 +41,19 @@ export const EventCard: React.FC<EventCardProps> = ({
   const offsetMs = Math.max(0, Math.round(timestampMs - anchorMs));
   const attributeEntries = attributes ? Object.entries(attributes) : [];
   const hasAttributes = attributeEntries.length > 0;
+  const warningBorder = tone === "warning" ? "yellow.solid/30" : "border.subtle";
+  const borderColor = tone === "danger" ? "red.solid/30" : warningBorder;
+  const warningFill = tone === "warning" ? "yellow.solid/8" : "bg.subtle";
+  const fill = tone === "danger" ? "red.solid/8" : warningFill;
 
   return (
     <HStack
       align="stretch"
       gap={0}
       borderWidth="1px"
-      borderColor={
-        tone === "danger"
-          ? "red.solid/30"
-          : tone === "warning"
-            ? "yellow.solid/30"
-            : "border.subtle"
-      }
+      borderColor={borderColor}
       borderRadius="md"
-      bg={tone === "danger" ? "red.solid/8" : tone === "warning" ? "yellow.solid/8" : "bg.subtle"}
+      bg={fill}
       overflow="hidden"
     >
       {tone !== "neutral" && (

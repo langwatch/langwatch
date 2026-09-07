@@ -70,7 +70,8 @@ export function detectFormat(value: unknown): AttributeFormat {
     return "leaf";
   }
 
-  if (trimmed.length <= LEAF_LENGTH && !trimmed.includes("\n") && !looksJsonShaped(trimmed)) {
+  const isShortSingleLine = trimmed.length <= LEAF_LENGTH && !trimmed.includes("\n");
+  if (isShortSingleLine && !looksJsonShaped(trimmed)) {
     return "leaf";
   }
 

@@ -10,7 +10,10 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { useOpenTraceDrawer } from "../hooks/use-open-trace-drawer.ts";
 import type { Density } from "../../../../behavior/density.store.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
-import { findStageDef } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
+import {
+  findStageDef,
+  type HeroLayout,
+} from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
 import { ARRIVAL_PREVIEW_TRACES, RICH_ARRIVAL_TRACE_ID } from "./data/sample-preview-traces.ts";
 import {
   hasCompletedJourney,
@@ -27,6 +30,15 @@ import { OutroPanel } from "../../../elements/explorer/onboarding/outro-panel.ts
 import { ReturningUserHub } from "../../../elements/explorer/onboarding/returning-user-hub.tsx";
 import { StaticHero } from "../../../blocks/explorer/onboarding/static-hero.tsx";
 import { TypewriterHero } from "../../../blocks/explorer/onboarding/typewriter-hero.tsx";
+import { nowInstant } from "@langwatch/time";
+
+/** How wide the hero copy runs in each of the journey's four layouts. */
+const HERO_MAX_WIDTH: Record<HeroLayout, string> = {
+  bottomCentre: "640px",
+  centre: "640px",
+  left: "460px",
+  topBanner: "820px",
+};
 
 // Was 8s — too punchy.
 const POST_ARRIVAL_AUTO_OPEN_MS = 14000;
@@ -229,6 +241,35 @@ export function TracesEmptyOnboarding(): React.ReactElement {
   // surrounding chrome (agent-handoff CTA, Replay, Integration
   // overview link) so the hub reads as the single thing on screen.
   const isReturningWelcome = stage === "welcome" && hasCompletedJourney();
+  // The linear narrative beat: one keyed hero per heading, so consecutive
+  // stages sharing a heading stay mounted instead of flickering.
+  const headingHero = stageDef.heading ? (
+    <motion.div
+      // `replayToken` in the key makes Replay work: bumping it remounts this node and
+      // restarts the enter animation even when the heading and stage haven't changed.
+      key={`${stageDef.heading}__${replayToken}`}
+      initial={{ opacity: 0, y: 4 }}
+      // `dimHero` (currently `auroraArrival`) drops the hero text to ~45% so the
+      // user's eye is pulled UP to the aurora ribbon. Animates back to full
+      // opacity the moment the stage advances and dimHero flips off, because
+      // motion's `animate` re-targets in place.
+      animate={{ opacity: stageDef.dimHero ? 0.45 : 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {stageDef.typewriter ? (
+        <TypewriterHero
+          heading={stageDef.heading}
+          subhead={stageDef.subhead}
+          lingerMs={stageDef.holdMs}
+          onDone={handleTypewriterDone}
+          paused={drawerOpen}
+        />
+      ) : (
+        <StaticHero stage={stage} heading={stageDef.heading} subhead={stageDef.subhead} />
+      )}
+    </motion.div>
+  ) : null;
 
   return (
     <>
@@ -247,13 +288,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
         // Left-anchored hero (drawer-overview chapter) was 380px and the subhead —
         // "Conversation, spans, evals — it's all in here. Take your time, then we'll
         // wrap up." — wrapped into a squashed three-line block.
-        maxWidth={
-          stageDef.heroLayout === "left"
-            ? "460px"
-            : stageDef.heroLayout === "topBanner"
-              ? "820px"
-              : "640px"
-        }
+        maxWidth={HERO_MAX_WIDTH[stageDef.heroLayout ?? "centre"]}
         paddingX={{ base: 4, md: 8 }}
       >
         {/* Hero motion key is the heading text (or a hidden-stage
@@ -279,34 +314,9 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             >
               <ReturningUserHub onJump={setStage} />
             </motion.div>
-          ) : stageDef.heading ? (
-            <motion.div
-              // `replayToken` in the key makes Replay work: bumping it remounts this node and
-              // restarts the enter animation even when the heading and stage haven't changed.
-              key={`${stageDef.heading}__${replayToken}`}
-              initial={{ opacity: 0, y: 4 }}
-              // `dimHero` (currently `auroraArrival`) drops the hero
-              // text to ~45% so the user's eye is pulled UP to the
-              // aurora ribbon. Animates back to full opacity the
-              // moment the stage advances and dimHero flips off,
-              // because motion's `animate` re-targets in place.
-              animate={{ opacity: stageDef.dimHero ? 0.45 : 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {stageDef.typewriter ? (
-                <TypewriterHero
-                  heading={stageDef.heading}
-                  subhead={stageDef.subhead}
-                  lingerMs={stageDef.holdMs}
-                  onDone={handleTypewriterDone}
-                  paused={drawerOpen}
-                />
-              ) : (
-                <StaticHero stage={stage} heading={stageDef.heading} subhead={stageDef.subhead} />
-              )}
-            </motion.div>
-          ) : null}
+          ) : (
+            headingHero
+          )}
         </AnimatePresence>
 
         {/* Auto-click countdown — visible during postArrival so the
@@ -593,9 +603,9 @@ export function TracesEmptyOnboarding(): React.ReactElement {
 const PostArrivalCountdown: React.FC<{ totalMs: number }> = ({ totalMs }) => {
   const [remainingMs, setRemainingMs] = useState(totalMs);
   useEffect(() => {
-    const start = Date.now();
+    const start = nowInstant().epochMilliseconds;
     const id = window.setInterval(() => {
-      const elapsed = Date.now() - start;
+      const elapsed = nowInstant().epochMilliseconds - start;
       const next = Math.max(0, totalMs - elapsed);
       setRemainingMs(next);
       if (next <= 0) window.clearInterval(id);

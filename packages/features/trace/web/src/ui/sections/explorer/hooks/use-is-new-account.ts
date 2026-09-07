@@ -1,4 +1,5 @@
 import { api } from "../../../../behavior/trace-api.ts";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 
 const NEW_ACCOUNT_WINDOW_MS = 5 * 24 * 60 * 60 * 1000;
 
@@ -13,5 +14,5 @@ export function useIsNewAccount(): boolean {
     { staleTime: Infinity, refetchOnWindowFocus: false },
   );
   if (!data?.createdAt) return false;
-  return Date.now() - new Date(data.createdAt).getTime() < NEW_ACCOUNT_WINDOW_MS;
+  return nowInstant().epochMilliseconds - toEpochMs(data.createdAt) < NEW_ACCOUNT_WINDOW_MS;
 }

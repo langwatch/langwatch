@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 import { useDrawerProjectId } from "./use-drawer-project-id.ts";
+import { nowInstant } from "@langwatch/time";
 
 const HOUR_MS = 60 * 60 * 1000;
 const WINDOW_DAYS = 90;
@@ -28,7 +29,7 @@ export function useConversationTurns(conversationId: string | null) {
   const isReadOnly = useIsReadOnlyTrace();
 
   const timeRange = useMemo(
-    () => conversationTurnsWindow(Date.now()),
+    () => conversationTurnsWindow(nowInstant().epochMilliseconds),
     // Recompute only when the target conversation or its project changes; the
     // hour-rounded window keeps the key stable across renders within the hour.
     // eslint-disable-next-line react-hooks/exhaustive-deps

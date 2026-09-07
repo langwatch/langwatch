@@ -7,7 +7,8 @@ function structureOf(value: unknown): unknown {
     return value;
   }
   const trimmed = value.trim();
-  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+  const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+  if (!looksLikeJson) {
     return value;
   }
   try {
@@ -16,6 +17,12 @@ function structureOf(value: unknown): unknown {
   } catch {
     return value;
   }
+}
+
+/** Object keys sort ascending so the same object always canonicalises the same. */
+function byKeyAscending(a: string, b: string): number {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
 }
 
 function canonicalJson(value: unknown): string {
@@ -27,7 +34,7 @@ function canonicalJson(value: unknown): string {
   if (object.success) {
     const entries = Object.entries(object.data)
       .filter(([, entry]) => entry !== void 0)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .sort(([a], [b]) => byKeyAscending(a, b))
       .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`);
     return `{${entries.join(",")}}`;
   }

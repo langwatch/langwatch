@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * How long a span-row pulse animation lasts. After this the spanId is
@@ -43,7 +44,7 @@ export const useSpanPulseStore = create<SpanPulseState>((set, get) => ({
 
   pulse: (spanId) => {
     const state = get();
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const last = state.lastPulseAt.get(spanId) ?? 0;
 
     if (now - last < PULSE_COALESCE_MS) {

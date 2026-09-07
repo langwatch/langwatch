@@ -2,6 +2,7 @@ import type { TraceListItem } from "../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../types/trace.ts";
 import type { ConversationGroup } from "./conversation-groups.ts";
 import type { TraceGroup } from "./registry/index.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * What a placeholder row's `traceId` starts with. Placeholder ids address no
@@ -25,7 +26,7 @@ export const withoutPlaceholderTraceIds = (traceIds: string[]): string[] =>
 export function buildTracePlaceholderRows(count: number): TraceListItem[] {
   return Array.from({ length: count }, (_, i) => ({
     traceId: `${SKELETON_TRACE_ID_PREFIX}${i}`,
-    timestamp: Date.now(),
+    timestamp: nowInstant().epochMilliseconds,
     name: "",
     serviceName: "",
     durationMs: 0,
@@ -61,8 +62,8 @@ export function buildConversationPlaceholderRows(count: number): ConversationGro
     evalsPassedCount: 0,
     evalsFailedCount: 0,
     worstStatus: "ok",
-    latestTimestamp: Date.now(),
-    earliestTimestamp: Date.now(),
+    latestTimestamp: nowInstant().epochMilliseconds,
+    earliestTimestamp: nowInstant().epochMilliseconds,
     lastMessage: "",
     lastOutput: "",
     primaryModel: "",

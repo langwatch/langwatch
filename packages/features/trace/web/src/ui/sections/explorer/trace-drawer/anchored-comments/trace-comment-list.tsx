@@ -3,6 +3,7 @@ import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
 import { Crosshair, Lightbulb } from "lucide-react";
 import { UserAvatar } from "../../../../elements/user-avatar.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import { readableDate } from "../../../../../model/display-formatters.ts";
 import {
   canJumpToAnnotationAnchor,
   useJumpToAnnotationAnchor,
@@ -97,7 +98,7 @@ function CommentRow({
           {comment.expectedOutput && <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />}
           <Box flex={1} />
           <Text textStyle="2xs" color="fg.subtle">
-            {new Date(comment.createdAt).toLocaleDateString()}
+            {readableDate(comment.createdAt).toLocaleDateString()}
           </Text>
         </HStack>
         <AnchorBreadcrumb

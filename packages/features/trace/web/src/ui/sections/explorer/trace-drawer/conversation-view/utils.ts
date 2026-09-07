@@ -12,6 +12,7 @@ import {
 import { formatDuration, formatRelativeTime } from "../../../../../model/display-formatters.ts";
 import { extractSystemText } from "../transcript/parsing.ts";
 import type { ParsedTurn } from "./types.ts";
+import { readableDate } from "../../../../../model/display-formatters.ts";
 
 /** Shared empty list so a media-free turn keeps a stable identity per parse. */
 const NO_MEDIA: MediaPartData[] = [];
@@ -66,8 +67,8 @@ export function buildConversationMarkdownChunks(
   if (parsedTurns.length > 0) {
     const first = parsedTurns[0]!.turn;
     const last = parsedTurns[parsedTurns.length - 1]!.turn;
-    headerLines.push(`- **Started:** ${new Date(first.timestamp).toISOString()}`);
-    headerLines.push(`- **Last turn:** ${new Date(last.timestamp).toISOString()}`);
+    headerLines.push(`- **Started:** ${readableDate(first.timestamp).toISOString()}`);
+    headerLines.push(`- **Last turn:** ${readableDate(last.timestamp).toISOString()}`);
     let totalCost = 0;
     let totalTokens = 0;
     for (const p of parsedTurns) {

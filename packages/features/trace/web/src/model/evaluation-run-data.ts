@@ -2,6 +2,8 @@
  * One evaluation run, as a sample trace carries it.
  */
 
+import type { TimeInput } from "@langwatch/time";
+
 export type EvaluationRunData = {
   evaluationId: string;
   traceId?: string;
@@ -18,11 +20,11 @@ export type EvaluationRunData = {
   errorDetails?: unknown;
   inputs?: Record<string, unknown> | null;
   costId?: string | null;
-  scheduledAt?: number | Date | null;
-  startedAt?: number | Date | null;
-  completedAt?: number | Date | null;
-  archivedAt?: number | Date | null;
-  createdAt?: number | Date | null;
-  updatedAt?: number | Date | null;
-  LastEventOccurredAt?: number | Date | null;
+  scheduledAt?: TimeInput | null;
+  startedAt?: TimeInput | null;
+  completedAt?: TimeInput | null;
+  archivedAt?: TimeInput | null;
+  createdAt?: TimeInput | null;
+  updatedAt?: TimeInput | null;
+  LastEventOccurredAt?: TimeInput | null;
 };

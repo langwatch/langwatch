@@ -73,8 +73,10 @@ export function mediaPartToMediaData(part: unknown): MediaPartData | null {
           : { type: "url", value: sourceValue, mimeType },
       );
     }
-    if (mimeType.startsWith("image/") || mimeType.startsWith("video/")) {
-      const mediaType = mimeType.startsWith("image/") ? "image" : "video";
+    const isImage = mimeType.startsWith("image/");
+    const isVisual = isImage || mimeType.startsWith("video/");
+    if (isVisual) {
+      const mediaType = isImage ? "image" : "video";
       return mediaWithSource(
         mediaType,
         data
@@ -84,7 +86,9 @@ export function mediaPartToMediaData(part: unknown): MediaPartData | null {
     }
     return { type: "binary", mimeType, ...(data ? { data } : { url: sourceValue }) };
   }
-  if (type === "audio" || type === "image" || type === "video" || type === "document") {
+  const isTypedMedia =
+    type === "audio" || type === "image" || type === "video" || type === "document";
+  if (isTypedMedia) {
     const mediaSource = source(record.source);
     if (!mediaSource) return null;
     if (type === "document") {

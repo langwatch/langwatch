@@ -1,5 +1,8 @@
 import { isUneditableViewMode, useDrawerStore } from "../../../../behavior/drawer.store.ts";
-import { selectIsTraceEditDirty, useTraceEditStore } from "../../../../behavior/trace-edit.store.ts";
+import {
+  selectIsTraceEditDirty,
+  useTraceEditStore,
+} from "../../../../behavior/trace-edit.store.ts";
 
 /**
  * Starts correcting a trace: the drawer flips into edit mode (which the URL
@@ -94,7 +97,8 @@ export function exitTraceEditMode(): void {
  */
 export function guardTraceEditExit(run: () => void): boolean {
   const editStore = useTraceEditStore.getState();
-  if (!useDrawerStore.getState().isEditing || !selectIsTraceEditDirty(editStore)) {
+  const hasUnsavedEdits = useDrawerStore.getState().isEditing && selectIsTraceEditDirty(editStore);
+  if (!hasUnsavedEdits) {
     run();
     return true;
   }

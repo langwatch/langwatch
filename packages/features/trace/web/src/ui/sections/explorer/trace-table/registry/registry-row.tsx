@@ -154,21 +154,27 @@ function RegistryRowComponent<TRow>({
   // direct hover.
   const showExpandedBg = hoverScope === "split" && isExpanded && !!expandedBg;
 
+  const splitScope = hoverScope === "split";
+  // Skeleton cells sit 2px taller so the placeholder row matches the real one.
+  const contentPadding = isLoading
+    ? `calc(${tokens.rowPaddingY} + 2px) 8px`
+    : `${tokens.rowPaddingY} 8px`;
+  const splitRowBg = showExpandedBg ? expandedBg!.surface : style.bg;
+  const splitRowHoverBg = showExpandedBg ? undefined : { bg: style.hoverBg };
+
   const mainRow = (
     <Tr
       outline={isFocused ? "1px solid" : undefined}
       outlineColor={isFocused ? "blue.fg" : undefined}
       cursor={onSelect || onToggleExpand ? "pointer" : "default"}
       onClick={hoverScope === "split" ? handleRowClick : undefined}
-      bg={hoverScope === "split" ? (showExpandedBg ? expandedBg!.surface : style.bg) : undefined}
+      bg={splitScope ? splitRowBg : undefined}
       // Reveal opt-in subdued content (e.g. trace ID in TraceCell)
       // only while the row is hovered. Children mark themselves with
       // `data-row-hover-reveal` and start at opacity 0 — the CSS rule
       // here lifts them to 1 when the parent row is hovered.
       css={{ "&:hover [data-row-hover-reveal]": { opacity: 1 } }}
-      _hover={
-        hoverScope === "split" ? (showExpandedBg ? undefined : { bg: style.hoverBg }) : undefined
-      }
+      _hover={splitScope ? splitRowHoverBg : undefined}
     >
       {visibleCells.map((cell, i) => {
         const isSelectCell = cell.column.id === SELECT_COLUMN_ID;
@@ -194,25 +200,15 @@ function RegistryRowComponent<TRow>({
             // Borders go on each TD instead of the Tr because the table runs under
             // `border-collapse: separate` — under that mode browsers ignore TR-level
             // borders, only TD borders render.
-            borderBottomWidth={isEvalsRowSpanCell ? "1px" : hasAddons ? undefined : "1px"}
+            borderBottomWidth={isEvalsRowSpanCell || !hasAddons ? "1px" : undefined}
             borderBottomColor={
-              isEvalsRowSpanCell
-                ? style.bottomSeparatorColor
-                : hasAddons
-                  ? undefined
-                  : style.bottomSeparatorColor
+              isEvalsRowSpanCell || !hasAddons ? style.bottomSeparatorColor : undefined
             }
             borderTopWidth={isFirstOfErrorRun ? "1px" : undefined}
             borderTopColor={isFirstOfErrorRun ? style.bottomSeparatorColor : undefined}
             // Select cells own their full padding so clicks anywhere inside the cell
             // (including the edge padding) hit the checkbox Box, not the Td.
-            padding={
-              isSelectCell
-                ? 0
-                : isLoading
-                  ? `calc(${tokens.rowPaddingY} + 2px) 8px`
-                  : `${tokens.rowPaddingY} 8px`
-            }
+            padding={isSelectCell ? 0 : contentPadding}
             cursor={isSelectCell ? "pointer" : undefined}
             // Clip whatever the cell renders at the column boundary — long unbreakable
             // strings (trace IDs, model slugs, error messages) will otherwise visually
@@ -220,13 +216,11 @@ function RegistryRowComponent<TRow>({
             overflow="hidden"
             {...cellPropsFor(cell, style.borderColor, i)}
           >
-            {isLoading ? (
-              isSelectCell ? (
-                <SkeletonSelectCell />
-              ) : (
-                <SkeletonCellContent meta={meta} rowIdx={skeletonRowIdx} colIdx={i} />
-              )
-            ) : (
+            {isLoading && isSelectCell && <SkeletonSelectCell />}
+            {isLoading && !isSelectCell && (
+              <SkeletonCellContent meta={meta} rowIdx={skeletonRowIdx} colIdx={i} />
+            )}
+            {!isLoading &&
               pickCell(registry, cell.column.id, densityMode, {
                 row: tanstackRow.original,
                 density: tokens,
@@ -236,8 +230,7 @@ function RegistryRowComponent<TRow>({
                 isFocused,
                 actions,
                 enabledAddonIds: addons,
-              })
-            )}
+              })}
           </Td>
         );
       })}

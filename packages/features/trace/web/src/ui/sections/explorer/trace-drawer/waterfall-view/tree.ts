@@ -167,7 +167,9 @@ export function ancestorSpanIds({
   const ancestors: string[] = [];
   const seen = new Set<string>([spanId]);
   let cursor = byId.get(spanId)?.parentSpanId ?? null;
-  while (cursor && !seen.has(cursor) && byId.has(cursor)) {
+  while (cursor !== null) {
+    const isNewAncestor = !seen.has(cursor) && byId.has(cursor);
+    if (!isNewAncestor) break;
     ancestors.push(cursor);
     seen.add(cursor);
     cursor = byId.get(cursor)?.parentSpanId ?? null;

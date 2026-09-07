@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../../behavior/trace-api.ts";
-import { type LensConfig, setLensSyncBridge, useViewStore } from "../../../../behavior/view.store.ts";
+import {
+  type LensConfig,
+  setLensSyncBridge,
+  useViewStore,
+} from "../../../../behavior/view.store.ts";
 
 /** Discriminator stored on each SavedView row so the traces v2 lens
  * persistence doesn't collide with the v1 filter views — rows left behind by
@@ -37,14 +41,17 @@ function encode(lens: LensConfig): SerializedLens {
 function decode(id: string, name: string, filters: unknown): LensConfig | null {
   if (!filters || typeof filters !== "object") return null;
   const f = filters as Partial<SerializedLens>;
-  if (!Array.isArray(f.columns) || !Array.isArray(f.addons)) return null;
+  const columns = f.columns;
+  const addons = f.addons;
+  const hasColumnAndAddonLists = Array.isArray(columns) && Array.isArray(addons);
+  if (!hasColumnAndAddonLists) return null;
   if (!f.sort || typeof f.sort !== "object") return null;
   return {
     id,
     name,
     isBuiltIn: false,
-    columns: f.columns,
-    addons: f.addons,
+    columns,
+    addons,
     grouping: f.grouping ?? "flat",
     sort: f.sort,
     filterText: typeof f.filterText === "string" ? f.filterText : "",

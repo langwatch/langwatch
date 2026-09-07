@@ -92,7 +92,8 @@ export function useSpanTreeCanonical() {
   useEffect(() => {
     const reconnected = sseConnected && !wasSseConnected.current;
     wasSseConnected.current = sseConnected;
-    if (!reconnected || !isReady || !isLive || shared) return;
+    const shouldRefetch = reconnected && isReady && isLive && !shared;
+    if (!shouldRefetch) return;
     void utils.tracesV2.spanTreeDelta.invalidate({
       projectId: queryArgs.projectId,
       traceId: queryArgs.traceId,

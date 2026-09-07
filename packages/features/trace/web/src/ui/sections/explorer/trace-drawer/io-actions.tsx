@@ -6,7 +6,11 @@ import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/promp
 import { type TraceAnchor, useAnchoredAnnotations } from "../hooks/use-anchored-annotations.ts";
 import type { useTextTranslation } from "../hooks/use-text-translation.ts";
 import { FieldCommentButton } from "./anchored-comments/field-comment-button.tsx";
-import { PlaygroundButton, SuggestCorrectionButton, TranslateButton } from "./io-toolbar-buttons.tsx";
+import {
+  PlaygroundButton,
+  SuggestCorrectionButton,
+  TranslateButton,
+} from "./io-toolbar-buttons.tsx";
 
 /** One toolbar action: its inline rendering and its overflow-menu row. */
 export type IOAction = {
@@ -37,14 +41,13 @@ function buildIOActions({
   showSuggest: boolean;
   playgroundHref: string;
 }): IOAction[] {
+  const settledTranslationLabel = translation.isActive ? "Show original" : "Translate";
+  const translationLabel = translation.isLoading ? "Translating…" : settledTranslationLabel;
+
   const actions: IOAction[] = [
     {
       id: "translate",
-      menuLabel: translation.isLoading
-        ? "Translating…"
-        : translation.isActive
-          ? "Show original"
-          : "Translate",
+      menuLabel: translationLabel,
       menuIcon: LuLanguages,
       disabled: translation.isLoading,
       render: () => (

@@ -70,14 +70,11 @@ export function usePublicEnv(options: { includeCapabilities?: boolean } = {}): P
     },
   );
   const staticValues = readTracePublicEnvironment();
+  const withCapabilities = capabilities.data ? { ...staticValues, ...capabilities.data } : void 0;
 
   return useMemo(
     () => ({
-      data: includeCapabilities
-        ? capabilities.data
-          ? { ...staticValues, ...capabilities.data }
-          : void 0
-        : staticValues,
+      data: includeCapabilities ? withCapabilities : staticValues,
       isLoading: includeCapabilities ? capabilities.isLoading : false,
     }),
     [

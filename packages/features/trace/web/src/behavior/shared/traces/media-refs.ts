@@ -113,17 +113,15 @@ const VALID_KINDS = new Set(["audio", "image", "video", "file"]);
 function parseMediaRefEntry(entry: unknown): TraceMediaRef | null {
   if (typeof entry !== "object" || entry === null) return null;
   const candidate = entry as Record<string, unknown>;
-  if (
-    typeof candidate.kind !== "string" ||
-    !VALID_KINDS.has(candidate.kind) ||
-    typeof candidate.url !== "string" ||
-    !isStoredObjectRefUrl(candidate.url)
-  ) {
+  const hasValidKind = typeof candidate.kind === "string" && VALID_KINDS.has(candidate.kind);
+  const url = candidate.url;
+  const hasRefUrl = typeof url === "string" && isStoredObjectRefUrl(url);
+  if (!hasValidKind || !hasRefUrl) {
     return null;
   }
   return {
     kind: candidate.kind as TraceMediaRef["kind"],
-    url: candidate.url,
+    url,
     ...(typeof candidate.filename === "string" ? { filename: candidate.filename } : {}),
     ...(typeof candidate.mimeType === "string" ? { mimeType: candidate.mimeType } : {}),
     // Same allowlist the walk applies, so an unrecognized role read back from

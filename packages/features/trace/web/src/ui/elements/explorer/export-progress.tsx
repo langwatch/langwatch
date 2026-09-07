@@ -54,27 +54,12 @@ export function ExportProgress({ exported, total, isExporting, onCancel }: Expor
     >
       <VStack align="stretch" gap={2}>
         <HStack justify="space-between" gap={3}>
-          {isDone ? (
-            <HStack gap={2}>
-              <Icon boxSize={3.5} color="green.fg">
-                <Check />
-              </Icon>
-              <Text textStyle="sm" color="green.fg" fontWeight="medium">
-                Exported {total.toLocaleString()} traces
-              </Text>
-            </HStack>
-          ) : isPreparing ? (
-            <HStack gap={2}>
-              <Spinner size="xs" color="fg.muted" />
-              <Text textStyle="sm" color="fg.muted">
-                Preparing export…
-              </Text>
-            </HStack>
-          ) : (
-            <Text textStyle="sm" color="fg">
-              Exported {exported.toLocaleString()} of {total.toLocaleString()} traces…
-            </Text>
-          )}
+          <ExportStatusLine
+            exported={exported}
+            isDone={isDone}
+            isPreparing={isPreparing}
+            total={total}
+          />
           {!isDone && onCancel && (
             <Button variant="ghost" size="xs" onClick={onCancel} aria-label="Cancel export">
               <X size={14} />
@@ -94,5 +79,46 @@ export function ExportProgress({ exported, total, isExporting, onCancel }: Expor
         </Progress.Root>
       </VStack>
     </Box>
+  );
+}
+
+/** The one line above the bar: finished, still counting, or mid-export. */
+function ExportStatusLine({
+  exported,
+  isDone,
+  isPreparing,
+  total,
+}: {
+  exported: number;
+  isDone: boolean;
+  isPreparing: boolean;
+  total: number;
+}) {
+  if (isDone) {
+    return (
+      <HStack gap={2}>
+        <Icon boxSize={3.5} color="green.fg">
+          <Check />
+        </Icon>
+        <Text textStyle="sm" color="green.fg" fontWeight="medium">
+          Exported {total.toLocaleString()} traces
+        </Text>
+      </HStack>
+    );
+  }
+  if (isPreparing) {
+    return (
+      <HStack gap={2}>
+        <Spinner size="xs" color="fg.muted" />
+        <Text textStyle="sm" color="fg.muted">
+          Preparing export…
+        </Text>
+      </HStack>
+    );
+  }
+  return (
+    <Text textStyle="sm" color="fg">
+      Exported {exported.toLocaleString()} of {total.toLocaleString()} traces…
+    </Text>
   );
 }

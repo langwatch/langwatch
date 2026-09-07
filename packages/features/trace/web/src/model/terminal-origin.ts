@@ -32,7 +32,10 @@ const CODING_AGENT_SERVICE_MARKERS = [
  */
 export function isTerminalOrigin(signals: TerminalOriginSignals): boolean {
   const service = (signals.serviceName ?? "").toLowerCase();
-  if (CODING_AGENT_SERVICE_MARKERS.some((marker) => service.includes(marker))) {
+  const isCodingAgentService = CODING_AGENT_SERVICE_MARKERS.some((marker) =>
+    service.includes(marker),
+  );
+  if (isCodingAgentService) {
     return true;
   }
   if ((signals.origin ?? "") === "coding_agent") return true;

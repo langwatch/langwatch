@@ -89,10 +89,13 @@ export function TranslateButton({
   isLoading: boolean;
   onToggle: () => void;
 }) {
+  const settledLabel = isActive ? "Show original" : "Translate";
+  const label = isLoading ? "Translating…" : settledLabel;
+
   return (
     <ActionButton
       icon={LuLanguages}
-      label={isLoading ? "Translating…" : isActive ? "Show original" : "Translate"}
+      label={label}
       aria-pressed={isActive}
       color={isActive ? "blue.fg" : "fg.muted"}
       disabled={isLoading}

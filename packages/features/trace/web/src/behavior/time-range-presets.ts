@@ -1,3 +1,5 @@
+import { nowInstant, Temporal } from "@langwatch/time";
+
 export interface TimeRangePreset {
   id: string;
   label: string;
@@ -11,7 +13,7 @@ const MS_PER_DAY = 24 * MS_PER_HOUR;
 
 function rolling(windowMs: number): () => { from: number; to: number } {
   return () => {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     return { from: now - windowMs, to: now };
   };
 }
@@ -67,10 +69,9 @@ export const CALENDAR_PRESETS: ReadonlyArray<TimeRangePreset> = [
     label: "This week",
     shortLabel: "WTD",
     compute: () => {
-      const now = new Date();
-      const daysSinceMonday = (now.getDay() + 6) % 7;
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday);
-      return { from: start.getTime(), to: now.getTime() };
+      const now = Temporal.Now.zonedDateTimeISO();
+      const start = now.subtract({ days: now.dayOfWeek - 1 }).startOfDay();
+      return { from: start.epochMilliseconds, to: now.epochMilliseconds };
     },
   },
   {
@@ -78,10 +79,10 @@ export const CALENDAR_PRESETS: ReadonlyArray<TimeRangePreset> = [
     label: "This month",
     shortLabel: "MTD",
     compute: () => {
-      const now = new Date();
+      const now = Temporal.Now.zonedDateTimeISO();
       return {
-        from: new Date(now.getFullYear(), now.getMonth(), 1).getTime(),
-        to: now.getTime(),
+        from: now.with({ day: 1 }).startOfDay().epochMilliseconds,
+        to: now.epochMilliseconds,
       };
     },
   },
@@ -90,11 +91,11 @@ export const CALENDAR_PRESETS: ReadonlyArray<TimeRangePreset> = [
     label: "This quarter",
     shortLabel: "QTD",
     compute: () => {
-      const now = new Date();
-      const quarterStartMonth = now.getMonth() - (now.getMonth() % 3);
+      const now = Temporal.Now.zonedDateTimeISO();
+      const quarterStartMonth = now.month - ((now.month - 1) % 3);
       return {
-        from: new Date(now.getFullYear(), quarterStartMonth, 1).getTime(),
-        to: now.getTime(),
+        from: now.with({ day: 1, month: quarterStartMonth }).startOfDay().epochMilliseconds,
+        to: now.epochMilliseconds,
       };
     },
   },
@@ -122,10 +123,9 @@ const PRESET_MATCH_TOLERANCE_MS = MS_PER_MINUTE;
 export function matchPreset(range: { from: number; to: number }): TimeRangePreset | null {
   for (const preset of ALL_PRESETS) {
     const computed = preset.compute();
-    if (
-      Math.abs(range.from - computed.from) < PRESET_MATCH_TOLERANCE_MS &&
-      Math.abs(range.to - computed.to) < PRESET_MATCH_TOLERANCE_MS
-    ) {
+    const fromMatches = Math.abs(range.from - computed.from) < PRESET_MATCH_TOLERANCE_MS;
+    const toMatches = Math.abs(range.to - computed.to) < PRESET_MATCH_TOLERANCE_MS;
+    if (fromMatches && toMatches) {
       return preset;
     }
   }

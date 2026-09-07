@@ -6,6 +6,7 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { IntegrateDrawer } from "./integrate-drawer.tsx";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * 14-day snooze window in milliseconds. After this period the card
@@ -33,7 +34,7 @@ export function useIntegrationCTAVisible({
   if (hasAnyTraces !== false) return false;
 
   if (dismissedAt !== null) {
-    const elapsed = Date.now() - dismissedAt;
+    const elapsed = nowInstant().epochMilliseconds - dismissedAt;
     if (elapsed < SNOOZE_DURATION_MS) return false;
   }
 
@@ -57,7 +58,7 @@ export const IntegrationCTACard: React.FC = () => {
 
   function handleDismiss(): void {
     if (!projectId) return;
-    setDismissedAt(projectId, Date.now());
+    setDismissedAt(projectId, nowInstant().epochMilliseconds);
   }
 
   return (

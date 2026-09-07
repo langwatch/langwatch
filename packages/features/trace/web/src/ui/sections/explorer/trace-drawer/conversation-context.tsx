@@ -13,7 +13,10 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
 import type { ConversationTurn } from "../../../../model/explorer/conversation-turn.ts";
 import { useConversationContext } from "../hooks/use-conversation-context.ts";
-import { type UseTextTranslationResult, useTextTranslation } from "../hooks/use-text-translation.ts";
+import {
+  type UseTextTranslationResult,
+  useTextTranslation,
+} from "../hooks/use-text-translation.ts";
 import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation.ts";
 import { getDrawerDensityTokens, useDensityStore } from "../../../../behavior/density.store.ts";
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
@@ -108,7 +111,8 @@ function extractReadableSnippet(
 ): string {
   if (!raw) return "";
   const trimmed = raw.trim();
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+  const looksLikeArray = trimmed.startsWith("[") && trimmed.endsWith("]");
+  if (looksLikeArray) {
     try {
       const parsed = JSON.parse(trimmed) as unknown;
       if (Array.isArray(parsed)) {
@@ -387,15 +391,16 @@ function ContextHeader({
         >
           Conversation Context
         </Text>
-        {isLoading ? (
+        {isLoading && (
           <Text textStyle="2xs" color="fg.subtle">
             loading…
           </Text>
-        ) : total > 0 ? (
+        )}
+        {!isLoading && total > 0 && (
           <Text textStyle="2xs" color="fg.subtle">
             turn {position} of {total}
           </Text>
-        ) : null}
+        )}
         <Box flex={1} />
         <Icon
           as={LuChevronDown}
@@ -414,11 +419,8 @@ function ContextHeader({
 
 /** Translate-to-English toggle for the whole context strip. */
 function ContextTranslateButton({ translation }: { translation: UseTextTranslationResult }) {
-  const label = translation.isLoading
-    ? "Translating…"
-    : translation.isActive
-      ? "Show original"
-      : "Translate";
+  const settledLabel = translation.isActive ? "Show original" : "Translate";
+  const label = translation.isLoading ? "Translating…" : settledLabel;
   return (
     <Tooltip
       content={translation.isActive ? "Show the original text" : "Translate these turns to English"}
@@ -473,9 +475,10 @@ function ContextBody({
   // specs/traces-v2/conversation-context-turn-counts.feature
   const turnsAbove = Math.max(0, ctx.position - 2);
   const turnsBelow = Math.max(0, ctx.total - ctx.position - 1);
+  const showSkeleton = ctx.isLoading && rows.length === 0;
   return (
     <>
-      {ctx.isLoading && rows.length === 0 ? (
+      {showSkeleton && (
         // Skeleton mirrors the eventual row layout (icon + line) so the
         // section doesn't jump in height once the thread resolves.
         <VStack
@@ -502,7 +505,8 @@ function ContextBody({
             </HStack>
           ))}
         </VStack>
-      ) : rows.length === 0 ? (
+      )}
+      {!showSkeleton && rows.length === 0 && (
         <Box
           paddingY={3}
           paddingX={3}
@@ -515,69 +519,71 @@ function ContextBody({
             This is the only turn in the conversation.
           </Text>
         </Box>
-      ) : (
-        // Bookshelf slide on navigation: the whole 3-row strip slides up
-        // (J / forward) or down (K / backward), exiting one strip while the
-        // new one slides in from the opposite side. Same snappy spring as
-        // the body bookshelf.
-        <Box
-          position="relative"
-          borderRadius="md"
-          borderWidth="1px"
-          // Light mode uses a deeper gray than `border.muted` so the
-          // card frame reads against the white panel surface. Dark
-          // mode keeps the validated muted border.
-          borderColor={{ base: "gray.200", _dark: "border.muted" }}
-          bg="bg.panel"
-          overflow="hidden"
-        >
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.div
-              key={traceId}
-              variants={SLIDE_VARIANTS}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={SLIDE_TRANSITION}
-            >
-              <VStack align="stretch" gap={0}>
-                {turnsAbove > 0 && (
-                  <Text
-                    textStyle="2xs"
-                    color="fg.subtle"
-                    textAlign="center"
-                    paddingY={1}
-                    borderBottomWidth="1px"
-                    borderColor={{ base: "gray.200", _dark: "border.muted" }}
-                  >
-                    {turnsAbove} {turnsAbove === 1 ? "turn" : "turns"} above
-                  </Text>
-                )}
-                {rows.map((row, i) => (
-                  <ConversationRow
-                    key={row.key}
-                    row={row}
-                    isLast={i === rows.length - 1 && turnsBelow === 0}
-                    onSelect={onSelect}
-                  />
-                ))}
-                {turnsBelow > 0 && (
-                  <Text
-                    textStyle="2xs"
-                    color="fg.subtle"
-                    textAlign="center"
-                    paddingY={1}
-                    borderTopWidth="1px"
-                    borderColor={{ base: "gray.200", _dark: "border.muted" }}
-                  >
-                    {turnsBelow} {turnsBelow === 1 ? "turn" : "turns"} below
-                  </Text>
-                )}
-              </VStack>
-            </motion.div>
-          </AnimatePresence>
-        </Box>
       )}
+      {!showSkeleton &&
+        rows.length > 0 && (
+          // Bookshelf slide on navigation: the whole 3-row strip slides up
+          // (J / forward) or down (K / backward), exiting one strip while the
+          // new one slides in from the opposite side. Same snappy spring as
+          // the body bookshelf.
+          <Box
+            position="relative"
+            borderRadius="md"
+            borderWidth="1px"
+            // Light mode uses a deeper gray than `border.muted` so the
+            // card frame reads against the white panel surface. Dark
+            // mode keeps the validated muted border.
+            borderColor={{ base: "gray.200", _dark: "border.muted" }}
+            bg="bg.panel"
+            overflow="hidden"
+          >
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.div
+                key={traceId}
+                variants={SLIDE_VARIANTS}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={SLIDE_TRANSITION}
+              >
+                <VStack align="stretch" gap={0}>
+                  {turnsAbove > 0 && (
+                    <Text
+                      textStyle="2xs"
+                      color="fg.subtle"
+                      textAlign="center"
+                      paddingY={1}
+                      borderBottomWidth="1px"
+                      borderColor={{ base: "gray.200", _dark: "border.muted" }}
+                    >
+                      {turnsAbove} {turnsAbove === 1 ? "turn" : "turns"} above
+                    </Text>
+                  )}
+                  {rows.map((row, i) => (
+                    <ConversationRow
+                      key={row.key}
+                      row={row}
+                      isLast={i === rows.length - 1 && turnsBelow === 0}
+                      onSelect={onSelect}
+                    />
+                  ))}
+                  {turnsBelow > 0 && (
+                    <Text
+                      textStyle="2xs"
+                      color="fg.subtle"
+                      textAlign="center"
+                      paddingY={1}
+                      borderTopWidth="1px"
+                      borderColor={{ base: "gray.200", _dark: "border.muted" }}
+                    >
+                      {turnsBelow} {turnsBelow === 1 ? "turn" : "turns"} below
+                    </Text>
+                  )}
+                </VStack>
+              </motion.div>
+            </AnimatePresence>
+          </Box>
+        )}
     </>
   );
 }
@@ -739,6 +745,9 @@ const TurnLine: React.FC<{
   visibleTo = null,
 }) => {
   const isAssistant = kind === "assistant";
+  const emphasisedColor = emphasised ? "fg" : "fg.muted";
+  const writtenColor = isAssistant ? "fg.muted" : emphasisedColor;
+  const textColor = text ? writtenColor : "fg.subtle";
   return (
     <HStack
       gap={1.5}
@@ -787,7 +796,7 @@ const TurnLine: React.FC<{
       ) : (
         <Text
           textStyle="xs"
-          color={text ? (isAssistant ? "fg.muted" : emphasised ? "fg" : "fg.muted") : "fg.subtle"}
+          color={textColor}
           fontStyle={text ? "normal" : "italic"}
           fontWeight={emphasised && text && !isAssistant ? "medium" : "normal"}
           flex={1}

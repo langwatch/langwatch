@@ -103,7 +103,8 @@ export const AddOrEditAnnotationScore = ({
   const [defaultCheckboxOption, setDefaultCheckboxOption] = useState<string[]>([]);
 
   const onSubmit = (data: FormData) => {
-    if (scoreTypeOptions.every((option) => !option.trim())) {
+    const everyOptionBlank = scoreTypeOptions.every((option) => !option.trim());
+    if (everyOptionBlank) {
       showErrorToast({
         fallbackTitle: annotationScoreId
           ? "Couldn't update the annotation score"

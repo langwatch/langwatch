@@ -417,14 +417,12 @@ export function PaneLayout({
             // is the SAME state as clicking the "Hide details" button: the pane
             // disappears AND the "Show details" affordance on the viz tab row appears.
             onCollapse={() => {
-              if (!useDrawerStore.getState().paneState.spanDetail.collapsed) {
-                togglePaneCollapsed("spanDetail");
-              }
+              const { collapsed } = useDrawerStore.getState().paneState.spanDetail;
+              if (!collapsed) togglePaneCollapsed("spanDetail");
             }}
             onExpand={() => {
-              if (useDrawerStore.getState().paneState.spanDetail.collapsed) {
-                togglePaneCollapsed("spanDetail");
-              }
+              const { collapsed } = useDrawerStore.getState().paneState.spanDetail;
+              if (collapsed) togglePaneCollapsed("spanDetail");
             }}
           >
             {detailPanel}
@@ -480,14 +478,12 @@ export function PaneLayout({
             // Library-driven collapse/expand fires when the operator drags the divider
             // across the `collapsedSize` threshold.
             onCollapse={() => {
-              if (!useDrawerStore.getState().paneState.conversationContext.collapsed) {
-                togglePaneCollapsed("conversationContext");
-              }
+              const { collapsed } = useDrawerStore.getState().paneState.conversationContext;
+              if (!collapsed) togglePaneCollapsed("conversationContext");
             }}
             onExpand={() => {
-              if (useDrawerStore.getState().paneState.conversationContext.collapsed) {
-                togglePaneCollapsed("conversationContext");
-              }
+              const { collapsed } = useDrawerStore.getState().paneState.conversationContext;
+              if (collapsed) togglePaneCollapsed("conversationContext");
             }}
           >
             {ctxPane}

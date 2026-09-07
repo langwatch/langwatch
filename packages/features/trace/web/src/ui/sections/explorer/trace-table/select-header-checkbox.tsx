@@ -5,6 +5,7 @@ const ChakraButton = chakra("button");
 import type React from "react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { useSelectionStore } from "../../../../behavior/selection.store.ts";
+import { ariaCheckedFor, checkboxStateFor } from "../../../../model/tri-state-checkbox.ts";
 
 interface SelectHeaderCheckboxProps {
   /** Every trace id currently rendered on this page across every row. */
@@ -24,14 +25,13 @@ export const SelectHeaderCheckbox: React.FC<SelectHeaderCheckboxProps> = ({ trac
       ? total
       : traceIds.reduce((n, id) => n + (traceIdSet.has(id) ? 1 : 0), 0);
 
-  const checked: boolean | "indeterminate" =
-    selectedCount === 0 ? false : selectedCount === total ? true : "indeterminate";
+  const checked = checkboxStateFor({ selectedCount, total });
 
   return (
     <ChakraButton
       type="button"
       aria-label="Select all on this page"
-      aria-checked={checked === true ? "true" : checked === false ? "false" : "mixed"}
+      aria-checked={ariaCheckedFor(checked)}
       display="flex"
       alignItems="center"
       justifyContent="center"

@@ -4,6 +4,7 @@ import type { EvaluationRunData } from "../../../../../model/evaluation-run-data
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import type { TraceEvalResult, TraceListItem } from "../../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../../types/trace.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Conversation turn exactly as the `tracesV2.conversationContext` procedure returns it
@@ -29,7 +30,7 @@ const NOT_REDACTED: Pick<
  * state. The trace table renders them just like any other rows so users can:
  */
 
-const NOW = () => Date.now();
+const NOW = () => nowInstant().epochMilliseconds;
 const minutesAgo = (n: number) => NOW() - n * 60_000;
 
 const noEvals: TraceEvalResult[] = [];

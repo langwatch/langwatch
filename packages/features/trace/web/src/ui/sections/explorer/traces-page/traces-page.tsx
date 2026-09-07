@@ -21,7 +21,10 @@ import { SpotlightOverlay } from "../onboarding/spotlights/spotlight-overlay.tsx
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
-import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "../../../../behavior/selection.store.ts";
+import {
+  SELECT_ALL_MATCHING_CAP,
+  useSelectionStore,
+} from "../../../../behavior/selection.store.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { DensityProvider } from "../density-provider.tsx";
 import { ExportConfigDialog } from "../export-config-dialog.tsx";
@@ -114,6 +117,18 @@ export const TracesPage: React.FC = () => {
   // preview. Once real traces arrive, always show ResultsPane.
   const showIntegratePane = !showEmptyState && hasAnyTraces === false && !showSamplePreview;
 
+  // Legacy journey (tourActive, dormant for new users) or the real results —
+  // held apart from the integration hero so the pane choice reads as a pair.
+  const resultsPane = showEmptyState ? (
+    <PaneFader key="empty">
+      <EmptyResultsPane />
+    </PaneFader>
+  ) : (
+    <PaneFader key="results" delayIn={0.04}>
+      <ResultsPane />
+    </PaneFader>
+  );
+
   // First-real-trace one-shot: when `hasAnyTraces` flips false → true
   // for this project AND we haven't auto-fired the spotlight tour for
   // it yet, kick off spotlights so the user gets a contextual tour of
@@ -199,16 +214,8 @@ export const TracesPage: React.FC = () => {
                 <PaneFader key="integrate">
                   <IntegratePane />
                 </PaneFader>
-              ) : showEmptyState ? (
-                // Legacy journey (tourActive) — dormant for new users.
-                <PaneFader key="empty">
-                  <EmptyResultsPane />
-                </PaneFader>
               ) : (
-                // Real traces, or no-traces with sample preview active.
-                <PaneFader key="results" delayIn={0.04}>
-                  <ResultsPane />
-                </PaneFader>
+                resultsPane
               )}
             </AnimatePresence>
           </HStack>
@@ -384,12 +391,9 @@ const ResultsPane: React.FC = React.memo(() => {
   }, [auroraArmedSample, auroraArmedFirstReal]);
 
   const isSelectedExport = selectionMode === "all-matching" || explicitCount > 0;
+  const cappedHits = Math.min(totalHits, SELECT_ALL_MATCHING_CAP);
   const dialogTraceCount =
-    selectionMode === "all-matching"
-      ? Math.min(totalHits, SELECT_ALL_MATCHING_CAP)
-      : explicitCount > 0
-        ? explicitCount
-        : Math.min(totalHits, SELECT_ALL_MATCHING_CAP);
+    explicitCount > 0 && selectionMode !== "all-matching" ? explicitCount : cappedHits;
 
   return (
     <Flex

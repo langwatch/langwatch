@@ -1,6 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { UserAvatar } from "../../../../elements/user-avatar.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import { readableDate } from "../../../../../model/display-formatters.ts";
 
 /**
  * What has already been said about one part of the trace, read above the composer that
@@ -36,7 +37,7 @@ export function AnchorCommentThread({ comments }: { comments: AnnotationByTrace[
               </Text>
               <Box flex={1} />
               <Text textStyle="2xs" color="fg.subtle">
-                {new Date(comment.createdAt).toLocaleDateString()}
+                {readableDate(comment.createdAt).toLocaleDateString()}
               </Text>
             </HStack>
             {comment.comment && (

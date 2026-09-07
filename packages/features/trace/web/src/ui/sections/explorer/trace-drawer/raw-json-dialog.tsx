@@ -61,9 +61,13 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
   const charCount = useMemo(() => fullPayload.length, [fullPayload]);
   const lineCount = useMemo(() => fullPayload.split("\n").length, [fullPayload]);
   const matchedLines = useMemo(
-    () => (search ? (visiblePayload === "" ? 0 : visiblePayload.split("\n").length) : null),
+    () => matchedLineCount({ search, visiblePayload }),
     [visiblePayload, search],
   );
+
+  const spansLoading = tab === "spans" && spansQuery.isLoading;
+  const spansFailed = tab === "spans" && !spansJson;
+  const noSearchMatch = search !== "" && visiblePayload === "";
 
   return (
     <Dialog.Root
@@ -154,14 +158,15 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
           <Dialog.CloseTrigger />
         </Dialog.Header>
         <Dialog.Body padding={0} overflow="hidden" display="flex" flexDirection="column" flex={1}>
-          {tab === "spans" && spansQuery.isLoading ? (
+          {spansLoading && (
             <VStack gap={2} paddingY={8} flex={1} justify="center">
               <Spinner size="sm" color="blue.fg" />
               <Text textStyle="xs" color="fg.muted">
                 Loading spans…
               </Text>
             </VStack>
-          ) : tab === "spans" && !spansJson ? (
+          )}
+          {!spansLoading && spansFailed && (
             <VStack gap={2} paddingY={8} flex={1} justify="center">
               <Text textStyle="xs" color="fg.muted">
                 Failed to load spans
@@ -170,7 +175,8 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
                 Retry
               </Button>
             </VStack>
-          ) : search && visiblePayload === "" ? (
+          )}
+          {!spansLoading && !spansFailed && noSearchMatch && (
             <VStack gap={2} paddingY={8} flex={1} justify="center">
               <Text textStyle="xs" color="fg.muted">
                 No lines match "{search}"
@@ -179,7 +185,8 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
                 Clear search
               </Button>
             </VStack>
-          ) : (
+          )}
+          {!spansLoading && !spansFailed && !noSearchMatch && (
             <Box
               flex={1}
               overflow="auto"
@@ -292,4 +299,16 @@ function CopyButton({ payload, disabled }: { payload: string; disabled?: boolean
       </Text>
     </Button>
   );
+}
+
+/** How many lines the in-modal search matched, or null when nothing is searched. */
+function matchedLineCount({
+  search,
+  visiblePayload,
+}: {
+  search: string;
+  visiblePayload: string;
+}): number | null {
+  if (!search) return null;
+  return visiblePayload === "" ? 0 : visiblePayload.split("\n").length;
 }

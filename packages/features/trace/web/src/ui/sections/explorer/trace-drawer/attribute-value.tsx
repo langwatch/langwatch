@@ -297,8 +297,9 @@ function ChatBody({ messages }: { messages: ChatMessage[] }) {
 function ChatRow({ message }: { message: ChatMessage }) {
   const role = message.role.toLowerCase();
   const known = KNOWN_CHAT_ROLES.has(role);
-  const RoleIcon =
-    role === "assistant" ? LuBot : role === "tool" || role === "function" ? LuWrench : LuUser;
+  const isToolRole = role === "tool" || role === "function";
+  const nonAssistantIcon = isToolRole ? LuWrench : LuUser;
+  const RoleIcon = role === "assistant" ? LuBot : nonAssistantIcon;
   return (
     <Box>
       <HStack gap={1.5} marginBottom={1}>

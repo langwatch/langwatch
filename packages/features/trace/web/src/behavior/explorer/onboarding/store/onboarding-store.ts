@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { nowInstant } from "@langwatch/time";
 import {
   INITIAL_STAGE,
   type StageId,
@@ -246,7 +247,9 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
             stage,
             history: [...s.history, s.stage],
             arrivedAt:
-              stage === "auroraArrival" && s.stage !== "auroraArrival" ? Date.now() : s.arrivedAt,
+              stage === "auroraArrival" && s.stage !== "auroraArrival"
+                ? nowInstant().epochMilliseconds
+                : s.arrivedAt,
           },
     ),
 

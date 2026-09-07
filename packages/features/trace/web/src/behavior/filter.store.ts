@@ -1,6 +1,7 @@
 import type { LiqeQuery } from "liqe";
 import { create } from "zustand";
 import type { AiActionError } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   addSameFieldOrValue,
   addToOrGroupAtLocation,
@@ -172,7 +173,7 @@ const EMPTY_AST: LiqeQuery = {
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 function defaultTimeRange(): TimeRange {
-  const now = Date.now();
+  const now = nowInstant().epochMilliseconds;
   return {
     from: now - THIRTY_DAYS_MS,
     to: now,

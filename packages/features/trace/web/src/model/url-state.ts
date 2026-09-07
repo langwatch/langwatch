@@ -48,7 +48,8 @@ export function parseFragment(fragment: string): FragmentState | null {
       if (from !== null && to !== null) {
         const fromN = Number(from);
         const toN = Number(to);
-        if (Number.isFinite(fromN) && Number.isFinite(toN)) {
+        const bothFinite = Number.isFinite(fromN) && Number.isFinite(toN);
+        if (bothFinite) {
           overrides.timeFrom = fromN;
           overrides.timeTo = toN;
         }

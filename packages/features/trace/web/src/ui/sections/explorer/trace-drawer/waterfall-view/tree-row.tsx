@@ -131,6 +131,11 @@ export const TreeRow = memo(function TreeRow({
   // the red marker is what says it. The green "changed" wash would only argue
   // with it, so it stays off those rows.
   const showsCorrectedTint = isEdited && !isDeletedByCorrection;
+  const correctedBackground = showsCorrectedTint ? "green.subtle" : undefined;
+  const unselectedBackground = isHovered ? "colorPalette.subtle/40" : correctedBackground;
+  const rowBackground = isSelected
+    ? { base: "bg.emphasized", _dark: "blue.subtle" }
+    : unselectedBackground;
   const isError = span.status === "error";
   const isLlm = span.type === "llm" && span.model != null;
   // A named tool span gets the same two-line treatment as an LLM span: the
@@ -303,15 +308,7 @@ export const TreeRow = memo(function TreeRow({
           // than a blue tint — keeps the row visually distinct from the hover state
           // without competing with the bar's own colour.
           colorPalette={isError ? "red" : palette}
-          bg={
-            isSelected
-              ? { base: "bg.emphasized", _dark: "blue.subtle" }
-              : isHovered
-                ? "colorPalette.subtle/40"
-                : showsCorrectedTint
-                  ? "green.subtle"
-                  : undefined
-          }
+          bg={rowBackground}
           // Edge tick on a corrected row so a change is spottable while
           // scanning the tree, not only once the row is read.
           boxShadow={

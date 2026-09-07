@@ -290,21 +290,16 @@ function buildLastUsedPromptChipDef({
   onOpenPromptsTab: () => void;
 }): ChipDef {
   const value = versionNumber != null ? `${handle} v${versionNumber}` : handle;
-  const tone: "blue" | "yellow" | "neutral" = state.missing
-    ? "neutral"
-    : driftFromSelection || outOfDate
-      ? "yellow"
-      : "blue";
+  const isStale = driftFromSelection || outOfDate;
+  const presentTone = isStale ? "yellow" : "blue";
+  const tone: "blue" | "yellow" | "neutral" = state.missing ? "neutral" : presentTone;
   // Drop the leading history glyph on the happy path — the purple status
   // dot + the "Prompt" label already say what this chip is, and the icon
   // was just visual noise next to the verbose handle. We do keep the
   // warning glyph for drift / out-of-date so the chip's tone change isn't
   // the only signal that something's off.
-  const icon = state.missing
-    ? LuCircleDashed
-    : driftFromSelection || outOfDate
-      ? LuTriangleAlert
-      : undefined;
+  const presentIcon = isStale ? LuTriangleAlert : undefined;
+  const icon = state.missing ? LuCircleDashed : presentIcon;
 
   const onClick = () => {
     if (spanId) {

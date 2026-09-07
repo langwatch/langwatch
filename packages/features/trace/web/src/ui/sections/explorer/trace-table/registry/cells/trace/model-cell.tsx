@@ -23,6 +23,25 @@ type Density = "compact" | "comfortable";
 type ProviderKey = keyof typeof modelProviderIcons;
 
 /**
+ * Which provider a bare model name belongs to, by the prefix it starts with.
+ * Order matters only in that the first matching entry wins.
+ */
+const PROVIDER_BY_MODEL_PREFIX: ReadonlyArray<{
+  prefixes: readonly string[];
+  provider: ProviderKey;
+}> = [
+  {
+    prefixes: ["gpt-", "o1", "o3", "o4", "text-embedding-", "dall-e", "whisper", "chatgpt-"],
+    provider: "openai",
+  },
+  { prefixes: ["claude-", "claude/"], provider: "anthropic" },
+  { prefixes: ["gemini-", "gemma-", "text-bison"], provider: "gemini" },
+  { prefixes: ["deepseek-"], provider: "deepseek" },
+  { prefixes: ["grok-", "xai"], provider: "xai" },
+  { prefixes: ["groq"], provider: "groq" },
+];
+
+/**
  * Map a model string to one of the known provider icons. Handles both the prefixed form
  * ("openai/gpt-5") and bare model names (the trace collector frequently records just
  * the model id without a provider prefix) via prefix sniffing on the model name itself.
@@ -32,35 +51,17 @@ function inferProvider(model: string): ProviderKey | null {
   const slash = model.indexOf("/");
   if (slash > 0) {
     const candidate = model.slice(0, slash).toLowerCase();
-    if (candidate in modelProviderIcons) return candidate as ProviderKey;
+    const isKnownProvider = candidate in modelProviderIcons;
+    if (isKnownProvider) return candidate as ProviderKey;
   }
   const lower = (slash > 0 ? model.slice(slash + 1) : model).toLowerCase();
-  if (
-    lower.startsWith("gpt-") ||
-    lower.startsWith("o1") ||
-    lower.startsWith("o3") ||
-    lower.startsWith("o4") ||
-    lower.startsWith("text-embedding-") ||
-    lower.startsWith("dall-e") ||
-    lower.startsWith("whisper") ||
-    lower.startsWith("chatgpt-")
-  ) {
-    return "openai";
-  }
-  if (lower.startsWith("claude-") || lower.startsWith("claude/")) {
-    return "anthropic";
-  }
-  if (lower.startsWith("gemini-") || lower.startsWith("gemma-") || lower.startsWith("text-bison")) {
-    return "gemini";
-  }
-  if (lower.startsWith("deepseek-")) return "deepseek";
-  if (lower.startsWith("grok-") || lower.startsWith("xai")) return "xai";
-  if (lower.startsWith("groq")) return "groq";
-  if (lower.includes("bedrock") || lower.startsWith("anthropic.claude")) {
-    return "bedrock";
-  }
-  if (lower.startsWith("cerebras")) return "cerebras";
-  return null;
+  const byPrefix = PROVIDER_BY_MODEL_PREFIX.find(({ prefixes }) =>
+    prefixes.some((prefix) => lower.startsWith(prefix)),
+  );
+  if (byPrefix) return byPrefix.provider;
+  const isBedrock = lower.includes("bedrock") || lower.startsWith("anthropic.claude");
+  if (isBedrock) return "bedrock";
+  return lower.startsWith("cerebras") ? "cerebras" : null;
 }
 
 /**
