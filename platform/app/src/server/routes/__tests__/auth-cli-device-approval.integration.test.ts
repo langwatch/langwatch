@@ -214,6 +214,31 @@ describe("CLI device-approval stream", () => {
         expect(heard).toBe("nothing");
       });
 
+      /** @scenario "A publication is lost if the stream has not subscribed yet" */
+      it("is closed by `subscribed`, which resolves only once the channel is live", async () => {
+        const deviceCode = await mintDeviceCode();
+        const abort = new AbortController();
+
+        // The other half of the boundary, and the reason re-reading after
+        // `subscribed` is enough on its own: from that point on, every
+        // publication is heard. So the gap the re-read has to cover is exactly
+        // [the route's first read, `subscribed`], with nothing after it.
+        const watch = waitForDeviceCodeSettled({
+          redis: redisConnection!,
+          deviceCode,
+          signal: abort.signal,
+        });
+        await watch.subscribed;
+        await publishDeviceCodeSettled({
+          redis: redisConnection!,
+          deviceCode,
+          status: "approved",
+        });
+
+        expect(await watch.settled).toBe("approved");
+        abort.abort();
+      });
+
       /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
       it("emits anyway, because the stream re-reads once its channel is live", async () => {
         const deviceCode = await mintDeviceCode();

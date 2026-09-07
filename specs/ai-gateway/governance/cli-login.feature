@@ -153,6 +153,8 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     When the stream subscribes afterwards
     Then it hears nothing, because the channel keeps no history
     And this is why the stream re-reads the code once its channel is live
+    And a settlement published after that point is always heard, so the re-read
+      covers the whole gap
 
   @integration @cli @device-flow @login-latency @rate-limit
   Scenario: A poll on a settled device code is answered, not rate limited
