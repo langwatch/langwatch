@@ -1,4 +1,6 @@
-import type { GatewayBudget, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget } from "@langwatch/gateway-contract";
+import { toGatewayBudgetRow } from "./prisma.gateway-budget.repository.ts";
 import type { GatewayPersistenceTransaction } from "../../ports/gateway-change-events.port.ts";
 import {
   GatewayKeyBudgetRepository,
@@ -20,16 +22,18 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
     super();
   }
 
-  tryFindDrawerManaged(
+  async tryFindDrawerManaged(
     { organizationId, virtualKeyId }: { organizationId: string; virtualKeyId: string },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget | null> {
-    return this.client(transaction).gatewayBudget.findFirst({
+    const row = await this.client(transaction).gatewayBudget.findFirst({
       where: { organizationId, managedByVirtualKeyId: virtualKeyId, archivedAt: null },
     });
+
+    return row ? toGatewayBudgetRow(row) : null;
   }
 
-  createForKey(
+  async createForKey(
     input: {
       organizationId: string;
       virtualKeyId: string;
@@ -39,33 +43,37 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
     },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget> {
-    return this.client(transaction).gatewayBudget.create({
-      data: {
-        ...input.fields,
-        organizationId: input.organizationId,
-        scopeType: "VIRTUAL_KEY",
-        scopeId: input.virtualKeyId,
-        managedByVirtualKeyId: input.virtualKeyId,
-        createdById: input.createdById,
-        resetsAt: toDate(input.resetsAt),
-      },
-    });
+    return toGatewayBudgetRow(
+      await this.client(transaction).gatewayBudget.create({
+        data: {
+          ...input.fields,
+          organizationId: input.organizationId,
+          scopeType: "VIRTUAL_KEY",
+          scopeId: input.virtualKeyId,
+          managedByVirtualKeyId: input.virtualKeyId,
+          createdById: input.createdById,
+          resetsAt: toDate(input.resetsAt),
+        },
+      }),
+    );
   }
 
-  updateForKey(
+  async updateForKey(
     input: { id: string; resetsAt?: Instant; fields: GatewayKeyBudgetFields },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget> {
-    return this.client(transaction).gatewayBudget.update({
-      where: { id: input.id },
-      data: {
-        ...input.fields,
-        ...(input.resetsAt ? { resetsAt: toDate(input.resetsAt) } : {}),
-      },
-    });
+    return toGatewayBudgetRow(
+      await this.client(transaction).gatewayBudget.update({
+        where: { id: input.id },
+        data: {
+          ...input.fields,
+          ...(input.resetsAt ? { resetsAt: toDate(input.resetsAt) } : {}),
+        },
+      }),
+    );
   }
 
-  findActiveForKey(
+  async findActiveForKey(
     {
       organizationId,
       virtualKeyId,
@@ -73,7 +81,7 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
     }: { organizationId: string; virtualKeyId: string; scope: GatewayKeyBudgetScope },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget[]> {
-    return this.client(transaction).gatewayBudget.findMany({
+    const rows = await this.client(transaction).gatewayBudget.findMany({
       where: {
         organizationId,
         archivedAt: null,
@@ -90,16 +98,20 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
             }),
       },
     });
+
+    return rows.map(toGatewayBudgetRow);
   }
 
-  archive(
+  async archive(
     { id, archivedAt }: { id: string; archivedAt: Instant },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget> {
-    return this.client(transaction).gatewayBudget.update({
-      where: { id },
-      data: { archivedAt: toDate(archivedAt) },
-    });
+    return toGatewayBudgetRow(
+      await this.client(transaction).gatewayBudget.update({
+        where: { id },
+        data: { archivedAt: toDate(archivedAt) },
+      }),
+    );
   }
 
   private client(

@@ -1,3 +1,5 @@
+import { readableDate } from "../../model/readable-date.ts";
+import { toEpochMs } from "@langwatch/time";
 import {
   Alert,
   Badge,
@@ -279,8 +281,8 @@ function BudgetDetailPage() {
                         {budget.window === "TOTAL" ? (
                           "never"
                         ) : (
-                          <Tooltip content={new Date(budget.resetsAt).toLocaleString()}>
-                            <span>{formatTimeAgo(new Date(budget.resetsAt).getTime())}</span>
+                          <Tooltip content={readableDate(budget.resetsAt).toLocaleString()}>
+                            <span>{formatTimeAgo(toEpochMs(budget.resetsAt))}</span>
                           </Tooltip>
                         )}
                       </strong>
@@ -306,17 +308,17 @@ function BudgetDetailPage() {
                   <ScopeBadge target={budget.scopeTarget} projectSlug={project?.slug ?? null} />
                 </DetailRow>
                 <DetailRow label="Created">
-                  <Tooltip content={new Date(budget.createdAt).toLocaleString()}>
+                  <Tooltip content={readableDate(budget.createdAt).toLocaleString()}>
                     <Text fontSize="sm" color="fg.muted">
-                      {formatTimeAgo(new Date(budget.createdAt).getTime())}
+                      {formatTimeAgo(toEpochMs(budget.createdAt))}
                     </Text>
                   </Tooltip>
                 </DetailRow>
                 {budget.lastResetAt && (
                   <DetailRow label="Last reset">
-                    <Tooltip content={new Date(budget.lastResetAt).toLocaleString()}>
+                    <Tooltip content={readableDate(budget.lastResetAt).toLocaleString()}>
                       <Text fontSize="sm" color="fg.muted">
-                        {formatTimeAgo(new Date(budget.lastResetAt).getTime())}
+                        {formatTimeAgo(toEpochMs(budget.lastResetAt))}
                       </Text>
                     </Tooltip>
                   </DetailRow>
@@ -357,9 +359,9 @@ function BudgetDetailPage() {
                       {budget.recentLedger.map((line) => (
                         <Table.Row key={line.id}>
                           <Table.Cell>
-                            <Tooltip content={new Date(line.occurredAt).toLocaleString()}>
+                            <Tooltip content={readableDate(line.occurredAt).toLocaleString()}>
                               <Text fontSize="xs" color="fg.muted">
-                                {formatTimeAgo(new Date(line.occurredAt).getTime())}
+                                {formatTimeAgo(toEpochMs(line.occurredAt))}
                               </Text>
                             </Tooltip>
                           </Table.Cell>

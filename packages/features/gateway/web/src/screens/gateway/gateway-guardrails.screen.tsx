@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -36,9 +37,9 @@ type GuardrailRow = {
   evaluatorId: string;
   direction: GatewayGuardrailDirection;
   failureMode: GatewayGuardrailFailureMode;
-  archivedAt: string | Date | null;
-  createdAt: string | Date;
-  updatedAt: string | Date;
+  archivedAt: string | Instant | null;
+  createdAt: string | Instant;
+  updatedAt: string | Instant;
 };
 
 const DIRECTION_LABEL: Record<GatewayGuardrailDirection, string> = {

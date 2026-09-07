@@ -3,6 +3,7 @@
  * Real Postgres + real internal auth route. Reversible disable/enable: the state machine (grace preservation, revoke terminality) and the distinct rejection a disabled key's traffic gets. Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
 
+import { type Instant, nowInstant } from "@langwatch/time";
 import jsonwebtoken from "jsonwebtoken";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -162,7 +163,7 @@ describe.skipIf(!databaseUrl)("virtual key disable and enable (real PG + interna
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
   }, 60_000);
 
-  async function mintKey({ name, expiresAt }: { name: string; expiresAt?: Date }) {
+  async function mintKey({ name, expiresAt }: { name: string; expiresAt?: Instant }) {
     return service.create({
       organizationId: ORG_ID,
       name: `${name}-${nanoid(6)}`,
@@ -245,7 +246,7 @@ describe.skipIf(!databaseUrl)("virtual key disable and enable (real PG + interna
   describe("when the key expires before the ordinary TTL", () => {
     /** @scenario "The token ends when the key does" */
     it("ends the token at the key's expiration date and carries that date on it", async () => {
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+      const expiresAt = nowInstant().add({ milliseconds: 5 * 60 * 1000 });
       const { virtualKey, secret } = await mintKey({ name: "short-lived", expiresAt });
       const stored = await prisma.virtualKey.findUniqueOrThrow({
         where: { id: virtualKey.id },

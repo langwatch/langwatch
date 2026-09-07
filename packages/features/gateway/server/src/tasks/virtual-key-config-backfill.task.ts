@@ -1,3 +1,4 @@
+import { type Instant, nowInstant } from "@langwatch/time";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 import { nanoid } from "nanoid";
@@ -57,11 +58,11 @@ export type VirtualKeyConfigBackfillOutcome = Readonly<{
 export async function backfillVirtualKeyConfig({
   repository,
   execute,
-  now = () => new Date(),
+  now = () => nowInstant(),
 }: {
   repository: GatewayVirtualKeyConfigBackfillRepository;
   execute: boolean;
-  now?: () => Date;
+  now?: () => Instant;
 }): Promise<VirtualKeyConfigBackfillOutcome> {
   const organizationIds = await repository.findOrganizationIds();
   const virtualKeys: VirtualKeyRow[] = [];
@@ -140,7 +141,7 @@ async function mintRoutingPolicy({
   execute: boolean;
   virtualKey: VirtualKeyRow;
   config: LegacyVirtualKeyConfig;
-  now: () => Date;
+  now: () => Instant;
 }): Promise<string> {
   const id = `rp_migr_${nanoid()}`;
   if (!execute) return id;
@@ -272,10 +273,11 @@ function hasGuardrails(config: LegacyVirtualKeyConfig): boolean {
   return DIRECTIONS.some((direction) => config.guardrails[direction].length > 0);
 }
 
-function stamp(date: Date): string {
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  return `${date.getUTCFullYear()}${month}${day}`;
+function stamp(at: Instant): string {
+  const clock = at.toZonedDateTimeISO("UTC");
+  const month = String(clock.month).padStart(2, "0");
+  const day = String(clock.day).padStart(2, "0");
+  return `${clock.year}${month}${day}`;
 }
 
 /**

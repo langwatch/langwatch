@@ -28,9 +28,10 @@
  * drops.
  */
 
+import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import {
   createTestClickHouseClient,
@@ -64,14 +65,19 @@ function budgetFor(window: GatewayBudgetWindow): GatewayBudget {
     onBreach: "BLOCK",
     timezone: null,
     spentUsd: new Prisma.Decimal("0"),
-    currentPeriodStartedAt: new Date(),
-    resetsAt: new Date(Date.now() + 86_400_000),
+    currentPeriodStartedAt: nowInstant(),
+    resetsAt: nowInstant().add({ milliseconds: 86_400_000 }),
     lastResetAt: null,
     archivedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: nowInstant(),
+    updatedAt: nowInstant(),
     createdById: `usr-${suffix}`,
-  } as GatewayBudget;
+    providerKey: null,
+    externalId: null,
+    metadata: null,
+    cycleAnchorAt: null,
+    managedByVirtualKeyId: null,
+  };
 }
 
 describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse", () => {
@@ -86,7 +92,7 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
     // reader computes the current period from the instant it is handed;
     // deriving both sides from the same value keeps a run that spans a
     // MINUTE or HOUR boundary from reading a later period than it wrote.
-    const occurredAt = new Date();
+    const occurredAt = nowInstant();
     for (const budget of budgets) {
       await repo.insertDebit([
         {
@@ -159,11 +165,11 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
       scopeId: `proj-tz-${window}-${suffix}`,
     }));
 
-    const tzOccurredAt = new Date();
+    const tzOccurredAt = nowInstant();
 
     beforeAll(async () => {
       const client = createTestClickHouseClient(chUrl!);
-      const occurredAt = tzOccurredAt.getTime();
+      const occurredAt = tzOccurredAt.epochMilliseconds;
       await client.insert({
         table: "gateway_budget_ledger_events",
         values: tzBudgets.map((budget) => ({

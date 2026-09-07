@@ -2,7 +2,8 @@
  * Version token for GET /api/internal/gateway/config/:vk_id: VirtualKey.revision covers the key; a provider digest over the materialiser's own resolver covers the dispatch chain the revision never reaches. Moves on any write, even one bypassing the service; budgets/cache/guardrails/spend excluded by decision.
  */
 import { createHash } from "node:crypto";
-import type { ModelProvider, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ModelProvider } from "@langwatch/gateway-contract";
 import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
 import { llmModels, toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";

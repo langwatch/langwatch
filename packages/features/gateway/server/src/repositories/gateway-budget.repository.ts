@@ -15,6 +15,7 @@ import type {
   GatewayBudgetWindow,
   GatewayBudgetScopeType,
 } from "@langwatch/gateway-contract";
+import type { Instant } from "@langwatch/time";
 import type { ProjectIdentity, TraceDestinationProject } from "@langwatch/project-contract";
 import type {
   GatewayBudgetCheckInput,
@@ -109,17 +110,17 @@ export type AttributedUserBudgetTemplate = {
   onBreach: string;
   /** Decimal-like: the money adapters read it through `toString()`. */
   limitUsd: { toString(): string };
-  currentPeriodStartedAt: Date;
-  resetsAt: Date;
-  lastResetAt: Date | null;
-  cycleAnchorAt: Date | null;
+  currentPeriodStartedAt: Instant;
+  resetsAt: Instant;
+  lastResetAt: Instant | null;
+  cycleAnchorAt: Instant | null;
 };
 
 /** When one budget's bucket last rolled over. */
 export type BucketBoundaryRow = {
   budgetId: string;
   bucketScopeId: string;
-  periodStartedAt: Date | null;
+  periodStartedAt: Instant | null;
 };
 
 export abstract class GatewayBudgetRepository {

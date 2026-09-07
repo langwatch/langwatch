@@ -1,3 +1,4 @@
+import { readableDate } from "../../model/readable-date.ts";
 import {
   Badge,
   Box,
@@ -14,7 +15,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keepPreviousData } from "../../model/keep-previous-data.ts";
-import { formatDistanceToNow } from "@langwatch/time";
+import { Temporal, formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import {
   ArrowLeft,
   Bird,
@@ -56,7 +57,10 @@ import {
 import { VirtualKeyOwnershipReadOnly } from "../../features/virtual-keys/ui/blocks/virtual-key-ownership-section.tsx";
 import { VirtualKeySecretReveal } from "../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
 import { VirtualKeyUsageSnippet } from "../../features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx";
-import { formatExpiry, isExpired } from "../../features/virtual-keys/model/virtual-key-expiration.ts";
+import {
+  formatExpiry,
+  isExpired,
+} from "../../features/virtual-keys/model/virtual-key-expiration.ts";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Link } from "../../ui/elements/gateway-link.tsx";
@@ -385,13 +389,12 @@ function VirtualKeyDetailPage() {
                 </DetailRow>
                 <DetailRow label="Expires">
                   {vk.expiresAt ? (
-                    <Tooltip content={new Date(vk.expiresAt).toLocaleString()}>
+                    <Tooltip content={readableDate(vk.expiresAt).toLocaleString()}>
                       <Text fontSize="sm" color="fg.muted" data-testid="vk-detail-expires">
-                        {formatExpiry(new Date(vk.expiresAt))} (
-                        {formatDistanceToNow(new Date(vk.expiresAt), {
-                          addSuffix: true,
-                        })}
-                        )
+                        {formatExpiry(
+                          Temporal.Instant.fromEpochMilliseconds(toEpochMs(vk.expiresAt)),
+                        )}{" "}
+                        ({formatDistanceToNow(vk.expiresAt, { addSuffix: true })})
                       </Text>
                     </Tooltip>
                   ) : (
@@ -410,9 +413,9 @@ function VirtualKeyDetailPage() {
               <Section title="Activity">
                 <DetailRow label="Last used">
                   {vk.lastUsedAt ? (
-                    <Tooltip content={new Date(vk.lastUsedAt).toLocaleString()}>
+                    <Tooltip content={readableDate(vk.lastUsedAt).toLocaleString()}>
                       <Text fontSize="sm" color="fg.muted">
-                        {formatTimeAgo(new Date(vk.lastUsedAt).getTime())}
+                        {formatTimeAgo(toEpochMs(vk.lastUsedAt))}
                       </Text>
                     </Tooltip>
                   ) : (
@@ -422,9 +425,9 @@ function VirtualKeyDetailPage() {
                   )}
                 </DetailRow>
                 <DetailRow label="Created">
-                  <Tooltip content={new Date(vk.createdAt).toLocaleString()}>
+                  <Tooltip content={readableDate(vk.createdAt).toLocaleString()}>
                     <Text fontSize="sm" color="fg.muted">
-                      {formatTimeAgo(new Date(vk.createdAt).getTime())}
+                      {formatTimeAgo(toEpochMs(vk.createdAt))}
                     </Text>
                   </Tooltip>
                 </DetailRow>
@@ -849,9 +852,9 @@ function UsageSection({
                   {data.recentDebits.slice(0, 10).map((d) => (
                     <Table.Row key={d.id}>
                       <Table.Cell>
-                        <Tooltip content={new Date(d.occurredAt).toLocaleString()}>
+                        <Tooltip content={readableDate(d.occurredAt).toLocaleString()}>
                           <Text fontSize="xs" color="fg.muted">
-                            {formatTimeAgo(new Date(d.occurredAt).getTime())}
+                            {formatTimeAgo(toEpochMs(d.occurredAt))}
                           </Text>
                         </Tooltip>
                       </Table.Cell>

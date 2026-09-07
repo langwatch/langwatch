@@ -3,10 +3,11 @@
  * Cycles roll from `cycleAnchorAt`, not the calendar, in UTC epoch math so
  * no local clock change can shift them.
  */
+import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { CYCLIC_WINDOWS, GatewayWindow } from "@langwatch/gateway-contract";
 
-const iso = (d: Date) => d.toISOString();
+const iso = (at: Instant) => toDate(at).toISOString();
 
 /** The first `count` period starts, followed boundary by boundary. */
 function walkPeriods({
@@ -15,7 +16,7 @@ function walkPeriods({
   count,
 }: {
   window: (typeof CYCLIC_WINDOWS)[number];
-  anchor: Date;
+  anchor: Instant;
   count: number;
 }): string[] {
   const starts: string[] = [];
@@ -34,11 +35,17 @@ function refloorPeriods({
   starts,
 }: {
   window: (typeof CYCLIC_WINDOWS)[number];
-  anchor: Date;
+  anchor: Instant;
   starts: string[];
 }): string[] {
   return starts.map((s) =>
-    iso(GatewayWindow.anchoredPeriodStart({ window, anchorAt: anchor, now: new Date(s) })),
+    iso(
+      GatewayWindow.anchoredPeriodStart({
+        window,
+        anchorAt: anchor,
+        now: Temporal.Instant.from(s),
+      }),
+    ),
   );
 }
 
@@ -52,11 +59,11 @@ describe("anchored cycle math", () => {
 
   /** @scenario "An anchored cycle starts periods at the anchor instant, not the calendar" */
   it("phases a month off the anchor day and time rather than the 1st", () => {
-    const anchor = new Date("2026-06-17T09:00:00.000Z");
+    const anchor = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
 
     // Mid-period: July 15th still belongs to the period that opened on the
     // 17th of June, and the next boundary is the 17th of July.
-    const now = new Date("2026-07-15T00:00:00.000Z");
+    const now = Temporal.Instant.from("2026-07-15T00:00:00.000Z");
     expect(iso(GatewayWindow.anchoredPeriodStart({ window: "MONTH", anchorAt: anchor, now }))).toBe(
       "2026-06-17T09:00:00.000Z",
     );
@@ -71,7 +78,7 @@ describe("anchored cycle math", () => {
         GatewayWindow.anchoredPeriodStart({
           window: "MONTH",
           anchorAt: anchor,
-          now: new Date("2026-07-17T08:59:59.999Z"),
+          now: Temporal.Instant.from("2026-07-17T08:59:59.999Z"),
         }),
       ),
     ).toBe("2026-06-17T09:00:00.000Z");
@@ -80,7 +87,7 @@ describe("anchored cycle math", () => {
         GatewayWindow.anchoredPeriodStart({
           window: "MONTH",
           anchorAt: anchor,
-          now: new Date("2026-07-17T09:00:00.000Z"),
+          now: Temporal.Instant.from("2026-07-17T09:00:00.000Z"),
         }),
       ),
     ).toBe("2026-07-17T09:00:00.000Z");
@@ -90,8 +97,8 @@ describe("anchored cycle math", () => {
     // A gap would drop the spend that landed in it; an overlap would count
     // it against two periods. Each boundary must floor back onto itself.
     for (const anchor of [
-      new Date("2026-01-31T10:00:00.000Z"),
-      new Date("2026-06-17T09:00:00.000Z"),
+      Temporal.Instant.from("2026-01-31T10:00:00.000Z"),
+      Temporal.Instant.from("2026-06-17T09:00:00.000Z"),
     ]) {
       for (const window of CYCLIC_WINDOWS) {
         const starts = walkPeriods({ window, anchor, count: 14 });
@@ -108,7 +115,7 @@ describe("anchored cycle math", () => {
     expect(
       walkPeriods({
         window: "MONTH",
-        anchor: new Date("2026-01-31T10:00:00.000Z"),
+        anchor: Temporal.Instant.from("2026-01-31T10:00:00.000Z"),
         count: 7,
       }),
     ).toEqual([
@@ -125,7 +132,7 @@ describe("anchored cycle math", () => {
     expect(
       walkPeriods({
         window: "MONTH",
-        anchor: new Date("2028-01-31T00:00:00.000Z"),
+        anchor: Temporal.Instant.from("2028-01-31T00:00:00.000Z"),
         count: 3,
       }),
     ).toEqual(["2028-01-31T00:00:00.000Z", "2028-02-29T00:00:00.000Z", "2028-03-31T00:00:00.000Z"]);
@@ -135,14 +142,14 @@ describe("anchored cycle math", () => {
     expect(
       walkPeriods({
         window: "MONTH",
-        anchor: new Date("2026-01-30T00:00:00.000Z"),
+        anchor: Temporal.Instant.from("2026-01-30T00:00:00.000Z"),
         count: 3,
       }),
     ).toEqual(["2026-01-30T00:00:00.000Z", "2026-02-28T00:00:00.000Z", "2026-03-30T00:00:00.000Z"]);
     expect(
       walkPeriods({
         window: "MONTH",
-        anchor: new Date("2028-01-29T00:00:00.000Z"),
+        anchor: Temporal.Instant.from("2028-01-29T00:00:00.000Z"),
         count: 3,
       }),
     ).toEqual(["2028-01-29T00:00:00.000Z", "2028-02-29T00:00:00.000Z", "2028-03-29T00:00:00.000Z"]);
@@ -151,7 +158,7 @@ describe("anchored cycle math", () => {
     expect(
       walkPeriods({
         window: "MONTH",
-        anchor: new Date("2026-05-31T00:00:00.000Z"),
+        anchor: Temporal.Instant.from("2026-05-31T00:00:00.000Z"),
         count: 5,
       }),
     ).toEqual([
@@ -170,54 +177,54 @@ describe("anchored cycle math", () => {
       { window: "DAY" as const, lengthMs: 86_400_000 },
       { window: "WEEK" as const, lengthMs: 604_800_000 },
     ];
-    const anchor = new Date("2026-03-07T13:42:17.500Z");
+    const anchor = Temporal.Instant.from("2026-03-07T13:42:17.500Z");
     for (const { window, lengthMs } of cases) {
       for (const k of [0, 1, 5, 97]) {
-        const inside = new Date(anchor.getTime() + k * lengthMs + 17);
+        const inside = anchor.add({ milliseconds: k * lengthMs + 17 });
         expect(
           GatewayWindow.anchoredPeriodStart({
             window,
             anchorAt: anchor,
             now: inside,
-          }).getTime(),
-        ).toBe(anchor.getTime() + k * lengthMs);
+          }).epochMilliseconds,
+        ).toBe(anchor.epochMilliseconds + k * lengthMs);
         expect(
           GatewayWindow.nextAnchoredResetAt({
             window,
             anchorAt: anchor,
             now: inside,
-          }).getTime(),
-        ).toBe(anchor.getTime() + (k + 1) * lengthMs);
+          }).epochMilliseconds,
+        ).toBe(anchor.epochMilliseconds + (k + 1) * lengthMs);
       }
     }
 
     // A week anchored on a Saturday rolls on Saturdays. The ISO Monday the
     // calendar window uses plays no part once a budget is anchored.
-    const saturday = new Date("2026-03-07T13:42:17.500Z");
-    expect(saturday.getUTCDay()).toBe(6);
+    const saturday = Temporal.Instant.from("2026-03-07T13:42:17.500Z");
+    expect(saturday.toZonedDateTimeISO("UTC").dayOfWeek % 7).toBe(6);
     const nextWeek = GatewayWindow.nextAnchoredResetAt({
       window: "WEEK",
       anchorAt: saturday,
       now: saturday,
     });
-    expect(nextWeek.getUTCDay()).toBe(6);
+    expect(nextWeek.toZonedDateTimeISO("UTC").dayOfWeek % 7).toBe(6);
     expect(iso(nextWeek)).toBe("2026-03-14T13:42:17.500Z");
   });
 
   it("keeps a DAY cycle exactly 86400s apart across US and EU clock changes", () => {
     // US DST starts 2026-03-08, EU 2026-03-29. Neither exists in UTC, and
     // this is the assertion that keeps it that way.
-    const anchor = new Date("2026-03-08T02:30:00.000Z");
+    const anchor = Temporal.Instant.from("2026-03-08T02:30:00.000Z");
     for (let k = 0; k <= 30; k++) {
-      const inside = new Date(anchor.getTime() + k * 86_400_000 + 3_600_000);
+      const inside = anchor.add({ milliseconds: k * 86_400_000 + 3_600_000 });
       const start = GatewayWindow.anchoredPeriodStart({
         window: "DAY",
         anchorAt: anchor,
         now: inside,
       });
-      expect(start.getTime()).toBe(anchor.getTime() + k * 86_400_000);
-      expect(start.getUTCHours()).toBe(2);
-      expect(start.getUTCMinutes()).toBe(30);
+      expect(start.epochMilliseconds).toBe(anchor.epochMilliseconds + k * 86_400_000);
+      expect(start.toZonedDateTimeISO("UTC").hour).toBe(2);
+      expect(start.toZonedDateTimeISO("UTC").minute).toBe(30);
     }
   });
 
@@ -225,8 +232,8 @@ describe("anchored cycle math", () => {
     // A budget anchored to next month exists but has not started. Flooring a
     // read at the anchor totals nothing, which is what makes a future anchor
     // work with no special case anywhere downstream.
-    const anchor = new Date("2026-09-01T00:00:00.000Z");
-    const now = new Date("2026-08-04T12:00:00.000Z");
+    const anchor = Temporal.Instant.from("2026-09-01T00:00:00.000Z");
+    const now = Temporal.Instant.from("2026-08-04T12:00:00.000Z");
     for (const window of CYCLIC_WINDOWS) {
       expect(iso(GatewayWindow.anchoredPeriodStart({ window, anchorAt: anchor, now }))).toBe(
         iso(anchor),
@@ -238,14 +245,14 @@ describe("anchored cycle math", () => {
   });
 
   it("routes non-cycling windows to the sentinel whatever the anchor says", () => {
-    const anchor = new Date("2026-06-17T09:00:00.000Z");
-    const now = new Date("2026-07-15T00:00:00.000Z");
+    const anchor = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
+    const now = Temporal.Instant.from("2026-07-15T00:00:00.000Z");
     for (const window of ["TOTAL", "MANUAL"] as const) {
       expect(
         GatewayWindow.nextBoundaryFor({
           budget: { window, cycleAnchorAt: anchor },
           now,
-        }).getUTCFullYear(),
+        }).toZonedDateTimeISO("UTC").year,
       ).toBe(9999);
     }
     // Unanchored cyclic windows keep the calendar boundary.

@@ -3,6 +3,7 @@
  * Real Postgres + real ClickHouse; "reset" moves the window, it does not wipe the counter.
  * Spec: specs/ai-gateway/end-user-attribution.feature, specs/ai-gateway/gateway-budget-targeting.feature
  */
+import { fromDate, type Instant, nowInstant, Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +22,7 @@ import {
   bucketPeriodFloorMs,
   budgetPeriodFloorMs,
   GatewayWindow,
+  type GatewayBudgetWindow,
 } from "@langwatch/gateway-contract";
 import type { BudgetDebitRow } from "../ports/gateway-budget-spend.port.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -36,7 +38,7 @@ import { TestProjectService } from "./support/test-project-service.ts";
  * that every run sees it as an established schedule, and on a day no
  * calendar month starts on.
  */
-const CYCLE_ANCHOR = new Date("2026-06-17T09:00:00.000Z");
+const CYCLE_ANCHOR = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
 
 /**
  * Loggers are stubbed so the suppressed-debit report can be asserted;
@@ -101,8 +103,23 @@ function debitRow(
     model: "gpt-x",
     durationMs: 100,
     status: "SUCCESS",
-    occurredAt: new Date(),
+    occurredAt: nowInstant(),
     ...over,
+  };
+}
+
+/** A stored budget row's temporal columns, as the window math reads them. */
+function toBudgetPeriod(row: {
+  window: GatewayBudgetWindow;
+  currentPeriodStartedAt: Date;
+  lastResetAt: Date | null;
+  cycleAnchorAt: Date | null;
+}) {
+  return {
+    window: row.window,
+    currentPeriodStartedAt: fromDate(row.currentPeriodStartedAt),
+    lastResetAt: row.lastResetAt ? fromDate(row.lastResetAt) : null,
+    cycleAnchorAt: row.cycleAnchorAt ? fromDate(row.cycleAnchorAt) : null,
   };
 }
 
@@ -326,7 +343,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
         scopeId: VK_ID,
         gatewayRequestId: requestId,
         amountNanoUsd: 42_000_000_000,
-        occurredAt: new Date(),
+        occurredAt: nowInstant(),
       }),
     ]);
 
@@ -392,7 +409,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
         scopeId: bucketA,
         gatewayRequestId: `req-${suffix}-alice`,
         amountNanoUsd: 20_000_000_000,
-        occurredAt: new Date(),
+        occurredAt: nowInstant(),
       }),
     ]);
     await chRepo.insertDebitsForBudgets([
@@ -401,7 +418,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
         scopeId: bucketB,
         gatewayRequestId: `req-${suffix}-bob`,
         amountNanoUsd: 30_000_000_000,
-        occurredAt: new Date(),
+        occurredAt: nowInstant(),
       }),
     ]);
 
@@ -434,7 +451,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
             scopeId: bucket,
             window: "MANUAL",
             match: "exact",
-            periodFloorMs: floorMs ?? budgetPeriodFloorMs(templateAfter!),
+            periodFloorMs: floorMs ?? budgetPeriodFloorMs(toBudgetPeriod(templateAfter!)),
           },
         ],
       );
@@ -455,18 +472,18 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
       cycleAnchorAt: CYCLE_ANCHOR,
       actorUserId: USER_ID,
     });
-    expect(anchored.cycleAnchorAt?.toISOString()).toBe(CYCLE_ANCHOR.toISOString());
+    expect(anchored.cycleAnchorAt?.epochMilliseconds).toBe(CYCLE_ANCHOR.epochMilliseconds);
     // Created mid-cycle, it reports the anchor's next boundary rather than
     // one month from the creation instant.
-    expect(anchored.resetsAt.toISOString()).toBe(
+    expect(anchored.resetsAt.epochMilliseconds).toBe(
       GatewayWindow.nextAnchoredResetAt({
         window: "MONTH",
         anchorAt: CYCLE_ANCHOR,
         now: anchored.createdAt,
-      }).toISOString(),
+      }).epochMilliseconds,
     );
 
-    const readAt = async ({ budget, now }: { budget: typeof anchored; now: Date }) => {
+    const readAt = async ({ budget, now }: { budget: typeof anchored; now: Instant }) => {
       const spends = await chRepo.getSpendForTargetsAcrossTenants(
         [PROJECT_ID],
         [
@@ -519,26 +536,26 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
 
     // ...and the reported boundary is the anchor's next one, not one month
     // from the reset. A reset is a credit, not a re-phasing.
-    expect(reset.resetsAt.toISOString()).toBe(
+    expect(reset.resetsAt.epochMilliseconds).toBe(
       GatewayWindow.nextAnchoredResetAt({
         window: "MONTH",
         anchorAt: CYCLE_ANCHOR,
         now: reset.lastResetAt!,
-      }).toISOString(),
+      }).epochMilliseconds,
     );
 
     // Once that boundary passes, the floor is the anchored period start
     // again: the reset's clamp expires exactly there rather than carrying a
     // private boundary forward forever.
-    const afterRollover = new Date(reset.resetsAt.getTime() + 1000);
+    const afterRollover = reset.resetsAt.add({ milliseconds: 1000 });
     expect(budgetPeriodFloorMs(reset, afterRollover)).toBe(
       GatewayWindow.anchoredPeriodStart({
         window: "MONTH",
         anchorAt: CYCLE_ANCHOR,
         now: afterRollover,
-      }).getTime(),
+      }).epochMilliseconds,
     );
-    expect(budgetPeriodFloorMs(reset, afterRollover)).toBe(reset.resetsAt.getTime());
+    expect(budgetPeriodFloorMs(reset, afterRollover)).toBe(reset.resetsAt.epochMilliseconds);
   });
 
   it("floors an anchored per-seat template's bucket read at the anchored period start", async () => {
@@ -552,7 +569,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
       actorUserId: USER_ID,
     });
     const bucket = attributedUserBucketScopeId(VK_ID, `seat-${suffix}`);
-    const now = new Date("2026-07-15T18:00:00.000Z");
+    const now = Temporal.Instant.from("2026-07-15T18:00:00.000Z");
     const periodStart = GatewayWindow.anchoredPeriodStart({
       window: "MONTH",
       anchorAt: CYCLE_ANCHOR,
@@ -568,7 +585,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
         window: "MONTH",
         gatewayRequestId: `req-${suffix}-seat-before`,
         amountNanoUsd: 7_000_000_000,
-        occurredAt: new Date(periodStart.getTime() - 3_600_000),
+        occurredAt: periodStart.subtract({ milliseconds: 3_600_000 }),
       }),
     ]);
     await chRepo.insertDebit([
@@ -578,7 +595,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
         window: "MONTH",
         gatewayRequestId: `req-${suffix}-seat-inside`,
         amountNanoUsd: 5_000_000_000,
-        occurredAt: new Date(periodStart.getTime() + 3_600_000),
+        occurredAt: periodStart.add({ milliseconds: 3_600_000 }),
       }),
     ]);
 
@@ -599,6 +616,6 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
     // Only the debit inside the anchored period. The bucket floor is the
     // budget's own, since this seat has no boundary row of its own.
     expect(Number.parseFloat(spends[0]!.spentUsd)).toBeCloseTo(5, 3);
-    expect(bucketPeriodFloorMs(template, null, now)).toBe(periodStart.getTime());
+    expect(bucketPeriodFloorMs(template, null, now)).toBe(periodStart.epochMilliseconds);
   });
 });

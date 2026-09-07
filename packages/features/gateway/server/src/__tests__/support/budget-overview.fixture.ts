@@ -1,6 +1,7 @@
 /**
  * The world every budget-overview assertion reads against: an org, a retired project, a member's personal workspace, a shared department, and five budgets spent across three tenants. Lives beside the test so a second suite can reuse it.
  */
+import { nowInstant, toDate } from "@langwatch/time";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { usdToNanoUsd, groupBucketScopeId } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -57,7 +58,7 @@ async function seedDebit(
       tokensCacheWrite: 0,
       model: "gpt-5-mini",
       status: "SUCCESS",
-      occurredAt: new Date(),
+      occurredAt: nowInstant(),
     },
   ]);
 }
@@ -119,7 +120,7 @@ export async function seedBudgetOverviewFixture(
       language: "en",
       framework: "openai",
       apiKey: `bov-archived-key-${suffix}`,
-      archivedAt: new Date(),
+      archivedAt: toDate(nowInstant()),
     },
   });
   await prisma.teamUser.create({
@@ -185,7 +186,7 @@ export async function seedBudgetOverviewFixture(
     },
   });
 
-  const resetsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const resetsAt = toDate(nowInstant().add({ milliseconds: 30 * 24 * 60 * 60 * 1000 }));
   await prisma.gatewayBudget.create({
     data: {
       id: BUDGET_ORG_ID,

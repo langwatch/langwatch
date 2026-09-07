@@ -1,3 +1,5 @@
+import type { Instant } from "@langwatch/time";
+
 /** Shared projection required whenever a virtual key materialises routing policy. */
 export const gatewayRoutingPolicySelect = {
   id: true,
@@ -26,9 +28,9 @@ export type GatewayVirtualKeyRecord = {
   purpose: "LANGY" | "USER";
   externalId: string | null;
   metadata: unknown;
-  disabledAt: Date | null;
+  disabledAt: Instant | null;
   disabledReason: string | null;
-  expiresAt: Date | null;
+  expiresAt: Instant | null;
   hashedSecret: string;
   displayPrefix: string;
   principalUserId: string | null;
@@ -36,13 +38,13 @@ export type GatewayVirtualKeyRecord = {
   config: unknown;
   revision: bigint;
   previousHashedSecret: string | null;
-  previousSecretValidUntil: Date | null;
-  revokedAt: Date | null;
+  previousSecretValidUntil: Instant | null;
+  revokedAt: Instant | null;
   revokedById: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
   createdById: string;
-  lastUsedAt: Date | null;
+  lastUsedAt: Instant | null;
   routingPolicyId: string | null;
   routingMode: "FALLBACK_ALL" | "NONE" | "POLICY";
   scopes: GatewayVirtualKeyScope[];
@@ -72,7 +74,7 @@ export type CreateGatewayVirtualKeyInput = {
   createdById: string;
   scopes: GatewayVirtualKeyScope[];
   traceProjectId?: string | null;
-  expiresAt?: Date | null;
+  expiresAt?: Instant | null;
   routingPolicyId?: string | null;
   routingMode?: "FALLBACK_ALL" | "NONE" | "POLICY";
   purpose?: "LANGY" | "USER";
@@ -92,7 +94,7 @@ export type UpdateGatewayVirtualKeyInput = {
   externalId?: string | null;
   metadata?: ResourceMetadata;
   routingPolicyId?: string | null;
-  expiresAt?: Date | null;
+  expiresAt?: Instant | null;
   traceProjectId: string;
   routingMode: "FALLBACK_ALL" | "NONE" | "POLICY";
 };
@@ -127,7 +129,7 @@ export abstract class GatewayVirtualKeysPort {
   abstract findPageInOrganization(input: {
     organizationId: string;
     limit: number;
-    cursor: { createdAt: Date; id: string } | null;
+    cursor: { createdAt: Instant; id: string } | null;
     externalId?: string;
   }): Promise<GatewayVirtualKeyRecord[]>;
   abstract findAllInOrganization(
@@ -171,7 +173,7 @@ export abstract class GatewayVirtualKeysPort {
       newHashedSecret: string;
       newDisplayPrefix: string;
       previousHashedSecret: string;
-      previousSecretValidUntil: Date;
+      previousSecretValidUntil: Instant;
     },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord>;
@@ -185,7 +187,7 @@ export abstract class GatewayVirtualKeysPort {
   ): Promise<GatewayVirtualKeyRecord>;
   abstract recordUsage(
     id: string,
-    at: Date,
+    at: Instant,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<void>;
 }

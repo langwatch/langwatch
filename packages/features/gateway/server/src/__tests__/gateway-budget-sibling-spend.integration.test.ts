@@ -2,6 +2,31 @@
  * @vitest-environment node
  * Real Postgres + real ClickHouse. Ledger writes one row per (budget, request); reads keyed by scope alone used to sum both into each, so N sibling budgets each reported N times true spend. Spec: specs/ai-gateway/budgets.feature
  */
+import { fromDate, type Instant, nowInstant, Temporal, toDate } from "@langwatch/time";
+
+/** A stored budget row, as the spend reads take it: the same columns, on instants. */
+function toBudgetRow<
+  Row extends {
+    currentPeriodStartedAt: Date;
+    resetsAt: Date;
+    lastResetAt: Date | null;
+    cycleAnchorAt: Date | null;
+    archivedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+>(row: Row) {
+  return {
+    ...row,
+    currentPeriodStartedAt: fromDate(row.currentPeriodStartedAt),
+    resetsAt: fromDate(row.resetsAt),
+    lastResetAt: row.lastResetAt ? fromDate(row.lastResetAt) : null,
+    cycleAnchorAt: row.cycleAnchorAt ? fromDate(row.cycleAnchorAt) : null,
+    archivedAt: row.archivedAt ? fromDate(row.archivedAt) : null,
+    createdAt: fromDate(row.createdAt),
+    updatedAt: fromDate(row.updatedAt),
+  };
+}
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -73,11 +98,11 @@ const ANCHOR_VK = `vk_sib_anch_${suffix}`;
  * Month anchored to the 17th: one instant inside the period opened 17
  * June, one after it rolled 17 July — a 20 June debit is in neither.
  */
-const CYCLE_ANCHOR = new Date("2026-06-17T09:00:00.000Z");
-const BACKDATED_DEBIT_AT = new Date("2026-06-20T00:00:00.000Z");
-const FRESH_DEBIT_AT = new Date("2026-07-15T12:00:00.000Z");
-const INSIDE_ANCHORED_PERIOD = new Date("2026-07-15T18:00:00.000Z");
-const AFTER_ANCHORED_ROLLOVER = new Date("2026-07-20T00:00:00.000Z");
+const CYCLE_ANCHOR = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
+const BACKDATED_DEBIT_AT = Temporal.Instant.from("2026-06-20T00:00:00.000Z");
+const FRESH_DEBIT_AT = Temporal.Instant.from("2026-07-15T12:00:00.000Z");
+const INSIDE_ANCHORED_PERIOD = Temporal.Instant.from("2026-07-15T18:00:00.000Z");
+const AFTER_ANCHORED_ROLLOVER = Temporal.Instant.from("2026-07-20T00:00:00.000Z");
 
 const COST_USD = 0.001;
 /** Above one request, at or below two. One request must not breach it. */
@@ -92,7 +117,7 @@ type ServedRequest = {
   virtualKeyId: string;
   endUserId?: string;
   /** When the request was served. Defaults to now. */
-  occurredAt?: Date;
+  occurredAt?: Instant;
 };
 
 /**
@@ -133,7 +158,7 @@ async function writeDebits(request: ServedRequest): Promise<void> {
       model: "gpt-5-mini",
       durationMs: 120,
       status: "SUCCESS" as const,
-      occurredAt: request.occurredAt ?? new Date(),
+      occurredAt: request.occurredAt ?? nowInstant(),
     })),
   );
 }
@@ -177,7 +202,7 @@ async function createBudget(input: {
       onBreach: input.onBreach ?? "BLOCK",
       createdById: USER_ID,
       cycleAnchorAt: input.cycleAnchorAt ?? null,
-      resetsAt: new Date(Date.now() + 86_400_000),
+      resetsAt: toDate(nowInstant().add({ milliseconds: 86_400_000 })),
     },
   });
 }
@@ -191,12 +216,12 @@ async function spentUsdFor({
   now,
 }: {
   budgetIds: string[];
-  now?: Date;
+  now?: Instant;
 }): Promise<string[]> {
   const budgets = await prisma.gatewayBudget.findMany({ where: { id: { in: budgetIds } } });
   const spends = await chRepo.getSpendForBudgetsAcrossTenants(
     [PROJECT_ID],
-    budgetIds.map((id) => budgets.find((b) => b.id === id)!),
+    budgetIds.map((id) => toBudgetRow(budgets.find((b) => b.id === id)!)),
     now,
   );
   return budgetIds.map((id) => spends.find((s) => s.budgetId === id)?.spentUsd ?? "missing");
@@ -309,7 +334,7 @@ describe.skipIf(!databaseUrl || !chUrl)("sibling budgets on one virtual key", ()
       virtualKeyId: ANCHOR_VK,
       window: "MONTH",
       limitUsd: LOOSE_LIMIT_USD,
-      cycleAnchorAt: CYCLE_ANCHOR,
+      cycleAnchorAt: toDate(CYCLE_ANCHOR),
     });
     await createBudget({
       id: `bdg-anch-cal-${suffix}`,
@@ -472,9 +497,9 @@ describe.skipIf(!databaseUrl || !chUrl)("sibling budgets on one virtual key", ()
 
       const breakdowns = await Promise.all(
         [seatAId, seatBId].map(async (id) => {
-          const budget = (await prisma.gatewayBudget.findUniqueOrThrow({
-            where: { id },
-          })) as Parameters<typeof chRepo.getBucketSpendBreakdownForBudget>[0]["budget"];
+          const budget = toBudgetRow(
+            await prisma.gatewayBudget.findUniqueOrThrow({ where: { id } }),
+          );
           return await chRepo.getBucketSpendBreakdownForBudget({
             budget,
             tenantIds: [PROJECT_ID],

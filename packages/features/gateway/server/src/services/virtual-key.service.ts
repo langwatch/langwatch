@@ -4,6 +4,7 @@
  * caller may ask of a key rather than a second copy of the invariants.
  */
 
+import { type Instant, nowInstant } from "@langwatch/time";
 import type { ProjectService } from "@langwatch/project-contract";
 import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
 import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
@@ -104,7 +105,7 @@ export class VirtualKeyService {
   async getPage(args: {
     organizationId: string;
     limit: number;
-    cursor: { createdAt: Date; id: string } | null;
+    cursor: { createdAt: Instant; id: string } | null;
     externalId?: string;
   }): Promise<VirtualKeyWithScopes[]> {
     return this.repository.findPageInOrganization(args);
@@ -195,6 +196,6 @@ export class VirtualKeyService {
   }
 
   async touchUsage(id: string): Promise<void> {
-    await this.repository.recordUsage(id, new Date());
+    await this.repository.recordUsage(id, nowInstant());
   }
 }

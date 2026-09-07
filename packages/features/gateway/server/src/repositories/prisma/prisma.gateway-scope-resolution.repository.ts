@@ -1,3 +1,4 @@
+import { fromDate } from "@langwatch/time";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayPersistenceTransaction } from "../../ports/gateway-change-events.port.ts";
 import {
@@ -71,13 +72,22 @@ export class PrismaGatewayScopeResolutionRepository extends GatewayScopeResoluti
       return [];
     }
 
-    return await this.client(transaction).modelProvider.findMany({
+    const rows = await this.client(transaction).modelProvider.findMany({
       where: {
         enabled: true,
         disabledAt: null,
         scopes: { some: { OR: predicates } },
       },
     });
+
+    return rows.map((row) => ({
+      ...row,
+      circuitOpenedAt: row.circuitOpenedAt ? fromDate(row.circuitOpenedAt) : null,
+      lastHealthCheckAt: row.lastHealthCheckAt ? fromDate(row.lastHealthCheckAt) : null,
+      disabledAt: row.disabledAt ? fromDate(row.disabledAt) : null,
+      createdAt: fromDate(row.createdAt),
+      updatedAt: fromDate(row.updatedAt),
+    }));
   }
 
   async tryFindRoutingPolicyOrder({

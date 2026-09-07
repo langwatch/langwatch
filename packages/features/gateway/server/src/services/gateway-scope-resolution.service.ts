@@ -139,7 +139,7 @@ function deterministicMpOrder(a: EligibleModelProvider, b: EligibleModelProvider
     return 1;
   }
 
-  return a.createdAt.getTime() - b.createdAt.getTime();
+  return a.createdAt.epochMilliseconds - b.createdAt.epochMilliseconds;
 }
 
 function parseModelProviderIds(raw: unknown): string[] {

@@ -1,6 +1,7 @@
 /**
  * Shared DTO for VirtualKey (tRPC camelCase, REST snake_case). Post-collapse: providerCredentialIds/providerChain are gone from the wire — eligible providers derive from the scope graph + RoutingPolicy at request time (scopeResolver.ts). Token is vk-lw-<ulid>, no env field since the gateway never branches on environment.
  */
+import { toDate } from "@langwatch/time";
 import type { ProjectService } from "@langwatch/project-contract";
 
 import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
@@ -127,11 +128,11 @@ function baseVk(vk: VirtualKeyWithScopes, facts: TraceDestinationFacts): BaseVk 
     routingMode: vk.routingMode,
     config: vk.config,
     revision: vk.revision.toString(),
-    createdAt: vk.createdAt.toISOString(),
-    updatedAt: vk.updatedAt.toISOString(),
-    lastUsedAt: vk.lastUsedAt?.toISOString() ?? null,
-    revokedAt: vk.revokedAt?.toISOString() ?? null,
-    expiresAt: vk.expiresAt?.toISOString() ?? null,
+    createdAt: toDate(vk.createdAt).toISOString(),
+    updatedAt: toDate(vk.updatedAt).toISOString(),
+    lastUsedAt: vk.lastUsedAt ? toDate(vk.lastUsedAt).toISOString() : null,
+    revokedAt: vk.revokedAt ? toDate(vk.revokedAt).toISOString() : null,
+    expiresAt: vk.expiresAt ? toDate(vk.expiresAt).toISOString() : null,
   };
 }
 

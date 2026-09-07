@@ -1,3 +1,5 @@
+import type { Instant } from "@langwatch/time";
+
 export type GatewayVirtualKeySpend = {
   virtualKeyId: string;
   spentUsd: string;
@@ -5,8 +7,8 @@ export type GatewayVirtualKeySpend = {
 };
 
 export type GatewaySpendWindow = {
-  fromDate: Date;
-  toDate: Date;
+  fromDate: Instant;
+  toDate: Instant;
 };
 
 export type GatewayUsageBucket = {
@@ -23,7 +25,7 @@ export type GatewayTraceRow = {
   virtualKeyId: string;
   costUsd: string;
   models: string[];
-  occurredAt: Date;
+  occurredAt: Instant;
   promptTokens: number;
   completionTokens: number;
   durationMs: number;

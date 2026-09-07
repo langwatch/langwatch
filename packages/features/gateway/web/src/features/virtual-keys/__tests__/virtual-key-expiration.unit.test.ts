@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -16,7 +17,7 @@ import {
  * every rule about it is pinned here rather than read off the screen.
  */
 describe("resolveExpiresAt", () => {
-  const now = new Date("2026-08-16T10:30:00.000Z");
+  const now = Temporal.Instant.from("2026-08-16T10:30:00.000Z");
 
   describe("given the Never option", () => {
     it("resolves to no date at all", () => {
@@ -26,22 +27,22 @@ describe("resolveExpiresAt", () => {
 
   describe("given a period", () => {
     it("counts the days forward from the moment it is picked", () => {
-      expect(resolveExpiresAt({ preset: "1", now })?.toISOString()).toBe(
+      expect(resolveExpiresAt({ preset: "1", now })?.toString({ fractionalSecondDigits: 3 })).toBe(
         "2026-08-17T10:30:00.000Z",
       );
-      expect(resolveExpiresAt({ preset: "7", now })?.toISOString()).toBe(
+      expect(resolveExpiresAt({ preset: "7", now })?.toString({ fractionalSecondDigits: 3 })).toBe(
         "2026-08-23T10:30:00.000Z",
       );
-      expect(resolveExpiresAt({ preset: "365", now })?.toISOString()).toBe(
-        "2027-08-16T10:30:00.000Z",
-      );
+      expect(
+        resolveExpiresAt({ preset: "365", now })?.toString({ fractionalSecondDigits: 3 }),
+      ).toBe("2027-08-16T10:30:00.000Z");
     });
 
     it("offers a period for every option the select lists", () => {
       for (const option of VIRTUAL_KEY_EXPIRATION_OPTIONS) {
         if (option.value === "" || option.value === "custom") continue;
-        expect(resolveExpiresAt({ preset: option.value, now })!.getTime()).toBeGreaterThan(
-          now.getTime(),
+        expect(resolveExpiresAt({ preset: option.value, now })!.epochMilliseconds).toBeGreaterThan(
+          now.epochMilliseconds,
         );
       }
     });
@@ -54,7 +55,7 @@ describe("resolveExpiresAt", () => {
           preset: "custom",
           customDate: "2026-08-20",
           now,
-        })?.toISOString(),
+        })?.toString({ fractionalSecondDigits: 3 }),
       ).toBe("2026-08-20T23:59:59.999Z");
     });
 
@@ -68,7 +69,9 @@ describe("resolveExpiresAt", () => {
 describe("earliestCustomDate", () => {
   describe("when the day is already part way through", () => {
     it("refuses today, so the smallest answer is a whole day away", () => {
-      expect(earliestCustomDate(new Date("2026-08-16T10:30:00.000Z"))).toBe("2026-08-17");
+      expect(earliestCustomDate(Temporal.Instant.from("2026-08-16T10:30:00.000Z"))).toBe(
+        "2026-08-17",
+      );
     });
   });
 });
@@ -76,7 +79,9 @@ describe("earliestCustomDate", () => {
 describe("formatExpiry", () => {
   describe("when the stored instant sits at the end of its day", () => {
     it("names the day that was picked, not the one a timezone rolls it into", () => {
-      expect(formatExpiry(new Date("2026-08-20T23:59:59.999Z"))).toBe("Thu, Aug 20, 2026");
+      expect(formatExpiry(Temporal.Instant.from("2026-08-20T23:59:59.999Z"))).toBe(
+        "Thu, Aug 20, 2026",
+      );
     });
   });
 });
@@ -107,7 +112,7 @@ describe("expirationStateFromStored", () => {
 });
 
 describe("isExpired", () => {
-  const now = new Date("2026-08-16T10:30:00.000Z");
+  const now = Temporal.Instant.from("2026-08-16T10:30:00.000Z");
 
   describe("when the key carries no expiration date", () => {
     it("says no", () => {

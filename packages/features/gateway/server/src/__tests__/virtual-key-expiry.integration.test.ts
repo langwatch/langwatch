@@ -3,6 +3,7 @@
  * @vitest-environment node
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -100,7 +101,7 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
   });
 
-  async function mintKey(name: string, expiresAt?: Date | null) {
+  async function mintKey(name: string, expiresAt?: Instant | null) {
     const { virtualKey } = await service.create({
       organizationId: ORG_ID,
       name: `${name}-${nanoid(6)}`,
@@ -122,14 +123,16 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
   describe("given a key created with an expiration", () => {
     /** @scenario "Picking a period states the date the key stops working" */
     it("stores the exact instant it was given", async () => {
-      const expiresAt = new Date(Date.now() + 7 * DAY_MS);
+      const expiresAt = nowInstant().add({ milliseconds: 7 * DAY_MS });
       const vk = await mintKey("in-a-week", expiresAt);
-      expect(vk.expiresAt?.toISOString()).toBe(expiresAt.toISOString());
+      expect(vk.expiresAt ? toDate(vk.expiresAt).toISOString() : null).toBe(
+        toDate(expiresAt).toISOString(),
+      );
     });
 
     /** @scenario "The expiration date is published on the key" */
     it("publishes the date while its status stays active", async () => {
-      const expiresAt = new Date(Date.now() + DAY_MS);
+      const expiresAt = nowInstant().add({ milliseconds: DAY_MS });
       const vk = await mintKey("published", expiresAt);
       const dto = virtualKeyDtos.toVirtualKeySnakeDto({
         virtualKey: await service.tryGetById(vk.id, ORG_ID).then((k) => k!),
@@ -138,7 +141,7 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
           virtualKeys: [vk],
         }),
       });
-      expect(dto.expires_at).toBe(expiresAt.toISOString());
+      expect(dto.expires_at).toBe(toDate(expiresAt).toISOString());
       expect(dto.status).toBe("active");
     });
   });
@@ -146,9 +149,10 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
   describe("when the date given has already passed", () => {
     /** @scenario "An expiration date in the past is refused" */
     it("refuses the create, naming the expiration field", async () => {
-      const error = await mintKey("born-dead", new Date(Date.now() - 1_000)).catch(
-        (err: unknown) => err,
-      );
+      const error = await mintKey(
+        "born-dead",
+        nowInstant().subtract({ milliseconds: 1_000 }),
+      ).catch((err: unknown) => err);
       expect(codeOf(error)).toBe("virtual_key_expiry_in_past");
       expect(
         (error as { meta?: { fieldErrors?: Record<string, string[]> } }).meta?.fieldErrors
@@ -158,7 +162,7 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
 
     /** @scenario "An expiration date in the past is refused when it is written" */
     it("refuses the update too, leaving the stored date alone", async () => {
-      const expiresAt = new Date(Date.now() + DAY_MS);
+      const expiresAt = nowInstant().add({ milliseconds: DAY_MS });
       const vk = await mintKey("keep-mine", expiresAt);
 
       const error = await service
@@ -166,7 +170,7 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
           id: vk.id,
           organizationId: ORG_ID,
           actorUserId: USER_ID,
-          expiresAt: new Date(Date.now() - 1_000),
+          expiresAt: nowInstant().subtract({ milliseconds: 1_000 }),
         })
         .catch((err: unknown) => err);
       expect(codeOf(error)).toBe("virtual_key_expiry_in_past");
@@ -174,25 +178,27 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
       const stored = await prisma.virtualKey.findUniqueOrThrow({
         where: { id: vk.id },
       });
-      expect(stored.expiresAt?.toISOString()).toBe(expiresAt.toISOString());
+      expect(stored.expiresAt?.toISOString()).toBe(toDate(expiresAt).toISOString());
     });
   });
 
   describe("when an update states what it means by the field", () => {
     /** @scenario "Extending the date puts an expired key back in service" */
     it("moves the date on a value, clears it on null, and leaves it on absence", async () => {
-      const first = new Date(Date.now() + DAY_MS);
+      const first = nowInstant().add({ milliseconds: DAY_MS });
       const vk = await mintKey("three-ways", first);
       const bornAt = vk.revision;
 
-      const later = new Date(Date.now() + 30 * DAY_MS);
+      const later = nowInstant().add({ milliseconds: 30 * DAY_MS });
       const moved = await service.update({
         id: vk.id,
         organizationId: ORG_ID,
         actorUserId: USER_ID,
         expiresAt: later,
       });
-      expect(moved.expiresAt?.toISOString()).toBe(later.toISOString());
+      expect(moved.expiresAt ? toDate(moved.expiresAt).toISOString() : null).toBe(
+        toDate(later).toISOString(),
+      );
       // Every write bumps the revision, which is what makes the gateway
       // re-read a key whose date just moved.
       expect(moved.revision > bornAt).toBe(true);
@@ -203,7 +209,9 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
         actorUserId: USER_ID,
         name: `${vk.name}-renamed`,
       });
-      expect(untouched.expiresAt?.toISOString()).toBe(later.toISOString());
+      expect(untouched.expiresAt ? toDate(untouched.expiresAt).toISOString() : null).toBe(
+        toDate(later).toISOString(),
+      );
 
       const cleared = await service.update({
         id: vk.id,

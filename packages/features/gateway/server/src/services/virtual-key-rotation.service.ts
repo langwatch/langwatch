@@ -4,6 +4,7 @@
  * hash stays stored only until that window closes.
  */
 
+import { nowInstant } from "@langwatch/time";
 import { TRPCError } from "@trpc/server";
 import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
 import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
@@ -62,7 +63,7 @@ export class VirtualKeyRotationService {
     const newSecret = this.crypto.mintSecret();
     const { displayPrefix: newDisplayPrefix } = this.crypto.parseSecret(newSecret);
     const newHashedSecret = this.crypto.hashSecret(newSecret);
-    const previousSecretValidUntil = new Date(Date.now() + ROTATION_GRACE_MS);
+    const previousSecretValidUntil = nowInstant().add({ milliseconds: ROTATION_GRACE_MS });
 
     const rotated = await this.transactions.run(async (tx) => {
       const vk = await this.repository.rotateSecret(

@@ -4,6 +4,7 @@
  * the enforcement stack, and the service re-checks org membership itself, failing closed.
  */
 
+import { nowInstant, toDate } from "@langwatch/time";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/gateway-contract";
@@ -299,7 +300,7 @@ export class BudgetOverviewService {
       return "0";
     }
 
-    const now = new Date();
+    const now = nowInstant();
     try {
       const spends = await this.chRepo.getSpendForTargetsAcrossTenants(
         tenantIds,
@@ -449,7 +450,7 @@ function resetsAtFor(window: string): string | null {
     return null;
   }
 
-  return GatewayWindow.nextResetAt(
-    window as Parameters<typeof GatewayWindow.nextResetAt>[0],
+  return toDate(
+    GatewayWindow.nextResetAt(window as Parameters<typeof GatewayWindow.nextResetAt>[0]),
   ).toISOString();
 }

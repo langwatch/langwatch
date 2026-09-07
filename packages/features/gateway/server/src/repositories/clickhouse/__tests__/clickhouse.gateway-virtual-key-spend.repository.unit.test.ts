@@ -11,6 +11,7 @@
  * The client is a fake that keeps the statement it was handed.
  */
 
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { GatewayVirtualKeySpendRepository } from "../clickhouse.gateway-virtual-key-spend.repository.ts";
 
@@ -37,8 +38,8 @@ function repositoryOver(rows: unknown[] = []) {
 }
 
 const WINDOW = {
-  fromDate: new Date("2026-08-01T00:00:00.000Z"),
-  toDate: new Date("2026-09-01T00:00:00.000Z"),
+  fromDate: Temporal.Instant.from("2026-08-01T00:00:00.000Z"),
+  toDate: Temporal.Instant.from("2026-09-01T00:00:00.000Z"),
 };
 
 describe("GatewayVirtualKeySpendRepository", () => {
@@ -108,8 +109,8 @@ describe("GatewayVirtualKeySpendRepository", () => {
 
         expect(statement.query).toContain("OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
         expect(statement.query).toContain("OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})");
-        expect(statement.query_params.fromMs).toBe(WINDOW.fromDate.getTime());
-        expect(statement.query_params.toMs).toBe(WINDOW.toDate.getTime());
+        expect(statement.query_params.fromMs).toBe(WINDOW.fromDate.epochMilliseconds);
+        expect(statement.query_params.toMs).toBe(WINDOW.toDate.epochMilliseconds);
       });
 
       it("dedups the summaries by latest version rather than by max", async () => {

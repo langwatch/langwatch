@@ -15,6 +15,7 @@ import {
   nanoUsdToDecimalString,
   parseSummedNanoUsd,
 } from "@langwatch/gateway-contract";
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port.ts";
 import {
   GatewayBudgetSpendPort,
@@ -58,7 +59,7 @@ type BudgetDebitRow = {
   providerSlot?: string | null;
   durationMs?: number | null;
   status: GatewayBudgetLedgerStatus;
-  occurredAt: Date;
+  occurredAt: Instant;
 };
 
 /**
@@ -95,9 +96,9 @@ type PulledUsageRow = {
   model: string;
   providerKey?: string | null;
   /** The provider's business bucket time. Stable under restatement. */
-  occurredAt: Date;
+  occurredAt: Instant;
   /** Monotonic pull time — the ReplacingMergeTree version column. */
-  observedAt: Date;
+  observedAt: Instant;
 };
 
 /** What a scope spent outside the gateway, over a window. */
@@ -137,7 +138,7 @@ export type BucketSpend = {
  */
 export type BudgetBucketBoundary = {
   bucketScopeId: string;
-  periodStartedAt: Date;
+  periodStartedAt: Instant;
 };
 
 /**
@@ -181,7 +182,7 @@ export type LedgerEventRow = {
   tokensOutput: number;
   durationMs: number | null;
   status: GatewayBudgetLedgerStatus;
-  occurredAt: Date;
+  occurredAt: Instant;
 };
 
 /**
@@ -285,8 +286,8 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
       ProviderSlot: r.providerSlot ?? "",
       DurationMS: r.durationMs ?? 0,
       Status: r.status.toLowerCase(),
-      OccurredAt: r.occurredAt.getTime(),
-      EventTimestamp: Date.now(),
+      OccurredAt: r.occurredAt.epochMilliseconds,
+      EventTimestamp: nowInstant().epochMilliseconds,
     }));
 
     try {
@@ -344,11 +345,11 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
       ProviderSlot: "",
       DurationMS: 0,
       Status: "success",
-      OccurredAt: r.occurredAt.getTime(),
+      OccurredAt: r.occurredAt.epochMilliseconds,
       // The ReplacingMergeTree version. Pull time, not bucket time: a
       // restatement of period P keeps P's OccurredAt, so ordering versions by
       // it would compare the period against itself.
-      EventTimestamp: r.observedAt.getTime(),
+      EventTimestamp: r.observedAt.epochMilliseconds,
     }));
 
     try {
@@ -382,7 +383,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     // a probe without it touches every partition the tenant has ever written — including whatever has aged onto S3 — on every single pull. A restatement
     // always carries its ORIGINAL bucket time (that is what makes it a restatement), so any prior version of these rows is inside this span by
     // construction; the day of slack on each side is for a provider that nudges a bucket boundary, not for correctness.
-    const occurredAtMs = rows.map((r) => r.occurredAt.getTime());
+    const occurredAtMs = rows.map((r) => r.occurredAt.epochMilliseconds);
     const SPAN_SLACK_MS = 24 * 60 * 60 * 1000;
     const probe = await client.query({
       query: `
@@ -445,8 +446,8 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     tenantId: string;
     /** The org id, the team id, or both — whichever the caller can see. */
     scopeIds: string[];
-    from: Date;
-    to: Date;
+    from: Instant;
+    to: Instant;
   }): Promise<PulledUsageTotals> {
     const empty: PulledUsageTotals = {
       spentNanoUsd: 0,
@@ -483,8 +484,8 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
         tenantId,
         scope: PULLED_USAGE_SCOPE,
         scopeIds,
-        fromMs: from.getTime(),
-        toMs: to.getTime(),
+        fromMs: from.epochMilliseconds,
+        toMs: to.epochMilliseconds,
       },
       format: "JSONEachRow",
     });
@@ -574,7 +575,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     // The instant the read is anchored to. Injectable so a test that wrote
     // a debit at a known time can read the same period deterministically
     // instead of racing the wall clock across a MINUTE or HOUR boundary.
-    now: Date = new Date(),
+    now: Instant = nowInstant(),
   ): Promise<ScopeSpend[]> {
     return this.getSpendForTargetsAcrossTenants(
       [tenantId],
@@ -591,7 +592,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   async getSpendForBudgetsAcrossTenants(
     tenantIds: string[],
     budgets: GatewayBudgetResource[] | BudgetSpendTarget[],
-    now: Date = new Date(),
+    now: Instant = nowInstant(),
   ): Promise<ScopeSpend[]> {
     return this.getSpendForTargetsAcrossTenants(
       tenantIds,
@@ -607,7 +608,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   async getSpendForTargetsAcrossTenants(
     tenantIds: string[],
     targets: BudgetSpendTarget[],
-    now: Date = new Date(),
+    now: Instant = nowInstant(),
   ): Promise<ScopeSpend[]> {
     if (targets.length === 0 || tenantIds.length === 0) return [];
 
@@ -705,7 +706,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     tenantIds: string[];
     window: GatewayBudgetWindow;
     targets: BudgetSpendTarget[];
-    now: Date;
+    now: Instant;
   }): Promise<ScopeSpend[]> {
     const { tenantIds, window, targets, now } = args;
     const scopeFilter = GatewayBudgetClickHouseRepository.rollupScopeFilter(targets);
@@ -732,7 +733,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
           ...GatewayBudgetClickHouseRepository.tenantParams(tenantIds),
           ...scopeFilter.params,
           window: GatewayBudgetClickHouseRepository.windowToClickHouse(window),
-          periodStart: currentPeriodStart(window, now).getTime(),
+          periodStart: currentPeriodStart(window, now).epochMilliseconds,
         },
         format: "JSONEachRow",
       });
@@ -762,10 +763,10 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     budget: GatewayBudgetSpendRecord;
     tenantIds: string[];
     boundaries: BudgetBucketBoundary[];
-    now?: Date;
+    now?: Instant;
   }): Promise<BucketSpend[]> {
     const { budget, tenantIds, boundaries } = args;
-    const now = args.now ?? new Date();
+    const now = args.now ?? nowInstant();
     if (tenantIds.length === 0) return [];
 
     const shape = GatewayBudgetClickHouseRepository.bucketQueryShape({
@@ -797,7 +798,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     client: ClickHouseClientFor;
     shape: BucketQueryShape;
     budget: GatewayBudgetSpendRecord;
-    now: Date;
+    now: Instant;
   }): Promise<Map<string, string>> {
     const { client, shape, budget, now } = args;
     const spentByBucket = new Map<string, string>();
@@ -817,7 +818,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
         `,
         query_params: {
           ...shape.params,
-          periodStart: currentPeriodStart(budget.window, now).getTime(),
+          periodStart: currentPeriodStart(budget.window, now).epochMilliseconds,
         },
         format: "JSONEachRow",
       });
@@ -931,7 +932,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     const params: Record<string, string | number> = {
       budgetId,
       limit,
-      since: Date.now() - RECENT_EVENTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+      since: nowInstant().epochMilliseconds - RECENT_EVENTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
     };
     const boundTenantPlaceholders = tenantIds
       .map((id, i) => {
@@ -1000,7 +1001,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     budget: GatewayBudgetSpendRecord;
     tenantIds: string[];
     boundaries: BudgetBucketBoundary[];
-    now: Date;
+    now: Instant;
   }): BucketQueryShape {
     const { budget, tenantIds, boundaries, now } = args;
     const params: Record<string, string | number | string[]> = {
@@ -1028,7 +1029,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     const movedBoundaryPredicates = boundaries.map((b, i) => {
       params[`fbucket${i}`] = b.bucketScopeId;
       params[`ffloor${i}`] =
-        bucketPeriodFloorMs(budget, b.periodStartedAt, now) ?? b.periodStartedAt.getTime();
+        bucketPeriodFloorMs(budget, b.periodStartedAt, now) ?? b.periodStartedAt.epochMilliseconds;
       return `(ScopeId = {fbucket${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))`;
     });
     params.flooredBuckets = boundaries.map((b) => b.bucketScopeId);
@@ -1218,7 +1219,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
           ? null
           : Number(r.durationMs),
       status: GatewayBudgetClickHouseRepository.ledgerStatusFromCH(r.status),
-      occurredAt: new Date(Number(r.occurredAtMs)),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(Number(r.occurredAtMs)),
     };
   }
 
@@ -1243,7 +1244,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
    */
   private static toSpendTargets(
     input: GatewayBudgetResource[] | BudgetSpendTarget[],
-    now: Date,
+    now: Instant,
   ): BudgetSpendTarget[] {
     if (input.length === 0) return [];
     const first = input[0]!;

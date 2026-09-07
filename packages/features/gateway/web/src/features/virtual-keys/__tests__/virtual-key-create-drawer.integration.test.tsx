@@ -10,6 +10,7 @@
  *
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
+import type { Instant } from "@langwatch/time";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
@@ -526,10 +527,10 @@ describe("given the new-virtual-key drawer", () => {
       await submit();
 
       await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
-      const sent = lastCreateInput().expiresAt as Date;
+      const sent = lastCreateInput().expiresAt as Instant;
       // Within a minute of seven days out: the drawer resolves the period
       // as the person picks it, not as the request is built.
-      expect(Math.abs(sent.getTime() - expected.getTime())).toBeLessThan(60_000);
+      expect(Math.abs(sent.epochMilliseconds - expected.getTime())).toBeLessThan(60_000);
     });
   });
 
@@ -546,7 +547,9 @@ describe("given the new-virtual-key drawer", () => {
       await submit();
 
       await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
-      expect((lastCreateInput().expiresAt as Date).toISOString()).toBe("2030-08-20T23:59:59.999Z");
+      expect((lastCreateInput().expiresAt as Instant).toString({ fractionalSecondDigits: 3 })).toBe(
+        "2030-08-20T23:59:59.999Z",
+      );
     });
 
     it("holds the save until a date is actually typed", async () => {

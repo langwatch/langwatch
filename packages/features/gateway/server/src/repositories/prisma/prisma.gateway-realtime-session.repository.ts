@@ -1,4 +1,5 @@
 import { parseVirtualKeyConfig } from "@langwatch/gateway-contract";
+import type { GatewayRealtimeSession as GatewayRealtimeSessionRow } from "@langwatch/gateway-contract";
 import type {
   GatewayRealtimeSession,
   GatewayRealtimeSessionStatus,
@@ -10,7 +11,7 @@ import {
   type NewGatewayRealtimeSession,
   type ReserveResult,
 } from "../gateway-realtime-session.repository.ts";
-import { toDate, type Instant } from "@langwatch/time";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 /** The client slice realtime sessions are booked and settled through. */
 export type GatewayRealtimeSessionDatabase = Pick<
@@ -118,7 +119,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     return updated.count > 0;
   }
 
-  tryFindByVendorConversationId({
+  async tryFindByVendorConversationId({
     organizationId,
     vendor,
     vendorConversationId,
@@ -126,13 +127,15 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     organizationId: string;
     vendor: string;
     vendorConversationId: string;
-  }): Promise<GatewayRealtimeSession | null> {
-    return this.database.gatewayRealtimeSession.findFirst({
+  }): Promise<GatewayRealtimeSessionRow | null> {
+    const row = await this.database.gatewayRealtimeSession.findFirst({
       where: { organizationId, vendor, vendorConversationId },
     });
+
+    return row ? toRealtimeSessionRow(row) : null;
   }
 
-  tryFindById({
+  async tryFindById({
     organizationId,
     vendor,
     id,
@@ -140,13 +143,15 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     organizationId: string;
     vendor: string;
     id: string;
-  }): Promise<GatewayRealtimeSession | null> {
-    return this.database.gatewayRealtimeSession.findFirst({
+  }): Promise<GatewayRealtimeSessionRow | null> {
+    const row = await this.database.gatewayRealtimeSession.findFirst({
       where: { organizationId, vendor, id },
     });
+
+    return row ? toRealtimeSessionRow(row) : null;
   }
 
-  findOpenSince({
+  async findOpenSince({
     organizationId,
     vendor,
     modelProviderId,
@@ -158,8 +163,8 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     modelProviderId: string;
     since: Instant;
     limit: number;
-  }): Promise<GatewayRealtimeSession[]> {
-    return this.database.gatewayRealtimeSession.findMany({
+  }): Promise<GatewayRealtimeSessionRow[]> {
+    const rows = await this.database.gatewayRealtimeSession.findMany({
       where: {
         organizationId,
         vendor,
@@ -169,9 +174,11 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
       },
       take: limit,
     });
+
+    return rows.map(toRealtimeSessionRow);
   }
 
-  tryFindForReport({
+  async tryFindForReport({
     sessionId,
     projectId,
     virtualKeyId,
@@ -179,10 +186,12 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     sessionId: string;
     projectId: string;
     virtualKeyId: string;
-  }): Promise<GatewayRealtimeSession | null> {
-    return this.database.gatewayRealtimeSession.findFirst({
+  }): Promise<GatewayRealtimeSessionRow | null> {
+    const row = await this.database.gatewayRealtimeSession.findFirst({
       where: { id: sessionId, projectId, virtualKeyId },
     });
+
+    return row ? toRealtimeSessionRow(row) : null;
   }
 
   async close({
@@ -235,4 +244,15 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
 
     return count;
   }
+}
+
+/** The one place a stored session's Dates become instants. */
+function toRealtimeSessionRow(row: GatewayRealtimeSession): GatewayRealtimeSessionRow {
+  return {
+    ...row,
+    mintedAt: fromDate(row.mintedAt),
+    closedAt: row.closedAt ? fromDate(row.closedAt) : null,
+    createdAt: fromDate(row.createdAt),
+    updatedAt: fromDate(row.updatedAt),
+  };
 }

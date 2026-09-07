@@ -2,6 +2,32 @@
  * @vitest-environment node
  * Real Postgres + real ClickHouse. Debits used to be rounded to micro-USD before summing rather than summed then rounded, so totals drifted with request count. Spec: specs/ai-gateway/budgets.feature
  */
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
+
+/** A stored budget row, as the spend reads take it: the same columns, on instants. */
+function toBudgetRow<
+  Row extends {
+    currentPeriodStartedAt: Date;
+    resetsAt: Date;
+    lastResetAt: Date | null;
+    cycleAnchorAt: Date | null;
+    archivedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+>(row: Row) {
+  return {
+    ...row,
+    currentPeriodStartedAt: fromDate(row.currentPeriodStartedAt),
+    resetsAt: fromDate(row.resetsAt),
+    lastResetAt: row.lastResetAt ? fromDate(row.lastResetAt) : null,
+    cycleAnchorAt: row.cycleAnchorAt ? fromDate(row.cycleAnchorAt) : null,
+    archivedAt: row.archivedAt ? fromDate(row.archivedAt) : null,
+    createdAt: fromDate(row.createdAt),
+    updatedAt: fromDate(row.updatedAt),
+  };
+}
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -101,7 +127,7 @@ async function serveRequest(options: {
       model: "gpt-5-mini",
       durationMs: 120,
       status: "SUCCESS",
-      occurredAt: new Date(),
+      occurredAt: nowInstant(),
     },
   ]);
 }
@@ -139,7 +165,7 @@ async function createBudget(input: {
       limitUsd: LOOSE_LIMIT_USD,
       onBreach: "BLOCK",
       createdById: USER_ID,
-      resetsAt: new Date(Date.now() + 86_400_000),
+      resetsAt: toDate(nowInstant().add({ milliseconds: 86_400_000 })),
     },
   });
 }
@@ -147,7 +173,7 @@ async function createBudget(input: {
 /** What the repository says one budget has spent, in both units. */
 async function spendFor(budgetId: string): Promise<{ spentNanoUsd: number; spentUsd: string }> {
   const budget = await prisma.gatewayBudget.findUniqueOrThrow({ where: { id: budgetId } });
-  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants([PROJECT_ID], [budget]);
+  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants([PROJECT_ID], [toBudgetRow(budget)]);
   if (!spend) throw new Error(`no spend row for ${budgetId}`);
   return { spentNanoUsd: spend.spentNanoUsd, spentUsd: spend.spentUsd };
 }

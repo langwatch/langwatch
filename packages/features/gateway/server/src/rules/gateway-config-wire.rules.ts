@@ -1,3 +1,4 @@
+import { type Instant, toDate } from "@langwatch/time";
 /**
  * The wire shapes the Go data plane reads, and the pure mapping from control-plane rows onto them.
  * Nothing here reads a store: a materialisation gathers the rows, and this decides what each one
@@ -387,7 +388,7 @@ export function buildProviderConfig(mp: ModelProvider): Record<string, unknown> 
     },
     health: {
       status: mp.healthStatus.toLowerCase(),
-      circuit_opened_at: mp.circuitOpenedAt?.toISOString() ?? null,
+      circuit_opened_at: mp.circuitOpenedAt ? toDate(mp.circuitOpenedAt).toISOString() : null,
     },
     ...(mp.extraHeaders ? { extra_headers: mp.extraHeaders as Record<string, unknown> } : {}),
     ...gatewayExtras,
@@ -441,8 +442,8 @@ export function providerExclusionWire(mp: ModelProvider): ProviderExclusionWire 
  * if never. Milliseconds would put the date tens of thousands of years out and lift the expiry cap
  * off the key.
  */
-export function expiresAtWire(expiresAt: Date | null): number | null {
-  return expiresAt ? Math.floor(expiresAt.getTime() / 1000) : null;
+export function expiresAtWire(expiresAt: Instant | null): number | null {
+  return expiresAt ? Math.floor(expiresAt.epochMilliseconds / 1000) : null;
 }
 
 /**
@@ -506,7 +507,7 @@ export function budgetToWire(
     spent_micro_usd: budgetSpentMicroUSD(b, spendByBudgetId),
     // The boundary this budget is actually heading for, not the stored
     // column, which only moves at create and at an explicit reset.
-    resets_at: Math.floor(effectiveBudgetPeriod(b).resetsAt.getTime() / 1000),
+    resets_at: Math.floor(effectiveBudgetPeriod(b).resetsAt.epochMilliseconds / 1000),
     on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
   };
 }

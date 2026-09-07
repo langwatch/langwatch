@@ -1,6 +1,7 @@
 /**
  * Which period a budget is in, and the lower bound a spend read for it must honor.
  */
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 import type { GatewayBudgetWindow } from "./gateway.budget.ts";
 import { GatewayWindow } from "./gateway.budget-window.ts";
 
@@ -12,33 +13,33 @@ import { GatewayWindow } from "./gateway.budget-window.ts";
 export function budgetPeriodFloorMs(
   budget: {
     window: GatewayBudgetWindow;
-    currentPeriodStartedAt: Date;
-    lastResetAt: Date | null;
-    cycleAnchorAt: Date | null;
+    currentPeriodStartedAt: Instant;
+    lastResetAt: Instant | null;
+    cycleAnchorAt: Instant | null;
   },
-  now: Date = new Date(),
+  now: Instant = nowInstant(),
 ): number | undefined {
   if (budget.window === "MANUAL") {
-    return budget.currentPeriodStartedAt.getTime();
+    return budget.currentPeriodStartedAt.epochMilliseconds;
   }
   if (budget.cycleAnchorAt && GatewayWindow.isCyclicWindow(budget.window)) {
     const anchored = GatewayWindow.anchoredPeriodStart({
       window: budget.window,
       anchorAt: budget.cycleAnchorAt,
       now,
-    }).getTime();
+    }).epochMilliseconds;
     // A reset forgives the spend so far but never re-phases the cycle: the
     // clamp holds only until this period ends, and the next one starts on
     // the anchor's schedule as if the reset had not happened. Same shape as
     // the calendar clamp below, with the anchored boundary in place of the
     // calendar one.
     return budget.lastResetAt
-      ? Math.max(anchored, budget.currentPeriodStartedAt.getTime())
+      ? Math.max(anchored, budget.currentPeriodStartedAt.epochMilliseconds)
       : anchored;
   }
   if (!budget.lastResetAt) return undefined;
-  const boundary = budget.currentPeriodStartedAt.getTime();
-  return boundary > currentPeriodStart(budget.window, now).getTime() ? boundary : undefined;
+  const boundary = budget.currentPeriodStartedAt.epochMilliseconds;
+  return boundary > currentPeriodStart(budget.window, now).epochMilliseconds ? boundary : undefined;
 }
 
 /**
@@ -49,13 +50,13 @@ export function budgetPeriodFloorMs(
 export function effectiveBudgetPeriod(
   budget: {
     window: GatewayBudgetWindow;
-    currentPeriodStartedAt: Date;
-    resetsAt: Date;
-    lastResetAt: Date | null;
-    cycleAnchorAt: Date | null;
+    currentPeriodStartedAt: Instant;
+    resetsAt: Instant;
+    lastResetAt: Instant | null;
+    cycleAnchorAt: Instant | null;
   },
-  now: Date = new Date(),
-): { currentPeriodStartedAt: Date; resetsAt: Date } {
+  now: Instant = nowInstant(),
+): { currentPeriodStartedAt: Instant; resetsAt: Instant } {
   if (!GatewayWindow.isCyclicWindow(budget.window)) {
     return {
       currentPeriodStartedAt: budget.currentPeriodStartedAt,
@@ -65,7 +66,9 @@ export function effectiveBudgetPeriod(
   const floorMs = budgetPeriodFloorMs(budget, now);
   return {
     currentPeriodStartedAt:
-      floorMs === undefined ? currentPeriodStart(budget.window, now) : new Date(floorMs),
+      floorMs === undefined
+        ? currentPeriodStart(budget.window, now)
+        : Temporal.Instant.fromEpochMilliseconds(floorMs),
     resetsAt: GatewayWindow.nextBoundaryFor({ budget, now }),
   };
 }
@@ -77,16 +80,17 @@ export function effectiveBudgetPeriod(
 export function bucketPeriodFloorMs(
   budget: {
     window: GatewayBudgetWindow;
-    currentPeriodStartedAt: Date;
-    lastResetAt: Date | null;
-    cycleAnchorAt: Date | null;
+    currentPeriodStartedAt: Instant;
+    lastResetAt: Instant | null;
+    cycleAnchorAt: Instant | null;
   },
-  boundaryPeriodStartedAt: Date | null | undefined,
-  now: Date = new Date(),
+  boundaryPeriodStartedAt: Instant | null | undefined,
+  now: Instant = nowInstant(),
 ): number | undefined {
-  const candidates = [budgetPeriodFloorMs(budget, now), boundaryPeriodStartedAt?.getTime()].filter(
-    (n): n is number => typeof n === "number",
-  );
+  const candidates = [
+    budgetPeriodFloorMs(budget, now),
+    boundaryPeriodStartedAt?.epochMilliseconds,
+  ].filter((n): n is number => typeof n === "number");
   return candidates.length > 0 ? Math.max(...candidates) : undefined;
 }
 
@@ -95,35 +99,32 @@ export function bucketPeriodFloorMs(
  * ever returns a row when this lands on exactly the PeriodStart the materialised view bucketed
  * the debit into.
  */
-export function currentPeriodStart(window: GatewayBudgetWindow, now: Date): Date {
-  const d = new Date(now.getTime());
+export function currentPeriodStart(window: GatewayBudgetWindow, now: Instant): Instant {
+  const clock = now
+    .toZonedDateTimeISO("UTC")
+    .with({ millisecond: 0, microsecond: 0, nanosecond: 0 });
   if (window === "MINUTE") {
-    d.setUTCSeconds(0, 0);
-    return d;
+    return clock.with({ second: 0 }).toInstant();
   }
   if (window === "HOUR") {
-    d.setUTCMinutes(0, 0, 0);
-    return d;
+    return clock.with({ minute: 0, second: 0 }).toInstant();
   }
   if (window === "DAY") {
-    d.setUTCHours(0, 0, 0, 0);
-    return d;
+    return clock.startOfDay().toInstant();
   }
   if (window === "WEEK") {
-    d.setUTCHours(0, 0, 0, 0);
-    const day = d.getUTCDay();
     // ISO week start (Monday). Matches ClickHouse toStartOfWeek(t, 1).
+    const day = clock.dayOfWeek % 7;
     const delta = day === 0 ? 6 : day - 1;
-    d.setUTCDate(d.getUTCDate() - delta);
-    return d;
+    return clock.startOfDay().subtract({ days: delta }).toInstant();
   }
   if (window === "MONTH") {
-    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+    return clock.startOfDay().with({ day: 1 }).toInstant();
   }
   // TOTAL and MANUAL: one lifetime bucket, keyed by the epoch sentinel
   // (the MV's multiIf falls through to epoch for both). MANUAL is never
   // read through the PeriodStart fast path (budgetPeriodFloorMs always
   // floors it onto the raw-events read); the sentinel only keys where its
   // debits land in the rollup.
-  return new Date(0);
+  return Temporal.Instant.fromEpochMilliseconds(0);
 }

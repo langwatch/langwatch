@@ -12,6 +12,7 @@
  *
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
+import type { Instant } from "@langwatch/time";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
@@ -395,7 +396,9 @@ describe("given the edit drawer for an existing key", () => {
       await userEvent.clear(dateInput);
       await userEvent.type(dateInput, "2030-09-01");
       await save();
-      expect((lastUpdateInput().expiresAt as Date).toISOString()).toBe("2030-09-01T23:59:59.999Z");
+      expect((lastUpdateInput().expiresAt as Instant).toString({ fractionalSecondDigits: 3 })).toBe(
+        "2030-09-01T23:59:59.999Z",
+      );
     });
   });
 

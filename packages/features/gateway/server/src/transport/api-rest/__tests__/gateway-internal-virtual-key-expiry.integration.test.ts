@@ -3,6 +3,7 @@
  * Real Postgres + real internal auth route. Expiry date read at resolve time, own rejection code, stored stops still win over it. Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
 
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -167,7 +168,7 @@ describe.skipIf(!databaseUrl)("virtual key expiry (real PG + internal route)", (
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
   }, 60_000);
 
-  async function mintKey({ name, expiresAt }: { name: string; expiresAt?: Date }) {
+  async function mintKey({ name, expiresAt }: { name: string; expiresAt?: Instant }) {
     return service.create({
       organizationId: ORG_ID,
       name: `${name}-${nanoid(6)}`,
@@ -179,15 +180,18 @@ describe.skipIf(!databaseUrl)("virtual key expiry (real PG + internal route)", (
 
   /** Writes a date the service would refuse, which is how a key that has
    *  already run out is set up without waiting for one to. */
-  async function forceExpiry(id: string, expiresAt: Date | null) {
-    await prisma.virtualKey.update({ where: { id }, data: { expiresAt } });
+  async function forceExpiry(id: string, expiresAt: Instant | null) {
+    await prisma.virtualKey.update({
+      where: { id },
+      data: { expiresAt: expiresAt ? toDate(expiresAt) : null },
+    });
   }
 
   describe("when the date has already passed", () => {
     /** @scenario "An expired key is rejected with its own error code" */
     it("rejects an expired key with the expiry code, not revoked or disabled", async () => {
       const { virtualKey, secret } = await mintKey({ name: "ran-out" });
-      await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
+      await forceExpiry(virtualKey.id, nowInstant().subtract({ milliseconds: 60_000 }));
 
       expect(await resolveCode(secret)).toEqual({
         status: 403,
@@ -201,7 +205,7 @@ describe.skipIf(!databaseUrl)("virtual key expiry (real PG + internal route)", (
     it("resolves a key whose date has not arrived yet", async () => {
       const { secret } = await mintKey({
         name: "still-good",
-        expiresAt: new Date(Date.now() + DAY_MS),
+        expiresAt: nowInstant().add({ milliseconds: DAY_MS }),
       });
 
       const res = await app.fetch(signedResolveKey(secret));
@@ -215,14 +219,14 @@ describe.skipIf(!databaseUrl)("virtual key expiry (real PG + internal route)", (
     /** @scenario "Extending the date puts an expired key back in service" */
     it("serves the same secret again once the date is moved forward", async () => {
       const { virtualKey, secret } = await mintKey({ name: "extend-me" });
-      await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
+      await forceExpiry(virtualKey.id, nowInstant().subtract({ milliseconds: 60_000 }));
       expect((await resolveCode(secret)).code).toBe("virtual_key_expired");
 
       await service.update({
         id: virtualKey.id,
         organizationId: ORG_ID,
         actorUserId: USER_ID,
-        expiresAt: new Date(Date.now() + DAY_MS),
+        expiresAt: nowInstant().add({ milliseconds: DAY_MS }),
       });
 
       expect((await app.fetch(signedResolveKey(secret))).status).toBe(200);
@@ -234,9 +238,9 @@ describe.skipIf(!databaseUrl)("virtual key expiry (real PG + internal route)", (
     it("serves forever once the date is cleared", async () => {
       const { virtualKey, secret } = await mintKey({
         name: "clear-me",
-        expiresAt: new Date(Date.now() + DAY_MS),
+        expiresAt: nowInstant().add({ milliseconds: DAY_MS }),
       });
-      await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
+      await forceExpiry(virtualKey.id, nowInstant().subtract({ milliseconds: 60_000 }));
       expect((await resolveCode(secret)).code).toBe("virtual_key_expired");
 
       await service.update({
@@ -258,7 +262,7 @@ describe.skipIf(!databaseUrl)("virtual key expiry (real PG + internal route)", (
     /** @scenario "Expiry leaves disable and revoke exactly as they were" */
     it("keeps the stored status, and reports the stored stop first", async () => {
       const { virtualKey, secret } = await mintKey({ name: "still-active" });
-      await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
+      await forceExpiry(virtualKey.id, nowInstant().subtract({ milliseconds: 60_000 }));
 
       const expired = await prisma.virtualKey.findUniqueOrThrow({
         where: { id: virtualKey.id },

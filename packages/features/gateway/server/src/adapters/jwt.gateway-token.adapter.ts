@@ -1,3 +1,4 @@
+import { type Instant, nowInstant } from "@langwatch/time";
 /**
  * Short-lived JWT that the control-plane issues after resolving a VK and
  * the Go gateway verifies on every public request.
@@ -36,10 +37,10 @@ export type GatewayJwtClaims = {
 };
 
 /** What a caller hands the signer: the identity claims, plus the key's own
- *  expiration date as a `Date`. The `vk_expires_at` claim is derived here so
+ *  expiration as an instant. The `vk_expires_at` claim is derived here so
  *  one place decides both the claim and the token lifetime it bounds. */
 export type GatewayJwtSubject = Omit<GatewayJwtClaims, "vk_expires_at"> & {
-  notAfter?: Date | null;
+  notAfter?: Instant | null;
 };
 
 /**
@@ -72,8 +73,8 @@ export class GatewayJwtAdapter {
     expiresAt: number;
   } {
     const secret = this.secret;
-    const issuedAt = Math.floor(Date.now() / 1000);
-    const keyExpiresAt = notAfter ? Math.floor(notAfter.getTime() / 1000) : null;
+    const issuedAt = Math.floor(nowInstant().epochMilliseconds / 1000);
+    const keyExpiresAt = notAfter ? Math.floor(notAfter.epochMilliseconds / 1000) : null;
     const ttlExpiresAt = issuedAt + TTL_SECONDS;
     const expiresAt = Math.max(
       issuedAt + 1,

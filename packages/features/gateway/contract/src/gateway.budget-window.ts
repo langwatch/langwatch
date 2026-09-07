@@ -2,7 +2,10 @@
  * Budget window math. Pure functions — no DB, no I/O. Given a window type and an anchor time,
  * compute the next reset instant. For now windows are computed in UTC.
  */
+import { type Instant, nowInstant, Temporal, toEpochMs, type ZonedDateTime } from "@langwatch/time";
 import type { GatewayBudgetWindow } from "./gateway.budget.ts";
+
+const UTC = "UTC";
 
 /**
  * The windows that roll on their own. TOTAL and MANUAL are the two that do
@@ -30,46 +33,55 @@ const FIXED_CYCLE_MS: Record<Exclude<CyclicWindow, "MONTH">, number> = {
   WEEK: 604_800_000,
 };
 
+/** The far-future sentinel TOTAL and MANUAL reset at: they never roll. */
+const NEVER_RESETS_AT = Temporal.PlainDateTime.from({ year: 9999, month: 12, day: 31 })
+  .toZonedDateTime(UTC)
+  .toInstant();
+
+/** UTC wall clock for an instant. Every window boundary below is computed on it. */
+function utcClock(at: Instant) {
+  return at.toZonedDateTimeISO(UTC);
+}
+
+/** `getUTCDay()`'s numbering — Sunday 0 through Saturday 6 — off a UTC clock. */
+function utcDayOfWeek(clock: ZonedDateTime): number {
+  return clock.dayOfWeek % 7;
+}
+
 /**
  * When a budget's window starts, ends and resets. Two families of answer live here and must not
  * be confused: the calendar ones, where a MONTH budget rolls on the first, and the anchored
  * ones, where it rolls on the phase the budget was given.
  */
 export class GatewayWindow {
-  private static daysInUtcMonth({
-    year,
-    monthIndex,
-  }: {
-    year: number;
-    monthIndex: number;
-  }): number {
-    // Day 0 of the following month is the last day of this one.
-    return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
-  }
-
   /**
    * The start of the nth monthly cycle after `anchorAt`, clamped into months too short to hold
    * the anchor's day.
    */
-  private static monthlyCycleStart({ anchorAt, cycles }: { anchorAt: Date; cycles: number }): Date {
-    const anchorDay = anchorAt.getUTCDate();
-    // Date.UTC normalises month overflow and underflow into the year.
-    const normalised = new Date(
-      Date.UTC(anchorAt.getUTCFullYear(), anchorAt.getUTCMonth() + cycles, 1),
-    );
-    const year = normalised.getUTCFullYear();
-    const monthIndex = normalised.getUTCMonth();
-    return new Date(
-      Date.UTC(
-        year,
-        monthIndex,
-        Math.min(anchorDay, GatewayWindow.daysInUtcMonth({ year, monthIndex })),
-        anchorAt.getUTCHours(),
-        anchorAt.getUTCMinutes(),
-        anchorAt.getUTCSeconds(),
-        anchorAt.getUTCMilliseconds(),
-      ),
-    );
+  private static monthlyCycleStart({
+    anchorAt,
+    cycles,
+  }: {
+    anchorAt: Instant;
+    cycles: number;
+  }): Instant {
+    const anchor = utcClock(anchorAt);
+    // PlainYearMonth normalises month overflow and underflow into the year.
+    const month = Temporal.PlainYearMonth.from({
+      year: anchor.year,
+      month: anchor.month,
+    }).add({ months: cycles });
+    return Temporal.PlainDateTime.from({
+      year: month.year,
+      month: month.month,
+      day: Math.min(anchor.day, month.daysInMonth),
+      hour: anchor.hour,
+      minute: anchor.minute,
+      second: anchor.second,
+      millisecond: anchor.millisecond,
+    })
+      .toZonedDateTime(UTC)
+      .toInstant();
   }
 
   /**
@@ -77,8 +89,8 @@ export class GatewayWindow {
    * a read with no `from` reports the month to date, and both doors into the gateway take it
    * from here so the default cannot be phrased two ways.
    */
-  static startOfCurrentMonthUTC(now: Date = new Date()): Date {
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  static startOfCurrentMonthUTC(now: Instant = nowInstant()): Instant {
+    return utcClock(now).with({ day: 1 }).startOfDay().toInstant();
   }
 
   static isCyclicWindow(window: GatewayBudgetWindow): window is CyclicWindow {
@@ -92,19 +104,22 @@ export class GatewayWindow {
   static anchoredPeriodStart({
     window,
     anchorAt,
-    now = new Date(),
+    now = nowInstant(),
   }: {
     window: CyclicWindow;
-    anchorAt: Date;
-    now?: Date;
-  }): Date {
-    const anchorMs = anchorAt.getTime();
-    if (now.getTime() < anchorMs) return new Date(anchorMs);
+    anchorAt: Instant;
+    now?: Instant;
+  }): Instant {
+    const anchorMs = anchorAt.epochMilliseconds;
+    const nowMs = now.epochMilliseconds;
+    if (nowMs < anchorMs) return Temporal.Instant.fromEpochMilliseconds(anchorMs);
 
     if (window !== "MONTH") {
       const length = FIXED_CYCLE_MS[window];
-      const elapsed = now.getTime() - anchorMs;
-      return new Date(anchorMs + Math.floor(elapsed / length) * length);
+      const elapsed = nowMs - anchorMs;
+      return Temporal.Instant.fromEpochMilliseconds(
+        anchorMs + Math.floor(elapsed / length) * length,
+      );
     }
 
     // Months are not a fixed length, so count them as calendar months and
@@ -112,13 +127,13 @@ export class GatewayWindow {
     // arrived yet (anchored on the 17th, now the 3rd: still last month's
     // period). One step is always enough, because the previous cycle starts
     // in the previous month and so before every instant in this one.
-    let cycles =
-      (now.getUTCFullYear() - anchorAt.getUTCFullYear()) * 12 +
-      (now.getUTCMonth() - anchorAt.getUTCMonth());
-    if (GatewayWindow.monthlyCycleStart({ anchorAt, cycles }).getTime() > now.getTime()) {
+    const anchor = utcClock(anchorAt);
+    const clock = utcClock(now);
+    let cycles = (clock.year - anchor.year) * 12 + (clock.month - anchor.month);
+    if (GatewayWindow.monthlyCycleStart({ anchorAt, cycles }).epochMilliseconds > nowMs) {
       cycles -= 1;
     }
-    if (cycles < 0) return new Date(anchorMs);
+    if (cycles < 0) return Temporal.Instant.fromEpochMilliseconds(anchorMs);
     return GatewayWindow.monthlyCycleStart({ anchorAt, cycles });
   }
 
@@ -129,79 +144,51 @@ export class GatewayWindow {
   static nextAnchoredResetAt({
     window,
     anchorAt,
-    now = new Date(),
+    now = nowInstant(),
   }: {
     window: CyclicWindow;
-    anchorAt: Date;
-    now?: Date;
-  }): Date {
-    const anchorMs = anchorAt.getTime();
-    if (now.getTime() < anchorMs) return new Date(anchorMs);
+    anchorAt: Instant;
+    now?: Instant;
+  }): Instant {
+    const anchorMs = anchorAt.epochMilliseconds;
+    if (now.epochMilliseconds < anchorMs) return Temporal.Instant.fromEpochMilliseconds(anchorMs);
 
     if (window !== "MONTH") {
-      return new Date(
-        GatewayWindow.anchoredPeriodStart({ window, anchorAt, now }).getTime() +
+      return Temporal.Instant.fromEpochMilliseconds(
+        GatewayWindow.anchoredPeriodStart({ window, anchorAt, now }).epochMilliseconds +
           FIXED_CYCLE_MS[window],
       );
     }
 
-    const start = GatewayWindow.anchoredPeriodStart({ window, anchorAt, now });
-    const elapsedMonths =
-      (start.getUTCFullYear() - anchorAt.getUTCFullYear()) * 12 +
-      (start.getUTCMonth() - anchorAt.getUTCMonth());
+    const anchor = utcClock(anchorAt);
+    const start = utcClock(GatewayWindow.anchoredPeriodStart({ window, anchorAt, now }));
+    const elapsedMonths = (start.year - anchor.year) * 12 + (start.month - anchor.month);
     return GatewayWindow.monthlyCycleStart({ anchorAt, cycles: elapsedMonths + 1 });
   }
 
-  static nextResetAt(window: GatewayBudgetWindow, now: Date = new Date()): Date {
-    const d = new Date(now);
-    d.setUTCMilliseconds(0);
+  static nextResetAt(window: GatewayBudgetWindow, now: Instant = nowInstant()): Instant {
+    const clock = utcClock(now).with({ millisecond: 0, microsecond: 0, nanosecond: 0 });
 
     switch (window) {
-      case "MINUTE": {
-        d.setUTCSeconds(0);
-        d.setUTCMinutes(d.getUTCMinutes() + 1);
-        return d;
-      }
-      case "HOUR": {
-        d.setUTCSeconds(0);
-        d.setUTCMinutes(0);
-        d.setUTCHours(d.getUTCHours() + 1);
-        return d;
-      }
-      case "DAY": {
-        d.setUTCSeconds(0);
-        d.setUTCMinutes(0);
-        d.setUTCHours(0);
-        d.setUTCDate(d.getUTCDate() + 1);
-        return d;
-      }
+      case "MINUTE":
+        return clock.with({ second: 0 }).add({ minutes: 1 }).toInstant();
+      case "HOUR":
+        return clock.with({ minute: 0, second: 0 }).add({ hours: 1 }).toInstant();
+      case "DAY":
+        return clock.startOfDay().add({ days: 1 }).toInstant();
       case "WEEK": {
-        // Reset on Monday 00:00 UTC. getUTCDay(): Sun=0, Mon=1, ..., Sat=6.
-        d.setUTCSeconds(0);
-        d.setUTCMinutes(0);
-        d.setUTCHours(0);
-        const day = d.getUTCDay();
+        // Reset on Monday 00:00 UTC. Sun=0, Mon=1, ..., Sat=6.
+        const day = utcDayOfWeek(clock);
         const daysUntilNextMonday = day === 1 ? 7 : (8 - day) % 7;
-        d.setUTCDate(d.getUTCDate() + daysUntilNextMonday);
-        return d;
+        return clock.startOfDay().add({ days: daysUntilNextMonday }).toInstant();
       }
-      case "MONTH": {
-        d.setUTCSeconds(0);
-        d.setUTCMinutes(0);
-        d.setUTCHours(0);
-        d.setUTCDate(1);
-        d.setUTCMonth(d.getUTCMonth() + 1);
-        return d;
-      }
-      case "TOTAL": {
-        // Sentinel — never resets. Use far-future to keep sort orders sensible.
-        return new Date(Date.UTC(9999, 11, 31));
-      }
-      case "MANUAL": {
-        // The boundary moves only through an explicit reset; until then the
-        // window is open-ended. Same far-future sentinel as TOTAL.
-        return new Date(Date.UTC(9999, 11, 31));
-      }
+      case "MONTH":
+        return clock.startOfDay().with({ day: 1 }).add({ months: 1 }).toInstant();
+      case "TOTAL":
+      case "MANUAL":
+        // Neither rolls: TOTAL never resets, MANUAL moves only through an
+        // explicit reset. The far-future sentinel keeps sort orders sensible.
+        return NEVER_RESETS_AT;
     }
   }
 
@@ -212,11 +199,11 @@ export class GatewayWindow {
    */
   static nextBoundaryFor({
     budget,
-    now = new Date(),
+    now = nowInstant(),
   }: {
-    budget: { window: GatewayBudgetWindow; cycleAnchorAt: Date | null };
-    now?: Date;
-  }): Date {
+    budget: { window: GatewayBudgetWindow; cycleAnchorAt: Instant | null };
+    now?: Instant;
+  }): Instant {
     if (budget.cycleAnchorAt && GatewayWindow.isCyclicWindow(budget.window)) {
       return GatewayWindow.nextAnchoredResetAt({
         window: budget.window,
@@ -229,11 +216,11 @@ export class GatewayWindow {
 
   static shouldResetBudget(
     window: GatewayBudgetWindow,
-    resetsAt: Date | string,
-    now: Date = new Date(),
+    resetsAt: Instant | string,
+    now: Instant = nowInstant(),
   ): boolean {
     if (window === "TOTAL" || window === "MANUAL") return false;
-    const resetTs = typeof resetsAt === "string" ? new Date(resetsAt) : resetsAt;
-    return now.getTime() >= resetTs.getTime();
+    const resetMs = typeof resetsAt === "string" ? toEpochMs(resetsAt) : resetsAt.epochMilliseconds;
+    return now.epochMilliseconds >= resetMs;
   }
 }

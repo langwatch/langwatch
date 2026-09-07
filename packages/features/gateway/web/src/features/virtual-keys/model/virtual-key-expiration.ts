@@ -13,7 +13,9 @@
  * its neighbour.
  */
 
+import { type Instant, Temporal, nowInstant, toDate, toEpochMs } from "@langwatch/time";
 import { readHandledError } from "../../../model/handled-error.ts";
+import { readableDate } from "../../../model/readable-date.ts";
 
 /** The option a select is currently on. "" is Never, "custom" is a date. */
 export type VirtualKeyExpirationPreset = "" | "1" | "7" | "30" | "180" | "365" | "custom";
@@ -42,52 +44,51 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export function resolveExpiresAt({
   preset,
   customDate,
-  now = new Date(),
+  now = nowInstant(),
 }: {
   preset: VirtualKeyExpirationPreset;
   /** A `yyyy-mm-dd` value straight off an `<input type="date">`. */
   customDate?: string;
-  now?: Date;
-}): Date | null {
+  now?: Instant;
+}): Instant | null {
   if (preset === "") return null;
   if (preset === "custom") return endOfDayUtc(customDate);
   const days = Number.parseInt(preset, 10);
   if (!Number.isFinite(days) || days <= 0) return null;
-  return new Date(now.getTime() + days * MS_PER_DAY);
+  return now.add({ milliseconds: days * MS_PER_DAY });
 }
 
 /**
  * The last millisecond of a `yyyy-mm-dd` day, UTC.
  *
- * Built from the split parts rather than `new Date(value)`: parsing the
- * string lands on midnight, so a key set to expire "today" would be born
- * expired, and the whole day the person picked would be gone.
+ * Built from the split parts rather than parsing the string: a parse lands
+ * on midnight, so a key set to expire "today" would be born expired, and
+ * the whole day the person picked would be gone.
  *
- * A day that does not exist is refused rather than moved. `Date.UTC` rolls
- * `2026-02-31` forward into March without saying so, and a key that expires
- * three days after the date on the form is worse than one that refuses to
- * be saved.
+ * A day that does not exist is refused rather than moved. A calendar that
+ * rolls `2026-02-31` forward into March would save a key that expires three
+ * days after the date on the form, which is worse than one that refuses.
  */
-function endOfDayUtc(value: string | undefined): Date | null {
+function endOfDayUtc(value: string | undefined): Instant | null {
   if (!value) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
   const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  const date = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
-  if (Number.isNaN(date.getTime())) return null;
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
+  try {
+    return Temporal.PlainDateTime.from(
+      { year, month, day, hour: 23, minute: 59, second: 59, millisecond: 999 },
+      { overflow: "reject" },
+    )
+      .toZonedDateTime("UTC")
+      .toInstant();
+  } catch {
     return null;
   }
-  return date;
 }
 
 /** The `yyyy-mm-dd` an `<input type="date">` shows for a stored instant. */
-export function dateInputValue(date: Date): string {
-  return date.toISOString().slice(0, 10);
+export function dateInputValue(at: Instant): string {
+  return toDate(at).toISOString().slice(0, 10);
 }
 
 /**
@@ -97,8 +98,8 @@ export function dateInputValue(date: Date): string {
  * expires at the end of today is legal by the server's rule, but a date
  * picker whose smallest useful answer is "in a few hours" reads as broken.
  */
-export function earliestCustomDate(now: Date = new Date()): string {
-  return dateInputValue(new Date(now.getTime() + MS_PER_DAY));
+export function earliestCustomDate(now: Instant = nowInstant()): string {
+  return dateInputValue(now.add({ milliseconds: MS_PER_DAY }));
 }
 
 /**
@@ -107,8 +108,8 @@ export function earliestCustomDate(now: Date = new Date()): string {
  * UTC, like everything else here, so the sentence names the day that was
  * picked rather than the one the reader's timezone rolls it into.
  */
-export function formatExpiry(date: Date): string {
-  return date.toLocaleDateString("en-US", {
+export function formatExpiry(at: Instant): string {
+  return readableDate(at).toLocaleDateString("en-US", {
     weekday: "short",
     year: "numeric",
     month: "short",
@@ -124,14 +125,18 @@ export function formatExpiry(date: Date): string {
  * meant seven days from the moment it was saved and reopening the drawer
  * a week later would silently re-arm it.
  */
-export function expirationStateFromStored(expiresAt: string | Date | null): {
+export function expirationStateFromStored(expiresAt: string | Instant | null): {
   preset: VirtualKeyExpirationPreset;
   customDate: string;
 } {
   if (!expiresAt) return { preset: "", customDate: "" };
-  const date = expiresAt instanceof Date ? expiresAt : new Date(expiresAt);
-  if (Number.isNaN(date.getTime())) return { preset: "", customDate: "" };
-  return { preset: "custom", customDate: dateInputValue(date) };
+  const epochMs =
+    typeof expiresAt === "string" ? toEpochMs(expiresAt) : expiresAt.epochMilliseconds;
+  if (Number.isNaN(epochMs)) return { preset: "", customDate: "" };
+  return {
+    preset: "custom",
+    customDate: dateInputValue(Temporal.Instant.fromEpochMilliseconds(epochMs)),
+  };
 }
 
 /**
@@ -145,7 +150,7 @@ export function expiryIncompleteReason({
   expiresAt,
 }: {
   preset: VirtualKeyExpirationPreset;
-  expiresAt: Date | null;
+  expiresAt: Instant | null;
 }): string | null {
   if (preset === "custom" && !expiresAt) {
     return "Pick the date this key expires, or choose Never.";
@@ -181,11 +186,12 @@ export function expiryFieldErrorFrom(error: unknown): string | null {
  * decide the precedence; this answers the one question.
  */
 export function isExpired(
-  expiresAt: string | Date | null | undefined,
-  now: Date = new Date(),
+  expiresAt: string | Instant | null | undefined,
+  now: Instant = nowInstant(),
 ): boolean {
   if (!expiresAt) return false;
-  const date = expiresAt instanceof Date ? expiresAt : new Date(expiresAt);
-  if (Number.isNaN(date.getTime())) return false;
-  return date.getTime() <= now.getTime();
+  const epochMs =
+    typeof expiresAt === "string" ? toEpochMs(expiresAt) : expiresAt.epochMilliseconds;
+  if (Number.isNaN(epochMs)) return false;
+  return epochMs <= now.epochMilliseconds;
 }

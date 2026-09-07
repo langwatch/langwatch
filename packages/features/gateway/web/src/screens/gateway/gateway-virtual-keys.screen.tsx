@@ -1,3 +1,5 @@
+import { readableDate } from "../../model/readable-date.ts";
+import { toEpochMs } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -486,9 +488,9 @@ function VirtualKeysPage() {
                             </Table.Cell>
                             <Table.Cell>
                               {vk.lastUsedAt ? (
-                                <Tooltip content={new Date(vk.lastUsedAt).toLocaleString()}>
+                                <Tooltip content={readableDate(vk.lastUsedAt).toLocaleString()}>
                                   <Text fontSize="sm">
-                                    {formatTimeAgo(new Date(vk.lastUsedAt).getTime())}
+                                    {formatTimeAgo(toEpochMs(vk.lastUsedAt))}
                                   </Text>
                                 </Tooltip>
                               ) : (

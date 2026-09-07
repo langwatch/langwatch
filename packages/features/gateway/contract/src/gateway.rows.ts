@@ -3,6 +3,7 @@
  * port, service or transport names the generated client. Each mirrors
  * `packages/prisma-client/prisma/schema.prisma` and moves with it.
  */
+import type { Instant } from "@langwatch/time";
 import type { GatewayBudgetScopeType, GatewayBudgetWindow } from "./gateway.budget.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
@@ -45,13 +46,13 @@ export type GatewayBudget = {
   externalId: string | null;
   metadata: GatewayJsonValue;
   spentUsd: GatewayDecimal;
-  currentPeriodStartedAt: Date;
-  resetsAt: Date;
-  lastResetAt: Date | null;
-  cycleAnchorAt: Date | null;
-  archivedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  currentPeriodStartedAt: Instant;
+  resetsAt: Instant;
+  lastResetAt: Instant | null;
+  cycleAnchorAt: Instant | null;
+  archivedAt: Instant | null;
+  createdAt: Instant;
+  updatedAt: Instant;
   createdById: string;
   managedByVirtualKeyId: string | null;
 };
@@ -61,9 +62,9 @@ export type GatewayBudgetBucketBoundary = {
   organizationId: string;
   budgetId: string;
   bucketScopeId: string;
-  periodStartedAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  periodStartedAt: Instant;
+  createdAt: Instant;
+  updatedAt: Instant;
 };
 
 export type ModelProvider = {
@@ -83,12 +84,13 @@ export type ModelProvider = {
   rotationPolicy: GatewayProviderRotationPolicy;
   providerConfig: GatewayJsonValue | null;
   fallbackPriorityGlobal: number | null;
+  langySkipPermissionsModels: GatewayJsonValue | null;
   healthStatus: GatewayProviderHealthStatus;
-  circuitOpenedAt: Date | null;
-  lastHealthCheckAt: Date | null;
-  disabledAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  circuitOpenedAt: Instant | null;
+  lastHealthCheckAt: Instant | null;
+  disabledAt: Instant | null;
+  createdAt: Instant;
+  updatedAt: Instant;
   organizationId: string;
 };
 
@@ -101,9 +103,9 @@ export type VirtualKey = {
   purpose: VirtualKeyPurpose;
   externalId: string | null;
   metadata: GatewayJsonValue;
-  disabledAt: Date | null;
+  disabledAt: Instant | null;
   disabledReason: string | null;
-  expiresAt: Date | null;
+  expiresAt: Instant | null;
   hashedSecret: string;
   displayPrefix: string;
   principalUserId: string | null;
@@ -111,13 +113,13 @@ export type VirtualKey = {
   config: GatewayJsonValue;
   revision: bigint;
   previousHashedSecret: string | null;
-  previousSecretValidUntil: Date | null;
-  revokedAt: Date | null;
+  previousSecretValidUntil: Instant | null;
+  revokedAt: Instant | null;
   revokedById: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
   createdById: string;
-  lastUsedAt: Date | null;
+  lastUsedAt: Instant | null;
   routingPolicyId: string | null;
   routingMode: VirtualKeyRoutingMode;
 };
@@ -134,11 +136,11 @@ export type GatewayRealtimeSession = {
   requestedModel: string | null;
   vendorConversationId: string | null;
   status: GatewayRealtimeSessionStatus;
-  mintedAt: Date;
-  closedAt: Date | null;
+  mintedAt: Instant;
+  closedAt: Instant | null;
   closeReason: string | null;
   traceId: string | null;
   vendorCostRaw: GatewayJsonValue | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 };

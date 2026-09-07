@@ -3,6 +3,7 @@
  * and builders seeding an org, its keys, budgets and ledger debits into
  * real Postgres + real ClickHouse. Split out so the suite reads as given/when cases.
  */
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -45,11 +46,12 @@ export const BUDGET_NEIGHBOUR_UNUSED_ID = `bdg-vkb-neigh-unused-${suffix}`;
  * instant keeps period arithmetic away from the wall clock, so a run at
  * 23:59:59 UTC can't straddle midnight between write and read.
  */
-export const NOW = (() => {
-  const d = new Date();
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
-})();
-export const YESTERDAY = new Date(NOW.getTime() - 24 * 60 * 60 * 1000);
+export const NOW = nowInstant()
+  .toZonedDateTimeISO("UTC")
+  .startOfDay()
+  .add({ hours: 12 })
+  .toInstant();
+export const YESTERDAY = NOW.subtract({ milliseconds: 24 * 60 * 60 * 1000 });
 
 export const ALL_KEY_IDS = [
   VK_DAILY_ID,
@@ -99,7 +101,7 @@ async function createBudget(
       limitUsd: args.limitUsd,
       onBreach: "BLOCK",
       createdById: USER_ID,
-      resetsAt: new Date(NOW.getTime() + 24 * 60 * 60 * 1000),
+      resetsAt: toDate(NOW.add({ milliseconds: 24 * 60 * 60 * 1000 })),
       ...(args.managedByVirtualKeyId ? { managedByVirtualKeyId: args.managedByVirtualKeyId } : {}),
     },
   });
@@ -114,7 +116,7 @@ async function debit(
     window: "DAY" | "MONTH";
     virtualKeyId: string;
     amountUsd: string;
-    occurredAt: Date;
+    occurredAt: Instant;
   },
 ) {
   await chRepo.insertDebit([

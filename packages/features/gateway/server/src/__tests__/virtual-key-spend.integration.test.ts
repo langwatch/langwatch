@@ -2,6 +2,7 @@
  * @vitest-environment node
  * Real Postgres + real ClickHouse. Pins: spend reports even with no budget, and one key's spend isn't multiplied by however many budgets cover it. Window is rolling [now-N days, now). Spec: specs/ai-gateway/budgets.feature
  */
+import { nowInstant, toDate } from "@langwatch/time";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -224,7 +225,7 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
         window: "MONTH",
         limitUsd: "100.00",
         createdById: USER_ID,
-        resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        resetsAt: toDate(nowInstant().add({ milliseconds: 30 * 24 * 60 * 60 * 1000 })),
       },
     });
     await prisma.gatewayBudget.create({
@@ -237,28 +238,28 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
         window: "MONTH",
         limitUsd: "100.00",
         createdById: USER_ID,
-        resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        resetsAt: toDate(nowInstant().add({ milliseconds: 30 * 24 * 60 * 60 * 1000 })),
       },
     });
 
-    const now = new Date();
+    const now = nowInstant();
     await insertGatewayTrace({
       traceId: `trace-nobudget-${suffix}`,
       virtualKeyId: VK_UNBUDGETED_ID,
-      occurredAt: new Date(now.getTime() - 60_000),
+      occurredAt: toDate(now.subtract({ milliseconds: 60_000 })),
       totalCost: 0.4,
     });
     await insertGatewayTrace({
       traceId: `trace-budgeted-${suffix}`,
       virtualKeyId: VK_BUDGETED_ID,
-      occurredAt: new Date(now.getTime() - 60_000),
+      occurredAt: toDate(now.subtract({ milliseconds: 60_000 })),
       totalCost: 0.25,
       models: ["claude-sonnet-4"],
     });
     await insertGatewayTrace({
       traceId: `trace-orgscoped-${suffix}`,
       virtualKeyId: VK_ORG_SCOPED_ID,
-      occurredAt: new Date(now.getTime() - 120_000),
+      occurredAt: toDate(now.subtract({ milliseconds: 120_000 })),
       totalCost: 0.123456,
       tenantId: GOV_PROJECT_ID,
     });
@@ -277,14 +278,14 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
     await insertGatewayTrace({
       traceId: `trace-models-openai-${suffix}`,
       virtualKeyId: VK_TWO_MODELS_ID,
-      occurredAt: new Date(now.getTime() - 180_000),
+      occurredAt: toDate(now.subtract({ milliseconds: 180_000 })),
       totalCost: 0.01,
       models: ["gpt-5-mini"],
     });
     await insertGatewayTrace({
       traceId: `trace-models-anthropic-${suffix}`,
       virtualKeyId: VK_TWO_MODELS_ID,
-      occurredAt: new Date(now.getTime() - 90_000),
+      occurredAt: toDate(now.subtract({ milliseconds: 90_000 })),
       totalCost: 0.02,
       models: ["claude-sonnet-4"],
     });
@@ -313,7 +314,7 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
 
   /** @scenario "A key with no budget still reports what it spent" */
   it("reports spend for a key nobody has capped", async () => {
-    const now = new Date();
+    const now = nowInstant();
     const spend = await usageService().spendByVirtualKey({
       organizationId: ORG_ID,
       virtualKeyIds: [VK_UNBUDGETED_ID],
@@ -325,7 +326,7 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
 
   /** @scenario "A key covered by several budgets is not counted once per budget" */
   it("counts a request once even when two budgets apply", async () => {
-    const now = new Date();
+    const now = nowInstant();
     const spend = await usageService().spendByVirtualKey({
       organizationId: ORG_ID,
       virtualKeyIds: [VK_BUDGETED_ID],
@@ -337,12 +338,12 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
 
   /** @scenario "Spend from minutes ago is inside the window the page asks for" */
   it("includes a request made moments ago in a rolling window", async () => {
-    const now = new Date();
+    const now = nowInstant();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
     const summary = await usageService().summary({
       organizationId: ORG_ID,
       virtualKeyIds: [VK_UNBUDGETED_ID, VK_BUDGETED_ID],
-      window: { fromDate: new Date(now.getTime() - thirtyDays), toDate: now },
+      window: { fromDate: now.subtract({ milliseconds: thirtyDays }), toDate: now },
     });
     expect(summary.totalRequests).toBe(2);
     expect(Number(summary.totalUsd)).toBeCloseTo(0.65, 4);
@@ -358,11 +359,11 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
     // rot into one, and deliberately NEAR past: the CI ClickHouse proved
     // unwilling to serve rows anchored hundreds of days back, and this
     // test is about window boundaries, not retention.
-    const anchor = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+    const anchor = nowInstant().subtract({ milliseconds: 45 * 24 * 60 * 60 * 1000 });
     await insertGatewayTrace({
       traceId: `trace-boundary-${suffix}`,
       virtualKeyId: VK_UNBUDGETED_ID,
-      occurredAt: anchor,
+      occurredAt: toDate(anchor),
       totalCost: 1.5,
     });
 
@@ -370,14 +371,14 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
     const onStart = await service.summary({
       organizationId: ORG_ID,
       virtualKeyIds: [VK_UNBUDGETED_ID],
-      window: { fromDate: anchor, toDate: new Date(anchor.getTime() + 1000) },
+      window: { fromDate: anchor, toDate: anchor.add({ milliseconds: 1000 }) },
     });
     expect(onStart.totalRequests).toBe(1);
 
     const onEnd = await service.summary({
       organizationId: ORG_ID,
       virtualKeyIds: [VK_UNBUDGETED_ID],
-      window: { fromDate: new Date(anchor.getTime() - 1000), toDate: anchor },
+      window: { fromDate: anchor.subtract({ milliseconds: 1000 }), toDate: anchor },
     });
     expect(onEnd.totalRequests).toBe(0);
   });
@@ -385,28 +386,28 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
   /** @scenario "A re-projected trace is counted once, at its latest cost" */
   it("counts a trace once when its projection is written twice", async () => {
     const traceId = `trace-reprojected-${suffix}`;
-    const anchor = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+    const anchor = nowInstant().subtract({ milliseconds: 40 * 24 * 60 * 60 * 1000 });
     // The same trace, projected twice before the engine merges the parts:
     // an early row with a partial cost and a later, correct one. Summing
     // both would over-report; taking the earlier one would under-report.
     await insertGatewayTrace({
       traceId,
       virtualKeyId: VK_UNBUDGETED_ID,
-      occurredAt: anchor,
+      occurredAt: toDate(anchor),
       totalCost: 0.1,
     });
     await insertGatewayTrace({
       traceId,
       virtualKeyId: VK_UNBUDGETED_ID,
-      occurredAt: anchor,
+      occurredAt: toDate(anchor),
       totalCost: 0.9,
-      updatedAt: new Date(anchor.getTime() + 5_000),
+      updatedAt: toDate(anchor.add({ milliseconds: 5_000 })),
     });
 
     const summary = await usageService().summary({
       organizationId: ORG_ID,
       virtualKeyIds: [VK_UNBUDGETED_ID],
-      window: { fromDate: anchor, toDate: new Date(anchor.getTime() + 60_000) },
+      window: { fromDate: anchor, toDate: anchor.add({ milliseconds: 60_000 }) },
     });
     expect(summary.totalRequests).toBe(1);
     expect(Number(summary.totalUsd)).toBeCloseTo(0.9, 4);
@@ -414,12 +415,12 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
 
   /** @scenario "Spend is reported per key with its own daily and model split" */
   it("breaks one key's spend down by day and model", async () => {
-    const now = new Date();
+    const now = nowInstant();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
     const summary = await usageService().summaryForVirtualKey({
       organizationId: ORG_ID,
       virtualKeyId: VK_BUDGETED_ID,
-      window: { fromDate: new Date(now.getTime() - thirtyDays), toDate: now },
+      window: { fromDate: now.subtract({ milliseconds: thirtyDays }), toDate: now },
     });
     expect(Number(summary.totalUsd)).toBeCloseTo(0.25, 4);
     expect(summary.byModel.map((m) => m.model)).toEqual(["claude-sonnet-4"]);
@@ -434,9 +435,9 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
     // viewer's selected project instead of the org is the bug that made
     // the Usage page render "No usage in this window" for every key while
     // the keys table showed spend.
-    const now = new Date();
+    const now = nowInstant();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-    const window = { fromDate: new Date(now.getTime() - thirtyDays), toDate: now };
+    const window = { fromDate: now.subtract({ milliseconds: thirtyDays }), toDate: now };
     const service = usageService();
 
     const perKey = await service.summaryForVirtualKey({
@@ -461,8 +462,8 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
   describe("when one model is picked from the spend breakdown", () => {
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
     const windowNow = () => {
-      const now = new Date();
-      return { fromDate: new Date(now.getTime() - thirtyDays), toDate: now };
+      const now = nowInstant();
+      return { fromDate: now.subtract({ milliseconds: thirtyDays }), toDate: now };
     };
 
     /** @scenario "Picking a model narrows the recent activity to that model" */
@@ -518,12 +519,12 @@ describe.skipIf(!databaseUrl || !chUrl)("virtual key spend (real PG + real CH)",
 
   /** @scenario "Spend that lands in the key's trace project is visible from anywhere in the organization" */
   it("includes the org-scoped key in the unfiltered org summary", async () => {
-    const now = new Date();
+    const now = nowInstant();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
     const summary = await usageService().summary({
       organizationId: ORG_ID,
       virtualKeyIds: [VK_UNBUDGETED_ID, VK_BUDGETED_ID, VK_ORG_SCOPED_ID],
-      window: { fromDate: new Date(now.getTime() - thirtyDays), toDate: now },
+      window: { fromDate: now.subtract({ milliseconds: thirtyDays }), toDate: now },
     });
     expect(summary.totalRequests).toBe(3);
     expect(Number(summary.totalUsd)).toBeCloseTo(0.773456, 4);

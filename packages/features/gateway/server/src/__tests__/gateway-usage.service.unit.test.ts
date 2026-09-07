@@ -1,3 +1,4 @@
+import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@langwatch/prisma-client/generated";
 
@@ -59,7 +60,7 @@ function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendPort {
     const byKey = new Map<string, GatewayUsageBucket>();
     for (const r of subset) {
       const model = r.models[0] ?? "unknown";
-      const day = r.occurredAt.toISOString().slice(0, 10);
+      const day = toDate(r.occurredAt).toISOString().slice(0, 10);
       const key = `${r.virtualKeyId}|${model}|${day}`;
       const existing = byKey.get(key);
       if (existing) {
@@ -87,7 +88,7 @@ function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendPort {
     gatewayTraces: async ({ virtualKeyIds, limit }: { virtualKeyIds?: string[]; limit: number }) =>
       filtered(virtualKeyIds)
         .slice()
-        .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+        .sort((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
         .slice(0, limit),
     spendByVirtualKey: async () => [],
   } as unknown as GatewayVirtualKeySpendPort;
@@ -106,8 +107,8 @@ function service(
 }
 
 const window = {
-  fromDate: new Date("2026-04-01T00:00:00Z"),
-  toDate: new Date("2026-05-01T00:00:00Z"),
+  fromDate: Temporal.Instant.from("2026-04-01T00:00:00Z"),
+  toDate: Temporal.Instant.from("2026-05-01T00:00:00Z"),
 };
 
 describe("GatewayUsageService.summary", () => {
@@ -144,18 +145,18 @@ describe("GatewayUsageService.summary", () => {
           {
             virtualKeyId: "vk_01",
             costUsd: "1.00",
-            occurredAt: new Date("2026-04-15T10:00:00Z"),
+            occurredAt: Temporal.Instant.from("2026-04-15T10:00:00Z"),
           },
           {
             virtualKeyId: "vk_01",
             costUsd: "2.00",
-            occurredAt: new Date("2026-04-16T10:00:00Z"),
+            occurredAt: Temporal.Instant.from("2026-04-16T10:00:00Z"),
           },
           {
             virtualKeyId: "vk_02",
             costUsd: "0.50",
             model: "claude-haiku",
-            occurredAt: new Date("2026-04-15T10:00:00Z"),
+            occurredAt: Temporal.Instant.from("2026-04-15T10:00:00Z"),
           },
         ],
       ).summary({
@@ -185,7 +186,7 @@ describe("GatewayUsageService.summary", () => {
           {
             virtualKeyId: "vk_org_wide",
             costUsd: "0.75",
-            occurredAt: new Date("2026-04-15T10:00:00Z"),
+            occurredAt: Temporal.Instant.from("2026-04-15T10:00:00Z"),
           },
         ],
       ).summary({
@@ -210,12 +211,12 @@ describe("GatewayUsageService.summary", () => {
             virtualKeyId: "vk_01",
             costUsd: "0.00",
             blockedByGuardrail: true,
-            occurredAt: new Date("2026-04-15T10:00:00Z"),
+            occurredAt: Temporal.Instant.from("2026-04-15T10:00:00Z"),
           },
           {
             virtualKeyId: "vk_01",
             costUsd: "1.00",
-            occurredAt: new Date("2026-04-15T11:00:00Z"),
+            occurredAt: Temporal.Instant.from("2026-04-15T11:00:00Z"),
           },
         ],
       ).summary({
@@ -248,12 +249,12 @@ describe("GatewayUsageService.summary", () => {
           {
             virtualKeyId: "vk_01",
             costUsd: "1.234567",
-            occurredAt: new Date("2026-04-15T10:00:00Z"),
+            occurredAt: Temporal.Instant.from("2026-04-15T10:00:00Z"),
           },
           {
             virtualKeyId: "vk_01",
             costUsd: "2.345678",
-            occurredAt: new Date("2026-04-15T10:00:00Z"),
+            occurredAt: Temporal.Instant.from("2026-04-15T10:00:00Z"),
           },
         ],
       ).summary({

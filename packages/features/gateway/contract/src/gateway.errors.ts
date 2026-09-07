@@ -6,6 +6,7 @@
  * prose — `message` is for whoever reads the trace.
  */
 import { HandledError } from "@langwatch/handled-error";
+import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 type ExternalIdResource = "virtual_key" | "budget";
@@ -430,7 +431,9 @@ export class GatewaySpendGroupByUnstableError extends HandledError {
       {
         meta: {
           group_by: groupBy,
-          settles_at: new Date(settlesAtMs).toISOString(),
+          settles_at: Temporal.Instant.fromEpochMilliseconds(settlesAtMs).toString({
+            fractionalSecondDigits: 3,
+          }),
         },
         httpStatus: 400,
         fault: "customer",

@@ -2,6 +2,7 @@
  * @vitest-environment node
  * Real Postgres + real ClickHouse. Regression for #6141: budgets accrued nothing on 4 of 6 windows, so warn/block never fired. Spec: specs/ai-gateway/budgets.feature
  */
+import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -109,7 +110,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
           model: "gpt-5-mini",
           durationMs: 120,
           status: "SUCCESS",
-          occurredAt: new Date(),
+          occurredAt: nowInstant(),
         },
       ]);
     };
@@ -163,7 +164,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
           limitUsd: LIMIT_USD,
           onBreach: "BLOCK",
           createdById: USER_ID,
-          resetsAt: new Date(Date.now() + 86_400_000),
+          resetsAt: toDate(nowInstant().add({ milliseconds: 86_400_000 })),
         },
       });
       // A budget pointed at a project no key sends traffic to.
@@ -178,7 +179,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
           limitUsd: LIMIT_USD,
           onBreach: "BLOCK",
           createdById: USER_ID,
-          resetsAt: new Date(Date.now() + 86_400_000),
+          resetsAt: toDate(nowInstant().add({ milliseconds: 86_400_000 })),
         },
       });
 

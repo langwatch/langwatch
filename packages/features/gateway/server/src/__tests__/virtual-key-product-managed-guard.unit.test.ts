@@ -4,6 +4,7 @@
  * its public REST twin both reach the same service, and the service let every by-id mutation through.
  */
 
+import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -13,6 +14,8 @@ import { PostgresVirtualKeyAdapter } from "../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";
+/** The stored row carries the columns Prisma always returns, as Prisma returns them. */
+const MINTED_AT = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
 function vkRow(purpose: "USER" | "LANGY") {
   return {
@@ -25,6 +28,8 @@ function vkRow(purpose: "USER" | "LANGY") {
     scopes: [{ scopeType: "PROJECT", scopeId: "proj_1" }],
     routingPolicy: null,
     principalUser: null,
+    createdAt: toDate(MINTED_AT),
+    updatedAt: toDate(MINTED_AT),
   };
 }
 

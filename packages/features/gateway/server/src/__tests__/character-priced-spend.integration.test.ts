@@ -2,6 +2,32 @@
  * @vitest-environment node
  * Real Postgres + real ClickHouse. Regression for #6934: the wire dropped the character count, so tts calls rated at zero and the ledger recorded nothing.
  */
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
+
+/** A stored budget row, as the spend reads take it: the same columns, on instants. */
+function toBudgetRow<
+  Row extends {
+    currentPeriodStartedAt: Date;
+    resetsAt: Date;
+    lastResetAt: Date | null;
+    cycleAnchorAt: Date | null;
+    archivedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+>(row: Row) {
+  return {
+    ...row,
+    currentPeriodStartedAt: fromDate(row.currentPeriodStartedAt),
+    resetsAt: fromDate(row.resetsAt),
+    lastResetAt: row.lastResetAt ? fromDate(row.lastResetAt) : null,
+    cycleAnchorAt: row.cycleAnchorAt ? fromDate(row.cycleAnchorAt) : null,
+    archivedAt: row.archivedAt ? fromDate(row.archivedAt) : null,
+    createdAt: fromDate(row.createdAt),
+    updatedAt: fromDate(row.updatedAt),
+  };
+}
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -77,14 +103,14 @@ async function serveRequest(model: string, usage: SpendUsage): Promise<void> {
       model,
       durationMs: 620,
       status: "SUCCESS",
-      occurredAt: new Date(),
+      occurredAt: nowInstant(),
     },
   ]);
 }
 
 async function spentNanoUsd(): Promise<number> {
   const budget = await prisma.gatewayBudget.findUniqueOrThrow({ where: { id: BUDGET_ID } });
-  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants([PROJECT_ID], [budget]);
+  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants([PROJECT_ID], [toBudgetRow(budget)]);
   if (!spend) throw new Error("no spend row for the budget");
   return spend.spentNanoUsd;
 }
@@ -137,7 +163,7 @@ describe.skipIf(!databaseUrl || !chUrl)("character- and duration-priced spend", 
         limitUsd: "50",
         onBreach: "WARN",
         createdById: USER_ID,
-        resetsAt: new Date(Date.now() + 86_400_000),
+        resetsAt: toDate(nowInstant().add({ milliseconds: 86_400_000 })),
       },
     });
   }, 180_000);

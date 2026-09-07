@@ -6,6 +6,7 @@
  *
  * Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
+import { nowInstant } from "@langwatch/time";
 import jwt from "jsonwebtoken";
 import { describe, expect, it } from "vitest";
 
@@ -33,8 +34,8 @@ describe("gateway JWT minting", () => {
 
   describe("when the key expires before the ordinary TTL", () => {
     it("ends the token at the key's expiration date", () => {
-      const notAfter = new Date(Date.now() + 5 * 60 * 1000);
-      const keyExpiresAt = Math.floor(notAfter.getTime() / 1000);
+      const notAfter = nowInstant().add({ milliseconds: 5 * 60 * 1000 });
+      const keyExpiresAt = Math.floor(notAfter.epochMilliseconds / 1000);
 
       const { jwt: token, expiresAt } = adapter.sign({ ...identity, notAfter });
 
@@ -46,14 +47,16 @@ describe("gateway JWT minting", () => {
 
   describe("when the key expires after the ordinary TTL", () => {
     it("keeps the fifteen minute lifetime and still carries the date", () => {
-      const notAfter = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const notAfter = nowInstant().add({ milliseconds: 24 * 60 * 60 * 1000 });
       const nowSeconds = Math.floor(Date.now() / 1000);
 
       const { jwt: token, expiresAt } = adapter.sign({ ...identity, notAfter });
 
       expect(expiresAt).toBeGreaterThanOrEqual(nowSeconds + TTL_SECONDS - 1);
       expect(expiresAt).toBeLessThanOrEqual(nowSeconds + TTL_SECONDS + 1);
-      expect(adapter.verify(token).vk_expires_at).toBe(Math.floor(notAfter.getTime() / 1000));
+      expect(adapter.verify(token).vk_expires_at).toBe(
+        Math.floor(notAfter.epochMilliseconds / 1000),
+      );
     });
   });
 
@@ -73,26 +76,28 @@ describe("gateway JWT minting", () => {
 
   describe("when the date has already passed", () => {
     it("mints a token that is already finished rather than one with no lifetime", () => {
-      const notAfter = new Date(Date.now() - 60 * 60 * 1000);
+      const notAfter = nowInstant().add({ milliseconds: -60 * 60 * 1000 });
       const nowSeconds = Math.floor(Date.now() / 1000);
 
       const { jwt: token, expiresAt } = adapter.sign({ ...identity, notAfter });
 
       expect(expiresAt).toBeGreaterThan(nowSeconds);
       expect(expiresAt).toBeLessThanOrEqual(nowSeconds + 2);
-      expect(adapter.verify(token).vk_expires_at).toBe(Math.floor(notAfter.getTime() / 1000));
+      expect(adapter.verify(token).vk_expires_at).toBe(
+        Math.floor(notAfter.epochMilliseconds / 1000),
+      );
     });
   });
 
   describe("when the token is read back", () => {
     it("round-trips every identity claim it was given", () => {
-      const notAfter = new Date(Date.now() + 5 * 60 * 1000);
+      const notAfter = nowInstant().add({ milliseconds: 5 * 60 * 1000 });
 
       const { jwt: token } = adapter.sign({ ...identity, notAfter });
 
       expect(adapter.verify(token)).toEqual({
         ...identity,
-        vk_expires_at: Math.floor(notAfter.getTime() / 1000),
+        vk_expires_at: Math.floor(notAfter.epochMilliseconds / 1000),
       });
     });
   });

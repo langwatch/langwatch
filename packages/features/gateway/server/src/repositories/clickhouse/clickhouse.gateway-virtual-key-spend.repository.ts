@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 /**
  * Per-virtual-key spend, read from the cost path rather than the budget ledger: the ledger holds rows only for keys with an applicable budget (one per budget), so reading it reports $0.00 for uncapped keys and multiplies spend for doubly-capped ones. trace_summaries carries per-trace cost + langwatch.virtual_key_id on every span, answering "what did this key cost" for every key — the same store the rest of the product bills from. Dedup: RMT keyed (TenantId, TraceId), collapsed with argMax(..., UpdatedAt) before summing, or an unmerged re-projection double-counts.
  */
@@ -40,8 +41,8 @@ export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort
 
     const params: Record<string, string | number> = {
       vkAttr: VK_ATTRIBUTE,
-      fromMs: window.fromDate.getTime(),
-      toMs: window.toDate.getTime(),
+      fromMs: window.fromDate.epochMilliseconds,
+      toMs: window.toDate.epochMilliseconds,
     };
     const tenantPlaceholders = tenantIds
       .map((id, i) => {
@@ -121,8 +122,8 @@ export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort
 
     const params: Record<string, string | number> = {
       vkAttr: VK_ATTRIBUTE,
-      fromMs: window.fromDate.getTime(),
-      toMs: window.toDate.getTime(),
+      fromMs: window.fromDate.epochMilliseconds,
+      toMs: window.toDate.epochMilliseconds,
     };
     const tenantPlaceholders = tenantIds
       .map((id, i) => {
@@ -217,8 +218,8 @@ export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort
 
     const params: Record<string, string | number> = {
       vkAttr: VK_ATTRIBUTE,
-      fromMs: window.fromDate.getTime(),
-      toMs: window.toDate.getTime(),
+      fromMs: window.fromDate.epochMilliseconds,
+      toMs: window.toDate.epochMilliseconds,
       limit: Math.max(1, Math.floor(limit)),
     };
     let modelFilter = "";
@@ -301,7 +302,7 @@ export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort
         virtualKeyId: r.virtualKeyId,
         costUsd: r.costUsd,
         models: r.models ?? [],
-        occurredAt: new Date(Number(r.occurredAtMs)),
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(Number(r.occurredAtMs)),
         promptTokens: Number(r.promptTokens) || 0,
         completionTokens: Number(r.completionTokens) || 0,
         durationMs: Number(r.durationMs) || 0,

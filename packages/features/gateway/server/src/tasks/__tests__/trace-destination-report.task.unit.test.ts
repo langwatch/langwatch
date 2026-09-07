@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import {
   GatewayTraceDestinationReportRepository,
@@ -11,7 +12,7 @@ function project(overrides: Partial<TraceDestinationProjectRow>): TraceDestinati
     id: "project-1",
     kind: "application",
     archivedAt: null,
-    createdAt: new Date("2026-01-01T00:00:00Z"),
+    createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
     team: { organizationId: "org-1" },
     ...overrides,
   } as TraceDestinationProjectRow;
@@ -71,7 +72,7 @@ describe("reportTraceDestinationBackfill", () => {
       const repository = fakeRepository({
         projects: [
           project({ id: "live" }),
-          project({ id: "archived", archivedAt: new Date("2026-01-01") }),
+          project({ id: "archived", archivedAt: Temporal.Instant.from("2026-01-01T00:00:00Z") }),
           project({ id: "governance", kind: "internal_governance" }),
           project({ id: "other-org", team: { organizationId: "org-2" } }),
         ],

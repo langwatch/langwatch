@@ -5,11 +5,13 @@ import {
   type ArchiveGatewayCacheRuleInput,
   type CreateGatewayCacheRuleInput,
   type GatewayCacheRuleAction,
+  type GatewayCacheRuleCursor,
   type GatewayCacheRuleMatchers,
   type GatewayCacheRuleResource,
   type UpdateGatewayCacheRuleInput,
   serializeRowForAudit,
 } from "@langwatch/gateway-contract";
+import { toDate } from "@langwatch/time";
 import {
   Prisma,
   type GatewayCacheRule,
@@ -57,7 +59,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
   async listPage(input: {
     organizationId: string;
     limit: number;
-    cursor: { priority: number; createdAt: Date; id: string } | null;
+    cursor: GatewayCacheRuleCursor | null;
   }): Promise<GatewayCacheRuleResource[]> {
     const rows = await this.database.gatewayCacheRule.findMany({
       where: {
@@ -67,7 +69,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
           ? {
               OR: wirePages.keysetAfter([
                 { name: "priority", value: input.cursor.priority, direction: "desc" },
-                { name: "createdAt", value: input.cursor.createdAt, direction: "asc" },
+                { name: "createdAt", value: toDate(input.cursor.createdAt), direction: "asc" },
                 { name: "id", value: input.cursor.id, direction: "asc" },
               ]),
             }

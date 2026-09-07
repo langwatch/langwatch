@@ -1,9 +1,10 @@
+import type { Instant } from "@langwatch/time";
 /** One project, in the shape the trace-destination report classifies keys against. */
 export type TraceDestinationProjectRow = Readonly<{
   id: string;
   kind: string;
-  archivedAt: Date | null;
-  createdAt: Date;
+  archivedAt: Instant | null;
+  createdAt: Instant;
   team: Readonly<{ organizationId: string }>;
 }>;
 

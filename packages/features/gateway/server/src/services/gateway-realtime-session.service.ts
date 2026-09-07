@@ -242,7 +242,7 @@ export class GatewayRealtimeSessionService {
       organization_id: params.session.organizationId,
       virtual_key_id: params.session.virtualKeyId,
       request_type: "realtime_session",
-      admitted_at: params.session.mintedAt.getTime(),
+      admitted_at: params.session.mintedAt.epochMilliseconds,
       // The mint recorded its own trace id on the session row, so the spend
       // record and the settlement span name the same trace and the two money
       // surfaces can be joined. A brokered call runs client to vendor, so no
@@ -329,7 +329,7 @@ export class GatewayRealtimeSessionService {
       occurredAt: now,
       collaborators: params.collaborators,
       reason: "usage reported by the client",
-      durationMs: Math.max(0, now.epochMilliseconds - session.mintedAt.getTime()),
+      durationMs: Math.max(0, now.epochMilliseconds - session.mintedAt.epochMilliseconds),
     });
 
     return "closed";

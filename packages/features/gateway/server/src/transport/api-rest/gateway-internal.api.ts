@@ -6,6 +6,7 @@
 
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: empty blocks here are deliberate no-ops.
 
+import { type Instant, nowInstant } from "@langwatch/time";
 import { internalSecret } from "@langwatch/api";
 import {
   type AppRestSecurity,
@@ -262,7 +263,7 @@ function verifyGatewaySignature(secretOf: () => string | undefined) {
         401,
       );
     }
-    const now = Math.floor(Date.now() / 1000);
+    const now = Math.floor(nowInstant().epochMilliseconds / 1000);
     if (Math.abs(now - ts) > GATEWAY_SIGNATURE_WINDOW_SECONDS) {
       logAuthDecision(c, "timestamp_out_of_window", 401, {
         driftSeconds: now - ts,
@@ -344,7 +345,7 @@ function virtualKeyStatusRejection({
   expiresAt,
 }: {
   status: string;
-  expiresAt: Date | null;
+  expiresAt: Instant | null;
 }): KeyAuthRejection | null {
   if (status === "REVOKED") {
     return {
@@ -362,7 +363,7 @@ function virtualKeyStatusRejection({
       message: "virtual key is disabled; it can be re-enabled by an administrator",
     };
   }
-  if (expiresAt && expiresAt.getTime() <= Date.now()) {
+  if (expiresAt && expiresAt.epochMilliseconds <= nowInstant().epochMilliseconds) {
     return {
       status: 403,
       type: "virtual_key_expired",
@@ -579,7 +580,7 @@ type AttributionVirtualKey = {
   id: string;
   organizationId: string;
   principalUserId: string | null;
-  lastUsedAt: Date | null;
+  lastUsedAt: Instant | null;
 };
 
 /** The ids an attributed record was validated with. Required on an
@@ -603,12 +604,13 @@ function attributedIdentity(command: Record<string, unknown>): {
 async function touchAdmittedVirtualKeys(
   store: GatewayInternalStorePort,
   virtualKeys: AttributionVirtualKey[],
-  now: Date,
+  now: Instant,
 ): Promise<void> {
   const staleIds = virtualKeys
     .filter(
       (vk) =>
-        !vk.lastUsedAt || now.getTime() - vk.lastUsedAt.getTime() > VIRTUAL_KEY_TOUCH_THROTTLE_MS,
+        !vk.lastUsedAt ||
+        now.epochMilliseconds - vk.lastUsedAt.epochMilliseconds > VIRTUAL_KEY_TOUCH_THROTTLE_MS,
     )
     .map((vk) => vk.id);
   if (staleIds.length === 0) return;
@@ -700,7 +702,7 @@ async function enrichAttributedCommands({
   await touchAdmittedVirtualKeys(
     store,
     virtualKeys.filter((vk) => admittedKeyIds.has(vk.id)),
-    new Date(),
+    nowInstant(),
   );
 }
 
@@ -1050,9 +1052,9 @@ export function createGatewayInternalRestApp(options: {
           Math.min(25, Number.parseInt(c.req.query("timeout_s") ?? "10", 10) || 10),
         );
         const repo = ports.changes();
-        const deadline = Date.now() + timeoutSeconds * 1000;
+        const deadline = nowInstant().epochMilliseconds + timeoutSeconds * 1000;
 
-        while (Date.now() < deadline) {
+        while (nowInstant().epochMilliseconds < deadline) {
           const { events, currentRevision } = await repo.since(orgId, since, 500);
           if (events.length > 0) {
             return c.json(

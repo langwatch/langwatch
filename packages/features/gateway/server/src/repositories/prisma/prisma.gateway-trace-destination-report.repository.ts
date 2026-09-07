@@ -1,3 +1,4 @@
+import { fromDate } from "@langwatch/time";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   GatewayTraceDestinationReportRepository,
@@ -48,10 +49,16 @@ export class PrismaGatewayTraceDestinationReportRepository extends GatewayTraceD
   }
 
   async findProjects(): Promise<TraceDestinationProjectRow[]> {
-    return this.database.project.findMany({
+    const rows = await this.database.project.findMany({
       select: PROJECT_SELECT,
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
+
+    return rows.map((row) => ({
+      ...row,
+      archivedAt: row.archivedAt ? fromDate(row.archivedAt) : null,
+      createdAt: fromDate(row.createdAt),
+    }));
   }
 
   async findKeyPage({

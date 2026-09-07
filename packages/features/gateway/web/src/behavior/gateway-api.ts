@@ -3,6 +3,7 @@
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
  */
 
+import type { Instant } from "@langwatch/time";
 import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 import type {
   GatewayApplicableBudget,
@@ -212,7 +213,7 @@ export type GatewaySpendEventRow = {
   labels: string[];
   metadata: string;
   durationMs: number;
-  occurredAt: Date;
+  occurredAt: string;
 };
 
 export type GatewaySpendEventCursor = { occurredAtMs: number; gatewayRequestId: string };
@@ -324,23 +325,23 @@ export type WebhookEndpointView = {
   enabledEvents: string[];
   status: "ACTIVE" | "DISABLED";
   disabledReason: string | null;
-  disabledAt: Date | null;
-  failingSince: Date | null;
-  lastSuccessAt: Date | null;
-  lastFailureAt: Date | null;
+  disabledAt: string | null;
+  failingSince: string | null;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
   maxBatchSize: number;
   maxBatchDelayMs: number;
   maxInFlight: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type WebhookEndpointHealth = {
   status: "ACTIVE" | "DISABLED";
   disabledReason: string | null;
-  failingSince: Date | null;
-  lastSuccessAt: Date | null;
-  lastFailureAt: Date | null;
+  failingSince: string | null;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
   oldestUndeliveredAgeMs: number | null;
   dlqDepth: number;
   sendsPerMinute: number;
@@ -361,7 +362,7 @@ export type WebhookEventType = {
   description: string;
 };
 
-export type WebhookDeliveryCursor = { firedAt: Date | string; id: string };
+export type WebhookDeliveryCursor = { firedAt: string; id: string };
 
 export type WebhookDeliveryPage = {
   deliveries: {
@@ -397,7 +398,7 @@ export type OrganizationModelProviderView = {
   provider: string;
   name: string;
   enabled: boolean;
-  disabledAt: Date | null;
+  disabledAt: string | null;
   healthStatus: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN" | null;
   customKeys: Record<string, unknown> | null;
   /** Always null on this projection. */
@@ -485,7 +486,7 @@ export type GatewayApiMap = {
           routingPolicyId?: string | null;
           routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
           /** Coerced server-side, so a form may send either. */
-          expiresAt?: Date | string;
+          expiresAt?: Instant | string;
           budget?: VirtualKeyBudgetInput | null;
           config?: VirtualKeyConfigInput;
         };
@@ -503,7 +504,7 @@ export type GatewayApiMap = {
           traceProjectId?: string | null;
           routingPolicyId?: string | null;
           routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
-          expiresAt?: Date | string | null;
+          expiresAt?: Instant | string | null;
           budget?: VirtualKeyBudgetInput | null;
           config?: VirtualKeyConfigInput;
         };
@@ -581,7 +582,7 @@ export type GatewayApiMap = {
           timezone?: string | null;
           providerKey?: string | null;
           /** An ISO string here must carry an offset. */
-          cycleAnchorAt?: Date | string | null;
+          cycleAnchorAt?: Instant | string | null;
           /** Saves a budget no key can reach, once the reader has been told. */
           allowUnreachable?: boolean;
         };

@@ -2,6 +2,7 @@
  * @vitest-environment node
  * Real family + real Postgres. GET /api/internal/gateway/config/:vk_id: the materialiser reads vk.routingPolicy off whatever the caller included, so a materialiser test with its own include can't catch the route forgetting one (bundle comes back with empty alias map/deny lists, silently breaking policy). Spec: specs/ai-gateway/provider-routing.feature, governance/routing-policy-aliases-and-rules.feature, auth-cache.feature
  */
+import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -63,7 +64,7 @@ const MP_ID = `mp-cfgroute-${suffix}`;
 const SECRET = "0123456789abcdef0123456789abcdef";
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The key's expiration date as the gateway reads it: unix seconds. */
-const EXPIRES_AT = new Date(Date.now() + 7 * DAY_MS);
+const EXPIRES_AT = nowInstant().add({ milliseconds: 7 * DAY_MS });
 
 /** Stored provider keys arrive already decrypted in these fixtures. */
 const credentials: GatewayModelProviderCredentialsPort = {
@@ -227,7 +228,7 @@ describe.skipIf(!databaseUrl)("GET /api/internal/gateway/config/:vk_id", () => {
         displayPrefix: "vk-lw-cfgexp",
         createdById: USER_ID,
         traceProjectId: PROJECT_ID,
-        expiresAt: EXPIRES_AT,
+        expiresAt: toDate(EXPIRES_AT),
         config: {},
         scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
       },
@@ -323,7 +324,7 @@ describe.skipIf(!databaseUrl)("GET /api/internal/gateway/config/:vk_id", () => {
     it("carries the date in unix seconds, and an explicit null for a key that never expires", async () => {
       const expiring = await fetchConfig(VK_EXPIRING_ID);
       expect(expiring.status).toBe(200);
-      expect(expiring.body?.expires_at).toBe(Math.floor(EXPIRES_AT.getTime() / 1000));
+      expect(expiring.body?.expires_at).toBe(Math.floor(EXPIRES_AT.epochMilliseconds / 1000));
 
       const never = await fetchConfig(VK_ID);
       expect(never.status).toBe(200);
@@ -334,7 +335,7 @@ describe.skipIf(!databaseUrl)("GET /api/internal/gateway/config/:vk_id", () => {
     /** @scenario "changing only the date moves the config version token" */
     it("moves the version token when only the date changes, so the next revalidation brings the new date", async () => {
       const before = await fetchConfig(VK_EXPIRING_ID);
-      const shortened = new Date(Date.now() + DAY_MS);
+      const shortened = nowInstant().add({ milliseconds: DAY_MS });
 
       await virtualKeys.update({
         id: VK_EXPIRING_ID,
@@ -345,7 +346,7 @@ describe.skipIf(!databaseUrl)("GET /api/internal/gateway/config/:vk_id", () => {
 
       const after = await fetchConfig(VK_EXPIRING_ID);
       expect(after.etag).not.toBe(before.etag);
-      expect(after.body?.expires_at).toBe(Math.floor(shortened.getTime() / 1000));
+      expect(after.body?.expires_at).toBe(Math.floor(shortened.epochMilliseconds / 1000));
 
       // The token the gateway held is the one its staleness refresh revalidates
       // with. It has to come back 200 with the new date, not 304, or a shortened
@@ -355,7 +356,7 @@ describe.skipIf(!databaseUrl)("GET /api/internal/gateway/config/:vk_id", () => {
       const revalidated = await app.fetch(signedRequest(path, before.etag ?? ""));
       expect(revalidated.status).toBe(200);
       const payload = (await revalidated.json()) as { expires_at: number };
-      expect(payload.expires_at).toBe(Math.floor(shortened.getTime() / 1000));
+      expect(payload.expires_at).toBe(Math.floor(shortened.epochMilliseconds / 1000));
 
       // And the token it now holds still revalidates to a 304, so an unchanged
       // key stays cheap.

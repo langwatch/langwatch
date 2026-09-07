@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { nowInstant } from "@langwatch/time";
-
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 /**
  * A rolling `[now - days, now)` window that keeps rolling.
  *
@@ -23,16 +22,16 @@ export function useRollingWindow(range: number | "mtd", refreshMs = 60_000) {
   }, [refreshMs]);
 
   return useMemo(() => {
-    const to = new Date(tick);
+    const to = Temporal.Instant.fromEpochMilliseconds(tick);
     // "mtd" anchors to the start of the current UTC month and keeps
     // advancing across a month boundary: it is the window the keys
     // table's "Spent this month" column is computed over, so the
     // click-through lands on the same total.
     const from =
       range === "mtd"
-        ? new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1))
-        : new Date(tick - range * 24 * 60 * 60 * 1000);
-    return { fromIso: from.toISOString(), toIso: to.toISOString() };
+        ? to.toZonedDateTimeISO("UTC").with({ day: 1 }).startOfDay().toInstant()
+        : Temporal.Instant.fromEpochMilliseconds(tick - range * 24 * 60 * 60 * 1000);
+    return { fromIso: toDate(from).toISOString(), toIso: toDate(to).toISOString() };
   }, [range, tick]);
 }
 

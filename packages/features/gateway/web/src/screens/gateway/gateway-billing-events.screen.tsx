@@ -1,3 +1,5 @@
+import { readableDate } from "../../model/readable-date.ts";
+import { toEpochMs } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -69,8 +71,8 @@ function resetsPaging<T>(set: (value: T) => void, reset: () => void) {
 /** The window the presets pick, as the epoch milliseconds the query takes. */
 function useWindowMs(days: number) {
   const { fromIso, toIso } = useRollingWindow(days);
-  const fromMs = useMemo(() => new Date(fromIso).getTime(), [fromIso]);
-  const toMs = useMemo(() => new Date(toIso).getTime(), [toIso]);
+  const fromMs = useMemo(() => toEpochMs(fromIso), [fromIso]);
+  const toMs = useMemo(() => toEpochMs(toIso), [toIso]);
   return { fromMs, toMs };
 }
 
@@ -328,7 +330,7 @@ function BillingEventRow({
 }) {
   return (
     <Table.Row>
-      <Table.Cell whiteSpace="nowrap">{new Date(row.occurredAt).toLocaleString()}</Table.Cell>
+      <Table.Cell whiteSpace="nowrap">{readableDate(row.occurredAt).toLocaleString()}</Table.Cell>
       <Table.Cell>
         {row.traceId && projectSlug ? (
           <Link href={`/${projectSlug}/traces/${row.traceId}`} fontFamily="mono" fontSize="xs">

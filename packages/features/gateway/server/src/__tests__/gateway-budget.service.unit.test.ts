@@ -1,3 +1,4 @@
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -19,7 +20,7 @@ function mockChRepoWithEvents(
     tokensOutput: e.tokensOutput ?? 0,
     durationMs: e.durationMs ?? null,
     status: e.status ?? "SUCCESS",
-    occurredAt: e.occurredAt ?? new Date(),
+    occurredAt: e.occurredAt ?? nowInstant(),
   }));
   return {
     recentEventsForBudget: async () => fullEvents,
@@ -40,12 +41,12 @@ function stubBudget(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
     limitUsd: new Prisma.Decimal("100.00"),
     spentUsd: new Prisma.Decimal("0.00"),
     timezone: null,
-    resetsAt: new Date("2099-01-01T00:00:00Z"),
-    currentPeriodStartedAt: new Date(),
+    resetsAt: toDate(Temporal.Instant.from("2099-01-01T00:00:00Z")),
+    currentPeriodStartedAt: toDate(nowInstant()),
     lastResetAt: null,
     archivedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: toDate(nowInstant()),
+    updatedAt: toDate(nowInstant()),
     createdById: "user_01",
     ...overrides,
   } as GatewayBudget;
@@ -315,7 +316,7 @@ describe("GatewayService.check", () => {
         mockPrismaWithBudgets([
           stubBudget({
             spentUsd: new Prisma.Decimal("99.00"),
-            resetsAt: new Date("2020-01-01T00:00:00Z"),
+            resetsAt: toDate(Temporal.Instant.from("2020-01-01T00:00:00Z")),
           }),
         ]),
       );
@@ -333,7 +334,7 @@ describe("GatewayService.check", () => {
           stubBudget({
             spentUsd: new Prisma.Decimal("99.00"),
             // resetsAt in the past → window has rolled over, stale spent is ignored.
-            resetsAt: new Date("2020-01-01T00:00:00Z"),
+            resetsAt: toDate(Temporal.Instant.from("2020-01-01T00:00:00Z")),
           }),
         ]),
       );

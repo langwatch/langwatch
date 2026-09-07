@@ -3,6 +3,7 @@
  * the budget ledger, which writes once per applicable budget and never for an uncapped key. Every
  * read spans the org's projects, since traces land in the key's resolved trace destination.
  */
+import { type Instant, toDate } from "@langwatch/time";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
 import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
@@ -29,7 +30,7 @@ export type GatewayUsageVirtualKeysPort = {
   }): Promise<Array<{ id: string; name: string; displayPrefix: string }>>;
 };
 
-export type UsageWindow = { fromDate: Date; toDate: Date };
+export type UsageWindow = { fromDate: Instant; toDate: Instant };
 
 export type UsageSummary = {
   totalUsd: string;
@@ -274,7 +275,7 @@ export class GatewayUsageService {
       byDay: this.sortedDays(byDay),
       recentDebits: recentTraces.map((trace) => ({
         id: trace.traceId,
-        occurredAt: trace.occurredAt.toISOString(),
+        occurredAt: toDate(trace.occurredAt).toISOString(),
         model: trace.models[0] ?? "unknown",
         providerSlot: null,
         amountUsd: trace.costUsd,

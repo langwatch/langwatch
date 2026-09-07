@@ -5,6 +5,8 @@
  *
  * Returns state and callbacks, never JSX.
  */
+import { readableDate } from "../../../model/readable-date.ts";
+import type { Instant } from "@langwatch/time";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
@@ -124,7 +126,7 @@ function useProviderOptions({
         id?: string | null;
         name?: string | null;
         provider: string;
-        disabledAt?: Date | string | null;
+        disabledAt?: Instant | string | null;
         healthStatus?: string | null;
       }>
     | undefined;
@@ -138,7 +140,7 @@ function useProviderOptions({
           id: provider.id!,
           modelProviderName: provider.name ?? provider.provider,
           slot: "primary",
-          disabledAt: provider.disabledAt ? new Date(provider.disabledAt).toISOString() : null,
+          disabledAt: provider.disabledAt ? readableDate(provider.disabledAt).toISOString() : null,
           healthStatus: provider.healthStatus ?? "UNKNOWN",
         })),
     [providers],

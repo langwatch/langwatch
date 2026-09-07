@@ -2,10 +2,11 @@
  * One end user's spending allowance, read from two stores that must agree: allowance + period boundary from Postgres, spend from the ledger. The join is the bucket scope id — get it wrong and you show someone else's spend, or quietly zero.
  */
 
+import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service.ts";
 
-const NOW_ISH = new Date("2026-06-01T00:00:00.000Z");
+const NOW_ISH = Temporal.Instant.from("2026-06-01T00:00:00.000Z");
 
 function template(over: Record<string, unknown> = {}) {
   return {
@@ -17,7 +18,7 @@ function template(over: Record<string, unknown> = {}) {
     onBreach: "BLOCK",
     limitUsd: "100",
     currentPeriodStartedAt: NOW_ISH,
-    resetsAt: new Date("2026-07-01T00:00:00.000Z"),
+    resetsAt: Temporal.Instant.from("2026-07-01T00:00:00.000Z"),
     lastResetAt: null,
     cycleAnchorAt: null,
     ...over,
@@ -26,7 +27,7 @@ function template(over: Record<string, unknown> = {}) {
 
 function capsWith(options: {
   templates?: Array<ReturnType<typeof template>>;
-  boundaries?: Array<{ budgetId: string; bucketScopeId: string; periodStartedAt: Date | null }>;
+  boundaries?: Array<{ budgetId: string; bucketScopeId: string; periodStartedAt: Instant | null }>;
   spends?: Array<{ budgetId: string; spentUsd: string }>;
 }) {
   const asked: Array<Record<string, unknown>> = [];
@@ -189,7 +190,7 @@ describe("GatewayEndUserCapsService.forEndUser", () => {
 
   describe("given a bucket that has rolled over", () => {
     it("dates the period from the boundary rather than the template", async () => {
-      const rolled = new Date("2026-06-15T00:00:00.000Z");
+      const rolled = Temporal.Instant.from("2026-06-15T00:00:00.000Z");
       const { service, asked } = capsWith({ templates: [template()] });
       await forEndUser(service);
       const bucketScopeId = spendTargets(asked)[0]!.scopeId;
@@ -200,7 +201,7 @@ describe("GatewayEndUserCapsService.forEndUser", () => {
       });
 
       await expect(forEndUser(rolledOver.service)).resolves.toMatchObject([
-        { period_started_at: rolled.toISOString() },
+        { period_started_at: toDate(rolled).toISOString() },
       ]);
     });
   });

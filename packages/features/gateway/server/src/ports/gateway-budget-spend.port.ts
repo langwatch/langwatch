@@ -7,6 +7,7 @@ import {
   type GatewayBudgetScopeType,
   type GatewayBudgetWindow,
 } from "@langwatch/gateway-contract";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 export type GatewayBudgetSpendRecord = {
   id: string;
@@ -14,14 +15,14 @@ export type GatewayBudgetSpendRecord = {
   scopeId: string;
   window: GatewayBudgetWindow;
   providerKey: string | null;
-  currentPeriodStartedAt: Date;
-  lastResetAt: Date | null;
-  cycleAnchorAt: Date | null;
+  currentPeriodStartedAt: Instant;
+  lastResetAt: Instant | null;
+  cycleAnchorAt: Instant | null;
 };
 
 export type BudgetBucketBoundary = {
   bucketScopeId: string;
-  periodStartedAt: Date;
+  periodStartedAt: Instant;
 };
 
 export type BudgetSpendTarget = {
@@ -59,7 +60,7 @@ export type LedgerEventRow = {
   tokensOutput: number;
   durationMs: number | null;
   status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
-  occurredAt: Date;
+  occurredAt: Instant;
 };
 
 export type BudgetDebitRow = {
@@ -81,7 +82,7 @@ export type BudgetDebitRow = {
   providerSlot?: string | null;
   durationMs?: number | null;
   status: GatewayBudgetLedgerStatus;
-  occurredAt: Date;
+  occurredAt: Instant;
 };
 
 export type PulledUsageRow = {
@@ -95,8 +96,8 @@ export type PulledUsageRow = {
   tokensCacheWrite: number;
   model: string;
   providerKey?: string | null;
-  occurredAt: Date;
-  observedAt: Date;
+  occurredAt: Instant;
+  observedAt: Instant;
 };
 
 export type PulledUsageTotals = {
@@ -113,10 +114,10 @@ export abstract class GatewayBudgetSpendPort {
    */
   static targetsForBudgets({
     budgets,
-    now = new Date(),
+    now = nowInstant(),
   }: {
     budgets: GatewayBudgetResource[];
-    now?: Date;
+    now?: Instant;
   }): BudgetSpendTarget[] {
     return budgets.map((b) =>
       b.scopeType === "GROUP"
@@ -152,32 +153,32 @@ export abstract class GatewayBudgetSpendPort {
   abstract readPulledUsageTotals(input: {
     tenantId: string;
     scopeIds: string[];
-    from: Date;
-    to: Date;
+    from: Instant;
+    to: Instant;
   }): Promise<PulledUsageTotals>;
   abstract insertDebitsForBudgets(rows: BudgetDebitRow[]): Promise<void>;
   abstract getSpendForBudgets(
     tenantId: string,
     budgets: GatewayBudgetSpendRecord[] | BudgetSpendTarget[],
-    now?: Date,
+    now?: Instant,
   ): Promise<ScopeSpend[]>;
   abstract getSpendForBudgetsAcrossTenants(
     tenantIds: string[],
     budgets: GatewayBudgetSpendRecord[] | BudgetSpendTarget[],
-    now?: Date,
+    now?: Instant,
   ): Promise<ScopeSpend[]>;
 
   abstract getSpendForTargetsAcrossTenants(
     tenantIds: string[],
     targets: BudgetSpendTarget[],
-    now?: Date,
+    now?: Instant,
   ): Promise<ScopeSpend[]>;
 
   abstract getBucketSpendBreakdownForBudget(input: {
     budget: GatewayBudgetSpendRecord;
     tenantIds: string[];
     boundaries: BudgetBucketBoundary[];
-    now: Date;
+    now: Instant;
   }): Promise<BucketSpend[]>;
 
   abstract recentEventsForBudget(

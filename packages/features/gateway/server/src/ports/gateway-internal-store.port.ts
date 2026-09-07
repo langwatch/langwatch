@@ -1,8 +1,6 @@
-import type {
-  GatewayBudget,
-  GatewayBudgetBucketBoundary,
-} from "@langwatch/gateway-contract";
+import type { GatewayBudget, GatewayBudgetBucketBoundary } from "@langwatch/gateway-contract";
 
+import type { Instant } from "@langwatch/time";
 import type { VirtualKeyWithScopes } from "./gateway-virtual-key.port.ts";
 
 /**
@@ -61,7 +59,7 @@ export abstract class GatewayInternalStorePort {
       id: string;
       organizationId: string;
       principalUserId: string | null;
-      lastUsedAt: Date | null;
+      lastUsedAt: Instant | null;
     }>
   >;
 
@@ -79,6 +77,6 @@ export abstract class GatewayInternalStorePort {
    */
   abstract touchVirtualKeysLastUsed(input: {
     virtualKeyIds: readonly string[];
-    now: Date;
+    now: Instant;
   }): Promise<void>;
 }

@@ -1,3 +1,4 @@
+import { fromDate, type Instant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 const identifierSchema = z.string().trim().min(1);
@@ -98,13 +99,13 @@ export type GatewayBudgetResource = {
   externalId: string | null;
   metadata: unknown;
   spentUsd: GatewayMoney;
-  currentPeriodStartedAt: Date;
-  resetsAt: Date;
-  lastResetAt: Date | null;
-  cycleAnchorAt: Date | null;
-  archivedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  currentPeriodStartedAt: Instant;
+  resetsAt: Instant;
+  lastResetAt: Instant | null;
+  cycleAnchorAt: Instant | null;
+  archivedAt: Instant | null;
+  createdAt: Instant;
+  updatedAt: Instant;
   createdById: string;
   managedByVirtualKeyId: string | null;
 };
@@ -239,7 +240,7 @@ export type GatewayBudgetScopeReachResult = {
 export type GatewayBudgetListWithHealth = {
   budgets: GatewayBudgetWithSeats[];
   spendAvailable: boolean;
-  readAt: Date;
+  readAt: Instant;
   scopeReach: Map<
     string,
     {
@@ -259,7 +260,7 @@ export type GatewayBudgetDetail = {
     amountUsd: GatewayMoney;
     model: string;
     status: GatewayBudgetLedgerStatus;
-    occurredAt: Date;
+    occurredAt: Instant;
     virtualKey: { name: string; displayPrefix: string } | null;
   }>;
   spendAvailable: boolean;
@@ -291,7 +292,7 @@ export type CreateGatewayBudgetInput = {
   providerKey?: string | null;
   externalId?: string | null;
   metadata?: Record<string, string>;
-  cycleAnchorAt?: Date | null;
+  cycleAnchorAt?: Instant | null;
   allowUnreachable?: boolean;
   actorUserId: string;
 };
@@ -347,12 +348,15 @@ const gatewayBudgetWindowSchema = z.enum([
   "MANUAL",
 ]);
 
+// The wire keeps carrying a Date or an offset-bearing ISO string; the instant
+// is what every layer above reads, and what a caller already holding one sends.
 const dateOrIsoSchema = z.union([
-  z.date(),
+  z.instanceof(Temporal.Instant),
+  z.date().transform(fromDate),
   z
     .string()
     .datetime({ offset: true })
-    .transform((value) => new Date(value)),
+    .transform((value) => Temporal.Instant.from(value)),
 ]);
 
 export const createGatewayBudgetInputSchema = z
@@ -402,7 +406,7 @@ export const resetGatewayBudgetInputSchema = z
 export type GatewayBudgetPageInput = {
   organizationId: string;
   limit: number;
-  cursor: { createdAt: Date; id: string } | null;
+  cursor: { createdAt: Instant; id: string } | null;
   scopeTypes?: GatewayBudgetScopeType[];
   externalId?: string;
 };
@@ -410,7 +414,7 @@ export type GatewayBudgetPageInput = {
 export type GatewayBudgetHealth = {
   budget: GatewayBudgetWithSeats;
   spendAvailable: boolean;
-  readAt: Date;
+  readAt: Instant;
   unreachableByAnyKey: boolean;
 };
 
@@ -473,11 +477,12 @@ export const gatewayBudgetApiCreateInputSchema = z.object({
   // per deployment.
   cycleAnchorAt: z
     .union([
-      z.date(),
+      z.instanceof(Temporal.Instant),
+      z.date().transform(fromDate),
       z
         .string()
         .datetime({ offset: true })
-        .transform((iso) => new Date(iso)),
+        .transform((iso) => Temporal.Instant.from(iso)),
     ])
     .nullable()
     .optional(),

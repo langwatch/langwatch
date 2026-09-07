@@ -1,3 +1,5 @@
+import { readableDate } from "../../../../model/readable-date.ts";
+import { type TimeInput } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -35,8 +37,8 @@ function outcomeBadge(outcome: string) {
   );
 }
 
-function formatWhen(date: Date | string) {
-  return new Date(date).toLocaleString();
+function formatWhen(at: TimeInput) {
+  return readableDate(at).toLocaleString();
 }
 
 function formatAge(ms: number) {
@@ -228,7 +230,7 @@ function useDeliveriesDrawerData(organizationId: string, endpoint: EndpointView 
   const page = deliveries.data;
   useEffect(() => {
     if (!page) return;
-    const key = cursor ? `${new Date(cursor.firedAt).toISOString()}:${cursor.id}` : "first";
+    const key = cursor ? `${readableDate(cursor.firedAt).toISOString()}:${cursor.id}` : "first";
     setPages((prev) => {
       if (key === "first") return [{ key, rows: page.deliveries }];
       const at = prev.findIndex((p) => p.key === key);

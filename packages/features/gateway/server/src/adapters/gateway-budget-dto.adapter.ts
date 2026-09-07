@@ -1,3 +1,4 @@
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 /**
  * Shared DTO shape for GatewayBudget on the public REST wire (budget
  * counterpart to gateway-virtual-key-dto.adapter.ts). Lives outside the
@@ -43,13 +44,13 @@ export class GatewayBudgetDtoAdapter {
     budget: b,
     memberCount,
     spendAvailable = true,
-    readAt = new Date(),
+    readAt = nowInstant(),
     reachable,
   }: {
     budget: GatewayBudgetWithSeats;
     memberCount?: number;
     spendAvailable?: boolean;
-    readAt?: Date;
+    readAt?: Instant;
     /**
      * Whether any active key can produce traffic this budget matches. Undefined
      * where reach was not resolved, which leaves the field off the wire rather
@@ -82,16 +83,16 @@ export class GatewayBudgetDtoAdapter {
       provider_key: b.providerKey,
       external_id: b.externalId ?? null,
       metadata: metadataFromRow(b.metadata),
-      current_period_started_at: period.currentPeriodStartedAt.toISOString(),
-      resets_at: period.resetsAt.toISOString(),
+      current_period_started_at: toDate(period.currentPeriodStartedAt).toISOString(),
+      resets_at: toDate(period.resetsAt).toISOString(),
       // Null is no anchor at all: a cyclic window aligned to the calendar, or
       // one of the two windows that do not cycle (total, manual) and so have
       // no phase to set. Set, it is the phase the window cycles on, and the
       // period fields above describe that cycle rather than the calendar one.
-      cycle_anchor_at: b.cycleAnchorAt?.toISOString() ?? null,
-      last_reset_at: b.lastResetAt?.toISOString() ?? null,
-      archived_at: b.archivedAt?.toISOString() ?? null,
-      created_at: b.createdAt.toISOString(),
+      cycle_anchor_at: b.cycleAnchorAt ? toDate(b.cycleAnchorAt).toISOString() : null,
+      last_reset_at: b.lastResetAt ? toDate(b.lastResetAt).toISOString() : null,
+      archived_at: b.archivedAt ? toDate(b.archivedAt).toISOString() : null,
+      created_at: toDate(b.createdAt).toISOString(),
       ...(memberCount !== undefined ? { member_count: memberCount } : {}),
       // Per-person templates only: one allowance per end user, so the wire
       // reports the distribution instead of pretending there is one total.

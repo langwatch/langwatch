@@ -2,6 +2,12 @@
  * @vitest-environment node
  * Real Postgres. The cap bounding concurrent voice calls per key, the lock making it a cap under concurrency, the expiry freeing an unreported session's slot, and the match refusing to guess. Spec: specs/ai-gateway/realtime-sessions.feature
  */
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
+
+/** The stored row, as the settlement seam reads it: the same columns, on instants. */
+function toSessionRecord<Row extends { mintedAt: Date }>(row: Row) {
+  return { ...row, mintedAt: fromDate(row.mintedAt) };
+}
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -179,7 +185,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
     });
 
     await realtimeSessions.closeAndConfirmRealtimeSession({
-      session,
+      session: toSessionRecord(session),
       // The vendor prices a conversation by duration and reports whole
       // seconds; every quantity on the spend wire is an integer, so the one
       // conversion to milliseconds happens at this seam.
@@ -227,7 +233,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
     });
 
     await realtimeSessions.closeAndConfirmRealtimeSession({
-      session,
+      session: toSessionRecord(session),
       usage: { audio_ms: 5000 },
       durationMs: 5000,
       reason: "post-call report",
@@ -257,7 +263,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
     });
 
     await realtimeSessions.closeAndConfirmRealtimeSession({
-      session,
+      session: toSessionRecord(session),
       usage: { audio_ms: 6000 },
       durationMs: 6000,
       reason: "post-call report",
@@ -299,7 +305,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
     });
 
     await realtimeSessions.closeAndConfirmRealtimeSession({
-      session,
+      session: toSessionRecord(session),
       usage: { audio_ms: 6000 },
       durationMs: 6000,
       reason: "post-call report",
@@ -308,7 +314,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
     // The same row the first delivery read: a resent webhook carries no
     // knowledge that the session has since closed.
     await realtimeSessions.closeAndConfirmRealtimeSession({
-      session,
+      session: toSessionRecord(session),
       usage: { audio_ms: 6000 },
       durationMs: 6000,
       reason: "post-call report, resent",
@@ -331,7 +337,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
     });
 
     await realtimeSessions.closeAndConfirmRealtimeSession({
-      session,
+      session: toSessionRecord(session),
       usage: { audio_ms: 3000 },
       durationMs: 3000,
       reason: "post-call report",
@@ -416,7 +422,9 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
     await prisma.gatewayRealtimeSession.update({
       where: { id: stale },
       data: {
-        mintedAt: new Date(Date.now() - REALTIME_OPEN_SESSION_WINDOW_MS - 60_000),
+        mintedAt: toDate(
+          nowInstant().subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS - 60_000 }),
+        ),
       },
     });
 
@@ -533,7 +541,9 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
     await prisma.gatewayRealtimeSession.update({
       where: { id: old },
       data: {
-        mintedAt: new Date(Date.now() - REALTIME_OPEN_SESSION_WINDOW_MS - 1000),
+        mintedAt: toDate(
+          nowInstant().subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS - 1000 }),
+        ),
       },
     });
 

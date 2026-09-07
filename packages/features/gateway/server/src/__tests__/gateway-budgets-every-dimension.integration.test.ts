@@ -3,6 +3,32 @@
  * Real Postgres + real ClickHouse. Covers which budgets apply to a key, ledger spend separation, gateway bundle contents, and key create/revoke invariants.
  * Spec: specs/ai-gateway/gateway-budget-targeting.feature, budgets.feature, virtual-key-creation.feature, provider-routing.feature, fallback.feature, governance/vk-provider-access.feature
  */
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
+
+/** A stored budget row, as the spend reads take it: the same columns, on instants. */
+function toBudgetRow<
+  Row extends {
+    currentPeriodStartedAt: Date;
+    resetsAt: Date;
+    lastResetAt: Date | null;
+    cycleAnchorAt: Date | null;
+    archivedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+>(row: Row) {
+  return {
+    ...row,
+    currentPeriodStartedAt: fromDate(row.currentPeriodStartedAt),
+    resetsAt: fromDate(row.resetsAt),
+    lastResetAt: row.lastResetAt ? fromDate(row.lastResetAt) : null,
+    cycleAnchorAt: row.cycleAnchorAt ? fromDate(row.cycleAnchorAt) : null,
+    archivedAt: row.archivedAt ? fromDate(row.archivedAt) : null,
+    createdAt: fromDate(row.createdAt),
+    updatedAt: fromDate(row.updatedAt),
+  };
+}
+
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
@@ -255,7 +281,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
         limitUsd: "50.00",
         onBreach: "BLOCK",
         createdById: USER_ID,
-        resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        resetsAt: toDate(nowInstant().add({ milliseconds: 30 * 24 * 60 * 60 * 1000 })),
       },
     });
     await prisma.gatewayBudget.create({
@@ -269,7 +295,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
         limitUsd: "500.00",
         onBreach: "BLOCK",
         createdById: USER_ID,
-        resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        resetsAt: toDate(nowInstant().add({ milliseconds: 30 * 24 * 60 * 60 * 1000 })),
       },
     });
     await prisma.gatewayBudget.create({
@@ -284,7 +310,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
         limitUsd: "10.00",
         onBreach: "BLOCK",
         createdById: USER_ID,
-        resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        resetsAt: toDate(nowInstant().add({ milliseconds: 30 * 24 * 60 * 60 * 1000 })),
       },
     });
   }, 120_000);
@@ -518,7 +544,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
           tokensCacheWrite: 0,
           model: "claude-sonnet-4",
           status: "SUCCESS",
-          occurredAt: new Date(),
+          occurredAt: nowInstant(),
         },
       ]);
 
@@ -591,7 +617,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
         tokensCacheWrite: 0,
         model: "gpt-5-mini",
         status: "SUCCESS" as const,
-        occurredAt: new Date(),
+        occurredAt: nowInstant(),
       });
       // One insert per request: the repository enforces one
       // gateway_request_id per debit burst.
@@ -623,7 +649,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
           limitUsd: "20.00",
           onBreach: "BLOCK",
           createdById: USER_ID,
-          resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          resetsAt: toDate(nowInstant().add({ milliseconds: 30 * 24 * 60 * 60 * 1000 })),
         },
       });
 
@@ -648,7 +674,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
           tokensCacheWrite: 0,
           model: "gpt-5-mini",
           status: "SUCCESS" as const,
-          occurredAt: new Date(),
+          occurredAt: nowInstant(),
         },
       ]);
 
@@ -657,7 +683,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
       });
       const spends = await chRepo.getSpendForBudgetsAcrossTenants(
         [PROJECT_ID],
-        [unfilteredBudget, filteredBudget],
+        [toBudgetRow(unfilteredBudget), toBudgetRow(filteredBudget)],
       );
       const byId = new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
 
@@ -801,7 +827,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
           name: `standalone-hard-cap-${suffix}`,
           window: "MONTH",
           limitUsd: "5.00",
-          resetsAt: new Date(Date.now() + 86_400_000),
+          resetsAt: toDate(nowInstant().add({ milliseconds: 86_400_000 })),
           createdById: USER_ID,
           managedByVirtualKeyId: null,
         },
@@ -838,7 +864,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
           name: `per-user-cap-${suffix}`,
           window: "MONTH",
           limitUsd: "2.00",
-          resetsAt: new Date(Date.now() + 86_400_000),
+          resetsAt: toDate(nowInstant().add({ milliseconds: 86_400_000 })),
           createdById: USER_ID,
         },
       });
@@ -874,7 +900,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
           name: `project-hard-cap-${suffix}`,
           window: "MONTH",
           limitUsd: "50.00",
-          resetsAt: new Date(Date.now() + 86_400_000),
+          resetsAt: toDate(nowInstant().add({ milliseconds: 86_400_000 })),
           createdById: USER_ID,
         },
       });
@@ -911,7 +937,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
           name: `survives-drawer-clear-${suffix}`,
           window: "MONTH",
           limitUsd: "3.00",
-          resetsAt: new Date(Date.now() + 86_400_000),
+          resetsAt: toDate(nowInstant().add({ milliseconds: 86_400_000 })),
           createdById: USER_ID,
           managedByVirtualKeyId: null,
         },
@@ -989,7 +1015,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
             limitUsd: "25.00",
             onBreach: "BLOCK",
             createdById: USER_ID,
-            resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            resetsAt: toDate(nowInstant().add({ milliseconds: 30 * 24 * 60 * 60 * 1000 })),
           },
         });
         await prisma.virtualKey.create({

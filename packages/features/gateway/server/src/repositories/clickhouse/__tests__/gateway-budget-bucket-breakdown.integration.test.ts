@@ -3,9 +3,10 @@
  * @vitest-environment node
  */
 
+import { type Instant, nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import {
   createTestClickHouseClient,
@@ -27,14 +28,14 @@ const PROVIDER_KEY = `prov-openai-${suffix}`;
 const LIMIT_USD = "1.00";
 
 /** The instant every debit is written at and every read is anchored to. */
-const NOW = new Date();
+const NOW = nowInstant();
 
 function templateFor(args: {
   id: string;
   anchorId: string;
   window?: GatewayBudgetWindow;
   providerKey?: string | null;
-  currentPeriodStartedAt?: Date;
+  currentPeriodStartedAt?: Instant;
 }): GatewayBudget {
   return {
     id: args.id,
@@ -49,14 +50,18 @@ function templateFor(args: {
     timezone: null,
     spentUsd: new Prisma.Decimal("0"),
     currentPeriodStartedAt: args.currentPeriodStartedAt ?? NOW,
-    resetsAt: new Date(NOW.getTime() + 86_400_000),
+    resetsAt: NOW.add({ milliseconds: 86_400_000 }),
     lastResetAt: null,
     archivedAt: null,
     createdAt: NOW,
     updatedAt: NOW,
     createdById: `usr-${suffix}`,
     providerKey: args.providerKey ?? null,
-  } as GatewayBudget;
+    externalId: null,
+    metadata: null,
+    cycleAnchorAt: null,
+    managedByVirtualKeyId: null,
+  };
 }
 
 let repo: GatewayBudgetClickHouseRepository;
@@ -73,7 +78,7 @@ async function debit(args: {
   window?: GatewayBudgetWindow;
   status?: "SUCCESS" | "PROVIDER_ERROR";
   tokensInput?: number;
-  occurredAt?: Date;
+  occurredAt?: Instant;
 }): Promise<void> {
   await repo.insertDebit([
     {
@@ -302,7 +307,7 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
           budgetId: template.id,
           bucketScopeId: `${anchorId}:${user}`,
           amountNanoUsd: 2_000_000_000,
-          occurredAt: new Date(NOW.getTime() - 60_000),
+          occurredAt: NOW.subtract({ milliseconds: 60_000 }),
         });
       }
       buckets = await repo.getBucketSpendBreakdownForBudget({
@@ -313,7 +318,7 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
         boundaries: [
           {
             bucketScopeId: `${anchorId}:resetuser`,
-            periodStartedAt: new Date(NOW.getTime() - 1_000),
+            periodStartedAt: NOW.subtract({ milliseconds: 1_000 }),
           },
         ],
         now: NOW,
@@ -335,7 +340,7 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
 
   describe("when the template runs a MANUAL window whose boundary moved mid-period", () => {
     const anchorId = `vkanchor-manual-${suffix}`;
-    const periodStartedAt = new Date(NOW.getTime() - 30 * 60_000);
+    const periodStartedAt = NOW.subtract({ milliseconds: 30 * 60_000 });
     const template = templateFor({
       id: `bdg-manual-${suffix}`,
       anchorId,
@@ -351,14 +356,14 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
         bucketScopeId: `${anchorId}:stale`,
         amountNanoUsd: 5_000_000_000,
         window: "MANUAL",
-        occurredAt: new Date(NOW.getTime() - 2 * 60 * 60_000),
+        occurredAt: NOW.subtract({ milliseconds: 2 * 60 * 60_000 }),
       });
       await debit({
         budgetId: template.id,
         bucketScopeId: `${anchorId}:current`,
         amountNanoUsd: 400_000_000,
         window: "MANUAL",
-        occurredAt: new Date(NOW.getTime() - 2 * 60 * 60_000),
+        occurredAt: NOW.subtract({ milliseconds: 2 * 60 * 60_000 }),
       });
       // After it: the only spend this period owns.
       await debit({
@@ -366,7 +371,7 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
         bucketScopeId: `${anchorId}:current`,
         amountNanoUsd: 3_000_000_000,
         window: "MANUAL",
-        occurredAt: new Date(NOW.getTime() - 60_000),
+        occurredAt: NOW.subtract({ milliseconds: 60_000 }),
       });
       buckets = await repo.getBucketSpendBreakdownForBudget({
         budget: template,

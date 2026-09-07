@@ -3,12 +3,13 @@
  * History folded by an older rollup view must survive the rebuild that
  * replaced it. Spec: specs/ai-gateway/budgets.feature
  */
+import { type Instant, nowInstant } from "@langwatch/time";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { Prisma } from "@langwatch/prisma-client/generated";
-import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
 
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import {
@@ -42,14 +43,19 @@ function budgetFor(window: GatewayBudgetWindow): GatewayBudget {
     onBreach: "BLOCK",
     timezone: null,
     spentUsd: new Prisma.Decimal("0"),
-    currentPeriodStartedAt: new Date(),
-    resetsAt: new Date(Date.now() + 86_400_000),
+    currentPeriodStartedAt: nowInstant(),
+    resetsAt: nowInstant().add({ milliseconds: 86_400_000 }),
     lastResetAt: null,
     archivedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: nowInstant(),
+    updatedAt: nowInstant(),
     createdById: `usr-${suffix}`,
-  } as GatewayBudget;
+    providerKey: null,
+    externalId: null,
+    metadata: null,
+    cycleAnchorAt: null,
+    managedByVirtualKeyId: null,
+  };
 }
 
 const enabled = Boolean(
@@ -60,7 +66,7 @@ const enabled = Boolean(
 
 describe.skipIf(!enabled)("given spend recorded before the rollup rebuild", () => {
   const preBudgets = PRE_WINDOWS.map(budgetFor);
-  const preOccurredAt = new Date();
+  const preOccurredAt = nowInstant();
 
   let endpoint: MigratedClickHouse;
   let repo: GatewayBudgetClickHouseRepository;
@@ -120,7 +126,7 @@ describe.skipIf(!enabled)("given spend recorded before the rollup rebuild", () =
 async function readSpend(
   repo: GatewayBudgetClickHouseRepository,
   budgets: GatewayBudget[],
-  at: Date,
+  at: Instant,
 ): Promise<Map<string, string>> {
   const spend = await repo.getSpendForBudgets(TENANT_ID, budgets, at);
 
@@ -130,7 +136,7 @@ async function readSpend(
 async function insertPreUpgradeDebits(
   client: ClickHouseClient,
   budgets: GatewayBudget[],
-  occurredAt: Date,
+  occurredAt: Instant,
 ): Promise<void> {
   await client.insert({
     table: "gateway_budget_ledger_events",
@@ -152,8 +158,8 @@ async function insertPreUpgradeDebits(
       ProviderSlot: "",
       DurationMS: 120,
       Status: "success",
-      OccurredAt: occurredAt.getTime(),
-      EventTimestamp: occurredAt.getTime(),
+      OccurredAt: occurredAt.epochMilliseconds,
+      EventTimestamp: occurredAt.epochMilliseconds,
     })),
     format: "JSONEachRow",
     clickhouse_settings: { session_timezone: "America/Sao_Paulo" },

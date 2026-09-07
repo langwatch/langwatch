@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 /**
  * Gateway spend, the per-request billing record, projected from the gateway_spend_processing pipeline: one row per REQUEST at its latest lifecycle status, keyed (TenantId, GatewayRequestId) on a ReplacingMergeTree versioned by the fold's monotonic updatedAt — every read here is FINAL since RMT dedup is eventual. CostNanoUSD is the integer of record; costUsd is derived at the read boundary for response shape. See migration 00067_create_gateway_spend.sql.
  */
@@ -5,7 +6,10 @@
 import { createLogger } from "@langwatch/observability";
 import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port.ts";
 import type { GatewaySpendState } from "../../projections/gateway-spend.projection.ts";
-import { EMPTY_SPEND_USAGE, type SpendUsage } from "../../processes/gateway-spend-commands.process.ts";
+import {
+  EMPTY_SPEND_USAGE,
+  type SpendUsage,
+} from "../../processes/gateway-spend-commands.process.ts";
 import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../processes/gateway-spend-commands.process.ts";
 import {
   GatewaySpendFiltersAdapter,
@@ -181,7 +185,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       httpStatus: row.httpStatus,
       needsReconciliation: row.needsReconciliation,
       settleReason: String(r.SettleReason ?? ""),
-      occurredAtMs: row.occurredAt.getTime(),
+      occurredAtMs: row.occurredAt.epochMilliseconds,
       durationMs: row.durationMs,
       createdAt: Number(r.CreatedAt ?? 0),
       updatedAt: Number(r.EventTimestamp ?? 0),
@@ -249,7 +253,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       nextCursor:
         rows.length === limit && last
           ? {
-              occurredAtMs: last.occurredAt.getTime(),
+              occurredAtMs: last.occurredAt.epochMilliseconds,
               gatewayRequestId: last.gatewayRequestId,
             }
           : null,
@@ -565,7 +569,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
       metadata: String(r.Metadata ?? ""),
       durationMs: Number(r.DurationMS),
-      occurredAt: new Date(Number(r.OccurredAtMs)),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(Number(r.OccurredAtMs)),
     };
   }
 

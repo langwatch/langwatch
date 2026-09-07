@@ -1,3 +1,5 @@
+import { readableDate } from "../../model/readable-date.ts";
+import { toEpochMs } from "@langwatch/time";
 import {
   Alert,
   Badge,
@@ -335,10 +337,8 @@ function BudgetsPage() {
                                   never
                                 </Text>
                               ) : (
-                                <Tooltip content={new Date(b.resetsAt).toLocaleString()}>
-                                  <Text fontSize="xs">
-                                    {formatTimeAgo(new Date(b.resetsAt).getTime())}
-                                  </Text>
+                                <Tooltip content={readableDate(b.resetsAt).toLocaleString()}>
+                                  <Text fontSize="xs">{formatTimeAgo(toEpochMs(b.resetsAt))}</Text>
                                 </Tooltip>
                               )}
                             </Table.Cell>

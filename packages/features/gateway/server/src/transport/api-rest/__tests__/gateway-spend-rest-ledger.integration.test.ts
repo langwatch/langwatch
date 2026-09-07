@@ -2,6 +2,7 @@
  * @vitest-environment node
  * Real ClickHouse (spend/budget rows) + real Postgres (tenancy filters name). Pins what no double can stand in for: insert-order paging that never skips a late fold, the tenant fence, and rollup/end-user arithmetic. Boundary decisions in front (auth, plan gate, cursor/window validation) are pinned in apps/api against the process's own credential chain; the org on this context is installed the same way, everything behind it is production code. Spec: specs/ai-gateway/gateway-spend-rest.feature, billing-spend-events.feature, end-user-attribution.feature
  */
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -68,7 +69,7 @@ function testEnvelope(row: SpendEventRow) {
   return {
     id: `${row.gatewayRequestId}:${family}`,
     type: `gateway.request.${family}`,
-    created: row.occurredAt.toISOString(),
+    created: toDate(row.occurredAt).toISOString(),
     schema_version: "1",
     data: { gateway_request_id: row.gatewayRequestId, status: row.status },
   };
@@ -162,7 +163,7 @@ function spendRow(requestId: string, overrides: Partial<SpendEventRow> = {}): Sp
     labels: [],
     metadata: "",
     durationMs: 800,
-    occurredAt: new Date(baseTime),
+    occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime),
     ...overrides,
   };
 }
@@ -215,13 +216,13 @@ async function seed(rows: SpendEventRow[]): Promise<void> {
         httpStatus: row.httpStatus,
         needsReconciliation: row.needsReconciliation,
         settleReason: row.settleReason,
-        occurredAtMs: row.occurredAt.getTime(),
+        occurredAtMs: row.occurredAt.epochMilliseconds,
         durationMs: row.durationMs,
         // Write-time stamps: the walk pages by insert order, so the version
         // must be the seed instant, never the occurred-at.
         createdAt: ++seedClock,
         updatedAt: ++seedClock,
-        LastEventOccurredAt: row.occurredAt.getTime(),
+        LastEventOccurredAt: row.occurredAt.epochMilliseconds,
       },
     })) as never,
   );
@@ -296,10 +297,18 @@ describe.skipIf(!databaseUrl || !chUrl)(
       /** @scenario "Pagination under concurrent inserts never skips a row" */
       it("serves late-folded rows on later pages of an in-flight walk", async () => {
         await seed([
-          spendRow(`${ns}-r1`, { occurredAt: new Date(baseTime + 1_000) }),
-          spendRow(`${ns}-r2`, { occurredAt: new Date(baseTime + 2_000) }),
+          spendRow(`${ns}-r1`, {
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 1_000),
+          }),
+          spendRow(`${ns}-r2`, {
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 2_000),
+          }),
         ]);
-        await seed([spendRow(`${ns}-r3`, { occurredAt: new Date(baseTime + 3_000) })]);
+        await seed([
+          spendRow(`${ns}-r3`, {
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 3_000),
+          }),
+        ]);
 
         const window = `from=${baseTime - 120_000}&to=${baseTime + 600_000}`;
         const firstResponse = await get(`/api/gateway/v1/spend-events?limit=2&${window}`);
@@ -314,7 +323,11 @@ describe.skipIf(!databaseUrl || !chUrl)(
         // A late fold: OLDER occurred-at than everything served, inserted
         // while the walk is mid-flight. Insert-order pagination must still
         // serve it.
-        await seed([spendRow(`${ns}-late`, { occurredAt: new Date(baseTime - 60_000) })]);
+        await seed([
+          spendRow(`${ns}-late`, {
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime - 60_000),
+          }),
+        ]);
 
         const seen: string[] = first.data.map((event) => event.id);
         let cursor = first.next_cursor;
@@ -368,12 +381,12 @@ describe.skipIf(!databaseUrl || !chUrl)(
           spendRow(`${ns}-sum-1`, {
             endUserId: endUser,
             costUsd: "0.020000",
-            occurredAt: new Date(baseTime + 40_000),
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 40_000),
           }),
           spendRow(`${ns}-sum-2`, {
             endUserId: endUser,
             costUsd: "0.030000",
-            occurredAt: new Date(baseTime + 41_000),
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 41_000),
           }),
           // Nonzero on purpose: if the aggregation ever sums settled rows,
           // the cost and token assertions below must fail, not coast on zero.
@@ -387,7 +400,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
             tokensOutput: 8_888,
             tokensCacheRead: 0,
             tokensCacheWrite: 0,
-            occurredAt: new Date(baseTime + 42_000),
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 42_000),
           }),
         ]);
 
@@ -423,7 +436,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
             spendRow(`${ns}-page-${index}`, {
               endUserId: key,
               costUsd: "0.010000",
-              occurredAt: new Date(window.from + 1_000 + index),
+              occurredAt: Temporal.Instant.fromEpochMilliseconds(window.from + 1_000 + index),
             }),
           ),
         );
@@ -465,12 +478,12 @@ describe.skipIf(!databaseUrl || !chUrl)(
           spendRow(`${ns}-vkf-1`, {
             virtualKeyId: `${ns}-vk-keep`,
             endUserId: `${ns}-vkf-user-a`,
-            occurredAt: new Date(window.from + 1_000),
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(window.from + 1_000),
           }),
           spendRow(`${ns}-vkf-2`, {
             virtualKeyId: `${ns}-vk-drop`,
             endUserId: `${ns}-vkf-user-b`,
-            occurredAt: new Date(window.from + 2_000),
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(window.from + 2_000),
           }),
         ]);
 
@@ -491,17 +504,17 @@ describe.skipIf(!databaseUrl || !chUrl)(
           spendRow(`${ns}-u1a`, {
             endUserId: `${ns}-user-1`,
             costUsd: "0.020000",
-            occurredAt: new Date(baseTime + 10_000),
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 10_000),
           }),
           spendRow(`${ns}-u1b`, {
             endUserId: `${ns}-user-1`,
             costUsd: "0.030000",
-            occurredAt: new Date(baseTime + 11_000),
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 11_000),
           }),
           spendRow(`${ns}-u2`, {
             endUserId: `${ns}-user-2`,
             costUsd: "5.000000",
-            occurredAt: new Date(baseTime + 12_000),
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 12_000),
           }),
         ]);
 
@@ -533,13 +546,13 @@ describe.skipIf(!databaseUrl || !chUrl)(
             endUserId: `${ns}-user-3`,
             virtualKeyId: "vk-a",
             costUsd: "0.010000",
-            occurredAt: new Date(baseTime + 20_000),
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 20_000),
           }),
           spendRow(`${ns}-vk-b`, {
             endUserId: `${ns}-user-3`,
             virtualKeyId: "vk-b",
             costUsd: "0.040000",
-            occurredAt: new Date(baseTime + 21_000),
+            occurredAt: Temporal.Instant.fromEpochMilliseconds(baseTime + 21_000),
           }),
         ]);
 
@@ -566,8 +579,8 @@ describe.skipIf(!databaseUrl || !chUrl)(
             window: "MONTH",
             limitUsd: "100",
             onBreach: "BLOCK",
-            resetsAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
-            currentPeriodStartedAt: new Date(Date.now() - 60_000),
+            resetsAt: toDate(nowInstant().add({ milliseconds: 30 * 24 * 3600 * 1000 })),
+            currentPeriodStartedAt: toDate(nowInstant().subtract({ milliseconds: 60_000 })),
             createdById: USER_ID,
           },
         });
@@ -589,7 +602,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
             model: "gpt-x",
             durationMs: 10,
             status: "SUCCESS",
-            occurredAt: new Date(),
+            occurredAt: nowInstant(),
           },
         ]);
 

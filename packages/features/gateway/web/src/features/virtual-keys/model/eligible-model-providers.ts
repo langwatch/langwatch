@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import { MODEL_PROVIDER_DEFAULT_MODELS } from "./model-provider-default-models.ts";
 import { isDispatchableProvider } from "@langwatch/model-provider-contract";
 import { SCOPE_BREADTH, scopeBreadthRank } from "./scope-breadth.ts";
@@ -29,7 +30,7 @@ export type OrgModelProvider = {
   /** Whether an admin has this credential switched on. */
   enabled?: boolean;
   /** Set once the credential has been withdrawn. */
-  disabledAt?: Date | string | null;
+  disabledAt?: Instant | string | null;
   scopes: ModelProviderScopeEntry[];
   models?: string[] | null;
   customModels?: Array<{ modelId: string }> | null;

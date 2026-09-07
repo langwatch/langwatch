@@ -4,6 +4,7 @@
  * reference agree. Shared by provisioning and the status changes so the two cannot drift apart.
  */
 
+import { type Instant, nowInstant } from "@langwatch/time";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -92,11 +93,11 @@ export type CreateVirtualKeyInput = {
    */
   routingPolicyId?: string | null;
   /**
-   * When the key stops serving. Absent or null means it never expires. A date
-   * that has already passed is refused rather than stored: the key would be
-   * dead on arrival.
+   * When the key stops serving. Absent or null means it never expires. A
+   * moment that has already passed is refused rather than stored: the key
+   * would be dead on arrival.
    */
-  expiresAt?: Date | null;
+  expiresAt?: Instant | null;
   config?: Partial<VirtualKeyConfig>;
   /**
    * USER (default) for keys created via the gateway UI/API; LANGY when
@@ -126,10 +127,10 @@ export type UpdateVirtualKeyInput = {
   routingPolicyId?: string | null;
   routingMode?: VirtualKeyRoutingMode;
   /**
-   * Undefined leaves the expiration where it is; null clears it; a date moves
-   * it. Extending an expired key is why expiry is a date, not a status.
+   * Undefined leaves the expiration where it is; null clears it; a moment
+   * moves it. Extending an expired key is why expiry is a moment, not a status.
    */
-  expiresAt?: Date | null;
+  expiresAt?: Instant | null;
   config?: Partial<VirtualKeyConfig>;
   /**
    * Undefined leaves the key's budget alone; a value creates or updates
@@ -214,16 +215,16 @@ export class VirtualKeyValidationService {
   }
 
   /**
-   * A key is never written already expired. Absence leaves the stored date
-   * alone and null clears it, so only a real date is checked, against the
+   * A key is never written already expired. Absence leaves the stored moment
+   * alone and null clears it, so only a real one is checked, against the
    * moment of the write — "now" itself is a refusal.
    */
-  static assertExpiryInFuture({ expiresAt }: { expiresAt: Date | null | undefined }): void {
+  static assertExpiryInFuture({ expiresAt }: { expiresAt: Instant | null | undefined }): void {
     if (!expiresAt) {
       return;
     }
 
-    if (expiresAt.getTime() <= Date.now()) {
+    if (expiresAt.epochMilliseconds <= nowInstant().epochMilliseconds) {
       throw new VirtualKeyExpiryInPastError();
     }
   }

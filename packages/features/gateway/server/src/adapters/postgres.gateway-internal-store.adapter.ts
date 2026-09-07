@@ -1,3 +1,6 @@
+import { fromDate, type Instant, toDate } from "@langwatch/time";
+import { toGatewayBudgetRow } from "../repositories/prisma/prisma.gateway-budget.repository.ts";
+import type { GatewayBudget, GatewayBudgetBucketBoundary } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -37,12 +40,17 @@ export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStorePort 
     return (found as VirtualKeyWithScopes | null) ?? null;
   }
 
-  tryFindBudget(budgetId: string) {
-    return this.database.gatewayBudget.findUnique({ where: { id: budgetId } });
+  async tryFindBudget(budgetId: string): Promise<GatewayBudget | null> {
+    const row = await this.database.gatewayBudget.findUnique({ where: { id: budgetId } });
+
+    return row ? toGatewayBudgetRow(row) : null;
   }
 
-  tryFindBucketBoundary(input: { budgetId: string; bucketScopeId: string }) {
-    return this.database.gatewayBudgetBucketBoundary.findUnique({
+  async tryFindBucketBoundary(input: {
+    budgetId: string;
+    bucketScopeId: string;
+  }): Promise<{ periodStartedAt: GatewayBudgetBucketBoundary["periodStartedAt"] } | null> {
+    const row = await this.database.gatewayBudgetBucketBoundary.findUnique({
       where: {
         budgetId_bucketScopeId: {
           budgetId: input.budgetId,
@@ -51,6 +59,8 @@ export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStorePort 
       },
       select: { periodStartedAt: true },
     });
+
+    return row ? { periodStartedAt: fromDate(row.periodStartedAt) } : null;
   }
 
   async listProjectIdsForOrganization(organizationId: string): Promise<string[]> {
@@ -61,8 +71,15 @@ export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStorePort 
     return projects.map((project) => project.id);
   }
 
-  findVirtualKeysForAttribution(virtualKeyIds: readonly string[]) {
-    return this.database.virtualKey.findMany({
+  async findVirtualKeysForAttribution(virtualKeyIds: readonly string[]): Promise<
+    Array<{
+      id: string;
+      organizationId: string;
+      principalUserId: string | null;
+      lastUsedAt: Instant | null;
+    }>
+  > {
+    const rows = await this.database.virtualKey.findMany({
       where: { id: { in: [...virtualKeyIds] } },
       select: {
         id: true,
@@ -71,9 +88,14 @@ export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStorePort 
         lastUsedAt: true,
       },
     });
+
+    return rows.map((row) => ({
+      ...row,
+      lastUsedAt: row.lastUsedAt ? fromDate(row.lastUsedAt) : null,
+    }));
   }
 
-  findProjectTeams(projectIds: readonly string[]) {
+  findProjectTeams(projectIds: readonly string[]): Promise<Array<{ id: string; teamId: string }>> {
     return this.database.project.findMany({
       where: { id: { in: [...projectIds] } },
       select: { id: true, teamId: true },
@@ -87,13 +109,13 @@ export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStorePort 
    */
   async touchVirtualKeysLastUsed(input: {
     virtualKeyIds: readonly string[];
-    now: Date;
+    now: Instant;
   }): Promise<void> {
     if (input.virtualKeyIds.length === 0) return;
     try {
       await this.database.virtualKey.updateMany({
         where: { id: { in: [...input.virtualKeyIds] } },
-        data: { lastUsedAt: input.now },
+        data: { lastUsedAt: toDate(input.now) },
       });
     } catch (error) {
       logger.warn(

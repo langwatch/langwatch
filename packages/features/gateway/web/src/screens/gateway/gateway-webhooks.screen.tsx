@@ -1,3 +1,4 @@
+import { readableDate } from "../../model/readable-date.ts";
 import {
   Alert,
   Badge,
@@ -273,7 +274,7 @@ function WebhookRow(props: EndpointActionProps) {
       </Table.Cell>
       <Table.Cell>{statusBadge(endpoint)}</Table.Cell>
       <Table.Cell whiteSpace="nowrap">
-        {endpoint.lastSuccessAt ? new Date(endpoint.lastSuccessAt).toLocaleString() : "never"}
+        {endpoint.lastSuccessAt ? readableDate(endpoint.lastSuccessAt).toLocaleString() : "never"}
       </Table.Cell>
       <Table.Cell>
         <WebhookRowMenu {...props} />

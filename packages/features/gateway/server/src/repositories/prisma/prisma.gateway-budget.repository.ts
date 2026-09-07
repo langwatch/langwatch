@@ -21,6 +21,7 @@ import {
   GatewayBudgetCycleAnchorInvalidError,
   type GatewayBudgetPageInput,
   type GatewayBudgetResolutionTarget,
+  type GatewayBudget as GatewayBudgetRow,
   type GatewayBudgetResource,
   type GatewayBudgetScopeTarget,
   type GatewayResolvedBudget,
@@ -58,6 +59,7 @@ import {
   type GatewayVirtualKeyProjectScope,
 } from "../gateway-budget.repository.ts";
 import type { ProjectIdentity } from "@langwatch/project-contract";
+import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 
 const wirePages = GatewayWirePaginationAdapter.create();
 const logger = createLogger("langwatch:gateway:budget-service");
@@ -65,7 +67,7 @@ const logger = createLogger("langwatch:gateway:budget-service");
 /**
  * A budget row plus the per-person standing only a fanned-out budget has: an ATTRIBUTED_USER template is one allowance per end user, so its honest headline is how many people it saw this period and how many are over cap, not one total. Every other scope leaves both fields absent.
  */
-export type GatewayBudgetWithSeats = GatewayBudget & {
+export type GatewayBudgetWithSeats = GatewayBudgetResource & {
   /**
    * Current-period spend as the ledger's nano-USD integer, present whenever read from the ledger. spentUsd on the same row is this rendered, so the two agree — a consumer publishing an integer takes it from here, not re-derived from decimals which can't recover digits the decimal never had.
    */
@@ -79,7 +81,7 @@ export type GatewayBudgetWithSeats = GatewayBudget & {
 export type BudgetHealth = {
   budget: GatewayBudgetWithSeats;
   spendAvailable: boolean;
-  readAt: Date;
+  readAt: Instant;
   unreachableByAnyKey: boolean;
 };
 
@@ -93,7 +95,7 @@ export type BudgetListWithHealth = {
   /**
    * Instant the spend above was read at. A caller rendering the period beside the figure must resolve it at THIS instant, not the wall clock, or a boundary crossed in between prints the new period next to the old spend.
    */
-  readAt: Date;
+  readAt: Instant;
   scopeReach: Map<string, GatewayBudgetScopeReach>;
 };
 
@@ -140,7 +142,7 @@ export type CreateBudgetInput = {
   /**
    * Phases a cyclic window off this instant instead of the calendar (e.g. a MONTH anchored 17th 09:00 UTC rolls every 17th 09:00 UTC). Null (default) keeps calendar alignment. Rejected on TOTAL and MANUAL, which don't cycle.
    */
-  cycleAnchorAt?: Date | null;
+  cycleAnchorAt?: Instant | null;
   /**
    * Keeps a budget no active key can reach, instead of refusing it.
    * Provisioning ahead of the keys that will use it is legitimate; the
@@ -191,7 +193,7 @@ export type BudgetDetail = {
     amountUsd: Prisma.Decimal;
     model: string;
     status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
-    occurredAt: Date;
+    occurredAt: Instant;
     virtualKey: { name: string; displayPrefix: string } | null;
   }>;
   /** False when spend could not be totalled, so `spentUsd` is not real spend. */
@@ -341,7 +343,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.applyClickHouseSpend(budgets, input);
+    return await this.applyClickHouseSpend(budgets.map(toGatewayBudgetResource), input);
   }
 
   async listForProject(input: GatewayProjectBudgetReadInput): Promise<GatewayBudgetWithSeats[]> {
@@ -357,14 +359,14 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.applyClickHouseSpend(budgets, input);
+    return await this.applyClickHouseSpend(budgets.map(toGatewayBudgetResource), input);
   }
 
   /**
    * Decorates budgets with current-period CH ledger spend so the list view shows real spend instead of the stale post-cutover GatewayBudget.spentUsd column, falling back to PG when CH isn't wired (mirrors check()). CH is keyed by TenantId = the project a trace landed in, but ORG/TEAM/PRINCIPAL budgets accumulate across MULTIPLE projects, so this sums across every project in the org via getSpendForBudgetsAcrossTenants.
    */
   private async applyClickHouseSpend(
-    budgets: GatewayBudget[],
+    budgets: GatewayBudgetResource[],
     input: GatewayOrganizationBudgetReadInput,
   ): Promise<GatewayBudgetWithSeats[]> {
     const { budgets: decorated } = await this.applyClickHouseSpendWithHealth(budgets, input);
@@ -375,17 +377,17 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    * As applyClickHouseSpend, but also reports whether the figures actually came from the ledger. GatewayBudget.spentUsd in Postgres has had no writer since the ledger cutover, so falling back to it renders a confident $0.00/$X, 0% on a budget that isn't really being totalled or enforced — callers must surface spendAvailable: false instead of showing that zero.
    */
   private async applyClickHouseSpendWithHealth(
-    budgets: GatewayBudget[],
+    budgets: GatewayBudgetResource[],
     input: GatewayOrganizationBudgetReadInput,
   ): Promise<{
     budgets: GatewayBudgetWithSeats[];
     spendAvailable: boolean;
-    readAt: Date;
+    readAt: Instant;
   }> {
     // One instant for every read below, so the per-person breakdown cannot
     // land in a later period than the totals it sits beside, and so the
     // period a caller reports is the one the figure was summed in.
-    const now = new Date();
+    const now = nowInstant();
     if (budgets.length === 0) {
       return { budgets, spendAvailable: true, readAt: now };
     }
@@ -449,7 +451,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     organizationId: string;
     virtualKeyId?: string;
   }): Promise<AttributedUserBudgetTemplate[]> {
-    return this.prisma.gatewayBudget.findMany({
+    const rows = await this.prisma.gatewayBudget.findMany({
       where: {
         organizationId,
         scopeType: "ATTRIBUTED_USER",
@@ -470,6 +472,13 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         cycleAnchorAt: true,
       },
     });
+    return rows.map((row) => ({
+      ...row,
+      currentPeriodStartedAt: fromDate(row.currentPeriodStartedAt),
+      resetsAt: fromDate(row.resetsAt),
+      lastResetAt: row.lastResetAt ? fromDate(row.lastResetAt) : null,
+      cycleAnchorAt: row.cycleAnchorAt ? fromDate(row.cycleAnchorAt) : null,
+    }));
   }
 
   async findBucketBoundaries({
@@ -481,14 +490,19 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }): Promise<BucketBoundaryRow[]> {
     if (budgetIds.length === 0) return [];
 
-    return this.prisma.gatewayBudgetBucketBoundary.findMany({
+    const rows = await this.prisma.gatewayBudgetBucketBoundary.findMany({
       where: { organizationId, budgetId: { in: budgetIds } },
       select: { budgetId: true, bucketScopeId: true, periodStartedAt: true },
     });
+    return rows.map((row) => ({
+      budgetId: row.budgetId,
+      bucketScopeId: row.bucketScopeId,
+      periodStartedAt: row.periodStartedAt ? fromDate(row.periodStartedAt) : null,
+    }));
   }
 
   private async bucketBoundaries(
-    budgets: GatewayBudget[],
+    budgets: GatewayBudgetResource[],
     organizationId: string,
   ): Promise<Map<string, BudgetBucketBoundary[]>> {
     const templateIds = budgets.filter((b) => b.scopeType === "ATTRIBUTED_USER").map((b) => b.id);
@@ -503,7 +517,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       const list = byBudget.get(row.budgetId) ?? [];
       list.push({
         bucketScopeId: row.bucketScopeId,
-        periodStartedAt: row.periodStartedAt,
+        periodStartedAt: fromDate(row.periodStartedAt),
       });
       byBudget.set(row.budgetId, list);
     }
@@ -514,10 +528,10 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    * How many people each per-person template watches, and how many are over their own cap. Over-cap is >=, the same comparator the gateway refuses a request on, so a seat the list calls over is one actually being stopped.
    */
   private async seatStandings(args: {
-    budgets: GatewayBudget[];
+    budgets: GatewayBudgetResource[];
     tenantIds: string[];
     boundariesByBudget: Map<string, BudgetBucketBoundary[]>;
-    now: Date;
+    now: Instant;
   }): Promise<Map<string, { seen: number; over: number }>> {
     const out = new Map<string, { seen: number; over: number }>();
     if (!this.chRepo) return out;
@@ -552,7 +566,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.decorateWithHealth(rows, input);
+    return await this.decorateWithHealth(rows.map(toGatewayBudgetResource), input);
   }
 
   /**
@@ -572,7 +586,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
               OR: wirePages.keysetAfter([
                 {
                   name: "createdAt",
-                  value: args.cursor.createdAt,
+                  value: toDate(args.cursor.createdAt),
                   direction: "desc",
                 },
                 { name: "id", value: args.cursor.id, direction: "desc" },
@@ -583,7 +597,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: args.limit,
     });
-    return await this.decorateWithHealth(rows, args);
+    return await this.decorateWithHealth(rows.map(toGatewayBudgetResource), args);
   }
 
   /** As listWithHealth, for the budgets that apply to one project. */
@@ -602,11 +616,11 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.decorateWithHealth(rows, input);
+    return await this.decorateWithHealth(rows.map(toGatewayBudgetResource), input);
   }
 
   private async decorateWithHealth(
-    rows: GatewayBudget[],
+    rows: GatewayBudgetResource[],
     input: GatewayOrganizationBudgetReadInput,
   ): Promise<BudgetListWithHealth> {
     const { budgets, spendAvailable, readAt } = await this.applyClickHouseSpendWithHealth(
@@ -624,12 +638,13 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { id: input.id, organizationId: input.organizationId, archivedAt: null },
     });
     if (!row) return null;
+    const resource = toGatewayBudgetResource(row);
     const { budgets, spendAvailable, readAt, scopeReach } = await this.decorateWithHealth(
-      [row],
+      [resource],
       input,
     );
     return {
-      budget: budgets[0] ?? row,
+      budget: budgets[0] ?? resource,
       spendAvailable,
       readAt,
       unreachableByAnyKey: scopeReach.get(row.id)?.reachable === false,
@@ -637,9 +652,12 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   async tryGet(input: GatewayBudgetReadInput): Promise<GatewayBudgetWithSeats | null> {
-    const budget = await this.tryGetStored(input.id, input.organizationId);
-    if (!budget) return null;
+    const stored = await this.tryGetStored(input.id, input.organizationId);
+    if (!stored) return null;
+
+    const budget = toGatewayBudgetResource(stored);
     const [decorated] = await this.applyClickHouseSpend([budget], input);
+
     return decorated ?? budget;
   }
 
@@ -655,8 +673,12 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { id: input.id, organizationId: input.organizationId },
     });
     if (!row) return null;
-    const { budgets, spendAvailable, scopeReach } = await this.decorateWithHealth([row], input);
-    const budget = budgets[0] ?? row;
+    const resource = toGatewayBudgetResource(row);
+    const { budgets, spendAvailable, scopeReach } = await this.decorateWithHealth(
+      [resource],
+      input,
+    );
+    const budget = budgets[0] ?? resource;
 
     const scopeTarget: BudgetScopeTargetInfo = {
       kind: budget.scopeType,
@@ -732,7 +754,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     return this.scopeReach.list(organizationId);
   }
 
-  async create(input: CreateBudgetInput): Promise<GatewayBudget> {
+  async create(input: CreateBudgetInput): Promise<GatewayBudgetResource> {
     // An anchor only means something on a window that rolls. Checked before
     // any lookup, since it needs nothing but the request.
     const cycleAnchorAt = input.cycleAnchorAt ?? null;
@@ -878,8 +900,8 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
             providerKey: input.providerKey ?? null,
             externalId: input.externalId ?? null,
             ...identityPatchData({ metadata: input.metadata }),
-            cycleAnchorAt,
-            resetsAt,
+            cycleAnchorAt: cycleAnchorAt ? toDate(cycleAnchorAt) : null,
+            resetsAt: toDate(resetsAt),
             currentPeriodStartedAt: new Date(),
             createdById: input.actorUserId,
           },
@@ -911,10 +933,10 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       // read off its violation rather than off a racy pre-flight SELECT.
       .catch((error: unknown) => translateExternalIdConflict(error, "budget", input.externalId));
 
-    return created;
+    return toGatewayBudgetResource(created);
   }
 
-  async update(input: UpdateBudgetInput): Promise<GatewayBudget> {
+  async update(input: UpdateBudgetInput): Promise<GatewayBudgetResource> {
     const existing = await this.tryGetStored(input.id, input.organizationId);
     if (!existing) throw new GatewayBudgetNotFoundError();
     const before = serializeRowForAudit(existing);
@@ -955,12 +977,12 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
           },
           tx,
         );
-        return updated;
+        return toGatewayBudgetResource(updated);
       })
       .catch((error: unknown) => translateExternalIdConflict(error, "budget", input.externalId));
   }
 
-  async archive(input: ArchiveBudgetInput): Promise<GatewayBudget> {
+  async archive(input: ArchiveBudgetInput): Promise<GatewayBudgetResource> {
     const existing = await this.tryGetStored(input.id, input.organizationId);
     if (!existing) throw new GatewayBudgetNotFoundError();
     const before = serializeRowForAudit(existing);
@@ -990,7 +1012,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         },
         tx,
       );
-      return updated;
+      return toGatewayBudgetResource(updated);
     });
   }
 
@@ -1058,7 +1080,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     actorUserId: string;
     endUserId?: string | null;
     reason?: string | null;
-  }): Promise<GatewayBudget> {
+  }): Promise<GatewayBudgetResource> {
     const existing = await this.tryGetStored(input.id, input.organizationId);
     if (!existing) throw new GatewayBudgetNotFoundError();
     const before = serializeRowForAudit(existing);
@@ -1074,7 +1096,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         before,
         now,
       });
-      return existing;
+      return toGatewayBudgetResource(existing);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -1086,7 +1108,15 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
           // A reset forgives the spend so far; it does not re-phase the
           // cycle, so an anchored budget reports the next boundary on its
           // own schedule rather than one window from this instant.
-          resetsAt: GatewayWindow.nextBoundaryFor({ budget: existing, now }),
+          resetsAt: toDate(
+            GatewayWindow.nextBoundaryFor({
+              budget: {
+                window: existing.window,
+                cycleAnchorAt: existing.cycleAnchorAt ? fromDate(existing.cycleAnchorAt) : null,
+              },
+              now: fromDate(now),
+            }),
+          ),
           // The current-period figure the bundle reads; the period just
           // restarted, so it is zero by definition. Ledger rows untouched.
           spentUsd: new Prisma.Decimal(0),
@@ -1121,7 +1151,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         },
         tx,
       );
-      return updated;
+      return toGatewayBudgetResource(updated);
     });
   }
 
@@ -1170,23 +1200,28 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
               // MANUAL window has no calendar period to fall back on, so
               // without it this read totals the budget's whole lifetime and
               // decides against a number the gateway never enforces on.
-              periodFloorMs: budgetPeriodFloorMs(r.budget),
+              periodFloorMs: budgetPeriodFloorMs(budgetPeriodOf(r.budget)),
             })),
           );
           return new Map(spends.map((s) => [s.budgetId, s.spentUsd] as const));
         })()
       : null;
 
-    const now = new Date();
+    const now = nowInstant();
     const warnings: BudgetCheckResult["warnings"] = [];
     const blockedBy: BudgetCheckResult["blockedBy"] = [];
     const scopes: BudgetCheckResult["scopes"] = [];
     let blockReason: string | null = null;
 
     for (const budget of applicable) {
+      const periodHasRolled = GatewayWindow.shouldResetBudget(
+        budget.window,
+        fromDate(budget.resetsAt),
+        now,
+      );
       const effectiveSpent = chSpendByBudgetId
         ? new Prisma.Decimal(chSpendByBudgetId.get(budget.id) ?? "0")
-        : GatewayWindow.shouldResetBudget(budget.window, budget.resetsAt, now)
+        : periodHasRolled
           ? new Prisma.Decimal(0)
           : budget.spentUsd;
 
@@ -1231,7 +1266,31 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 }
 
-function toGatewayBudgetResource(budget: GatewayBudget): GatewayBudgetResource {
+/** The temporal half of a stored row, as instants, for the window math. */
+function budgetPeriodOf(budget: GatewayBudget) {
+  return {
+    window: budget.window,
+    currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),
+    lastResetAt: budget.lastResetAt ? fromDate(budget.lastResetAt) : null,
+    cycleAnchorAt: budget.cycleAnchorAt ? fromDate(budget.cycleAnchorAt) : null,
+  };
+}
+
+/** The stored row, as the contract spells it: the same columns, on instants. */
+export function toGatewayBudgetRow(budget: GatewayBudget): GatewayBudgetRow {
+  return {
+    ...budget,
+    currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),
+    resetsAt: fromDate(budget.resetsAt),
+    lastResetAt: budget.lastResetAt ? fromDate(budget.lastResetAt) : null,
+    cycleAnchorAt: budget.cycleAnchorAt ? fromDate(budget.cycleAnchorAt) : null,
+    archivedAt: budget.archivedAt ? fromDate(budget.archivedAt) : null,
+    createdAt: fromDate(budget.createdAt),
+    updatedAt: fromDate(budget.updatedAt),
+  };
+}
+
+export function toGatewayBudgetResource(budget: GatewayBudget): GatewayBudgetResource {
   return {
     id: budget.id,
     organizationId: budget.organizationId,
@@ -1247,13 +1306,13 @@ function toGatewayBudgetResource(budget: GatewayBudget): GatewayBudgetResource {
     externalId: budget.externalId,
     metadata: budget.metadata,
     spentUsd: budget.spentUsd,
-    currentPeriodStartedAt: budget.currentPeriodStartedAt,
-    resetsAt: budget.resetsAt,
-    lastResetAt: budget.lastResetAt,
-    cycleAnchorAt: budget.cycleAnchorAt,
-    archivedAt: budget.archivedAt,
-    createdAt: budget.createdAt,
-    updatedAt: budget.updatedAt,
+    currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),
+    resetsAt: fromDate(budget.resetsAt),
+    lastResetAt: budget.lastResetAt ? fromDate(budget.lastResetAt) : null,
+    cycleAnchorAt: budget.cycleAnchorAt ? fromDate(budget.cycleAnchorAt) : null,
+    archivedAt: budget.archivedAt ? fromDate(budget.archivedAt) : null,
+    createdAt: fromDate(budget.createdAt),
+    updatedAt: fromDate(budget.updatedAt),
     createdById: budget.createdById,
     managedByVirtualKeyId: budget.managedByVirtualKeyId,
   };

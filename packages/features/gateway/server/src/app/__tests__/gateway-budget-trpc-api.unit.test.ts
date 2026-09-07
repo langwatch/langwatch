@@ -15,16 +15,23 @@
  * transport talks to. The ledger arithmetic behind the standing keeps its own
  * coverage in `gateway-budget-dto.unit.test.ts`.
  */
+import { Temporal } from "@langwatch/time";
 import type { GatewayService } from "@langwatch/gateway-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC } from "@trpc/server";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GatewayBudgetTrpcApi } from "../../transport/api-trpc/gateway-budget.api.ts";
 import { GatewayApp, type GatewayAppDependencies } from "../gateway.app.ts";
 
 /** The slice of the application this surface reaches, and nothing else. */
 function gatewayAppStub(dependencies: Partial<GatewayAppDependencies>): GatewayApp {
-  return GatewayApp.create(dependencies as GatewayAppDependencies);
+  return GatewayApp.create({
+    dependencies: {},
+    infrastructure: dependencies as GatewayAppDependencies,
+    config: undefined,
+    resources: new ResourceScope(),
+  });
 }
 
 function budgetDecisionsStub(overrides: Partial<GatewayService>): GatewayService {
@@ -61,13 +68,13 @@ function template(overrides: Record<string, unknown> = {}) {
     providerKey: null,
     externalId: null,
     metadata: null,
-    currentPeriodStartedAt: new Date("2099-01-01T00:00:00Z"),
-    resetsAt: new Date("2099-02-01T00:00:00Z"),
+    currentPeriodStartedAt: Temporal.Instant.from("2099-01-01T00:00:00Z"),
+    resetsAt: Temporal.Instant.from("2099-02-01T00:00:00Z"),
     lastResetAt: null,
     cycleAnchorAt: null,
     archivedAt: null,
-    createdAt: new Date("2026-01-01T00:00:00Z"),
-    updatedAt: new Date("2026-01-01T00:00:00Z"),
+    createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+    updatedAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
     createdById: "usr_1",
     managedByVirtualKeyId: null,
     endUsersSeen: 2,

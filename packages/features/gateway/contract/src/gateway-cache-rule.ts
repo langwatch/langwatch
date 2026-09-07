@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 export const gatewayCacheRuleMatchersSchema = z
@@ -72,7 +73,7 @@ export type ArchiveGatewayCacheRuleInput = z.infer<typeof archiveGatewayCacheRul
 
 export type GatewayCacheRuleCursor = {
   priority: number;
-  createdAt: Date;
+  createdAt: Instant;
   id: string;
 };
 

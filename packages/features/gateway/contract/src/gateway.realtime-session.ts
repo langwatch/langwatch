@@ -1,3 +1,5 @@
+import type { Instant } from "@langwatch/time";
+
 /** Portable session record used by Gateway settlement and reconciliation. */
 export interface GatewayRealtimeSessionRecord {
   id: string;
@@ -9,6 +11,6 @@ export interface GatewayRealtimeSessionRecord {
   model: string;
   traceId: string | null;
   requestedModel: string | null;
-  mintedAt: Date;
+  mintedAt: Instant;
   vendorConversationId: string | null;
 }

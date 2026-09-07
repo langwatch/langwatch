@@ -12,12 +12,23 @@
  * issued, not about what a database does with it.
  */
 
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { PrismaGatewayVirtualKeyRepository } from "../prisma.virtual-key.repository.ts";
 
 type Call = { method: string; args: Record<string, unknown> };
 
-function repositoryWith(row: unknown = { id: "key-1", scopes: [] }) {
+/** The stored row carries the columns Prisma always returns, as Prisma returns them. */
+const MINTED_AT = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
+
+function repositoryWith(
+  row: unknown = {
+    id: "key-1",
+    scopes: [],
+    createdAt: toDate(MINTED_AT),
+    updatedAt: toDate(MINTED_AT),
+  },
+) {
   const calls: Call[] = [];
   const record = (method: string) => async (args: Record<string, unknown>) => {
     calls.push({ method, args });
@@ -91,7 +102,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
     describe("when the new secret is written", () => {
       it("keeps the old one alongside it with the window it was given", async () => {
         const { repository, calls } = repositoryWith();
-        const validUntil = new Date("2026-09-01T00:00:00.000Z");
+        const validUntil = Temporal.Instant.from("2026-09-01T00:00:00.000Z");
 
         await repository.rotateSecret({
           id: "key-1",
@@ -107,7 +118,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
           hashedSecret: "hash-new",
           displayPrefix: "lw_new",
           previousHashedSecret: "hash-old",
-          previousSecretValidUntil: validUntil,
+          previousSecretValidUntil: toDate(validUntil),
         });
       });
 
@@ -120,7 +131,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
           newHashedSecret: "hash-new",
           newDisplayPrefix: "lw_new",
           previousHashedSecret: "hash-old",
-          previousSecretValidUntil: new Date(),
+          previousSecretValidUntil: nowInstant(),
         });
 
         expect((calls[0]?.args.data as { revision: unknown }).revision).toEqual({

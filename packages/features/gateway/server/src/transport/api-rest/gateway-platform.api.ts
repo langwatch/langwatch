@@ -4,6 +4,14 @@
  * translate wire casing and map TRPCError onto HTTP.
  */
 
+import { type Instant, nowInstant, Temporal, type TimeInput, toEpochMs } from "@langwatch/time";
+/** The expiry a request carries, as the service reads it: absent, cleared, or a moment. */
+function expiryInstant(value: TimeInput | null | undefined): Instant | null | undefined {
+  return value === undefined || value === null
+    ? value
+    : Temporal.Instant.fromEpochMilliseconds(toEpochMs(value));
+}
+
 import { apiKeyPermission } from "@langwatch/api";
 import {
   apiErrorBody,
@@ -210,9 +218,12 @@ const spendSummaryDtoSchema = z.object({
 });
 
 /** Spend window in epoch ms, matching every other spend endpoint; echoed in the same unit. */
+/** The widest epoch millisecond count a moment can carry. */
+const MAX_EPOCH_MS = 8_640_000_000_000_000;
+
 const vkSpendWindowSchema = z.object({
-  from: z.coerce.number().int().positive().safe().optional(),
-  to: z.coerce.number().int().positive().safe().optional(),
+  from: z.coerce.number().int().positive().max(MAX_EPOCH_MS).optional(),
+  to: z.coerce.number().int().positive().max(MAX_EPOCH_MS).optional(),
 });
 
 const cacheRuleMatchersSchema = z
@@ -306,15 +317,24 @@ const resetBudgetQuerySchema = z.object({
     ),
 });
 
+/** The epoch millisecond count a cursor part names, or null when it names none. */
+function cursorInstant(part: unknown): Instant | null {
+  const epochMs = Number(part);
+  if (!Number.isFinite(epochMs) || Math.abs(epochMs) > MAX_EPOCH_MS) return null;
+
+  return Temporal.Instant.fromEpochMilliseconds(epochMs);
+}
+
 /** The (createdAt, id) sort key a cursor names, or a 400-worthy null. */
 function createdAtIdCursor(
   encoded: string | undefined,
-): { createdAt: Date; id: string } | null | undefined {
+): { createdAt: Instant; id: string } | null | undefined {
   if (encoded === undefined) return undefined;
   const parts = wirePages.decodePageCursor(encoded, 2);
   if (!parts) return null;
-  const createdAt = new Date(Number(parts[0]));
-  return Number.isNaN(createdAt.getTime()) ? null : { createdAt, id: String(parts[1]) };
+  const createdAt = cursorInstant(parts[0]);
+
+  return createdAt ? { createdAt, id: String(parts[1]) } : null;
 }
 
 /** The (priority, createdAt, id) sort key a cache-rule cursor names. */
@@ -323,8 +343,9 @@ function cacheRuleCursor(encoded: string | undefined): GatewayCacheRuleCursor | 
   const parts = wirePages.decodePageCursor(encoded, 3);
   if (!parts) return null;
   const priority = Number(parts[0]);
-  const createdAt = new Date(Number(parts[1]));
-  return Number.isNaN(priority) || Number.isNaN(createdAt.getTime())
+  const createdAt = cursorInstant(parts[1]);
+
+  return Number.isNaN(priority) || !createdAt
     ? null
     : { priority, createdAt, id: String(parts[2]) };
 }
@@ -632,7 +653,7 @@ function budgetFromWire(
 ): GatewayVirtualKeyBudgetInput | null | undefined {
   if (budget === undefined) return undefined;
   if (budget === null) return null;
-  const parsed = app.schemas.virtualKeyBudgetInput.safeParse({
+  const parsed = app.parseVirtualKeyBudget({
     limitUsd: typeof budget.limit_usd === "number" ? String(budget.limit_usd) : budget.limit_usd,
     window: toStoredEnum(budget.window),
     onBreach: budget.on_breach && toStoredEnum(budget.on_breach),
@@ -708,8 +729,7 @@ export function createGatewayPlatformRestApp(options: {
         if (cursor === null) return invalidCursor(c);
 
         const organizationId = await app.organizationIdForProject(project.id);
-        const virtualKeysService = app.virtualKeys;
-        const rows = await virtualKeysService.getPage({
+        const rows = await app.getVirtualKeyPage({
           organizationId,
           limit: page.data.limit,
           cursor: cursor ?? null,
@@ -725,7 +745,7 @@ export function createGatewayPlatformRestApp(options: {
             virtualKeys: app.visibleToProjectCredential({ project, virtualKeys: rows }),
           }),
           next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (vk) => [
-            vk.createdAt.getTime(),
+            vk.createdAt.epochMilliseconds,
             vk.id,
           ]),
         });
@@ -768,7 +788,7 @@ export function createGatewayPlatformRestApp(options: {
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
         const scopes = scopesFromWire(body.data.scopes, project.id);
-        const { virtualKey, secret } = await app.virtualKeys.create({
+        const { virtualKey, secret } = await app.createVirtualKey({
           organizationId,
           name: body.data.name,
           description: body.data.description ?? null,
@@ -777,7 +797,7 @@ export function createGatewayPlatformRestApp(options: {
           traceProjectId: body.data.trace_project_id ?? null,
           routingPolicyId: body.data.routing_policy_id ?? null,
           routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
-          expiresAt: body.data.expires_at ?? null,
+          expiresAt: expiryInstant(body.data.expires_at) ?? null,
           budget: budgetFromWire(app, body.data.budget),
           config: body.data.config,
           externalId: body.data.external_id,
@@ -911,13 +931,16 @@ export function createGatewayPlatformRestApp(options: {
         const project = projectOf(c);
         const id = input.id;
         const windowParse = { data: input };
-        const now = new Date();
+        const now = nowInstant();
         const fromDate =
           windowParse.data.from !== undefined
-            ? new Date(windowParse.data.from)
+            ? Temporal.Instant.fromEpochMilliseconds(windowParse.data.from)
             : GatewayWindow.startOfCurrentMonthUTC(now);
-        const toDate = windowParse.data.to !== undefined ? new Date(windowParse.data.to) : now;
-        if (fromDate.getTime() >= toDate.getTime()) {
+        const toDate =
+          windowParse.data.to !== undefined
+            ? Temporal.Instant.fromEpochMilliseconds(windowParse.data.to)
+            : now;
+        if (fromDate.epochMilliseconds >= toDate.epochMilliseconds) {
           return errorResponse(c, {
             status: 400,
             code: "validation_error",
@@ -940,7 +963,7 @@ export function createGatewayPlatformRestApp(options: {
         // Same failure the tRPC spend column raises (spend_source_unavailable):
         // without the ClickHouse spend source there is no number to report, and
         // a confident zero would be indistinguishable from a zero-spend key.
-        if (!app.spendSourceAvailable) {
+        if (!app.isSpendSourceAvailable()) {
           return errorResponse(c, {
             status: 412,
             code: "spend_source_unavailable",
@@ -961,7 +984,7 @@ export function createGatewayPlatformRestApp(options: {
           // genuinely spent nothing, so zero is the honest render.
           spent_usd: row?.spentUsd ?? "0",
           requests: row?.requests ?? 0,
-          window: { from: fromDate.getTime(), to: toDate.getTime() },
+          window: { from: fromDate.epochMilliseconds, to: toDate.epochMilliseconds },
         });
       },
       (b) =>
@@ -1008,7 +1031,6 @@ export function createGatewayPlatformRestApp(options: {
         const body = { data: input };
         const organizationId = await app.organizationIdForProject(project.id);
         const { actor, actorUserId } = actorForRequest(c, app);
-        const virtualKeysService = app.virtualKeys;
         try {
           // Absent `scopes` means "not re-scoping", which is what the
           // application's update pre-flight reads to decide whether the stored
@@ -1028,7 +1050,7 @@ export function createGatewayPlatformRestApp(options: {
             traceProjectId: body.data.trace_project_id,
             guardrailAttachments: body.data.config?.guardrailAttachments,
           });
-          const updated = await virtualKeysService.update({
+          const updated = await app.updateVirtualKey({
             id,
             organizationId,
             actorUserId,
@@ -1038,7 +1060,7 @@ export function createGatewayPlatformRestApp(options: {
             traceProjectId: body.data.trace_project_id,
             routingPolicyId: body.data.routing_policy_id,
             routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
-            expiresAt: body.data.expires_at,
+            expiresAt: expiryInstant(body.data.expires_at),
             budget: budgetFromWire(app, body.data.budget),
             config: body.data.config,
             externalId: body.data.external_id,
@@ -1088,7 +1110,6 @@ export function createGatewayPlatformRestApp(options: {
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
         const { actor, actorUserId } = actorForRequest(c, app);
-        const virtualKeysService = app.virtualKeys;
         try {
           await app.authorizeVirtualKeyOperation({
             actor,
@@ -1096,7 +1117,7 @@ export function createGatewayPlatformRestApp(options: {
             id,
             permission: "virtualKeys:rotate",
           });
-          const { virtualKey, secret } = await virtualKeysService.rotate({
+          const { virtualKey, secret } = await app.rotateVirtualKey({
             id,
             organizationId,
             actorUserId,
@@ -1145,7 +1166,6 @@ export function createGatewayPlatformRestApp(options: {
         if (!body.success) return validationErrorResponse(c, body.error);
         const organizationId = await app.organizationIdForProject(project.id);
         const { actor, actorUserId } = actorForRequest(c, app);
-        const virtualKeysService = app.virtualKeys;
         try {
           await app.authorizeVirtualKeyOperation({
             actor,
@@ -1153,7 +1173,7 @@ export function createGatewayPlatformRestApp(options: {
             id,
             permission: "virtualKeys:update",
           });
-          const updated = await virtualKeysService.disable({
+          const updated = await app.disableVirtualKey({
             id,
             organizationId,
             actorUserId,
@@ -1217,7 +1237,6 @@ export function createGatewayPlatformRestApp(options: {
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
         const { actor, actorUserId } = actorForRequest(c, app);
-        const virtualKeysService = app.virtualKeys;
         try {
           await app.authorizeVirtualKeyOperation({
             actor,
@@ -1225,7 +1244,7 @@ export function createGatewayPlatformRestApp(options: {
             id,
             permission: "virtualKeys:update",
           });
-          const updated = await virtualKeysService.enable({
+          const updated = await app.enableVirtualKey({
             id,
             organizationId,
             actorUserId,
@@ -1267,7 +1286,6 @@ export function createGatewayPlatformRestApp(options: {
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
         const { actor, actorUserId } = actorForRequest(c, app);
-        const virtualKeysService = app.virtualKeys;
         try {
           await app.authorizeVirtualKeyOperation({
             actor,
@@ -1275,7 +1293,7 @@ export function createGatewayPlatformRestApp(options: {
             id,
             permission: "virtualKeys:delete",
           });
-          const updated = await virtualKeysService.revoke({
+          const updated = await app.revokeVirtualKey({
             id,
             organizationId,
             actorUserId,
@@ -1408,13 +1426,12 @@ export function createGatewayPlatformRestApp(options: {
           scopeTypes = new Set(parsed.data);
         }
         const organizationId = await app.organizationIdForProject(project.id);
-        const budgetDecisionsService = app.budgetDecisions;
         const {
           budgets: rows,
           spendAvailable,
           readAt,
           scopeReach,
-        } = await budgetDecisionsService.listPageWithHealth({
+        } = await app.listBudgetPageWithHealth({
           organizationId,
           limit: page.data.limit,
           cursor: cursor ?? null,
@@ -1437,7 +1454,7 @@ export function createGatewayPlatformRestApp(options: {
             }),
           ),
           next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (b) => [
-            b.createdAt.getTime(),
+            b.createdAt.epochMilliseconds,
             b.id,
           ]),
         });
@@ -1485,8 +1502,7 @@ export function createGatewayPlatformRestApp(options: {
         const project = projectOf(c);
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
-        const budgetDecisionsService = app.budgetDecisions;
-        const found = await budgetDecisionsService.tryGetWithHealth({ id, organizationId });
+        const found = await app.tryGetBudgetWithHealth({ id, organizationId });
         if (!found) {
           return errorResponse(c, {
             status: 404,
@@ -1552,8 +1568,7 @@ export function createGatewayPlatformRestApp(options: {
         // being reshaped by the budgetDecisionsService-error mapping below.
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const budgetDecisionsService = app.budgetDecisions;
-        const row = await budgetDecisionsService.create({
+        const row = await app.createBudget({
           organizationId,
           scope: scopeFromWire(body.data.scope),
           name: body.data.name,
@@ -1565,13 +1580,15 @@ export function createGatewayPlatformRestApp(options: {
           providerKey: body.data.provider_key ?? null,
           externalId: body.data.external_id,
           metadata: body.data.metadata,
-          cycleAnchorAt: body.data.cycle_anchor_at ? new Date(body.data.cycle_anchor_at) : null,
+          cycleAnchorAt: body.data.cycle_anchor_at
+            ? Temporal.Instant.from(body.data.cycle_anchor_at)
+            : null,
           allowUnreachable: body.data.allow_unreachable,
           actorUserId,
         });
         const [memberCounts, reach] = await Promise.all([
           app.groupMemberCounts([row]),
-          budgetDecisionsService.scopeReach({ organizationId, scope: row }),
+          app.budgetScopeReach({ organizationId, scope: row }),
         ]);
         return {
           budget: budgetDtos.toBudgetDto({
@@ -1628,13 +1645,12 @@ export function createGatewayPlatformRestApp(options: {
         const body = { data: input };
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const budgetDecisionsService = app.budgetDecisions;
         try {
           await authorizeOrganizationWide(c, app, {
             organizationId,
             permission: "gatewayBudgets:update",
           });
-          const row = await budgetDecisionsService.update({
+          const row = await app.updateBudget({
             id,
             organizationId,
             name: body.data.name,
@@ -1690,13 +1706,12 @@ export function createGatewayPlatformRestApp(options: {
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const budgetDecisionsService = app.budgetDecisions;
         try {
           await authorizeOrganizationWide(c, app, {
             organizationId,
             permission: "gatewayBudgets:delete",
           });
-          const row = await budgetDecisionsService.archive({
+          const row = await app.archiveBudget({
             id,
             organizationId,
             actorUserId,
@@ -1746,13 +1761,12 @@ export function createGatewayPlatformRestApp(options: {
         if (!body.success) return validationErrorResponse(c, body.error);
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const budgetDecisionsService = app.budgetDecisions;
         try {
           await authorizeOrganizationWide(c, app, {
             organizationId,
             permission: "gatewayBudgets:update",
           });
-          const row = await budgetDecisionsService.reset({
+          const row = await app.resetBudget({
             id,
             organizationId,
             actorUserId,
@@ -1891,8 +1905,7 @@ export function createGatewayPlatformRestApp(options: {
         if (cursor === null) return invalidCursor(c);
 
         const organizationId = await app.organizationIdForProject(project.id);
-        const budgetDecisionsService = app.budgetDecisions;
-        const rows = await budgetDecisionsService.cacheRuleListPage({
+        const rows = await app.listCacheRulePage({
           organizationId,
           limit: page.data.limit,
           cursor: cursor ?? null,
@@ -1942,8 +1955,7 @@ export function createGatewayPlatformRestApp(options: {
         const project = projectOf(c);
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
-        const budgetDecisionsService = app.budgetDecisions;
-        const row = await budgetDecisionsService.tryCacheRuleGet({ id, organizationId });
+        const row = await app.tryGetCacheRule({ id, organizationId });
         if (!row) {
           return errorResponse(c, {
             status: 404,
@@ -1985,7 +1997,7 @@ export function createGatewayPlatformRestApp(options: {
         const body = { data: input };
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const row = await app.budgetDecisions.cacheRuleCreate({
+        const row = await app.createCacheRule({
           organizationId,
           name: body.data.name,
           description: body.data.description ?? null,
@@ -2044,13 +2056,12 @@ export function createGatewayPlatformRestApp(options: {
         const body = { data: input };
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const budgetDecisionsService = app.budgetDecisions;
         try {
           await authorizeOrganizationWide(c, app, {
             organizationId,
             permission: "gatewayCacheRules:update",
           });
-          const row = await budgetDecisionsService.cacheRuleUpdate({
+          const row = await app.updateCacheRule({
             id,
             organizationId,
             name: body.data.name,
@@ -2099,13 +2110,12 @@ export function createGatewayPlatformRestApp(options: {
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const budgetDecisionsService = app.budgetDecisions;
         try {
           await authorizeOrganizationWide(c, app, {
             organizationId,
             permission: "gatewayCacheRules:delete",
           });
-          const row = await budgetDecisionsService.cacheRuleArchive({
+          const row = await app.archiveCacheRule({
             id,
             organizationId,
             actorUserId,

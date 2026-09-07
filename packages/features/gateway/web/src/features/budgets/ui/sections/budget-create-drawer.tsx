@@ -1,3 +1,4 @@
+import { Temporal, currentTimeZone } from "@langwatch/time";
 import {
   Button,
   Field,
@@ -268,10 +269,14 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
         limitUsd,
         onBreach,
         providerKey: providerKey || null,
-        // The picker gives a local wall-clock string with no zone; the
-        // Date constructor reads it in the browser's zone, which is the
-        // one the admin typed it in.
-        cycleAnchorAt: isScheduledWindow && cycleAnchorAt ? new Date(cycleAnchorAt) : null,
+        // The picker gives a local wall-clock string with no zone, read in
+        // the browser's zone, which is the one the admin typed it in.
+        cycleAnchorAt:
+          isScheduledWindow && cycleAnchorAt
+            ? Temporal.PlainDateTime.from(cycleAnchorAt)
+                .toZonedDateTime(currentTimeZone())
+                .toInstant()
+            : null,
         allowUnreachable: allowUnreachable || undefined,
       });
       onCreated();

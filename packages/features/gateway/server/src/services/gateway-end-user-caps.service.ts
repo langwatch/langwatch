@@ -1,3 +1,4 @@
+import { nowInstant, Temporal } from "@langwatch/time";
 import {
   bucketPeriodFloorMs,
   effectiveBudgetPeriod,
@@ -54,7 +55,7 @@ export class GatewayEndUserCapsService {
     const bucketFor = (template: AttributedUserBudgetTemplate) =>
       bucketScopeIdFor(template, attributedUserBucketScopeId(template.scopeId, input.endUserId));
 
-    const now = new Date();
+    const now = nowInstant();
     const targets = templates.map((template) => {
       const bucketScopeId = bucketFor(template);
 
@@ -85,9 +86,10 @@ export class GatewayEndUserCapsService {
         on_breach: toWireEnum(template.onBreach),
         limit_usd: usdDisplayString(template.limitUsd),
         spent_usd: usdDisplayString(spentByBudget.get(template.id) ?? "0"),
-        period_started_at: new Date(
-          periodFloorMs ?? effectiveBudgetPeriod(template, now).currentPeriodStartedAt.getTime(),
-        ).toISOString(),
+        period_started_at: Temporal.Instant.fromEpochMilliseconds(
+          periodFloorMs ??
+            effectiveBudgetPeriod(template, now).currentPeriodStartedAt.epochMilliseconds,
+        ).toString({ fractionalSecondDigits: 3 }),
       };
     });
   }

@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { ModelProvider } from "@langwatch/prisma-client/generated";
+import type { ModelProvider } from "@langwatch/gateway-contract";
 import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter.ts";
 
 const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });

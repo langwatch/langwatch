@@ -1,3 +1,5 @@
+import { readableDate } from "../../model/readable-date.ts";
+import { toEpochMs } from "@langwatch/time";
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Info } from "lucide-react";
 
@@ -71,8 +73,10 @@ export function budgetDescription(item: BudgetOverviewItemView): string {
 
 export function formatResetDay(resetsAt: string | null): string | null {
   if (!resetsAt) return null;
-  const date = new Date(resetsAt);
-  if (Number.isNaN(date.getTime())) return null;
+
+  const epochMs = toEpochMs(resetsAt);
+  if (Number.isNaN(epochMs)) return null;
+  const date = readableDate(epochMs);
   // Reset boundaries are computed in UTC, the same clock the ledger's
   // period buckets use, so the promised day matches the actual reset.
   return date.toLocaleDateString("en-US", {
@@ -188,7 +192,7 @@ function BudgetTooltip({ item }: { item: BudgetOverviewItemView }) {
       ) : (
         <Text>Warns when the limit is reached, without blocking</Text>
       )}
-      {item.resetsAt && <Text>Resets {new Date(item.resetsAt).toLocaleString()}</Text>}
+      {item.resetsAt && <Text>Resets {readableDate(item.resetsAt).toLocaleString()}</Text>}
       {item.topModels && item.topModels.length > 0 && (
         <>
           <Text marginTop={1}>Top models this month:</Text>

@@ -3,6 +3,7 @@
  * calendar-month spend: a daily cap measures against today, so a monthly figure and a daily one
  * are both true and neither substitutes. Spend comes from the rollup every other surface reads.
  */
+import { type Instant, nowInstant } from "@langwatch/time";
 import type { GatewayBudget } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
@@ -80,7 +81,7 @@ async function loadPeriodSpend(args: {
   organizationId: string;
   budgets: GatewayBudget[];
   chRepo: GatewayBudgetSpendPort | undefined;
-  now: Date;
+  now: Instant;
 }): Promise<Map<string, string> | null> {
   const { repository, organizationId, budgets, chRepo, now } = args;
   if (!chRepo) {
@@ -136,9 +137,9 @@ export class VirtualKeyDirectBudgetService {
      * wrote a debit at a known time reads the same period back instead of
      * racing the wall clock across a midnight boundary.
      */
-    now?: Date;
+    now?: Instant;
   }): Promise<Map<string, VirtualKeyDirectBudget>> {
-    const { chRepo, now = new Date() } = args;
+    const { chRepo, now = nowInstant() } = args;
     const out = new Map<string, VirtualKeyDirectBudget>();
     if (args.virtualKeyIds.length === 0) {
       return out;
@@ -172,7 +173,9 @@ export class VirtualKeyDirectBudgetService {
         // stored instant is only rewritten when the window changes, so a
         // budget that has been running for days carries a reset moment
         // that has already passed.
-        resetsAt: GatewayWindow.nextResetAt(budget.window, now).toISOString(),
+        resetsAt: GatewayWindow.nextResetAt(budget.window, now).toString({
+          fractionalSecondDigits: 3,
+        }),
       });
     }
 

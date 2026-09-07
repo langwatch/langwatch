@@ -2,8 +2,10 @@
  * @vitest-environment node
  * The gatewaySpendEvents transport: filter/cursor passthrough, VK display-name resolution, ClickHouse-absent degrade, declared scope. Refusal now stands on the policy the process hands in, not the app's RBAC middleware — asserts the handler never runs when the policy refuses.
  */
+import { Temporal } from "@langwatch/time";
 import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GatewaySpendEventTrpcApi } from "../../transport/api-trpc/gateway-spend-event.api.ts";
 import { GatewayApp, type GatewayAppDependencies } from "../gateway.app.ts";
@@ -12,7 +14,12 @@ import type { GatewaySpendEventsService } from "../../services/gateway-spend-eve
 import type { SpendEventRow } from "../../ports/gateway-spend-events.port.ts";
 /** The slice of the application this surface reaches, and nothing else. */
 function gatewayAppStub(dependencies: Partial<GatewayAppDependencies>): GatewayApp {
-  return GatewayApp.create(dependencies as GatewayAppDependencies);
+  return GatewayApp.create({
+    dependencies: {},
+    infrastructure: dependencies as GatewayAppDependencies,
+    config: undefined,
+    resources: new ResourceScope(),
+  });
 }
 
 function spendEventsStub(overrides: Partial<GatewaySpendEventsService>): GatewaySpendEventsService {
@@ -53,7 +60,7 @@ const SPEND_ROW: SpendEventRow = {
   labels: [],
   metadata: "",
   durationMs: 900,
-  occurredAt: new Date("2026-07-20T12:00:00Z"),
+  occurredAt: Temporal.Instant.from("2026-07-20T12:00:00Z"),
 };
 
 const BASE_INPUT = {

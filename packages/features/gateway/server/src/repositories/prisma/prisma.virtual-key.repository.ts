@@ -2,6 +2,7 @@
  * Data-access for VirtualKey. Post-collapse model: organization-scoped + reachable from N (scopeType, scopeId) entries in VirtualKeyScope. dbMultiTenancyProtection enforces every where-clause carries organizationId, a row id, a hashedSecret, or a scopes:{some:{...}} predicate.
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, type Instant, toDate } from "@langwatch/time";
 import { identityPatchData } from "@langwatch/gateway-contract";
 import { z } from "zod";
 import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
@@ -45,16 +46,18 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes | null> {
     const client = this.client(tx);
-    return client.virtualKey.findFirst({
-      where: { id, organizationId },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
+    return toVirtualKeyRecordFrom(
+      client.virtualKey.findFirst({
+        where: { id, organizationId },
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: {
+            select: gatewayRoutingPolicySelect,
+          },
         },
-      },
-    });
+      }),
+    );
   }
 
   async findMetaByIds({
@@ -77,16 +80,18 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes | null> {
     const client = this.client(tx);
-    return client.virtualKey.findUnique({
-      where: { id },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
+    return toVirtualKeyRecordFrom(
+      client.virtualKey.findUnique({
+        where: { id },
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: {
+            select: gatewayRoutingPolicySelect,
+          },
         },
-      },
-    });
+      }),
+    );
   }
 
   async tryFindByHashedSecret(
@@ -94,24 +99,26 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes | null> {
     const client = this.client(tx);
-    return client.virtualKey.findFirst({
-      where: {
-        OR: [
-          { hashedSecret },
-          {
-            previousHashedSecret: hashedSecret,
-            previousSecretValidUntil: { gt: new Date() },
-          },
-        ],
-      },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
+    return toVirtualKeyRecordFrom(
+      client.virtualKey.findFirst({
+        where: {
+          OR: [
+            { hashedSecret },
+            {
+              previousHashedSecret: hashedSecret,
+              previousSecretValidUntil: { gt: new Date() },
+            },
+          ],
         },
-      },
-    });
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: {
+            select: gatewayRoutingPolicySelect,
+          },
+        },
+      }),
+    );
   }
 
   /**
@@ -120,38 +127,40 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
   async findPageInOrganization(args: {
     organizationId: string;
     limit: number;
-    cursor: { createdAt: Date; id: string } | null;
+    cursor: { createdAt: Instant; id: string } | null;
     /** Exact match, not a prefix: this is an id, not a search box. */
     externalId?: string;
   }): Promise<VirtualKeyWithScopes[]> {
-    return this.prisma.virtualKey.findMany({
-      where: {
-        organizationId: args.organizationId,
-        purpose: "USER",
-        ...(args.externalId !== undefined ? { externalId: args.externalId } : {}),
-        ...(args.cursor
-          ? {
-              OR: wirePages.keysetAfter([
-                {
-                  name: "createdAt",
-                  value: args.cursor.createdAt,
-                  direction: "desc",
-                },
-                { name: "id", value: args.cursor.id, direction: "desc" },
-              ]),
-            }
-          : {}),
-      },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
+    return toVirtualKeyRecordsFrom(
+      this.prisma.virtualKey.findMany({
+        where: {
+          organizationId: args.organizationId,
+          purpose: "USER",
+          ...(args.externalId !== undefined ? { externalId: args.externalId } : {}),
+          ...(args.cursor
+            ? {
+                OR: wirePages.keysetAfter([
+                  {
+                    name: "createdAt",
+                    value: toDate(args.cursor.createdAt),
+                    direction: "desc",
+                  },
+                  { name: "id", value: args.cursor.id, direction: "desc" },
+                ]),
+              }
+            : {}),
         },
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: args.limit,
-    });
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: {
+            select: gatewayRoutingPolicySelect,
+          },
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: args.limit,
+      }),
+    );
   }
 
   async findAllInOrganization(
@@ -159,17 +168,19 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes[]> {
     const client = this.client(tx);
-    return client.virtualKey.findMany({
-      where: { organizationId, purpose: "USER" },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
+    return toVirtualKeyRecordsFrom(
+      client.virtualKey.findMany({
+        where: { organizationId, purpose: "USER" },
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: {
+            select: gatewayRoutingPolicySelect,
+          },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+    );
   }
 
   /**
@@ -180,22 +191,24 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes[]> {
     const client = this.client(tx);
-    return client.virtualKey.findMany({
-      where: {
-        purpose: "USER",
-        scopes: {
-          some: { scopeType: scope.scopeType, scopeId: scope.scopeId },
+    return toVirtualKeyRecordsFrom(
+      client.virtualKey.findMany({
+        where: {
+          purpose: "USER",
+          scopes: {
+            some: { scopeType: scope.scopeType, scopeId: scope.scopeId },
+          },
         },
-      },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: {
+            select: gatewayRoutingPolicySelect,
+          },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+    );
   }
 
   async create(
@@ -203,40 +216,42 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes> {
     const client = this.client(tx);
-    return client.virtualKey.create({
-      data: {
-        id: data.id,
-        organizationId: data.organizationId,
-        name: data.name,
-        description: data.description ?? null,
-        hashedSecret: data.hashedSecret,
-        displayPrefix: data.displayPrefix,
-        principalUserId: data.principalUserId ?? null,
-        traceProjectId: data.traceProjectId ?? null,
-        expiresAt: data.expiresAt ?? null,
-        config: jsonInput(data.config),
-        externalId: data.externalId ?? null,
-        ...(data.metadata !== undefined ? { metadata: jsonInput(data.metadata) } : {}),
-        createdById: data.createdById,
-        routingPolicyId: data.routingPolicyId ?? null,
-        ...(data.routingMode ? { routingMode: data.routingMode } : {}),
-        purpose: data.purpose ?? "USER",
-        revision: 1n,
-        scopes: {
-          create: data.scopes.map((s) => ({
-            scopeType: s.scopeType,
-            scopeId: s.scopeId,
-          })),
+    return toVirtualKeyRecordOf(
+      client.virtualKey.create({
+        data: {
+          id: data.id,
+          organizationId: data.organizationId,
+          name: data.name,
+          description: data.description ?? null,
+          hashedSecret: data.hashedSecret,
+          displayPrefix: data.displayPrefix,
+          principalUserId: data.principalUserId ?? null,
+          traceProjectId: data.traceProjectId ?? null,
+          expiresAt: data.expiresAt ? toDate(data.expiresAt) : null,
+          config: jsonInput(data.config),
+          externalId: data.externalId ?? null,
+          ...(data.metadata !== undefined ? { metadata: jsonInput(data.metadata) } : {}),
+          createdById: data.createdById,
+          routingPolicyId: data.routingPolicyId ?? null,
+          ...(data.routingMode ? { routingMode: data.routingMode } : {}),
+          purpose: data.purpose ?? "USER",
+          revision: 1n,
+          scopes: {
+            create: data.scopes.map((s) => ({
+              scopeType: s.scopeType,
+              scopeId: s.scopeId,
+            })),
+          },
         },
-      },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: {
+            select: gatewayRoutingPolicySelect,
+          },
         },
-      },
-    });
+      }),
+    );
   }
 
   async update(
@@ -245,29 +260,35 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
   ): Promise<VirtualKeyWithScopes> {
     const client = this.client(tx);
 
-    return client.virtualKey.update({
-      where: { id: input.id, organizationId: input.organizationId },
-      data: {
-        name: input.name,
-        description: input.description,
-        config: jsonInput(input.config),
-        ...identityPatchData(input),
-        ...(input.routingPolicyId !== undefined ? { routingPolicyId: input.routingPolicyId } : {}),
-        ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
-        traceProjectId: input.traceProjectId,
-        routingMode: input.routingMode,
-        revision: { increment: 1n },
-      },
-      // The same projection every other read materialises. Without the two
-      // relations the row is not a `VirtualKeyWithScopes`: the update would
-      // answer a key whose principal and routing policy read as absent to
-      // everything downstream of it.
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: { select: gatewayRoutingPolicySelect },
-      },
-    });
+    return toVirtualKeyRecordOf(
+      client.virtualKey.update({
+        where: { id: input.id, organizationId: input.organizationId },
+        data: {
+          name: input.name,
+          description: input.description,
+          config: jsonInput(input.config),
+          ...identityPatchData(input),
+          ...(input.routingPolicyId !== undefined
+            ? { routingPolicyId: input.routingPolicyId }
+            : {}),
+          ...(input.expiresAt !== undefined
+            ? { expiresAt: input.expiresAt ? toDate(input.expiresAt) : null }
+            : {}),
+          traceProjectId: input.traceProjectId,
+          routingMode: input.routingMode,
+          revision: { increment: 1n },
+        },
+        // The same projection every other read materialises. Without the two
+        // relations the row is not a `VirtualKeyWithScopes`: the update would
+        // answer a key whose principal and routing policy read as absent to
+        // everything downstream of it.
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: { select: gatewayRoutingPolicySelect },
+        },
+      }),
+    );
   }
 
   async tryFindRoutingPolicyOwner({
@@ -317,28 +338,30 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
       newHashedSecret: string;
       newDisplayPrefix: string;
       previousHashedSecret: string;
-      previousSecretValidUntil: Date;
+      previousSecretValidUntil: Instant;
     },
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes> {
     const client = this.client(tx);
-    return client.virtualKey.update({
-      where: { id, organizationId },
-      data: {
-        hashedSecret: newHashedSecret,
-        displayPrefix: newDisplayPrefix,
-        previousHashedSecret,
-        previousSecretValidUntil,
-        revision: { increment: 1n },
-      },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
+    return toVirtualKeyRecordOf(
+      client.virtualKey.update({
+        where: { id, organizationId },
+        data: {
+          hashedSecret: newHashedSecret,
+          displayPrefix: newDisplayPrefix,
+          previousHashedSecret,
+          previousSecretValidUntil: toDate(previousSecretValidUntil),
+          revision: { increment: 1n },
         },
-      },
-    });
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: {
+            select: gatewayRoutingPolicySelect,
+          },
+        },
+      }),
+    );
   }
 
   async revoke(
@@ -350,24 +373,26 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     tx?: Prisma.TransactionClient,
   ): Promise<VirtualKeyWithScopes> {
     const client = this.client(tx);
-    return client.virtualKey.update({
-      where: { id, organizationId },
-      data: {
-        status: "REVOKED",
-        revokedAt: new Date(),
-        revokedById,
-        previousHashedSecret: null,
-        previousSecretValidUntil: null,
-        revision: { increment: 1n },
-      },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
+    return toVirtualKeyRecordOf(
+      client.virtualKey.update({
+        where: { id, organizationId },
+        data: {
+          status: "REVOKED",
+          revokedAt: new Date(),
+          revokedById,
+          previousHashedSecret: null,
+          previousSecretValidUntil: null,
+          revision: { increment: 1n },
         },
-      },
-    });
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: {
+            select: gatewayRoutingPolicySelect,
+          },
+        },
+      }),
+    );
   }
 
   async setDisabled(
@@ -375,41 +400,106 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     tx?: Prisma.TransactionClient,
   ): Promise<VirtualKeyWithScopes> {
     const client = this.client(tx);
-    return client.virtualKey.update({
-      where: { id: data.id, organizationId: data.organizationId },
-      data: data.disabled
-        ? {
-            status: "DISABLED",
-            disabledAt: new Date(),
-            disabledReason: data.reason,
-            revision: { increment: 1n },
-          }
-        : {
-            // Rotation-grace fields are deliberately untouched in BOTH
-            // directions: disable is reversible, and a key re-enabled
-            // mid-grace must keep honoring its previous secret.
-            status: "ACTIVE",
-            disabledAt: null,
-            disabledReason: null,
-            revision: { increment: 1n },
+    return toVirtualKeyRecordOf(
+      client.virtualKey.update({
+        where: { id: data.id, organizationId: data.organizationId },
+        data: data.disabled
+          ? {
+              status: "DISABLED",
+              disabledAt: new Date(),
+              disabledReason: data.reason,
+              revision: { increment: 1n },
+            }
+          : {
+              // Rotation-grace fields are deliberately untouched in BOTH
+              // directions: disable is reversible, and a key re-enabled
+              // mid-grace must keep honoring its previous secret.
+              status: "ACTIVE",
+              disabledAt: null,
+              disabledReason: null,
+              revision: { increment: 1n },
+            },
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: {
+            select: gatewayRoutingPolicySelect,
           },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
         },
-      },
-    });
+      }),
+    );
   }
 
-  async recordUsage(id: string, at: Date, tx?: GatewayPersistenceTransaction): Promise<void> {
+  async recordUsage(id: string, at: Instant, tx?: GatewayPersistenceTransaction): Promise<void> {
     const client = this.client(tx);
     await client.virtualKey.update({
       where: { id },
-      data: { lastUsedAt: at },
+      data: { lastUsedAt: toDate(at) },
     });
   }
+}
+
+/** The moments a key carries, once read off the stored columns. */
+type KeyMoments = {
+  disabledAt: Instant | null;
+  expiresAt: Instant | null;
+  previousSecretValidUntil: Instant | null;
+  revokedAt: Instant | null;
+  createdAt: Instant;
+  updatedAt: Instant;
+  lastUsedAt: Instant | null;
+};
+
+/** The stored columns a key's instants are read off. */
+type StoredKeyMoments = {
+  disabledAt: Date | null;
+  expiresAt: Date | null;
+  previousSecretValidUntil: Date | null;
+  revokedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lastUsedAt: Date | null;
+};
+
+/** A read that hands back one key, or none, mapped onto instants. */
+async function toVirtualKeyRecordFrom<Row extends StoredKeyMoments>(
+  query: PromiseLike<Row | null>,
+): Promise<(Omit<Row, keyof StoredKeyMoments> & KeyMoments) | null> {
+  const row = await query;
+
+  return row ? toVirtualKeyRecord(row) : null;
+}
+
+/** A write that hands back the one key it touched, mapped onto instants. */
+async function toVirtualKeyRecordOf<Row extends StoredKeyMoments>(
+  query: PromiseLike<Row>,
+): Promise<Omit<Row, keyof StoredKeyMoments> & KeyMoments> {
+  return toVirtualKeyRecord(await query);
+}
+
+/** A read that hands back many keys, mapped onto instants. */
+async function toVirtualKeyRecordsFrom<Row extends StoredKeyMoments>(
+  query: PromiseLike<Row[]>,
+): Promise<Array<Omit<Row, keyof StoredKeyMoments> & KeyMoments>> {
+  return (await query).map(toVirtualKeyRecord);
+}
+
+/** The one place a stored key's Dates become instants. */
+function toVirtualKeyRecord<Row extends StoredKeyMoments>(
+  row: Row,
+): Omit<Row, keyof StoredKeyMoments> & KeyMoments {
+  return {
+    ...row,
+    disabledAt: row.disabledAt ? fromDate(row.disabledAt) : null,
+    expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+    previousSecretValidUntil: row.previousSecretValidUntil
+      ? fromDate(row.previousSecretValidUntil)
+      : null,
+    revokedAt: row.revokedAt ? fromDate(row.revokedAt) : null,
+    createdAt: fromDate(row.createdAt),
+    updatedAt: fromDate(row.updatedAt),
+    lastUsedAt: row.lastUsedAt ? fromDate(row.lastUsedAt) : null,
+  };
 }
 
 function jsonInput(value: unknown): Prisma.InputJsonValue {

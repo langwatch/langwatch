@@ -2,6 +2,7 @@
  * @vitest-environment node
  * Real Postgres + real ClickHouse. Month total and budget standing are different measurements, which only holds if the read buckets to the budget's own period. Spec: specs/ai-gateway/budgets.feature
  */
+import { nowInstant, toDate } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -92,15 +93,12 @@ describe.skipIf(!databaseUrl || !chUrl)("direct budget per virtual key (real PG 
     /** @scenario "Monthly budget resets at month start" */
     it("dates the reset at the end of the period the spend was measured over", async () => {
       const budgets = await load();
-      const expectedDay = new Date(
-        Date.UTC(NOW.getUTCFullYear(), NOW.getUTCMonth(), NOW.getUTCDate() + 1, 0, 0, 0),
-      );
-      expect(budgets.get(VK_DAILY_ID)?.resetsAt).toBe(expectedDay.toISOString());
+      const utcNow = NOW.toZonedDateTimeISO("UTC");
+      const expectedDay = utcNow.startOfDay().add({ days: 1 }).toInstant();
+      expect(budgets.get(VK_DAILY_ID)?.resetsAt).toBe(toDate(expectedDay).toISOString());
 
-      const expectedMonth = new Date(
-        Date.UTC(NOW.getUTCFullYear(), NOW.getUTCMonth() + 1, 1, 0, 0, 0),
-      );
-      expect(budgets.get(VK_STANDALONE_ID)?.resetsAt).toBe(expectedMonth.toISOString());
+      const expectedMonth = utcNow.startOfDay().with({ day: 1 }).add({ months: 1 }).toInstant();
+      expect(budgets.get(VK_STANDALONE_ID)?.resetsAt).toBe(toDate(expectedMonth).toISOString());
     });
   });
 
@@ -116,7 +114,7 @@ describe.skipIf(!databaseUrl || !chUrl)("direct budget per virtual key (real PG 
     it("drops the cap once it is archived", async () => {
       await prisma.gatewayBudget.update({
         where: { id: BUDGET_STANDALONE_ID },
-        data: { archivedAt: new Date() },
+        data: { archivedAt: toDate(nowInstant()) },
       });
       try {
         expect((await load()).has(VK_STANDALONE_ID)).toBe(false);

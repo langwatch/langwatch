@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import type { SpendEventStatus } from "../adapters/gateway-spend-filters.adapter.ts";
 import type { GatewaySpendState } from "../projections/gateway-spend.projection.ts";
 
@@ -68,7 +69,7 @@ export type SpendEventRow = {
   labels: string[];
   metadata: string;
   durationMs: number;
-  occurredAt: Date;
+  occurredAt: Instant;
 };
 
 export interface SpendEventsPageCursor {
