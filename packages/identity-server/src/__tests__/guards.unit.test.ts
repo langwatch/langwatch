@@ -799,6 +799,7 @@ describe("detachIdentifier strands guard", () => {
     });
 
     /** @scenario "Removal follows the same guards as every other identifier" */
+    /** @scenario "Removing an address that is not the last way in" */
     it("allows the removal once a verified email is there to recover through", async () => {
       const heads = new InMemoryHeads();
       heads.heads.set(
