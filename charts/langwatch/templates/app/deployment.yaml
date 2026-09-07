@@ -155,6 +155,11 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: {{ .Values.app.otel.serviceName | default "langwatch-app" | quote }}
 
+            {{- with .Values.app.trustedProxyAddresses }}
+            - name: TRUSTED_PROXY_ADDRESSES
+              value: {{ . | quote }}
+            {{- end }}
+
             {{/* NEXTAUTH_URL comes from langwatch.sharedEnv: every process
                  needs the same answer for what this installation is called. */}}
             - name: NEXTAUTH_URL_INTERNAL

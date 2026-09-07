@@ -4,6 +4,7 @@ import type { Context } from "hono";
 import type { NextApiRequest } from "~/types/next-stubs";
 
 interface DirectPeerRequest {
+  headers?: Record<string, string | string[] | undefined>;
   socket?: { remoteAddress?: string };
 }
 
@@ -84,6 +85,95 @@ export function getDirectPeerIp(
 
   const normalized = remoteAddress.replace(/^::ffff:/, "").trim();
   return isIP(normalized) === 0 ? undefined : normalized;
+}
+
+/**
+ * Resolves a rate-limit address without trusting caller-controlled headers.
+ *
+ * The socket peer is authoritative unless the operator explicitly names it
+ * as a trusted proxy. Only then is the canonical `x-forwarded-for` chain
+ * considered, walking from right to left until the first hop that is not
+ * itself trusted. A generic proxy is not evidence that a Cloudflare, Fastly,
+ * or other vendor-specific header was sanitized, so those headers never
+ * participate in this security-sensitive answer.
+ */
+export function getTrustedProxyClientIp(
+  req: DirectPeerRequest | undefined,
+  trustedProxies: readonly string[],
+): string | undefined {
+  const socketAddress = getDirectPeerIp(req);
+  if (!socketAddress || !isTrustedProxy(socketAddress, trustedProxies)) {
+    return socketAddress;
+  }
+
+  return forwardedAddress(req?.headers ?? {}, trustedProxies) ?? socketAddress;
+}
+
+export function parseTrustedProxyAddresses(
+  configured: string | undefined,
+): readonly string[] {
+  return (configured ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function forwardedAddress(
+  headers: Record<string, string | string[] | undefined>,
+  trustedProxies: readonly string[],
+): string | undefined {
+  const value = headers["x-forwarded-for"];
+  if (!value) return undefined;
+
+  const hops = (Array.isArray(value) ? value.join(",") : value).split(",");
+  for (let index = hops.length - 1; index >= 0; index--) {
+    const address = parseAddress(hops[index] ?? "");
+    if (!address) continue;
+    if (!isTrustedProxy(address, trustedProxies)) return address;
+  }
+
+  return undefined;
+}
+
+function parseAddress(value: string): string | undefined {
+  const normalized = value.replace(/^\s*::ffff:/, "").trim();
+  return isIP(normalized) === 0 ? undefined : normalized;
+}
+
+function isTrustedProxy(
+  address: string,
+  trustedProxies: readonly string[],
+): boolean {
+  return trustedProxies.some((entry) => {
+    const configured = entry.trim();
+    return configured.includes("/")
+      ? withinIpv4Range(address, configured)
+      : parseAddress(configured) === address;
+  });
+}
+
+function withinIpv4Range(address: string, range: string): boolean {
+  const [network, prefix] = range.split("/");
+  const bits = Number(prefix);
+  if (!network || !Number.isInteger(bits) || bits < 0 || bits > 32) {
+    return false;
+  }
+
+  const target = ipv4AsNumber(address);
+  const base = ipv4AsNumber(network);
+  if (target === null || base === null) return false;
+
+  const mask = bits === 0 ? 0 : (0xff_ff_ff_ff << (32 - bits)) >>> 0;
+  return (target & mask) === (base & mask);
+}
+
+function ipv4AsNumber(address: string): number | null {
+  if (isIP(address) !== 4) return null;
+
+  return address
+    .split(".")
+    .map(Number)
+    .reduce((total, octet) => ((total << 8) | octet) >>> 0, 0);
 }
 
 /**

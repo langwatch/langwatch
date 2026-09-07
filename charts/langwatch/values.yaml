@@ -211,6 +211,13 @@ app:
   ## @param app.nodeEnv [string] Node.js environment override (falls back to global.env if empty).
   nodeEnv: ""
 
+  # Proxy hops allowed to append the X-Forwarded-For chain used by public auth
+  # rate limits. Set this to the ingress controller or load balancer egress
+  # addresses/CIDRs for the deployment. Empty keeps the safe socket-peer
+  # fallback; the chart cannot infer network-specific CIDRs.
+  ## @param app.trustedProxyAddresses [string, default: ""] Comma-separated trusted proxy addresses or IPv4 CIDR ranges.
+  trustedProxyAddresses: ""
+
   # Encryption key for securing sensitive credentials
   # This key is used to encrypt/decrypt stored API keys and secrets
   ## @extra app.credentialsEncryptionKey Configuration for credentials encryption.

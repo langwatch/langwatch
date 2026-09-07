@@ -135,6 +135,13 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the decision and its reason code are logged
     And the log carries the domain, never the local part of the address
 
+  @unit
+  Scenario: Auth throttles distinguish callers behind a trusted ingress
+    Given two callers reach the auth screen through the same configured trusted proxy
+    When each caller asks the sign-in router where an address should go
+    Then each caller spends a separate per-client budget
+    And a forwarding header received from an untrusted peer is ignored
+
   # ── Self-hosted priority ───────────────────────────────────────────────
 
   @unit
