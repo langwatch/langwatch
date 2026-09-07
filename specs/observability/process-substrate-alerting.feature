@@ -53,3 +53,26 @@ Feature: The process substrate tells operators when it is in trouble
     Given the substrate and topic clustering dashboards are tracked in the infra repository
     Then production Grafana serves them from reviewed, versioned JSON
     And a metric rename in this repository is caught by its alert rules referencing the old name
+
+  Scenario: A failed fleet collection cannot clear unresolved work
+    Given the last successful database read found a dead outbox intent
+    When the next fleet metrics collection fails
+    Then the dead count remains visible
+    And collection success is zero
+    And the last successful collection timestamp does not advance
+    And concurrent gauges share the same collection attempt
+
+  Scenario: The first discarded queue job is visible without a counter baseline
+    Given a worker has never emitted a discard metric series
+    When a job is discarded
+    Then the first scrape exposes its last-discard timestamp
+    And the metric identifies queue, pipeline, job type, job name and reason
+    And reoffered unroutable work does not set that timestamp
+    And a subsequent discard after a worker restart is visible on its first scrape
+
+  Scenario: OTLP partial rejection exposes its cause independently of HTTP status
+    Given an OTLP request contains collected, filtered, duplicate and rejected spans
+    When the collection tally records their outcomes
+    Then metrics distinguish dispatch failure from invalid or aged spans
+    And intentional filtering and deduplication are not counted as rejected
+    And dispatched spans are not described as already queryable

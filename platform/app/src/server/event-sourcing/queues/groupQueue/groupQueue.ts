@@ -90,7 +90,7 @@ import {
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
-  gqJobsDroppedTotal,
+  recordDroppedJob,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
@@ -300,9 +300,9 @@ const dropReasonOf = (err: unknown): DecodeFailureReason | "unknown" =>
  * - Weighted round-robin (sqrt(pendingCount)) provides fair scheduling across groups
  * - fastq provides concurrency-limited async task execution with backpressure
  */
-export class GroupQueueProcessor<Payload extends Record<string, unknown>>
-  implements EventSourcedQueueProcessor<Payload>
-{
+export class GroupQueueProcessor<
+  Payload extends Record<string, unknown>,
+> implements EventSourcedQueueProcessor<Payload> {
   private readonly logger = createLogger(
     "langwatch:event-sourcing:group-queue",
   );
@@ -390,8 +390,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * a restarted pod must never inherit the identity of the one it replaced, or
    * its predecessor's death would resolve to "that's me, still running".
    */
-  private readonly workerId =
-    `${hostname()}-${pid}-${randomUUID().slice(0, 8)}`;
+  private readonly workerId = `${hostname()}-${pid}-${randomUUID().slice(0, 8)}`;
 
   /** Beacon refresh timer; stopped before the retirement write in {@link close}. */
   private livenessTimer: ReturnType<typeof setInterval> | undefined;
@@ -2471,7 +2470,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const { pipelineName, jobType, jobName } = readJobRoutingMeta(jobDataJson);
     const descriptor = readEnvelopeDescriptor(jobDataJson);
 
-    gqJobsDroppedTotal.inc({
+    recordDroppedJob({
       queue_name: this.queueName,
       pipeline_name: pipelineName ?? "unknown",
       job_type: jobType ?? "unknown",
