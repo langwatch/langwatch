@@ -34,16 +34,17 @@ import {
  */
 const findAddressHolder = vi.fn();
 const createPasskeyUser = vi.fn();
-const requestVerification = vi.fn();
+const validateAddressProof = vi.fn();
+const claimAddressProof = vi.fn();
 
 const signUpContext = (email: string, claim = "a".repeat(43)) =>
-  JSON.stringify({ email, claim });
+  JSON.stringify({ email, claim, addressProof: "proof-1" });
 
 const registration = () =>
   new PasskeySignUpRegistration({
     directory: { findAddressHolder },
     accounts: { createPasskeyUser },
-    verification: { requestVerification },
+    verification: { validateAddressProof, claimAddressProof },
   });
 
 const resolveUser = (args: { ctx: never; context?: string | null }) =>
@@ -99,7 +100,8 @@ describe("given passkey sign-up, which creates an account with no session", () =
     vi.clearAllMocks();
     findAddressHolder.mockResolvedValue(null);
     createPasskeyUser.mockResolvedValue({ id: "user_1", created: true });
-    requestVerification.mockResolvedValue(void 0);
+    validateAddressProof.mockResolvedValue(true);
+    claimAddressProof.mockResolvedValue(true);
     // Nobody signed in, which is the case this whole block is about.
     getSessionFromCtx.mockResolvedValue(null);
   });
@@ -419,7 +421,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       expect(result.userId).toBe("user_1");
     });
 
-    it("sends the address confirmation after them, not in front of them", async () => {
+    it("spends the address proof before creating the account", async () => {
       const { ctx } = fakeContext();
 
       await afterVerification({
@@ -427,21 +429,23 @@ describe("given passkey sign-up, which creates an account with no session", () =
         context: signUpContext("someone@example.com"),
       });
 
-      expect(requestVerification).toHaveBeenCalledWith({
+      expect(claimAddressProof).toHaveBeenCalledWith({
+        token: "proof-1",
         email: "someone@example.com",
       });
     });
 
-    it("finishes the sign-up even when the mailer is down", async () => {
+    it("refuses a proof that was spent by another enrollment", async () => {
       const { ctx } = fakeContext();
-      requestVerification.mockRejectedValue(new Error("mailer unreachable"));
+      claimAddressProof.mockResolvedValue(false);
 
       await expect(
         afterVerification({
           ctx,
           context: signUpContext("someone@example.com"),
         }),
-      ).resolves.toMatchObject({ userId: "user_1" });
+      ).rejects.toMatchObject({ body: { code: "VERIFICATION_REQUIRED" } });
+      expect(createPasskeyUser).not.toHaveBeenCalled();
     });
   });
 });
@@ -461,7 +465,8 @@ describe("given somebody who is already signed in", () => {
     vi.clearAllMocks();
     findAddressHolder.mockResolvedValue(null);
     createPasskeyUser.mockResolvedValue({ id: "user_1", created: true });
-    requestVerification.mockResolvedValue(void 0);
+    validateAddressProof.mockResolvedValue(true);
+    claimAddressProof.mockResolvedValue(true);
     getSessionFromCtx.mockResolvedValue({
       user: { id: "signed_in_user", email: "sergio+test@langwatch.ai" },
     });
@@ -512,7 +517,8 @@ describe("given somebody who is already signed in", () => {
 
       await afterVerification({ ctx, context: null });
 
-      expect(requestVerification).not.toHaveBeenCalled();
+      expect(validateAddressProof).not.toHaveBeenCalled();
+      expect(claimAddressProof).not.toHaveBeenCalled();
     });
 
     it("opens no session of its own, because they already hold one", async () => {

@@ -738,25 +738,6 @@ export function signUpVerification(): SignUpVerificationService {
       sendVerificationLink: ({ email, verificationUrl }) =>
         sendSignUpVerificationEmail({ email, verificationUrl }),
     },
-    accounts: {
-      // Nobody has been asked for a name on this path: the person typed an
-      // address and a password into a log-in form, and the service writes the
-      // address in its place, the same as `user.register`. The credential
-      // identifier is stated by the same call — the front door reads the
-      // projection, so an account with no identifier is an account the door
-      // says does not exist, and this path's whole purpose is to hand somebody
-      // an account they can immediately sign in to.
-      createCredentialAccount: async ({ email, passwordHash }) => {
-        await credentialAccounts().openCredentialAccount({
-          name: null,
-          email,
-          passwordHash,
-        });
-      },
-      markAddressConfirmed: async ({ email }) => {
-        await identityUsers.updateAddressConfirmed({ email });
-      },
-    },
     buildVerificationUrl: ({ token }) => buildSignUpVerificationUrl(token),
   });
 }
@@ -871,8 +852,10 @@ export function passkeySignUp(): PasskeySignUpRegistration {
         credentialAccounts().openPasskeyAccount({ email, claimHash }),
     },
     verification: {
-      requestVerification: ({ email }) =>
-        signUpVerification().requestVerification({ email }),
+      validateAddressProof: ({ token, email, purpose }) =>
+        signUpVerification().validateAddressProof({ token, email, purpose }),
+      claimAddressProof: ({ token, email, purpose }) =>
+        signUpVerification().claimAddressProof({ token, email, purpose }),
     },
   });
 }

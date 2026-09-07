@@ -69,7 +69,6 @@ export function emailAndPassword({
   hashRounds,
   revokeAllSessions,
   recordPasswordReset,
-  clearSignUpConfirmationPending,
 }: EmailAndPasswordDeps): BetterAuthOptions["emailAndPassword"] {
   return {
     enabled: isEmailPasswordEnabled(env),
@@ -143,7 +142,10 @@ export function emailAndPassword({
      */
     onPasswordReset: async ({ user }) => {
       await revokeAllSessions({ userId: user.id });
-      await clearSignUpConfirmationPending({ userId: user.id });
+      // Password recovery never clears the explicit sign-up latch. A pending
+      // row may already hold a credential planted before mailbox proof, and a
+      // reset proves only the mailbox, not that the stored passkey or account
+      // should become trusted. The session gate keeps that residue closed.
       // Every old session is gone; the after-hook opens the one new session
       // this reset earned, for the device that set the password. Recorded
       // AFTER the revoke so the new session is never among the revoked.

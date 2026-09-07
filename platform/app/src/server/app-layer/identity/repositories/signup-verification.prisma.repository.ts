@@ -13,9 +13,7 @@ import type {
  * costs no schema of its own. The identifier the service writes is
  * namespaced, so a token minted here can only ever be spent here.
  */
-export class PrismaSignUpVerificationTokenStore
-  implements SignUpVerificationTokenStore
-{
+export class PrismaSignUpVerificationTokenStore implements SignUpVerificationTokenStore {
   constructor(private readonly prisma: PrismaClient) {}
 
   async issue({
@@ -101,6 +99,41 @@ export class PrismaSignUpVerificationTokenStore
     if (!row.identifier.startsWith(SPENT_NAMESPACE)) return null;
     return { identifier: row.identifier.slice(SPENT_NAMESPACE.length) };
   }
+
+  async claimExpected({
+    token,
+    identifier,
+    now,
+  }: {
+    token: string;
+    identifier: string;
+    now: Date;
+  }): Promise<boolean> {
+    const claimed = await this.prisma.verificationToken.deleteMany({
+      where: { token, identifier, expires: { gt: now } },
+    });
+    return claimed.count === 1;
+  }
+
+  async hasExpected({
+    token,
+    identifier,
+    now,
+  }: {
+    token: string;
+    identifier: string;
+    now: Date;
+  }): Promise<boolean> {
+    return (
+      (await this.prisma.verificationToken.count({
+        where: {
+          token,
+          identifier,
+          expires: { gt: now },
+        },
+      })) === 1
+    );
+  }
 }
 
 /**
@@ -127,9 +160,10 @@ export class PrismaSignUpAccountDirectory implements SignUpAccountDirectory {
   async stateFor({ email }: { email: string }): Promise<SignUpAddressState> {
     const user = await this.prisma.user.findFirst({
       where: { email: { equals: email, mode: "insensitive" } },
-      select: { emailVerified: true },
+      select: { emailVerified: true, signupConfirmationPending: true },
     });
     if (!user) return "unknown";
+    if (user.signupConfirmationPending) return "awaiting_confirmation";
     return user.emailVerified ? "confirmed" : "awaiting_confirmation";
   }
 }
