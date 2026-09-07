@@ -65,7 +65,7 @@ import { app } from "../app";
 
 const PROJECT_ID = "project_owned";
 
-function post(path: string, body: unknown): Promise<Response> {
+async function post(path: string, body: unknown): Promise<Response> {
   return app.request(path, {
     method: "POST",
     headers: { "content-type": "application/json" },

@@ -66,6 +66,7 @@ export function readElevenLabsErrorReason(
     if (message) return message;
   } else if (
     detail &&
+    typeof detail === "object" &&
     typeof detail.message === "string" &&
     detail.message.length > 0
   ) {

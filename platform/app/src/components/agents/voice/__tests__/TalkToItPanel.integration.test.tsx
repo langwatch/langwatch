@@ -8,10 +8,13 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { VoiceTransportClient } from "../voice-transport-client.registry";
 
 // Mock the transport client registry so no vendor SDK is loaded in the test.
 const { openCall } = vi.hoisted(() => ({
-  openCall: vi.fn(async () => ({ hangUp: vi.fn(async () => {}) })),
+  openCall: vi.fn<VoiceTransportClient["openCall"]>(async () => ({
+    hangUp: vi.fn(async () => {}),
+  })),
 }));
 vi.mock("../voice-transport-client.registry", () => ({
   voiceTransportClientRegistry: { elevenlabs_convai: { openCall } },

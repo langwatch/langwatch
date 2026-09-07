@@ -186,19 +186,23 @@ describe("finishVoiceSession", () => {
   describe("when the provider record names a different agent than the token", () => {
     it("refuses without writing the run", async () => {
       const runner = fakeRunner({
-        fetchCallRecord: vi.fn(async () => ({
-          conversationId: "conv_1",
-          transport: "elevenlabs_convai",
-          agentExternalId: "someone_elses_agent",
-          startedAt: 1000,
-          endedAt: 2000,
-          durationMs: 1000,
-          turns: [],
-          cutAtLimit: false,
-          source: "provider",
-        })),
+        fetchCallRecord: vi.fn(
+          async (): Promise<CallRecord> => ({
+            conversationId: "conv_1",
+            transport: "elevenlabs_convai",
+            agentExternalId: "someone_elses_agent",
+            startedAt: 1000,
+            endedAt: 2000,
+            durationMs: 1000,
+            turns: [],
+            cutAtLimit: false,
+            source: "provider",
+          }),
+        ),
       });
-      const writeCallRun = vi.fn(async () => {});
+      const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+        async () => {},
+      );
       const ports = fakePorts(runner, { writeCallRun });
 
       await expect(
@@ -214,7 +218,9 @@ describe("finishVoiceSession", () => {
   describe("when the limit ended the call", () => {
     it("carries the cut-at-limit flag onto the written record", async () => {
       const runner = fakeRunner();
-      const writeCallRun = vi.fn(async () => {});
+      const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+        async () => {},
+      );
       const ports = fakePorts(runner, { writeCallRun });
 
       await finishVoiceSession(ports, {
@@ -234,7 +240,9 @@ describe("finishVoiceSession", () => {
     /** @scenario "Call it myself against a scenario and be scored on its criteria" */
     it("writes the run under the scenario and its set so the scenario grades it", async () => {
       const runner = fakeRunner();
-      const writeCallRun = vi.fn(async () => {});
+      const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+        async () => {},
+      );
       const resolveScenarioSet = vi.fn(async () => ({
         scenarioSetId: "set_x",
       }));
@@ -264,7 +272,9 @@ describe("finishVoiceSession", () => {
 
     it("keeps a drawer call out of any scenario set when no scenario is named", async () => {
       const runner = fakeRunner();
-      const writeCallRun = vi.fn(async () => {});
+      const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+        async () => {},
+      );
       const resolveScenarioSet = vi.fn(async () => ({
         scenarioSetId: "set_x",
       }));

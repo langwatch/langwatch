@@ -144,7 +144,10 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
       });
 
       expect(result).toEqual({ signedUrl: "wss://signed/abc" });
-      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const [, init] = fetchMock.mock.calls[0] as unknown as [
+        string,
+        RequestInit,
+      ];
       expect((init.headers as Record<string, string>)["xi-api-key"]).toBe(
         CREDENTIAL.apiKey,
       );
@@ -215,7 +218,7 @@ describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
     /** @scenario "Recording unavailable leaves the transcript without a Play control or an error" */
     it("normalises the transcript with no audio url and no error", async () => {
       mockFetchOnce({
-        json: () => ({
+        json: async () => ({
           conversation_id: "conv_1",
           has_audio: false,
           metadata: { start_time_unix_secs: 1, call_duration_secs: 3 },
@@ -244,7 +247,7 @@ describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
   describe("when the conversation has audio", () => {
     it("points audioUrl at the app proxy, never at ElevenLabs", async () => {
       mockFetchOnce({
-        json: () => ({
+        json: async () => ({
           conversation_id: "conv_1",
           has_audio: true,
           transcript: [],

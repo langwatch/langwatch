@@ -687,7 +687,7 @@ function CallerVoiceBlock({
           min={0}
           max={100}
           step={5}
-          aria-label="Interrupts"
+          aria-label={["Interrupts"]}
           size="sm"
         />
       </Box>

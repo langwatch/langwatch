@@ -13,6 +13,9 @@ function fakeRegistry(
     elevenlabs_convai: {
       missingKeyMessage: "No ElevenLabs key in this project",
       createAgentAdapter,
+      mintSession: vi.fn(),
+      fetchCallRecord: vi.fn(),
+      endCall: vi.fn(),
     },
   };
 }

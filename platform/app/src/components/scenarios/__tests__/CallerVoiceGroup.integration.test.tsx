@@ -45,9 +45,10 @@ describe("Caller voice group", () => {
     it("shows the Caller voice group and reloads the saved caller values", async () => {
       renderForm();
 
-      // Customize scenario is collapsed by default; the Caller voice group is
-      // rendered but not yet visible until both are expanded.
-      expect(screen.queryByText("Voice")).not.toBeVisible();
+      // Customize scenario is collapsed by default; the Voice picker is not
+      // mounted until the Caller voice group is expanded, so it never queries
+      // the project's providers for a form the user has not opened.
+      expect(screen.queryByText("Voice")).not.toBeInTheDocument();
 
       await userEvent.click(screen.getByText("Customize scenario"));
 
@@ -56,6 +57,7 @@ describe("Caller voice group", () => {
 
       await userEvent.click(screen.getByText("Caller voice"));
 
+      expect(screen.getByText("Voice")).toBeVisible();
       expect(screen.getByText("Interrupts: 20%")).toBeInTheDocument();
       expect(screen.getByLabelText("Effects")).toHaveValue("phone_line");
     });

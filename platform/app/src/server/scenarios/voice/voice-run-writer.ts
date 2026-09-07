@@ -22,6 +22,7 @@ import { AgentRepository } from "~/server/agents/agent.repository";
 import { VOICE_CALL_SCENARIO_SET_ID } from "~/server/agents/voice/voice-agent.config";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import type { SimulationMessage } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/shared";
 import type { CallRecord } from "./call-record";
 
 /** How the run records who spoke as the caller: a person, not a simulator. */
@@ -40,15 +41,7 @@ export class VoiceAgentNotFoundError extends Error {
   }
 }
 
-interface VoiceRunMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  /** Per-turn recording, when the provider exposed one. */
-  audioUrl?: string;
-}
-
-function toMessages(record: CallRecord): VoiceRunMessage[] {
+function toMessages(record: CallRecord): SimulationMessage[] {
   return record.turns.map((turn, index) => ({
     id: `${record.conversationId}-${index}`,
     role: turn.role === "agent" ? "assistant" : "user",

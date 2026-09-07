@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   type Control,
   Controller,
+  type Resolver,
   type UseFormReturn,
   useForm,
 } from "react-hook-form";
@@ -106,7 +107,10 @@ export function ScenarioForm({
       callerVoice: DEFAULT_CALLER_VOICE,
       ...defaultValues,
     },
-    resolver: zodResolver(scenarioFormSchema),
+    // The schema's callerVoice `.default(...)` makes zod's input and output
+    // types diverge; pin the resolver to the form's own value type so useForm,
+    // control and formRef all instantiate from one type source.
+    resolver: zodResolver(scenarioFormSchema) as Resolver<ScenarioFormData>,
   });
 
   const {
@@ -254,22 +258,28 @@ function CallerVoiceSection({
           <Text fontSize="12px" color="fg.muted">
             Used when this scenario runs against a voice agent.
           </Text>
-          <Field.Root>
-            <Text fontSize="13px" fontWeight="medium">
-              Voice
-            </Text>
-            <Controller
-              name="callerVoice.voiceModel"
-              control={control}
-              render={({ field }) => (
-                <CallerVoiceModelSelect
-                  value={field.value ?? null}
-                  onChange={field.onChange}
-                  size="full"
-                />
-              )}
-            />
-          </Field.Root>
+          {/* The model picker queries the project's providers on mount, so it
+              is mounted only once the group is opened — the collapsed content
+              stays mounted otherwise, which would fire the query for every
+              scenario form. */}
+          {open && (
+            <Field.Root>
+              <Text fontSize="13px" fontWeight="medium">
+                Voice
+              </Text>
+              <Controller
+                name="callerVoice.voiceModel"
+                control={control}
+                render={({ field }) => (
+                  <CallerVoiceModelSelect
+                    value={field.value ?? null}
+                    onChange={field.onChange}
+                    size="full"
+                  />
+                )}
+              />
+            </Field.Root>
+          )}
 
           <Controller
             name="callerVoice.interruptProbability"
