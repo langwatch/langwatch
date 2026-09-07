@@ -142,6 +142,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|apps/ui/src/behavior/ui-api-reachability.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "cognitive-complexity|apps/ui/src/behavior/ui-scope-resolution.ts",
       "measured": "2026-09-06"
     },
@@ -382,6 +386,18 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|packages/architecture-lint/src/composed-exports.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/architecture-lint/src/feature-catalogue.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/architecture-lint/src/feature-configuration.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "cognitive-complexity|packages/architecture-lint/src/feature-layout.ts",
       "measured": "2026-09-06"
     },
@@ -398,8 +414,20 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|packages/architecture-lint/src/test-quality.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "cognitive-complexity|packages/architecture-lint/src/workspace-package-rename.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/architecture-lint/src/workspace.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/config/src/runtime-config.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "cognitive-complexity|packages/config/src/zod-issues.ts",
@@ -1158,6 +1186,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|packages/features/evaluation/server/src/rules/evaluator-catalogue.rules.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "cognitive-complexity|packages/features/evaluation/server/src/services/evaluation-data.service.ts",
       "measured": "2026-09-06"
     },
@@ -1380,6 +1412,10 @@
     {
       "key": "cognitive-complexity|packages/features/experiment/web/src/ui/elements/experiments/ds-py-experiment.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/experiment/web/src/ui/elements/navigation-footer.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "cognitive-complexity|packages/features/experiment/web/src/ui/sections/batch-evaluation-results.aggregates.ts",
@@ -1662,8 +1698,40 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|packages/features/langy/web/src/behavior/langy-context-target.store.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/langy/web/src/behavior/langy-local-control.store.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "cognitive-complexity|packages/features/langy/web/src/behavior/langy.store.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/langy/web/src/behavior/use-langy-context-target.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/langy/web/src/behavior/use-langy-orb-proximity.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/logic/langy-chat-transport.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/use-langy-conversation-update-listener.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/use-langy-stick-to-bottom.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/use-langy-turn-recovery.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/elements/github/langy-git-hub-pr-card.tsx",
@@ -1714,12 +1782,28 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/sections/langy-tool-error-card.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/sections/message-content.tsx",
       "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/sections/recent-chats-view.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-answer-segments.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-cli-follow-ups.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-trace-explorer-link.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "cognitive-complexity|packages/features/langy/web/src/ui/elements/langy-wave.tsx",
@@ -1792,6 +1876,10 @@
     {
       "key": "cognitive-complexity|packages/features/model-provider/server/src/services/model-provider-resolution.service.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/model-provider/server/src/transport/api-rest/model-defaults.api.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "cognitive-complexity|packages/features/model-provider/server/src/transport/api-rest/playground.api.ts",
@@ -2038,6 +2126,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|packages/features/organization/server/src/rules/team-membership-plan.rules.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "cognitive-complexity|packages/features/organization/server/src/services/organization-group-binding.service.ts",
       "measured": "2026-09-06"
     },
@@ -2170,6 +2262,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|packages/features/prompt/server/src/rules/prompt-output-format.rules.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "cognitive-complexity|packages/features/prompt/server/src/transport/api-rest/prompt.api.ts",
       "measured": "2026-09-06"
     },
@@ -2216,6 +2312,10 @@
     {
       "key": "cognitive-complexity|packages/features/prompt/web/src/screens/prompt-studio/browser/window/prompt-browser-window-content.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/prompt/web/src/screens/prompt-studio/chat/playground-turn-separator.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "cognitive-complexity|packages/features/prompt/web/src/screens/prompt-studio/chat/synced-chat-input.tsx",
@@ -2606,6 +2706,78 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/explorer/ai/use-typewriter-placeholder.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/explorer/onboarding/store/onboarding-store.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/explorer/search-bar/filter-highlight.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/filter.store.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/flame/use-flame-keyboard.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/flame/use-flame-viewport.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/preview-formatter.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/refresh-ui.store.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/selection.store.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/sequence/use-mermaid-renderer.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/shared/traces/media-parts.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/transcript/chat-message-coercion.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/transcript/content-parser.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/transcript/media-part.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/transcript/turns.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/use-drawer.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/use-viewport-zoom.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/model/attribute-format.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "cognitive-complexity|packages/features/trace/web/src/model/evaluation-results.ts",
       "measured": "2026-09-06"
     },
@@ -2620,6 +2792,10 @@
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/model/sequence/topology-mermaid.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/features/trace/web/src/model/shared/content-parts/coerce-content-to-array.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/blocks/explorer/onboarding/typewriter-hero.tsx",
@@ -3186,6 +3362,18 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|packages/mail/src/templates/email-layout.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/mail/src/templates/onboarding/highlight.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "cognitive-complexity|packages/mail/src/templates/trigger-digest-email.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "cognitive-complexity|packages/observability/src/logger.ts",
       "measured": "2026-09-06"
     },
@@ -3654,6 +3842,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "complexity|packages/architecture-lint/src/workspace.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "complexity|packages/enterprise/features/billing/web/src/screens/billing/subscription-page.tsx",
       "measured": "2026-09-06"
     },
@@ -3918,6 +4110,18 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "complexity|packages/features/langy/web/src/features/langy/behavior/data/use-langy-messages.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "complexity|packages/features/langy/web/src/features/langy/behavior/logic/langy-error-explainer.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "complexity|packages/features/langy/web/src/features/langy/behavior/use-capability-data.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "complexity|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-dataset-card.tsx",
       "measured": "2026-09-06"
     },
@@ -3928,6 +4132,10 @@
     {
       "key": "complexity|packages/features/langy/web/src/features/langy/ui/sections/message-content.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "complexity|packages/features/langy/web/src/model/langy-local-waits.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "complexity|packages/features/langy/web/src/ui/sections/langy-card.tsx",
@@ -4100,6 +4308,10 @@
     {
       "key": "complexity|packages/features/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "complexity|packages/features/trace/web/src/behavior/flame/use-flame-keyboard.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "complexity|packages/features/trace/web/src/behavior/transcript/content-parser.ts",
@@ -4338,8 +4550,20 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|apps/api/scripts/check-gateway-control-plane.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|apps/api/src/app-rest/app-rest.packaged-families.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|apps/api/src/app-static/app-static.handler.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/api/src/app-static/app-static.surface.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|apps/api/src/app/api-evaluator-execution.composition.ts",
@@ -4350,8 +4574,48 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|apps/api/src/app/api-key-request-credentials.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|apps/api/src/app/api-production.composition.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|apps/api/src/features/analytics/__tests__/saved-workbench-charts-trpc.integration.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/api/src/features/auth/auth-cli-device-flow-rest.mount.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/api/src/features/auth/auth-rest.mount.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/api/src/features/discovery/__tests__/legacy-response-fields-optional.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/api/src/features/discovery/openapi-serve.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/api/src/features/enterprise/governance-cli-rest.mount.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/api/src/features/enterprise/governance-ingest-rest.mount.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/api/src/features/langy/langy-rest.mount.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/api/src/features/role/role.composition.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|apps/api/src/features/rum/rum-ingest.service.ts",
@@ -4362,8 +4626,16 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|apps/api/src/features/trace/trace-producer.composition.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|apps/api/src/platform/config/api.config.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|apps/api/src/platform/infrastructure/api-database.infrastructure.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|apps/api/src/tasks/openapi-document/openapi-document.generator.ts",
@@ -4378,8 +4650,28 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|apps/server/src/services/app-dir.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/server/src/services/langevals.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/server/src/services/langwatch.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|apps/server/src/services/node-deps.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|apps/server/src/services/postgres.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/server/src/shared/paths.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|apps/server/test/workspace-invariants.test.ts",
@@ -4390,12 +4682,24 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|apps/ui/e2e/langy/langy-local-connected-agent.scenario.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|apps/ui/e2e/langy/local-control-fixture.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|apps/ui/src/behavior/ui-session.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|apps/ui/src/model/errors/__tests__/codes.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/ui/src/model/errors/__tests__/handled-error-messages.unit.test.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|apps/ui/src/model/errors/__tests__/no-raw-error-toasts.unit.test.ts",
@@ -4406,8 +4710,28 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|apps/ui/vite/dev-logging.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/worker/scripts/build-server.mjs",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|apps/worker/src/app/__tests__/worker-automation-settlement.composition.unit.test.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|apps/worker/src/app/__tests__/worker-gateway-spend.composition.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/worker/src/app/__tests__/worker-langy-conversation.composition.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/worker/src/app/__tests__/worker-scenario-processing.composition.unit.test.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|apps/worker/src/app/worker-evaluation-model-env.composition.ts",
@@ -4416,6 +4740,14 @@
     {
       "key": "condition-shape|apps/worker/src/app/worker-production.composition.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|apps/worker/src/platform/infrastructure/worker-clickhouse.infrastructure.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|apps/worker/src/platform/infrastructure/worker-stored-object-storage.adapter.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|mcp/typescript/src/__tests__/canonical-v1-paths.unit.test.ts",
@@ -4470,6 +4802,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/api/src/rest/__tests__/raw-body-and-response.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/api/src/rest/builder.ts",
       "measured": "2026-09-06"
     },
@@ -4480,6 +4816,14 @@
     {
       "key": "condition-shape|packages/api/src/rest/idempotency-ledger.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/api/src/rest/rest-version-selector.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/api/src/rest/v1-alias.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/api/src/trpc/trpc-runtime-policy.ts",
@@ -4514,6 +4858,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/architecture-lint/src/composed-exports.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/architecture-lint/src/feature-layout.ts",
       "measured": "2026-09-06"
     },
@@ -4538,8 +4886,16 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/architecture-lint/src/test-quality.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/architecture-lint/src/workspace-package-rename.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/architecture-lint/src/workspace.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/design-system/src/components/form-error-display.tsx",
@@ -4568,6 +4924,10 @@
     {
       "key": "condition-shape|packages/enterprise/composition/api/src/governance/governance-eventing.adapter.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/enterprise/features/billing/contract/src/billing.config.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/enterprise/features/billing/server/src/services/currency.service.ts",
@@ -4826,16 +5186,36 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/agent/server/src/adapters/connected-agent-state.adapter.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/agent/server/src/services/connected-agent-long-poll.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/agent/server/src/services/connected-agent-parameter-spec.service.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/agent/server/src/services/connected-agent-session.service.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/agent/server/src/transport/api-trpc/agent.api.ts",
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/agent/server/src/transport/api-ws/connected-agent-connect.api.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/agent/web/src/model/connected-agent-rows.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/analytics/contract/scripts/generate-vega-lite-validator.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/analytics/contract/src/analytics.lwql-time-window.ts",
@@ -4846,24 +5226,124 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/analytics/contract/src/visualization/build-langwatch-ql-vega-spec.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/analytics/contract/src/visualization/lwql-chart-failures.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/analytics/contract/src/visualization/scan-langwatch-ql-chart-values.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/annotation/server/src/transport/api-trpc/annotation.api.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/annotation/web/src/model/annotation-export.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/annotation/web/src/model/annotation-period.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/annotation/web/src/model/annotation-row.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/annotation/web/src/screens/annotation-scores/annotation-score-form.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/annotation/web/src/ui/elements/annotation-hover-chip.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/api-key/contract/src/api-key.tokens.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/api-key/server/src/app/api-key.app.ts",
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/api-key/server/src/services/api-key-cli.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/api-key/server/src/services/api-key-grant-policy.service.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/api-key/server/src/services/api-key-lifecycle.service.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/api-key/server/src/services/api-key-token-resolution.service.ts",
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/api-key/web/src/model/__tests__/api-key-scope-filter.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/api-key/web/src/model/api-key-snippets.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/api-key/web/src/screens/api-key/api-keys.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/api-key/web/src/ui/sections/__tests__/token-created-snippets.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/auth/contract/src/auth.config.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/auth/server/src/services/auth.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/auth/server/src/services/auth0-password.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/auth/server/src/transport/api-rest/auth.api.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/auth/server/src/transport/better-auth/__tests__/helm-auth-base-url.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/auth/web/src/behavior/auth-client.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/auth/web/src/behavior/use-passkey-autofill.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/auth/web/src/model/castle-snake.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/auth/web/src/screens/auth/reset-password.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/auth/web/src/ui/sections/credential-sign-in-form.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/auth/web/src/ui/sections/identifier-step-form.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/authz/contract/src/walk.ts",
@@ -4902,12 +5382,36 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/automation/contract/src/report.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/automation/contract/src/templating/block-kit-allowlist.ts",
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/automation/server/src/adapters/slack-web-api.delivery.adapter.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/automation/server/src/repositories/prisma/prisma.graph-trigger-sent.repository.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/automation/server/src/services/active-trigger-cache.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/automation/server/src/services/automation-settlement-match-confirmation.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/automation/server/src/services/graph-alert-dispatch.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/automation/server/src/services/graph-trigger-alert-delivery.service.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/automation/server/src/services/report-chart.service.ts",
@@ -4958,6 +5462,22 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/coding-agent/contract/src/coding-agent-transcript-value.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/coding-agent/contract/src/injected-notice.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/coding-agent/contract/src/telemetry/coding-agent-normalization.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/coding-agent/server/src/projections/coding-agent-session-span.projection.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/coding-agent/server/src/repositories/__tests__/coding-agent-session-clickhouse-dedup.unit.test.ts",
       "measured": "2026-09-06"
     },
@@ -4982,6 +5502,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/coding-agent/web/src/trace/context-health.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/coding-agent/web/src/trace/session-view.tsx",
       "measured": "2026-09-06"
     },
@@ -4998,8 +5522,16 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/coding-agent/web/src/trace/terminal-tool-spans.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/coding-agent/web/src/trace/terminal-view.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/coding-agent/web/src/trace/token-timeline.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/dashboard/server/src/transport/api-trpc/graph.api.ts",
@@ -5030,6 +5562,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/data-retention/contract/src/data-retention.config.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/data-retention/server/src/rules/platform-default-retention.rules.ts",
       "measured": "2026-09-06"
     },
@@ -5046,12 +5582,44 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/dataset/contract/src/dataset-chunks.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/dataset/contract/src/dataset-file.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|packages/features/dataset/server/src/adapters/dataset-normalize.adapter.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/dataset/server/src/adapters/local.dataset-storage.adapter.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/dataset/server/src/services/dataset-chunk-delete.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/dataset/server/src/services/dataset-chunk-maintenance.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/dataset/server/src/services/dataset-chunk.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/dataset/server/src/services/dataset.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/evaluation/server/src/__tests__/helm-langevals-memory.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/evaluation/server/src/repositories/clickhouse/evaluation-run-read.repository.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/evaluation/server/src/repositories/clickhouse/evaluation-run-write.repository.ts",
@@ -5062,8 +5630,24 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/evaluation/server/src/services/evaluation-execution-outcome.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/evaluation/server/src/services/evaluator-availability.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/evaluator/contract/src/__tests__/shipped-evaluator-types.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/evaluator/server/src/repositories/prisma/prisma.evaluator.repository.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/evaluator/server/src/services/evaluator-code.service.ts",
@@ -5100,6 +5684,10 @@
     {
       "key": "condition-shape|packages/features/evaluator/web/src/ui/sections/evaluations/online-evaluation-drawer.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/experiment/contract/src/workbench/actions/transforms/set-cell-value.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run.repository.ts",
@@ -5142,6 +5730,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/experiment/web/src/screens/experiments/experiment-detail.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/experiment/web/src/screens/experiments/experiments.screen.tsx",
       "measured": "2026-09-06"
     },
@@ -5154,6 +5746,14 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/experiment/web/src/ui/elements/experiments/batch-evaluation.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/experiment/web/src/ui/elements/experiments/ds-py-experiment.tsx",
       "measured": "2026-09-06"
     },
@@ -5162,8 +5762,16 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/batch-runs-sidebar.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/comparison-table.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/table-utils.ts",
@@ -5172,6 +5780,10 @@
     {
       "key": "condition-shape|packages/features/experiment/web/src/ui/sections/experiments-v3/comparison-cell.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/feature-flag/contract/src/feature-flag-experiment.ts",
@@ -5282,6 +5894,26 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/github/server/src/__tests__/github-pull-request-mapping.persistence.integration.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/github/server/src/adapters/__tests__/github-app-token.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/github/server/src/adapters/github-pull-request-event.adapter.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/github/server/src/services/github-branch-demand.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/github/server/src/services/github-branch-mapping.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/github/server/src/transport/api-rest/github.api.ts",
       "measured": "2026-09-06"
     },
@@ -5294,12 +5926,56 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/identity/contract/src/backfill.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/identity/contract/src/mfa-condition.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/identity/contract/src/reduce.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/identity/server/src/__tests__/support/in-memory-users.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/identity/server/src/adapters/better-auth.identity-storage.adapter.ts",
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/identity/server/src/intents/identity-events.intent.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/identity/server/src/services/join-requests.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/identity/server/src/services/sso-connection-guards.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/identity/server/src/services/verification-ceremony.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/identity/server/src/testing.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/langy/contract/src/cards/__tests__/prompt-examples.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/langy/contract/src/cards/handled-error.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/langy/contract/src/cards/registry.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/langy/contract/src/cards/schemas.ts",
@@ -5314,8 +5990,20 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/langy/contract/src/langy-turn-context.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/langy/contract/src/langy.commands.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/langy/contract/src/langy.config.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/langy/server/scripts/generate-setup-skill-bodies.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/langy/server/src/__tests__/langy.langy.adapter.unit.test.ts",
@@ -5330,8 +6018,24 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/langy/server/src/rules/langy-conversation-title.rules.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/langy/server/src/services/langy-cli-envelope.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/langy/server/src/services/langy-conversation-memory.service.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/langy/server/src/services/langy-credential.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/langy/server/src/services/langy-turn-settlement-waiter.service.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/langy/server/src/transport/api-trpc/langy.api.ts",
@@ -5370,6 +6074,18 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/model-provider/contract/src/catalog/static-model-costs.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/model-provider/contract/src/model-cost.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/model-provider/contract/src/model-provider-registry.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/model-provider/server/src/rules/reasoning-config.rules.ts",
       "measured": "2026-09-06"
     },
@@ -5390,20 +6106,64 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/navigation/web/src/behavior/use-product-flags-by-organization.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/navigation/web/src/ui/sections/__tests__/navigation-shell.integration.test.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/navigation/web/src/ui/sections/shell-page-body.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/navigation/web/src/ui/sections/usage-indicator.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/notification/server/src/services/email-provider.service.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/onboarding/web/src/model/shared/build-mcp-config.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/onboarding/web/src/ui/sections/welcome-screen.tsx",
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/ops/server/src/__tests__/ops-metrics-collector.latency-windows.integration.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/ops/server/src/adapters/__tests__/postgres.system-migrations.adapter.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/ops/server/src/adapters/ops-clickhouse-explain.adapter.ts",
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/ops/server/src/adapters/ops-worker-contribution.adapter.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/ops/server/src/app/ops.app.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/ops/server/src/repositories/redis/__tests__/operator-recovery-counters.integration.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/ops/server/src/repositories/redis/__tests__/redis.queue.repository.reconcile-pending.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/ops/server/src/repositories/redis/__tests__/redis.queue.repository.scan-groups.unit.test.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/ops/server/src/repositories/redis/queue.repository.ts",
@@ -5414,16 +6174,56 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/ops/server/src/services/ops-metrics-collector.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/ops/server/src/services/ops-snapshot-reader.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/ops/server/src/transport/api-rest/admin.api.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/ops/server/src/transport/api-rest/ops-clickhouse-explain.api.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/ops/server/src/transport/api-trpc/bug-report.api.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/organization/server/src/ports/__tests__/organization.service.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/organization/server/src/repositories/prisma/prisma.group.repository.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/organization/server/src/services/__tests__/support/invite-fakes.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/organization/server/src/services/organization-group.service.ts",
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/organization/server/src/services/organization.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/organization/server/src/transport/api-trpc/organization.api.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/organization/web/src/model/audit-period.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/organization/web/src/ui/sections/member-detail-dialog.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/presence/server/src/adapters/broadcast.adapter.ts",
@@ -5450,8 +6250,24 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/prompt/contract/src/prompt.liquid.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/prompt/contract/src/prompt.llm-error.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/prompt/server/src/repositories/prisma/prisma.prompt.repository.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/prompt/server/src/transport/api-rest/prompt.api.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/prompt/web/src/screens/prompt-studio/dialogs/version-history-list-popover.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/role/server/src/services/role.service.ts",
@@ -5730,6 +6546,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/trace/web/src/model/shared/content-parts/coerce-content-to-array.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/trace/web/src/ui/sections/traces/span-details.tsx",
       "measured": "2026-09-06"
     },
@@ -5746,6 +6566,18 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/user/web/src/model/handled-error.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/user/web/src/ui/sections/devices-panel.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "condition-shape|packages/features/webhook/server/src/adapters/sqs.webhook-destination.adapter.ts",
       "measured": "2026-09-06"
     },
@@ -5756,6 +6588,34 @@
     {
       "key": "condition-shape|packages/features/webhook/server/src/services/__tests__/webhook-delivery.process.integration.test.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/workflow/contract/src/workflow-dsl-migration.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/workflow/server/src/adapters/aws.nlp-lambda-arn-resolver.adapter.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/workflow/server/src/adapters/prisma.workflow-agent-mapping.adapter.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/workflow/server/src/adapters/workflow-nlp-lambda.adapter.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/workflow/server/src/ports/__tests__/workflow.service.unit.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/workflow/server/src/rules/nlp-lambda-config.rules.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|packages/features/workflow/server/src/services/studio-workflow-event-enricher.service.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/features/workflow/web/src/behavior/workflow-store.ts",
@@ -5808,6 +6668,10 @@
     {
       "key": "condition-shape|packages/mail/src/providers/resend.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/mail/src/templates/budget-increase-request-email.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "condition-shape|packages/prisma-client/src/mass-delete-guard.ts",
@@ -6114,6 +6978,14 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|apps/api/src/api-secret-rest.feature.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|apps/api/src/app-rest/__tests__/api-rest.teams-family.integration.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|apps/api/src/app/api-authoring-rest.composition.ts",
       "measured": "2026-09-06"
     },
@@ -6130,12 +7002,32 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|apps/api/src/features/langy/langy.composition.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|apps/api/src/features/organization/__tests__/tenant-features.composition.integration.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|apps/api/src/features/role/__tests__/role.composition.integration.test.ts",
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|apps/api/src/features/scenario/__tests__/scenario.composition.integration.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|apps/api/src/features/stored-object/__tests__/product-storage.composition.integration.test.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|apps/api/src/features/trace/__tests__/trace.composition.integration.test.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|apps/ui/e2e/langy/scenario-transcript.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|apps/ui/src/behavior/ui-scope-resolution.ts",
@@ -6206,12 +7098,24 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|packages/api/src/trpc/trpc-error-formatter.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/api/src/trpc/trpc-service-builder.ts",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|packages/architecture-lint/src/api-transport-framework.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "nested-ternary|packages/architecture-lint/src/cli.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/architecture-lint/src/composed-exports.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|packages/architecture-lint/src/frontend-ui-boundaries.ts",
@@ -6394,12 +7298,32 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|packages/features/annotation/web/src/ui/blocks/annotation-score-editor.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/annotation/web/src/ui/sections/annotation-list.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|packages/features/api-key/server/src/app/api-key.app.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "nested-ternary|packages/features/api-key/server/src/services/api-key-grant-policy.service.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/features/auth/web/src/behavior/auth-client.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/auth/web/src/screens/auth/signup.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/auth/web/src/ui/sections/sign-up-credential-form.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|packages/features/authz/contract/src/authz.commands.ts",
@@ -6506,8 +7430,16 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|packages/features/coding-agent/web/src/pull-request-detail-drawer.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|packages/features/coding-agent/web/src/trace/session-view.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/features/coding-agent/web/src/trace/terminal-session.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|packages/features/coding-agent/web/src/trace/terminal-view.tsx",
@@ -6646,8 +7578,16 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|packages/features/experiment/web/src/screens/experiments/experiment-detail.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|packages/features/experiment/web/src/screens/experiments/experiments.screen.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/features/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|packages/features/experiment/web/src/ui/elements/experiments/batch-evaluation.tsx",
@@ -6656,6 +7596,30 @@
     {
       "key": "nested-ternary|packages/features/experiment/web/src/ui/elements/experiments/ds-py-experiment.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/features/experiment/web/src/ui/elements/navigation-footer.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/batch-evaluation-results/batch-evaluation-results.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/batch-results/batch-runs-sidebar.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/experiments-v3/TargetSection/target-header.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|packages/features/feature-flag/web/src/experiments-dialog.tsx",
@@ -6846,6 +7810,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|packages/features/navigation/web/src/ui/sections/command-palette.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|packages/features/notification/web/src/screens/email-suppressions/email-suppressions.screen.tsx",
       "measured": "2026-09-06"
     },
@@ -6890,6 +7858,14 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|packages/features/organization/web/src/ui/sections/group-detail-dialog.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/organization/web/src/ui/sections/member-detail-dialog.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|packages/features/project/web/src/screens/home/briefing/attention-inbox.ts",
       "measured": "2026-09-06"
     },
@@ -6916,6 +7892,10 @@
     {
       "key": "nested-ternary|packages/features/project/web/src/screens/home/home.screen.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/features/prompt/web/src/model/prompt-version-diff.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|packages/features/scenario/server/src/adapters/finish-run.adapter.ts",
@@ -7026,6 +8006,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|packages/features/share/web/src/share-links-list.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|packages/features/stored-object/server/src/adapters/azure-blob.stored-object-driver.adapter.ts",
       "measured": "2026-09-06"
     },
@@ -7122,6 +8106,26 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/personal-sessions.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/project-pull-requests.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/project-sessions.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "nested-ternary|packages/features/user/web/src/ui/sections/devices-panel.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|packages/features/webhook/server/src/transport/api-rest/__tests__/webhook-events.api.integration.test.ts",
       "measured": "2026-09-06"
     },
@@ -7166,8 +8170,16 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-autosave.tsx",
+      "measured": "2026-09-07"
+    },
+    {
       "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-node-execution.tsx",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-run-until-here-dialog.tsx",
+      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|packages/group-queue/src/groupQueue.ts",
@@ -7180,6 +8192,10 @@
     {
       "key": "nested-ternary|packages/handled-error/src/read-handled-error.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/mail/src/templates/onboarding/highlight.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|packages/test-harness/src/mock-specifier-scan.ts",
