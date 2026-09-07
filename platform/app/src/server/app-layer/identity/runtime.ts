@@ -619,7 +619,9 @@ export function organizationMfa(): OrganizationMfaService {
     sessions: new PrismaSessionFactors(prisma),
     members: new PrismaOrganizationMemberFactors(prisma),
     connections: new PrismaOrganizationConnectionFactors(prisma),
-    notifier: new EmailOrganizationMfaNotifier(prisma),
+    notifier: new EmailOrganizationMfaNotifier(prisma, ({ userId }) =>
+      identityEmail().resolveEmail({ userId }),
+    ),
     // Stated once, here, like every other environment read this root owns.
     offered: deploymentOffersTwoStepVerification,
     // The plan, resolved the one way the app resolves plans: the provider

@@ -1,3 +1,4 @@
+import { normalizeIdentifierValue } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { sendOrganizationMfaRequirementEmail } from "~/server/mailer/organization-mfa-requirement-email";
@@ -252,10 +253,17 @@ export class PrismaSessionFactors implements SessionFactorPort {
  * Telling an organization's active members when its requirement changes.
  * Delivery uses the same mail transport as the rest of the app. Every
  * recipient is attempted before a failure is reported, and the log names the
- * failed count rather than claiming the whole audience was reached.
+ * failed count rather than claiming the whole audience was reached. Identity
+ * owns the destination once a user is latched; a null resolution deliberately
+ * preserves the resolver's legacy User.email fallback policy.
  */
 export class EmailOrganizationMfaNotifier implements OrganizationMfaNotifier {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly resolveIdentityEmail: (args: {
+      userId: string;
+    }) => Promise<string | null>,
+  ) {}
 
   async requirementChanged({
     organizationId,
@@ -293,22 +301,41 @@ export class EmailOrganizationMfaNotifier implements OrganizationMfaNotifier {
     }
 
     const actorName = actor?.name ?? actor?.email ?? "An administrator";
-    const deliveries = memberships.map(async ({ userId, user }) => {
-      if (!user.email) {
-        throw new Error(
-          `member ${userId} has no email address for the MFA requirement notification`,
+    const resolvedMembers = await Promise.all(
+      memberships.map(async ({ userId, user }) => ({
+        userId,
+        email: (await this.resolveIdentityEmail({ userId })) ?? user.email,
+      })),
+    );
+    const destinations = new Map<string, string>();
+    const failures: unknown[] = [];
+    for (const member of resolvedMembers) {
+      if (!member.email) {
+        failures.push(
+          new Error(
+            `member ${member.userId} has no email address for the MFA requirement notification`,
+          ),
         );
+        continue;
       }
+      const normalized = normalizeIdentifierValue(member.email);
+      if (!destinations.has(normalized)) {
+        destinations.set(normalized, member.email);
+      }
+    }
+    const deliveries = [...destinations.values()].map(async (to) => {
       await sendOrganizationMfaRequirementEmail({
-        to: user.email,
+        to,
         organizationName: organization.name,
         actorName,
         required,
       });
     });
     const results = await Promise.allSettled(deliveries);
-    const failures = results.flatMap((result) =>
-      result.status === "rejected" ? [result.reason] : [],
+    failures.push(
+      ...results.flatMap((result) =>
+        result.status === "rejected" ? [result.reason] : [],
+      ),
     );
     if (failures.length > 0) {
       logger.error(
@@ -316,7 +343,7 @@ export class EmailOrganizationMfaNotifier implements OrganizationMfaNotifier {
           organizationId,
           actorUserId,
           required,
-          attempted: memberships.length,
+          attempted: destinations.size,
           failed: failures.length,
         },
         "organization MFA requirement notification delivery failed",
