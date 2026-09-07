@@ -767,8 +767,8 @@ export class LangyTokenBuffer {
    * STREAM_TTL_SECONDS from now.
    *
    * The stream TTL used to move on `append` alone, so a turn that spent longer
-   * than STREAM_TTL_SECONDS inside one tool call — a suite run waited on, a
-   * long build — lost its whole buffer while the worker was provably alive and
+   * than STREAM_TTL_SECONDS inside one tool call, a suite run waited on, a
+   * long build, lost its whole buffer while the worker was provably alive and
    * still beating. A reader attaching after that replayed an empty tail, and
    * the turn-order reader at finalize recorded the turn's parts with no order.
    * A heartbeat IS the statement that this turn is still live, and the stream

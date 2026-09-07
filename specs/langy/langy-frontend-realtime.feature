@@ -196,11 +196,11 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
   # The fold and the transcript are different reads. The fold advances on the
   # freshness signal, so a turn started elsewhere is adopted within a batch;
   # the transcript is re-read on an explicit open, or on a poll armed by its
-  # own in-flight flag — which a snapshot taken before the turn existed does
+  # own in-flight flag, which a snapshot taken before the turn existed does
   # not carry. A tab that had already answered a turn therefore held the
   # previous transcript for the whole of the next one, was never ready to
   # resume, and never subscribed: every live-only entry that turn issued
-  # reached nobody.
+  # reached no reader.
   @integration
   Scenario: A folder-connected turn reaches a tab that already answered one
     Given this tab answered a turn of its own, so the last thing on screen is that answer

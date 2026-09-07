@@ -446,7 +446,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
 /**
  * A redis double that actually expires. The fake above answers `expire` with 1
  * and never drops anything, which makes any assertion about the buffer's TTL a
- * test of the fake — the whole point here is what a key does when its TTL runs
+ * test of the fake, the whole point here is what a key does when its TTL runs
  * out.
  */
 function makeExpiringRedis(clock: { now: number }): LangyStreamRedis {
@@ -486,7 +486,7 @@ function makeExpiringRedis(clock: { now: number }): LangyStreamRedis {
 }
 
 /**
- * A tool call the agent waits on — a suite run, a build — produces no frames
+ * A tool call the agent waits on, a suite run, a build, produces no frames
  * for as long as it takes. The worker keeps beating throughout, and the buffer
  * has to keep the turn's live edge alive on that proof alone: with the TTL
  * moving on appends only, a turn quiet for longer than STREAM_TTL_SECONDS lost

@@ -296,7 +296,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
 
   # The buffer's TTL used to move on appends alone, while the proof that a turn
   # is alive is the heartbeat, which touched a different key. A tool call the
-  # agent waits on — a suite run, a build — produces no appends for as long as
+  # agent waits on, a suite run, a build, produces no appends for as long as
   # it takes, so a turn quiet for longer than the TTL lost its whole buffer
   # under a worker that was beating the entire time.
   @unit

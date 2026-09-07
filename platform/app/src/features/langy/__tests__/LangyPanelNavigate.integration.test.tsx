@@ -630,11 +630,11 @@ describe("Feature: Langy opens the resource it surfaced in the browser", () => {
     // The panel had answered a turn of its own before the folder connected, so
     // the engine's last message is that answer and the transcript snapshot
     // predates the new turn entirely. Nothing refreshes that snapshot on its
-    // own — the freshness signal drives the event fold, and the transcript's
-    // in-flight poll is armed by a flag the stale snapshot does not carry — so
+    // own, the freshness signal drives the event fold, and the transcript's
+    // in-flight poll is armed by a flag the stale snapshot does not carry, so
     // the panel used to sit on the previous turn's transcript for the whole
     // run, never ready to resume and never subscribed, and every live-only
-    // entry the turn issued (both of the take's navigates) reached nobody.
+    // entry the turn issued (both of the take's navigates) reached no reader.
     /** @scenario "A folder-connected turn reaches a tab that already answered one" */
     it("re-reads the transcript, then resumes and navigates", async () => {
       useLangyStore.setState({ activeConversationId: "conv-1" });

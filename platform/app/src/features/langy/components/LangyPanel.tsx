@@ -1647,8 +1647,8 @@ function LangyPanel({
 
   // The fold adopted a turn the transcript snapshot has never seen (the server
   // starting one when the shared folder connects, another tab's send). The
-  // transcript is not refreshed by the freshness signal — that drives the
-  // event fold instead — and its own in-flight poll is armed by a flag the
+  // transcript is not refreshed by the freshness signal, that drives the
+  // event fold instead, and its own in-flight poll is armed by a flag the
   // stale snapshot does not carry, so without this read the engine never gains
   // the turn's user message and the resume below stays blocked on its
   // engine-ready guard for the turn's whole run. One read per adopted turn:

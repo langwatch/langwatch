@@ -49,13 +49,13 @@ export function shouldResumeAdoptedTurn(params: {
  * The fold and the transcript are two different reads. The fold (ADR-059)
  * advances event by event off the freshness signal, so a turn started elsewhere
  * is adopted within a signal batch. The transcript (`langy.messages`) is
- * re-read only on an explicit open, or on its own in-flight poll — and that
+ * re-read only on an explicit open, or on its own in-flight poll, and that
  * poll is armed by the transcript's OWN in-flight flag, which a snapshot taken
  * before the turn existed says nothing about. So a tab that adopted a
  * server-started turn (the shared folder connecting) held the previous turn's
  * transcript for the turn's whole run: the engine never gained the new turn's
  * user message, `shouldResumeAdoptedTurn` stayed blocked on its engine-ready
- * guard, and nothing ever opened the turn's stream — losing every live-only
+ * guard, and nothing ever opened the turn's stream, losing every live-only
  * entry it carried, navigate included.
  *
  * One re-read per adopted turn is enough: it lands the turn's user message,
@@ -86,7 +86,7 @@ export function shouldRefetchHistoryForAdoptedTurn(params: {
   // from that stream.
   if (params.activeTurnId === params.dispatchedTurnId) return false;
   // The snapshot already knows this turn, so the transcript already carries
-  // its user message — there is nothing to catch up on.
+  // its user message, there is nothing to catch up on.
   if (params.activeTurnId === params.foldInFlightTurnId) return false;
   if (params.activeTurnId === params.refetchedTurnId) return false;
   if (params.isFetchingHistory) return false;
