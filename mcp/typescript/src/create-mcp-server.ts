@@ -268,7 +268,7 @@ function registerTools(server: McpServer): void {
       traceId: z
         .string()
         .describe(
-          "The trace ID to retrieve. A full ID resolves at any age; a unique hex prefix of 8 or more characters also resolves, git-style, within the last 90 days."
+          "The trace ID to retrieve. A full ID resolves at any age; a unique 8–31 character hex prefix also resolves, git-style, within the last 90 days."
         ),
       format: z
         .enum(["digest", "json"])
