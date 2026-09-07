@@ -103,7 +103,7 @@ export const listAgentsCommand = async (
           );
           console.error(
             chalk.gray(
-              "Start the process with LANGWATCH_API_KEY and LANGWATCH_ENDPOINT set, and read its log for the connect line.",
+              "Read the process's own output for the reason: an exception at startup, or the SDK's connect line.",
             ),
           );
           process.exit(1);

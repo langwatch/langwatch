@@ -164,6 +164,13 @@ const langwatch = new LangWatch();
 
 The exact pattern depends on the framework, so follow the docs, not these examples.
 
+**The environment loads before LangWatch initialises.** `langwatch.setup()` and `new LangWatch()` read `LANGWATCH_API_KEY` from the process environment the moment they run, and a `.env` file is not the environment until something loads it. A filmed run put `langwatch.setup()` at the top of the entry file, above the import that called `load_dotenv()`, and the process died at import with "LangWatch API key is required but not provided".
+
+- Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
+- TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
+
+Before you start the process, check that the key is visible to it the way the project reads it: run the project's own loader in a one-line program and print only whether `LANGWATCH_API_KEY` is set, never its value, for example `uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"`. A key that is set in the file and unset in the process is the order above.
+
 ## Step 4: Verify
 
 Do NOT consider the work complete without verifying. In order:
@@ -178,6 +185,7 @@ Do NOT consider the work complete without verifying. In order:
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
+- Do NOT call `langwatch.setup()` above the import that loads the environment: the key is read when `setup()` runs
 - Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly
 ````
 
@@ -3570,6 +3578,13 @@ const langwatch = new LangWatch();
 
 The exact pattern depends on the framework, so follow the docs, not these examples.
 
+**The environment loads before LangWatch initialises.** `langwatch.setup()` and `new LangWatch()` read `LANGWATCH_API_KEY` from the process environment the moment they run, and a `.env` file is not the environment until something loads it. A filmed run put `langwatch.setup()` at the top of the entry file, above the import that called `load_dotenv()`, and the process died at import with "LangWatch API key is required but not provided".
+
+- Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
+- TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
+
+Before you start the process, check that the key is visible to it the way the project reads it: run the project's own loader in a one-line program and print only whether `LANGWATCH_API_KEY` is set, never its value, for example `uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"`. A key that is set in the file and unset in the process is the order above.
+
 ## Step 4: Verify
 
 Do NOT consider the work complete without verifying. In order:
@@ -3584,6 +3599,7 @@ Do NOT consider the work complete without verifying. In order:
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
+- Do NOT call `langwatch.setup()` above the import that loads the environment: the key is read when `setup()` runs
 - Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly
 
 ---

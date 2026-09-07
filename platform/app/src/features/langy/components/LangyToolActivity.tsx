@@ -1476,11 +1476,13 @@ function FailedToolCallRow({
 }
 
 /**
- * A step that failed and that the turn then recovered from, as one line.
+ * A step that failed and that the turn then answered after, as one line.
  *
  * Quiet, not gone. The same card is one click away, and the failure keeps its
  * place in the transcript — it just stops competing with the answer the turn
- * went on to give.
+ * went on to give. The line says the reply follows and nothing more: the reply
+ * may be the turn stopping on that failure, so the line never claims Langy
+ * carried on.
  */
 function RecoveredToolFailureRow({
   presentation,
@@ -1503,7 +1505,7 @@ function RecoveredToolFailureRow({
             <AlertCircle size={11} aria-hidden="true" />
           </Box>
           <Text textStyle="xs" color="fg.subtle" flex={1} truncate>
-            {presentation.title}, and Langy carried on
+            {presentation.title}, and Langy answered below
           </Text>
           <Box
             color="fg.subtle"

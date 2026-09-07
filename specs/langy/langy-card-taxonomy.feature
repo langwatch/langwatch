@@ -67,6 +67,7 @@ Feature: Langy's cards read at the right attention weight
     Given a step that failed and a reply Langy wrote after it
     When I read the finished turn
     Then that failure is one quiet line, not a card
+    And the line says Langy answered below, never that it carried on, since the reply may be the turn stopping there
     And opening the line shows the card it always showed
 
   @integration

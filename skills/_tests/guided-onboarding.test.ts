@@ -266,6 +266,8 @@ describe("the guided-onboarding skill", () => {
         "say in one line what is not done and what the error names as the cause, and end the turn",
       );
       expect(section).toContain("stop there, without diagnosing");
+      expect(section).toContain("never the env file:");
+      expect(section).not.toContain("never the env file or the process log");
       expect(section).toContain("`langwatch onboarding complete-path` does not run");
       expect(section).toContain(
         "the why-a-scenario line, the two-things line and the closing line are not said",
@@ -277,6 +279,30 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain(
         "never one that stopped at a failed step",
       );
+    });
+
+    /** @scenario "An agent that never comes online is explained by its own output" */
+    it("reports what the agent process printed when it does not come online, never a guess", () => {
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      expect(section).toContain(
+        "when the agent is not online after two minutes, the cause is in the agent process itself, so read the log the background command named",
+      );
+      expect(section).toContain("report its last lines, the exception if there is one, as the reason");
+      expect(section).toContain("Never a guess about the CLI, the login or the project in its place");
+    });
+
+    /** @scenario "LangWatch initialises after the project's environment is loaded" */
+    it("keeps the tracing skill's order between the env loader and setup, and checks the key before the start", () => {
+      expect(rendered).toContain(
+        "`langwatch.setup()` sits below the import that loads the env file, never at the top of the entry file",
+      );
+      const check = rendered.indexOf(
+        "run the tracing skill's check that the key is visible to the process the way the project reads it",
+      );
+      const start = rendered.indexOf("Start the agent from that branch");
+      expect(check).toBeGreaterThan(-1);
+      expect(start).toBeGreaterThan(check);
     });
 
     /** @scenario "The instrumentation that cannot be applied stops the path" */

@@ -19,6 +19,32 @@ function tracingSkill(): string {
 }
 
 describe("given the tracing skill", () => {
+  describe("when its instrumentation step is read", () => {
+    /** @scenario "LangWatch initialises after the project's environment is loaded" */
+    it("puts setup() below the import that loads the environment, in Python and TypeScript", () => {
+      const rendered = tracingSkill();
+      expect(rendered).toContain("**The environment loads before LangWatch initialises.**");
+      expect(rendered).toContain(
+        "put `langwatch.setup()` below every import that runs it, never at the top of the entry file",
+      );
+      expect(rendered).toContain(
+        "add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`",
+      );
+      expect(rendered).toContain(
+        '`import "dotenv/config"` is the first import of the entry file, above the `langwatch` import',
+      );
+    });
+
+    /** @scenario "LangWatch initialises after the project's environment is loaded" */
+    it("checks the key is visible to the process the way the project reads it, without printing it", () => {
+      const rendered = tracingSkill();
+      expect(rendered).toContain(
+        "check that the key is visible to it the way the project reads it",
+      );
+      expect(rendered).toContain("print only whether `LANGWATCH_API_KEY` is set, never its value");
+    });
+  });
+
   describe("when its verification step is read", () => {
     /** @scenario "The tracing skill waits for the trace instead of asking again at once" */
     it("says an empty first answer means the trace has not arrived yet", () => {

@@ -407,6 +407,20 @@ Feature: Langy guides the first setup after sign-up
       And Langy says in one line what is not done and what it needs, and ends the turn
       And neither the why-a-scenario line, the two-things line, the closing line nor complete-path follow
 
+    # A film told the person the CLI was not logged into the project when the
+    # agent process had died at import. The reason is what the process printed.
+    @unit
+    Scenario: An agent that never comes online is explained by its own output
+      When the compiled guided-onboarding skill is read
+      Then an agent that is not online after two minutes is explained by the last lines of its own log, the exception when there is one
+      And never by a guess about the CLI, the login or the project
+
+    @unit
+    Scenario: LangWatch initialises after the project's environment is loaded
+      When the compiled guided-onboarding skill is read
+      Then the tracing edit keeps setup below the import that loads the env file
+      And the key is checked visible to the process before the agent starts
+
     @unit
     Scenario: The instrumentation that cannot be applied stops the path
       When the compiled guided-onboarding skill is read

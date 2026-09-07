@@ -193,6 +193,17 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And it bounds the retries and says how long to leave between them
     And it says not to report the change as verified when the wait runs out
 
+  # A filmed run put langwatch.setup() at the top of the entry file, above the
+  # import that loaded the .env it had just written, and the agent died at
+  # import with "LangWatch API key is required but not provided".
+  @unit
+  Scenario: LangWatch initialises after the project's environment is loaded
+    Given the tracing skill
+    When its instrumentation step is read
+    Then setup runs below the import that loads the environment, in Python and in TypeScript
+    And the env loader is added to the entry file when the project has it and the entry file does not load it
+    And the key is checked visible to the process the way the project reads it, without printing it
+
   @unit
   Scenario: A run cleans up the demo folders the runs before it left
     Given several finished runs left their demo folder on disk

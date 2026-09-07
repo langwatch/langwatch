@@ -170,7 +170,7 @@ describe("listAgentsCommand()", () => {
 
       expect(await outcome).toBeInstanceOf(ProcessExitError);
       expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("LANGWATCH_API_KEY"),
+        expect.stringContaining("Read the process's own output for the reason"),
       );
     });
   });
