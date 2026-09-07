@@ -36,6 +36,7 @@ import {
 } from "~/generated/prisma/client";
 
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
+import { recordGovernanceTenantUse } from "./governanceTenantHistory.service";
 
 /** Canonical Project.kind values. Free-form string in the DB column for
  *  extensibility; this constant is the source of truth in TS. */
@@ -91,6 +92,24 @@ export async function ensureHiddenGovernanceProject(
   prisma: PrismaClient,
   organizationId: string,
 ): Promise<Project> {
+  const project = await resolveHiddenGovernanceProject(prisma, organizationId);
+  // Every route to a governance TenantId passes through here, so this is the
+  // one place that can promise the history is complete (ADR-128 §11). Recording
+  // it at the point of USE rather than only at creation is what covers the row
+  // this function can hand back from the archived-by-slug branch below — a
+  // tenant the read-side resolver has already gone blind to.
+  await recordGovernanceTenantUse({
+    prisma,
+    organizationId,
+    tenantId: project.id,
+  });
+  return project;
+}
+
+async function resolveHiddenGovernanceProject(
+  prisma: PrismaClient,
+  organizationId: string,
+): Promise<Project> {
   const existing = await findHiddenGovernanceProject({
     prisma,
     organizationId,
@@ -117,10 +136,25 @@ export async function ensureHiddenGovernanceProject(
     return bySlug;
   }
 
-  // Two concurrent ensures can both pass the check above and reach create
-  // — the slug-uniqueness re-check closes the common case but not the
-  // window between the findUnique and the create. Catch P2002 (unique
-  // constraint) and re-fetch the row that won the race.
+  return await createGovernanceProject({ prisma, slug, teamId: team.id });
+}
+
+/** Creates the row, or returns the one that beat us to the slug.
+ *
+ *  Two concurrent ensures can both pass the caller's slug re-check and reach
+ *  create — that re-check closes the common case but not the window between
+ *  the findUnique and the create. P2002 (unique constraint) is the losing
+ *  side of that race, and the winner's row is the correct answer.
+ */
+async function createGovernanceProject({
+  prisma,
+  slug,
+  teamId,
+}: {
+  prisma: PrismaClient;
+  slug: string;
+  teamId: string;
+}): Promise<Project> {
   try {
     return await prisma.project.create({
       data: {
@@ -128,7 +162,7 @@ export async function ensureHiddenGovernanceProject(
         name: "Governance (internal)",
         slug,
         apiKey: generateApiKey(),
-        teamId: team.id,
+        teamId,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
         // Internal-only — these aren't real "I'm building an app"
         // language/framework signals, but the Project model requires
@@ -143,13 +177,14 @@ export async function ensureHiddenGovernanceProject(
     });
   } catch (err) {
     if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2002"
+      !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+      err.code !== "P2002"
     ) {
-      const winner = await prisma.project.findUnique({ where: { slug } });
-      if (winner && winner.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
-        return winner;
-      }
+      throw err;
+    }
+    const winner = await prisma.project.findUnique({ where: { slug } });
+    if (winner?.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
+      return winner;
     }
     throw err;
   }

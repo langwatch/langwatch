@@ -117,3 +117,61 @@ Feature: Pulled provider usage becomes visible, attributed cost
     And it reads as dollars with no biller conversion
     # The event log is append-only history. A shape change that cannot read
     # what is already on it is a rebuild, not a migration.
+
+  # --- Days read while cost recording was off ---
+  # The pull cursor advances whether or not the money path is live, because
+  # audit-only is a supported way to run a source. That makes the loss one-way:
+  # turning recording on later stops it growing but recovers nothing already
+  # read. These say the loss out loud, so a day nobody priced reads as unknown
+  # rather than as a day that cost nothing.
+
+  @unit
+  Scenario: A day read without recording cost is remembered as unpriced
+    Given an organization that is not recording pulled cost
+    When a source pulls a day that carries a price
+    Then the day's spend is not recorded
+    And the source remembers that day as one it could not price
+
+  @unit
+  Scenario: The unpriced window spans the first lost day to the last
+    Given an organization that is not recording pulled cost
+    When a source pulls several priced days in one run
+    Then the source remembers the window from the earliest to the latest
+
+  @unit
+  Scenario: A later loss never shrinks an earlier one
+    Given a source that already remembers an unpriced day
+    When a later run fails to price a later day
+    Then the remembered window covers both days
+    # Widen-only. A short run inside a long gap must not make the gap look
+    # smaller than it is.
+
+  @unit
+  Scenario: A day that never carried a price is not remembered as lost
+    Given an organization that is not recording pulled cost
+    When a source pulls a day with no price on it
+    Then the source remembers no unpriced window
+
+  @unit
+  Scenario: Recording cost normally remembers no loss
+    Given an organization that is recording pulled cost
+    When a source pulls a day that carries a price
+    Then the day's spend is recorded
+    And the source remembers no unpriced window
+
+  @unit
+  Scenario: Reading back across the whole window clears it
+    Given a source that remembers an unpriced window
+    And an organization that is recording pulled cost again
+    When a run prices a day at or before the start of that window
+    Then the source remembers no unpriced window
+    # The cost adapters re-read a whole trailing window from the source's start
+    # date, so reaching the earliest lost day means reaching every later one.
+
+  @unit
+  Scenario: A re-read that starts inside the window leaves it alone
+    Given a source that remembers an unpriced window
+    When a run prices only a day inside that window
+    Then the source still remembers the whole window
+    # Half a repair is not a repair, and narrowing the window would claim days
+    # that were never re-priced.

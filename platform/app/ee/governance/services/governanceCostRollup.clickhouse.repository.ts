@@ -7,6 +7,7 @@ import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
   GOVERNANCE_COST_ROLLUP_TABLE,
+  GOVERNANCE_COST_SOURCE,
 } from "../projections/governanceCostRollup.constants";
 import type { GovernanceCostRollupCell } from "../projections/governanceCostRollup.foldProjection";
 
@@ -479,6 +480,89 @@ export class GovernanceCostRollupClickHouseRepository {
       previousAmountNanoUsd: nullableInt(row.PreviousAmountNanoUsd),
       cellsWithoutPreviousAmount: int(row.CellsWithoutPreviousAmount),
       lastObservedAt: int(row.LastObservedAt),
+    }));
+  }
+
+  /**
+   * The pulled lane's window total per (provider, spender, agent) — who the
+   * provider said spent the money, over the whole window at once.
+   *
+   * PULLED ONLY, by predicate and not by caller convention. The gateway lane
+   * writes its own actor ids into this table under a different provider
+   * vocabulary (`model_provider_id`, not the source type discovery keys on),
+   * so an unfiltered read would both mislabel those rows and sum the two
+   * lanes — the cross-lane sum the whole screen exists to refuse.
+   *
+   * The spender is (Provider, RawActorId), never the id alone: that pair is
+   * the discovered person's unique key, and one id string at two providers is
+   * two people. AgentId completes the group because it is a key column and
+   * one spender spends through several agents; the caller shows the pairing.
+   *
+   * Same two-pass shape as `sumDaysByLane` and for the same reason: the inner
+   * query collapses each cell to its surviving version (current `Version`
+   * stamp, `argMax` on the replacement timestamp, amount tupled so a cell
+   * restated to unpriced is not totalled at its old price), and the outer one
+   * sums only survivors. `sumOrNull` because a group of wholly unpriced cells
+   * holds nothing, and 0 would be a claim.
+   */
+  async sumWindowBySpender(input: {
+    tenantId: string;
+    /** Inclusive, `YYYY-MM-DD`. */
+    fromDay: string;
+    /** Inclusive, `YYYY-MM-DD`. */
+    toDay: string;
+  }): Promise<
+    Array<{
+      provider: string;
+      /** Empty when the provider named nobody for the row's day. */
+      rawActorId: string;
+      /** Empty when the provider named no agent. */
+      agentId: string;
+      amountNanoUsd: number | null;
+      /** Cells of this group holding no USD figure. Above zero, withhold. */
+      cellsWithoutAmount: number;
+    }>
+  > {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          Provider                             AS Provider,
+          RawActorId                           AS RawActorId,
+          AgentId                              AS AgentId,
+          sumOrNull(LatestAmountNanoUsd)       AS AmountNanoUsd,
+          countIf(LatestAmountNanoUsd IS NULL) AS CellsWithoutAmount
+        FROM (
+          SELECT
+            ${KEY_COLUMNS.join(",\n            ")},
+            argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd
+          FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
+          WHERE TenantId = {tenantid:String}
+            AND Day >= {fromday:Date}
+            AND Day <= {today:Date}
+            AND CostSource = {costsource:String}
+            AND Version = {version:String}
+          GROUP BY ${KEY_COLUMNS.join(", ")}
+        )
+        GROUP BY Provider, RawActorId, AgentId
+        ORDER BY Provider, RawActorId, AgentId
+      `,
+      query_params: {
+        tenantid: input.tenantId,
+        fromday: input.fromDay,
+        today: input.toDay,
+        costsource: GOVERNANCE_COST_SOURCE.PULLED,
+        version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      provider: str(row.Provider),
+      rawActorId: str(row.RawActorId),
+      agentId: str(row.AgentId),
+      amountNanoUsd: nullableInt(row.AmountNanoUsd),
+      cellsWithoutAmount: int(row.CellsWithoutAmount),
     }));
   }
 
