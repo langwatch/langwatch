@@ -13,7 +13,7 @@ import {
 import {
   type EndpointStreamState,
   WEBHOOK_DELIVERY_PROCESS_NAME,
-} from "./webhook-delivery.service.ts";
+} from "../rules/webhook-delivery-contract.rules.ts";
 
 /** The last-hour window the rate figures aggregate over. */
 const RATE_WINDOW_MS = 60 * 60 * 1000;

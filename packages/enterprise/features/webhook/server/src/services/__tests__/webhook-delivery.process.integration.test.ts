@@ -41,15 +41,17 @@ import type { WebhookEndpointRuntime } from "../../adapters/webhook-endpoint.web
 import type { WebhookIdPort } from "../../ports/webhook-id.port.ts";
 import type { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
 import {
+  WebhookDeliveryService,
+  type WebhookDeliveryProcessDeps,
+} from "../webhook-delivery.service.ts";
+import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
   WEBHOOK_DELIVERY_PROCESS_NAME,
-  WebhookDeliveryService,
-  type WebhookDeliveryProcessDeps,
   type WebhookDeliveryState,
-} from "../webhook-delivery.service.ts";
+} from "../../rules/webhook-delivery-contract.rules.ts";
 import { WebhookHealthService } from "../webhook-health.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {

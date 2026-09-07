@@ -16,11 +16,11 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
 import {
-  WebhookDeliveryService,
   WEBHOOK_RETRY_LADDER_MS,
   WEBHOOK_SEND_MAX_ATTEMPTS,
-} from "../webhook-delivery.service.ts";
+} from "../../rules/webhook-delivery-contract.rules.ts";
 
 type OutboxOptions = {
   maxAttempts?: number;

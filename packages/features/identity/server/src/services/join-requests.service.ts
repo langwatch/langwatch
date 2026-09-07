@@ -3,8 +3,6 @@ import {
   DOMAIN_AUTO_JOIN_POLICY_ID,
   type DomainJoinSetting,
   isPublicEmailDomain,
-  JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD,
-  JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
   type JoinLookupDecision,
@@ -12,16 +10,12 @@ import {
   type JoinOffer,
   type JoinRequestAggregateState,
   JoinRequestNotFoundError,
-  JoinRequestThrottledError,
   joinDomainOf,
   normalizeDomain,
   organizationAdmitsDomain,
   resolveJoinLookup,
 } from "@langwatch/identity-contract";
-import type {
-  JoinCandidateRepository,
-  JoinRequestListReadRepository,
-} from "../repositories/join-request.repository.ts";
+import type {} from "../repositories/join-request.repository.ts";
 import type { JoinRequestService } from "./join-request.service.ts";
 import {
   approveJoinCommandId,
@@ -30,102 +24,11 @@ import {
 } from "../rules/join-request-id.rules.ts";
 import { createLogger } from "@langwatch/observability";
 import { JOIN_REQUEST_EXPIRY_MS } from "../processes/join-request-lifecycle.process.ts";
+import { type JoinRequestsServiceDeps } from "../rules/join-requests-contract.rules.ts";
+import { JoinRequestAdmissionGuardsService } from "./join-request-admission-guards.service.ts";
+import { JoinDomainSettingService } from "./join-domain-setting.service.ts";
 
 const logger = createLogger("langwatch:identity:join-requests");
-
-/**
- * How often somebody may ask, and how often they may look. The sign-in endpoints' own shape
- * (`frontDoor.ts`): a per-actor sliding window, generous enough that nobody legitimate meets it and
- * tight enough that volume is not free.
- */
-export const JOIN_REQUEST_RATE_WINDOW_SECONDS = 60 * 60;
-export const JOIN_REQUESTS_PER_WINDOW = 5;
-export const JOIN_LOOKUPS_PER_WINDOW = 60;
-
-/**
- * How long a rejected person waits before asking the same organization again.
- */
-export const JOIN_REJECTION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
-
-/** What an organization's admins are told, and by what means. Injected so
- *  the mail is the app's business and this service stays testable. */
-export interface JoinRequestNotifier {
-  requestArrived(args: {
-    joinRequestId: string;
-    organizationId: string;
-    requesterUserId: string;
-    domain: string;
-  }): Promise<void>;
-  requestStillWaiting(args: { joinRequestId: string; organizationId: string }): Promise<void>;
-  requestApproved(args: {
-    joinRequestId: string;
-    organizationId: string;
-    requesterUserId: string;
-  }): Promise<void>;
-  requestRejected(args: {
-    joinRequestId: string;
-    organizationId: string;
-    requesterUserId: string;
-  }): Promise<void>;
-  requestExpired(args: {
-    joinRequestId: string;
-    organizationId: string;
-    requesterUserId: string;
-  }): Promise<void>;
-  joinedAutomatically(args: {
-    joinRequestId: string;
-    organizationId: string;
-    requesterUserId: string;
-    domain: string;
-  }): Promise<void>;
-}
-
-/** How a membership actually lands: the same ledger an invitation uses. */
-export interface JoinMembershipPort {
-  attachDefaultMembership(args: {
-    userId: string;
-    organizationId: string;
-    /** The approving admin, or nobody when the policy approved. */
-    approvedByUserId: string | null;
-  }): Promise<void>;
-  isMember(args: { userId: string; organizationId: string }): Promise<boolean>;
-}
-
-/** Whether this organization may change its joining setting, and to what. */
-export interface JoinSettingPort {
-  read(args: {
-    organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
-  write(args: {
-    organizationId: string;
-    domainJoin: DomainJoinSetting;
-    joinDomains: string[];
-  }): Promise<void>;
-}
-
-export interface JoinRequestsServiceDeps {
-  requests: JoinRequestService;
-  reads: JoinRequestListReadRepository;
-  candidates: JoinCandidateRepository;
-  membership: JoinMembershipPort;
-  notifier: JoinRequestNotifier;
-  settings: JoinSettingPort;
-  /** The licence gate. Holds `auto`, lets `request` through. */
-  autoJoinLicensed: () => Promise<boolean>;
-  /** Whether any of this exists at all. Flag off, nothing here runs. */
-  enabled: (args: { userId: string }) => Promise<boolean>;
-  /**
-   * The shared counter behind the two throttles. The process's, not this service's: it is the same
-   * counter the sign-in doors and the public REST surface meter through, and a second one here
-   * would let somebody spend a budget twice by asking on two paths.
-   */
-  rateLimit: (input: {
-    key: string;
-    windowSeconds: number;
-    max: number;
-  }) => Promise<{ allowed: boolean; resetAt: number }>;
-  now?: () => number;
-}
 
 /**
  * The event-sourced service owns the lifecycle; this owns everything around it — which
@@ -138,11 +41,18 @@ export class JoinRequestsService {
   }
 
   private readonly deps: JoinRequestsServiceDeps;
+
+  private readonly guards: JoinRequestAdmissionGuardsService;
+
+  private readonly domainSetting: JoinDomainSettingService;
+
   private readonly now: () => number;
 
   private constructor(deps: JoinRequestsServiceDeps) {
     this.deps = deps;
     this.now = deps.now ?? (() => Date.now());
+    this.guards = JoinRequestAdmissionGuardsService.create(deps, this.now);
+    this.domainSetting = JoinDomainSettingService.create(deps, this.guards);
   }
 
   /**
@@ -170,7 +80,7 @@ export class JoinRequestsService {
       return { outcome: "none" };
     }
 
-    await this.assertNotLooking({ userId });
+    await this.guards.assertNotLooking({ userId });
 
     const organizations = await this.deps.candidates.findCandidateOrganizations({ domain });
     const decision = resolveJoinLookup({
@@ -209,7 +119,7 @@ export class JoinRequestsService {
       throw new JoinNotAvailableError("join requests are not enabled here");
     }
 
-    const domain = this.provenDomainOrRefuse({ verifiedEmail });
+    const domain = this.guards.provenDomainOrRefuse({ verifiedEmail });
     const candidate = await this.deps.candidates.tryFindCandidateOrganization({
       organizationId,
       domain,
@@ -219,8 +129,8 @@ export class JoinRequestsService {
       throw new JoinNotAvailableError(`organization ${organizationId} is not open to ${domain}`);
     }
 
-    await this.assertNotAsking({ userId, organizationId });
-    await this.assertNotInCoolDown({ userId, organizationId });
+    await this.guards.assertNotAsking({ userId, organizationId });
+    await this.guards.assertNotInCoolDown({ userId, organizationId });
 
     const joinRequestId = newJoinRequestId();
     const occurredAtMs = this.now();
@@ -323,7 +233,7 @@ export class JoinRequestsService {
     organizationId: string;
     adminUserId: string;
   }): Promise<void> {
-    const request = await this.ownedRequestOrRefuse({
+    const request = await this.guards.ownedRequestOrRefuse({
       joinRequestId,
       organizationId,
     });
@@ -353,7 +263,7 @@ export class JoinRequestsService {
     organizationId: string;
     adminUserId: string;
   }): Promise<void> {
-    const request = await this.ownedRequestOrRefuse({
+    const request = await this.guards.ownedRequestOrRefuse({
       joinRequestId,
       organizationId,
     });
@@ -473,59 +383,21 @@ export class JoinRequestsService {
   }
 
   /**
-   * Turn automatic joining on, off, or back to asking. Three refusals, in the order that costs the
-   * customer least to fix: the licence, then the identity provider that already admits people, then
-   * the domain nobody has proved.
+   * Turn automatic joining on, off, or back to asking. Three refusals, in the order that costs
+   * the customer least to fix: the licence, then the identity provider that already admits
+   * people, then the domain nobody has proved.
    */
-  async setJoining({
-    organizationId,
-    domainJoin,
-    domains,
-  }: {
-    organizationId: string;
-    domainJoin: DomainJoinSetting;
-    domains: readonly string[];
-  }): Promise<{ previous: DomainJoinSetting; next: DomainJoinSetting }> {
-    const current = await this.deps.settings.read({ organizationId });
-    const normalized = domains.map(normalizeDomain).filter(Boolean);
-
-    if (domainJoin === "auto") {
-      if (!(await this.deps.autoJoinLicensed())) {
-        throw new JoinAutoNotLicensedError(
-          `organization ${organizationId} cannot enable automatic joining without a genuine license`,
-        );
-      }
-
-      if (normalized.length === 0) {
-        throw new JoinAutoDomainUnprovenError(
-          "automatic joining needs a company domain to be named",
-        );
-      }
-
-      for (const domain of normalized) {
-        await this.assertDomainProven({ organizationId, domain });
-      }
-    }
-
-    await this.deps.settings.write({
-      organizationId,
-      domainJoin,
-      // Turning automatic joining off clears the domains it named: a setting
-      // flipped back on later must name them again, deliberately, rather than
-      // inherit a list from a decision somebody made months ago.
-      joinDomains: domainJoin === "auto" ? normalized : [],
-    });
-
-    return { previous: current.domainJoin, next: domainJoin };
+  setJoining(
+    ...args: Parameters<JoinDomainSettingService["setJoining"]>
+  ): ReturnType<JoinDomainSettingService["setJoining"]> {
+    return this.domainSetting.setJoining(...args);
   }
 
   /** How this organization has set joining, for the settings card. */
-  async readJoining({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }> {
-    return this.deps.settings.read({ organizationId });
+  readJoining(
+    ...args: Parameters<JoinDomainSettingService["readJoining"]>
+  ): ReturnType<JoinDomainSettingService["readJoining"]> {
+    return this.domainSetting.readJoining(...args);
   }
 
   /** What is waiting on this organization. */
@@ -595,132 +467,4 @@ export class JoinRequestsService {
       approvedByUserId,
     });
   }
-
-  /** The request, if this organization has one by that id. A request from
-   *  somewhere else is answered as if it did not exist. */
-  private async ownedRequestOrRefuse({
-    joinRequestId,
-    organizationId,
-  }: {
-    joinRequestId: string;
-    organizationId: string;
-  }): Promise<JoinRequestAggregateState> {
-    const request = await this.deps.reads.tryFindRequest({ joinRequestId });
-    if (!request || request.organizationId !== organizationId) {
-      throw new JoinRequestNotFoundError(
-        `join request ${joinRequestId} does not belong to ${organizationId}`,
-      );
-    }
-
-    return request;
-  }
-
-  /** The domain the caller has PROVED, or the universal nothing. */
-  private provenDomainOrRefuse({ verifiedEmail }: { verifiedEmail: string | null }): string {
-    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
-    if (!domain || isPublicEmailDomain(domain)) {
-      throw new JoinNotAvailableError("no verified company address is available for this request");
-    }
-
-    return domain;
-  }
-
-  private async assertNotAsking({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const limit = await this.deps.rateLimit({
-      key: `joinRequests.request:${userId}`,
-      windowSeconds: JOIN_REQUEST_RATE_WINDOW_SECONDS,
-      max: JOIN_REQUESTS_PER_WINDOW,
-    });
-    if (!limit.allowed) {
-      throw new JoinRequestThrottledError(retryAfterSeconds(limit.resetAt));
-    }
-
-    logger.debug({ organizationId }, "join request rate limit checked for an asking user");
-  }
-
-  private async assertNotLooking({ userId }: { userId: string }): Promise<void> {
-    const limit = await this.deps.rateLimit({
-      key: `joinRequests.lookup:${userId}`,
-      windowSeconds: JOIN_REQUEST_RATE_WINDOW_SECONDS,
-      max: JOIN_LOOKUPS_PER_WINDOW,
-    });
-    if (!limit.allowed) {
-      throw new JoinRequestThrottledError(retryAfterSeconds(limit.resetAt));
-    }
-  }
-
-  private async assertNotInCoolDown({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const rejectedAt = await this.deps.reads.tryFindLastRejectionAt({
-      userId,
-      organizationId,
-    });
-    if (!rejectedAt) {
-      return;
-    }
-
-    const clearsAt = rejectedAt.getTime() + JOIN_REJECTION_COOLDOWN_MS;
-    const now = this.now();
-    if (now >= clearsAt) {
-      return;
-    }
-
-    // The throttle code, not a rejection code: see the cool-down constant.
-    throw new JoinRequestThrottledError(Math.ceil((clearsAt - now) / 1000));
-  }
-
-  /**
-   * Automatic joining needs the administrator to have named the domain AND a
-   * second verified member on it. One colleague with a company-looking
-   * address at a small vendor is not evidence a company owns a domain.
-   */
-  private async assertDomainProven({
-    organizationId,
-    domain,
-  }: {
-    organizationId: string;
-    domain: string;
-  }): Promise<void> {
-    if (isPublicEmailDomain(domain)) {
-      // Company domains only — and the copy says so without listing what is
-      // on the deny-list, because publishing it makes the refusal a way to
-      // enumerate it.
-      throw new JoinAutoDomainUnprovenError(
-        `automatic joining refused for the public email domain ${domain}`,
-      );
-    }
-
-    const candidate = await this.deps.candidates.tryFindCandidateOrganization({
-      organizationId,
-      domain,
-    });
-    if (candidate?.connectionAdmitsDomain) {
-      throw new JoinAutoConnectionAdmitsError(
-        `an active connection already admits ${domain} for ${organizationId}`,
-      );
-    }
-
-    const verified = candidate?.verifiedMembersOnDomain ?? 0;
-    if (verified < JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD) {
-      throw new JoinAutoDomainUnprovenError(
-        `${domain} is held by ${verified} verified member(s) of ${organizationId}; automatic joining needs ${JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD}`,
-      );
-    }
-  }
-}
-
-/** What the screen says is left, from the limiter's own answer. */
-function retryAfterSeconds(resetAt: number): number {
-  return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
 }

@@ -16,7 +16,8 @@
 
 import { describe, expect, it } from "vitest";
 import { DispatchError } from "@langwatch/eventing";
-import { WebhookDeliveryService, type WebhookDispatchResult } from "../webhook-delivery.service.ts";
+import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
+import type { WebhookDispatchResult } from "../../rules/webhook-delivery-contract.rules.ts";
 
 type Recorded = Record<string, unknown>;
 

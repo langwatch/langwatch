@@ -15,10 +15,8 @@ import {
   type PlatformFrame,
   type RegisterFrame,
 } from "@langwatch/langy-contract";
-import type {
-  ControlSession,
-  LocalControlSessionCoreService,
-} from "../../services/langy-local-session.service.ts";
+import type { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
+import type { ControlSession } from "../../rules/langy-local-session-contract.rules.ts";
 
 const logger = createLogger("langwatch:langy:local-control:long-poll");
 

@@ -21,10 +21,12 @@ import {
   type LangyConversationCommands,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
-  type ConversationDetail,
-  type ConversationListItem,
-  type ConversationListPage,
 } from "./langy-conversation.service.ts";
+import type {
+  ConversationDetail,
+  ConversationListItem,
+  ConversationListPage,
+} from "../rules/langy-conversation-shape.rules.ts";
 import { LangyMessageService, type LangyTrustedMessageReader } from "./langy-message.service.ts";
 import { LangyTurnService } from "./langy-turn.service.ts";
 import { LangyCredentialService } from "./langy-credential.service.ts";

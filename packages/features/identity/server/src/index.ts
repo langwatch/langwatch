@@ -253,14 +253,14 @@ export {
 export { PrismaJoinRequestProjectionRepository } from "./repositories/prisma/prisma.join-request-projection.repository.ts";
 export { LegacySsoDomainRoutingRepository } from "./repositories/prisma/prisma.legacy-sso-domain-routing.repository.ts";
 export { SsoConnectionDomainRoutingRepository } from "./repositories/prisma/prisma.sso-connection-routing.repository.ts";
+export { JoinRequestsService } from "./services/join-requests.service.ts";
 export {
   JOIN_REJECTION_COOLDOWN_MS,
-  JoinRequestsService,
   type JoinMembershipPort,
   type JoinRequestNotifier,
   type JoinRequestsServiceDeps,
   type JoinSettingPort,
-} from "./services/join-requests.service.ts";
+} from "./rules/join-requests-contract.rules.ts";
 export {
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,

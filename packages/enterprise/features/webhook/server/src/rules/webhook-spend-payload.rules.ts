@@ -9,7 +9,7 @@ import type {
   SettleSpendCommandData,
   SpendAttribution,
   WebhookDeliveryState,
-} from "../services/webhook-delivery.service.ts";
+} from "./webhook-delivery-contract.rules.ts";
 import type { WebhookSpendEventRow } from "../services/webhook-envelope.service.ts";
 
 /** The columns admission's attribution owns. A row whose process instance

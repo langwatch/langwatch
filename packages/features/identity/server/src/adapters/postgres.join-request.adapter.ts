@@ -16,7 +16,7 @@ import type {
   JoinMembershipPort,
   JoinRequestNotifier,
   JoinSettingPort,
-} from "../services/join-requests.service.ts";
+} from "../rules/join-requests-contract.rules.ts";
 import { PrismaJoinCandidateRepository } from "../repositories/prisma/prisma.join-request.repository.ts";
 import type { JoinRequestService } from "../services/join-request.service.ts";
 

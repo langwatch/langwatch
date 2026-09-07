@@ -5,12 +5,7 @@
  */
 
 import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
-import {
-  type ChunkedDatasetMeta,
-  chunkedMeta,
-  chunkMetaOf,
-  toSingleJsonl,
-} from "../rules/dataset-chunking.rules.ts";
+import { chunkedMeta, chunkMetaOf, toSingleJsonl } from "../rules/dataset-chunking.rules.ts";
 import {
   MAX_INMEMORY_COLUMN_EDIT_BYTES,
   type DatasetMutationRecord,

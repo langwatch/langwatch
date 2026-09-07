@@ -4,156 +4,61 @@
  * subscription, turn start, and frame translation; transports own only clocks.
  */
 
-import type {
-  LangyLocalWorkspaceConnectedEventData,
-  LangyLocalWorkspaceDisconnectedEventData,
-  LangyCredentialSession,
-  LangyMessagePart,
-  LangyMessageRole,
-} from "@langwatch/langy-contract";
+import type {} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { LangyTurnInProgressError } from "@langwatch/langy-contract";
-import { LangyActorSessionService, type LangyActorUserReader } from "./langy-actor-session.service.ts";
+import {
+  LangyActorSessionService,
+  type LangyActorUserReader,
+} from "./langy-actor-session.service.ts";
 import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
 import type { AgentStateStorePort, Unsubscribe } from "@langwatch/agent-contract";
 import {
   connectMessage,
   conversationTitle,
   conversationUrl,
-  disconnectMessage,
-  grantedPatterns,
 } from "../rules/langy-local-session-text.rules.ts";
 import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
-import { workspaceNudgeSchema } from "./langy-local-call-dispatcher.service.ts";
+import { workspaceNudgeSchema } from "../rules/langy-local-call-record.rules.ts";
 import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
 import type { ControlRequestService } from "./langy-local-control-request.service.ts";
 import { LangyWaitExpiredError } from "@langwatch/langy-contract";
 import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
 import type {
-  ConnectedWorkspace,
   LangyLocalPresencePort,
   PresenceHeartbeat,
 } from "../ports/langy-local-presence.port.ts";
 import {
   type CallEnvelope,
   LOCAL_CONTROL_PROTOCOL_VERSION,
-  type LocalControlRefusedCode,
   type PermissionAnsweredFrame,
   type PermissionRequiredFrame,
   type PlatformFrame,
   type RegisterFrame,
   type ResultFrame,
-  type WorkspaceInfo,
 } from "@langwatch/langy-contract";
 import type { UserWaitService } from "./langy-local-user-wait.service.ts";
+import { LocalControlFramesService } from "./langy-local-session-frames.service.ts";
+
+import {
+  type AuthenticateOutcome,
+  type ControlBuffer,
+  type ControlConversations,
+  type ControlCredential,
+  type ControlCredentialReader,
+  type ControlEvents,
+  type ControlSession,
+  type ControlSkipGate,
+  type ControlTurnStarter,
+  type LangyLocalConversationTurns,
+  type RegisterOutcome,
+  eventWorkspace,
+} from "../rules/langy-local-session-contract.rules.ts";
+import { LocalControlLifecycleService } from "./langy-local-session-lifecycle.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:session");
-
-/** The credential behind one socket, once it resolved to a conversation. */
-export interface ControlCredential {
-  apiKeyId: string;
-  projectId: string;
-  /** The project's own address segment, so the follow along link names it. */
-  projectSlug: string;
-  userId: string;
-  conversationId: string;
-  requestId: string;
-}
-
-/** One registered folder, as both transports hold it. */
-export interface ControlSession {
-  instanceId: string;
-  conversationId: string;
-  projectId: string;
-  userId: string;
-  requestId: string;
-  apiKeyId: string;
-  workspaceName: string;
-  hostname: string;
-  /** When this connection registered, so a heartbeat can write the record back. */
-  connectedAt: number;
-  /** The folder itself, for the same reason. */
-  workspace: WorkspaceInfo;
-}
-
-export type AuthenticateOutcome =
-  | { ok: true; credential: ControlCredential }
-  | { ok: false; code: LocalControlRefusedCode; message: string };
-
-export type RegisterOutcome =
-  | {
-      ok: true;
-      session: ControlSession;
-      reply: PlatformFrame;
-      /** Calls the command line says it's still running — marked handed over so a reconnect's pending-calls scan doesn't start a second copy. */
-      inFlightCallIds: string[];
-    }
-  | { ok: false; code: LocalControlRefusedCode; message: string };
-
-/** The one conversation read the core makes. */
-export interface ControlConversations {
-  findByIdVisible(args: { id: string; projectId: string; userId: string }): Promise<{
-    id: string;
-    title: string | null;
-    currentTurnId: string | null;
-    lastModel: string | null;
-  } | null>;
-  /** Writes one line into the transcript without starting a turn. */
-  recordUserMessage(args: {
-    projectId: string;
-    conversationId: string;
-    userId: string;
-    parts: LangyMessagePart[];
-    role?: LangyMessageRole;
-  }): Promise<{ messageId: string }>;
-}
-
-/** The two durable dispatches the core makes. */
-export interface ControlEvents {
-  connectLocalWorkspace(
-    data: LangyLocalWorkspaceConnectedEventData & {
-      tenantId: string;
-      occurredAt: number;
-    },
-  ): Promise<void>;
-  disconnectLocalWorkspace(
-    data: LangyLocalWorkspaceDisconnectedEventData & {
-      tenantId: string;
-      occurredAt: number;
-    },
-  ): Promise<void>;
-}
-
-/** The model gate behind the skip switch, injected so a test can set it. */
-export type ControlSkipGate = (args: {
-  projectId: string;
-  model: string;
-}) => Promise<{ allowed: boolean }>;
-
-/** The live edge the core writes the folder's comings and goings to. */
-export type ControlBuffer = Pick<LangyTokenBufferPort, "appendLocalWorkspace">;
-
-/** The one turn call the core makes, as a type, so a test needs no worker. */
-export interface ControlTurnStarter {
-  start(args: {
-    projectId: string;
-    conversationId: string;
-    userId: string;
-    text: string;
-    idempotencyKey: string;
-  }): Promise<void>;
-}
-
-/**
- * How this process reads the worker's bearer credential off a frame's headers.
- * A port because credential precedence is the deployment's published contract,
- * and a second reading of it here is how the two would drift.
- */
-export type ControlCredentialReader = (
-  header: (name: string) => string | undefined,
-) => Readonly<{ token: string; projectId: string | null }> | null;
 
 export interface LocalControlSessionCoreOptions {
   /** The directory the worker's session key is resolved through. */
@@ -249,7 +154,28 @@ export class LocalControlSessionCoreService {
     this.conversations = () => conversations;
     this.events = () => events;
     this.buffer = () => buffer;
+    this.lifecycle = LocalControlLifecycleService.create({
+      buffer: this.buffer,
+      conversations: this.conversations,
+      events: this.events,
+      dispatcher: this.dispatcher,
+      presence: this.presence,
+      requests: this.requests,
+      now: this.now,
+      isCurrentConnection: (session) => this.isCurrentConnection(session),
+    });
+    this.frames = LocalControlFramesService.create({
+      conversations: this.conversations,
+      dispatcher: this.dispatcher,
+      waits: this.waits,
+      skipGate: this.skipGate,
+      isCurrentConnection: (session) => this.isCurrentConnection(session),
+    });
   }
+
+  private readonly frames: LocalControlFramesService;
+
+  private readonly lifecycle: LocalControlLifecycleService;
 
   /**
    * The bearer key, and nothing else. Three distinct refusals: unresolvable
@@ -378,7 +304,8 @@ export class LocalControlSessionCoreService {
     // provider does not allow reports the cards back on, so the command line
     // never runs a session on a permission it no longer has.
     const skipPermissions =
-      (await this.presence.readPolicy(credential.conversationId)) && (await this.maySkip(session));
+      (await this.presence.readPolicy(credential.conversationId)) &&
+      (await this.frames.maySkip(session));
     if (!skipPermissions) {
       await this.presence.writePolicy({
         conversationId: credential.conversationId,
@@ -412,7 +339,7 @@ export class LocalControlSessionCoreService {
   ): Promise<Unsubscribe> {
     return this.store.subscribe(
       workspaceChannel(session.conversationId),
-      (raw) => void this.onNudge(session, raw, send),
+      (raw) => void this.lifecycle.onNudge(session, raw, send),
     );
   }
 
@@ -486,364 +413,43 @@ export class LocalControlSessionCoreService {
 
     return !workspace || workspace.instanceId === session.instanceId;
   }
-
   /** The command line started the call. */
-  async ack(session: ControlSession, callId: string): Promise<void> {
-    const call = await this.dispatcher.tryRead(callId);
-    if (call?.conversationId !== session.conversationId) {
-      return;
-    }
-
-    if (!(await this.isCurrentConnection(session))) {
-      return;
-    }
-
-    await this.dispatcher.ack(callId);
+  ack(session: ControlSession, callId: string): Promise<void> {
+    return this.frames.ack(session, callId);
   }
 
-  /**
-   * The command line answered the call. A result for a call that already
-   * ended is a quiet no-op, not an error — a resend after a dropped socket.
-   */
-  async result(session: ControlSession, frame: ResultFrame): Promise<void> {
-    const call = await this.dispatcher.tryRead(frame.callId);
-    if (call?.conversationId !== session.conversationId) {
-      return;
-    }
-
-    // A folder that was replaced must not answer the folder that replaced it.
-    if (!(await this.isCurrentConnection(session))) {
-      logger.info(
-        { callId: frame.callId, conversationId: session.conversationId },
-        "a result arrived from a connection a newer folder replaced, refused",
-      );
-
-      return;
-    }
-
-    await this.dispatcher.result({ callId: frame.callId, frame });
+  /** The command line finished the call. */
+  result(session: ControlSession, frame: ResultFrame): Promise<void> {
+    return this.frames.result(session, frame);
   }
 
-  /** The command line needs the developer's answer before it runs the call. */
-  async permissionRequired(session: ControlSession, frame: PermissionRequiredFrame): Promise<void> {
-    const call = await this.dispatcher.tryRead(frame.callId);
-    if (!call || call.conversationId !== session.conversationId) {
-      return;
-    }
-
-    const wait = await this.waits.startPermission({
-      projectId: call.projectId,
-      conversationId: call.conversationId,
-      turnId: call.turnId,
-      ...(call.toolCallId ? { toolCallId: call.toolCallId } : {}),
-      callId: call.callId,
-      summary: frame.summary,
-      pattern: frame.pattern,
-      patterns: grantedPatterns(frame),
-      reason: frame.reason,
-      ...(frame.timeoutSeconds === undefined ? {} : { timeoutSeconds: frame.timeoutSeconds }),
-      // The command line always offers the switch; whether the card may show
-      // it is the platform's answer, and it is the model that decides.
-      skipOffered: frame.skipOffered && (await this.maySkip(session)),
-      workspaceName: session.workspaceName,
-      hostname: session.hostname,
-    });
-    await this.dispatcher.tryAwaitPermission({
-      callId: call.callId,
-      waitId: wait.waitId,
-    });
+  /** The command line is asking the person for permission. */
+  permissionRequired(session: ControlSession, frame: PermissionRequiredFrame): Promise<void> {
+    return this.frames.permissionRequired(session, frame);
   }
 
-  /**
-   * The developer answered in the terminal instead of on the card. Only
-   * settles the wait — the command line already applied the answer. First
-   * answer wins; an already-settled wait ignores this frame.
-   */
-  async permissionAnswered(session: ControlSession, frame: PermissionAnsweredFrame): Promise<void> {
-    const call = await this.dispatcher.tryRead(frame.callId);
-    if (!call || call.conversationId !== session.conversationId) {
-      return;
-    }
-
-    if (!call.waitId) {
-      return;
-    }
-
-    if (!(await this.isCurrentConnection(session))) {
-      return;
-    }
-
-    try {
-      await this.waits.answer({
-        waitId: call.waitId,
-        userId: session.userId,
-        decision: frame.decision,
-        source: "terminal",
-        ...(frame.patterns ? { patterns: frame.patterns } : {}),
-      });
-    } catch (error) {
-      if (LangyWaitExpiredError.is(error)) {
-        logger.info(
-          { callId: frame.callId, conversationId: session.conversationId },
-          "the terminal answered a permission card that had already settled",
-        );
-
-        return;
-      }
-
-      throw error;
-    }
+  /** The person answered in the terminal rather than in the panel. */
+  permissionAnswered(session: ControlSession, frame: PermissionAnsweredFrame): Promise<void> {
+    return this.frames.permissionAnswered(session, frame);
   }
 
-  /**
-   * Whether the conversation's model is allowed to skip permission cards. An
-   * unresolvable model, or no turn run yet, answers no.
-   */
-  private async maySkip(session: ControlSession): Promise<boolean> {
-    const conversation = await this.conversations().findByIdVisible({
-      id: session.conversationId,
-      projectId: session.projectId,
-      userId: session.userId,
-    });
-    const model = conversation?.lastModel;
-    if (!model) {
-      return false;
-    }
-
-    const decision = await this.skipGate({
-      projectId: session.projectId,
-      model,
-    });
-
-    return decision.allowed;
-  }
-
-  /** Calls written for this folder while its socket was away. */
   async pendingCalls(session: ControlSession): Promise<CallEnvelope[]> {
     return this.dispatcher.pendingEnvelopes(session.conversationId);
   }
-
   /**
    * The folder is gone. Clears presence, records it, and fails the calls it was
    * working on so the worker's poll answers at once instead of at the deadline.
    */
-  async retire(
-    session: ControlSession,
-    reason: "cli_exit" | "panel" | "presence_lost",
-  ): Promise<void> {
-    // Read before the deregister, so the line written below can name the
-    // folder that is going rather than whatever answers afterwards.
-    const workspace = await this.presence.read(session.conversationId);
-    const cleared = await this.presence.deregister({
-      conversationId: session.conversationId,
-      instanceId: session.instanceId,
-    });
-    // A socket replaced by a newer share clears nothing, and must not cancel
-    // the calls the new folder is already running.
-    if (!cleared) {
-      return;
-    }
-
-    for (const call of await this.dispatcher.listPendingForConversation(session.conversationId)) {
-      await this.dispatcher.tryCancel({
-        callId: call.callId,
-        code: "cancelled",
-        message: "The shared folder disconnected, so the command did not finish.",
-      });
-    }
-
-    await this.events().disconnectLocalWorkspace({
-      tenantId: session.projectId,
-      occurredAt: this.now(),
-      conversationId: session.conversationId,
-      instanceId: session.instanceId,
-      reason,
-    });
-    await this.requests.revokeKeyBinding(session.apiKeyId);
-    await this.announceWorkspace(session, "disconnected");
-    await this.recordDisconnect(session, workspace?.workspace);
+  retire(
+    ...args: Parameters<LocalControlLifecycleService["retire"]>
+  ): ReturnType<LocalControlLifecycleService["retire"]> {
+    return this.lifecycle.retire(...args);
   }
 
-  /**
-   * Says in the chat that the folder is gone (the connect is already a
-   * transcript line; Ctrl-C was not). Recorded with the `system` role: starts
-   * no turn, renders as a plain notice.
-   */
-  private async recordDisconnect(
-    session: ControlSession,
-    workspace: { name: string; root: string } | undefined,
-  ): Promise<void> {
-    try {
-      await this.conversations().recordUserMessage({
-        projectId: session.projectId,
-        conversationId: session.conversationId,
-        userId: session.userId,
-        role: "system",
-        parts: [
-          {
-            type: "text",
-            text: disconnectMessage(
-              workspace ?? { name: session.workspaceName, root: "" },
-              session.hostname,
-            ),
-          },
-        ],
-      });
-    } catch (error) {
-      // The folder is already gone and its key already revoked; a line that
-      // could not be written must not turn a clean exit into a failure.
-      logger.warn(
-        { conversationId: session.conversationId, error },
-        "could not write the folder disconnect into the transcript",
-      );
-    }
-  }
-
-  /** Puts the folder's connect or disconnect on the live edge of a running turn. */
-  async announceWorkspace(
-    session: ControlSession,
-    state: "connected" | "disconnected",
-  ): Promise<void> {
-    const conversation = await this.conversations().findByIdVisible({
-      id: session.conversationId,
-      projectId: session.projectId,
-      userId: session.userId,
-    });
-    const turnId = conversation?.currentTurnId;
-    if (!turnId) {
-      return;
-    }
-
-    const workspace = await this.presence.read(session.conversationId);
-    await this.buffer().appendLocalWorkspace({
-      conversationId: session.conversationId,
-      turnId,
-      entry: {
-        state,
-        name: workspace?.workspace.name ?? session.workspaceName,
-        root: workspace?.workspace.root ?? "",
-        hostname: session.hostname,
-        ...(workspace?.workspace.gitBranch ? { gitBranch: workspace.workspace.gitBranch } : {}),
-      },
-    });
-  }
-
-  private async onNudge(
-    session: ControlSession,
-    raw: string,
-    send: (frame: PlatformFrame) => void,
-  ): Promise<void> {
-    const parsed = safeNudge(raw);
-    if (!parsed) {
-      return;
-    }
-
-    if ("call" in parsed) {
-      const call = await this.dispatcher.tryRead(parsed.call);
-      if (!call || call.conversationId !== session.conversationId) {
-        return;
-      }
-
-      // The channel is the conversation's, not this connection's, so a folder
-      // that a newer one replaced still hears every call written for it.
-      if (!(await this.isCurrentConnection(session))) {
-        return;
-      }
-
-      send({
-        type: "call",
-        protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
-        call: this.dispatcher.envelopeOf(call),
-      });
-
-      return;
-    }
-
-    if ("cancel" in parsed) {
-      send({
-        type: "cancel",
-        protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
-        callId: parsed.cancel,
-      });
-
-      return;
-    }
-
-    if ("permission" in parsed) {
-      send({
-        type: "permission",
-        protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
-        callId: parsed.permission.callId,
-        decision: parsed.permission.decision,
-      });
-
-      return;
-    }
-
-    if ("policy" in parsed) {
-      send({
-        type: "policy",
-        protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
-        skipPermissions: parsed.policy.skipPermissions,
-      });
-
-      return;
-    }
-
-    send({
-      type: "disconnect",
-      protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
-      reason: parsed.disconnect.reason,
-    });
-  }
-}
-
-/**
- * The folder as the durable event carries it. The command line's checklist is
- * best effort, so a field it could not read is left out rather than recorded
- * as empty, which would read as an answer.
- */
-function eventWorkspace(
-  connected: ConnectedWorkspace,
-): LangyLocalWorkspaceConnectedEventData["workspace"] {
-  const { workspace } = connected;
-
-  return {
-    root: workspace.root,
-    name: workspace.name,
-    hostname: connected.hostname,
-    os: workspace.os,
-    ...(workspace.gitBranch ? { gitBranch: workspace.gitBranch } : {}),
-    ...(workspace.gitRemote ? { gitRemote: workspace.gitRemote } : {}),
-    ...(workspace.gitDirty !== undefined ? { gitDirty: workspace.gitDirty } : {}),
-    ...(workspace.nodeVersion ? { nodeVersion: workspace.nodeVersion } : {}),
-    ...(workspace.pythonVersion ? { pythonVersion: workspace.pythonVersion } : {}),
-    ...(workspace.ghAuthenticated !== undefined
-      ? { ghAuthenticated: workspace.ghAuthenticated }
-      : {}),
-    ...(workspace.packageManager ? { packageManager: workspace.packageManager } : {}),
-  };
-}
-
-/** The one turn method a folder-connected session starts work through. */
-export type LangyLocalConversationTurns = Readonly<{
-  startConversationTurn(input: {
-    projectId: string;
-    idempotencyKey: string;
-    session: LangyCredentialSession;
-    requestedConversationId: string;
-    messages: readonly { role: "user" | "assistant" | "system"; parts: LangyMessagePart[] }[];
-    isRetry: boolean;
-    turnContext: Record<string, never>;
-  }): Promise<{ conversationId: string; turnId: string }>;
-}>;
-
-function safeNudge(raw: string) {
-  try {
-    const parsed = workspaceNudgeSchema.safeParse(JSON.parse(raw));
-
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
+  /** Announces the folder on the live edge and in the durable log. */
+  announceWorkspace(
+    ...args: Parameters<LocalControlLifecycleService["announceWorkspace"]>
+  ): ReturnType<LocalControlLifecycleService["announceWorkspace"]> {
+    return this.lifecycle.announceWorkspace(...args);
   }
 }

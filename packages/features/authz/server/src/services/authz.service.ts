@@ -7,9 +7,7 @@ import {
   ALL_PERMISSIONS,
   AuthzEngine,
   AuthzService as AuthzServiceContract,
-  LiteMemberRestrictedError,
   PermissionDeniedError,
-  ProjectPermissionDeniedError,
   type ApiKeyPermissionCheck,
   type ApiKeyProjectDecision,
   type AuthzAccessBinding,
@@ -18,6 +16,14 @@ import {
   type AuthzAccessBreakdownInput,
   type AuthzAccessBreakdownOutput,
   type AuthzDeclaredScopeId,
+  type AuthzCanAnyByIdsInput,
+  type AuthzCanAnyByIdsOutput,
+  type AuthzCanBatchByIdsInput,
+  type AuthzCanBatchByIdsOutput,
+  type AuthzCanBatchPermissionsByIdsInput,
+  type AuthzCanBatchPermissionsByIdsOutput,
+  type AuthzCheckByIdsInput,
+  type AuthzCheckByIdsOutput,
   type AuthzDecision,
   type AuthzGetApiKeyProjectDecisionInput,
   type AuthzGetDecisionInput,
@@ -58,6 +64,8 @@ import { AuthzBindingReaderService } from "./authz-binding-reader.service.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
 import { AuthzGrantSnapshotService } from "./authz-grant-snapshot.service.ts";
 import { AuthzScopeLineageService } from "./authz-scope-lineage.service.ts";
+import { AuthzIdDecisionsService } from "./authz-id-decisions.service.ts";
+import { AuthzPermissionGateService } from "./authz-permission-gate.service.ts";
 
 const decisions = createLogger("langwatch:authz:decisions");
 
@@ -118,6 +126,10 @@ export class AuthzService extends AuthzServiceContract {
 
   private readonly engine = new AuthzEngine();
 
+  private readonly idDecisions: AuthzIdDecisionsService;
+
+  private readonly gate: AuthzPermissionGateService;
+
   private constructor(
     private readonly collector: AuthzCollectorService,
     private readonly bindingReader: AuthzBindingReaderService,
@@ -126,6 +138,21 @@ export class AuthzService extends AuthzServiceContract {
     private readonly options: AuthzServiceOptions,
   ) {
     super();
+    this.idDecisions = AuthzIdDecisionsService.create({
+      engine: this.engine,
+      collector,
+      snapshots,
+      tryResolveScope: (ids) => this.tryResolveScope(ids),
+      recordDenial: (decision) => this.recordDenial(decision),
+    });
+    this.gate = AuthzPermissionGateService.create({
+      authorize: (input) => this.authorize(input),
+      can: (input) => this.can(input),
+      canAnyByIds: (args) => this.canAnyByIds(args),
+      checkByIds: (args) => this.checkByIds(args),
+      tryResolveScope: (ids) => this.tryResolveScope(ids),
+      tryScopeOf: (scope) => this.tryScopeOf(scope),
+    });
   }
 
   async check(args: CheckArgs): Promise<AuthzDecision> {
@@ -244,254 +271,28 @@ export class AuthzService extends AuthzServiceContract {
    * The same question as `check`, asked with the ids a caller already holds instead of a
    * resolved scope ref.
    */
-  async checkByIds({
-    principal,
-    permission,
-    projectId,
-    teamId,
-    organizationId,
-    ceiling = true,
-  }: ScopeIds & {
-    principal: AuthzPrincipalRef;
-    permission: AuthzPermission;
-    ceiling?: boolean;
-  }): Promise<{
-    allowed: boolean;
-    organizationRole: OrganizationRoleOrNull;
-    denialReason?: AuthzDecision["denialReason"];
-  }> {
-    const scope = await this.tryResolveScope({
-      projectId,
-      teamId,
-      organizationId,
-    });
-    if (!scope) {
-      return { allowed: false, organizationRole: null };
-    }
-
-    const scopeOrg = scopeOrganizationId(scope);
-    const pass = this.collector.beginPass();
-    const [grants, ownerGrants] = await Promise.all([
-      this.collector.collectGrants({
-        principal,
-        organizationId: scopeOrg,
-        reader: pass,
-      }),
-      ceiling
-        ? this.snapshots.tryOwnerGrantsFor({
-            principal,
-            organizationId: scopeOrg,
-            reader: pass,
-          })
-        : Promise.resolve(null),
-    ]);
-    const decision = this.engine.decideWithCeiling({
-      keyGrants: grants,
-      ownerGrants,
-      permission,
-      scope,
-      demoProjectId: this.snapshots.tryDemoProjectId(),
-    });
-    this.recordDenial(decision);
-
-    return {
-      allowed: decision.allowed,
-      organizationRole: grants.organizationRole,
-      ...(decision.denialReason ? { denialReason: decision.denialReason } : {}),
-    };
+  checkByIds(args: AuthzCheckByIdsInput): Promise<AuthzCheckByIdsOutput> {
+    return this.idDecisions.checkByIds(args);
   }
 
   /**
    * "Any one of these is enough", in the order given, first allow wins. One
-   * scope resolution and one collection serve every candidate — asking per
-   * permission would re-query for an answer the first snapshot already holds.
+   * scope resolution and one collection serve every candidate.
    */
-  async canAnyByIds({
-    principal,
-    permissions,
-    projectId,
-  }: {
-    principal: AuthzPrincipalRef;
-    permissions: readonly AuthzPermission[];
-    projectId: string;
-  }): Promise<{
-    allowed: boolean;
-    matchedPermission?: AuthzPermission;
-    organizationRole: OrganizationRoleOrNull;
-    denialReason?: AuthzDecision["denialReason"];
-  }> {
-    const scope = await this.collector.tryResolveScopeRef({ projectId });
-    if (!scope) {
-      return { allowed: false, organizationRole: null };
-    }
-
-    // Same api-key owner ceiling every other decision path applies: an api-key principal is
-    // capped at its owner's grants, so demoting the owner shrinks the key here too.
-    // `ownerGrantsFor` returns null for a user principal, and `decideWithCeiling` with a null
-    // ceiling is a plain decide — so this is a no-op for the user callers this has today and
-    // closes the hole before an api-key caller reaches it.
-    const scopeOrg = scopeOrganizationId(scope);
-    const pass = this.collector.beginPass();
-    const [grants, ownerGrants] = await Promise.all([
-      this.collector.collectGrants({
-        principal,
-        organizationId: scopeOrg,
-        reader: pass,
-      }),
-      this.snapshots.tryOwnerGrantsFor({
-        principal,
-        organizationId: scopeOrg,
-        reader: pass,
-      }),
-    ]);
-    const demoProjectId = this.snapshots.tryDemoProjectId();
-    let matched: AuthzPermission | undefined;
-    let firstDenied: AuthzDecision | undefined;
-    for (const permission of permissions) {
-      const decision = this.engine.decideWithCeiling({
-        keyGrants: grants,
-        ownerGrants,
-        permission,
-        scope,
-        demoProjectId,
-      });
-      if (decision.allowed) {
-        matched = permission;
-        break;
-      }
-
-      firstDenied ??= decision;
-    }
-
-    const result: {
-      allowed: boolean;
-      matchedPermission?: AuthzPermission;
-      organizationRole: OrganizationRoleOrNull;
-      denialReason?: AuthzDecision["denialReason"];
-    } = {
-      allowed: matched !== undefined,
-      organizationRole: grants.organizationRole,
-    };
-    if (matched) {
-      result.matchedPermission = matched;
-    } else if (firstDenied?.denialReason) {
-      result.denialReason = firstDenied.denialReason;
-    }
-
-    return result;
+  canAnyByIds(args: AuthzCanAnyByIdsInput): Promise<AuthzCanAnyByIdsOutput> {
+    return this.idDecisions.canAnyByIds(args);
   }
 
-  /**
-   * One permission across many scopes in one organization: one collection, N pure decisions.
-   * Deciding per scope would turn a flat batch into a collect per scope, which is the
-   * pool-starving fan-out this replaces.
-   */
-  async canBatchByIds({
-    principal,
-    permission,
-    organizationId,
-    teams,
-    projects,
-  }: {
-    principal: AuthzPrincipalRef;
-    permission: AuthzPermission;
-    organizationId: string;
-    teams: ReadonlyArray<{ teamId: string }>;
-    projects: ReadonlyArray<{ projectId: string; teamId?: string | undefined }>;
-  }): Promise<{
-    teams: Map<string, boolean>;
-    projects: Map<string, boolean>;
-    organizationRole: OrganizationRoleOrNull;
-  }> {
-    const { byPermission, organizationRole } = await this.canBatchPermissionsByIds({
-      principal,
-      permissions: [permission],
-      organizationId,
-      teams,
-      projects,
-    });
-    const decision = byPermission.get(permission) ?? {
-      teams: new Map<string, boolean>(),
-      projects: new Map<string, boolean>(),
-    };
-
-    return { ...decision, organizationRole };
+  /** One permission across many scopes in one organization: one collection, N pure decisions. */
+  canBatchByIds(args: AuthzCanBatchByIdsInput): Promise<AuthzCanBatchByIdsOutput> {
+    return this.idDecisions.canBatchByIds(args);
   }
 
-  /**
-   * MANY permissions across many scopes in one organization — and still ONE collection.
-   */
-  async canBatchPermissionsByIds({
-    principal,
-    permissions,
-    organizationId,
-    teams,
-    projects,
-  }: {
-    principal: AuthzPrincipalRef;
-    permissions: readonly AuthzPermission[];
-    organizationId: string;
-    teams: ReadonlyArray<{ teamId: string }>;
-    projects: ReadonlyArray<{ projectId: string; teamId?: string | undefined }>;
-  }): Promise<{
-    byPermission: Map<
-      AuthzPermission,
-      { teams: Map<string, boolean>; projects: Map<string, boolean> }
-    >;
-    organizationRole: OrganizationRoleOrNull;
-  }> {
-    // The api-key owner ceiling, off the same snapshot as the key's grants —
-    // see `canAnyByIds`. Null for a user or service-key principal, and
-    // `decideWithCeiling` with a null ceiling is a plain decide.
-    const pass = this.collector.beginPass();
-    const [grants, ownerGrants] = await Promise.all([
-      this.collector.collectGrants({
-        principal,
-        organizationId,
-        reader: pass,
-      }),
-      this.snapshots.tryOwnerGrantsFor({ principal, organizationId, reader: pass }),
-    ]);
-    const demoProjectId = this.snapshots.tryDemoProjectId();
-    const allowedAt = (permission: AuthzPermission, scope: AuthzScopeRef | null): boolean =>
-      scope
-        ? this.engine.decideWithCeiling({
-            keyGrants: grants,
-            ownerGrants,
-            permission,
-            scope,
-            demoProjectId,
-          }).allowed
-        : false;
-
-    const projectScopes = await Promise.all(
-      projects.map(async ({ projectId, teamId }): Promise<[string, AuthzScopeRef | null]> => [
-        projectId,
-        teamId
-          ? { type: "project", id: projectId, teamId, organizationId }
-          : await this.collector.tryResolveScopeRef({ projectId }),
-      ]),
-    );
-
-    return {
-      byPermission: new Map(
-        permissions.map((permission) => [
-          permission,
-          {
-            teams: new Map(
-              teams.map(({ teamId }) => [
-                teamId,
-                allowedAt(permission, { type: "team", id: teamId, organizationId }),
-              ]),
-            ),
-            projects: new Map(
-              projectScopes.map(([projectId, scope]) => [projectId, allowedAt(permission, scope)]),
-            ),
-          },
-        ]),
-      ),
-      organizationRole: grants.organizationRole,
-    };
+  /** MANY permissions across many scopes in one organization — and still ONE collection. */
+  canBatchPermissionsByIds(
+    args: AuthzCanBatchPermissionsByIdsInput,
+  ): Promise<AuthzCanBatchPermissionsByIdsOutput> {
+    return this.idDecisions.canBatchPermissionsByIds(args);
   }
 
   /** Most-specific-first, the order every seam resolves in: an explicit
@@ -520,186 +321,41 @@ export class AuthzService extends AuthzServiceContract {
     return this.scopeLineage.check(args);
   }
 
-  async getDecision({
-    userId,
-    permission,
-    scope,
-  }: AuthzGetDecisionInput): Promise<PermissionDecision> {
-    const ids: ScopeIds = {};
-    if (scope.tier === "project") {
-      ids.projectId = scope.id;
-    }
-
-    if (scope.tier === "team") {
-      ids.teamId = scope.id;
-    }
-
-    if (scope.tier === "organization") {
-      ids.organizationId = scope.id;
-    }
-
-    const result = await this.checkByIds({
-      principal: { type: "user", id: userId },
-      permission,
-      ...ids,
-    });
-
-    return {
-      permitted: result.allowed,
-      organizationRole: result.organizationRole,
-      ...(result.denialReason ? { denialReason: result.denialReason } : {}),
-    };
+  getDecision(args: AuthzGetDecisionInput): Promise<PermissionDecision> {
+    return this.gate.getDecision(args);
   }
 
-  async getProjectAnyDecision({
-    userId,
-    projectId,
-    permissions,
-  }: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision> {
-    const result = await this.canAnyByIds({
-      principal: { type: "user", id: userId },
-      projectId,
-      permissions,
-    });
-
-    return {
-      permitted: result.allowed,
-      organizationRole: result.organizationRole,
-      ...(result.denialReason ? { denialReason: result.denialReason } : {}),
-    };
+  getProjectAnyDecision(args: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision> {
+    return this.gate.getProjectAnyDecision(args);
   }
 
-  async hasPermission<Permission extends AuthzPermission>(
-    check: {
-      userId: string;
-      permission: Permission;
-    } & PermissionScopeArg<Permission>,
+  hasPermission<Permission extends AuthzPermission>(
+    check: { userId: string; permission: Permission } & PermissionScopeArg<Permission>,
   ): Promise<boolean> {
-    const scope = this.tryScopeOf(check);
-    if (!scope) {
-      return false;
-    }
-
-    const decision = await this.getDecision({
-      userId: check.userId,
-      permission: check.permission,
-      scope,
-    });
-
-    return decision.permitted;
+    return this.gate.hasPermission(check);
   }
 
-  async authorizePermission<
+  authorizePermission<
     Permission extends AuthzPermission,
     ScopeArg extends PermissionScopeArg<Permission>,
   >(
     check: { userId: string; permission: Permission } & ScopeArg,
   ): Promise<Authorized<TierOfScopeArg<ScopeArg>, Permission>> {
-    const declaredScope = this.tryScopeOf(check);
-    let scope: AuthzScopeRef | null = null;
-    if (declaredScope?.tier === "project") {
-      scope = await this.tryResolveScope({ projectId: declaredScope.id });
-    } else if (declaredScope?.tier === "team") {
-      scope = await this.tryResolveScope({ teamId: declaredScope.id });
-    } else if (declaredScope?.tier === "organization") {
-      scope = await this.tryResolveScope({ organizationId: declaredScope.id });
-    }
-
-    if (!scope || scope.type === "resource") {
-      throw new PermissionDeniedError({
-        permission: check.permission,
-        scope: {
-          type: declaredScope?.tier ?? "project",
-          id: declaredScope?.id ?? "unresolved",
-        },
-        denialReason: "no-binding",
-      });
-    }
-
-    const witness = await this.authorize({
-      principal: { type: "user", id: check.userId },
-      permission: check.permission,
-      scope,
-    });
-
-    return witness as Authorized<TierOfScopeArg<ScopeArg>, Permission>;
+    return this.gate.authorizePermission(check);
   }
 
-  async authorizeProjectPermission({
-    userId,
-    projectId,
-    permission,
-  }: AuthzRequireProjectPermissionInput): Promise<void> {
-    const result = await this.checkByIds({
-      principal: { type: "user", id: userId },
-      projectId,
-      permission,
-    });
-    if (result.allowed) {
-      return;
-    }
-
-    if (result.organizationRole === "EXTERNAL") {
-      throw new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown");
-    }
-
-    throw new ProjectPermissionDeniedError(permission);
+  authorizeProjectPermission(args: AuthzRequireProjectPermissionInput): Promise<void> {
+    return this.gate.authorizeProjectPermission(args);
   }
 
-  async hasApiKeyPermission({
-    apiKeyId,
-    organizationId,
-    scope,
-    permission,
-  }: ApiKeyPermissionCheck): Promise<boolean> {
-    let resolvedScope: AuthzScopeRef;
-    if (scope.type === "project") {
-      resolvedScope = {
-        type: "project",
-        id: scope.id,
-        teamId: scope.teamId,
-        organizationId,
-      };
-    } else if (scope.type === "team") {
-      resolvedScope = { type: "team", id: scope.id, organizationId };
-    } else {
-      resolvedScope = { type: "organization", id: scope.id };
-    }
-
-    return this.can({
-      principal: { type: "apiKey", id: apiKeyId },
-      permission,
-      scope: resolvedScope,
-    });
+  hasApiKeyPermission(args: ApiKeyPermissionCheck): Promise<boolean> {
+    return this.gate.hasApiKeyPermission(args);
   }
 
-  async getApiKeyProjectDecision({
-    apiKeyId,
-    organizationId,
-    projectId,
-    permission,
-  }: AuthzGetApiKeyProjectDecisionInput): Promise<ApiKeyProjectDecision> {
-    const scope = await this.tryResolveScope({ projectId });
-    if (scope?.type !== "project" || scope.organizationId !== organizationId) {
-      return { outcome: "project_not_found" };
-    }
-
-    const allowed = await this.can({
-      principal: { type: "apiKey", id: apiKeyId },
-      permission,
-      scope,
-    });
-
-    return allowed
-      ? {
-          outcome: "allowed",
-          scope: {
-            projectId: scope.id,
-            teamId: scope.teamId,
-            organizationId: scope.organizationId,
-          },
-        }
-      : { outcome: "denied" };
+  getApiKeyProjectDecision(
+    args: AuthzGetApiKeyProjectDecisionInput,
+  ): Promise<ApiKeyProjectDecision> {
+    return this.gate.getApiKeyProjectDecision(args);
   }
 
   async listUserBindings(args: AuthzListUserBindingsInput): Promise<AuthzAccessBinding[]> {

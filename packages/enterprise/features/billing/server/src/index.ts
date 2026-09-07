@@ -104,11 +104,11 @@ export {
   type BillingCooldownCache,
 } from "./services/billing-alert-cooldown.service.ts";
 export { UsageLimitService } from "./services/usage-limit.service.ts";
-export {
-  UsageWarningService,
-  type BillingNextStepResolver,
-  type BillingUsageUnit,
-} from "./services/usage-warning.service.ts";
+export { UsageWarningService } from "./services/usage-warning.service.ts";
+export type {
+  BillingNextStepResolver,
+  BillingUsageUnit,
+} from "./rules/usage-warning-thresholds.rules.ts";
 export {
   BillingSubscriptionService,
   RECENT_INVOICES_LIMIT,

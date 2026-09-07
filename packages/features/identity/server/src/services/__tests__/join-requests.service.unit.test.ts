@@ -18,13 +18,13 @@ const rateLimitMock = vi.fn(
   }),
 );
 
+import { JoinRequestsService } from "../join-requests.service.ts";
 import {
   JOIN_REJECTION_COOLDOWN_MS,
   type JoinMembershipPort,
   type JoinRequestNotifier,
-  JoinRequestsService,
   type JoinSettingPort,
-} from "../join-requests.service.ts";
+} from "../../rules/join-requests-contract.rules.ts";
 
 /**
  * Everything AROUND the lifecycle: the reveal discipline at the boundary, the anti-abuse limits,

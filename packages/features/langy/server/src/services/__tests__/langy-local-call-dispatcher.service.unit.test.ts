@@ -8,10 +8,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
-import {
-  LocalCallDispatcherService,
-  type WorkspaceNudge,
-} from "../langy-local-call-dispatcher.service.ts";
+import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
+import type { WorkspaceNudge } from "../../rules/langy-local-call-record.rules.ts";
 import { workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts";
 import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter.ts";
 

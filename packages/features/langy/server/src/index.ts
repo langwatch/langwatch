@@ -318,16 +318,16 @@ export {
   type ControlRequestProjects,
   type StoredControlRequest,
 } from "./services/langy-local-control-request.service.ts";
-export {
-  LocalControlSessionCoreService,
-  type ControlConversations,
-  type ControlCredentialReader,
-  type ControlEvents,
-  type ControlSkipGate,
-  type ControlTurnStarter,
-  type LangyLocalConversationTurns,
-  type LocalControlSessionCoreOptions,
-} from "./services/langy-local-session.service.ts";
+export { LocalControlSessionCoreService } from "./services/langy-local-session.service.ts";
+export type { LocalControlSessionCoreOptions } from "./services/langy-local-session.service.ts";
+export type {
+  ControlConversations,
+  ControlCredentialReader,
+  ControlEvents,
+  ControlSkipGate,
+  ControlTurnStarter,
+  LangyLocalConversationTurns,
+} from "./rules/langy-local-session-contract.rules.ts";
 export {
   connectMessage,
   conversationTitle,
@@ -336,7 +336,8 @@ export {
   grantedPatterns,
 } from "./rules/langy-local-session-text.rules.ts";
 export { LocalCallDispatcherService } from "./services/langy-local-call-dispatcher.service.ts";
-export { UserWaitService, type UserWaitEvents } from "./services/langy-local-user-wait.service.ts";
+export { UserWaitService } from "./services/langy-local-user-wait.service.ts";
+export type { UserWaitEvents } from "./rules/langy-local-user-wait-record.rules.ts";
 export { LangyLocalPresenceAdapter } from "./adapters/redis.langy-local-presence.adapter.ts";
 export { reconcileSkipPolicy, type SkipGate } from "./rules/langy-local-skip-policy.rules.ts";
 export type { LangyLocalTrpcPorts } from "./transport/api-trpc/langy.api.ts";

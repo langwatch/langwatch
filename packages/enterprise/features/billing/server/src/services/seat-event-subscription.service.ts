@@ -10,7 +10,6 @@ import {
   GROWTH_SEAT_PLAN_TYPES,
   isGrowthSeatPrice,
   NoActiveSubscriptionError,
-  QuoteExpiredError,
   resolveGrowthSeatPlanType,
   type StripePriceMap,
   SubscriptionItemNotFoundError,

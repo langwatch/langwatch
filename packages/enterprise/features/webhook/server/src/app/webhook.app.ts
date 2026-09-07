@@ -4,7 +4,7 @@
  * events log — and reaches the rest through {@link endpoints}/{@link health}.
  */
 import type { WebhookEndpointRuntime } from "../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
-import type { WebhookDispatchResult } from "../services/webhook-delivery.service.ts";
+import type { WebhookDispatchResult } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 import type { WebhookEventsService } from "../services/webhook-events.service.ts";
 import type { WebhookHealthService } from "../services/webhook-health.service.ts";

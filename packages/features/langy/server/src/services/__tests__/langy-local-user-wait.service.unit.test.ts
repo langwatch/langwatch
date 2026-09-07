@@ -15,11 +15,11 @@ import {
   PERMISSION_WAIT_BUDGET_MS,
   QUESTION_WAIT_BUDGET_MS,
 } from "@langwatch/langy-contract";
-import {
-  type UserWaitBuffer,
-  type UserWaitEvents,
-  UserWaitService,
-} from "../langy-local-user-wait.service.ts";
+import { UserWaitService } from "../langy-local-user-wait.service.ts";
+import type {
+  UserWaitBuffer,
+  UserWaitEvents,
+} from "../../rules/langy-local-user-wait-record.rules.ts";
 
 const projectId = "proj_1";
 const conversationId = "conv_1";

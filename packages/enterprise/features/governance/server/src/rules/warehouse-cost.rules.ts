@@ -10,7 +10,7 @@ import { z } from "zod";
 
 export const WAREHOUSE_COST_SETTLING_LAG_MS = 2 * 60 * 60 * 1000;
 
-const ONE_HOUR_MS = 60 * 60 * 1000;
+export const ONE_HOUR_MS = 60 * 60 * 1000;
 
 export type WarehouseCostWindow = {
   fromMs: number;
@@ -261,4 +261,3 @@ export type WarehouseCostAllocation = {
    */
   owed: Set<string>;
 };
-

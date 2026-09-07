@@ -5,7 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { WorkspaceNudge } from "../services/langy-local-call-dispatcher.service.ts";
+import type { WorkspaceNudge } from "./langy-local-call-record.rules.ts";
 import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
 import type { LocalControlRuntime } from "../adapters/langy-local-control-runtime.adapter.ts";
 

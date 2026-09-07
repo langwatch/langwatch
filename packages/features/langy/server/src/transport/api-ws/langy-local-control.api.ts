@@ -18,11 +18,11 @@ import {
   LOCAL_CONTROL_PROTOCOL_VERSION,
   type PlatformFrame,
 } from "@langwatch/langy-contract";
+import type { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
 import type {
   ControlCredential,
   ControlSession,
-  LocalControlSessionCoreService,
-} from "../../services/langy-local-session.service.ts";
+} from "../../rules/langy-local-session-contract.rules.ts";
 
 const logger = createLogger("langwatch:langy:local-control:gateway");
 

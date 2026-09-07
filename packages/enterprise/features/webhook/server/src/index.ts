@@ -50,10 +50,13 @@ export {
   type WebhookUrlProblemCode,
 } from "./services/webhook-destination.service.ts";
 export {
+  WebhookDeliveryService,
+  type WebhookDeliveryProcessDeps,
+} from "./services/webhook-delivery.service.ts";
+export {
   deliverSchema,
   flushEndpointSchema,
   sendBatchSchema,
-  WebhookDeliveryService,
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
@@ -74,10 +77,9 @@ export {
   type SpendAttribution,
   type SpendUsage,
   type WebhookDeliveryEndpointService,
-  type WebhookDeliveryProcessDeps,
   type WebhookDeliveryState,
   type WebhookDispatchResult,
-} from "./services/webhook-delivery.service.ts";
+} from "./rules/webhook-delivery-contract.rules.ts";
 export {
   WebhookBatchPlannerService,
   WEBHOOK_FLUSH_RECHECK_MS,

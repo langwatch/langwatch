@@ -6,21 +6,19 @@
 
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 
-import {
-  type LocalCallBuffer,
-  LocalCallDispatcherService,
-} from "../services/langy-local-call-dispatcher.service.ts";
+import { LocalCallDispatcherService } from "../services/langy-local-call-dispatcher.service.ts";
+import type { LocalCallBuffer } from "../rules/langy-local-call-record.rules.ts";
 import {
   ControlRequestService,
   type ControlRequestKeyMinter,
   type ControlRequestProjects,
 } from "../services/langy-local-control-request.service.ts";
 import { LangyLocalPresenceAdapter } from "./redis.langy-local-presence.adapter.ts";
-import {
-  type UserWaitBuffer,
-  type UserWaitEvents,
-  UserWaitService,
-} from "../services/langy-local-user-wait.service.ts";
+import { UserWaitService } from "../services/langy-local-user-wait.service.ts";
+import type {
+  UserWaitBuffer,
+  UserWaitEvents,
+} from "../rules/langy-local-user-wait-record.rules.ts";
 
 export interface LocalControlRuntime {
   store: AgentStateStorePort;
