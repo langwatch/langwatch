@@ -58,6 +58,32 @@ describe("given the tracing skill", () => {
         "```bash\nuv run python -c \"from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))\"\n```",
       );
     });
+
+    /** @scenario "A LangGraph callback is attached at the graph, not inside a node" */
+    it("puts the LangChain callback in the config of the graph invocation", () => {
+      const rendered = tracingSkill();
+      expect(rendered).toContain(
+        "**A graph takes the callback at the graph, not at a model call inside it.**",
+      );
+      expect(rendered).toContain(
+        'graph.invoke(state, config={"callbacks": [langwatch.get_current_trace().get_langchain_callback()]})',
+      );
+      expect(rendered).toContain("The same config argument works on `ainvoke` and `stream`");
+    });
+
+    /** @scenario "A LangGraph callback is attached at the graph, not inside a node" */
+    it("says every node becomes a span, and that a callback on one model call leaves the nodes out", () => {
+      const rendered = tracingSkill();
+      expect(rendered).toContain(
+        "Every node the run touches then becomes a span under the trace: a chain span named after the node, LLM spans for the model calls and tool spans for the tool calls.",
+      );
+      expect(rendered).toContain(
+        "Attached only to the model call inside one node, the trace holds LLM spans and nothing else, so the tool nodes and the plain function nodes are missing",
+      );
+      expect(rendered).toContain(
+        "Do NOT attach the LangChain callback only to a model call inside a graph node: it belongs on the graph invocation, or the nodes never become spans",
+      );
+    });
   });
 
   describe("when its verification step is read", () => {

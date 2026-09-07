@@ -265,7 +265,9 @@ describe("the documentation paths the skills tell the agent to fetch", () => {
    * only `langwatch docs` is checkable here.
    */
   function docsPaths(rendered: string): string[] {
-    return extractAll(rendered, /langwatch docs ([a-z0-9/_-]+)/g);
+    return extractAll(rendered, /langwatch docs ([a-z0-9/_<>|-]+)/g).filter(
+      (docsPath) => !docsPath.includes("<")
+    );
   }
 
   describe("given every skill Langy ships with is rendered", () => {
