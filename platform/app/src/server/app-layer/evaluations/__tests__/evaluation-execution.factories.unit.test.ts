@@ -59,9 +59,11 @@ function buildProvider(
  * skipped-evaluation details both build on. Resolving instead of throwing
  * yields a bare object, so the caller's `code` assertion fails on it too.
  */
-async function refusalFrom(
-  promise: Promise<unknown>,
-): Promise<EvaluatorConfigError> {
+async function refusalFrom({
+  promise,
+}: {
+  promise: Promise<unknown>;
+}): Promise<EvaluatorConfigError> {
   return (await promise.then(
     () => ({}),
     (reason: unknown) => reason,
@@ -302,9 +304,9 @@ describe("setupModelEnv", () => {
         azureOnlyProject();
         vi.mocked(getResolvedDefaultForFeature).mockResolvedValueOnce(null);
 
-        const error = await refusalFrom(
-          setupModelEnv("openai/text-embedding-ada-002", true, "proj-1"),
-        );
+        const error = await refusalFrom({
+          promise: setupModelEnv("openai/text-embedding-ada-002", true, "proj-1"),
+        });
 
         expect(error.code).toBe("evaluator_config_error");
         // The message is what the customer reads: a refused evaluation
@@ -321,9 +323,9 @@ describe("setupModelEnv", () => {
           scope: "project" as never,
         });
 
-        const error = await refusalFrom(
-          setupModelEnv("openai/text-embedding-ada-002", true, "proj-1"),
-        );
+        const error = await refusalFrom({
+          promise: setupModelEnv("openai/text-embedding-ada-002", true, "proj-1"),
+        });
 
         expect(error.code).toBe("evaluator_config_error");
         expect(error.message).toContain('"openai/text-embedding-ada-002"');
@@ -335,9 +337,9 @@ describe("setupModelEnv", () => {
       it("refuses the judge model rather than swapping it", async () => {
         azureOnlyProject();
 
-        const error = await refusalFrom(
-          setupModelEnv("openai/gpt-4o", false, "proj-1"),
-        );
+        const error = await refusalFrom({
+          promise: setupModelEnv("openai/gpt-4o", false, "proj-1"),
+        });
 
         expect(error.code).toBe("evaluator_config_error");
         expect(getResolvedDefaultForFeature).not.toHaveBeenCalled();
