@@ -1924,6 +1924,12 @@
               "api-reference/webhooks/send-a-test-event-to-an-endpoint",
               "api-reference/webhooks/archive-a-webhook-endpoint"
             ]
+          },
+          {
+            "group": "Platform Health",
+            "pages": [
+              "api-reference/platform-health/overview"
+            ]
           }
         ]
       }

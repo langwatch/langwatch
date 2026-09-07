@@ -80,6 +80,7 @@ describe("API process configuration", () => {
       validateTrpcOutput: true,
       cronApiKey: undefined,
       opsApiKey: undefined,
+      platformHealth: { apiKey: undefined, probeApiKey: undefined },
       // `ADMIN_EMAILS`, unset here: nobody is instance staff on this deployment.
       deployment: { adminEmails: undefined },
       nlpLambdaFleet: undefined,

@@ -2357,6 +2357,11 @@ const presentations = {
     title: "Ingestion template not found",
     describe: () => "It may have been archived or removed. Reload to see the current list.",
   },
+  platform_health_unauthorized: {
+    title: "That platform health key was not accepted",
+    describe: () =>
+      "Send the monitoring key this deployment was configured with as a bearer token. Check it is current and copied in full.",
+  },
   platform_template_immutable: {
     title: "This template can't be edited directly",
     describe: () =>

@@ -31,6 +31,7 @@ export const FEATURE_NAMES = [
   "onboarding",
   "ops",
   "organization",
+  "platform-health",
   "presence",
   "project",
   "prompt",

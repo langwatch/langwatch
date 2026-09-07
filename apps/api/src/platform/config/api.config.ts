@@ -42,6 +42,7 @@ import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing
 import { modelProviderServerConfigDefinition } from "@langwatch/model-provider-contract";
 import { notificationServerConfigDefinition } from "@langwatch/notification-contract";
 import { opsServerConfigDefinition } from "@langwatch/ops-contract";
+import { platformHealthServerConfigDefinition } from "@langwatch/platform-health-contract";
 import { saasServerConfigDefinition } from "@langwatch/enterprise-saas-contract";
 import { scimServerConfigDefinition } from "@langwatch/enterprise-scim-contract";
 import { secretServerConfigDefinition } from "@langwatch/secret-contract";
@@ -215,6 +216,13 @@ export const apiConfigDefinition = RuntimeConfig.define({
    * presenting nothing.
    */
   opsApiKey: opsServerConfigDefinition.apiKey,
+  /**
+   * The external monitor's key and the project credential its canaries are
+   * sent with. Both refused blank, and with either absent the platform-health
+   * family is not mounted — a platform-wide probe is not reachable by
+   * presenting nothing.
+   */
+  platformHealth: { ...platformHealthServerConfigDefinition },
   /**
    * `AUTHZ_EPOCH_CACHE` reads "1 or true, else off" like the platform app.
    * `DEMO_PROJECT_ID` blank means no demo project, never `""`.

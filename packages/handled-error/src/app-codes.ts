@@ -348,6 +348,7 @@ export const APP_ERROR_CODES = [
   "personal_virtual_key_label_taken",
   "personal_workspace_boundary",
   "personal_workspace_not_managed_here",
+  "platform_health_unauthorized",
   "platform_template_immutable",
   "project_cannot_archive_current",
   "project_destination_team_not_found",

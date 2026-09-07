@@ -4,8 +4,8 @@ import { classOf, COMPOSITE_KEYS, DEV_GENERATED_KEYS, SECRET_KEYS } from "../key
 describe("given the secret registry", () => {
   describe("when it is read", () => {
     /** @scenario "Every rotating credential is classified as a secret" */
-    it("names twenty-nine secret keys and ten composite keys", () => {
-      expect(SECRET_KEYS).toHaveLength(29);
+    it("names thirty-one secret keys and ten composite keys", () => {
+      expect(SECRET_KEYS).toHaveLength(31);
       expect(COMPOSITE_KEYS).toHaveLength(10);
       expect(SECRET_KEYS).toContain("OPENAI_API_KEY");
       expect(COMPOSITE_KEYS).toContain("DATABASE_URL");
