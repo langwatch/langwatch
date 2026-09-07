@@ -53,8 +53,11 @@ func fileToCLIService(name string) string {
 // logServiceColors mirrors the supervisor's lane palette so a service reads
 // the same in `haven logs` as it did live.
 var logServiceColors = map[string]string{
-	"ui": "34", "api": "35", "gateway": "33", "nlp": "36", "langy": "92", "workers": "32",
-	"storybook": "96", "mail": "95", "idp": "92",
+	"ui": "34", "backend": "32", "go": "33", "langy": "92",
+	"design-system": "96", "mail-room": "95", "idp": "92",
+	// Pre-2026-09-07 lane names. A log file written before the local topology
+	// changed still reads in its own colour rather than falling to plain text.
+	"api": "35", "workers": "32", "gateway": "33", "nlp": "36",
 }
 
 func runLogsCmd(ctx context.Context, d deps, inv invocation) error {

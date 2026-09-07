@@ -121,23 +121,36 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 // restartTargets resolves which children to bounce. Only supervised children
 // qualify: the routed per-worktree services this stack runs itself (not
 // baseline fallbacks) — the `app` port is the ui lane's, so it is offered under
-// that name — plus the api and workers lanes, each on its own loopback port.
-// Every one of the three Node lanes is its own process, so bouncing one can
-// never reach another's group. name=="" means all of them.
+// that name — plus the backend lane on its API port.
+//
+// gateway and nlp share ONE process locally (ADR-004, amendment 2026-09-07), so
+// they are offered as the single `go` lane rather than as two names that would
+// each take the other down without saying so. Every lane is its own process
+// group, so bouncing one can never reach another's.
+//
+// name=="" means all of them.
 func restartTargets(st domain.Stack, name string) []restartTarget {
 	var all []restartTarget
+	var goPort int
 	for _, r := range domain.PerWorktreeServices {
 		for _, svc := range st.Services {
-			if svc.Name == r.Name && !svc.IsFallback && svc.Port != 0 {
-				all = append(all, restartTarget{Name: domain.CLIServiceName(svc.Name), Port: svc.Port})
+			if svc.Name != r.Name || svc.IsFallback || svc.Port == 0 {
+				continue
 			}
+			if svc.Name == "gateway" || svc.Name == "nlp" {
+				if goPort == 0 {
+					goPort = svc.Port
+				}
+				continue
+			}
+			all = append(all, restartTarget{Name: domain.CLIServiceName(svc.Name), Port: svc.Port})
 		}
 	}
-	if st.APIPort != 0 {
-		all = append(all, restartTarget{Name: "api", Port: st.APIPort})
+	if goPort != 0 {
+		all = append(all, restartTarget{Name: GoLane, Port: goPort})
 	}
-	if st.WorkerMetricsPort != 0 {
-		all = append(all, restartTarget{Name: "workers", Port: st.WorkerMetricsPort})
+	if st.APIPort != 0 {
+		all = append(all, restartTarget{Name: BackendLane, Port: st.APIPort})
 	}
 	if name == "" {
 		return all

@@ -133,18 +133,18 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{"nlp", "NLP engine (Go)"},
 	{"langyagent", "Langy agent manager (Go)"},
 	{"idp", "IdP simulator (Go)"},
-	{StorybookService, "Design system — Storybook"},
-	{MailService, "Mail studio — transactional message preview"},
+	{DesignSystemService, "Design system — Storybook"},
+	{MailRoomService, "Mail studio — transactional message preview"},
 }
 
 // ServiceHostAliases are extra hostnames routed to the same listener as a
 // service's own, so nobody has to remember which spelling was chosen. `ds` is
-// the short form of the design system, and the studio answers to both `mail`
-// and `mails` under either. The service's own name stays the one hostname
-// printed, linked and put in the overlay; these only ever add ways in.
+// the short form of the design system. The mail studio has no alias — its
+// hostname is mail-room.<slug>, full stop. The service's own name stays the
+// one hostname printed, linked and put in the overlay; these only ever add
+// ways in.
 var ServiceHostAliases = map[string][]string{
-	StorybookService: {"ds"},
-	MailService:      {"mail." + StorybookService, "mails.ds", "mail.ds"},
+	DesignSystemService: {"ds"},
 }
 
 // BaselineService finds a live baseline stack that runs `service` locally (not
@@ -197,13 +197,17 @@ type Lane struct {
 }
 
 // Lanes are the Node application lanes every stack supervises, in launch order:
-// the browser application (on the routed `app` port), the API and the
-// background worker. The Go services are omitted because they are one-to-one
-// with their routed services, which the same report already lists.
+// the browser application (on the routed `app` port) and the backend — the API
+// application and the worker application in ONE local process (ADR-004,
+// amendment 2026-09-07). The backend lane is reported on the API port; its
+// worker half's metrics listener is WorkerMetricsPort, which the same report
+// already carries.
+//
+// The Go services are omitted because they are one-to-one with their routed
+// services, which the same report already lists.
 func (s Stack) Lanes() []Lane {
 	return []Lane{
 		{Name: "ui", Port: s.svc("app").Port},
-		{Name: "api", Port: s.APIPort},
-		{Name: "workers", Port: s.WorkerMetricsPort},
+		{Name: "backend", Port: s.APIPort},
 	}
 }

@@ -992,10 +992,10 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.Langy
 	case "idp":
 		return opts.Selection.IDP
-	case domain.StorybookService:
-		return opts.Selection.Storybook
-	case domain.MailService:
-		return opts.Selection.Mail
+	case domain.DesignSystemService:
+		return opts.Selection.DesignSystem
+	case domain.MailRoomService:
+		return opts.Selection.MailRoom
 	default:
 		return true
 	}

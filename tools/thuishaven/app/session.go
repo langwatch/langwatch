@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -83,6 +84,19 @@ func (o *Orchestrator) SessionSnapshot(slug string) SessionReport {
 			Fallback:    svc.IsFallback,
 			Restartable: restartable[cli] && !svc.IsFallback,
 		})
+		// The backend lane shares the app's hostname under /api, so the routed
+		// list has no row of its own for it. It is the process that decides
+		// whether the stack works at all, so it gets one right under the ui.
+		if svc.Name == "app" && st.APIPort != 0 {
+			r.Services = append(r.Services, SessionServiceStatus{
+				Name:        BackendLane,
+				Role:        svc.Role,
+				URL:         strings.TrimSuffix(svc.URL, "/") + "/api",
+				Port:        st.APIPort,
+				Up:          o.sys.PortInUse(st.APIPort),
+				Restartable: restartable[BackendLane],
+			})
+		}
 	}
 
 	info, daemonUp := o.store.Daemon()

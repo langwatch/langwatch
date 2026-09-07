@@ -191,6 +191,9 @@ type model struct {
 	outcome     Outcome
 	busy        bool
 	showMonitor bool
+	// height is the terminal's row count, from the last tea.WindowSizeMsg; zero
+	// until the first one arrives, which renders the page unclipped.
+	height int
 	// wtOverride is the user's explicit worktree-section toggle ("t"); nil means
 	// automatic — visible only while no stacks are running, so the running work
 	// owns the screen and the idle trees stay out of the way.
@@ -234,6 +237,9 @@ func tick() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.height = msg.Height
+		return m, nil
 	case tickMsg:
 		m.refresh()
 		return m, tick()
@@ -454,15 +460,46 @@ var (
 const hubWidth = 72
 
 func (m model) View() string {
-	var b strings.Builder
-	m.viewHeader(&b)
-	m.viewStacks(&b)
-	m.viewWorktrees(&b)
+	var body, footer strings.Builder
+	m.viewHeader(&body)
+	m.viewStacks(&body)
+	m.viewWorktrees(&body)
 	if m.showMonitor {
-		m.viewMonitor(&b)
+		m.viewMonitor(&body)
 	}
-	m.viewFooter(&b)
-	return b.String()
+	m.viewFooter(&footer)
+	return fitToHeight(body.String(), footer.String(), m.height)
+}
+
+// fitToHeight keeps the page inside the terminal: the footer always shows, and
+// the body scrolls so the selected row (the one carrying the ▸ marker) stays in
+// view instead of running off the bottom of a tall stack list. A zero height
+// (no size message yet) renders everything.
+func fitToHeight(body, footer string, height int) string {
+	footerLines := strings.Count(footer, "\n")
+	avail := height - footerLines
+	lines := strings.Split(strings.TrimRight(body, "\n"), "\n")
+	if height <= 0 || len(lines) <= avail {
+		return body + footer
+	}
+	if avail < 1 {
+		return footer
+	}
+	selected := 0
+	for i, l := range lines {
+		if strings.Contains(l, "▸") {
+			selected = i
+			break
+		}
+	}
+	start := 0
+	if selected >= avail {
+		start = selected - avail + 1
+	}
+	if start+avail > len(lines) {
+		start = len(lines) - avail
+	}
+	return strings.Join(lines[start:start+avail], "\n") + "\n" + footer
 }
 
 func (m model) viewHeader(b *strings.Builder) {

@@ -86,10 +86,10 @@ func TestRender(t *testing.T) {
 			want: "11:10:46.108  api        error  boom\n    Error: boom\n        at run (job.ts:1:1)",
 		},
 		{
-			name: "the longest lane and the longest level still align",
+			name: "a lane name that exactly fills the column and the longest level still align",
 			line: `{"time":"2026-09-07T11:10:46.108Z","level":"error","msg":"x"}`,
-			opts: Options{Lane: "storybook", Time: fixtureTime},
-			want: "11:10:46.108  storybook  error  x",
+			opts: Options{Lane: "mail-room", Time: fixtureTime},
+			want: "11:10:46.108  mail-room  error  x",
 		},
 		{
 			name: "constant process identity is dropped, the line's own fields are not",

@@ -28,20 +28,16 @@ const HubService = "hub"
 // routes it slugless, as the machine-wide idp.langwatch.localhost.
 const IdPService = "idp"
 
-// StorybookService is the design system's Storybook, routed as
-// design-system.<slug>.langwatch.localhost. The HOSTNAME says design-system
-// because that is the thing a person is going to look at; the LANE is called
-// storybook everywhere someone types it (`haven up +storybook`, `haven logs
-// storybook`), because that is the tool actually running. CLIServiceName joins
-// the two.
-const StorybookService = "design-system"
+// DesignSystemService is the design system's Storybook, routed as
+// design-system.<slug>.langwatch.localhost. The lane is called design-system
+// everywhere someone types it too (`haven up +design-system`, `haven logs
+// design-system`) — the hostname and the CLI spelling are the same word.
+const DesignSystemService = "design-system"
 
-// MailService is the mail studio — the preview of every transactional message
-// the product sends — routed UNDER the design system, at
-// mails.design-system.<slug>.langwatch.localhost, because the messages are
-// designed with the same system the workshop next door shows. Its lane is
-// called mail.
-const MailService = "mails." + StorybookService
+// MailRoomService is the mail studio — the preview of every transactional
+// message the product sends — routed at mail-room.<slug>.langwatch.localhost.
+// Its lane is called mail-room too.
+const MailRoomService = "mail-room"
 
 // DefaultNaming is the standard scheme: <service>.<slug>.langwatch.localhost.
 func DefaultNaming(tld string) Naming {

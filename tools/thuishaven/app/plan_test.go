@@ -22,17 +22,17 @@ func TestNoLaneIsRed(t *testing.T) {
 		"", // langyDockerHost — not exercised here; the langy lane isn't under test
 	)
 
-	var sawWorkers bool
+	var sawBackend bool
 	for _, c := range children {
 		if c.Color == red {
 			t.Errorf("lane %q uses red (ANSI %s); red is reserved for real errors", c.Name, red)
 		}
-		if c.Name == "workers" {
-			sawWorkers = true
+		if c.Name == BackendLane {
+			sawBackend = true
 		}
 	}
-	if !sawWorkers {
-		t.Fatal("expected a workers lane in the plan")
+	if !sawBackend {
+		t.Fatal("expected a backend lane in the plan")
 	}
 }
 
@@ -51,14 +51,15 @@ func (stubProxy) Shutdown() error                    { return nil }
 func (stubProxy) Install() error                     { return nil }
 func (stubProxy) Version() string                    { return domain.PortlessVersion }
 
-// The three Node lanes are the whole application, so all three are planned
-// unconditionally and each runs its own package's `dev` script from the
-// workspace root. Nothing selects them and no environment variable moves work
-// between them: a stack that planned two of the three would boot, serve pages,
-// and quietly process no jobs.
+// The two Node lanes are the whole application, so both are planned
+// unconditionally: ui, and the backend that hosts the API application and the
+// worker application in one local process (ADR-004, amendment 2026-09-07).
+// Nothing selects them and no environment variable moves work between them: a
+// stack that planned only the ui lane would boot, serve pages, and quietly
+// process no jobs.
 //
-// @scenario "Every stack runs the three Node lanes"
-func TestTheThreeNodeLanesAlwaysRun(t *testing.T) {
+// @scenario "Every stack runs the ui and backend lanes"
+func TestTheTwoNodeLanesAlwaysRun(t *testing.T) {
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	repo := t.TempDir()
 	children := o.planChildren(domain.Stack{Slug: "test"}, PlanOptions{Selection: domain.Selection{}}, repo, "")
@@ -72,10 +73,10 @@ func TestTheThreeNodeLanesAlwaysRun(t *testing.T) {
 		return Child{}, false
 	}
 
-	for lane, pkg := range map[string]string{"ui": UIPackage, "api": APIPackage, "workers": WorkerPackage} {
+	for lane, pkg := range map[string]string{"ui": UIPackage, BackendLane: BackendPackage} {
 		child, ok := find(lane)
 		if !ok {
-			t.Fatalf("no %q lane was planned; every stack runs all three", lane)
+			t.Fatalf("no %q lane was planned; every stack runs both", lane)
 		}
 		if !strings.Contains(child.Shell, pkg) {
 			t.Errorf("%s lane runs %q, want it to filter %s", lane, child.Shell, pkg)
@@ -89,4 +90,88 @@ func TestTheThreeNodeLanesAlwaysRun(t *testing.T) {
 			}
 		}
 	}
+	// The worker is not a lane of its own any more, and neither is the api.
+	for _, gone := range []string{"api", "workers"} {
+		if _, found := find(gone); found {
+			t.Errorf("a %q lane was planned; both run inside the backend lane now", gone)
+		}
+	}
+}
+
+// One Go process, hosting whichever data-plane services the stack selected,
+// each on the port haven allocated for its hostname. SERVER_ADDR cannot name
+// two listeners in one process, so each service gets its own address variable.
+//
+// @scenario "The Go data-plane services share one lane"
+func TestTheGoServicesSharePlanOneLane(t *testing.T) {
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	repo := t.TempDir()
+	st := domain.Stack{Slug: "test", Services: []domain.Service{
+		{Name: "gateway", Port: 44003},
+		{Name: "nlp", Port: 44001},
+	}}
+	children := o.planChildren(st, PlanOptions{
+		RepoRoot:  repo,
+		Selection: domain.Selection{Gateway: true, NLP: true},
+	}, repo, "")
+
+	var lane *Child
+	for i := range children {
+		if children[i].Name == GoLane {
+			lane = &children[i]
+		}
+		if children[i].Name == "gateway" || children[i].Name == "nlp" {
+			t.Errorf("%q is still its own lane; both run in the go lane now", children[i].Name)
+		}
+	}
+	if lane == nil {
+		t.Fatal("no go lane was planned for a stack selecting gateway and nlp")
+	}
+	if !strings.Contains(lane.Shell, "svc=combined") {
+		t.Errorf("go lane runs %q, want the combined mono-binary subcommand", lane.Shell)
+	}
+	for _, want := range []string{GatewayAddrEnv + "=:44003", NLPAddrEnv + "=:44001"} {
+		found := false
+		for _, e := range lane.Env {
+			if e == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("go lane env %v is missing %q", lane.Env, want)
+		}
+		if strings.HasPrefix(want, "SERVER_ADDR") {
+			t.Error("SERVER_ADDR cannot address two listeners in one process")
+		}
+	}
+}
+
+// A worktree that turned one of them off gets a process hosting only the other,
+// not a lane it has to reason about and not a second process.
+//
+// @scenario "A deselected Go service is simply not hosted"
+func TestTheGoLaneHostsOnlyWhatWasSelected(t *testing.T) {
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	repo := t.TempDir()
+	st := domain.Stack{Slug: "test", Services: []domain.Service{{Name: "gateway", Port: 44003}}}
+	children := o.planChildren(st, PlanOptions{
+		RepoRoot:  repo,
+		Selection: domain.Selection{Gateway: true},
+	}, repo, "")
+
+	for _, c := range children {
+		if c.Name != GoLane {
+			continue
+		}
+		if strings.Contains(c.Shell, "nlpgo") {
+			t.Errorf("go lane runs %q, but nlp was not selected", c.Shell)
+		}
+		for _, e := range c.Env {
+			if strings.HasPrefix(e, NLPAddrEnv+"=") {
+				t.Errorf("go lane carries %q, but nlp was not selected", e)
+			}
+		}
+		return
+	}
+	t.Fatal("no go lane was planned for a stack selecting the gateway")
 }

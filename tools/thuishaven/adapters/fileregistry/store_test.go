@@ -105,6 +105,79 @@ func TestReadSelectionKeepsDefaultsForServicesTheFileNeverNames(t *testing.T) {
 	})
 }
 
+// A worktree's .haven.json may still carry the two developer-tool lanes'
+// pre-rename spellings ("storybook", "mail") from before they became
+// "design-system" and "mail-room". Losing that on the rename would silently
+// turn a lane back off for every worktree that had turned it on — so the old
+// keys still decode, and the new key wins when a file somehow states both.
+//
+// @scenario "A stored old-name developer-tool selection migrates on load"
+func TestReadSelectionMigratesTheOldDeveloperToolNames(t *testing.T) {
+	s := New(t.TempDir())
+
+	t.Run("given a file written before the rename", func(t *testing.T) {
+		dir := t.TempDir()
+		writeSelectionJSON(t, dir, `{"services":{"storybook":true,"mail":true}}`)
+
+		t.Run("when the selection is read", func(t *testing.T) {
+			sel, ok := s.ReadSelection(dir)
+			if !ok {
+				t.Fatal("a file stating the old names was treated as never written")
+			}
+			if !sel.DesignSystem || !sel.MailRoom {
+				t.Errorf("got %+v, want both developer tools read back on from their old keys", sel)
+			}
+		})
+
+		t.Run("when it is re-saved, the file switches to the new keys", func(t *testing.T) {
+			sel, ok := s.ReadSelection(dir)
+			if !ok {
+				t.Fatal("a file stating the old names was treated as never written")
+			}
+			if err := s.WriteSelection(dir, sel); err != nil {
+				t.Fatalf("WriteSelection: %v", err)
+			}
+			b, err := os.ReadFile(filepath.Join(dir, ".haven.json"))
+			if err != nil {
+				t.Fatalf("read back: %v", err)
+			}
+			var raw struct {
+				Services map[string]any `json:"services"`
+			}
+			if err := json.Unmarshal(b, &raw); err != nil {
+				t.Fatalf("written file is not valid JSON: %v", err)
+			}
+			if _, stated := raw.Services["storybook"]; stated {
+				t.Error("the re-saved file still carries the old \"storybook\" key")
+			}
+			if _, stated := raw.Services["mail"]; stated {
+				t.Error("the re-saved file still carries the old \"mail\" key")
+			}
+			if v, _ := raw.Services["design-system"].(bool); !v {
+				t.Error("the re-saved file does not state \"design-system\": true")
+			}
+			if v, _ := raw.Services["mail-room"].(bool); !v {
+				t.Error("the re-saved file does not state \"mail-room\": true")
+			}
+		})
+	})
+
+	t.Run("given a file naming both the old and the new key", func(t *testing.T) {
+		dir := t.TempDir()
+		writeSelectionJSON(t, dir, `{"services":{"storybook":false,"design-system":true}}`)
+
+		t.Run("when the selection is read, the new key wins", func(t *testing.T) {
+			sel, ok := s.ReadSelection(dir)
+			if !ok {
+				t.Fatal("a file stating a service was treated as never written")
+			}
+			if !sel.DesignSystem {
+				t.Error("got design-system off, want the new key (true) to win over the old one (false)")
+			}
+		})
+	})
+}
+
 // The read side keeps defaults for what a file does not state; the write side
 // must never lean on that, or a service haven itself turned off would come back
 // on the next read.

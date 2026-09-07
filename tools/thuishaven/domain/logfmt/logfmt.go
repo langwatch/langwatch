@@ -22,10 +22,12 @@ import (
 	"time"
 )
 
-// Column widths. The lane column fits the longest lane name ("storybook"); the
-// level column fits the longest level word ("error"). Both are fixed so the
-// message starts at the same offset on every line of every lane — which is the
-// whole point of rendering centrally.
+// Column widths. The lane column is 9 wide, fitting every lane name except
+// "design-system" (13 chars) — pad() leaves a name that long unpadded rather
+// than truncated, so it never loses a character, only the alignment on that
+// one lane's lines. The level column fits the longest level word ("error").
+// Both are fixed so the message starts at the same offset on every line of
+// every lane — which is the whole point of rendering centrally.
 const (
 	LaneWidth  = 9
 	LevelWidth = 5

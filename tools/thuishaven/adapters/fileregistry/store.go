@@ -119,22 +119,33 @@ type selectionFields struct {
 	// The two developer tools, both off by default and both stated here the
 	// same way as the rest, so a file written before they existed keeps
 	// leaving them off rather than reading as a deliberate choice.
-	Storybook *bool `json:"storybook"`
-	Mail      *bool `json:"mail"`
+	DesignSystem *bool `json:"design-system"`
+	MailRoom     *bool `json:"mail-room"`
+	// LegacyDesignSystem / LegacyMailRoom decode the pre-rename keys
+	// (`"storybook"` / `"mail"`) a worktree's .haven.json may still carry.
+	// applyTo prefers the new key when both are present; WriteSelection never
+	// writes these, so the next `haven up` in that worktree migrates the file
+	// to the new spelling instead of silently dropping the lane it had turned
+	// on.
+	LegacyDesignSystem *bool `json:"storybook,omitempty"`
+	LegacyMailRoom     *bool `json:"mail,omitempty"`
 }
 
 // applyTo overlays the services this file actually states onto sel.
 func (f selectionFields) applyTo(sel *domain.Selection) {
-	for _, field := range []struct{ stated, target *bool }{
-		{f.Gateway, &sel.Gateway},
-		{f.NLP, &sel.NLP},
-		{f.Langy, &sel.Langy},
-		{f.IDP, &sel.IDP},
-		{f.Storybook, &sel.Storybook},
-		{f.Mail, &sel.Mail},
+	for _, field := range []struct{ stated, legacy, target *bool }{
+		{f.Gateway, nil, &sel.Gateway},
+		{f.NLP, nil, &sel.NLP},
+		{f.Langy, nil, &sel.Langy},
+		{f.IDP, nil, &sel.IDP},
+		{f.DesignSystem, f.LegacyDesignSystem, &sel.DesignSystem},
+		{f.MailRoom, f.LegacyMailRoom, &sel.MailRoom},
 	} {
-		if field.stated != nil {
+		switch {
+		case field.stated != nil:
 			*field.target = *field.stated
+		case field.legacy != nil:
+			*field.target = *field.legacy
 		}
 	}
 }
@@ -171,12 +182,12 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 // write.
 func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 	b, err := json.MarshalIndent(selectionFile{Services: &selectionFields{
-		Gateway:   &sel.Gateway,
-		NLP:       &sel.NLP,
-		Langy:     &sel.Langy,
-		IDP:       &sel.IDP,
-		Storybook: &sel.Storybook,
-		Mail:      &sel.Mail,
+		Gateway:      &sel.Gateway,
+		NLP:          &sel.NLP,
+		Langy:        &sel.Langy,
+		IDP:          &sel.IDP,
+		DesignSystem: &sel.DesignSystem,
+		MailRoom:     &sel.MailRoom,
 	}}, "", "  ")
 	if err != nil {
 		return err

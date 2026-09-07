@@ -122,7 +122,7 @@ func (s Stack) OverlayEnv() []string {
 	// Emitted only when there is a Storybook to point at (a local lane, or a
 	// baseline stack's), so a worktree that never selected it keeps today's
 	// start-on-first-visit behavior untouched.
-	if sb := s.svc(StorybookService); sb.Port != 0 {
+	if sb := s.svc(DesignSystemService); sb.Port != 0 {
 		env = append(env, fmt.Sprintf("LANGWATCH_STORYBOOK_PORT=%d", sb.Port))
 	}
 	// A stable local API key so the seed always mints the same credential and any

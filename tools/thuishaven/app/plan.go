@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -18,6 +19,22 @@ func goServiceShell(repoRoot, svc string, shouldWatch bool) string {
 		target = "service-watch"
 	}
 	return fmt.Sprintf("make -C %q %s svc=%s", repoRoot, target, svc)
+}
+
+// goCombinedShell runs the data-plane services in ONE Go process — the local
+// topology (ADR-004, amendment 2026-09-07). `services` names which of them this
+// stack selected, so a worktree that turned one off gets a process hosting only
+// the other rather than a second lane it has to reason about.
+//
+// Watching is air: it rebuilds the one binary on a Go change, restarts only
+// when the build succeeded, and waits out the same quiet window the Node lane
+// debounces on (LANGWATCH_DEV_WATCH_DEBOUNCE_MS).
+func goCombinedShell(repoRoot string, services []string, shouldWatch bool) string {
+	target := "service"
+	if shouldWatch {
+		target = "service-watch"
+	}
+	return fmt.Sprintf("make -C %q %s svc=combined args=%q", repoRoot, target, strings.Join(services, " "))
 }
 
 // planChildren turns a resolved stack into the supervised process set, layering
@@ -67,23 +84,25 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		// simply isn't served until the stack can actually handle a request.
 		ReadyProbeURL: fmt.Sprintf("http://127.0.0.1:%d/api/health", st.APIPort),
 	})
-	out = append(out, Child{
-		Name: "api", Dir: repoDir, Color: palette[3], LogPath: logPath("api"),
-		Shell: "pnpm -s --filter " + APIPackage + " dev",
-		Env:   nodeEnv(),
-	})
+	// One Go lane, hosting whichever data-plane services this stack selected.
+	// Each still binds the port haven allocated for its hostname: SERVER_ADDR
+	// cannot answer for two listeners in one process, so each has its own
+	// address variable.
+	var goServices []string
+	goEnv := append([]string{}, base...)
 	if opts.Selection.Gateway {
-		out = append(out, Child{
-			Name: "gateway", Dir: opts.RepoRoot, Color: palette[2], LogPath: logPath("gateway"),
-			Shell: goServiceShell(opts.RepoRoot, "aigateway", opts.ShouldGoWatch),
-			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("gateway"))),
-		})
+		goServices = append(goServices, "aigateway")
+		goEnv = append(goEnv, fmt.Sprintf("%s=:%d", GatewayAddrEnv, port("gateway")))
 	}
 	if opts.Selection.NLP {
+		goServices = append(goServices, "nlpgo")
+		goEnv = append(goEnv, fmt.Sprintf("%s=:%d", NLPAddrEnv, port("nlp")))
+	}
+	if len(goServices) > 0 {
 		out = append(out, Child{
-			Name: "nlp", Dir: opts.RepoRoot, Color: palette[4], LogPath: logPath("nlp"),
-			Shell: goServiceShell(opts.RepoRoot, "nlpgo", opts.ShouldGoWatch),
-			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("nlp"))),
+			Name: GoLane, Dir: opts.RepoRoot, Color: palette[2], LogPath: logPath(GoLane),
+			Shell: goCombinedShell(opts.RepoRoot, goServices, opts.ShouldGoWatch),
+			Env:   goEnv,
 		})
 	}
 	if opts.Selection.IDP {
@@ -116,21 +135,23 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	// Each is handed the port haven allocated for its hostname, on the command
 	// line, because both tools otherwise bind a fixed default that a second
 	// worktree would find busy.
-	if opts.Selection.Storybook {
+	if opts.Selection.DesignSystem {
 		out = append(out, Child{
-			Name: "storybook", Dir: repoDir, Color: palette[8], LogPath: logPath("storybook"),
+			Name: domain.DesignSystemService, Dir: repoDir, Color: palette[8], LogPath: logPath(domain.DesignSystemService),
 			Shell: fmt.Sprintf("pnpm -s --filter %s storybook --port %d --ci",
-				DesignSystemPackage, port(domain.StorybookService)),
+				DesignSystemPackage, port(domain.DesignSystemService)),
 			Env: nodeEnv(),
 		})
 	}
-	if opts.Selection.Mail {
+	if opts.Selection.MailRoom {
 		out = append(out, Child{
-			Name: "mail", Dir: repoDir, Color: palette[9], LogPath: logPath("mail"),
+			Name: domain.MailRoomService, Dir: repoDir, Color: palette[9], LogPath: logPath(domain.MailRoomService),
 			// --strictPort: vite silently moves to the next free port otherwise,
-			// which would leave mail.<slug> routed to nothing at all.
-			Shell: fmt.Sprintf("pnpm -s --filter %s dev --port %d --strictPort",
-				MailPackage, port(domain.MailService)),
+			// which would leave mail-room.<slug> routed to nothing at all.
+			// --host 127.0.0.1: vite's default "localhost" binds only ::1 on
+			// this machine, and the proxy and the port probe both dial IPv4.
+			Shell: fmt.Sprintf("pnpm -s --filter %s dev --host 127.0.0.1 --port %d --strictPort",
+				MailPackage, port(domain.MailRoomService)),
 			Env: nodeEnv(),
 		})
 	}
@@ -140,47 +161,71 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		out = append(out, langy)
 	}
 	out = append(out, Child{
-		// green, not red: workers are a healthy background lane, and a red
-		// prefix reads as an error even on ordinary info logs. Red (palette[5])
-		// is reserved for genuine failures, so no lane label uses it —
-		// TestNoLaneIsRed pins that.
+		// green, not red: the backend is a healthy lane, and a red prefix reads
+		// as an error even on ordinary info logs. Red (palette[5]) is reserved
+		// for genuine failures, so no lane label uses it — TestNoLaneIsRed pins
+		// that.
 		//
-		// Unconditional: the background worker is its own application now
-		// (apps/worker), so there is no in-process mode left to choose and
-		// nothing reads WORKERS_IN_PROCESS or START_WORKERS. Every stack runs
-		// the three Node lanes — a stack that quietly did no background
-		// processing would look identical to a healthy one until a job was
-		// expected to have run.
-		Name: "workers", Dir: repoDir, Color: palette[0], LogPath: logPath("workers"),
-		Shell: "pnpm -s --filter " + WorkerPackage + " dev",
+		// Unconditional, and one lane: locally the API application and the
+		// worker application share a process (ADR-004, amendment 2026-09-07).
+		// It is a launcher, not a process role — each application still parses
+		// its own configuration and composes its own graph, and nothing reads
+		// WORKERS_IN_PROCESS or START_WORKERS. Production still deploys them
+		// separately.
+		Name: BackendLane, Dir: repoDir, Color: palette[0], LogPath: logPath(BackendLane),
+		Shell: "pnpm -s --filter " + BackendPackage + " dev",
 		Env:   nodeEnv(),
 	})
 	return out
 }
 
-// The three Node applications a stack supervises, by workspace package name.
-// planChildren runs each with `pnpm --filter <pkg> dev` from the workspace
-// root, so the lane never depends on a path staying where it is.
+// The Node lanes a stack supervises, by workspace package name. planChildren
+// runs each with `pnpm --filter <pkg> dev` from the workspace root, so the lane
+// never depends on a path staying where it is.
 const (
 	// UIPackage is the browser application — Vite, which serves the routed
-	// app.<slug> hostname and proxies /api to the API lane.
+	// app.<slug> hostname and proxies /api to the backend lane.
 	UIPackage = "@langwatch/ui"
-	// APIPackage is the interactive API process: tRPC, REST, SSE.
-	APIPackage = "@langwatch/platform-api"
-	// WorkerPackage is the background process: queues, schedulers, projections.
+	// BackendPackage is the contributor-only launcher that hosts the API
+	// application and the worker application in one local process. Both
+	// applications keep their own entry points; this only starts them together.
+	BackendPackage = "@langwatch/dev-runtime"
+	// APIPackage and WorkerPackage are the two applications the backend lane
+	// hosts. Locally they share one process; in production each is its own
+	// deployment, started from its own entry point. Named here because that is
+	// what the lane is made of, and because `pnpm --filter <pkg> dev` still runs
+	// either one on its own.
+	APIPackage    = "@langwatch/platform-api"
 	WorkerPackage = "@langwatch/worker"
+)
+
+// The lane names haven supervises, logs and restarts by.
+const (
+	// BackendLane is the API + worker Node process.
+	BackendLane = "backend"
+	// GoLane is the process hosting the Go data-plane services.
+	GoLane = "go"
+)
+
+// The address variable each service in the combined Go process binds. One per
+// service, because SERVER_ADDR cannot name two listeners in one process. They
+// are the same names cmd/service reads.
+const (
+	GatewayAddrEnv = "LANGWATCH_GO_AIGATEWAY_ADDR"
+	NLPAddrEnv     = "LANGWATCH_GO_NLPGO_ADDR"
 )
 
 // The two developer tools a stack can optionally supervise, by workspace
 // package name. They are tools rather than parts of the product — nothing the
 // application does depends on either — so they stay in their own packages and
-// haven only runs them for a worktree that asked (`haven up +storybook +mail`).
+// haven only runs them for a worktree that asked (`haven up +design-system
+// +mail-room`).
 const (
 	// DesignSystemPackage owns the component workshop (Storybook), routed at
-	// design.<slug>.
+	// design-system.<slug>.
 	DesignSystemPackage = "@langwatch/design-system"
 	// MailPackage owns the studio that previews every transactional message,
-	// routed at mail.<slug>. Its `dev` script is the studio's Vite server.
+	// routed at mail-room.<slug>. Its `dev` script is the studio's Vite server.
 	MailPackage = "@langwatch/mail"
 )
 

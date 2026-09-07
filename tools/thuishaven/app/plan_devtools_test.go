@@ -13,8 +13,8 @@ func devToolsPlan(t *testing.T, sel domain.Selection) []Child {
 	t.Helper()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "test", Services: []domain.Service{
-		{Name: domain.StorybookService, Port: 46006},
-		{Name: domain.MailService, Port: 45566},
+		{Name: domain.DesignSystemService, Port: 46006},
+		{Name: domain.MailRoomService, Port: 45566},
 	}}
 	return o.planChildren(st, PlanOptions{Selection: sel}, t.TempDir(), "")
 }
@@ -31,7 +31,7 @@ func findChild(children []Child, name string) (Child, bool) {
 // @scenario "The developer tools are off until a worktree asks for them"
 func TestDeveloperToolLanesAreNotPlannedByDefault(t *testing.T) {
 	children := devToolsPlan(t, domain.DefaultSelection())
-	for _, lane := range []string{"storybook", "mail"} {
+	for _, lane := range []string{"design-system", "mail-room"} {
 		if _, ok := findChild(children, lane); ok {
 			t.Errorf("the %q lane was planned for a worktree that never asked for it", lane)
 		}
@@ -46,29 +46,29 @@ func TestDeveloperToolLanesAreNotPlannedByDefault(t *testing.T) {
 // @scenario "Adding both developer tools is one command and it sticks"
 func TestDeveloperToolLanesRunTheirOwnPackageOnTheAllocatedPort(t *testing.T) {
 	sel := domain.DefaultSelection()
-	sel.Storybook, sel.Mail = true, true
+	sel.DesignSystem, sel.MailRoom = true, true
 	children := devToolsPlan(t, sel)
 
 	t.Run("when the Storybook lane is selected", func(t *testing.T) {
-		child, ok := findChild(children, "storybook")
+		child, ok := findChild(children, "design-system")
 		if !ok {
-			t.Fatal("no storybook lane was planned for a selection that asked for one")
+			t.Fatal("no design-system lane was planned for a selection that asked for one")
 		}
 		for _, want := range []string{DesignSystemPackage, "storybook", "--port 46006", "--ci"} {
 			if !strings.Contains(child.Shell, want) {
-				t.Errorf("storybook lane runs %q, want %q in it", child.Shell, want)
+				t.Errorf("design-system lane runs %q, want %q in it", child.Shell, want)
 			}
 		}
 	})
 
 	t.Run("when the mail studio lane is selected", func(t *testing.T) {
-		child, ok := findChild(children, "mail")
+		child, ok := findChild(children, "mail-room")
 		if !ok {
-			t.Fatal("no mail lane was planned for a selection that asked for one")
+			t.Fatal("no mail-room lane was planned for a selection that asked for one")
 		}
 		for _, want := range []string{MailPackage, "dev", "--port 45566", "--strictPort"} {
 			if !strings.Contains(child.Shell, want) {
-				t.Errorf("mail lane runs %q, want %q in it", child.Shell, want)
+				t.Errorf("mail-room lane runs %q, want %q in it", child.Shell, want)
 			}
 		}
 	})
@@ -80,10 +80,10 @@ func TestDeveloperToolLanesRunTheirOwnPackageOnTheAllocatedPort(t *testing.T) {
 // @scenario "Adding both developer tools is one command and it sticks"
 func TestDeveloperToolLanesCarryTheStackEnvironment(t *testing.T) {
 	sel := domain.DefaultSelection()
-	sel.Storybook, sel.Mail = true, true
+	sel.DesignSystem, sel.MailRoom = true, true
 	children := devToolsPlan(t, sel)
 
-	for _, lane := range []string{"storybook", "mail"} {
+	for _, lane := range []string{"design-system", "mail-room"} {
 		child, ok := findChild(children, lane)
 		if !ok {
 			t.Fatalf("no %q lane was planned", lane)
@@ -97,20 +97,20 @@ func TestDeveloperToolLanesCarryTheStackEnvironment(t *testing.T) {
 	}
 }
 
-// A stack that planned two of the three Node lanes boots, serves pages and
-// quietly processes no jobs — so a developer tool must never be mistaken for
-// one. Selecting both leaves ui, api and workers exactly as they were.
+// A stack that planned one of the two Node lanes boots and serves pages while
+// quietly processing no jobs — so a developer tool must never be mistaken for
+// one. Selecting both leaves ui and backend exactly as they were.
 //
 // @scenario "A developer tool is not one of the three Node lanes"
 func TestDeveloperToolsDoNotDisturbTheThreeNodeLanes(t *testing.T) {
 	sel := domain.DefaultSelection()
-	sel.Storybook, sel.Mail = true, true
+	sel.DesignSystem, sel.MailRoom = true, true
 	children := devToolsPlan(t, sel)
 
-	for lane, pkg := range map[string]string{"ui": UIPackage, "api": APIPackage, "workers": WorkerPackage} {
+	for lane, pkg := range map[string]string{"ui": UIPackage, BackendLane: BackendPackage} {
 		child, ok := findChild(children, lane)
 		if !ok {
-			t.Fatalf("no %q lane was planned; every stack runs all three", lane)
+			t.Fatalf("no %q lane was planned; every stack runs both", lane)
 		}
 		if !strings.Contains(child.Shell, pkg) {
 			t.Errorf("%s lane runs %q, want it to filter %s", lane, child.Shell, pkg)

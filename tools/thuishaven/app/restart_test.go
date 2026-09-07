@@ -32,7 +32,8 @@ func restartOrch(store *fakeStore, sys *fakeSystem) *Orchestrator {
 
 // @scenario "Restarting one service bounces only that service"
 // @scenario "Restarting with no service named bounces every supervised child"
-// @scenario "Bouncing the workers lane touches only its own process group"
+// @scenario "Bouncing the backend lane touches only its own process group"
+// @scenario "The Go data-plane services are restarted as one lane"
 func TestRestart(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
@@ -52,23 +53,26 @@ func TestRestart(t *testing.T) {
 	}
 
 	t.Run("given a live stack", func(t *testing.T) {
+		// gateway and nlp share one process, so they are offered as the one `go`
+		// lane rather than two names that would each take the other down without
+		// saying so.
 		t.Run("when restarting one service, it kills only that service's group", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, "gateway", false); err != nil {
+			if err := o.Restart(ctx, params, GoLane, false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 101 {
-				t.Errorf("only gateway's group should be terminated, got %v", sys.groupTerminated)
+				t.Errorf("only the go lane's group should be terminated, got %v", sys.groupTerminated)
 			}
 		})
 
-		t.Run("when restarting the api, it resolves the API backend port", func(t *testing.T) {
+		t.Run("when restarting the backend, it resolves the API port", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, "api", false); err != nil {
+			if err := o.Restart(ctx, params, BackendLane, false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 102 {
-				t.Errorf("api backend group should be terminated, got %v", sys.groupTerminated)
+				t.Errorf("backend group should be terminated, got %v", sys.groupTerminated)
 			}
 		})
 
@@ -77,8 +81,10 @@ func TestRestart(t *testing.T) {
 			if err := o.Restart(ctx, params, "", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
-			// app, gateway, api, workers — NOT the fallback nlp, NOT clickhouse.
-			want := map[int]bool{100: true, 101: true, 102: true, 103: true}
+			// ui, go, backend — NOT the fallback nlp, NOT clickhouse. The
+			// worker's metrics port is inside the backend process, so it is not
+			// a target of its own.
+			want := map[int]bool{100: true, 101: true, 102: true}
 			if len(sys.groupTerminated) != len(want) {
 				t.Fatalf("expected %d groups terminated, got %v", len(want), sys.groupTerminated)
 			}
@@ -90,7 +96,7 @@ func TestRestart(t *testing.T) {
 		})
 
 		t.Run("when naming an unknown or shared service, it refuses with the restartable list", func(t *testing.T) {
-			for _, name := range []string{"clickhouse", "nlp", "bogus"} {
+			for _, name := range []string{"clickhouse", "nlp", "api", "workers", "bogus"} {
 				_, sys, o := newFixture()
 				if err := o.Restart(ctx, params, name, false); err == nil {
 					t.Errorf("Restart(%q) should refuse", name)
@@ -113,28 +119,27 @@ func TestRestart(t *testing.T) {
 			}
 		})
 
-		// The three Node lanes are three processes, so each holds its own port and
-		// its own group. `workers` is always a target, and bouncing it can never
-		// reach the API's group — which is exactly what it did while the two
-		// shared a process.
-		t.Run("when `workers` is named, only the workers' own group is bounced", func(t *testing.T) {
+		// The API and the worker share the backend process locally, so `backend`
+		// is the one name that bounces both, and it can never reach the ui lane's
+		// group or the go lane's.
+		t.Run("when `backend` is named, only the backend's own group is bounced", func(t *testing.T) {
 			store, sys, o := newFixture()
-			if err := o.Restart(ctx, params, "workers", false); err != nil {
-				t.Fatalf("Restart(workers): %v", err)
+			if err := o.Restart(ctx, params, BackendLane, false); err != nil {
+				t.Fatalf("Restart(backend): %v", err)
 			}
 			_ = store
-			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 103 {
-				t.Errorf("expected only the workers group (pid 103) bounced, got %v", sys.groupTerminated)
+			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 102 {
+				t.Errorf("expected only the backend group (pid 102) bounced, got %v", sys.groupTerminated)
 			}
 		})
 
-		t.Run("when nothing is named, all three Node lanes are bounced", func(t *testing.T) {
+		t.Run("when nothing is named, both Node lanes and the go lane are bounced", func(t *testing.T) {
 			_, sys, o := newFixture()
 			if err := o.Restart(ctx, params, "", false); err != nil {
 				t.Fatalf("Restart(all): %v", err)
 			}
-			// ui (9000), gateway (9001), api (9100), workers (9200).
-			want := map[int]bool{100: true, 101: true, 102: true, 103: true}
+			// ui (9000), go (9001), backend (9100).
+			want := map[int]bool{100: true, 101: true, 102: true}
 			for _, pid := range sys.groupTerminated {
 				if !want[pid] {
 					t.Errorf("unexpected group %d bounced, got %v", pid, sys.groupTerminated)
