@@ -139,7 +139,8 @@ export function promoteCard({
   for (const probe of probes) {
     if (probe.card === nominal) continue;
     if (best && probe.specificity <= best.specificity) continue;
-    if (!probe.schema.safeParse(payload).success) continue;
+    const parseSucceeded = probe.schema.safeParse(payload).success;
+    if (!parseSucceeded) continue;
     best = probe;
   }
   return best?.card ?? null;
@@ -437,7 +438,8 @@ export const asJsonDocument = (output: unknown): unknown | null => {
   if (typeof output !== "string") return null;
 
   const trimmed = output.trim();
-  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+  const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+  if (!looksLikeJson) return null;
 
   try {
     return JSON.parse(trimmed) as unknown;

@@ -453,7 +453,9 @@ export class JoinRequestsService {
       resolvedBy,
     });
 
-    if (await this.deps.membership.isMember({ userId, organizationId })) {
+    const membership = this.deps.membership;
+    const isAlreadyMember = await membership.isMember({ userId, organizationId });
+    if (isAlreadyMember) {
       logger.info(
         { joinRequestId, organizationId },
         "join request approved for somebody who was already a member; no second membership attached",

@@ -343,7 +343,8 @@ class MemoryTeams extends TeamRepository {
   }
   getOrganizationMembers(input: { userIds: string[]; activeOnly?: boolean }): Promise<string[]> {
     this.organizationMemberReads += 1;
-    if ((!this.member || (input.activeOnly && !this.activeMember)) && input.userIds[0]) {
+    const isNotAnActiveMember = !this.member || (input.activeOnly && !this.activeMember);
+    if (isNotAnActiveMember && input.userIds[0]) {
       return Promise.reject(new UserNotInOrganizationError(input.userIds[0]));
     }
     return Promise.resolve(input.userIds);

@@ -179,7 +179,8 @@ export class LangyCredentialService {
     session: LangyCredentialSession;
     repositoryFullName?: string;
   }): Promise<{ githubToken?: string; githubLogin?: string; githubRepoScopeKey?: string }> {
-    if (!this.deps.github.enabled) {
+    const github = this.deps.github;
+    if (!github.enabled) {
       return {};
     }
 

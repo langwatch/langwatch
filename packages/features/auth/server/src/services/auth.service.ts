@@ -21,6 +21,15 @@ const tokenCacheKey = (token: string) => `${CACHE_PREFIX}${token}`;
 
 type CachedSession = { token: string; expiresAt: number };
 
+function isCachedSessionShape(item: unknown): item is CachedSession {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    typeof (item as Partial<CachedSession>).token === "string" &&
+    typeof (item as Partial<CachedSession>).expiresAt === "number"
+  );
+}
+
 /** One process-owned service for browser session reads and revocation. */
 export class AuthService extends AuthCapability {
   static create(options: {
@@ -76,10 +85,10 @@ export class AuthService extends AuthCapability {
     });
 
     const impersonation = browserSessionImpersonationSchema.safeParse(stored.impersonating);
-    if (
+    const impersonationExpired =
       !impersonation.success ||
-      Temporal.Instant.compare(fromDate(impersonation.data.expires), this.options.clock.now()) <= 0
-    ) {
+      Temporal.Instant.compare(fromDate(impersonation.data.expires), this.options.clock.now()) <= 0;
+    if (impersonationExpired) {
       return session;
     }
 
@@ -199,12 +208,7 @@ export class AuthService extends AuthCapability {
       }
 
       return parsed.flatMap((item): CachedSession[] => {
-        if (
-          typeof item === "object" &&
-          item !== null &&
-          typeof item.token === "string" &&
-          typeof item.expiresAt === "number"
-        ) {
+        if (isCachedSessionShape(item)) {
           return [{ token: item.token, expiresAt: item.expiresAt }];
         }
 

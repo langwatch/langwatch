@@ -49,6 +49,9 @@ export class EvaluationExecutionOutcomeService {
     prepared: PreparedEvaluation,
   ): Promise<EvaluationProcessingEvent[]> {
     const operationKey = `${data.tenantId}:${data.evaluationId}:execution`;
+    const evaluatorConfig = prepared.monitor.evaluator;
+    const workflowId =
+      evaluatorConfig?.type === "workflow" ? evaluatorConfig.workflowId : undefined;
     const execution = await this.deps.executionReceipt.execute({
       tenantId: data.tenantId,
       evaluationId: data.evaluationId,
@@ -60,10 +63,7 @@ export class EvaluationExecutionOutcomeService {
         settings: prepared.settings ?? null,
         mappings: prepared.monitor.mappings ?? null,
         level: prepared.monitor.level === "thread" ? "thread" : "trace",
-        workflowId:
-          prepared.monitor.evaluator?.type === "workflow"
-            ? prepared.monitor.evaluator.workflowId
-            : undefined,
+        workflowId,
         idempotencyKey: operationKey,
       },
       cost: {

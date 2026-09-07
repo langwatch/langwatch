@@ -31,12 +31,14 @@ import { describe, expect, it } from "vitest";
 // package directory and silently wrong the moment the suite moved.
 const REPO_ROOT = (() => {
   let directory = path.dirname(fileURLToPath(import.meta.url));
-  while (!existsSync(path.join(directory, "charts", "langwatch"))) {
+  let hasChartsMarker = existsSync(path.join(directory, "charts", "langwatch"));
+  while (!hasChartsMarker) {
     const parent = path.dirname(directory);
     if (parent === directory) {
       throw new Error("could not find the repository root holding charts/langwatch");
     }
     directory = parent;
+    hasChartsMarker = existsSync(path.join(directory, "charts", "langwatch"));
   }
   return directory;
 })();

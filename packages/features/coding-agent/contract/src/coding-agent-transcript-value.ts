@@ -36,7 +36,8 @@ export function parseMaybeJson(raw: string | null): unknown {
   if (raw === null) return null;
 
   const trimmed = raw.trim();
-  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return raw;
+  const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+  if (!looksLikeJson) return raw;
 
   try {
     return JSON.parse(trimmed);

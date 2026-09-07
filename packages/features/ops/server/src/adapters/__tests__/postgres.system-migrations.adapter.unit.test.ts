@@ -42,13 +42,13 @@ function stubDatabase({
 }) {
   const findFirst = vi.fn(
     async (args: { where: { userId: string; organizationId: { in: string[] } } }) =>
-      guardOrganizationId({ model: "OrganizationUser", action: "findFirst", args }, async () =>
-        (memberships[args.where.userId] ?? []).some((organizationId) =>
-          args.where.organizationId.in.includes(organizationId),
-        )
-          ? { userId: args.where.userId }
-          : null,
-      ),
+      guardOrganizationId({ model: "OrganizationUser", action: "findFirst", args }, async () => {
+        const allowedOrganizationIds = args.where.organizationId.in;
+        const isMember = (memberships[args.where.userId] ?? []).some((organizationId) =>
+          allowedOrganizationIds.includes(organizationId),
+        );
+        return isMember ? { userId: args.where.userId } : null;
+      }),
   );
   const findMany = vi.fn().mockResolvedValue([]);
   return {

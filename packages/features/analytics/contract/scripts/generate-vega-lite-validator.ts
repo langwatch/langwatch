@@ -190,6 +190,8 @@ function main(): void {
 // `tsx scripts/generate-vega-lite-validator.ts` writes the files; the drift
 // guard imports the exports above and writes nothing.
 const entryPoint = process.argv[1];
-if (entryPoint !== undefined && fileURLToPath(import.meta.url) === resolve(entryPoint)) {
+const isDirectInvocation =
+  entryPoint !== undefined && fileURLToPath(import.meta.url) === resolve(entryPoint);
+if (isDirectInvocation) {
   main();
 }

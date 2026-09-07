@@ -57,12 +57,9 @@ class FakeWorkflowRepository extends WorkflowRepository {
     includeArchived?: boolean;
   }): Promise<WorkflowWithVersion | null> {
     const value = this.workflows.get(input.id);
-    if (
-      !value ||
-      value.projectId !== input.projectId ||
-      (!input.includeArchived && value.archivedAt)
-    )
-      return null;
+    const isUnavailable =
+      !value || value.projectId !== input.projectId || (!input.includeArchived && value.archivedAt);
+    if (isUnavailable) return null;
     const current = value.currentVersionId ? this.versions.get(value.currentVersionId) : null;
     return {
       ...value,

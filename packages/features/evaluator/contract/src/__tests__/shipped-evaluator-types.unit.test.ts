@@ -14,12 +14,14 @@ import { AVAILABLE_EVALUATORS } from "../index.ts";
 // one package directory and silently wrong the moment the suite moved.
 const repoRoot = (() => {
   let directory = path.dirname(fileURLToPath(import.meta.url));
-  while (!fs.existsSync(path.join(directory, "pnpm-workspace.yaml"))) {
+  let hasWorkspaceMarker = fs.existsSync(path.join(directory, "pnpm-workspace.yaml"));
+  while (!hasWorkspaceMarker) {
     const parent = path.dirname(directory);
     if (parent === directory) {
       throw new Error("could not find the repository root holding pnpm-workspace.yaml");
     }
     directory = parent;
+    hasWorkspaceMarker = fs.existsSync(path.join(directory, "pnpm-workspace.yaml"));
   }
   return directory;
 })();
@@ -37,7 +39,8 @@ function shippedInstructionFiles(): string[] {
 
   const skillsRoot = path.join(repoRoot, "skills");
   for (const entry of fs.readdirSync(skillsRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.name.startsWith("_")) continue;
+    const isHiddenSkillDir = !entry.isDirectory() || entry.name.startsWith("_");
+    if (isHiddenSkillDir) continue;
     const source = path.join(skillsRoot, entry.name, "SKILL.mdx");
     if (fs.existsSync(source)) files.push(source);
   }

@@ -10,10 +10,20 @@ import {
   type ApiKeyUser,
   HIDDEN_SYSTEM_KEY_NAMES,
 } from "@langwatch/api-key-contract";
+import type { AuthzCustomRole } from "@langwatch/authz-contract";
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
+
+function toApiKeyRoleSummary(role: AuthzCustomRole): ApiKeyRoleSummary {
+  const permissionsArray = Array.isArray(role.permissions) ? role.permissions : [];
+  const isStringPermission = (permission: unknown): permission is string =>
+    typeof permission === "string";
+  const permissions = permissionsArray.every(isStringPermission) ? permissionsArray : [];
+
+  return { id: role.id, name: role.name, permissions };
+}
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
@@ -52,10 +62,10 @@ export class ApiKeyCatalogService {
     callerCanReadAnyKey: boolean;
   }): Promise<ApiKeyDetail> {
     const row = await this.getInOrganization(input.id, input.organizationId);
-    if (
+    const isHiddenFromCaller =
       SYSTEM_NAMES.has(row.name) ||
-      (!input.callerCanReadAnyKey && !isApiKeyVisibleToMember(row, input.callerUserId))
-    ) {
+      (!input.callerCanReadAnyKey && !isApiKeyVisibleToMember(row, input.callerUserId));
+    if (isHiddenFromCaller) {
       throw new ApiKeyNotFoundError(input.id);
     }
 
@@ -174,19 +184,7 @@ export class ApiKeyCatalogService {
 
     const roles = await this.options.authz.listUserCreatedRoles({ organizationId });
 
-    return roles
-      .filter((role) => ids.includes(role.id))
-      .map((role) => ({
-        id: role.id,
-        name: role.name,
-        permissions:
-          Array.isArray(role.permissions) &&
-          role.permissions.every(
-            (permission): permission is string => typeof permission === "string",
-          )
-            ? role.permissions
-            : [],
-      }));
+    return roles.filter((role) => ids.includes(role.id)).map(toApiKeyRoleSummary);
   }
 
   private async getInOrganization(id: string, organizationId: string): Promise<StoredApiKey> {

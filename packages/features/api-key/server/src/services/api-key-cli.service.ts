@@ -13,11 +13,26 @@ import {
   type CliKeyScopeSummary,
   type CliKeySelection,
 } from "@langwatch/api-key-contract";
-import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 import { Temporal, fromDate, type Instant } from "@langwatch/time";
+
+function isCliLoginKeyToRevoke(
+  key: StoredApiKey,
+  input: { deviceLabel: string; exceptApiKeyId?: string; createdBefore?: Instant },
+): boolean {
+  const isCliLoginKey = key.name.startsWith("CLI login - ");
+  const matchesDevice = key.createdByDeviceLabel === input.deviceLabel;
+  const isExempted = key.id === input.exceptApiKeyId;
+  const isTooRecent = Boolean(
+    input.createdBefore &&
+    Temporal.Instant.compare(fromDate(key.createdAt), input.createdBefore) >= 0,
+  );
+
+  return isCliLoginKey && matchesDevice && !isExempted && !isTooRecent;
+}
 
 export class ApiKeyCliService {
   static create(
@@ -199,13 +214,7 @@ export class ApiKeyCliService {
       organizationId: input.organizationId,
     });
     for (const key of keys) {
-      if (
-        !key.name.startsWith("CLI login - ") ||
-        key.createdByDeviceLabel !== input.deviceLabel ||
-        key.id === input.exceptApiKeyId ||
-        (input.createdBefore &&
-          Temporal.Instant.compare(fromDate(key.createdAt), input.createdBefore) >= 0)
-      ) {
+      if (!isCliLoginKeyToRevoke(key, input)) {
         continue;
       }
 

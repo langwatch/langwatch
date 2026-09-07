@@ -200,7 +200,8 @@ export class LangyCliEnvelopeService {
    * are shells and where a command hides in a tool input.
    */
   tryShellCommandOf(frame: LangyToolFrame): string | null {
-    if (!SHELL_TOOL_NAMES.has(frame.name.trim().toLowerCase())) {
+    const normalizedName = frame.name.trim().toLowerCase();
+    if (!SHELL_TOOL_NAMES.has(normalizedName)) {
       return null;
     }
 

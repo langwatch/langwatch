@@ -116,16 +116,19 @@ class GithubHttpFixture {
         { status: 201 },
       );
     }
-    if (apiPath.toLowerCase() === `/repos/acme-${namespace}/widgets/pulls`.toLowerCase()) {
+    const lowercasedPath = apiPath.toLowerCase();
+    const isListingRequest =
+      lowercasedPath === `/repos/acme-${namespace}/widgets/pulls`.toLowerCase();
+    if (isListingRequest) {
       this.listingUrls.push(url.toString());
       return await this.pullResponse();
     }
-    if (
-      apiPath.toLowerCase() ===
-        `/repos/acme-${namespace}/widgets/pulls/${this.pull?.number ?? ""}`.toLowerCase() &&
-      this.pull
-    ) {
-      return Response.json(githubApiPullRequest(this.pull));
+    const pull = this.pull;
+    const isSinglePullRequest =
+      pull &&
+      lowercasedPath === `/repos/acme-${namespace}/widgets/pulls/${pull.number}`.toLowerCase();
+    if (isSinglePullRequest) {
+      return Response.json(githubApiPullRequest(pull));
     }
     return new Response("not found", { status: 404 });
   }

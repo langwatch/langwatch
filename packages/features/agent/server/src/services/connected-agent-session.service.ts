@@ -119,7 +119,8 @@ export class AgentSessionService {
    * instance held by another.
    */
   tryReplicaRefusal(): AgentRegisterRefusedError | null {
-    if (this.runtime.store.shared || this.replicaCount <= 1) {
+    const noReplicaConflictPossible = this.runtime.store.shared || this.replicaCount <= 1;
+    if (noReplicaConflictPossible) {
       return null;
     }
 
@@ -135,7 +136,8 @@ export class AgentSessionService {
     projectId,
   }: ConnectCredentials): Promise<ResolvedConnectCredential> {
     const header = authorization ?? "";
-    const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
+    const isBearerHeader = header.toLowerCase().startsWith("bearer ");
+    const token = isBearerHeader ? header.slice(7).trim() : "";
     if (!token) {
       throw new AgentRegisterRefusedError({
         reason: "api_key_invalid",

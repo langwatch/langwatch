@@ -49,7 +49,8 @@ describe.skipIf(!hasRedis)("operator recovery clears every per-group counter", (
   async function survivingCounters(): Promise<string[]> {
     const present: string[] = [];
     for (const suffix of counterSuffixes) {
-      if ((await redis.exists(counterKey(suffix))) === 1) present.push(suffix);
+      const exists = (await redis.exists(counterKey(suffix))) === 1;
+      if (exists) present.push(suffix);
     }
     return present;
   }

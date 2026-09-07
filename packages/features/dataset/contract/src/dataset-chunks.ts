@@ -9,7 +9,8 @@ export const chunkKey = (projectId: string, datasetId: string, index: number): s
  */
 export const assertNoTraversal = (...parts: string[]): void => {
   for (const part of parts) {
-    if (part.includes("..") || part.includes("/")) {
+    const hasTraversalMarker = part.includes("..") || part.includes("/");
+    if (hasTraversalMarker) {
       throw new Error("Invalid id: path traversal attempt detected");
     }
   }
@@ -21,7 +22,9 @@ export const assertNoTraversal = (...parts: string[]): void => {
  */
 export const assertKeyWithinProject = (projectId: string, key: string): void => {
   assertNoTraversal(projectId);
-  if (key.includes("..") || key.startsWith("/") || !key.startsWith(`staging/${projectId}/`)) {
+  const isOutsideProjectStaging =
+    key.includes("..") || key.startsWith("/") || !key.startsWith(`staging/${projectId}/`);
+  if (isOutsideProjectStaging) {
     throw new Error("Invalid key: path traversal attempt detected");
   }
 };

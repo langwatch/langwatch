@@ -32,13 +32,13 @@ export class EvaluatorAvailabilityService {
     evaluatorType: string;
     environment: EvaluatorInstallEnvironment;
   }): EvaluatorUnavailability | undefined {
-    if (
+    const presidioDisabled =
       input.evaluatorType.startsWith("presidio/") &&
       EvaluatorAvailabilityService.explicitlyDisabled({
         environment: input.environment,
         variable: PRESIDIO_ENABLE_ENV_VAR,
-      })
-    ) {
+      });
+    if (presidioDisabled) {
       return {
         reason: "PII detection is not installed on this server.",
         howToEnable:
@@ -47,13 +47,13 @@ export class EvaluatorAvailabilityService {
       };
     }
 
-    if (
+    const linguaDisabled =
       input.evaluatorType.startsWith("lingua/") &&
       EvaluatorAvailabilityService.explicitlyDisabled({
         environment: input.environment,
         variable: LINGUA_ENABLE_ENV_VAR,
-      })
-    ) {
+      });
+    if (linguaDisabled) {
       return {
         reason: "Language detection is not installed on this server.",
         howToEnable:

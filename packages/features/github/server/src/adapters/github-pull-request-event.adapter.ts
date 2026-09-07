@@ -49,7 +49,8 @@ export class GithubPullRequestEventAdapter extends GithubPullRequestEventPort {
     if (installation?.id == null || !headRepository) {
       return null;
     }
-    if (headRepository.toLowerCase() !== repository.full_name.toLowerCase()) {
+    const repositoryFullName = repository.full_name.toLowerCase();
+    if (headRepository.toLowerCase() !== repositoryFullName) {
       return null;
     }
 

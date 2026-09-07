@@ -92,7 +92,8 @@ export function backfillParityDiffs({
   }
   const expectedIds = new Set(expected.map((expectation) => expectation.identifierId));
   for (const row of rows) {
-    if (expectedIds.has(row.id) || !isLiveIdentifierState(row.state)) continue;
+    const isExpectedOrDead = expectedIds.has(row.id) || !isLiveIdentifierState(row.state);
+    if (isExpectedOrDead) continue;
     diffs.push({
       kind: "surplus_row",
       identifierId: row.id,

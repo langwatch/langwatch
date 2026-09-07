@@ -149,7 +149,8 @@ export class BugReportTrpcApi {
     const requireStaff = (ctx: BugReportTrpcContext): StaffIdentity => {
       const user = ctx.session?.user;
       const staff = user?.impersonator ?? user;
-      if (!staff || !ctx.app.ops.isAdmin(staff)) {
+      const ops = ctx.app.ops;
+      if (!staff || !ops.isAdmin(staff)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
       }
       return staff;

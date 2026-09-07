@@ -29,7 +29,8 @@ export const reportScheduleSchema = z
       return;
     }
 
-    if (cron.trim().split(/\s+/).length !== CRON_FIELD_COUNT) {
+    const cronFieldCount = cron.trim().split(/\s+/).length;
+    if (cronFieldCount !== CRON_FIELD_COUNT) {
       reject(
         "cron",
         `A report schedule is a 5-field cron expression (minute hour day-of-month month day-of-week), for example "0 9 * * 1".`,

@@ -5,6 +5,15 @@ type ProviderWithCustomModels = {
   customModels?: CustomModelEntry[] | null;
 };
 
+const ALWAYS_PASSED_THROUGH_PARAMS = new Set([
+  "model",
+  "messages",
+  "tools",
+  "response_format",
+  "stream",
+  "litellm_params",
+]);
+
 /**
  * Resolve the set of sampling parameters a model accepts.
  *
@@ -73,14 +82,8 @@ export function filterUnsupportedSamplingParams<T extends Record<string, unknown
   }
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(params)) {
-    if (
-      k === "model" ||
-      k === "messages" ||
-      k === "tools" ||
-      k === "response_format" ||
-      k === "stream" ||
-      k === "litellm_params"
-    ) {
+    const isAlwaysPassedThrough = ALWAYS_PASSED_THROUGH_PARAMS.has(k);
+    if (isAlwaysPassedThrough) {
       out[k] = v;
       continue;
     }

@@ -18,7 +18,8 @@ export interface ClassifiedPrompt {
 
 /** Split injected leading notices from the human's prompt text. */
 export function classifyPromptText(text: string): ClassifiedPrompt {
-  if (text.trimStart().startsWith(SYSTEM_NOTIFICATION_MARKER)) {
+  const startsWithSystemMarker = text.trimStart().startsWith(SYSTEM_NOTIFICATION_MARKER);
+  if (startsWithSystemMarker) {
     return {
       notices: [{ label: summaryOf(text) ?? "system notification", body: text }],
       remainder: null,

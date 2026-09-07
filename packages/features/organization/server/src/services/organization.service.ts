@@ -324,7 +324,10 @@ export class OrganizationService extends OrganizationServiceContract {
       organizationId: parsed.organizationId,
       teamIds: [team.id],
     });
-    if (!(bindings.get(team.id) ?? []).some(({ userId }) => userId === parsed.userId)) {
+    const isBoundToTeam = (bindings.get(team.id) ?? []).some(
+      ({ userId }) => userId === parsed.userId,
+    );
+    if (!isBoundToTeam) {
       throw new TeamNotFoundError(team.id);
     }
 

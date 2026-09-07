@@ -72,7 +72,8 @@ class FakeRedis {
   }[] = [];
 
   async set(key: string, value: string, ...options: (string | number)[]): Promise<string | null> {
-    if (options.includes("NX") && this.strings.has(key)) return null;
+    const nxRefused = options.includes("NX") && this.strings.has(key);
+    if (nxRefused) return null;
     this.strings.set(key, value);
     const pxIndex = options.indexOf("PX");
     if (pxIndex >= 0) {

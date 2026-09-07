@@ -104,7 +104,8 @@ if (isMain) {
     main: () => {
       // The published @langwatch/server artifact excludes the skills tree,
       // so the committed bodies are the source there.
-      if (!fs.existsSync(SKILLS_DIR) && fs.existsSync(OUT)) {
+      const shouldKeepCommittedBodies = !fs.existsSync(SKILLS_DIR) && fs.existsSync(OUT);
+      if (shouldKeepCommittedBodies) {
         console.log(
           "skills/_compiled/native not in this tree (published artifact), keeping the committed setup skill bodies.",
         );

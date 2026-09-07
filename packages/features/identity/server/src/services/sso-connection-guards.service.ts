@@ -110,11 +110,11 @@ export class SsoConnectionGuardsService {
   async claimDomain(data: ClaimDomainCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, CLAIM_DOMAIN_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
-    if (
+    const domainAlreadyKnown =
       state.claimedDomains.includes(domain) ||
       state.approvedDomains.includes(domain) ||
-      state.verifiedDomains.includes(domain)
-    ) {
+      state.verifiedDomains.includes(domain);
+    if (domainAlreadyKnown) {
       return [];
     }
 

@@ -66,7 +66,8 @@ export function reduceIdentity({
       // which is what stops a partial-window replay leaving a person with no
       // PRIMARY where they had one.
       const promoted = deliver({ heads, identifierIds: [identifierId], fact });
-      if (promoted.identifiers[identifierId]?.state !== "PRIMARY") return heads;
+      const promotedState = promoted.identifiers[identifierId]?.state;
+      if (promotedState !== "PRIMARY") return heads;
       // Every OTHER holder, not only the one the fact names — the sweep a
       // per-identifier fold gives up and `primaryChangeFacts` takes over.
       return deliver({

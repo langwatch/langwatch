@@ -70,11 +70,11 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
    * `storage_not_writable` refusal; rethrow anything else.
    */
   private rethrowWritable(error: unknown): never {
-    if (
+    const isWriteAccessError =
       errorHasProp(error, "code", "EACCES") ||
       errorHasProp(error, "code", "EROFS") ||
-      errorHasProp(error, "code", "EPERM")
-    ) {
+      errorHasProp(error, "code", "EPERM");
+    if (isWriteAccessError) {
       logger.error(
         { root: this.root, error },
         `Dataset storage path "${this.root}" is not writable. Configure object storage (set S3_BUCKET_NAME) or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory.`,

@@ -21,10 +21,12 @@ import { DERIVED_SAFE_CARD_KINDS, langyDerivedCardSchema } from "../derived-safe
  */
 function repoRoot(): string {
   let dir = path.dirname(fileURLToPath(import.meta.url));
-  while (!fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) {
+  let hasWorkspaceMarker = fs.existsSync(path.join(dir, "pnpm-workspace.yaml"));
+  while (!hasWorkspaceMarker) {
     const parent = path.dirname(dir);
     if (parent === dir) throw new Error("no workspace root above this test");
     dir = parent;
+    hasWorkspaceMarker = fs.existsSync(path.join(dir, "pnpm-workspace.yaml"));
   }
   return dir;
 }

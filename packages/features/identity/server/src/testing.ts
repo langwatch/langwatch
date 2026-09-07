@@ -26,8 +26,9 @@ export function inMemoryIdentityUsers({
       return rows.get(userId) ?? null;
     },
     async tryFindUserIdByEmail({ normalizedValue }) {
+      const normalizedTarget = normalizedValue.toLowerCase();
       for (const [userId, email] of rows) {
-        if (email.toLowerCase() === normalizedValue.toLowerCase()) {
+        if (email.toLowerCase() === normalizedTarget) {
           return userId;
         }
       }

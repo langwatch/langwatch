@@ -272,7 +272,8 @@ function createMemoryStateStore({
       strings.set(key, { value, expiresAt: now() + ttlSeconds * 1000 });
     },
     async setIfAbsent(key, value, ttlSeconds) {
-      if (live(strings, key, now) !== null || live(counters, key, now) !== null) {
+      const alreadyLive = live(strings, key, now) !== null || live(counters, key, now) !== null;
+      if (alreadyLive) {
         return false;
       }
       strings.set(key, { value, expiresAt: now() + ttlSeconds * 1000 });

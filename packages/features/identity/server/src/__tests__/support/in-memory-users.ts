@@ -37,8 +37,9 @@ export class InMemoryUsers implements IdentityUsersRepository {
   }: {
     normalizedValue: string;
   }): Promise<string | null> {
+    const normalizedTarget = normalizedValue.toLowerCase();
     for (const [userId, email] of this.emails) {
-      if (email.toLowerCase() === normalizedValue.toLowerCase()) return userId;
+      if (email.toLowerCase() === normalizedTarget) return userId;
     }
     return null;
   }

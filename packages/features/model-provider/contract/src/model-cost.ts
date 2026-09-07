@@ -156,7 +156,8 @@ export const normalizeBedrockModelId = (model: string): string => {
   normalized = normalized.replace(/-v\d+$/i, "");
   normalized = normalized.replace(/^[a-z]{2,}(?:-[a-z0-9]+)*\.(?=[a-z]+\.)/i, "");
   const firstDot = normalized.indexOf(".");
-  if (firstDot > 0 && !normalized.slice(0, firstDot).includes("/")) {
+  const prefixHasNoSlash = firstDot > 0 && !normalized.slice(0, firstDot).includes("/");
+  if (prefixHasNoSlash) {
     normalized = normalized.slice(0, firstDot) + "/" + normalized.slice(firstDot + 1);
   }
   return normalized;

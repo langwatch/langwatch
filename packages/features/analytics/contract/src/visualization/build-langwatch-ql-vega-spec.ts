@@ -134,9 +134,11 @@ export function mergeConfig({
   const merged: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(override)) {
     const existing = merged[key];
+    const existingObject = isPlainObject(existing) ? existing : undefined;
+    const valueObject = isPlainObject(value) ? value : undefined;
     merged[key] =
-      isPlainObject(existing) && isPlainObject(value)
-        ? mergeConfig({ base: existing, override: value })
+      existingObject && valueObject
+        ? mergeConfig({ base: existingObject, override: valueObject })
         : value;
   }
   return merged;

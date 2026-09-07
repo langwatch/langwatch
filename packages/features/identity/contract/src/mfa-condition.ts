@@ -105,7 +105,8 @@ export function secondFactorsIn(amr: readonly string[] | null | undefined): read
   const seen = new Set<string>();
   const factors: Amr[] = [];
   for (const value of amr) {
-    if (!assertsSecondFactor(value) || seen.has(value)) continue;
+    const isNewSecondFactor = assertsSecondFactor(value) && !seen.has(value);
+    if (!isNewSecondFactor) continue;
     seen.add(value);
     factors.push(value as Amr);
   }

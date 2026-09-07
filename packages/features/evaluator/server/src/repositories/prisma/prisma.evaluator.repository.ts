@@ -154,12 +154,11 @@ export class PrismaEvaluatorRepository extends EvaluatorRepository {
         });
         return mapRow(row as unknown as EvaluatorRow);
       } catch (error) {
-        if (
-          !(error instanceof Error) ||
-          !error.message.includes("Unique constraint") ||
-          !error.message.includes("slug")
-        )
-          throw error;
+        const isSlugUniqueConstraint =
+          error instanceof Error &&
+          error.message.includes("Unique constraint") &&
+          error.message.includes("slug");
+        if (!isSlugUniqueConstraint) throw error;
         requestedSlug = generateEvaluatorSlug(input.name);
       }
     }

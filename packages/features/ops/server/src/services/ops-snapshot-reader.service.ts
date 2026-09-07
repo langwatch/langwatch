@@ -58,8 +58,9 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
     computedAt: NonNullable<OpsApiGetBadgeCountsOutput["computedAt"]>;
   } {
     const now = nowInstant().epochMilliseconds;
-    if (this.badgeCache && now - this.badgeCache.computedAt.getTime() < BADGE_CACHE_TTL_MS) {
-      return this.badgeCache;
+    const badgeCache = this.badgeCache;
+    if (badgeCache && now - badgeCache.computedAt.getTime() < BADGE_CACHE_TTL_MS) {
+      return badgeCache;
     }
 
     let blockedCount = 0;

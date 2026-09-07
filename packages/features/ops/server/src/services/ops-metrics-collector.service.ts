@@ -416,8 +416,9 @@ export class OpsMetricsCollectorService {
       blockedCount: totalBlockedCount,
       parkedCount: totalParkedCount,
     });
-    if (this.window.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {
-      this.window.throughputBuffer.shift();
+    const throughputBuffer = this.window.throughputBuffer;
+    if (throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {
+      throughputBuffer.shift();
     }
   }
 

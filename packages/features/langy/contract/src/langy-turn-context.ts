@@ -215,12 +215,10 @@ export function renderLangyTurnContext({
   // with a UI-action manifest: the page the user is on can be driven live. The
   // full catalog stays behind `langwatch ui actions` so this block never grows
   // with it.
-  if (
-    isUiActionSurfaceOpen &&
-    (context.pageContext ?? []).some((chip) =>
-      (LANGY_UI_ACTION_CHIP_KINDS as readonly string[]).includes(chip.kind),
-    )
-  ) {
+  const hasDrivableUiActionChip = (context.pageContext ?? []).some((chip) =>
+    (LANGY_UI_ACTION_CHIP_KINDS as readonly string[]).includes(chip.kind),
+  );
+  if (isUiActionSurfaceOpen && hasDrivableUiActionChip) {
     blocks.push(
       "This page accepts live UI actions: run `langwatch ui actions` to list them, and `langwatch ui call <kind> --payload '<json>'` to drive the page the user is watching.",
     );

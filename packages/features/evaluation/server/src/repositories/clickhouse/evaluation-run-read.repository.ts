@@ -17,6 +17,10 @@ import type {
 import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
+function hasOwnProperty(value: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
 const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 const DEFAULT_SCHEDULED_AT_SLACK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -379,9 +383,7 @@ export class EvaluationRunClickHouseReadRepository {
         label: row.Label,
         details: row.Details,
         error: row.Error,
-        ...(Object.prototype.hasOwnProperty.call(row, "Inputs")
-          ? { inputs: parseObject(row.Inputs) }
-          : {}),
+        ...(hasOwnProperty(row, "Inputs") ? { inputs: parseObject(row.Inputs) } : {}),
         timestamps: {
           scheduledAt: numberOrNull(row.ScheduledAt),
           startedAt: numberOrNull(row.StartedAt),

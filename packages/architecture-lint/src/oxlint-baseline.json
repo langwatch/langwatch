@@ -5046,19 +5046,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/agent/server/src/adapters/connected-agent-state.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/agent/server/src/services/connected-agent-long-poll.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/agent/server/src/services/connected-agent-parameter-spec.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/agent/server/src/services/connected-agent-session.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5066,15 +5054,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/agent/server/src/transport/api-ws/connected-agent-connect.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/agent/web/src/model/connected-agent-rows.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/contract/scripts/generate-vega-lite-validator.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5083,18 +5063,6 @@
     },
     {
       "key": "condition-shape|packages/features/analytics/contract/src/analytics.timeseries.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/contract/src/visualization/build-langwatch-ql-vega-spec.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/contract/src/visualization/lwql-chart-failures.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/contract/src/visualization/scan-langwatch-ql-chart-values.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5130,27 +5098,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/api-key/contract/src/api-key.tokens.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/api-key/server/src/app/api-key.app.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/api-key/server/src/services/api-key-catalog.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/api-key/server/src/services/api-key-cli.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/api-key/server/src/services/api-key-grant-policy.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/api-key/server/src/services/api-key-lifecycle.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5178,19 +5130,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/auth/server/src/services/auth.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/auth/server/src/services/auth0-password.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/auth/server/src/transport/api-rest/auth.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/auth/server/src/transport/better-auth/__tests__/helm-auth-base-url.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5258,35 +5198,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/automation/contract/src/report.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/automation/contract/src/templating/block-kit-allowlist.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/automation/server/src/adapters/slack-web-api.delivery.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/automation/server/src/repositories/prisma/prisma.graph-trigger-sent.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/automation/server/src/services/active-trigger-cache.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/automation/server/src/services/automation-settlement-match-confirmation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/automation/server/src/services/graph-alert-dispatch.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/automation/server/src/services/graph-trigger-alert-delivery.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5335,22 +5251,6 @@
     },
     {
       "key": "condition-shape|packages/features/coding-agent/contract/src/coding-agent-transcript-content.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/coding-agent/contract/src/coding-agent-transcript-value.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/coding-agent/contract/src/injected-notice.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/coding-agent/contract/src/telemetry/coding-agent-normalization.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/coding-agent/server/src/projections/coding-agent-session-span.projection.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5466,35 +5366,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/dataset/contract/src/dataset-chunks.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/dataset/contract/src/dataset-file.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|packages/features/dataset/server/src/adapters/dataset-normalize.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/dataset/server/src/adapters/local.dataset-storage.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/dataset/server/src/services/dataset-chunk.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/dataset/server/src/services/dataset.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/evaluation/server/src/__tests__/helm-langevals-memory.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/evaluation/server/src/repositories/clickhouse/evaluation-run-read.repository.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5506,23 +5382,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/evaluation/server/src/services/evaluation-execution-outcome.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/evaluation/server/src/services/evaluator-availability.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/evaluator/contract/src/__tests__/shipped-evaluator-types.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/evaluator/server/src/repositories/prisma/prisma.evaluator.repository.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5559,10 +5419,6 @@
     },
     {
       "key": "condition-shape|packages/features/evaluator/web/src/ui/sections/evaluations/online-evaluation-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/experiment/contract/src/workbench/actions/transforms/set-cell-value.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5750,26 +5606,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/github/server/src/__tests__/github-pull-request-mapping.persistence.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/github/server/src/adapters/__tests__/github-app-token.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/github/server/src/adapters/github-pull-request-event.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/github/server/src/services/github-branch-demand.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/github/server/src/services/github-branch-mapping.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/github/server/src/transport/api-rest/github.api.ts",
       "measured": "2026-09-06"
     },
@@ -5782,55 +5618,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/identity/contract/src/backfill.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/identity/contract/src/mfa-condition.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/identity/contract/src/reduce.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/identity/server/src/__tests__/support/in-memory-users.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/identity/server/src/adapters/better-auth.identity-storage.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/identity/server/src/intents/identity-events.intent.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/identity/server/src/services/join-requests.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/identity/server/src/services/sso-connection-guards.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/identity/server/src/services/verification-ceremony.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/identity/server/src/testing.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/contract/src/cards/__tests__/prompt-examples.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/langy/contract/src/cards/handled-error.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/contract/src/cards/registry.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5846,15 +5638,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/langy/contract/src/langy-turn-context.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/langy/contract/src/langy.commands.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/server/scripts/generate-setup-skill-bodies.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5870,23 +5654,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/langy/server/src/rules/langy-conversation-title.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/server/src/services/langy-cli-envelope.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/langy/server/src/services/langy-conversation-memory.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/server/src/services/langy-credential.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/server/src/services/langy-turn-settlement-waiter.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5923,22 +5691,6 @@
     },
     {
       "key": "condition-shape|packages/features/model-provider/contract/src/catalog/__tests__/model-catalog-price-coverage.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/model-provider/contract/src/catalog/resolve-supported-parameters.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/model-provider/contract/src/catalog/static-model-costs.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/model-provider/contract/src/model-cost.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/model-provider/contract/src/model-provider-registry.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6014,35 +5766,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/ops/server/src/__tests__/ops-metrics-collector.latency-windows.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/server/src/adapters/__tests__/postgres.system-migrations.adapter.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/ops/server/src/adapters/ops-clickhouse-explain.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/ops/server/src/adapters/ops-worker-contribution.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/ops/server/src/app/ops.app.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/server/src/repositories/redis/__tests__/operator-recovery-counters.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/server/src/repositories/redis/__tests__/redis.queue.repository.reconcile-pending.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/server/src/repositories/redis/__tests__/redis.queue.repository.scan-groups.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6054,39 +5782,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/ops/server/src/services/ops-metrics-collector.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/server/src/services/ops-snapshot-reader.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/ops/server/src/transport/api-rest/admin.api.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/ops/server/src/transport/api-rest/ops-clickhouse-explain.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/server/src/transport/api-trpc/bug-report.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/organization/server/src/ports/__tests__/organization.service.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/organization/server/src/repositories/prisma/prisma.group.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/organization/server/src/services/organization-group.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/organization/server/src/services/organization.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6135,14 +5835,6 @@
     },
     {
       "key": "condition-shape|packages/features/project/web/src/ui/elements/form-error-display.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/contract/src/prompt.liquid.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/server/src/repositories/prisma/prisma.prompt.repository.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6467,26 +6159,6 @@
     },
     {
       "key": "condition-shape|packages/features/webhook/server/src/services/__tests__/webhook-delivery.process.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/contract/src/workflow-dsl-migration.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/server/src/adapters/prisma.workflow-agent-mapping.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/server/src/adapters/workflow-nlp-lambda.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/server/src/ports/__tests__/workflow.service.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/workflow/server/src/services/studio-workflow-event-enricher.service.ts",
       "measured": "2026-09-06"
     },
     {

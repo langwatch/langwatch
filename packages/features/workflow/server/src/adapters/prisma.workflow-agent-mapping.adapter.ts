@@ -197,12 +197,12 @@ export class PrismaWorkflowAgentMappingAdapter extends WorkflowAgentMappingPort 
         // does not read a non-existent identifier at run time.
         const shouldRemoveOutputField = outputFieldIsStale && scenarioOutputField === undefined;
 
-        if (
-          !mappingsChanged &&
-          !needsInitialMappings &&
-          !shouldUpdateOutputField &&
-          !shouldRemoveOutputField
-        ) {
+        const needsPersist =
+          mappingsChanged ||
+          needsInitialMappings ||
+          shouldUpdateOutputField ||
+          shouldRemoveOutputField;
+        if (!needsPersist) {
           continue;
         }
 

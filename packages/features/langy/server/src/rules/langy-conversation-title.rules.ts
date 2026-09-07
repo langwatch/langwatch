@@ -55,11 +55,11 @@ function unwrap(raw: string): string {
   out = out.replace(/^```[a-zA-Z]*\n?/, "").replace(/\n?```$/, "");
   out = out.replace(/^(?:title|chat|conversation)\s*[:=]\s*/i, "");
   out = out.trim();
-  if (
+  const isWrappedInQuotes =
     (out.startsWith('"') && out.endsWith('"')) ||
     (out.startsWith("'") && out.endsWith("'")) ||
-    (out.startsWith("“") && out.endsWith("”"))
-  ) {
+    (out.startsWith("“") && out.endsWith("”"));
+  if (isWrappedInQuotes) {
     out = out.slice(1, -1);
   }
   return stripTrailingPunctuation(out.trim());
@@ -98,7 +98,8 @@ function lowerCaseOrdinaryWord(word: string): string {
   const core = word.slice(lead.length).replace(/[^A-Za-z'’]+$/, "");
   const tail = word.slice(lead.length + core.length);
   if (!CAPITALISED_WORD.test(core)) return word;
-  if (ALWAYS_CAPITALISED.has(core.toLowerCase())) return word;
+  const lowercasedCore = core.toLowerCase();
+  if (ALWAYS_CAPITALISED.has(lowercasedCore)) return word;
   return `${lead}${core.toLowerCase()}${tail}`;
 }
 

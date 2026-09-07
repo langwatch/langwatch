@@ -169,10 +169,10 @@ function extractVariablesFromTag(
 
 function isOperatorOrLiteral(value: string): boolean {
   if (["==", "!=", "<", ">", "<=", ">="].includes(value)) return true;
-  if (
+  const isQuotedLiteral =
     (value.startsWith("'") && value.endsWith("'")) ||
-    (value.startsWith('"') && value.endsWith('"'))
-  ) {
+    (value.startsWith('"') && value.endsWith('"'));
+  if (isQuotedLiteral) {
     return true;
   }
   return /^\d+(\.\d+)?$/.test(value) || LIQUID_KEYWORDS.has(value);

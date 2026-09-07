@@ -112,15 +112,16 @@ export class AutomationSettlementMatchConfirmationService extends AutomationSett
     const { trace, evaluation } = splitFilters(input.trigger.filters);
     const events = hasEventFilters(trace) ? await this.deriveEvents(input) : null;
 
-    if (
-      Object.keys(trace).length > 0 &&
-      !this.filterEvaluator.matchesTraceFilters({
+    const hasTraceFilters = Object.keys(trace).length > 0;
+    if (hasTraceFilters) {
+      const matchesTraceFilters = this.filterEvaluator.matchesTraceFilters({
         filters: trace,
         foldState: input.foldState,
         events,
-      })
-    ) {
-      return false;
+      });
+      if (!matchesTraceFilters) {
+        return false;
+      }
     }
 
     if (Object.keys(evaluation).length === 0) {
