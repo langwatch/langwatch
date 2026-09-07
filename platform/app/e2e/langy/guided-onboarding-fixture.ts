@@ -358,15 +358,29 @@ async function firstNameOfTestUser(): Promise<string> {
 }
 
 /** The kickoff input for one path, as the tour builds it from the state. */
+/**
+ * Which guided state the kickoff is composed from. "current" reads it after
+ * everything the test seeded, so the brief carries the key the tour minted.
+ * "before-the-key" is what the panel sends live: the tour records the key
+ * seconds before it ends, the host composes from the state it still holds,
+ * and the brief says none was minted. The server settles that kickoff from
+ * the stored state; this is the snapshot that proves it does.
+ */
+export type GuidedKickoffSnapshot = "current" | "before-the-key";
+
 export async function guidedKickoffInput({
   org,
   path,
   tourStatus,
+  snapshot = "current",
 }: {
   org: GuidedOrganization;
   path: GuidedPath;
   tourStatus: GuidedKickoffTourStatus;
+  snapshot?: GuidedKickoffSnapshot;
 }): Promise<GuidedKickoffInput> {
+  const state = await readGuidedState(org.organizationId);
+  const fields = pickKickoffStateFields(state);
   return {
     path,
     paths: org.paths,
@@ -378,8 +392,11 @@ export async function guidedKickoffInput({
     tourStatus,
     // The Gateway and Virtual key lines: the host takes both from the guided
     // state, where the instance names the address an app on it points at and
-    // the tour records the key it minted.
-    ...pickKickoffStateFields(await readGuidedState(org.organizationId)),
+    // the tour records the key it minted. The snapshot from before the key
+    // keeps the address and drops the key, which is what the host held then.
+    ...(snapshot === "before-the-key"
+      ? { gatewayUrl: fields.gatewayUrl }
+      : fields),
   };
 }
 
@@ -410,14 +427,16 @@ export async function queueGuidedKickoff({
   path,
   tourStatus,
   continuing = false,
+  snapshot = "current",
 }: {
   adapter: LangyAdapter;
   org: GuidedOrganization;
   path: GuidedPath;
   tourStatus: GuidedKickoffTourStatus;
   continuing?: boolean;
+  snapshot?: GuidedKickoffSnapshot;
 }): Promise<GuidedKickoffInput> {
-  const input = await guidedKickoffInput({ org, path, tourStatus });
+  const input = await guidedKickoffInput({ org, path, tourStatus, snapshot });
   if (continuing && !adapter.state.conversationId) {
     throw new Error(
       "a continuing kickoff needs the adapter on the attached conversation",

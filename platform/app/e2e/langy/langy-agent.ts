@@ -713,8 +713,11 @@ export function makeLangyAdapter(
       // than an empty message list.
       const messages: Array<{ role: TurnMessage["role"]; parts: unknown[] }> =
         queuedParts ? [{ role: "user", parts: queuedParts }] : scriptedMessages;
+      // The same wire shape the panel's transport sends: one identity per
+      // logical send, and the trigger a composer submit carries.
       const turnInput = {
-        requestId: crypto.randomUUID(),
+        idempotencyKey: crypto.randomUUID(),
+        trigger: "submit-message" as const,
         messages,
         projectId: PROJECT_ID,
         ...(options.pageContext ? { pageContext: options.pageContext } : {}),

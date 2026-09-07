@@ -195,6 +195,30 @@ Feature: Langy guides the first setup after sign-up
       And the picks, the provider and the gateway come from the stored state as well
       And what only the panel knows, the name, the first name and how the tour ended, stays as sent
 
+    # The record was settled and the prompt was not: the worker's session
+    # file for a live take on the settle showed the model reading "Virtual
+    # key: none minted by the tour" while the stored message carried the
+    # reveal id, and the model listed the keys as that line asks. The prompt
+    # handed to the worker is composed from the settled message.
+    @unit
+    Scenario: The prompt the model reads is the settled brief, not the panel's snapshot
+      Given the panel composed the kickoff before the tour's key was recorded on the guided state
+      When the kickoff turn starts
+      Then the prompt handed to the worker carries the settled Virtual key line with the reveal id
+      And it never says none was minted
+
+    # The suite composed its kickoff from the guided state after the key was
+    # minted, so its brief carried the reveal id before it reached the server
+    # and the settle was never exercised end to end. This case sends what the
+    # panel sends live: a snapshot from before the key.
+    @e2e
+    Scenario: The suite sends the panel's snapshot from before the key and the server settles it
+      Given the tour minted the production-app key
+      And the kickoff is composed from a snapshot that predates the key, as the panel composes it live
+      When the kickoff turn runs
+      Then Langy shows the card from the reveal id on the guided state
+      And Langy lists no keys and creates none
+
     @unit
     Scenario: The panel sends the kickoff exactly once
       Given a queued kickoff

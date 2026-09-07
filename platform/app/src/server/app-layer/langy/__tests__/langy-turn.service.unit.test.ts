@@ -216,6 +216,35 @@ describe("LangyTurnService.startConversationTurn", () => {
       expect(JSON.stringify(accepted)).not.toContain("none minted by the tour");
     });
 
+    /** @scenario "The prompt the model reads is the settled brief, not the panel's snapshot" */
+    it("hands the worker the settled brief as the prompt, not the panel's snapshot", async () => {
+      const guidedKickoffFacts = vi.fn(async () => ({
+        paths: ["gateway" as const],
+        provider: undefined,
+        providerModel: undefined,
+        gatewayUrl: "https://gateway.acme.example/v1",
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-01M1X40",
+        virtualKeyRevealId: "rvl_late",
+      }));
+      ({ deps, mocks } = makeDeps({ guidedKickoffFacts }));
+
+      await LangyTurnService.create(deps).startConversationTurn(
+        input({ messages: [{ role: "user", parts: kickoff }] }),
+      );
+
+      const [[stashed]] = mocks.stash.mock.calls as unknown as [
+        [{ prompt: string }],
+      ];
+      expect(stashed.prompt).toContain(
+        "Virtual key: production-app is live (preview vk-lw-01M1X40, reveal id rvl_late). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.",
+      );
+      expect(stashed.prompt).not.toContain("none minted by the tour");
+      expect(stashed.prompt.startsWith("Guided onboarding kickoff.")).toBe(
+        true,
+      );
+    });
+
     it("records the kickoff as sent when nothing reads the state", async () => {
       await LangyTurnService.create(deps).startConversationTurn(
         input({ messages: [{ role: "user", parts: kickoff }] }),

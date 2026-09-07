@@ -925,6 +925,12 @@ export class LangyTurnService {
         facts: this.deps.guidedKickoffFacts,
       });
       const questionParts = userMessage?.parts ?? [];
+      // The model reads the settled message as well: a kickoff the panel
+      // composed from a snapshot older than the guided state says no key was
+      // minted, and the prompt has to say what the record says.
+      const promptText = userMessage
+        ? extractTextFromParts(userMessage.parts)
+        : userText;
       // The FIRST USER message names the conversation, never messages[0]
       // verbatim: a client can send assistant parts it still held (a new chat
       // started while the previous reply streamed), and those must not become
@@ -1148,7 +1154,7 @@ export class LangyTurnService {
         memoryResult.status === "fulfilled" ? memoryResult.value : [];
       const conversationTranscript = renderLangyConversationTranscript({
         messages: durableMessages,
-        currentPrompt: userText,
+        currentPrompt: promptText,
       });
       const conversationMemory = renderLangyConversationMemory(
         extractLangyConversationMemory({ messages: durableMessages }),
@@ -1227,7 +1233,7 @@ export class LangyTurnService {
           isUiActionSurfaceOpen,
         }),
         capNote: capReachedNote,
-        userText,
+        userText: promptText,
       });
       // The seed ends with the ask's label when the prompt itself carries
       // none: the manager folds `seed + prompt` into a fresh session's first
