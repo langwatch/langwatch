@@ -8,16 +8,16 @@ import {
 } from "@langwatch/identity";
 import {
   IdentityGuards,
-  IdentityService,
-  LinkProposalGuards,
-  LinkProposalService,
-  SignInRouterService,
   type IdentityHeadsRepository,
   type IdentityLedger,
   type IdentityReservationRepository,
+  IdentityService,
   type IdentityUsersRepository,
+  LinkProposalGuards,
   type LinkProposalReadsRepository,
   type LinkProposalRecord,
+  LinkProposalService,
+  SignInRouterService,
 } from "@langwatch/identity-server";
 import { describe, expect, it, vi } from "vitest";
 import { IdentityLookupService } from "../identity-lookup.service";
@@ -192,7 +192,9 @@ function identityServiceFor(
 
 function proposal({
   decision = null,
-}: { decision?: LinkProposalRecord["decision"] } = {}) {
+}: {
+  decision?: LinkProposalRecord["decision"];
+} = {}) {
   return {
     proposalId: "proposal_1",
     userId: USER_ID,
