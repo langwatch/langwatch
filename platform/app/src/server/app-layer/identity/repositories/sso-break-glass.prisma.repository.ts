@@ -91,7 +91,7 @@ export class PrismaSsoBreakGlassRepository implements SsoBreakGlassRepository {
     nowMs: number;
   }): Promise<BreakGlassBinding> {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId}, 0))`;
+      await lockOrganization(tx, organizationId);
       const row = await tx.ssoBreakGlassBinding.findUnique({
         where: { id: bindingId },
       });
@@ -156,8 +156,8 @@ export class PrismaSsoBreakGlassRepository implements SsoBreakGlassRepository {
       const existing = await tx.$queryRaw<ActivationRecoveryReservationRow[]>`
         SELECT "commandId", "organizationId", "connectionId"
         FROM "SsoActivationRecoveryReservation"
-        WHERE "commandId" = ${commandId}
-           OR ("organizationId" = ${organizationId} AND "connectionId" = ${connectionId})
+        WHERE "organizationId" = ${organizationId}
+          AND ("commandId" = ${commandId} OR "connectionId" = ${connectionId})
       `;
       const repeated = existing.find(
         (reservation) =>
@@ -290,7 +290,10 @@ async function lockOrganization(
   tx: Prisma.TransactionClient,
   organizationId: string,
 ): Promise<void> {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId}, 0))`;
+  await tx.$queryRaw`
+    -- @tenancy: organization-scoped advisory lock keyed by the bound organization id
+    SELECT pg_advisory_xact_lock(hashtextextended(${organizationId}, 0))
+  `;
 }
 
 function rowToBinding(row: SsoBreakGlassBindingRow): BreakGlassBinding {

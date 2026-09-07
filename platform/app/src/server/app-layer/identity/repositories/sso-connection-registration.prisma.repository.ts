@@ -20,6 +20,7 @@ export class PrismaSsoConnectionRegistrationRepository
   ): Promise<SsoConnectionRegistrationSlot> {
     return await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw<Array<{ locked: boolean }>>`
+        -- @tenancy: organization-scoped advisory lock keyed by the bound organization id
         SELECT pg_advisory_xact_lock(
           hashtextextended(${candidate.organizationId}, 1397968719)
         ) IS NULL AS locked

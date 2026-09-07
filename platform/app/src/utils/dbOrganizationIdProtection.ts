@@ -310,6 +310,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "connectionId") === "string",
   },
+  SsoConnectionRegistrationSlot: {},
+  SsoActivationRecoveryReservation: {},
   // One globally unique organization owner per proved domain. Reads and
   // writes name the domain primary key; individual connection entitlement is
   // guarded separately on `SsoVerifiedDomainHolder` below.
