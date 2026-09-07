@@ -1,14 +1,16 @@
 /**
  * Heal a personal ingest key the collector rejected.
  *
- * Personal ingest keys are minted per device, but a key can still die under a
- * running agent: a revoke from the API-keys page, an old server that rotated
- * in place, the cap evicting a machine that sat idle. The agent's own OTLP
- * exporter fails silently on the 401, and until now so did the session
- * context hook. The hook is the one process that learns the key is dead on
- * every session, so it is where the repair belongs: re-mint through the same
- * resolver `langwatch instrument` uses, persist the cache, rewrite the tool's
- * wiring, and hand back a target for the retry.
+ * A personal ingest key lives and dies with the CLI session that minted it,
+ * but it can still die under a running agent: a revoke from the API-keys
+ * page, or a session that ended while the agent kept running, after a
+ * re-login on this device or a logout of a session that shared the key. The
+ * agent's own OTLP exporter fails silently on the 401, and until now so did
+ * the session context hook. The hook is the one process that learns the key
+ * is dead on every session, so it is where the repair belongs: re-mint under
+ * the device's current session through the same resolver `langwatch
+ * instrument` uses, persist the cache, rewrite the tool's wiring, and hand
+ * back a target for the retry.
  *
  * Nothing here throws to the caller: the hook is never allowed to be why a
  * session broke, so every failure is a null and a debug line.
@@ -65,7 +67,7 @@ const DECLINED: HealOutcome = { status: "declined" };
  */
 const EXPIRED_SESSION = Symbol("expired-session");
 
-/** The seams the healer composes, injectable so a test needs no real config. */
+/** The collaborators the healer composes, injectable so a test needs no real config. */
 export interface HealDeps {
   loadConfig: () => GovernanceConfig;
   saveConfig: (cfg: GovernanceConfig) => void;
@@ -93,13 +95,13 @@ const REAL_DEPS: HealDeps = {
 const DESCRIBE_TIMEOUT_MS = 3_000;
 
 /**
- * The revocations the platform did on its own, which a device may repair. A
- * person's revoke, and a revoke recorded with no cause, are not in this set.
+ * The one revocation a device must not mint past: a person's. Every other
+ * cause is the platform's own doing (a session that ended, a rotation, an
+ * older server's cap) and the device repairs itself under its current
+ * session. A revoke recorded with no cause may have been a person's, so it
+ * counts as one.
  */
-const PLATFORM_REVOCATION_CAUSES: ReadonlySet<string | null> = new Set([
-  "cap",
-  "rotation",
-]);
+const USER_REVOCATION_CAUSE = "user";
 
 /** The wiring tool slug for each agent the hook runs for. */
 const TOOL_BY_AGENT: Record<string, string> = {
@@ -118,12 +120,11 @@ const TOOL_BY_AGENT: Record<string, string> = {
  * the user's, never overwritten, and a request that carried no bearer at all
  * was rejected for another reason).
  *
- * Withholds the repair when the platform says the cached key was revoked and
- * does not say the platform itself did it. A revoke from the API-keys page is
- * a decision about this device, and a device that minted its way past it
- * would make that page a no-op. A key revoked before the cause was recorded
- * reads the same way: it may have been a person, so it is not re-minted. Only
- * the platform's own revocations, a rotation or the cap, are.
+ * Withholds the repair when the platform says a person revoked the cached
+ * key, or recorded no cause for the revoke. A revoke from the API-keys page
+ * is a decision about this device, and a device that minted its way past it
+ * would make that page a no-op. A key retired with its session, replaced by
+ * a rotation or evicted by an older server's cap is re-minted.
  *
  * Reports a failure once it has gone to the platform and not come back with a
  * wired tool that this device can recognise again: a status call that did not
@@ -202,7 +203,8 @@ async function revocationBlocksHeal({
   if (described === EXPIRED_SESSION) return { status: "expired" };
   if (
     described.status === "revoked" &&
-    !PLATFORM_REVOCATION_CAUSES.has(described.revocationCause)
+    (described.revocationCause === USER_REVOCATION_CAUSE ||
+      described.revocationCause === null)
   ) {
     return { status: "withheld" };
   }

@@ -140,13 +140,13 @@ describe("healRevokedIngestKey", () => {
     });
   });
 
-  describe("given a platform that says the cap retired the cached key", () => {
-    /** @scenario "A key the cap retired is re-minted" */
-    it("re-mints as it would for any platform revocation", async () => {
+  describe("given a platform that says the cached key was retired with its session", () => {
+    /** @scenario "A key retired with its session is re-minted under the device's current session" */
+    it("re-mints under the current session and wires the new key", async () => {
       const d = deps({
         describeIngestionKey: vi
           .fn()
-          .mockResolvedValue({ status: "revoked", revocationCause: "cap" }),
+          .mockResolvedValue({ status: "revoked", revocationCause: "session" }),
       });
 
       const healed = await healRevokedIngestKey({
@@ -157,6 +157,49 @@ describe("healRevokedIngestKey", () => {
 
       expect(healed.status).toBe("healed");
       expect(d.resolveLiveIngestionKey).toHaveBeenCalledTimes(1);
+      expect(d.installTelemetryWiring).toHaveBeenCalledWith(
+        expect.objectContaining({ tool: "claude", token: FRESH }),
+      );
+    });
+  });
+
+  describe("given a platform that says the cached key expired with its session", () => {
+    /** @scenario "A key whose session expired is re-minted when the device signed in again" */
+    it("re-mints, since the device holds a live session the platform answered under", async () => {
+      const d = deps({
+        describeIngestionKey: vi
+          .fn()
+          .mockResolvedValue({ status: "revoked", revocationCause: "expired" }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      expect(healed.status).toBe("healed");
+      expect(d.resolveLiveIngestionKey).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a platform that names any other cause of its own", () => {
+    it("re-mints for a rotation and for an older server's cap alike", async () => {
+      for (const revocationCause of ["rotation", "cap"]) {
+        const d = deps({
+          describeIngestionKey: vi
+            .fn()
+            .mockResolvedValue({ status: "revoked", revocationCause }),
+        });
+
+        const healed = await healRevokedIngestKey({
+          agent: "claude_code",
+          rejectedToken: CACHED,
+          deps: d,
+        });
+
+        expect(healed.status).toBe("healed");
+      }
     });
   });
 
