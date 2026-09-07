@@ -17,7 +17,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "node scripts/check-feature-names.mjs && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
