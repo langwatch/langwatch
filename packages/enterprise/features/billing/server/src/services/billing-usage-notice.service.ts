@@ -15,6 +15,20 @@ import {
   NullUsageLimitEmailAdapter,
   type UsageLimitEmailPort,
 } from "../ports/usage-limit-email.port.ts";
+import {
+  type HubspotFormBody,
+  billingThresholdFailureText,
+  cancelledBlocks,
+  confirmedBlocks,
+  hubspotFormUrl,
+  licensePurchaseBlocks,
+  planLimitAlertText,
+  planLimitFormBody,
+  prospectiveBlocks,
+  resourceLimitAlertText,
+  signupAlertText,
+  signupFormBody,
+} from "../rules/billing-usage-notice-copy.rules.ts";
 
 const logger = createLogger("ee:notification-service");
 
@@ -60,12 +74,6 @@ export interface UsageLimitEmailData {
 // ---------------------------------------------------------------------------
 // Helpers (absorbed from billingNotificationRegistration.ts)
 // ---------------------------------------------------------------------------
-
-type ProspectiveNotification = Extract<SubscriptionNotificationPayload, { type: "prospective" }>;
-
-type ConfirmedNotification = Extract<SubscriptionNotificationPayload, { type: "confirmed" }>;
-
-type CancelledNotification = Extract<SubscriptionNotificationPayload, { type: "cancelled" }>;
 
 type NotificationServiceOptions = {
   config: {
@@ -199,9 +207,7 @@ export class NotificationService {
   async sendSlackPlanLimitAlert(context: PlanLimitNotificationContext): Promise<void> {
     await this.sendSlackMessage({
       channelUrl: this.config.slackPlanLimitChannel,
-      body: {
-        text: `Plan limit reached: ${context.organizationName}, ${context.adminEmail ?? "unknown"}, Plan: ${context.planName}, ${context.limitType}: ${context.current}/${context.max}`,
-      },
+      body: { text: planLimitAlertText(context) },
       errorLog: "Failed to send Slack plan-limit notification",
     });
   }
@@ -212,9 +218,7 @@ export class NotificationService {
   async sendSlackResourceLimitAlert(context: ResourceLimitNotificationContext): Promise<void> {
     await this.sendSlackMessage({
       channelUrl: this.config.slackPlanLimitChannel,
-      body: {
-        text: `Resource limit reached: ${context.organizationName}, ${context.adminEmail ?? "unknown"}, Plan: ${context.planName}, ${context.limitType}: ${context.current}/${context.max}`,
-      },
+      body: { text: resourceLimitAlertText(context) },
       errorLog: "Failed to send Slack resource-limit notification",
     });
   }
@@ -232,9 +236,7 @@ export class NotificationService {
   }): Promise<void> {
     await this.sendSlackMessage({
       channelUrl: this.config.slackSubscriptionsChannel,
-      body: {
-        text: `Annual events billing threshold NOT set on ${stripeSubscriptionId}: ${reason}. This subscription will bill its event overage as one renewal invoice until the threshold is applied — re-run the backfill or set it manually.`,
-      },
+      body: { text: billingThresholdFailureText({ stripeSubscriptionId, reason }) },
       missingConfigLog:
         "SLACK_CHANNEL_SUBSCRIPTIONS is not configured; skipping billing-threshold failure alert",
       errorLog: "Failed to send Slack billing-threshold failure notification",
@@ -250,13 +252,23 @@ export class NotificationService {
     let blocks: IncomingWebhookSendArguments["blocks"];
     switch (payload.type) {
       case "prospective":
-        blocks = NotificationService.prospectiveBlocks(payload, adminLink);
+        blocks = prospectiveBlocks({ payload, adminLink });
         break;
       case "confirmed":
-        blocks = NotificationService.confirmedBlocks(payload, adminLink);
+        blocks = confirmedBlocks({
+          payload,
+          adminLink,
+          startDateText: NotificationService.formatDate(payload.startDate),
+          seatsText: NotificationService.formatNumber(payload.maxMembers),
+          messagesPerMonthText: NotificationService.formatNumber(payload.maxMessagesPerMonth),
+        });
         break;
       case "cancelled":
-        blocks = NotificationService.cancelledBlocks(payload, adminLink);
+        blocks = cancelledBlocks({
+          payload,
+          adminLink,
+          cancellationDateText: NotificationService.formatDate(payload.cancellationDate),
+        });
         break;
     }
 
@@ -273,18 +285,9 @@ export class NotificationService {
    * Sends a Slack notification for a new signup.
    */
   async sendSlackSignupEvent(payload: SignupNotificationPayload): Promise<void> {
-    const details = [
-      payload.phoneNumber,
-      payload.utmCampaign ? `Campaign: ${payload.utmCampaign}` : null,
-    ].filter(Boolean);
-
-    const organizationDetails = details.length > 0 ? `, ${details.join(", ")}` : "";
-
     await this.sendSlackMessage({
       channelUrl: this.config.slackSignupsChannel,
-      body: {
-        text: `🔔 New user registered: ${payload.userName ?? "Unknown"}, ${payload.userEmail ?? "unknown"}. Organization: ${payload.organizationName ?? "Unknown"}${organizationDetails}`,
-      },
+      body: { text: signupAlertText(payload) },
       missingConfigLog: "SLACK_CHANNEL_SIGNUPS is not configured; skipping signup notification",
       errorLog: "Failed to send Slack signup notification",
     });
@@ -303,24 +306,7 @@ export class NotificationService {
       channelUrl: this.config.slackSubscriptionsChannel,
       body: {
         text: "New License Purchase",
-        blocks: [
-          {
-            type: "header",
-            text: {
-              type: "plain_text",
-              text: "New License Purchase",
-            },
-          },
-          {
-            type: "section",
-            fields: [
-              { type: "mrkdwn", text: `*Buyer:*\n${payload.buyerEmail}` },
-              { type: "mrkdwn", text: `*Plan:*\n${payload.planType}` },
-              { type: "mrkdwn", text: `*Seats:*\n${payload.seats}` },
-              { type: "mrkdwn", text: `*Amount:*\n${amountFormatted}` },
-            ],
-          },
-        ],
+        blocks: licensePurchaseBlocks({ payload, amountFormatted }),
       },
       errorLog: "Failed to send Slack license purchase notification",
     });
@@ -340,91 +326,12 @@ export class NotificationService {
       return;
     }
 
-    const nameParts = (payload.userName ?? "").split(" ").filter(Boolean);
-    const firstName = nameParts[0] ?? "";
-    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1]! : "";
-
-    const signUpData = payload.signUpData;
-
-    const formData = {
-      submittedAt: Date.now(),
-      fields: [
-        {
-          objectTypeId: "0-1",
-          name: "company",
-          value: payload.organizationName ?? "",
-        },
-        { objectTypeId: "0-1", name: "firstname", value: firstName },
-        { objectTypeId: "0-1", name: "lastname", value: lastName },
-        { objectTypeId: "0-1", name: "email", value: payload.userEmail ?? "" },
-        {
-          objectTypeId: "0-1",
-          name: "mobilephone",
-          value: payload.phoneNumber ?? "",
-        },
-        {
-          objectTypeId: "0-1",
-          name: "Features_usage_multiple",
-          value: signUpData?.featureUsage ?? "Other",
-        },
-        {
-          objectTypeId: "0-1",
-          name: "user_role",
-          value: signUpData?.yourRole ?? "Other",
-        },
-        {
-          objectTypeId: "0-1",
-          name: "product_usage",
-          value: signUpData?.usage ?? "",
-        },
-        {
-          objectTypeId: "0-1",
-          name: "product_solution",
-          value: signUpData?.solution ?? "",
-        },
-        {
-          objectTypeId: "0-1",
-          name: "organization_size",
-          value: signUpData?.companySize ?? "1",
-        },
-        {
-          objectTypeId: "0-1",
-          name: "utm_campaign",
-          value: signUpData?.utmCampaign ?? payload.utmCampaign ?? "",
-        },
-      ],
-      context: {
-        pageUri: "app.langwatch.ai",
-        pageName: "Sign Up",
-      },
-    };
-
-    const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotFormId}`;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_SERVICE_TIMEOUT_MS);
-
-    try {
-      const response = await this.fetchFn(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        this.errorReporter.capture(
-          new Error(`HubSpot signup form request failed: ${response.status}`),
-        );
-      }
-    } catch (error) {
-      logger.error({ error }, "Failed to send HubSpot signup form notification");
-      this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    await this.submitHubspotForm({
+      url: hubspotFormUrl({ portalId: hubspotPortalId, formId: hubspotFormId }),
+      body: signupFormBody(payload),
+      rejectedMessage: "HubSpot signup form request failed",
+      errorLog: "Failed to send HubSpot signup form notification",
+    });
   }
 
   /**
@@ -437,33 +344,26 @@ export class NotificationService {
       return;
     }
 
-    const formData = {
-      submittedAt: Date.now(),
-      fields: [
-        {
-          objectTypeId: "0-1",
-          name: "firstname",
-          value: context.adminName,
-        },
-        {
-          objectTypeId: "0-1",
-          name: "company",
-          value: context.organizationName,
-        },
-        {
-          objectTypeId: "0-1",
-          name: "email",
-          value: context.adminEmail,
-        },
-      ],
-      context: {
-        pageUri: "app.langwatch.ai",
-        pageName: "Plan Limit Reached",
-      },
-    };
+    await this.submitHubspotForm({
+      url: hubspotFormUrl({ portalId: hubspotPortalId, formId: hubspotReachedLimitFormId }),
+      body: planLimitFormBody(context),
+      rejectedMessage: "HubSpot request failed",
+      errorLog: "Failed to send HubSpot plan-limit notification",
+    });
+  }
 
-    const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotReachedLimitFormId}`;
-
+  private async submitHubspotForm({
+    url,
+    body,
+    rejectedMessage,
+    errorLog,
+  }: {
+    url: string;
+    body: HubspotFormBody;
+    rejectedMessage: string;
+    errorLog: string;
+  }): Promise<void> {
+    const formData = { submittedAt: Date.now(), ...body };
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_SERVICE_TIMEOUT_MS);
 
@@ -478,10 +378,10 @@ export class NotificationService {
       });
 
       if (!response.ok) {
-        this.errorReporter.capture(new Error(`HubSpot request failed: ${response.status}`));
+        this.errorReporter.capture(new Error(`${rejectedMessage}: ${response.status}`));
       }
     } catch (error) {
-      logger.error({ error }, "Failed to send HubSpot plan-limit notification");
+      logger.error({ error }, errorLog);
       this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
     } finally {
       clearTimeout(timeoutId);
@@ -499,183 +399,5 @@ export class NotificationService {
           timeStyle: "short",
         }).format(value)
       : "Now";
-  }
-
-  private static prospectiveBlocks(
-    payload: ProspectiveNotification,
-    adminLink: string,
-  ): IncomingWebhookSendArguments["blocks"] {
-    const blocks: IncomingWebhookSendArguments["blocks"] = [
-      {
-        type: "header",
-        text: { type: "plain_text", text: "Prospective subscription interest" },
-      },
-    ];
-
-    const dataBlock = {
-      type: "section",
-      fields: [
-        { type: "mrkdwn", text: `*Organization:* ${payload.organizationName}` },
-        { type: "mrkdwn", text: `*Plan:* ${payload.plan}` },
-        {
-          type: "mrkdwn",
-          text: `*Customer:* ${payload.customerName ?? "Unknown"}`,
-        },
-      ],
-    };
-
-    if (payload.note) {
-      dataBlock.fields.push({
-        type: "mrkdwn",
-        text: `_${payload.note}_`,
-      });
-    }
-
-    blocks.push(dataBlock);
-
-    blocks.push({
-      type: "context",
-      elements: [
-        {
-          type: "mrkdwn",
-          text: `Triggered by ${payload.customerName ?? "a team member"}`,
-        },
-      ],
-    });
-
-    blocks.push({
-      type: "actions",
-      elements: [
-        {
-          type: "button",
-          text: { type: "plain_text", text: "Open org in admin" },
-          url: adminLink,
-          action_id: "subscription_prospective_admin",
-          style: "primary",
-        },
-      ],
-    });
-
-    return blocks;
-  }
-
-  private static confirmedBlocks(
-    payload: ConfirmedNotification,
-    adminLink: string,
-  ): IncomingWebhookSendArguments["blocks"] {
-    const startText = payload.startDate
-      ? `Activated on ${NotificationService.formatDate(payload.startDate)}`
-      : "Activated just now";
-
-    return [
-      {
-        type: "header",
-        text: { type: "plain_text", text: "Subscription activated" },
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*${payload.organizationName}* is live on *${payload.plan}*.`,
-        },
-      },
-      {
-        type: "section",
-        fields: [
-          {
-            type: "mrkdwn",
-            text: `*Subscription ID:* ${payload.subscriptionId}`,
-          },
-          {
-            type: "mrkdwn",
-            text: `*Start Date:* ${NotificationService.formatDate(payload.startDate)}`,
-          },
-          {
-            type: "mrkdwn",
-            text: `*Seats:* ${NotificationService.formatNumber(payload.maxMembers)}`,
-          },
-          {
-            type: "mrkdwn",
-            text: `*Traces/month:* ${NotificationService.formatNumber(payload.maxMessagesPerMonth)}`,
-          },
-        ],
-      },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: startText,
-          },
-        ],
-      },
-      {
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: { type: "plain_text", text: "Open org in admin" },
-            url: adminLink,
-            action_id: "subscription_confirmed_admin",
-          },
-        ],
-      },
-    ];
-  }
-
-  private static cancelledBlocks(
-    payload: CancelledNotification,
-    adminLink: string,
-  ): IncomingWebhookSendArguments["blocks"] {
-    const cancelText = payload.cancellationDate
-      ? `Cancelled on ${NotificationService.formatDate(payload.cancellationDate)}`
-      : "Cancelled just now";
-
-    return [
-      {
-        type: "header",
-        text: { type: "plain_text", text: "Subscription cancelled" },
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*${payload.organizationName}* has cancelled *${payload.plan}*.`,
-        },
-      },
-      {
-        type: "section",
-        fields: [
-          {
-            type: "mrkdwn",
-            text: `*Subscription ID:* ${payload.subscriptionId}`,
-          },
-          {
-            type: "mrkdwn",
-            text: `*Cancellation Date:* ${NotificationService.formatDate(payload.cancellationDate)}`,
-          },
-        ],
-      },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: cancelText,
-          },
-        ],
-      },
-      {
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: { type: "plain_text", text: "Open org in admin" },
-            url: adminLink,
-            action_id: "subscription_cancelled_admin",
-          },
-        ],
-      },
-    ];
   }
 }

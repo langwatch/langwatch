@@ -41,12 +41,12 @@ function buildService({
   const service = createPromptServiceForTest();
   const taken = new Set(takenHandles);
 
-  vi.spyOn(service, "tryGetPromptByIdOrHandle").mockResolvedValue(source);
-  vi.spyOn(service, "checkHandleUniqueness").mockImplementation(
+  vi.spyOn(service.reads, "tryGetPromptByIdOrHandle").mockResolvedValue(source);
+  vi.spyOn(service.writes, "checkHandleUniqueness").mockImplementation(
     async ({ handle }) => !taken.has(handle),
   );
   const createPrompt = vi
-    .spyOn(service, "createPrompt")
+    .spyOn(service.writes, "createPrompt")
     .mockImplementation(async ({ handle }) =>
       handle ? { ...SOURCE_PROMPT, id: "prompt_new", handle } : SOURCE_PROMPT,
     );
@@ -121,7 +121,7 @@ describe("PromptService", () => {
       it("produces support-bot-1 then support-bot-2", async () => {
         const taken = new Set<string>();
         const { service, createPrompt } = buildService();
-        vi.spyOn(service, "checkHandleUniqueness").mockImplementation(
+        vi.spyOn(service.writes, "checkHandleUniqueness").mockImplementation(
           async ({ handle }) => !taken.has(handle),
         );
         createPrompt.mockImplementation(async ({ handle }) => {
@@ -201,7 +201,7 @@ describe("PromptService", () => {
 
       it("stops after a hundred attempts past the first", async () => {
         const { service } = buildService({ takenHandles: [] });
-        vi.spyOn(service, "checkHandleUniqueness").mockResolvedValue(false);
+        vi.spyOn(service.writes, "checkHandleUniqueness").mockResolvedValue(false);
 
         await expect(
           service.duplicatePrompt({
@@ -210,7 +210,7 @@ describe("PromptService", () => {
           }),
         ).rejects.toThrow(HandleGenerationError);
 
-        expect(service.checkHandleUniqueness).toHaveBeenCalledTimes(101);
+        expect(service.writes.checkHandleUniqueness).toHaveBeenCalledTimes(101);
       });
     });
   });
@@ -311,7 +311,7 @@ describe("PromptService", () => {
     describe("given every candidate handle is taken", () => {
       it("stops after a hundred suffixes", async () => {
         const { service } = buildService();
-        vi.spyOn(service, "checkHandleUniqueness").mockResolvedValue(false);
+        vi.spyOn(service.writes, "checkHandleUniqueness").mockResolvedValue(false);
 
         await expect(
           service.copyPrompt({
@@ -321,7 +321,7 @@ describe("PromptService", () => {
           }),
         ).rejects.toThrow(HandleGenerationError);
 
-        expect(service.checkHandleUniqueness).toHaveBeenCalledTimes(101);
+        expect(service.writes.checkHandleUniqueness).toHaveBeenCalledTimes(101);
       });
     });
   });

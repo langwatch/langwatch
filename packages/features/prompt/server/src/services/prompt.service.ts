@@ -1,65 +1,26 @@
-import { createLogger } from "@langwatch/observability";
 import {
   PromptService as PromptServiceContract,
+  deriveResponseFormatFromOutputs,
+  normalizeReasoningFromProviderFields,
+  type LatestConfigVersionSchema,
   type PromptCopySource,
   type PromptCopySummary,
   type PromptScope,
   type PromptTag,
-  type PromptTagAssignment,
-  type UpdatePromptCommand,
 } from "@langwatch/prompt-contract";
-import type { z } from "zod";
-import {
-  deriveResponseFormatFromOutputs,
-  handleSchema,
-  type inputsSchema,
-  type messageSchema,
-  type outputsSchema,
-  type promptingTechniqueSchema,
-} from "@langwatch/prompt-contract";
-import { describeLocalFileUpdate } from "../ports/prompt-describe-local-file-update.port.ts";
-import {
-  HandleGenerationError,
-  NotFoundError,
-  SystemPromptRequiredError,
-} from "@langwatch/prompt-contract";
-import { toHandleSlug } from "../ports/prompt-handle-slug.port.ts";
-import { hoistSystemMessage } from "@langwatch/prompt-contract";
-import { mergeAutoDetectedInputs } from "../ports/prompt-merge-auto-detected-inputs.port.ts";
-import { PromptVersionService } from "./prompt-version.service.ts";
-import { normalizeReasoningFromProviderFields } from "@langwatch/prompt-contract";
-import { PromptTagService } from "./prompt-tag.service.ts";
-import { remoteConfigDataOf } from "../rules/prompt-sync.rules.ts";
-import {
+import type {
   LlmConfigRepository,
-  type LlmConfigWithLatestVersion,
+  LlmConfigWithLatestVersion,
 } from "../repositories/prompt.repository.ts";
-import {
-  PromptTagAssignmentRepository,
-  TagValidationError,
-} from "../repositories/prompt-tag-assignment.repository.ts";
-import {
-  diffRuntimeParameters,
-  type getLatestConfigVersionSchema,
-  LATEST_SCHEMA_VERSION,
-  type LatestConfigVersionSchema,
-  parseLlmConfigVersion,
-  parseRuntimeParameters,
-  runtimeParametersEqual,
-} from "@langwatch/prompt-contract";
-import { PromptTagRepository } from "../repositories/prompt-tag.repository.ts";
-import { transformCamelToSnake, transformSnakeToCamel } from "../ports/prompt-transform-db.port.ts";
-
-const logger = createLogger("langwatch:prompt-service");
-
-// Extract the configData type from the schema
-type ConfigData = z.infer<ReturnType<typeof getLatestConfigVersionSchema>>["configData"];
-type PromptUpdateInput = Omit<UpdatePromptCommand, "data"> & {
-  data: UpdatePromptCommand["data"] & {
-    handle?: string;
-    scope?: PromptScope;
-  };
-};
+import type { PromptTagAssignmentRepository } from "../repositories/prompt-tag-assignment.repository.ts";
+import type { PromptTagRepository } from "../repositories/prompt-tag.repository.ts";
+import { PromptCopyService } from "./prompt-copy.service.ts";
+import { PromptReadService } from "./prompt-read.service.ts";
+import { PromptSyncService } from "./prompt-sync.service.ts";
+import { PromptTagLookupService } from "./prompt-tag-lookup.service.ts";
+import type { PromptTagService } from "./prompt-tag.service.ts";
+import type { PromptVersionService } from "./prompt-version.service.ts";
+import { PromptWriteService } from "./prompt-write.service.ts";
 
 /**
  * Full prompt shape that combines prompt config with version data.
@@ -129,8 +90,8 @@ export type VersionedPrompt = {
 };
 
 /**
- * Service layer for managing LLM prompt configurations.
- * Handles business logic for prompt operations including handle formatting.
+ * Service layer for managing LLM prompt configurations. The public contract lives here; the
+ * work is done by the read, write, copy, sync and tag-lookup collaborators it composes.
  */
 export class PromptService extends PromptServiceContract {
   readonly repository: LlmConfigRepository;
@@ -138,6 +99,11 @@ export class PromptService extends PromptServiceContract {
   readonly tagRepository: PromptTagAssignmentRepository;
   readonly promptTagRepository: PromptTagRepository;
   readonly tagService: PromptTagService;
+  readonly tagLookup: PromptTagLookupService;
+  readonly reads: PromptReadService;
+  readonly writes: PromptWriteService;
+  readonly copies: PromptCopyService;
+  readonly syncs: PromptSyncService;
 
   static create(options: {
     repository: LlmConfigRepository;
@@ -162,988 +128,182 @@ export class PromptService extends PromptServiceContract {
     this.tagRepository = options.tagRepository;
     this.promptTagRepository = options.promptTagRepository;
     this.tagService = options.tagService;
-  }
-
-  /**
-   * Get all prompts for a project
-   */
-  async getAllPrompts(params: {
-    projectId: string;
-    organizationId?: string;
-    version?: "latest" | "all";
-  }): Promise<VersionedPrompt[]> {
-    const { projectId } = params;
-
-    const organizationId =
-      params.organizationId ?? (await this.getOrganizationIdFromProjectId(projectId));
-
-    const configs = await this.repository.getAllWithLatestVersion({
-      projectId,
-      organizationId,
+    this.tagLookup = PromptTagLookupService.create({
+      repository: options.repository,
+      tagRepository: options.tagRepository,
+      promptTagRepository: options.promptTagRepository,
     });
-
-    const latestVersionIds = configs
-      .map((c) => c.latestVersion.id)
-      .filter((id): id is string => !!id);
-    const tagsByVersionId = await this.getTagsByVersionIds({
-      versionIds: latestVersionIds,
-      projectId,
+    this.reads = PromptReadService.create({
+      repository: options.repository,
+      tagLookup: this.tagLookup,
+      toVersionedPrompt: (config, tags) => this.transformToVersionedPrompt(config, tags),
     });
-
-    return configs.map((config) => {
-      const latestVersionId = config.latestVersion.id ?? "";
-
-      return this.transformToVersionedPrompt(
-        config,
-        this.withLatestTag({
-          tags: tagsByVersionId.get(latestVersionId) ?? [],
-          currentVersionId: latestVersionId,
-          latestVersionId,
-        }),
-      );
+    this.writes = PromptWriteService.create({
+      repository: options.repository,
+      versionService: options.versionService,
+      read: this.reads,
+      tagLookup: this.tagLookup,
+      toVersionedPrompt: (config, tags) => this.transformToVersionedPrompt(config, tags),
+    });
+    this.copies = PromptCopyService.create({
+      repository: options.repository,
+      read: this.reads,
+      write: this.writes,
+    });
+    this.syncs = PromptSyncService.create({
+      repository: options.repository,
+      read: this.reads,
+      write: this.writes,
     });
   }
 
-  /**
-   * Gets a prompt by ID or handle. If a handle is provided, it is formatted
-   * with the organization and project context.
-   */
-  async tryGetPromptByIdOrHandle(params: {
-    idOrHandle: string;
-    projectId: string;
-    version?: number;
-    organizationId?: string;
-    versionId?: string;
-    /** Optional: fetch the version pointed to by this tag */
-    tag?: string;
-  }): Promise<VersionedPrompt | null> {
-    const { idOrHandle, projectId } = params;
-
-    if (params.tag && (params.version !== undefined || params.versionId !== undefined)) {
-      logger.warn(
-        {
-          idOrHandle,
-          tag: params.tag,
-          version: params.version,
-          versionId: params.versionId,
-        },
-        "Mutual exclusion: cannot specify both version/versionId and tag",
-      );
-
-      throw new TagValidationError(
-        "Cannot specify both 'version'/'versionId' and 'tag'. Use one or the other.",
-      );
-    }
-
-    const organizationId =
-      params.organizationId ?? (await this.getOrganizationIdFromProjectId(projectId));
-
-    // `latest` is a virtual tag that is never stored in the PromptTag table
-    // (see parsePromptShorthand, which also normalizes it away). Treat
-    // `tag: "latest"` as "no tag filter" so that what we advertise in the
-    // response (tags: [{name: "latest"}]) is round-trippable via ?tag=latest.
-    const normalizedTag = params.tag === "latest" ? undefined : params.tag;
-
-    // If a tag is provided, resolve it to a versionId
-    let resolvedVersionId = params.versionId;
-    if (normalizedTag) {
-      const config = await this.repository.tryGetPromptByIdOrHandle({
-        idOrHandle,
-        projectId,
-        organizationId,
-      });
-
-      if (!config) {
-        return null;
-      }
-
-      const tagId = await this.resolveTagNameToId({
-        tagName: normalizedTag,
-        organizationId,
-      });
-
-      if (!tagId) {
-        throw new NotFoundError(`Tag "${normalizedTag}" not found for prompt "${idOrHandle}"`);
-      }
-
-      const versionTag = await this.tagRepository.tryGetByConfigAndTagId({
-        configId: config.id,
-        tagId,
-        projectId,
-      });
-
-      if (!versionTag) {
-        throw new NotFoundError(`Tag "${normalizedTag}" not found for prompt "${idOrHandle}"`);
-      }
-
-      resolvedVersionId = versionTag.versionId;
-    }
-
-    const config = await this.repository.tryGetConfigByIdOrHandleWithLatestVersion({
-      idOrHandle,
-      projectId,
-      organizationId,
-      version: params.version,
-      versionId: resolvedVersionId,
-    });
-
-    if (!config) {
-      return null;
-    }
-
-    const currentVersionId = config.latestVersion.id ?? "";
-    const latestVersionId = await this.getLatestVersionIdForConfig({
-      configId: config.id,
-      projectId,
-    });
-
-    // Only fetch assignments for the versions we actually need (the returned
-    // version and, when it differs, the latest version for the "latest" tag
-    // comparison) — not the whole tag history for the config.
-    const versionIdsToQuery = Array.from(
-      new Set([currentVersionId, latestVersionId].filter((id): id is string => !!id)),
-    );
-    const tagsByVersionId = await this.getTagsByVersionIds({
-      versionIds: versionIdsToQuery,
-      projectId,
-    });
-
-    return this.transformToVersionedPrompt(
-      config,
-      this.withLatestTag({
-        tags: tagsByVersionId.get(currentVersionId) ?? [],
-        currentVersionId,
-        latestVersionId,
-      }),
-    );
+  getAllPrompts(
+    input: Parameters<PromptReadService["getAllPrompts"]>[0],
+  ): ReturnType<PromptReadService["getAllPrompts"]> {
+    return this.reads.getAllPrompts(input);
   }
 
-  /**
-   * Get all versions for a prompt
-   */
-  async getAllVersions(params: {
-    idOrHandle: string;
-    projectId: string;
-    organizationId?: string;
-  }): Promise<VersionedPrompt[]> {
-    // If no organizationId is provided, get it from the projectId
-    const organizationId: string =
-      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
-
-    // Get the config
-    const config = await this.repository.tryGetPromptByIdOrHandle({
-      idOrHandle: params.idOrHandle,
-      projectId: params.projectId,
-      organizationId,
-    });
-
-    // If the config doesn't exist, return an empty array
-    if (!config) {
-      throw new NotFoundError("Prompt not found");
-    }
-
-    // Get the versions
-    const rawVersions = await this.repository.versions.getVersionsForConfigByIdOrHandle({
-      idOrHandle: params.idOrHandle,
-      projectId: params.projectId,
-      organizationId,
-    });
-
-    const versions = rawVersions.map((v) => ({
-      ...parseLlmConfigVersion(v),
-      runtimeParameters: parseRuntimeParameters(v.runtimeParameters),
-    }));
-
-    const versionIds = versions.map((v) => v.id).filter((id): id is string => !!id);
-    const tagsByVersionId = await this.getTagsByVersionIds({
-      versionIds,
-      projectId: params.projectId,
-    });
-
-    // Repo returns versions sorted by createdAt desc, so versions[0] is latest.
-    const latestVersionId = versions[0]?.id ?? "";
-
-    return versions.map((version) =>
-      this.transformToVersionedPrompt(
-        {
-          ...config,
-          latestVersion: version,
-        },
-        this.withLatestTag({
-          tags: tagsByVersionId.get(version.id ?? "") ?? [],
-          currentVersionId: version.id ?? "",
-          latestVersionId,
-        }),
-      ),
-    );
+  tryGetPromptByIdOrHandle(
+    input: Parameters<PromptReadService["tryGetPromptByIdOrHandle"]>[0],
+  ): ReturnType<PromptReadService["tryGetPromptByIdOrHandle"]> {
+    return this.reads.tryGetPromptByIdOrHandle(input);
   }
 
-  /**
-   * Creates a new prompt configuration with an initial version, defaulting
-   * the version data when none is provided.
-   */
-  async createPrompt(params: {
-    // Config data
-    projectId: string;
-    organizationId?: string;
-    handle: string;
-    scope?: PromptScope;
-    // Version data
-    authorId?: string;
-    prompt?: string;
-    messages?: z.infer<typeof messageSchema>[];
-    inputs?: z.infer<typeof inputsSchema>[];
-    outputs?: z.infer<typeof outputsSchema>[];
-    model?: string;
-    temperature?: number;
-    maxTokens?: number;
-    // Traditional sampling parameters
-    topP?: number;
-    frequencyPenalty?: number;
-    presencePenalty?: number;
-    // Other sampling parameters
-    seed?: number;
-    topK?: number;
-    minP?: number;
-    repetitionPenalty?: number;
-    // Reasoning parameter (canonical/unified field)
-    reasoning?: string;
-    verbosity?: string;
-    promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
-    demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
-    commitMessage?: string | null;
-    parameters?: Record<string, unknown>;
-  }): Promise<VersionedPrompt> {
-    const organizationId =
-      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
-    // If any of the version data is provided,
-    // we should create a version from that data
-    // and it's not consideered a draft
-    const shouldCreateVersion = Boolean(
-      params.prompt !== undefined ||
-      params.messages !== undefined ||
-      params.inputs !== undefined ||
-      params.outputs !== undefined ||
-      params.model !== undefined ||
-      params.temperature !== undefined ||
-      params.maxTokens !== undefined ||
-      params.promptingTechnique !== undefined ||
-      params.demonstrations !== undefined,
-    );
-
-    if (shouldCreateVersion) {
-      this.versionService.assertNoSystemPromptConflict({
-        prompt: params.prompt,
-        messages: params.messages,
-      });
-    }
-
-    // Normalize system message into prompt
-    const normalizedCreate = this.normalizeSystemMessage({
-      prompt: params.prompt,
-      messages: params.messages,
-    });
-    params.prompt = normalizedCreate.prompt;
-    params.messages = normalizedCreate.messages as unknown as
-      | Array<{
-          role: "user" | "assistant" | "system";
-          content: string;
-        }>
-      | undefined;
-
-    if (!normalizedCreate.prompt && !params.prompt) {
-      throw new SystemPromptRequiredError();
-    }
-
-    const config = await this.repository.createConfigWithInitialVersion({
-      configData: {
-        name: params.handle,
-        handle: params.handle ?? null,
-        projectId: params.projectId,
-        organizationId,
-        scope: params.scope ?? "PROJECT",
-        authorId: params.authorId,
-        copiedFromPromptId: null,
-      },
-      versionData: shouldCreateVersion
-        ? {
-            configData: this.transformToDbFormat({
-              prompt: params.prompt,
-              messages: params.messages,
-              inputs: params.inputs ?? [{ identifier: "input", type: "str" }],
-              outputs: params.outputs ?? [{ identifier: "output", type: "str" }],
-              model: params.model,
-              temperature: params.temperature,
-              maxTokens: params.maxTokens,
-              // Traditional sampling parameters
-              topP: params.topP,
-              frequencyPenalty: params.frequencyPenalty,
-              presencePenalty: params.presencePenalty,
-              // Other sampling parameters
-              seed: params.seed,
-              topK: params.topK,
-              minP: params.minP,
-              repetitionPenalty: params.repetitionPenalty,
-              // Reasoning parameter (canonical/unified field)
-              reasoning: params.reasoning,
-              verbosity: params.verbosity,
-              promptingTechnique: params.promptingTechnique,
-              demonstrations: params.demonstrations,
-            }) as LatestConfigVersionSchema["configData"],
-            schemaVersion: LATEST_SCHEMA_VERSION,
-            commitMessage: params.commitMessage ?? "Initial version",
-            authorId: params.authorId ?? null,
-            version: 1,
-            runtimeParameters: params.parameters ?? {},
-          }
-        : undefined,
-    });
-
-    // A freshly created prompt's only version is also the latest; no custom
-    // tag assignments exist yet (those are attached by the route in a second
-    // step), so the only tag to surface is the built-in "latest".
-    const newVersionId = config.latestVersion.id ?? "";
-
-    return this.transformToVersionedPrompt(
-      config,
-      newVersionId ? [{ name: "latest", versionId: newVersionId }] : [],
-    );
+  getAllVersions(
+    input: Parameters<PromptReadService["getAllVersions"]>[0],
+  ): ReturnType<PromptReadService["getAllVersions"]> {
+    return this.reads.getAllVersions(input);
   }
 
-  /**
-   * Duplicates a prompt inside the project it already belongs to. Single Responsibility:
-   * Recreate a prompt's configuration under a free handle.
-   */
-  async duplicatePrompt(params: {
-    idOrHandle: string;
-    projectId: string;
-    authorId?: string;
-  }): Promise<VersionedPrompt> {
-    const { idOrHandle, projectId, authorId } = params;
-
-    const source = await this.tryGetPromptByIdOrHandle({ idOrHandle, projectId });
-
-    if (!source) {
-      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
-    }
-
-    const baseHandle = this.deriveBaseHandle(source);
-    const handle = await this.generateUniqueHandle({
-      candidateFor: (attempt) => `${baseHandle}-${attempt + 1}`,
-      projectId,
-      scope: source.scope,
-    });
-
-    return await this.createPrompt({
-      ...this.buildCreateParamsFromSource(source),
-      projectId,
-      handle,
-      authorId,
-      commitMessage: `Duplicated from "${baseHandle}"`,
-    });
+  createPrompt(
+    input: Parameters<PromptWriteService["createPrompt"]>[0],
+  ): ReturnType<PromptWriteService["createPrompt"]> {
+    return this.writes.createPrompt(input);
   }
 
-  /**
-   * Copies a prompt into another project, recording the source it came from. Single
-   * Responsibility: Recreate a prompt's configuration in a target project.
-   */
-  async copyPrompt(params: {
-    idOrHandle: string;
-    sourceProjectId: string;
-    targetProjectId: string;
-    authorId?: string;
-  }): Promise<VersionedPrompt & { copiedFromPromptId: string }> {
-    const { idOrHandle, sourceProjectId, targetProjectId, authorId } = params;
-
-    const source = await this.tryGetPromptByIdOrHandle({
-      idOrHandle,
-      projectId: sourceProjectId,
-    });
-
-    if (!source) {
-      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
-    }
-
-    const baseHandle = this.deriveBaseHandle(source);
-    const handle = await this.generateUniqueHandle({
-      // The bare handle is free in most target projects, so try it first.
-      candidateFor: (attempt) => (attempt === 0 ? baseHandle : `${baseHandle}_copy${attempt}`),
-      projectId: targetProjectId,
-      scope: source.scope,
-    });
-
-    const copied = await this.createPrompt({
-      ...this.buildCreateParamsFromSource(source),
-      projectId: targetProjectId,
-      handle,
-      authorId,
-      commitMessage: `Copied from "${baseHandle}"`,
-    });
-
-    await this.repository.setCopiedFromPrompt({
-      id: copied.id,
-      projectId: targetProjectId,
-      copiedFromPromptId: source.id,
-    });
-
-    return { ...copied, copiedFromPromptId: source.id };
+  updateHandle(
+    input: Parameters<PromptWriteService["updateHandle"]>[0],
+  ): ReturnType<PromptWriteService["updateHandle"]> {
+    return this.writes.updateHandle(input);
   }
 
-  /**
-   * Finds the first handle no other prompt in the project has taken. `candidateFor(0)` is
-   * the first handle tried.
-   */
-  private async generateUniqueHandle(params: {
-    candidateFor: (attempt: number) => string;
-    projectId: string;
-    scope: PromptScope;
-    maxAttempts?: number;
-  }): Promise<string> {
-    const { candidateFor, projectId, scope, maxAttempts = 100 } = params;
-
-    for (let attempt = 0; attempt <= maxAttempts; attempt++) {
-      const handle = candidateFor(attempt);
-      const isAvailable = await this.checkHandleUniqueness({
-        handle,
-        projectId,
-        scope,
-      });
-
-      if (isAvailable) {
-        return handle;
-      }
-    }
-
-    throw new HandleGenerationError(
-      `Failed to generate a unique handle after ${maxAttempts} attempts, starting from "${candidateFor(
-        0,
-      )}" in project ${projectId}.`,
-    );
+  updatePrompt(
+    input: Parameters<PromptWriteService["updatePrompt"]>[0],
+  ): ReturnType<PromptWriteService["updatePrompt"]> {
+    return this.writes.updatePrompt(input);
   }
 
-  /**
-   * The handle a duplicate or copy numbers from.
-   */
-  private deriveBaseHandle(source: VersionedPrompt): string {
-    const candidate = source.handle ?? source.name;
-
-    return handleSchema.safeParse(candidate).success ? candidate : toHandleSlug(candidate);
+  restoreVersion(
+    input: Parameters<PromptWriteService["restoreVersion"]>[0],
+  ): ReturnType<PromptWriteService["restoreVersion"]> {
+    return this.writes.restoreVersion(input);
   }
 
-  /**
-   * Maps a source prompt's configuration into `createPrompt` parameters,
-   * leaving the target-specific fields (project, handle, author, commit
-   * message) to the caller.
-   */
-  private buildCreateParamsFromSource(source: VersionedPrompt) {
-    const { prompt, messages } = hoistSystemMessage(source);
-
-    return {
-      scope: source.scope,
-      prompt,
-      messages,
-      inputs: source.inputs ?? undefined,
-      outputs: source.outputs ?? undefined,
-      model: source.model ?? undefined,
-      temperature: source.temperature ?? undefined,
-      maxTokens: source.maxTokens ?? undefined,
-      // Traditional sampling parameters
-      topP: source.topP ?? undefined,
-      frequencyPenalty: source.frequencyPenalty ?? undefined,
-      presencePenalty: source.presencePenalty ?? undefined,
-      // Other sampling parameters
-      seed: source.seed ?? undefined,
-      topK: source.topK ?? undefined,
-      minP: source.minP ?? undefined,
-      repetitionPenalty: source.repetitionPenalty ?? undefined,
-      // Reasoning parameter (canonical/unified field)
-      reasoning: source.reasoning ?? undefined,
-      verbosity: source.verbosity ?? undefined,
-      promptingTechnique: source.promptingTechnique ?? undefined,
-      demonstrations: source.demonstrations ?? undefined,
-      parameters: source.parameters ?? undefined,
-    };
+  deletePrompt(
+    input: Parameters<PromptWriteService["deletePrompt"]>[0],
+  ): ReturnType<PromptWriteService["deletePrompt"]> {
+    return this.writes.deletePrompt(input);
   }
 
-  /**
-   * Normalize system message rules for prompt/messages.
-   * Single Responsibility: Ensure system content lives in prompt and is removed from messages.
-   */
-  private normalizeSystemMessage(data: {
-    prompt?: string;
-    messages?: Array<{ role: string; content: string }> | undefined;
-  }): { prompt?: string; messages?: Array<{ role: string; content: string }> } {
-    const messageSystemPrompt = data.messages?.find((msg) => msg.role === "system")?.content;
-    const normalized: {
-      prompt?: string;
-      messages?: Array<{ role: string; content: string }>;
-    } = { ...data };
-    if (messageSystemPrompt) {
-      normalized.prompt = normalized.prompt ?? messageSystemPrompt;
-      normalized.messages = (normalized.messages ?? []).filter((msg) => msg.role !== "system");
-    }
-
-    return normalized;
+  checkHandleUniqueness(
+    input: Parameters<PromptWriteService["checkHandleUniqueness"]>[0],
+  ): ReturnType<PromptWriteService["checkHandleUniqueness"]> {
+    return this.writes.checkHandleUniqueness(input);
   }
 
-  // Draft persistence removed (client-only draft creation/update)
-
-  /**
-   * Updates only the prompt's handle and scope without creating a new version.
-   * Single Responsibility: Update the prompt's handle and scope.
-   */
-  async updateHandle(params: {
-    idOrHandle: string;
-    projectId: string;
-    data: {
-      handle?: string;
-      scope?: PromptScope;
-    };
-  }): Promise<VersionedPrompt> {
-    const { idOrHandle, projectId, data } = params;
-
-    await this.assertModifyPermission({
-      idOrHandle,
-      projectId,
-    });
-
-    const updatedConfig = await this.repository.updateConfig(idOrHandle, projectId, data);
-
-    // Get the latest version to return complete prompt
-    const latestVersionRaw = await this.repository.versions.getLatestVersion(
-      updatedConfig.id,
-      projectId,
-    );
-    const latestVersion = {
-      ...parseLlmConfigVersion(latestVersionRaw),
-      runtimeParameters: parseRuntimeParameters(latestVersionRaw.runtimeParameters),
-    };
-
-    const latestVersionId = latestVersion.id ?? "";
-    const tagsByVersionId = await this.getTagsByVersionIds({
-      versionIds: latestVersionId ? [latestVersionId] : [],
-      projectId,
-    });
-
-    return this.transformToVersionedPrompt(
-      {
-        ...updatedConfig,
-        latestVersion,
-      } as LlmConfigWithLatestVersion,
-      this.withLatestTag({
-        tags: tagsByVersionId.get(latestVersionId) ?? [],
-        currentVersionId: latestVersionId,
-        latestVersionId,
-      }),
-    );
+  checkModifyPermission(
+    input: Parameters<PromptWriteService["checkModifyPermission"]>[0],
+  ): ReturnType<PromptWriteService["checkModifyPermission"]> {
+    return this.writes.checkModifyPermission(input);
   }
 
-  /**
-   * Updates a prompt configuration with the provided data, creating a new
-   * version with a commit message tracking the changes. Only provided
-   * fields are updated; a commit message is always required.
-   */
-  async updatePrompt(params: PromptUpdateInput): Promise<VersionedPrompt> {
-    const { idOrHandle, projectId, data } = params;
-    const {
-      handle,
-      scope,
-      commitMessage,
-      parameters: incomingParameters,
-      ...configDataUpdates
-    } = data;
-
-    this.versionService.assertNoSystemPromptConflict(configDataUpdates);
-
-    // Only normalize system messages if prompt or messages are being updated
-    // This prevents undefined values from overwriting existing database values
-    if (configDataUpdates.prompt !== undefined || configDataUpdates.messages !== undefined) {
-      const normalizedUpdate = this.normalizeSystemMessage(configDataUpdates);
-      configDataUpdates.prompt = normalizedUpdate.prompt;
-      configDataUpdates.messages = normalizedUpdate.messages as unknown as
-        | Array<{
-            role: "user" | "assistant" | "system";
-            content: string;
-          }>
-        | undefined;
-    }
-
-    const updatedConfig = await this.repository.updateConfigAndCreateVersion({
-      idOrHandle,
-      projectId,
-      data: { handle, scope },
-      commitMessage,
-      configDataUpdates: this.transformToDbFormat(configDataUpdates) as Partial<
-        LatestConfigVersionSchema["configData"]
-      >,
-      schemaVersion: LATEST_SCHEMA_VERSION,
-      authorId: data.authorId,
-      runtimeParameters: incomingParameters,
-    });
-    const newVersionId = updatedConfig.latestVersion.id ?? "";
-
-    return this.transformToVersionedPrompt(
-      updatedConfig,
-      newVersionId ? [{ name: "latest", versionId: newVersionId }] : [],
-    );
+  duplicatePrompt(
+    input: Parameters<PromptCopyService["duplicatePrompt"]>[0],
+  ): ReturnType<PromptCopyService["duplicatePrompt"]> {
+    return this.copies.duplicatePrompt(input);
   }
 
-  /**
-   * Restore a prompt version
-   * Creates a new version with the same config data as the restored version
-   */
-  async restoreVersion(params: {
-    versionId: string;
-    projectId: string;
-    authorId?: string | null;
-    organizationId?: string;
-  }): Promise<VersionedPrompt> {
-    const organizationId =
-      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
-
-    const newVersion = await this.repository.versions.restoreVersion({
-      id: params.versionId,
-      authorId: params.authorId ?? null,
-      projectId: params.projectId,
-      organizationId,
-    });
-
-    const newPrompt = await this.tryGetPromptByIdOrHandle({
-      idOrHandle: newVersion.configId,
-      projectId: params.projectId,
-      organizationId,
-    });
-
-    if (!newPrompt) {
-      throw new Error("Failed to restore version");
-    }
-
-    return newPrompt;
+  copyPrompt(
+    input: Parameters<PromptCopyService["copyPrompt"]>[0],
+  ): ReturnType<PromptCopyService["copyPrompt"]> {
+    return this.copies.copyPrompt(input);
   }
 
-  /** Checks if a handle is unique for a project. */
-  async checkHandleUniqueness(params: {
-    handle: string;
-    projectId: string;
-    organizationId?: string;
-    scope: PromptScope;
-    excludeId?: string;
-  }): Promise<boolean> {
-    const organizationId =
-      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
-
-    return this.repository.isHandleUnique({
-      handle: params.handle,
-      projectId: params.projectId,
-      organizationId,
-      organizationIdForScopeCheck: params.organizationId,
-      scope: params.scope,
-      excludeId: params.excludeId,
-    });
+  syncPrompt(
+    input: Parameters<PromptSyncService["syncPrompt"]>[0],
+  ): ReturnType<PromptSyncService["syncPrompt"]> {
+    return this.syncs.syncPrompt(input);
   }
 
-  /**
-   * Converts the snake_case sync payload to the camelCase named parameters `createPrompt`
-   * takes: without it, a key like `max_tokens` is invisible to `maxTokens` and its value is
-   * silently lost.
-   */
-  private async createSyncedPrompt({
-    idOrHandle,
-    resolvedConfigData,
-    projectId,
-    organizationId,
-    authorId,
-    commitMessage,
-    parameters,
-  }: {
-    idOrHandle: string;
-    resolvedConfigData: ConfigData;
+  getTagsForConfig(
+    input: Parameters<PromptTagLookupService["getTagsForConfig"]>[0],
+  ): ReturnType<PromptTagLookupService["getTagsForConfig"]> {
+    return this.tagLookup.getTagsForConfig(input);
+  }
+
+  assignTag(
+    input: Parameters<PromptTagLookupService["assignTag"]>[0],
+  ): ReturnType<PromptTagLookupService["assignTag"]> {
+    return this.tagLookup.assignTag(input);
+  }
+
+  async listCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]> {
+    return this.repository.listCopies(input);
+  }
+
+  async tryGetCopySource(input: { promptId: string }): Promise<PromptCopySource | null> {
+    return this.repository.tryGetCopySource(input);
+  }
+
+  getNamesByIds(input: {
+    ids: string[];
     projectId: string;
     organizationId: string;
-    authorId?: string;
-    commitMessage?: string;
-    parameters?: Record<string, unknown>;
-  }): Promise<VersionedPrompt> {
-    const camelCaseData = transformSnakeToCamel(
-      resolvedConfigData as unknown as Record<string, unknown>,
-    );
-
-    return this.createPrompt({
-      handle: idOrHandle,
-      projectId,
-      organizationId,
-      scope: "PROJECT" as PromptScope,
-      authorId,
-      commitMessage: commitMessage ?? "Synced from local file",
-      parameters,
-      ...camelCaseData,
-    });
+  }): Promise<Array<{ id: string; name: string }>> {
+    return this.repository.findNamesByIds(input);
   }
 
-  /** Same version on both sides: up to date when the content agrees, a new version when not. */
-  private async syncSameVersion({
-    existingPrompt,
-    resolvedConfigData,
-    remoteConfigData,
-    parameters,
-    projectId,
-    authorId,
-    commitMessage,
-  }: {
-    existingPrompt: VersionedPrompt;
-    resolvedConfigData: ConfigData;
-    remoteConfigData: LatestConfigVersionSchema["configData"];
-    parameters?: Record<string, unknown>;
-    projectId: string;
-    authorId?: string;
-    commitMessage?: string;
-  }): Promise<{ action: "updated" | "up_to_date"; prompt: VersionedPrompt }> {
-    const comparison = this.repository.compareConfigContent(resolvedConfigData, remoteConfigData);
-    const parametersEqual = runtimeParametersEqual(parameters, existingPrompt.parameters);
-    if (comparison.isEqual && parametersEqual) {
-      return { action: "up_to_date", prompt: existingPrompt };
-    }
-
-    const allDifferences = [
-      ...(comparison.differences ?? []),
-      ...diffRuntimeParameters({
-        localParameters: parameters,
-        remoteParameters: existingPrompt.parameters,
-      }),
-    ];
-
-    return {
-      action: "updated",
-      prompt: await this.updatePrompt({
-        idOrHandle: existingPrompt.id,
-        projectId,
-        data: {
-          authorId,
-          commitMessage: commitMessage ?? describeLocalFileUpdate(allDifferences),
-          ...this.transformToDbFormat(resolvedConfigData),
-          parameters,
-        },
-      }),
-    };
-  }
-
-  /**
-   * Local is behind remote: safe to fast-forward when the local file has not changed since the
-   * version it was taken from, and a conflict when it has.
-   */
-  private async syncBehindRemote({
-    existingPrompt,
-    idOrHandle,
-    localVersion,
-    remoteVersion,
-    remoteConfigData,
-    resolvedConfigData,
-    parameters,
-    projectId,
-    organizationId,
-  }: {
-    existingPrompt: VersionedPrompt;
-    idOrHandle: string;
-    localVersion: number;
-    remoteVersion: number;
-    remoteConfigData: LatestConfigVersionSchema["configData"];
-    resolvedConfigData: ConfigData;
-    parameters?: Record<string, unknown>;
+  async getExistingIds(input: {
+    ids: string[];
     projectId: string;
     organizationId: string;
-  }): Promise<{
-    action: "conflict" | "up_to_date";
-    prompt?: VersionedPrompt;
-    conflictInfo?: {
-      localVersion: number;
-      remoteVersion: number;
-      differences: string[];
-      remoteConfigData: ConfigData;
-      remoteParameters: Record<string, unknown>;
-    };
-  }> {
-    const localBaseVersion = await this.repository.tryGetConfigVersionByNumber({
-      idOrHandle,
-      versionNumber: localVersion,
-      projectId,
-      organizationId,
-    });
-    if (localBaseVersion) {
-      const baseComparison = this.repository.compareConfigContent(
-        resolvedConfigData,
-        localBaseVersion.configData as Record<string, unknown>,
-      );
-      const baseParametersEqual = runtimeParametersEqual(
-        parameters,
-        localBaseVersion.runtimeParameters as Record<string, unknown> | undefined,
-      );
-      if (baseComparison.isEqual && baseParametersEqual) {
-        return { action: "up_to_date", prompt: existingPrompt };
-      }
-    }
-
-    return {
-      action: "conflict",
-      conflictInfo: {
-        localVersion,
-        remoteVersion,
-        differences:
-          this.repository.compareConfigContent(resolvedConfigData, remoteConfigData).differences ??
-          [],
-        remoteConfigData,
-        remoteParameters: existingPrompt.parameters ?? {},
-      },
-    };
+  }): Promise<string[]> {
+    return [...(await this.repository.findExistingIds(input))];
   }
 
-  /**
-   * Syncs a prompt from a local source: skipped when versions match, updated
-   * when local is newer, and reported as a conflict when local is older.
-   */
-  async syncPrompt(params: {
-    idOrHandle: string;
-    localConfigData: ConfigData;
-    localVersion?: number;
-    projectId: string;
+  async listTags(input: { organizationId: string }): Promise<PromptTag[]> {
+    return this.tagService.getAll(input);
+  }
+
+  seedTagsForOrganization(input: { organizationId: string }): Promise<void> {
+    return this.tagService.seedForOrganization(input);
+  }
+
+  createTag(input: {
     organizationId: string;
-    authorId?: string;
-    commitMessage?: string;
-    parameters?: Record<string, unknown>;
-  }): Promise<{
-    action: "created" | "updated" | "conflict" | "up_to_date";
-    prompt?: VersionedPrompt;
-    conflictInfo?: {
-      localVersion: number;
-      remoteVersion: number;
-      differences: string[];
-      remoteConfigData: ConfigData;
-      remoteParameters: Record<string, unknown>;
-    };
-  }> {
-    const {
-      idOrHandle,
-      localConfigData,
-      localVersion,
-      projectId,
-      organizationId,
-      authorId,
-      commitMessage,
-    } = params;
-
-    // Must run before comparison/creation so both code paths use the merged inputs.
-    const resolvedConfigData = {
-      ...localConfigData,
-      inputs: mergeAutoDetectedInputs({
-        prompt: localConfigData.prompt,
-        messages: localConfigData.messages ?? [],
-        inputs: localConfigData.inputs ?? [],
-      }),
-    };
-
-    // Check if prompt exists on server
-    const existingPrompt = await this.tryGetPromptByIdOrHandle({
-      idOrHandle,
-      projectId,
-      organizationId,
-    });
-
-    if (!existingPrompt) {
-      return {
-        action: "created",
-        prompt: await this.createSyncedPrompt({
-          idOrHandle,
-          resolvedConfigData,
-          projectId,
-          organizationId,
-          authorId,
-          commitMessage,
-          parameters: params.parameters,
-        }),
-      };
-    }
-
-    // Check modify permissions
-    await this.assertModifyPermission({
-      idOrHandle,
-      projectId,
-      organizationId: organizationId,
-    });
-
-    const remoteVersion = existingPrompt.version;
-
-    const remoteConfigData = remoteConfigDataOf(existingPrompt);
-
-    if (localVersion === remoteVersion) {
-      return this.syncSameVersion({
-        existingPrompt,
-        resolvedConfigData,
-        remoteConfigData,
-        parameters: params.parameters,
-        projectId,
-        authorId,
-        commitMessage,
-      });
-    }
-
-    if (localVersion && localVersion < remoteVersion) {
-      return this.syncBehindRemote({
-        existingPrompt,
-        idOrHandle,
-        localVersion,
-        remoteVersion,
-        remoteConfigData,
-        resolvedConfigData,
-        parameters: params.parameters,
-        projectId,
-        organizationId,
-      });
-    }
-
-    // Case 4: Local version is newer or unknown - assume conflict
-    return {
-      action: "conflict",
-      conflictInfo: {
-        localVersion: localVersion ?? 0,
-        remoteVersion,
-        differences:
-          this.repository.compareConfigContent(resolvedConfigData, remoteConfigData).differences ??
-          [],
-        remoteConfigData,
-        remoteParameters: existingPrompt.parameters ?? {},
-      },
-    };
+    name: string;
+    createdById?: string;
+  }): Promise<PromptTag> {
+    return this.tagService.create(input);
   }
 
-  /**
-   * Delete a prompt
-   */
-  async deletePrompt(params: {
-    idOrHandle: string;
-    projectId: string;
-    organizationId?: string;
-  }): Promise<{ success: boolean }> {
-    const organizationId =
-      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
-
-    await this.assertModifyPermission({
-      idOrHandle: params.idOrHandle,
-      projectId: params.projectId,
-      organizationId,
-    });
-
-    const result = await this.repository.deleteConfig({
-      idOrHandle: params.idOrHandle,
-      projectId: params.projectId,
-      organizationId,
-    });
-
-    return result;
+  renameTag(input: {
+    organizationId: string;
+    oldName: string;
+    newName: string;
+  }): Promise<PromptTag> {
+    return this.tagService.rename(input);
   }
 
-  /**
-   * Transforms a config from repository format to the VersionedPrompt shape
-   * expected by the API and service layer.
-   */
+  tryDeleteTag(input: { id: string; organizationId: string }): Promise<PromptTag | null> {
+    return this.tagService.tryDelete(input);
+  }
+
+  tryDeleteTagByName(input: { organizationId: string; name: string }): Promise<PromptTag | null> {
+    return this.tagService.tryDeleteByName(input);
+  }
+
+  /** The repository row in the `VersionedPrompt` shape the API and the service layer return. */
   private transformToVersionedPrompt(
     config: Omit<LlmConfigWithLatestVersion, "deletedAt">,
     tags: Array<{ name: string; versionId: string }>,
@@ -1211,239 +371,5 @@ export class PromptService extends PromptServiceContract {
       tags,
       parameters: config.latestVersion.runtimeParameters ?? {},
     };
-  }
-
-  private async getOrganizationIdFromProjectId(projectId: string): Promise<string> {
-    return this.repository.getOrganizationIdForProject(projectId);
-  }
-
-  /**
-   * Transforms camelCase service params to snake_case for repository/database Single
-   * Responsibility: Handle naming convention conversion at data boundary
-   */
-  private transformToDbFormat(data: Record<string, unknown>): Record<string, unknown> {
-    return transformCamelToSnake(data);
-  }
-
-  /**
-   * Assert permission to modify/delete a prompt
-   */
-  private async assertModifyPermission(params: {
-    idOrHandle: string;
-    projectId: string;
-    // Deduced from projectId if not provided
-    organizationId?: string;
-  }): Promise<void> {
-    const organizationId =
-      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
-
-    const permission = await this.repository.checkModifyPermission({
-      idOrHandle: params.idOrHandle,
-      projectId: params.projectId,
-      organizationId,
-    });
-
-    if (!permission.hasPermission) {
-      throw new Error(permission.reason ?? "You don't have permission to modify this prompt");
-    }
-  }
-
-  /**
-   * Check if user has permission to modify/delete a prompt
-   * Single Responsibility: Delegate permission check to repository with proper context
-   */
-  async checkModifyPermission(params: {
-    idOrHandle: string;
-    projectId: string;
-    organizationId?: string;
-  }): Promise<{ hasPermission: boolean; reason?: string }> {
-    const organizationId =
-      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
-
-    return await this.repository.checkModifyPermission({
-      idOrHandle: params.idOrHandle,
-      projectId: params.projectId,
-      organizationId,
-    });
-  }
-
-  // --- Tag operations ---
-
-  /** Get all tags for a prompt config. */
-  async getTagsForConfig(params: {
-    configId: string;
-    projectId: string;
-  }): Promise<PromptTagAssignment[]> {
-    return this.tagRepository.getTagsForConfig(params);
-  }
-
-  /** Assign (or reassign) a tag to a specific prompt version. */
-  async assignTag(params: {
-    configId: string;
-    versionId: string;
-    tag: string;
-    projectId: string;
-    userId?: string;
-    organizationId?: string;
-  }): Promise<PromptTagAssignment> {
-    // Always resolve organizationId from projectId to prevent org mismatch attacks
-    const organizationId = await this.getOrganizationIdFromProjectId(params.projectId);
-
-    const tagId = await this.resolveTagNameToId({
-      tagName: params.tag,
-      organizationId,
-    });
-
-    if (!tagId) {
-      throw new TagValidationError(
-        `Invalid tag "${params.tag}". Must be a custom tag defined for this org.`,
-      );
-    }
-
-    return this.tagRepository.assignTag({
-      configId: params.configId,
-      versionId: params.versionId,
-      tagId,
-      projectId: params.projectId,
-      userId: params.userId,
-    });
-  }
-
-  async listCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]> {
-    return this.repository.listCopies(input);
-  }
-
-  async tryGetCopySource(input: { promptId: string }): Promise<PromptCopySource | null> {
-    return this.repository.tryGetCopySource(input);
-  }
-
-  getNamesByIds(input: {
-    ids: string[];
-    projectId: string;
-    organizationId: string;
-  }): Promise<Array<{ id: string; name: string }>> {
-    return this.repository.findNamesByIds(input);
-  }
-
-  async getExistingIds(input: {
-    ids: string[];
-    projectId: string;
-    organizationId: string;
-  }): Promise<string[]> {
-    return [...(await this.repository.findExistingIds(input))];
-  }
-
-  async listTags(input: { organizationId: string }): Promise<PromptTag[]> {
-    return this.tagService.getAll(input);
-  }
-
-  seedTagsForOrganization(input: { organizationId: string }): Promise<void> {
-    return this.tagService.seedForOrganization(input);
-  }
-
-  createTag(input: {
-    organizationId: string;
-    name: string;
-    createdById?: string;
-  }): Promise<PromptTag> {
-    return this.tagService.create(input);
-  }
-
-  renameTag(input: {
-    organizationId: string;
-    oldName: string;
-    newName: string;
-  }): Promise<PromptTag> {
-    return this.tagService.rename(input);
-  }
-
-  tryDeleteTag(input: { id: string; organizationId: string }): Promise<PromptTag | null> {
-    return this.tagService.tryDelete(input);
-  }
-
-  tryDeleteTagByName(input: { organizationId: string; name: string }): Promise<PromptTag | null> {
-    return this.tagService.tryDeleteByName(input);
-  }
-
-  /**
-   * Fetches the tag assignments pointing at exactly the given versionIds, grouped by
-   * versionId. Delegates to the repository so the service keeps no raw Prisma access.
-   */
-  private async getTagsByVersionIds(params: {
-    versionIds: string[];
-    projectId: string;
-  }): Promise<Map<string, Array<{ name: string; versionId: string }>>> {
-    const map = new Map<string, Array<{ name: string; versionId: string }>>();
-
-    if (params.versionIds.length === 0) {
-      return map;
-    }
-
-    const assignments = await this.tagRepository.findByVersionIds({
-      versionIds: params.versionIds,
-      projectId: params.projectId,
-    });
-
-    for (const assignment of assignments) {
-      const bucket = map.get(assignment.versionId) ?? [];
-      bucket.push({
-        name: assignment.promptTag.name,
-        versionId: assignment.versionId,
-      });
-      map.set(assignment.versionId, bucket);
-    }
-
-    return map;
-  }
-
-  /**
-   * Returns the id of the latest (by createdAt desc) version for a config, or an empty
-   * string when no version exists.
-   */
-  private async getLatestVersionIdForConfig(params: {
-    configId: string;
-    projectId: string;
-  }): Promise<string> {
-    return (
-      (await this.repository.versions.tryFindLatestId({
-        configId: params.configId,
-        projectId: params.projectId,
-      })) ?? ""
-    );
-  }
-
-  /**
-   * Prepends the built-in "latest" tag when the current version is the latest for its
-   * prompt.
-   */
-  private withLatestTag(params: {
-    tags: Array<{ name: string; versionId: string }>;
-    currentVersionId: string;
-    latestVersionId: string;
-  }): Array<{ name: string; versionId: string }> {
-    if (!params.currentVersionId || params.currentVersionId !== params.latestVersionId) {
-      return params.tags;
-    }
-
-    return [{ name: "latest", versionId: params.latestVersionId }, ...params.tags];
-  }
-
-  /**
-   * Resolves a tag name to its PromptTag ID for the given org.
-   * Returns null if no matching tag definition exists.
-   */
-  private async resolveTagNameToId({
-    tagName,
-    organizationId,
-  }: {
-    tagName: string;
-    organizationId: string;
-  }): Promise<string | null> {
-    const promptTag = await this.promptTagRepository.tryFindByOrgAndName({
-      organizationId,
-      name: tagName,
-    });
-
-    return promptTag?.id ?? null;
   }
 }

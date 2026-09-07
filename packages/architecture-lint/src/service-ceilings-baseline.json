@@ -1,13 +1,4 @@
 {
   "version": 0,
-  "services": [
-    {
-      "file": "packages/features/prompt/server/src/services/prompt.service.ts",
-      "moduleLines": 1450,
-      "methodLines": 101,
-      "statements": 24,
-      "complexity": 24,
-      "lineLength": 160
-    }
-  ]
+  "services": []
 }
