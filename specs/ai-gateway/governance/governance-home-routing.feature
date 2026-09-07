@@ -173,7 +173,9 @@ Feature: Governance home — route, nav promotion, persona detection
   Scenario: The inventory family is exempt from the no-organization onboarding bouncer
     Given a session that belongs to no organization yet
     When it sits on "/governance/inventory", "/governance/inventory/<id>",
-      "/governance/people", "/governance/costs" or "/governance/billed"
+      "/governance/people", "/governance/costs", "/governance/billed",
+      "/governance/insights", "/governance/analytics" or
+      "/governance/signals"
     Then the route is recognized as bouncer-exempt, like every sibling
       governance route, instead of bouncing to "/onboarding/welcome"
     # The bounce fires only for zero-ORG sessions (an org with zero
@@ -337,7 +339,17 @@ Feature: Governance home — route, nav promotion, persona detection
     When the admin looks at the GOVERNANCE rail
     Then "Costs" (/governance/costs) and "Billed" (/governance/billed)
       are listed between Overview and Inventory
+    And "Insights" (/governance/insights), "Analytics"
+      (/governance/analytics) and "Signals & Alerts"
+      (/governance/signals) are listed after People, in that order
     And each page renders its heading
+    # The three Platform entries ride the same flag on purpose: they are
+    # placeholder screens for the Langy-driven brief, explore and rule
+    # registry that ADR-128's cost work leads into, and they are meant
+    # to be previewed by the same audience that previews Costs. Their
+    # bodies and headings are specified and bound in specs/governance/
+    # governance-platform-placeholders.feature; this scenario pins only
+    # the rail listing, and its binding renders no page.
     # Costs has since grown its real content — the billed/gateway/seat
     # lanes of specs/governance/governance-cost-screen.feature (ADR-128
     # wave 1). Billed is still the placeholder shell this scenario was

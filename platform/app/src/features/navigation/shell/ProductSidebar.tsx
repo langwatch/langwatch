@@ -216,6 +216,8 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
 /**
  * The Gateway and Governance sidebar bodies: the same registry data the
  * legacy section rails render, promoted to first-class sidebar entries.
+ * Ungrouped entries list flat first; each `group` then lists under its own
+ * collapsible label, in the order the groups first appear in the data.
  */
 function SectionItemsNav({
   items,
@@ -226,21 +228,38 @@ function SectionItemsNav({
 }) {
   const pathname = usePathname();
   const visibleItems = useVisibleSectionNavItems(items);
+  const ungrouped = visibleItems.filter((item) => item.group === undefined);
+  const groups = new Map<string, SectionNavItemData[]>();
+  for (const item of visibleItems) {
+    if (item.group === undefined) continue;
+    groups.set(item.group, [...(groups.get(item.group) ?? []), item]);
+  }
+  const renderLink = (item: SectionNavItemData) => (
+    <SideMenuLink
+      key={item.href}
+      icon={item.icon}
+      label={item.label}
+      href={item.href}
+      isActive={
+        item.includePath
+          ? isPathUnder({ pathname, base: item.includePath })
+          : pathname === item.href
+      }
+      showLabel={showExpanded}
+    />
+  );
   return (
     <>
-      {visibleItems.map((item) => (
-        <SideMenuLink
-          key={item.href}
-          icon={item.icon}
-          label={item.label}
-          href={item.href}
-          isActive={
-            item.includePath
-              ? isPathUnder({ pathname, base: item.includePath })
-              : pathname === item.href
-          }
-          showLabel={showExpanded}
-        />
+      {ungrouped.map(renderLink)}
+      {[...groups.entries()].map(([group, groupItems]) => (
+        <SidebarSection
+          key={group}
+          id={group.toLowerCase()}
+          label={group}
+          showExpanded={showExpanded}
+        >
+          {groupItems.map(renderLink)}
+        </SidebarSection>
       ))}
     </>
   );

@@ -4,6 +4,7 @@ import {
   Coins,
   Eye,
   Gauge,
+  Inbox,
   KeyRound,
   LineChart,
   type LucideIcon,
@@ -11,6 +12,7 @@ import {
   ReceiptText,
   Route,
   Shield,
+  Target,
   Users,
   Webhook,
   Zap,
@@ -35,6 +37,12 @@ export interface SectionNavItemData {
    * presentations agree on what exists.
    */
   featureFlag?: FrontendFeatureFlag;
+  /**
+   * Listed under a labelled group in the navigation-v2 sidebar, after
+   * every ungrouped entry. The legacy section rail has no grouping
+   * affordance and lists grouped entries flat, in the same order.
+   */
+  group?: string;
 }
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
@@ -131,5 +139,33 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     href: "/governance/people",
     includePath: "/governance/people",
     icon: Users,
+  },
+  // The Platform group: placeholder screens for the brief, explore and
+  // rule registry that the cost work leads into. They ride the billed-cost
+  // flag so the audience previewing Costs previews these too.
+  // Spec: specs/governance/governance-platform-placeholders.feature
+  {
+    label: "Insights",
+    href: "/governance/insights",
+    includePath: "/governance/insights",
+    icon: Inbox,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+    group: "Platform",
+  },
+  {
+    label: "Analytics",
+    href: "/governance/analytics",
+    includePath: "/governance/analytics",
+    icon: LineChart,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+    group: "Platform",
+  },
+  {
+    label: "Signals & Alerts",
+    href: "/governance/signals",
+    includePath: "/governance/signals",
+    icon: Target,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+    group: "Platform",
   },
 ];

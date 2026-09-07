@@ -371,6 +371,32 @@ describe("the product sidebar", () => {
       // Tool Tiles folded into Inventory's Catalog tab.
       expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
     });
+
+    /** @scenario "The Platform group lists its three entries under one label" */
+    it("groups the Platform entries under one label, after the ungrouped ones", () => {
+      mockPathname = "/governance";
+      renderSidebar("governance");
+
+      expect(
+        screen.getByRole("button", { name: "Collapse Platform" }),
+      ).toBeInTheDocument();
+      // DOM order, not presence: the group sits after every flat entry
+      // and keeps its own order inside.
+      const labels = screen
+        .getAllByRole("link")
+        .map((link) => link.textContent?.trim())
+        .filter((label) =>
+          ["People", "Insights", "Analytics", "Signals & Alerts"].includes(
+            label ?? "",
+          ),
+        );
+      expect(labels).toEqual([
+        "People",
+        "Insights",
+        "Analytics",
+        "Signals & Alerts",
+      ]);
+    });
   });
 
   describe("when a page is opened by its address", () => {
