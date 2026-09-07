@@ -51,8 +51,8 @@ const { claimAddressProofMock } = vi.hoisted(() => ({
 const { registerMock } = vi.hoisted(() => ({
   registerMock: vi.fn(),
 }));
-const { localSignUpIsAllowedMock } = vi.hoisted(() => ({
-  localSignUpIsAllowedMock: vi.fn(),
+const { localSignUpDecisionMock } = vi.hoisted(() => ({
+  localSignUpDecisionMock: vi.fn(),
 }));
 
 // The account-creating call is what sends the confirmation link, so the two
@@ -64,7 +64,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
     typeof import("~/server/app-layer/identity/runtime")
   >()),
   credentialAccounts: () => ({ register: registerMock }),
-  localSignUpIsAllowed: localSignUpIsAllowedMock,
+  localSignUpDecision: localSignUpDecisionMock,
   signUpVerification: () => ({
     claimAddressProof: claimAddressProofMock,
   }),
@@ -92,7 +92,11 @@ describe("userRouter.register()", () => {
     // Most cases here are the coerced/email-mode deployment; the licensed-SSO
     // case overrides this.
     resolveAuthProviderMock.mockResolvedValue("email");
-    localSignUpIsAllowedMock.mockResolvedValue(true);
+    localSignUpDecisionMock.mockResolvedValue({
+      outcome: "enroll",
+      methodSet: [{ id: "password", kind: "password", connectionId: null }],
+      reasonCode: "identifier_unknown",
+    });
     claimAddressProofMock.mockResolvedValue(true);
   });
 
@@ -216,7 +220,11 @@ describe("userRouter.register()", () => {
 
   describe("when the address becomes SSO-routed after proof", () => {
     it("refuses before spending the proof or writing a credential", async () => {
-      localSignUpIsAllowedMock.mockResolvedValue(false);
+      localSignUpDecisionMock.mockResolvedValue({
+        outcome: "redirect",
+        methodSet: [],
+        reasonCode: "verified_domain",
+      });
 
       await expect(
         createCaller().register({

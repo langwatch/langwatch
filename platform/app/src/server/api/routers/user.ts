@@ -18,7 +18,7 @@ import { getApp } from "~/server/app-layer/app";
 import type { FederatedPasswordResult } from "~/server/app-layer/identity/credential-account.service";
 import {
   credentialAccounts,
-  localSignUpIsAllowed,
+  localSignUpDecision,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
 import { deploymentOffersTwoStepVerification } from "~/server/app-layer/identity/signin-method-policy";
@@ -278,7 +278,11 @@ export const userRouter = createTRPCRouter({
       if ((await resolveAuthProvider()) !== "email") {
         throw new DirectRegistrationUnavailableError();
       }
-      if (!(await localSignUpIsAllowed(email))) {
+      const enrollment = await localSignUpDecision(email);
+      if (
+        enrollment.outcome !== "enroll" ||
+        !enrollment.methodSet.some((method) => method.kind === "password")
+      ) {
         throw new DirectRegistrationUnavailableError();
       }
 
