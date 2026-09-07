@@ -45,6 +45,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { reapExpiredAgentSandboxApiKeys } from "~/server/api-key/agent-sandbox-key";
+import { reapExpiredCliLoginKeys } from "~/server/api-key/cli-login-key-reaper";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
@@ -143,6 +144,7 @@ import {
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
 import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
+import { createCliLoginKeyMaintenancePipeline } from "./pipelines/cli-login-key-maintenance/pipeline";
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
@@ -639,6 +641,20 @@ export class PipelineRegistry {
         sandboxKeyReap: {
           reap: () =>
             reapExpiredAgentSandboxApiKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // CLI device-session credential maintenance, on the same footing. A
+    // session the CLI stops refreshing leaves Redis by TTL, which runs no
+    // code, so this sweep is what retires its login key and the ingest keys
+    // parented to it.
+    this.deps.eventSourcing.register(
+      createCliLoginKeyMaintenancePipeline({
+        loginKeyReap: {
+          reap: () => reapExpiredCliLoginKeys({ prisma: this.deps.prisma }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
