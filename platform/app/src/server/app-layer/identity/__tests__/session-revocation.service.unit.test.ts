@@ -325,6 +325,7 @@ describe("given a person changing their password from one of several devices", (
 describe("given a person signed in through two different methods", () => {
   describe("when the sessions one method minted are revoked", () => {
     /** @scenario "Ending the sessions one sign-in method minted leaves the others alone" */
+    /** @scenario "A session can be ended for one sign-in method alone" */
     it("ends that method's sessions and leaves the others listed in the cache", async () => {
       const stores = revocationOver({
         sessions: [
