@@ -10,20 +10,25 @@ import (
 type sortMode int
 
 const (
-	sortStale sortMode = iota // most idle first — the cleanup order, and the default
-	sortSize                  // largest on disk first
-	sortName                  // alphabetical by slug
-	sortDirty                 // uncommitted first
-	sortGone                  // origin-deleted (merged + pruned) first
+	// sortRecent is the default: the newest thing on top, where the eye lands.
+	// Recent work is what a mistaken tick costs most, so it is never buried
+	// hundreds of rows down a list sorted oldest-first.
+	sortRecent sortMode = iota
+	sortStale           // most idle first
+	sortSize            // largest on disk first
+	sortName            // alphabetical by slug
+	sortDirty           // uncommitted first
+	sortGone            // origin-deleted (merged + pruned) first
 	sortModeCount
 )
 
 var sortNames = map[sortMode]string{
-	sortStale: "most idle",
-	sortSize:  "largest",
-	sortName:  "name",
-	sortDirty: "uncommitted",
-	sortGone:  "origin-gone",
+	sortRecent: "newest",
+	sortStale:  "most idle",
+	sortSize:   "largest",
+	sortName:   "name",
+	sortDirty:  "uncommitted",
+	sortGone:   "origin-gone",
 }
 
 func (s sortMode) next() sortMode { return (s + 1) % sortModeCount }
@@ -65,12 +70,19 @@ func (m model) less(a, b Row) bool {
 		}
 	case sortName:
 		// name is the tiebreak below — nothing extra
-	default: // sortStale
+	case sortStale:
 		if a.StaleKnown != b.StaleKnown {
 			return a.StaleKnown // known staleness ahead of the still-loading ones
 		}
 		if a.StaleFor != b.StaleFor {
 			return a.StaleFor > b.StaleFor
+		}
+	default: // sortRecent
+		if a.StaleKnown != b.StaleKnown {
+			return a.StaleKnown
+		}
+		if a.StaleFor != b.StaleFor {
+			return a.StaleFor < b.StaleFor
 		}
 	}
 	return strings.ToLower(displayName(a)) < strings.ToLower(displayName(b))

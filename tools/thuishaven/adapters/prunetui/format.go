@@ -9,19 +9,22 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// itemCount labels the list by what is actually in it, so a run with jobs in it
-// does not call them worktrees.
-func itemCount(rows []Row) string {
-	jobs := 0
-	for _, r := range rows {
-		if r.Kind == KindJob {
-			jobs++
-		}
+// ageLabel names the time column for what it measures: how long a worktree has
+// sat idle, and how long ago a job last did anything.
+func ageLabel(r Row) string {
+	if r.Kind == KindJob {
+		return "age"
 	}
-	if jobs == 0 {
-		return fmt.Sprintf("%d worktree(s)", len(rows))
+	return "idle"
+}
+
+// protectedNote says why a row cannot be ticked, in terms of its kind — a job
+// held out of reach is a different refusal from a protected checkout.
+func protectedNote(r Row) string {
+	if r.Kind == KindJob {
+		return "held back — pass --include-recent to reclaim a job this recent"
 	}
-	return fmt.Sprintf("%d worktree(s) · %d job(s)", len(rows)-jobs, jobs)
+	return "protected — never deleted by prune"
 }
 
 // displayName is a worktree's label (slug, else directory basename); dbChips are

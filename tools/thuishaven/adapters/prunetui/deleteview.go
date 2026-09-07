@@ -8,25 +8,25 @@ import (
 )
 
 // renderDeleteScreen is the reset-the-screen view once a delete is underway: the
-// worktree list is gone, replaced by a headline (an animated spinner while work is
+// list is gone, replaced by a headline (an animated spinner while work is
 // in flight, a tick when it finishes), a per-worktree status list that flips
 // ✓/✗/spinner as outcomes stream in, and a one-line tally. It is windowed to the
 // terminal height so a large batch never overflows.
 func (m model) renderDeleteScreen() string {
 	var b strings.Builder
-	b.WriteString(styleTitle.Render(" ⌂ haven prune "))
+	b.WriteString(styleTitle.Render(m.title()))
 	b.WriteString("\n\n")
 
 	done := m.deletedOK + m.deletedErr
 	spin := spinnerFrames[m.spin%len(spinnerFrames)]
 	if m.mode == modeDone {
-		head := fmt.Sprintf("  ✓  deleted %d worktree(s), reclaimed ~%s", m.deletedOK, domain.HumanBytes(m.reclaimed))
+		head := fmt.Sprintf("  ✓  reclaimed %s, freeing ~%s", m.actions.Kind.Count(m.deletedOK), domain.HumanBytes(m.reclaimed))
 		if m.deletedErr > 0 {
 			head += fmt.Sprintf(" · %d failed", m.deletedErr)
 		}
 		b.WriteString(styleGood.Render(head))
 	} else {
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  %s  deleting %d worktree(s) in parallel — %d/%d done", spin, m.deletingTotal, done, m.deletingTotal)))
+		b.WriteString(styleWarn.Render(fmt.Sprintf("  %s  reclaiming %s in parallel — %d/%d done", spin, m.actions.Kind.Count(m.deletingTotal), done, m.deletingTotal)))
 	}
 	b.WriteString("\n\n")
 

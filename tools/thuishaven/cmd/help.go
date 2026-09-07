@@ -158,8 +158,11 @@ var envHelpText = `Environment variables.
                                  their class instead, whatever their age.
     HAVEN_JOBS_ROOT=<dir>        Where agent job directories live (default
                                  ~/.claude/jobs). "haven clean" and the daemon
-                                 reclaim a finished job's scratch and keep its
-                                 state.json + timeline.jsonl. Empty disables it.
+                                 reclaim a cold job's scratch and keep its
+                                 state.json + timeline.jsonl. Cold means terminal
+                                 for more than 48h, or untouched for a week; a job
+                                 that finished more recently is reached only by
+                                 "haven clean --include-recent". Empty disables it.
 
   Services and data
     LANGWATCH_SEED=1             Seed the DB during up.

@@ -32,6 +32,11 @@ func (m model) View() string {
 	if m.mode == modeDeleting || m.mode == modeDone {
 		return clampLines(m.renderDeleteScreen(), m.width)
 	}
+	// The confirmation is its own screen, not a footer: it is the last thing seen
+	// before real data goes, so it gets the whole terminal to say what will go.
+	if m.mode == modeConfirm {
+		return clampLines(m.renderConfirmScreen(), m.width)
+	}
 	header := m.renderHeader()
 	footer := m.renderFooter()
 	budget := m.viewHeight() - countLines(header) - countLines(footer) - 1
@@ -62,7 +67,7 @@ func (m model) scrollCap() int {
 func (m model) renderHeader() string {
 	sel := m.countSelected()
 	n := len(m.rows)
-	parts := []string{itemCount(m.rows)}
+	parts := []string{m.actions.Kind.Count(len(m.rows))}
 	if m.metaCount < n {
 		parts = append(parts, fmt.Sprintf("reading %d/%d", m.metaCount, n))
 	}
@@ -77,12 +82,21 @@ func (m model) renderHeader() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(styleTitle.Render(" ⌂ haven prune "))
+	b.WriteString(styleTitle.Render(m.title()))
 	b.WriteString(styleDim.Render("  " + strings.Join(parts, " · ")))
 	b.WriteString("\n")
 	b.WriteString(styleDim.Render(" " + strings.Repeat("─", m.divider())))
 	b.WriteString("\n\n")
 	return b.String()
+}
+
+// title names the one kind this picker reclaims, so the screen can never be read
+// as acting on the other one.
+func (m model) title() string {
+	if m.actions.Kind.Plural == "" {
+		return " ⌂ haven clean "
+	}
+	return " ⌂ haven clean — " + m.actions.Kind.Plural + " "
 }
 
 func (m model) divider() int {
@@ -176,6 +190,8 @@ func (m model) renderRow(pos int, r Row) string {
 func (m model) facts(r Row) string {
 	if !r.Deletable {
 		switch {
+		case r.Kind == KindJob:
+			return "held back · " + r.Reason
 		case r.IsPrimary:
 			return "primary · protected"
 		case r.IsCurrent:
@@ -187,9 +203,9 @@ func (m model) facts(r Row) string {
 	if !r.MetaKnown {
 		return spinnerFrames[m.spin%len(spinnerFrames)] + " scanning…"
 	}
-	idle := "idle ?"
+	idle := ageLabel(r) + " ?"
 	if r.StaleKnown {
-		idle = "idle " + domain.HumanAge(r.StaleFor)
+		idle = ageLabel(r) + " " + domain.HumanAge(r.StaleFor)
 	}
 	size := styleDim.Render("   …")
 	if r.SizeKnown {
@@ -216,23 +232,12 @@ func (m model) facts(r Row) string {
 
 func (m model) renderFooter() string {
 	var b strings.Builder
-	if m.mode == modeConfirm {
-		n := m.countSelected()
-		b.WriteString("\n")
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  Reclaim %d item(s) — a worktree's stack is stopped, its databases dropped and its", n)))
-		b.WriteString("\n")
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  directory removed; a job keeps its record and loses its scratch. Reclaims ~%s.", domain.HumanBytes(m.selectedBytes()))))
-		b.WriteString("\n")
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  type %q to confirm: %s▏", confirmWord, m.confirm)))
-		b.WriteString("\n")
-		return b.String()
-	}
 	b.WriteString("\n")
 	b.WriteString(m.renderDetail())
 	if m.anyDeletable() {
 		b.WriteString(styleDim.Render("  ↑↓ move · space toggle · a all · n none · s sort · enter delete · q quit"))
 	} else {
-		b.WriteString(styleDim.Render("  no other worktrees to prune · q quit"))
+		b.WriteString(styleDim.Render("  no other " + m.actions.Kind.Plural + " to prune · q quit"))
 	}
 	b.WriteString("\n")
 	if m.actions.SharedNote != "" {
@@ -255,7 +260,7 @@ func (m model) renderDetail() string {
 	b.WriteString("\n")
 	switch {
 	case !r.Deletable:
-		b.WriteString(styleDim.Render("  protected — never deleted by prune"))
+		b.WriteString(styleDim.Render("  " + protectedNote(r)))
 	case r.MetaKnown:
 		b.WriteString(styleDim.Render("  reclaims: " + reclaimDetail(r)))
 	default:

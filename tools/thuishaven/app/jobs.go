@@ -68,17 +68,32 @@ func (o *Orchestrator) ScanJobSizes(ctx context.Context, rows []JobRow, onSize f
 	})
 }
 
+// JobReclaimScope is how far a reclaim reaches into the terminal jobs. The
+// default excludes a job that finished within domain.JobScratchRecent: its
+// files are the ones somebody is still reading. IncludeRecentJobs is the single
+// deliberate opt-in that reaches them, and no unattended path ever passes it.
+type JobReclaimScope bool
+
+const (
+	// ColdJobsOnly reclaims only jobs classified cold — the default everywhere.
+	ColdJobsOnly JobReclaimScope = false
+	// IncludeRecentJobs also reclaims terminal jobs younger than
+	// domain.JobScratchRecent. Only `haven clean --include-recent` passes it.
+	IncludeRecentJobs JobReclaimScope = true
+)
+
 // ReclaimJobs deletes the scratch of the named job directories, keeping
 // state.json and timeline.jsonl in each — what the job was and what it did
 // survive its working files. It re-plans first and acts only on directories the
-// current plan still calls reclaimable. onDone is called once per input dir.
-func (o *Orchestrator) ReclaimJobs(dirs []string, onDone func(dir string, freed int64, err error)) {
+// current plan still calls reclaimable within scope. onDone is called once per
+// input dir.
+func (o *Orchestrator) ReclaimJobs(dirs []string, scope JobReclaimScope, onDone func(dir string, freed int64, err error)) {
 	report := func(dir string, freed int64, err error) {
 		if onDone != nil {
 			onDone(dir, freed, err)
 		}
 	}
-	allowed, err := o.reclaimableByDir()
+	allowed, err := o.reclaimableByDir(scope)
 	if err != nil {
 		for _, dir := range dirs {
 			report(dir, 0, err)
@@ -96,21 +111,32 @@ func (o *Orchestrator) ReclaimJobs(dirs []string, onDone func(dir string, freed 
 	}
 }
 
-// reclaimableByDir re-plans and indexes what the plan currently offers, so a
-// stale selection — a job that started running again between the scan and the
-// confirmation — is refused rather than acted on.
-func (o *Orchestrator) reclaimableByDir() (map[string]JobRow, error) {
+// reclaimableByDir re-plans and indexes what the plan currently offers within
+// scope, so a stale selection — a job that started running again between the
+// scan and the confirmation, or a recent one nobody asked for — is refused
+// rather than acted on.
+func (o *Orchestrator) reclaimableByDir(scope JobReclaimScope) (map[string]JobRow, error) {
 	rows, err := o.PlanJobs()
 	if err != nil {
 		return nil, err
 	}
 	allowed := map[string]JobRow{}
 	for i := range rows {
-		if rows[i].Reclaimable {
+		if InScope(rows[i].JobVerdict, scope) {
 			allowed[rows[i].Dir] = rows[i]
 		}
 	}
 	return allowed, nil
+}
+
+// InScope reports whether a verdict may be acted on at this scope. It is the one
+// place the cold rule is applied, so the picker, the unattended pass and the
+// daemon cannot drift apart on what "reclaimable" means.
+func InScope(v domain.JobVerdict, scope JobReclaimScope) bool {
+	if !v.Reclaimable {
+		return false
+	}
+	return v.Cold || scope == IncludeRecentJobs
 }
 
 // reclaimOne deletes one job's scratch and records the reclamation.
@@ -137,11 +163,11 @@ func errJobNotReclaimable(dir string) error {
 type jobNotReclaimableError struct{ dir string }
 
 func (e *jobNotReclaimableError) Error() string {
-	return filepath.Base(e.dir) + " is not reclaimable right now (in use, or still active)"
+	return filepath.Base(e.dir) + " is not reclaimable right now (in use, still active, or finished too recently — pass --include-recent)"
 }
 
 // reapJobScratch is the daemon's unattended pass: it reclaims every job the plan
-// calls reclaimable. Safe unattended in a way a database drop is not — the two
+// calls cold — never one that finished in the last two days. Safe unattended in a way a database drop is not — the two
 // record files are kept, and everything deleted is a finished (or week-cold)
 // run's working files, regenerable by re-running the job (ADR-064).
 func (o *Orchestrator) reapJobScratch() {
@@ -152,14 +178,14 @@ func (o *Orchestrator) reapJobScratch() {
 	}
 	var dirs []string
 	for _, r := range rows {
-		if r.Reclaimable {
+		if InScope(r.JobVerdict, ColdJobsOnly) {
 			dirs = append(dirs, r.Dir)
 		}
 	}
 	if len(dirs) == 0 {
 		return
 	}
-	o.ReclaimJobs(dirs, func(dir string, _ int64, rerr error) {
+	o.ReclaimJobs(dirs, ColdJobsOnly, func(dir string, _ int64, rerr error) {
 		if rerr != nil {
 			o.log.Warn("job scratch reap failed", zap.String("job", filepath.Base(dir)), zap.Error(rerr))
 		}

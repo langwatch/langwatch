@@ -104,7 +104,7 @@ haven db         this stack's data: `db seed [preset]` (reseed in place, drops
                  nothing) · `db reset [preset]` (fresh database, confirmed;
                  --yes for scripts) · `db url [engine]`. Presets: demo,
                  onboarding, post-onboarding, bare
-haven clean      one cleanup: interactive worktree picker + safe reclaim
+haven clean      one cleanup: worktree picker, then job-scratch picker, then safe reclaim
                  (build artifacts, orphaned processes); --yes applies only the
                  safe categories
 haven pr <ref>   try a GitHub PR in a fresh worktree (--allow-closed,
@@ -377,8 +377,11 @@ registry, and dashboard stay the same.
   the daemon removes every worktree classified temporary or merged (see
   `haven clean` below for both definitions) with `git worktree remove --force`
   plus a `git worktree prune`, logging one line per removal naming the reason,
-  and reclaims the scratch of every finished or week-cold agent job while
-  keeping its `state.json` and `timeline.jsonl`. It drops no database on this
+  and reclaims the scratch of every **cold** agent job — terminal for more than
+  48 hours, or untouched for a week — while
+  keeping its `state.json` and `timeline.jsonl`. A job that finished this
+  morning is never reclaimed unattended: the tail of a run is read long after
+  the run itself is `done`. It drops no database on this
   path — a database is not regenerable, so only the interactive picker, which
   shows exactly which are in scope, may drop one (ADR-064) — and it never
   touches a worktree that is dirty, live, the primary checkout, or the one haven
@@ -437,7 +440,15 @@ registry, and dashboard stay the same.
   loopback port. Production is never any of these — it always runs sandboxed under
   gVisor.
 
-- **`haven clean`.** One cleanup command. The interactive picker scans every
+- **`haven clean`.** One cleanup command, and **two pickers in turn** — worktrees
+  first, then agent job scratch. Never one merged list: the two kinds have
+  different guards and different consequences, and a single list invites ticking
+  one while reading the other. Every header, progress line and summary counts
+  the kind it is actually acting on, and every list is sorted **newest first**,
+  so recent work sits at the top of the screen where a mistaken tick is seen
+  rather than scrolled past.
+
+  The worktree picker scans every
   worktree at once (git + database facts on a fast queue, disk size via `du` on
   a slow one), pre-ticks everything idle 5+ days (`--stale-days N`), lets you
   sort and tick, then removes exactly those (stack stopped, databases dropped,
@@ -457,7 +468,7 @@ registry, and dashboard stay the same.
   - **merged** worktrees, whose branch is already an ancestor of `origin/main`
     (`git merge-base --is-ancestor`), at any age.
 
-  The same screen lists the reclaimable **agent jobs** under `~/.claude/jobs`
+  The second picker lists the reclaimable **agent jobs** under `~/.claude/jobs`
   (`HAVEN_JOBS_ROOT`) with their size, name, state and age. Reclaiming a job
   deletes its scratch — `tmp/`, worktree copies, logs — and keeps `state.json`
   and `timeline.jsonl`, so what the job was and what it did survive. A job is
@@ -466,13 +477,31 @@ registry, and dashboard stay the same.
   process still names, and the job haven itself was launched from
   (`HAVEN_JOB_DIR` / `CLAUDE_JOB_DIR`), are never touched.
 
-  `--yes` skips the picker and applies the safe categories, which now include
-  those two: everything they remove is regenerable — a temporary worktree is
+  Only a **cold** job is pre-ticked: terminal for more than 48 hours, or
+  untouched for a week. A job that finished more recently is listed held back
+  and cannot be ticked at all — `--include-recent` is the one thing that reaches
+  it, and no unattended path passes it.
+
+  Before anything goes, each picker shows a **one-screen confirmation**: the
+  kind, the count, the total size, and the five newest ticked rows with their
+  age, size and reason — the rows a mistake costs most, named where they are
+  read — behind the typed `delete`.
+
+  `--yes` skips both pickers and applies **exactly the pre-tick defaults**:
+  temporary and merged worktrees, cold job scratch, build artifacts and orphan
+  processes. Everything it removes is regenerable — a temporary worktree is
   scratch a tool makes on demand, a merged one's commits are already on main,
   and a job's scratch comes back by re-running the job. Databases are still
   never dropped unattended, and a worktree with uncommitted changes is never a
   candidate whatever its age. Agents (and any non-TTY) get the read-only report,
   which names both new categories, and delete nothing.
+
+  **Output discipline.** Exactly one thing owns stdout per run. In a terminal
+  the picker owns it and the structured log goes to `clean.log` under the haven
+  home; under `--agent`, `--yes`, or a piped stdout there is no spinner at all —
+  one plain line per item, then one summary counting each kind separately
+  ("reclaimed 158 job scratch dirs, 2.1 GB; 3 worktrees, 500 MB"). A zap record
+  never lands on the stream a progress render or a parsed line is using.
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
   typechecks across worktrees don't exhaust RAM (bounded by memory / CPU). The
   `typecheck` script slots itself too (`dev/scripts/check-queue.mjs`,

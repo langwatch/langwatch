@@ -10,6 +10,14 @@ import (
 // review of last Friday's run.
 const JobScratchIdle = 7 * 24 * time.Hour
 
+// JobScratchRecent is how long a finished job's scratch is treated as recent
+// work regardless of the state it recorded. A job that ended an hour ago is the
+// one whose files somebody is still opening — the tail of a run is read long
+// after the run itself is `done` — so its scratch is never pre-ticked and never
+// reclaimed unattended. Two days puts yesterday evening's run out of reach of a
+// cleanup run this morning.
+const JobScratchRecent = 48 * time.Hour
+
 // JobRecordFiles are the two files a reclaim always keeps: what the job was and
 // what it did. Everything else in the directory — a `tmp/` tree, worktree
 // copies, logs — is scratch the job produced on its way there, and can run to
@@ -55,10 +63,16 @@ type JobRecord struct {
 // one line explaining why, shown in the picker, the report and the daemon log.
 type JobVerdict struct {
 	Reclaimable bool
-	Reason      string
+	// Cold marks a job whose scratch is clearly beyond use: terminal for longer
+	// than JobScratchRecent, or untouched for JobScratchIdle. Only a cold job is
+	// pre-ticked in the picker or reclaimed unattended; a terminal job younger
+	// than that is offered to a person who asks for it by name and to nobody else.
+	Cold   bool
+	Reason string
 }
 
-// ClassifyJob decides whether a job's scratch may be reclaimed. A job in use is
+// ClassifyJob decides whether a job's scratch may be reclaimed, and whether it
+// is cold enough to reclaim without being asked twice. A job in use is
 // never touched — that guard comes before the state, because a state file
 // written minutes ago can already say `done` while the process that wrote it is
 // still tidying up. Otherwise a terminal job's scratch has no reader left, and a
@@ -69,12 +83,19 @@ func ClassifyJob(rec JobRecord, now time.Time) JobVerdict {
 		return JobVerdict{Reason: "in use by a live process"}
 	}
 	if IsTerminalJobState(rec.State) {
-		return JobVerdict{Reclaimable: true, Reason: "finished (" + rec.State + ")"}
+		age := JobAge(rec, now)
+		if age < JobScratchRecent {
+			return JobVerdict{
+				Reclaimable: true,
+				Reason:      "finished (" + rec.State + ") " + HumanAge(age) + " ago — recent",
+			}
+		}
+		return JobVerdict{Reclaimable: true, Cold: true, Reason: "finished (" + rec.State + ")"}
 	}
 	cutoff := now.Add(-JobScratchIdle)
 	if !rec.NewestMtime.IsZero() && !rec.NewestAtime.IsZero() &&
 		rec.NewestMtime.Before(cutoff) && rec.NewestAtime.Before(cutoff) {
-		return JobVerdict{Reclaimable: true, Reason: fmt.Sprintf("untouched %s", HumanAge(now.Sub(rec.NewestMtime)))}
+		return JobVerdict{Reclaimable: true, Cold: true, Reason: fmt.Sprintf("untouched %s", HumanAge(now.Sub(rec.NewestMtime)))}
 	}
 	return JobVerdict{Reason: "still active"}
 }

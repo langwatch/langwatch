@@ -423,10 +423,11 @@ var table = []commandSpec{
 	},
 	{
 		name:    "clean",
-		summary: "one cleanup: worktree picker, then safe reclaim (artifacts, orphan processes)",
+		summary: "one cleanup: worktree picker, then job-scratch picker, then safe reclaim",
 		flags: []flagSpec{
-			{long: "--yes", summary: "no picker: build artefacts + orphan processes only — never worktrees or databases"},
+			{long: "--yes", summary: "no pickers: apply exactly the pre-tick defaults — never a database"},
 			{long: "--stale-days", takesValue: true, value: "<n>", summary: "idle age pre-ticked for deletion"},
+			{long: "--include-recent", summary: "also reclaim agent jobs that finished within the last 48h"},
 		},
 		run: runClean,
 	},

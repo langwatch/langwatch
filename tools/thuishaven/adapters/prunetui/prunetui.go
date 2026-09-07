@@ -1,5 +1,6 @@
-// Package prunetui is the interactive prune picker: one screen listing every
-// worktree with the footprint deleting it would reclaim — disk size, its
+// Package prunetui is the interactive prune picker: one screen listing one kind
+// of reclaimable thing — worktrees, or agent job scratch, never the two merged
+// into a single list — with the footprint deleting it would reclaim — disk size, its
 // ClickHouse/Postgres databases, how long it has sat idle, and whether its branch
 // was merged and deleted upstream — with the stale ones pre-ticked so the common
 // cleanup is one keypress. Like hubtui it never imports the app core: it renders
@@ -20,6 +21,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // confirmWord is what the user types to arm the bulk delete — one deliberate act
@@ -44,6 +47,11 @@ type Row struct {
 	// deletes scratch and keeps the two record files. The zero value is a
 	// worktree, so every existing caller keeps its meaning.
 	Kind Kind
+	// Preselect pre-ticks a row whose facts are already complete when the picker
+	// opens — an agent job, whose classification needs no scan. Worktrees are
+	// pre-ticked later, as their meta pass lands. Either way the decision is the
+	// composition root's: the picker never invents one.
+	Preselect bool
 
 	MetaKnown  bool
 	HasCHDB    bool
@@ -93,17 +101,31 @@ type MetaResult struct {
 // moment it finishes, so the picker streams live progress instead of freezing on a
 // slow one. Threshold is the idle age at or beyond which a worktree is pre-ticked.
 type Actions struct {
-	Rows       []Row
-	Threshold  time.Duration
-	Scan       func(ctx context.Context, onMeta func(index int, meta MetaResult), onSize func(index int, bytes int64))
-	DeleteAll  func(ctx context.Context, dirs []string, onDone func(dir string, err error))
-	SharedNote string
+	Rows []Row
+	// Kind names what this picker reclaims, in the words every header, progress
+	// line and summary uses. One picker shows one kind.
+	Kind domain.ReclaimKind
+	// ConfirmNote is the one sentence the confirmation screen spells out about
+	// what reclaiming this kind actually does.
+	ConfirmNote string
+	Threshold   time.Duration
+	Scan        func(ctx context.Context, onMeta func(index int, meta MetaResult), onSize func(index int, bytes int64))
+	DeleteAll   func(ctx context.Context, dirs []string, onDone func(dir string, err error))
+	SharedNote  string
 }
 
-// Run blocks in the picker. It returns nil when the user quits or the deletions
-// finish; a non-nil error only for an unexpected TUI failure (a clean ctx-cancel
-// quit is nil).
-func Run(ctx context.Context, a Actions) error {
+// Result is what one picker run actually reclaimed, so the caller can tally the
+// kinds separately and print one summary for the whole cleanup.
+type Result struct {
+	Reclaimed int
+	Failed    int
+	Freed     int64
+}
+
+// Run blocks in the picker. It returns what was reclaimed, and nil when the user
+// quits or the deletions finish; a non-nil error only for an unexpected TUI
+// failure (a clean ctx-cancel quit is nil).
+func Run(ctx context.Context, a Actions) (Result, error) {
 	// A child context so a late scan callback can never block on a Send after the
 	// program has exited: cancelling it makes bubbletea's Send a no-op.
 	runCtx, cancel := context.WithCancel(ctx)
@@ -124,12 +146,15 @@ func Run(ctx context.Context, a Actions) error {
 			func(i int, bytes int64) { p.Send(sizeDoneMsg{index: i, bytes: bytes}) },
 		)
 	}
-	_, err := p.Run()
+	final, err := p.Run()
 	cancel()
 	if err != nil && ctx.Err() != nil { // ctrl+c via signal context is a clean quit
-		return nil
+		err = nil
 	}
-	return err
+	if fm, ok := final.(model); ok {
+		return Result{Reclaimed: fm.deletedOK, Failed: fm.deletedErr, Freed: fm.reclaimed}, err
+	}
+	return Result{}, err
 }
 
 type mode int
@@ -203,6 +228,13 @@ func newModel(ctx context.Context, a Actions) model {
 		selected: map[string]bool{},
 		touched:  map[string]bool{},
 		status:   map[string]string{},
+	}
+	// Rows that arrive already classified carry their own pre-tick; the rest are
+	// ticked by applyMeta when their scan lands.
+	for _, r := range m.rows {
+		if r.Preselect && r.Deletable {
+			m.selected[r.Dir] = true
+		}
 	}
 	m.order = m.computeOrder()
 	return m

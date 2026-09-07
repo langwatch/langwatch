@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -181,7 +182,7 @@ func TestReclaimingAJobKeepsItsRecord(t *testing.T) {
 		t.Run("when haven reclaims the reclaimable jobs", func(t *testing.T) {
 			var freedTotal int64
 			errs := map[string]error{}
-			o.ReclaimJobs([]string{dirs["done1"], dirs["busy1"]}, func(dir string, freed int64, err error) {
+			o.ReclaimJobs([]string{dirs["done1"], dirs["busy1"]}, IncludeRecentJobs, func(dir string, freed int64, err error) {
 				freedTotal += freed
 				errs[dir] = err
 			})
@@ -228,16 +229,20 @@ func TestReclaimingAJobKeepsItsRecord(t *testing.T) {
 func TestTheDaemonReclaimsFinishedJobScratch(t *testing.T) {
 	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
 	o, dirs := jobsOrch(t, now, []jobFixture{
-		{id: "done1", state: "done", touched: time.Hour},
+		{id: "done1", state: "done", touched: 3 * 24 * time.Hour},
+		{id: "recent1", state: "done", touched: time.Hour},
 		{id: "live1", state: "blocked", touched: time.Hour},
 	})
 
-	t.Run("given one finished job and one still active", func(t *testing.T) {
+	t.Run("given one cold finished job, one that finished an hour ago, and one still active", func(t *testing.T) {
 		t.Run("when the daemon runs its daily disk reclaim", func(t *testing.T) {
 			o.reapJobScratch()
 
 			if _, err := os.Stat(filepath.Join(dirs["done1"], "tmp")); !os.IsNotExist(err) {
 				t.Errorf("the finished job's scratch should be gone, stat gave %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(dirs["recent1"], "tmp")); err != nil {
+				t.Errorf("a job that finished an hour ago must survive an unattended pass: %v", err)
 			}
 			if _, err := os.Stat(filepath.Join(dirs["live1"], "tmp")); err != nil {
 				t.Errorf("an active job must be left entirely alone: %v", err)
@@ -273,4 +278,46 @@ func TestSizingSkipsJobsThatAreNotReclaimable(t *testing.T) {
 	if sized["busy1"] {
 		t.Error("a job in use must never be sized")
 	}
+}
+
+// @scenario "Reclaiming a job that finished within two days is refused unless asked for"
+func TestRecentlyFinishedJobsAreOutOfScopeByDefault(t *testing.T) {
+	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
+	o, dirs := jobsOrch(t, now, []jobFixture{
+		{id: "hot1", state: "done", touched: time.Hour},
+		{id: "cold1", state: "done", touched: 7 * 24 * time.Hour},
+	})
+
+	t.Run("given a job that finished an hour ago and one that finished a week ago", func(t *testing.T) {
+		t.Run("when a cleanup reclaims both without asking for the recent ones", func(t *testing.T) {
+			errs := map[string]error{}
+			o.ReclaimJobs([]string{dirs["hot1"], dirs["cold1"]}, ColdJobsOnly, func(dir string, _ int64, err error) {
+				errs[dir] = err
+			})
+
+			if _, err := os.Stat(filepath.Join(dirs["cold1"], "tmp")); !os.IsNotExist(err) {
+				t.Errorf("the week-old job's scratch should be gone, stat gave %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(dirs["hot1"], "tmp")); err != nil {
+				t.Errorf("a job that finished an hour ago must be untouched: %v", err)
+			}
+			if errs[dirs["hot1"]] == nil {
+				t.Fatal("reclaiming a recent job must be refused, not quietly skipped")
+			}
+			if !strings.Contains(errs[dirs["hot1"]].Error(), "--include-recent") {
+				t.Errorf("the refusal must name the flag that would reach it, got %q", errs[dirs["hot1"]])
+			}
+		})
+
+		t.Run("when the operator asks for the recent ones by name, the recent job goes too", func(t *testing.T) {
+			o.ReclaimJobs([]string{dirs["hot1"]}, IncludeRecentJobs, func(_ string, _ int64, err error) {
+				if err != nil {
+					t.Errorf("--include-recent must reach a recent job: %v", err)
+				}
+			})
+			if _, err := os.Stat(filepath.Join(dirs["hot1"], "tmp")); !os.IsNotExist(err) {
+				t.Errorf("the recent job's scratch should be gone, stat gave %v", err)
+			}
+		})
+	})
 }
