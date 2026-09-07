@@ -51,6 +51,7 @@ type McpServerLike = {
   ): unknown;
 };
 
+import { auditLog } from "../../ee/audit-log/auditLog";
 import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
 import type { Permission } from "../server/api/rbac";
@@ -318,7 +319,7 @@ export function registerGovernanceMcpTools(
       }
       const denied = await requireRead(r, "organization:view");
       if (denied) return text(denied);
-      const rows = await ingestionKeyService.listForPersonalProject({
+      const rows = await ingestionKeyService.list({
         userId: r.callerUserId,
         organizationId: r.organizationId,
       });
@@ -328,7 +329,7 @@ export function registerGovernanceMcpTools(
 
   server.tool(
     "governance_ingestion_keys_mint",
-    "Mint an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown ONCE). Minting adds a key rather than replacing one, so the keys other machines already export with keep working; the only exception is the per-source cap, which retires the least recently used key once the workspace holds 32 of them. source_type must be a tool the LangWatch CLI wraps, or match a published ingestion template named by template_id. Requires OAuth-authenticated session + organization:view.",
+    "Mint an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown ONCE). Minting adds a key rather than replacing one, so the keys other machines already export with keep working. source_type must match a published ingestion template named by template_id; a tool the LangWatch CLI wraps (claude_code, codex, gemini, opencode, copilot_*) is refused here, because its key is minted by the CLI on the machine that runs it and retired with that machine's session. Requires OAuth-authenticated session + organization:view.",
     {
       source_type: z.string(),
       template_id: z.string().optional(),
@@ -337,16 +338,49 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requirePermission(r, "organization:view");
       if (denied) return text(denied);
-      // Create-only: an agent asking for a key for the machine it runs on
-      // must not revoke the key every other machine under this login is
-      // exporting with. The explicit rotate lives on the /me tile.
-      const result = await ingestionKeyService.createForPersonalProject({
+      // Create-only: an agent asking for a key must not revoke the key every
+      // other machine under this login is exporting with. The explicit
+      // rotate lives on the /me tile.
+      const result = await ingestionKeyService.mint({
         userId: r.callerUserId!,
         organizationId: r.organizationId,
         sourceType: source_type,
         ingestionTemplateId: template_id ?? null,
       });
+      void auditLog({
+        userId: r.callerUserId!,
+        organizationId: r.organizationId,
+        action: "ingestionKey.mint",
+        args: {
+          apiKeyId: result.apiKeyId,
+          sourceType: source_type,
+          surface: SURFACE,
+        },
+      });
       return json(result);
+    },
+  );
+
+  server.tool(
+    "governance_ingestion_keys_revoke",
+    "Revoke one of the caller's own ingestion keys by api_key_id (from governance_ingestion_keys_list). The token stops authorizing trace writes from that moment; past traces stay. Idempotent: a key already revoked stays revoked. Another person's key answers ingestion_key_not_found. Requires OAuth-authenticated session + organization:view.",
+    { api_key_id: z.string() },
+    async ({ api_key_id }) => {
+      const r = await resolve();
+      const denied = await requirePermission(r, "organization:view");
+      if (denied) return text(denied);
+      await ingestionKeyService.revoke({
+        userId: r.callerUserId!,
+        organizationId: r.organizationId,
+        apiKeyId: api_key_id,
+      });
+      void auditLog({
+        userId: r.callerUserId!,
+        organizationId: r.organizationId,
+        action: "ingestionKey.revoke",
+        args: { apiKeyId: api_key_id, surface: SURFACE },
+      });
+      return text(`revoked ${api_key_id}`);
     },
   );
 }

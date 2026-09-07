@@ -15,15 +15,20 @@ import { createLogger } from "@langwatch/observability";
  * `client_info.session_started_at` to fold rotated access tokens
  * under their parent session.
  *
- * Revoke is a per-session op (delete the access + refresh tokens
- * matching one session_started_at). The existing
- * `CliTokenRevocationService.revokeForUser` is the user-wide revoke
- * (Phase 1B.5); this service adds the per-session granularity.
+ * Revoke is a per-session op: the session's CLI login key is revoked first,
+ * which retires the ingest keys parented to it, then the access + refresh
+ * tokens matching one session_started_at are deleted. Revoke-all does the
+ * same for every session, then clears the per-user index through
+ * `CliTokenRevocationService.revokeForUser`.
  *
  * Spec: specs/ai-governance/sessions/sessions-inventory.feature
+ * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
 import type { Cluster, Redis } from "ioredis";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { CliLoginKeyService } from "~/server/api-key/cli-login-key.service";
 import { tryGetApp } from "~/server/app-layer/app";
+import { prisma as defaultPrisma } from "~/server/db";
 
 import { CliTokenRevocationService } from "./cliTokenRevocation.service";
 
@@ -51,6 +56,13 @@ export interface CliSession {
   lastSeenMs: number;
   /** Refresh-token TTL ceiling. */
   expiresAtMs: number;
+  /** The organization the session signed in to. */
+  organizationId: string;
+  /**
+   * The CLI login key /exchange minted for the session, which its ingest
+   * keys are parented to. Null for sessions that minted no key.
+   */
+  cliApiKeyId: string | null;
   /**
    * Tokens belonging to this session (access + refresh). The revoke
    * path deletes these from Redis + scrubs them from the per-user
@@ -59,11 +71,19 @@ export interface CliSession {
   tokenKeys: string[];
 }
 
+/** What a revoke did, for the person who asked. */
+export interface CliSessionRevocation {
+  revokedTokens: number;
+  /** Login keys and the ingest keys retired under them. */
+  revokedKeys: number;
+}
+
 interface AccessOrRefreshRecord {
   user_id: string;
   organization_id: string;
   issued_at: number;
   expires_at: number;
+  cli_api_key_id?: string;
   client_info?: {
     device_label?: string;
     hostname?: string;
@@ -74,20 +94,33 @@ interface AccessOrRefreshRecord {
 }
 
 export class CliSessionInventoryService {
-  constructor(private readonly injectedRedis?: RedisLike | null) {}
+  constructor(
+    private readonly injectedRedis: RedisLike | null | undefined,
+    private readonly injectedPrisma: PrismaClient | undefined,
+  ) {}
 
   /**
-   * Builds the service. Takes a connection when the caller has one; otherwise
-   * the App's is resolved when a read actually runs, so constructing this
-   * never demands an App (ADR-093).
+   * Builds the service. Takes connections when the caller has them;
+   * otherwise the App's are resolved when a read actually runs, so
+   * constructing this never demands an App (ADR-093).
    */
-  static create(redis?: RedisLike | null): CliSessionInventoryService {
-    return new CliSessionInventoryService(redis);
+  static create({
+    redis,
+    prisma,
+  }: {
+    redis?: RedisLike | null;
+    prisma?: PrismaClient;
+  } = {}): CliSessionInventoryService {
+    return new CliSessionInventoryService(redis, prisma);
   }
 
   /** The injected connection, else the App's, resolved at the point of use. */
   private get redis(): RedisLike | undefined {
     return this.injectedRedis ?? tryGetApp()?.redis ?? void 0;
+  }
+
+  private get prisma(): PrismaClient {
+    return this.injectedPrisma ?? defaultPrisma;
   }
 
   async listForUser({ userId }: { userId: string }): Promise<CliSession[]> {
@@ -161,6 +194,10 @@ export class CliSessionInventoryService {
         platform: fresh.client_info?.platform ?? null,
         lastSeenMs,
         expiresAtMs,
+        organizationId: fresh.organization_id,
+        cliApiKeyId:
+          bucket.records.find((record) => record.cli_api_key_id)
+            ?.cli_api_key_id ?? null,
         tokenKeys: bucket.tokenKeys,
       });
     }
@@ -170,10 +207,10 @@ export class CliSessionInventoryService {
   }
 
   /**
-   * Revoke a single session by its sessionStartedAtMs. Deletes every
-   * access + refresh token belonging to that session and scrubs them
-   * from the per-user index. Other sessions for the same user are
-   * untouched.
+   * Revoke a single session by its sessionStartedAtMs: its login key and
+   * the ingest keys under it first, then every access + refresh token
+   * belonging to it, scrubbed from the per-user index. Other sessions for
+   * the same user are untouched.
    */
   async revokeSession({
     userId,
@@ -181,33 +218,102 @@ export class CliSessionInventoryService {
   }: {
     userId: string;
     sessionStartedAtMs: number;
-  }): Promise<{ revokedTokens: number }> {
+  }): Promise<CliSessionRevocation> {
     if (!this.redis) {
-      return { revokedTokens: 0 };
+      return { revokedTokens: 0, revokedKeys: 0 };
     }
     const sessions = await this.listForUser({ userId });
     const target = sessions.find(
       (s) => s.sessionStartedAtMs === sessionStartedAtMs,
     );
     if (!target) {
-      return { revokedTokens: 0 };
+      return { revokedTokens: 0, revokedKeys: 0 };
     }
 
+    const revokedKeys = await this.revokeLoginKey({ userId, session: target });
+    const revokedTokens = await this.deleteTokens({ userId, session: target });
+    return { revokedTokens, revokedKeys };
+  }
+
+  /**
+   * Revoke every session of the user: each session's login key and ingest
+   * keys, then every token, then the per-user index in one shot.
+   */
+  async revokeAllSessions({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<CliSessionRevocation> {
+    if (!this.redis) {
+      return { revokedTokens: 0, revokedKeys: 0 };
+    }
+    let revokedKeys = 0;
+    for (const session of await this.listForUser({ userId })) {
+      revokedKeys += await this.revokeLoginKey({ userId, session });
+    }
+    const { revokedCount } = await CliTokenRevocationService.create(
+      this.redis,
+    ).revokeForUser({ userId });
+    return { revokedTokens: revokedCount, revokedKeys };
+  }
+
+  /**
+   * The key side of a revoke, before the tokens go: a person revoking a
+   * device from the inventory means the machine stops, telemetry included.
+   * A failure here is logged and the tokens are still deleted, so the device
+   * is signed out either way and the sweep retires the key later.
+   */
+  private async revokeLoginKey({
+    userId,
+    session,
+  }: {
+    userId: string;
+    session: CliSession;
+  }): Promise<number> {
+    if (!session.cliApiKeyId) return 0;
+    try {
+      const result = await CliLoginKeyService.create(
+        this.prisma,
+      ).revokeSessionKey({
+        apiKeyId: session.cliApiKeyId,
+        userId,
+        organizationId: session.organizationId,
+        cause: "user",
+      });
+      return (result.loginKeyRevoked ? 1 : 0) + result.ingestKeysRevoked;
+    } catch (error) {
+      logger.warn(
+        { error, userId, apiKeyId: session.cliApiKeyId },
+        "could not revoke the login key of a revoked CLI session",
+      );
+      return 0;
+    }
+  }
+
+  private async deleteTokens({
+    userId,
+    session,
+  }: {
+    userId: string;
+    session: CliSession;
+  }): Promise<number> {
+    const redis = this.redis;
+    if (!redis) return 0;
     let revokedTokens = 0;
-    for (const tokenKey of target.tokenKeys) {
-      const deleted = await this.redis.del(tokenKey);
+    for (const tokenKey of session.tokenKeys) {
+      const deleted = await redis.del(tokenKey);
       if (deleted > 0) revokedTokens += deleted;
     }
     // SREM the revoked keys from the per-user index. Leaving them as
     // dead members is harmless but the index would grow unbounded
     // across many rotations + revokes.
     const indexKey = CliTokenRevocationService.userTokensIndexKey(userId);
-    if (target.tokenKeys.length > 0) {
+    if (session.tokenKeys.length > 0) {
       // SREM accepts variadic keys; cluster-safe since we operate on a
       // single SET key.
-      await this.redis.srem(indexKey, ...target.tokenKeys);
+      await redis.srem(indexKey, ...session.tokenKeys);
     }
-    return { revokedTokens };
+    return revokedTokens;
   }
 }
 

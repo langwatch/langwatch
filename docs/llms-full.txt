@@ -10866,19 +10866,21 @@ A few resource-shape notes that generalise across the namespace:
 - **Resource-specific verbs**: `update-ottl-rules` (instead of generic `update`) and `clone-from-platform` (instead of generic `create`) reflect the domain, admins don't generically PATCH every field; they specifically replace OTTL or clone a platform row. Other resources will introduce their own resource-specific verbs (`rotate` on ingestion sources, `assign-to-user` on role bindings, `revoke` on sessions) the same way.
 - **Error mapping**: `403 PlatformTemplateImmutable` (admin tried to PATCH a platform-published row), `404 TemplateNotFound` (cross-org probe), `400 InvalidSourceType`, validation. All map to a common `errorSchema` with `{ type, code, message }`.
 
-The second resource to ship is `ingestion-keys` (Sergey's Lane B-2 commit at `5275e7e11`). An ingestion key is just an `ApiKey` (prefix `sk-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate`):
+The second resource to ship is `ingestion-keys`. An ingestion key is just an `ApiKey` (prefix `ik-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate` / `revoke`):
 
 | Verb | Method + path | Returns | RBAC |
 |---|---|---|---|
-| `mint` | `POST /api/auth/cli/governance/ingestion-key` (body `{ source_type }`) | `{ token: "sk-lw-…", prefix, endpoint }` (token returned exactly once) | `aiTools:manage` |
-| `list` | tRPC `ingestionKey.list` | `{ data: IngestionKeyDto[] }` (project-scoped; only the `sk-lw-` prefix is visible, never the full token) | `aiTools:manage` |
-| `install` | tRPC `ingestionKey.install` | `{ key: ..., token: "sk-lw-…" }` (token returned exactly once) | `aiTools:manage` |
-| `rotate` | tRPC `ingestionKey.rotate` | `{ key: ..., token: "sk-lw-…" }` (hard-cut rotation per spec, old token is invalid immediately) | `aiTools:manage` |
+| `mint` | `POST /api/auth/cli/governance/ingestion-key` (body `{ source_type }`) | `{ token: "ik-lw-…", prefix, endpoint }` (token returned exactly once) | device session |
+| `list` | tRPC `ingestionKey.list` | one row per live key: `apiKeyId`, `sourceType`, `deviceLabel`, `parentApiKeyId`, `createdAtMs`, `lastUsedAtMs` (never the token) | `organization:view` |
+| `install` | tRPC `ingestionKey.install` | `{ token: "ik-lw-…", prefix, apiKeyId }` (token returned exactly once) | `organization:view` |
+| `rotate` | tRPC `ingestionKey.rotate` | the same plus `revokedCount` and `revokedDeviceLabels` (every previous key for the source is refused immediately) | `organization:view` |
+| `revoke` | tRPC `ingestionKey.revoke` (`{ apiKeyId }`) | `{ success: true }`; idempotent, another person's key answers `ingestion_key_not_found` | `organization:view` |
 
-Two consequences:
+Three consequences:
 
-- **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `sk-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
+- **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `ik-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
 - **`source_type` selects the shaping**: the mint body's `source_type` records which upstream tool the key ingests for, so the gateway can apply the matching ingestion-template OTTL transform when traces arrive on that key. A key minted for an org-authored template carries that template's id.
+- **A CLI key follows its session**: a key the CLI mints stores the session's login key as `parentApiKeyId`. Logout, a revoke from the devices tab, a re-login from the same device and session expiry all revoke the login key, and every key parented to it is revoked with cause `session` (or `expired`). A mint from a session whose login key is already revoked answers 401. `install` and the MCP mint have no session and accept only source types a published template names; a tool the CLI wraps answers `ingestion_key_source_not_allowed` there.
 
 The Zod schemas backing each request and response body are the same schemas the corresponding service-layer function consumes. The OpenAPI generator (`describeRoute` + `hono-openapi`) reads them directly, so the spec and the runtime are guaranteed in sync.
 
@@ -10922,7 +10924,7 @@ SELECT * FROM "AuditLog"
 
 All four rows have **identical** payload shapes apart from the `metadata.surface` field, same event kind, same target, same actor. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
 
-The mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform` on templates; `install`, `rotate` on ingestion keys) all carry surface attribution as of Sergey's Lane B-3 commit at `fc6d54100`. Minting or rotating an ingestion key emits a `gateway.ingestion_key.minted` audit row, and revoking one emits `gateway.ingestion_key.revoked`.
+The mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform` on templates; `install`, `rotate`, `revoke` on ingestion keys) all carry surface attribution. Minting an ingestion key emits an `ingestionKey.mint` audit row, rotating a source emits `ingestionKey.rotate` with the count of keys it revoked, and revoking one emits `ingestionKey.revoke`.
 
 ## Verifying the contract
 
@@ -13537,6 +13539,7 @@ governance_ingestion_templates_clone_from_platform
 
 governance_ingestion_keys_list
 governance_ingestion_keys_mint
+governance_ingestion_keys_revoke
 
 governance_anomaly_rules_list
 governance_anomaly_rules_create
@@ -13613,7 +13616,8 @@ Every state-changing tool call emits an audit row with `AuditLog.metadata.surfac
 |---|---|
 | `governance_anomaly_rules_create` | `gateway.anomaly_rule.created` (`metadata.surface = "mcp"`) |
 | `governance_ingestion_templates_clone_from_platform` | `gateway.ingestion_template.cloned` (`metadata.surface = "mcp"`) |
-| `governance_ingestion_keys_mint` | `gateway.ingestion_key.minted` (`metadata.surface = "mcp"`) |
+| `governance_ingestion_keys_mint` | `ingestionKey.mint` (`args.surface = "mcp"`) |
+| `governance_ingestion_keys_revoke` | `ingestionKey.revoke` (`args.surface = "mcp"`) |
 | `governance_role_bindings_assign_to_user` | `organization.roleBinding.assignedToUser` (`metadata.surface = "mcp"`) |
 
 Payload shapes are identical to the REST API's audit rows apart from `metadata.surface`, every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
