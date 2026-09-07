@@ -118,11 +118,26 @@ export type ApiGovernanceIngestRestOptions = Readonly<{
  * Composes the receiver ports, or none. Absent without the governance capability, the
  * project mint, the trace collection or the database.
  */
+type RequiredGovernanceIngestPorts = {
+  governance: GovernanceService;
+  projects: Pick<GovernanceInternalProjectPort, "ensureInternal">;
+  traceCollection: GovernanceIngestTraceCollectionPort;
+  prisma: PrismaClient;
+};
+
+/** Narrows to the ingest ports only when every one of them is present. */
+function hasAllGovernanceIngestPorts(
+  options: ApiGovernanceIngestRestOptions,
+): options is ApiGovernanceIngestRestOptions & RequiredGovernanceIngestPorts {
+  const { governance, projects, traceCollection, prisma } = options;
+  return Boolean(governance && projects && traceCollection && prisma);
+}
+
 export function composeApiGovernanceIngestRest(
   options: ApiGovernanceIngestRestOptions,
 ): GovernanceIngestRestPorts | undefined {
+  if (!hasAllGovernanceIngestPorts(options)) return undefined;
   const { governance, projects, traceCollection, prisma } = options;
-  if (!governance || !projects || !traceCollection || !prisma) return undefined;
 
   return {
     governance: () => governance,

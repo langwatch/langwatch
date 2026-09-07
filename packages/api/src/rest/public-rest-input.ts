@@ -121,7 +121,8 @@ async function readJsonObject(
  */
 async function readBodyWithinCap(context: Context, maxInputBytes: number): Promise<string> {
   const body = context.req.raw.body;
-  if (!body || context.req.raw.bodyUsed) {
+  const needsBuffering = !body || context.req.raw.bodyUsed;
+  if (needsBuffering) {
     const buffered = await context.req.text();
     if (new TextEncoder().encode(buffered).byteLength > maxInputBytes) {
       throw inputError("request_too_large", "Request body exceeds the configured size limit");

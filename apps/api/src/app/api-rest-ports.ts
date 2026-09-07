@@ -81,12 +81,12 @@ export function createPlatformUrlBuilder(publicBaseUrl: string | undefined): Pla
  * and callers match plain field names either way.
  */
 export function uniqueConstraintTargets(error: unknown): string[] {
-  if (
-    typeof error !== "object" ||
-    error === null ||
-    !("code" in error) ||
-    (error as { code: unknown }).code !== "P2002"
-  ) {
+  const isPrismaUniqueConstraintError =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: unknown }).code === "P2002";
+  if (!isPrismaUniqueConstraintError) {
     return [];
   }
   const dequote = (value: unknown) => String(value).replace(/^"(.*)"$/, "$1");

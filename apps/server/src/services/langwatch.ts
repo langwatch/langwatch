@@ -86,7 +86,8 @@ async function ensureNodeModules(
   ctx: RuntimeContext,
   bus: EventBus,
 ): Promise<void> {
-  if (existsSync(join(langwatchDir, "node_modules"))) return;
+  const hasNodeModules = existsSync(join(langwatchDir, "node_modules"));
+  if (hasNodeModules) return;
   bus.emit({
     type: "log",
     service: "langwatch",

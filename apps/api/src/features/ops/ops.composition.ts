@@ -401,10 +401,11 @@ export function composeOpsCheck(ops: Pick<OpsApp, "isAdmin">) {
         const user = context.session?.user;
         if (!user) throw new ApiOpsUnauthenticatedError();
 
-        const scope: { kind: "platform" | "none" } =
-          ops.isAdmin({ email: user.email }) || ops.isAdmin({ email: user.impersonator?.email })
-            ? { kind: "platform" }
-            : { kind: "none" };
+        const isPlatformAdmin =
+          ops.isAdmin({ email: user.email }) || ops.isAdmin({ email: user.impersonator?.email });
+        const scope: { kind: "platform" | "none" } = isPlatformAdmin
+          ? { kind: "platform" }
+          : { kind: "none" };
 
         if (scope.kind === "none" && throwOnDeny) {
           throw new ApiOperatorForbiddenError();

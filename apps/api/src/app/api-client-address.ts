@@ -100,7 +100,8 @@ function forwardedAddress(
 /** One address, or nothing when the text is not one. */
 function parseAddress(value: string): string | null {
   const address = value.replace(/^\s*::ffff:/, "").trim();
-  return IPV4.test(address) || IPV6.test(address) ? address : null;
+  const isIpAddress = IPV4.test(address) || IPV6.test(address);
+  return isIpAddress ? address : null;
 }
 
 function isTrustedProxy(address: string, trusted: readonly string[]): boolean {
@@ -113,7 +114,8 @@ function isTrustedProxy(address: string, trusted: readonly string[]): boolean {
 function withinIpv4Range(address: string, range: string): boolean {
   const [network, prefix] = range.split("/");
   const bits = Number(prefix);
-  if (network === undefined || !Number.isInteger(bits) || bits < 0 || bits > 32) return false;
+  const hasValidPrefix = network !== undefined && Number.isInteger(bits) && bits >= 0 && bits <= 32;
+  if (!hasValidPrefix) return false;
 
   const target = ipv4AsNumber(address);
   const base = ipv4AsNumber(network);

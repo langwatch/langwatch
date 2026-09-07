@@ -9,17 +9,18 @@ export type ScenarioResult = Awaited<ReturnType<typeof runScenarioAndLog>>;
  * adapter returned, so both shapes are handled here rather than at each call
  * site.
  */
+/** The text of one content part, whichever of the two shapes it arrived in. */
+function partText(part: unknown): string {
+  if (typeof part === "string") return part;
+  const text = (part as { text?: unknown })?.text;
+  return typeof text === "string" ? text : "";
+}
+
 function flattenContent(content: unknown): string {
   if (typeof content === "string") return content.trim();
   if (!Array.isArray(content)) return "";
   return content
-    .map((part) =>
-      typeof part === "string"
-        ? part
-        : typeof (part as { text?: unknown })?.text === "string"
-          ? (part as { text: string }).text
-          : "",
-    )
+    .map((part) => partText(part))
     .join("")
     .trim();
 }

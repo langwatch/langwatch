@@ -67,7 +67,8 @@ export async function startPostgres(ctx: RuntimeContext, bus: EventBus): Promise
   const dataDir = ctx.paths.postgresData;
   const sp = servicePaths(ctx.paths);
 
-  if (!existsSync(join(dataDir, "PG_VERSION"))) {
+  const hasVersionFile = existsSync(join(dataDir, "PG_VERSION"));
+  if (!hasVersionFile) {
     await initdb(layout, dataDir, env);
   }
 

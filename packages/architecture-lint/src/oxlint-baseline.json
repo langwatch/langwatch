@@ -4626,27 +4626,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|apps/api/scripts/check-gateway-control-plane.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|apps/api/src/app-rest/app-rest.packaged-families.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/app-static/app-static.handler.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/app-static/app-static.storage-connect-src.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/app-static/app-static.surface.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/app/api-client-address.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4658,59 +4638,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|apps/api/src/app/api-key-request-credentials.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|apps/api/src/app/api-production.composition.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/app/api-rest-ports.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/analytics/__tests__/saved-workbench-charts-trpc.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/auth/auth-cli-device-flow-rest.mount.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/auth/auth-rest.mount.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/cron/cron-rest.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/discovery/__tests__/legacy-response-fields-optional.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/discovery/openapi-serve.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/enterprise/governance-cli-rest.mount.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/enterprise/governance-ingest-rest.mount.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/langy/langy-rest.mount.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/ops/ops.composition.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/features/role/role.composition.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4722,15 +4650,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|apps/api/src/features/trace/trace-producer.composition.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|apps/api/src/platform/config/api.config.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/api/src/platform/infrastructure/api-database.infrastructure.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4746,47 +4666,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|apps/server/src/predeps/redis.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/server/src/services/app-dir.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/server/src/services/env-file.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/server/src/services/langevals.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/server/src/services/langwatch.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/server/src/services/langy-cli.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|apps/server/src/services/node-deps.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/server/src/services/postgres.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/server/src/services/venvs.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/server/src/shared/paths.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/server/src/task/task.executable.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4798,22 +4678,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|apps/ui/e2e/dogfood-claude-code-install.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/ui/e2e/langy/langwatch-api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/ui/e2e/langy/langy-local-connected-agent.scenario.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/ui/e2e/langy/langy-prompt-optimization.scenario.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|apps/ui/e2e/langy/local-control-fixture.ts",
       "measured": "2026-09-06"
     },
@@ -4822,19 +4686,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|apps/ui/src/model/errors/__tests__/codes.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/ui/src/model/errors/__tests__/handled-error-messages.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|apps/ui/src/model/errors/__tests__/no-raw-error-toasts.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/ui/src/ui/sections/ui-page-guard.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -4842,27 +4694,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|apps/ui/vite/dev-logging.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/worker/scripts/build-server.mjs",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|apps/worker/src/app/__tests__/worker-automation-settlement.composition.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/worker/src/app/__tests__/worker-gateway-spend.composition.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/worker/src/app/__tests__/worker-langy-conversation.composition.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/worker/src/app/__tests__/worker-scenario-processing.composition.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4871,18 +4703,6 @@
     },
     {
       "key": "condition-shape|apps/worker/src/app/worker-production.composition.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/worker/src/platform/infrastructure/worker-clickhouse.infrastructure.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/worker/src/platform/infrastructure/worker-stored-object-storage.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|apps/worker/tests/e2e/code-agent/auth0-code-agent.scenario.test.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4938,14 +4758,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/api/src/rest/__tests__/openapi-docs.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/api/src/rest/__tests__/raw-body-and-response.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/api/src/rest/builder.ts",
       "measured": "2026-09-06"
     },
@@ -4955,18 +4767,6 @@
     },
     {
       "key": "condition-shape|packages/api/src/rest/idempotency-ledger.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/api/src/rest/public-rest-input.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/api/src/rest/rest-version-selector.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/api/src/rest/v1-alias.ts",
       "measured": "2026-09-06"
     },
     {
@@ -7174,14 +6974,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/api/src/api-secret-rest.feature.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|apps/api/src/app-rest/__tests__/api-rest.teams-family.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|apps/api/src/app/api-authoring-rest.composition.ts",
       "measured": "2026-09-06"
     },
@@ -7194,31 +6986,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/api/src/features/agent/agent-platform-url.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|apps/api/src/features/enterprise/__tests__/governance-cli-rest.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|apps/api/src/features/gateway/__tests__/gateway-cached-call-cost-agreement.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|apps/api/src/features/gateway/__tests__/gateway.composition.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|apps/api/src/features/langy/langy.composition.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|apps/api/src/features/organization/__tests__/tenant-features.composition.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|apps/api/src/features/role/__tests__/role-trpc.mount.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
@@ -7226,19 +6994,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/api/src/features/scenario/__tests__/scenario.composition.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|apps/api/src/features/stored-object/__tests__/product-storage.composition.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|apps/api/src/features/trace/__tests__/trace.composition.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|apps/ui/e2e/langy/scenario-transcript.ts",
       "measured": "2026-09-06"
     },
     {
@@ -7307,14 +7063,6 @@
     },
     {
       "key": "nested-ternary|packages/api/src/trpc/trpc-call-logging.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/api/src/trpc/trpc-error-formatter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/api/src/trpc/trpc-service-builder.ts",
       "measured": "2026-09-06"
     },
     {

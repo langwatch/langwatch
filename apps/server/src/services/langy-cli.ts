@@ -33,12 +33,12 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
   // The entrypoint is part of the fast-path condition: a pruned or
   // half-deleted cli/node_modules with the marker still present would
   // otherwise leave a shim pointing at nothing until the pin next moved.
-  if (
+  const shimIsCurrent =
     existsSync(marker) &&
     readFileSync(marker, "utf8").trim() === LANGY_CLI_VERSION &&
     existsSync(shim) &&
-    existsSync(entry)
-  ) {
+    existsSync(entry);
+  if (shimIsCurrent) {
     return;
   }
 

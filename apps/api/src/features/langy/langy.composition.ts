@@ -378,6 +378,27 @@ class UnavailableApiLangyUiActionCatalog extends LangyUiActionCatalogPort {
  * The two gates every customer-facing Langy procedure carries, built here
  * because neither is a permission.
  */
+/** The feature-flag target for a caller: project, then organization, then bare user. */
+function langyFeatureFlagTarget(input: {
+  userId: string;
+  projectId: string | undefined;
+  organizationId: string | undefined;
+}): FeatureFlagTarget {
+  const { userId, projectId, organizationId } = input;
+  if (projectId) {
+    return {
+      kind: "project",
+      userId,
+      projectId,
+      ...(organizationId ? { organizationId } : {}),
+    };
+  }
+  if (organizationId) {
+    return { kind: "organization", userId, organizationId };
+  }
+  return { kind: "user", userId };
+}
+
 function composeLangyGates(options: LangyFeatureCollaborators) {
   /**
    * Refuses the demo project outright. `project:view` is granted to every authenticated
@@ -415,16 +436,7 @@ function composeLangyGates(options: LangyFeatureCollaborators) {
       input.organizationId ??
       (input.projectId ? await options.projects.getOrganizationId(input.projectId) : undefined);
 
-    const target: FeatureFlagTarget = input.projectId
-      ? {
-          kind: "project",
-          userId,
-          projectId: input.projectId,
-          ...(organizationId ? { organizationId } : {}),
-        }
-      : organizationId
-        ? { kind: "organization", userId, organizationId }
-        : { kind: "user", userId };
+    const target = langyFeatureFlagTarget({ userId, projectId: input.projectId, organizationId });
 
     if (!(await options.featureFlags.isEnabled(LANGY_RELEASE_FLAG, target))) {
       // A typed handled error, not a bare NOT_FOUND: the client tells a rollout

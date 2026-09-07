@@ -76,13 +76,30 @@ export type ApiGovernanceCliRestOptions = Readonly<{
  * tenant; without AuthZ there is no permission check and any member could read
  * every ingestion source in the organization.
  */
+type RequiredGovernanceCliPorts = {
+  governance: GovernanceService;
+  accessTokens: GovernanceCliAccessTokenPort;
+  prisma: PrismaClient;
+  organizations: OrganizationApp;
+  plans: PlanProvider;
+  authz: AuthzService;
+};
+
+/** Narrows to the CLI governance ports only when every one of them is present. */
+function hasAllGovernanceCliPorts(
+  options: ApiGovernanceCliRestOptions,
+): options is ApiGovernanceCliRestOptions & RequiredGovernanceCliPorts {
+  const { governance, accessTokens, prisma, organizations, plans, authz } = options;
+  return Boolean(governance && accessTokens && prisma && organizations && plans && authz);
+}
+
 export function composeApiGovernanceCliRest(
   options: ApiGovernanceCliRestOptions,
 ): GovernanceCliRestPorts | undefined {
-  const { governance, accessTokens, prisma, organizations, plans, authz } = options;
-  if (!governance || !accessTokens || !prisma || !organizations || !plans || !authz) {
+  if (!hasAllGovernanceCliPorts(options)) {
     return undefined;
   }
+  const { governance, accessTokens, prisma, organizations, plans, authz } = options;
 
   const ensurePersonalWorkspace = async (input: {
     organizationId: string;

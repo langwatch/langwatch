@@ -500,12 +500,13 @@ function buildProcedure({
   // The parser FIRST, then the policy: a check installed ahead of `.input()`
   // reads `undefined` and silently authorizes nothing.
   const parsed = state.input ? procedure.input(state.input) : procedure;
-  const guarded =
-    validateOutput && state.output
-      ? kind === "subscription"
+  let guarded = handler;
+  if (validateOutput && state.output) {
+    guarded =
+      kind === "subscription"
         ? guardStream(name, state.output, handler, parseOutput ?? false)
-        : guardOutput(name, state.output, handler, parseOutput ?? false)
-      : handler;
+        : guardOutput(name, state.output, handler, parseOutput ?? false);
+  }
   const decorated = state.policy(parsed);
   if (kind === "query") return decorated.query(guarded);
   if (kind === "mutation") return decorated.mutation(guarded);

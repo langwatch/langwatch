@@ -230,6 +230,13 @@ const PUBLISHED_PROCEDURES = [
   "removeFromUser",
 ] as const;
 
+/** The permissions a declaration claims, whichever declared shape it holds. */
+function claimedPermissions(declaration: AuthzDeclaration | null | undefined): readonly string[] {
+  if (declaration?.kind === "permission") return [declaration.permission];
+  if (declaration && "permissions" in declaration) return declaration.permissions;
+  return [];
+}
+
 function declarationsOf(router: unknown): Record<string, AuthzDeclaration | null> {
   const procedures = (router as { _def: { procedures: Record<string, unknown> } })._def.procedures;
 
@@ -256,12 +263,7 @@ describe("given the role transport mounted on the process's own tRPC root", () =
       expect(Object.keys(declarations).sort()).toEqual([...PUBLISHED_PROCEDURES].sort());
       for (const name of PUBLISHED_PROCEDURES) {
         const declaration = declarations[name];
-        const claimed =
-          declaration?.kind === "permission"
-            ? [declaration.permission]
-            : declaration && "permissions" in declaration
-              ? declaration.permissions
-              : [];
+        const claimed = claimedPermissions(declaration);
         expect(claimed).toContain(name === "getById" ? "organization:view" : "organization:manage");
       }
     });

@@ -105,15 +105,21 @@ function buildSecretRestApi(options: {
  * check and no recorded policy, which is the one state the endpoint-authorization audit
  * cannot tell apart from a route that bypassed the builder.
  */
+function secretRoutePolicy(route: MountedRoute) {
+  if (route.isNamespaceGuard) {
+    return publicEndpoint(
+      "version-namespace guard: answers 404 for unknown version segments so they " +
+        "cannot fall through to a dynamic route; reads no data and takes no credential",
+    );
+  }
+  if (route.config?.permission) {
+    return apiKeyPermission(route.config.permission);
+  }
+  return undefined;
+}
+
 function registerSecretRoutePolicy(route: MountedRoute): void {
-  const policy = route.isNamespaceGuard
-    ? publicEndpoint(
-        "version-namespace guard: answers 404 for unknown version segments so they " +
-          "cannot fall through to a dynamic route; reads no data and takes no credential",
-      )
-    : route.config?.permission
-      ? apiKeyPermission(route.config.permission)
-      : undefined;
+  const policy = secretRoutePolicy(route);
   if (!policy) {
     throw new Error(
       `Secret endpoint ${route.method.toUpperCase()} ${route.path} declares no permission`,

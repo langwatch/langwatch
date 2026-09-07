@@ -63,6 +63,13 @@ function billableInputTokens(usage: ProviderUsage): number {
   return fresh < 0 ? usage.promptTokens : fresh;
 }
 
+/** An OTLP attribute value in the wire shape matching its JS type. */
+function otlpAttributeValue(value: string | number): unknown {
+  if (typeof value !== "number") return { stringValue: value };
+  if (Number.isInteger(value)) return { intValue: String(value) };
+  return { doubleValue: value };
+}
+
 /** A minimal wire-shaped `span_received` event carrying the token attributes
  *  the trace fold rates. */
 function spanReceivedEvent(usage: ProviderUsage, inputTokens: number): SpanReceivedEvent {
@@ -84,12 +91,7 @@ function spanReceivedEvent(usage: ProviderUsage, inputTokens: number): SpanRecei
     endTimeUnixNano: "1700000002500000000",
     attributes: Object.entries(attributes).map(([key, value]) => ({
       key,
-      value:
-        typeof value === "number"
-          ? Number.isInteger(value)
-            ? { intValue: String(value) }
-            : { doubleValue: value }
-          : { stringValue: value },
+      value: otlpAttributeValue(value),
     })),
     events: [],
     links: [],

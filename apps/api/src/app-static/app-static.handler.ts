@@ -51,7 +51,9 @@ export function serveStaticOrFallback({
   assetBase: string;
 }): boolean {
   const normalizedRelative = path.normalize(pathname.slice(1));
-  if (normalizedRelative.startsWith("..") || path.isAbsolute(normalizedRelative)) {
+  const escapesAssetRoot =
+    normalizedRelative.startsWith("..") || path.isAbsolute(normalizedRelative);
+  if (escapesAssetRoot) {
     res.statusCode = 400;
     res.end("Bad Request");
     return true;
@@ -143,7 +145,8 @@ function tryServeHtml({
   }
 
   try {
-    if (!fs.fstatSync(fd).isFile()) {
+    const isRegularFile = fs.fstatSync(fd).isFile();
+    if (!isRegularFile) {
       return false;
     }
     const html = fs.readFileSync(fd, "utf8");

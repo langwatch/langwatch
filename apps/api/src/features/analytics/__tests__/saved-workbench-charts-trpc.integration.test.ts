@@ -163,7 +163,11 @@ function policyMiddlewares(grants: () => ReadonlySet<string>): AppTrpcPolicyMidd
         next: () => Promise<unknown>;
       }) => {
         const permission = declaration.kind === "permission" ? declaration.permission : undefined;
-        if (permission !== undefined && !grants().has(permission)) {
+        if (permission === undefined) {
+          return next();
+        }
+        const isGranted = grants().has(permission);
+        if (!isGranted) {
           throw new PermissionDeniedError({
             permission,
             scope: { type: "project", id: (input as { projectId: string }).projectId },

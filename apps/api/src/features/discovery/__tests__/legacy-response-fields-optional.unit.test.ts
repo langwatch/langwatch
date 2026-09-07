@@ -103,7 +103,8 @@ function walkFamily({ family, bornWith = [] }: { family: string; bornWith?: stri
   const propertyPaths: string[] = [];
   for (const [path, operations] of Object.entries(document.paths)) {
     if (!path.startsWith(family)) continue;
-    if (bornWith.some((route) => path.startsWith(route))) continue;
+    const isBornWithRoute = bornWith.some((route) => path.startsWith(route));
+    if (isBornWithRoute) continue;
     for (const [method, operation] of Object.entries(operations)) {
       if (!METHODS.includes(method)) continue;
       const answer = walkOperationSuccessResponses(operation, { method, path });

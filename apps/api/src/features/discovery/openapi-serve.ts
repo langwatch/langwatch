@@ -95,7 +95,8 @@ export function respondWithApiDocument(c: Context): Response {
     "Cache-Control": CACHE_CONTROL,
   };
 
-  if (alreadyHasIt(c.req.header("if-none-match"))) {
+  const clientAlreadyHasIt = alreadyHasIt(c.req.header("if-none-match"));
+  if (clientAlreadyHasIt) {
     // 304 carries no body and no Content-Length by definition.
     return new Response(null, { status: 304, headers });
   }

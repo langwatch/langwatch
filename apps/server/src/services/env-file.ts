@@ -15,10 +15,10 @@ export function readEnvFile(path: string): Record<string, string> {
     if (eq <= 0) continue;
     const key = line.slice(0, eq).trim();
     let value = line.slice(eq + 1).trim();
-    if (
+    const isQuoted =
       (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
-      (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
-    ) {
+      (value.startsWith("'") && value.endsWith("'") && value.length >= 2);
+    if (isQuoted) {
       value = value.slice(1, -1);
     }
     // A `KEY=` line means "not configured", and must stay that way in the

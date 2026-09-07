@@ -235,6 +235,16 @@ describe("given a device session lazily resolving the personal project", () => {
 
 // --------------------------------------------------------------------------
 
+/** The membership status the stub directory answers for a world's options. */
+function membershipStatusFor(options: {
+  deactivated?: boolean;
+  activeMembership?: boolean;
+}): "user_deactivated" | "not_org_member" | "active" {
+  if (options.deactivated) return "user_deactivated";
+  if (options.activeMembership === false) return "not_org_member";
+  return "active";
+}
+
 function governanceCliWorld(
   options: {
     planType?: string;
@@ -260,14 +270,7 @@ function governanceCliWorld(
   };
 
   const directory: GovernanceDirectoryPort = {
-    membershipStatus: () =>
-      Promise.resolve(
-        options.deactivated
-          ? "user_deactivated"
-          : options.activeMembership === false
-            ? "not_org_member"
-            : "active",
-      ),
+    membershipStatus: () => Promise.resolve(membershipStatusFor(options)),
     tryFindPersonProfile: () => Promise.resolve({ name: "Bob", email: "bob@example.test" }),
     tryFindOrganizationIdByProjectApiKey: () => Promise.resolve(null),
     tryFindMemberIdByEmail: () => Promise.resolve(null),

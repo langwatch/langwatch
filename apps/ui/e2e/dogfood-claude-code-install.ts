@@ -64,7 +64,9 @@ void (async () => {
   let capturedToken: string | null = null;
   page.on("response", async (resp) => {
     const url = resp.url();
-    if (url.includes("/api/trpc/") && resp.request().method() === "POST" && resp.status() === 200) {
+    const isSuccessfulTrpcCall =
+      url.includes("/api/trpc/") && resp.request().method() === "POST" && resp.status() === 200;
+    if (isSuccessfulTrpcCall) {
       const body = await resp.text().catch(() => "");
       const m = body.match(/"token":"(sk-lw-[A-Za-z0-9_]+)"/);
       if (m?.[1]) {

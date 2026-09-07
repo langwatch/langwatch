@@ -69,12 +69,12 @@ async function lwPost({ path, body }: { path: string; body: unknown }): Promise<
 // neither) to an array, so downstream .map/.filter never throws on an object.
 function toArray<T>(payload: unknown): T[] {
   if (Array.isArray(payload)) return payload as T[];
-  if (
+  const hasArrayDataField =
     payload &&
     typeof payload === "object" &&
     "data" in payload &&
-    Array.isArray((payload as { data?: unknown }).data)
-  ) {
+    Array.isArray((payload as { data?: unknown }).data);
+  if (hasArrayDataField) {
     return (payload as { data: T[] }).data;
   }
   return [];

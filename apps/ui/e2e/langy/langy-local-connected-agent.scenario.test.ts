@@ -72,10 +72,7 @@ describe("Langy changes a connected agent through the shared folder", () => {
       "adds the run parameter, restarts the agent, and the platform sees it again",
       async () => {
         const before = await readAgent(AGENT_NAME);
-        console.log(
-          "[layer2] agent before:",
-          JSON.stringify(before?.parameters),
-        );
+        console.log("[layer2] agent before:", JSON.stringify(before?.parameters));
 
         const langy = makeLangyAdapter();
         watcher = watchLangyConversation({
@@ -126,7 +123,8 @@ describe("Langy changes a connected agent through the shared folder", () => {
                 const conversationId = langy.state.conversationId ?? "";
                 // A failure here reads as an empty tool list otherwise, and
                 // the reply is what says why Langy did not ask for the code.
-                if (!langy.state.toolNames.includes("code_access")) {
+                const hasCodeAccessTool = langy.state.toolNames.includes("code_access");
+                if (!hasCodeAccessTool) {
                   console.log(
                     "[layer2] tools without code_access:",
                     langy.state.toolNames.join(", "),
@@ -137,9 +135,7 @@ describe("Langy changes a connected agent through the shared folder", () => {
                     "[layer2] reply:",
                     await watcher!
                       .lastAssistantText()
-                      .catch(
-                        (error: unknown) => `unreadable: ${String(error)}`,
-                      ),
+                      .catch((error: unknown) => `unreadable: ${String(error)}`),
                   );
                 }
                 expect(langy.state.toolNames).toContain("code_access");
@@ -171,9 +167,7 @@ describe("Langy changes a connected agent through the shared folder", () => {
           },
         });
 
-        const branches = repo
-          .branches()
-          .filter((branch) => branch.startsWith("langy/"));
+        const branches = repo.branches().filter((branch) => branch.startsWith("langy/"));
         const capture = terminal.capture();
         console.log("[layer2] branches:", repo.branches().join(", "));
         console.log("[layer2] tools:", langy.state.toolNames.join(", "));
@@ -199,9 +193,7 @@ describe("Langy changes a connected agent through the shared folder", () => {
         // The platform holds the agent again, with the new parameter.
         const after = await readAgent(AGENT_NAME);
         console.log("[layer2] agent after:", JSON.stringify(after?.parameters));
-        expect(JSON.stringify(after?.parameters ?? [])).toMatch(
-          /account|plan/i,
-        );
+        expect(JSON.stringify(after?.parameters ?? [])).toMatch(/account|plan/i);
 
         if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
         expect(result.success).toBe(true);

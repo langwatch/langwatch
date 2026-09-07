@@ -88,8 +88,10 @@ const NEVER_INLINED = [
  */
 const isInlined = (id) => {
   if (/^(\.\.?\/|\/|#)/.test(id)) return true;
-  if (workspaceBundled.has(basePackage(id))) return true;
-  return !NEVER_INLINED.some((re) => re.test(id));
+  const isWorkspacePackage = workspaceBundled.has(basePackage(id));
+  if (isWorkspacePackage) return true;
+  const isNeverInlined = NEVER_INLINED.some((re) => re.test(id));
+  return !isNeverInlined;
 };
 
 /** @returns {import("esbuild").Plugin} */
@@ -176,7 +178,8 @@ for (const { name, entry } of ENTRIES) {
     for (const imported of output.imports) {
       if (!imported.external) continue;
       const id = imported.path;
-      if (id.startsWith("node:") || builtins.has(basePackage(id))) continue;
+      const isBuiltin = id.startsWith("node:") || builtins.has(basePackage(id));
+      if (isBuiltin) continue;
       if (id === ".prisma" || id.startsWith(".prisma/")) continue;
       const base = basePackage(id);
       if (declared.has(base)) continue;
@@ -194,16 +197,19 @@ for (const { name, entry } of ENTRIES) {
   // the sideEffects:false waiver unless listed above, so a new one fails the
   // build here instead of the side effect silently never running.
   for (const input of Object.keys(result.metafile.inputs)) {
-    if (input.includes("node_modules/") || scannedSources.has(input)) continue;
+    const isAlreadyScanned = input.includes("node_modules/") || scannedSources.has(input);
+    if (isAlreadyScanned) continue;
     scannedSources.add(input);
     if (!/\.(ts|tsx|mts|cts|js|mjs|cjs)$/.test(input)) continue;
     const source = readFileSync(path.join(APP, input), "utf8");
     for (const m of source.matchAll(/^[ \t]*import\s*(["'])([^"'\n]+)\1/gm)) {
       const spec = m[2] ?? "";
       if (/^(\.|\/|#)/.test(spec)) continue;
-      if (spec.startsWith("node:") || builtins.has(basePackage(spec))) continue;
+      const isSpecBuiltin = spec.startsWith("node:") || builtins.has(basePackage(spec));
+      if (isSpecBuiltin) continue;
       if (sideEffectImports.has(spec)) continue;
-      if (workspaceBundled.has(basePackage(spec))) continue;
+      const isWorkspaceBundled = workspaceBundled.has(basePackage(spec));
+      if (isWorkspaceBundled) continue;
       let files = unlistedSideEffectImports.get(spec);
       if (!files) {
         files = new Set();

@@ -28,12 +28,29 @@ export type ApiAuthRestOptions = Readonly<{
   featureFlags: FeatureFlagService | undefined;
 }>;
 
+type RequiredAuthRestPorts = {
+  betterAuth: ApiComposedBetterAuth;
+  sessions: ApiBrowserSessionTransportPort;
+  auth: AuthService;
+  apiKeys: ApiKeyService;
+  prisma: PrismaClient;
+  featureFlags: FeatureFlagService;
+};
+
+/** Narrows to the `/api/auth` ports only when every one of them is present. */
+function hasAllAuthRestPorts(
+  options: ApiAuthRestOptions,
+): options is ApiAuthRestOptions & RequiredAuthRestPorts {
+  const { betterAuth, sessions, auth, apiKeys, prisma, featureFlags } = options;
+  return Boolean(betterAuth && sessions && auth && apiKeys && prisma && featureFlags);
+}
+
 /** Composes the `/api/auth` family's ports, or none. */
 export function composeApiAuthRest(options: ApiAuthRestOptions): AuthRestPorts | undefined {
-  const { betterAuth, sessions, auth, apiKeys, prisma, featureFlags } = options;
-  if (!betterAuth || !sessions || !auth || !apiKeys || !prisma || !featureFlags) {
+  if (!hasAllAuthRestPorts(options)) {
     return undefined;
   }
+  const { betterAuth, sessions, auth, apiKeys, prisma, featureFlags } = options;
 
   return {
     betterAuth: () => betterAuth.transport,

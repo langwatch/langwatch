@@ -107,11 +107,26 @@ export type LangyRestMetricsPorts = Readonly<{
  * door shares is missing — the application, the credential directory, the flag store or the
  * user directory.
  */
+type RequiredLangyRestPorts = {
+  langy: LangyApp;
+  apiKeys: ApiKeyService;
+  featureFlags: FeatureFlagService;
+  actors: LangyActorUserReader;
+};
+
+/** Narrows to the shared Langy REST ports only when every one of them is present. */
+function hasAllLangyRestPorts(
+  options: ApiLangyRestOptions,
+): options is ApiLangyRestOptions & RequiredLangyRestPorts {
+  const { langy, apiKeys, featureFlags, actors } = options;
+  return Boolean(langy && apiKeys && featureFlags && actors);
+}
+
 export function composeApiLangyRest(
   options: ApiLangyRestOptions,
 ): ApiLangyRestComposition | undefined {
+  if (!hasAllLangyRestPorts(options)) return undefined;
   const { langy, apiKeys, featureFlags, actors, redis } = options;
-  if (!langy || !apiKeys || !featureFlags || !actors) return undefined;
 
   const credentials: LangyRestCredentialPorts = {
     readCredential: (request) => extractApiKeyRequestCredentials(request),

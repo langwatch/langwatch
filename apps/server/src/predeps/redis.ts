@@ -91,7 +91,8 @@ export const redisPredep: Predep = {
     tar.x({ sync: true, file: tmp, cwd: paths.bin });
     const serverBin = join(paths.bin, "redis-server");
     const cliBin = join(paths.bin, "redis-cli");
-    if (!existsSync(serverBin) || !existsSync(cliBin)) {
+    const extractedIncompletely = !existsSync(serverBin) || !existsSync(cliBin);
+    if (extractedIncompletely) {
       throw new Error(
         `redis tarball ${url} extracted incompletely — expected both redis-server and redis-cli, got ${
           [existsSync(serverBin) ? "redis-server" : null, existsSync(cliBin) ? "redis-cli" : null]

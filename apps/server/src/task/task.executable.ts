@@ -162,7 +162,9 @@ function resolveServiceVersion(values: TaskExecutableValues): string | undefined
 
   for (const pair of attributes.split(",")) {
     const separator = pair.indexOf("=");
-    if (separator === -1 || pair.slice(0, separator).trim() !== "service.version") continue;
+    const isServiceVersionKey =
+      separator !== -1 && pair.slice(0, separator).trim() === "service.version";
+    if (!isServiceVersionKey) continue;
 
     const value = decodeAttributeValue(pair.slice(separator + 1).trim());
     if (value) return value;

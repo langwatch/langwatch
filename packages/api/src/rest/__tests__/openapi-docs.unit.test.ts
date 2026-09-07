@@ -11,6 +11,16 @@ import { createTestService as createService } from "./test-service.ts";
 
 const SPEC_OPTIONS = { excludeStaticFile: false } as const;
 
+/** Narrows an OpenAPI operation object down to one carrying a string operationId. */
+function hasStringOperationId(operation: unknown): operation is { operationId: string } {
+  return (
+    typeof operation === "object" &&
+    operation !== null &&
+    "operationId" in operation &&
+    typeof operation.operationId === "string"
+  );
+}
+
 function buildDocumentedApp() {
   return (
     createService({ name: "things", basePath: "/api/things" })
@@ -143,12 +153,7 @@ describe("OpenAPI documentation", () => {
     const spec = await generateSpecs(buildDocumentedApp(), SPEC_OPTIONS);
     const operationIds = Object.values(spec.paths).flatMap((path) =>
       Object.values(path ?? {}).flatMap((operation) => {
-        if (
-          typeof operation !== "object" ||
-          operation === null ||
-          !("operationId" in operation) ||
-          typeof operation.operationId !== "string"
-        ) {
+        if (!hasStringOperationId(operation)) {
           return [];
         }
         return [operation.operationId];

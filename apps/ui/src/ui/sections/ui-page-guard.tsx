@@ -51,7 +51,8 @@ export function resolveUiPageAccess({
   if (answers.some((answer) => answer === void 0)) return { kind: "loading" };
   if (answers.some((answer) => answer === false)) return { kind: "not-found" };
 
-  if (permission !== void 0 && isSettled() && !hasPermission(permission)) {
+  const isForbidden = permission !== void 0 && isSettled() && !hasPermission(permission);
+  if (isForbidden) {
     return { kind: "forbidden", permission };
   }
 

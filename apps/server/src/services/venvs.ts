@@ -37,7 +37,8 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
       // the spec adds new extras. Pure-lockfile hashing missed this and
       // left langevals with no evaluator routes registered.
       const expected = `${hashFileSafely(spec.lockFile)}|extras=${(spec.extras ?? []).slice().sort().join(",")}`;
-      if (existsSync(venvDir) && readFileSafely(hashFile) === expected) return;
+      const isUpToDate = existsSync(venvDir) && readFileSafely(hashFile) === expected;
+      if (isUpToDate) return;
 
       bus.emit({ type: "starting", service: `prepare:${spec.name}` as never });
       const start = nowInstant().epochMilliseconds;

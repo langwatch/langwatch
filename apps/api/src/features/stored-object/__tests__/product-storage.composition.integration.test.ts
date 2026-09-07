@@ -122,6 +122,13 @@ function testPrisma() {
 /**
  * The AuthZ service every declared check and every scope filter runs on.
  */
+/** The stub scope a project id or organization id resolves to, or none. */
+function stubResolvedScope(input: { projectId?: string; organizationId?: string }) {
+  if (input.projectId) return { type: "project", id: input.projectId };
+  if (input.organizationId) return { type: "organization", id: input.organizationId };
+  return null;
+}
+
 function testAuthz(): AuthzService {
   return {
     // The DECLARED check on each procedure permits: the refusal path is that
@@ -147,11 +154,7 @@ function testAuthz(): AuthzService {
       projects: new Map(projects.map(({ projectId }) => [projectId, projectId === PROJECT_ID])),
     }),
     tryResolveScope: async (input: { projectId?: string; organizationId?: string }) =>
-      input.projectId
-        ? { type: "project", id: input.projectId }
-        : input.organizationId
-          ? { type: "organization", id: input.organizationId }
-          : null,
+      stubResolvedScope(input),
     effectivePermissions: async () => ["project:view", "traces:view"],
   } as unknown as AuthzService;
 }

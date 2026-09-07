@@ -70,11 +70,11 @@ beforeAll(async () => {
     void readBody(req).then((body) => {
       // Enforce the full token-request HTTP contract, not just a parseable
       // body: POST, the /oauth/token path, and a JSON content type.
-      if (
-        req.method !== "POST" ||
-        req.url !== "/oauth/token" ||
-        !(req.headers["content-type"] ?? "").startsWith("application/json")
-      ) {
+      const isValidTokenRequest =
+        req.method === "POST" &&
+        req.url === "/oauth/token" &&
+        (req.headers["content-type"] ?? "").startsWith("application/json");
+      if (!isValidTokenRequest) {
         res.writeHead(400).end(JSON.stringify({ error: "bad_request" }));
         return;
       }

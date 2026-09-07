@@ -68,9 +68,12 @@ export const buildStorageConnectSrc = (env: StorageEnv): string[] => {
   const origins = new Set<string>();
 
   const endpointOrigin = safeOrigin(env.S3_ENDPOINT);
+  const hasAwsS3Env = Boolean(
+    env.S3_ENDPOINT || env.S3_REGION || env.S3_BUCKET_NAME || env.AWS_REGION,
+  );
   if (endpointOrigin) {
     origins.add(endpointOrigin);
-  } else if (env.S3_ENDPOINT || env.S3_REGION || env.S3_BUCKET_NAME || env.AWS_REGION) {
+  } else if (hasAwsS3Env) {
     // AWS S3 is plausibly the backend (some AWS/S3 env present) but no usable
     // explicit endpoint — emit the AWS origin(s) for the configured region.
     const region = (env.S3_REGION ?? env.AWS_REGION)?.trim();

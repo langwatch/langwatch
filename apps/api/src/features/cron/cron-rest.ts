@@ -40,12 +40,11 @@ export function verifyCronSecret(secretOf: () => string | undefined): Middleware
       logger.error("CRON_API_KEY is not configured");
       return c.body(null, 401);
     }
-    if (
-      !isInternalSecretValid({
-        authorizationHeader: c.req.header("authorization"),
-        expected: secret,
-      })
-    ) {
+    const isValid = isInternalSecretValid({
+      authorizationHeader: c.req.header("authorization"),
+      expected: secret,
+    });
+    if (!isValid) {
       return c.body(null, 401);
     }
     await next();

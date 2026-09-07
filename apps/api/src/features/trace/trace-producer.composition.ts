@@ -49,11 +49,11 @@ export function composeApiTraceProducerCommands(options: {
   const add = commands.addAnnotation;
   const remove = commands.removeAnnotation;
   const recordSpan = commands.recordSpan;
-  if (!isSender(add) || !isSender(remove) || !isSender(recordSpan)) {
-    throw new Error(
-      'The trace_processing registration produced no "addAnnotation", "removeAnnotation" and "recordSpan" command senders; the pipeline was registered incompletely.',
-    );
-  }
+  const registrationIncomplete =
+    'The trace_processing registration produced no "addAnnotation", "removeAnnotation" and "recordSpan" command senders; the pipeline was registered incompletely.';
+  if (!isSender(add)) throw new Error(registrationIncomplete);
+  if (!isSender(remove)) throw new Error(registrationIncomplete);
+  if (!isSender(recordSpan)) throw new Error(registrationIncomplete);
   return {
     add: async (input) => {
       await add.send(input);

@@ -1,9 +1,8 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const root = process.env.LANGWATCH_HOME?.length
-  ? process.env.LANGWATCH_HOME
-  : join(homedir(), ".langwatch");
+const langwatchHomeOverride = process.env.LANGWATCH_HOME;
+const root = langwatchHomeOverride?.length ? langwatchHomeOverride : join(homedir(), ".langwatch");
 
 export const paths = {
   root,

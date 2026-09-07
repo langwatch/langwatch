@@ -21,6 +21,11 @@ export function createAgentPlatformUrlBuilder(
     platformUrl({ projectSlug, path: agentDrawerPath({ agentId, agentType }) });
 }
 
+const AGENT_DRAWER_BY_TYPE: Record<string, string> = {
+  http: "agentHttpEditor",
+  connected: "agentConnectedDetail",
+};
+
 /** The project-relative half of that address, for a door that adds the origin itself. */
 export function agentDrawerPath({
   agentId,
@@ -29,11 +34,6 @@ export function agentDrawerPath({
   agentId: string;
   agentType: string;
 }): string {
-  const drawer =
-    agentType === "http"
-      ? "agentHttpEditor"
-      : agentType === "connected"
-        ? "agentConnectedDetail"
-        : "agentCodeEditor";
+  const drawer = AGENT_DRAWER_BY_TYPE[agentType] ?? "agentCodeEditor";
   return `/agents?drawer.open=${drawer}&drawer.agentId=${encodeURIComponent(agentId)}`;
 }

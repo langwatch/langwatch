@@ -91,6 +91,13 @@ function testPrisma() {
 }
 
 /** Permits everything: the refusal path is the declared check's own suite. */
+/** The stub scope a project id or organization id resolves to, or none. */
+function stubResolvedScope(input: { projectId?: string; organizationId?: string }) {
+  if (input.projectId) return { type: "project", id: input.projectId };
+  if (input.organizationId) return { type: "organization", id: input.organizationId };
+  return null;
+}
+
 function testAuthz(): AuthzService {
   return {
     hasPermission: vi.fn(async () => true),
@@ -106,11 +113,7 @@ function testAuthz(): AuthzService {
     listUserCreatedRoles: async () => [],
     listBindingsForSynthesis: async (): Promise<AuthzBindingForSynthesis[]> => [],
     tryResolveScope: async (input: { projectId?: string; organizationId?: string }) =>
-      input.projectId
-        ? { type: "project", id: input.projectId }
-        : input.organizationId
-          ? { type: "organization", id: input.organizationId }
-          : null,
+      stubResolvedScope(input),
     effectivePermissions: async () => ["project:view"],
   } as unknown as AuthzService;
 }

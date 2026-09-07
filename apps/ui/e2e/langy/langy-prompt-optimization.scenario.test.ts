@@ -288,7 +288,10 @@ describe("Langy prompt optimization: the improvement loop", () => {
       let holdingSlug: string | undefined;
       for (const entry of experiments) {
         const ws = await getWorkbenchState(entry.slug).catch(() => null);
-        if (ws?.state?.targets?.some((t) => t.type === "prompt" && t.promptId === seededPromptId)) {
+        const holdsSeededPrompt = ws?.state?.targets?.some(
+          (t) => t.type === "prompt" && t.promptId === seededPromptId,
+        );
+        if (holdsSeededPrompt) {
           holdingSlug = entry.slug;
           break;
         }
