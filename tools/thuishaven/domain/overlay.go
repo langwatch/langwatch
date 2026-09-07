@@ -53,6 +53,16 @@ func (s Stack) OverlayEnv() []string {
 	// client, langy) dial that loopback port directly — robust, no TLS/CA, no
 	// second public hostname to confuse anyone.
 	apiInternal := fmt.Sprintf("http://127.0.0.1:%d", s.APIPort)
+	// better-auth trusts only the origin it is told about via BASE_HOST/
+	// NEXTAUTH_URL. A stack exposed through a tunnel (tailscale serve,
+	// cloudflared) is reached by browsers at PublicURL, not app.URL — carry
+	// that origin on those two lines only, so sign-in from the tunnel passes
+	// the trusted-origin check while every other URL (LANGWATCH_ENDPOINT
+	// included) stays local.
+	authURL := app.URL
+	if s.PublicURL != "" {
+		authURL = s.PublicURL
+	}
 	env := []string{
 		"LANGWATCH_PORTLESS=1",
 		"LANGWATCH_SLUG=" + s.Slug,
@@ -61,8 +71,8 @@ func (s Stack) OverlayEnv() []string {
 		fmt.Sprintf("LANGWATCH_GATEWAY_PORT=%d", gw.Port),
 		fmt.Sprintf("LANGWATCH_NLP_PORT=%d", nlp.Port),
 		fmt.Sprintf("WORKER_METRICS_PORT=%d", s.WorkerMetricsPort),
-		"BASE_HOST=" + app.URL,
-		"NEXTAUTH_URL=" + app.URL,
+		"BASE_HOST=" + authURL,
+		"NEXTAUTH_URL=" + authURL,
 		"LANGWATCH_ENDPOINT=" + app.URL,
 		"LANGWATCH_API_URL=" + apiInternal,
 		"LANGWATCH_NLP_SERVICE=" + nlp.URL,
