@@ -1,10 +1,4 @@
-/**
- * A feature owns procedure names, input parsers and its `AuthzDeclaration`;
- * the process owns tracing, auth, scope-lineage and audit middlewares in one
- * fixed order. The policy MUST apply to an already-parsed procedure —
- * `policy(declaration)(procedure.input(schema))` — since a check installed
- * before `.input()` sees `input === undefined` with no error reported.
- */
+/** Apply policy after input parsing so authorization checks the validated scope. */
 import {
   authzDeclarationOf,
   type AuthzDeclaration,
@@ -138,11 +132,6 @@ export type TrpcApiMount<
   root: TRPCRootObject<TContext, object, TOptions, TRoot>;
   protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   middlewares: AppTrpcPolicyMiddlewares;
-  /**
-   * Check each answer against the output schema its procedure declared. The
-   * process decides — this package reads no environment — and production
-   * leaves it off: a declared shape documents the answer, it does not gate it.
-   */
 }> &
   ([TApp] extends [never]
     ? Readonly<{ validateOutput?: boolean }>
@@ -200,10 +189,17 @@ export type TrpcApiService<
   }): TrpcApiPolicyDecorator;
   /** The same chain around a check the feature hands over already built. */
   custom(check: unknown): TrpcApiPolicyDecorator;
-  /** @see the mount field of the same name. */
-  validateOutput: boolean;
 }> &
-  Readonly<{ handlerBinding?: TrpcHandlerBinding<TContext, TApp> }>;
+  ([TApp] extends [never]
+    ? Readonly<{
+        handlerBinding?: TrpcHandlerBinding<TContext, TApp>;
+        /** @see the mount field of the same name. */
+        validateOutput: boolean;
+      }>
+    : Readonly<{
+        handlerBinding: TrpcHandlerBinding<TContext, TApp>;
+        validateOutput?: never;
+      }>);
 
 /**
  * One factory with two overloads, not two functions: a mount author writes
@@ -213,7 +209,8 @@ export type TrpcApiPublicService<
   TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
-> = TrpcApiService<TContext, TOptions, TRoot> &
+  TApp = never,
+> = TrpcApiService<TContext, TOptions, TRoot, TApp> &
   Readonly<{ public: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"] }>;
 
 /**
@@ -228,8 +225,22 @@ export function createTrpcApiService<
 >(
   mount: TrpcApiMount<TContext, TOptions, TRoot, TApp> &
     TrpcApiPublicMount<TContext, TOptions, TRoot>,
-): TrpcApiPublicService<TContext, TOptions, TRoot> &
-  TrpcApiService<TContext, TOptions, TRoot, TApp>;
+): TrpcApiPublicService<TContext, TOptions, TRoot, TApp>;
+export function createTrpcApiService<
+  TContext extends object,
+  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
+  TRoot extends AnyTRPCRootTypes,
+>(
+  mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPublicMount<TContext, TOptions, TRoot>,
+): TrpcApiPublicService<TContext, TOptions, TRoot>;
+export function createTrpcApiService<
+  TContext extends object,
+  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
+  TRoot extends AnyTRPCRootTypes,
+  TApp,
+>(
+  mount: TrpcApiMount<TContext, TOptions, TRoot, TApp>,
+): TrpcApiService<TContext, TOptions, TRoot, TApp>;
 export function createTrpcApiService<
   TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -249,14 +260,19 @@ export function createTrpcApiService<
     handlerBinding?: TrpcHandlerBinding<TContext, TApp>;
   }> &
     Partial<TrpcApiPublicMount<TContext, TOptions, TRoot>>,
-): TrpcApiService<TContext, TOptions, TRoot, TApp> &
+): Omit<TrpcApiService<TContext, TOptions, TRoot>, "handlerBinding" | "validateOutput"> &
+  Readonly<{
+    handlerBinding?: TrpcHandlerBinding<TContext, TApp>;
+    validateOutput?: boolean;
+  }> &
   Partial<Pick<TrpcApiPublicService<TContext, TOptions, TRoot>, "public">> {
   const declared = declaredPolicy(mount.middlewares);
+  const governed = "handlerBinding" in mount;
 
   return {
     protected: mount.protectedProcedure,
-    ...(!("handlerBinding" in mount) ? {} : { handlerBinding: mount.handlerBinding }),
-    validateOutput: mount.validateOutput ?? false,
+    ...(governed ? { handlerBinding: mount.handlerBinding } : {}),
+    ...(governed ? {} : { validateOutput: mount.validateOutput ?? false }),
     // Spread rather than set to undefined: a mount with no signed-out surface
     // must not hand a feature a `public` key at all.
     ...(mount.publicProcedure === undefined ? {} : { public: mount.publicProcedure }),

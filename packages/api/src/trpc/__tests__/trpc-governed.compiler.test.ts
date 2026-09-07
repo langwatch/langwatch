@@ -60,3 +60,84 @@ chain.handle(() => ({ id: 7 }));
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+it("rejects validateOutput on a governed API mount", () => {
+  const directory = mkdtempSync(join(process.cwd(), ".tmp-trpc-api-mount-"));
+  const fixture = join(directory, "fixture.ts");
+  const service = join(process.cwd(), "src/trpc/trpc-api-service.ts");
+  const root = join(process.cwd(), "src/trpc/trpc-root.ts");
+  const handler = join(process.cwd(), "src/trpc/trpc-handler.ts");
+
+  writeFileSync(
+    fixture,
+    `import { createTrpcApiService } from ${JSON.stringify(service)};
+import { TrpcRootDefinition } from ${JSON.stringify(root)};
+import type { AppTrpcPolicyMiddlewares } from ${JSON.stringify(service)};
+import { createTrpcHandlerBinding } from ${JSON.stringify(handler)};
+
+type Context = { actor: { id: string } };
+type App = { projects: string };
+const root = TrpcRootDefinition.forContext<Context>().create({});
+declare const middlewares: AppTrpcPolicyMiddlewares;
+const handlerBinding = createTrpcHandlerBinding<Context, App>(async () => ({
+  app: { projects: "projects" }, actor: null, scope: null,
+}));
+createTrpcApiService({
+  root,
+  protectedProcedure: root.procedure,
+  middlewares,
+  handlerBinding,
+  validateOutput: false,
+});
+createTrpcApiService({
+  root,
+  protectedProcedure: root.procedure,
+  middlewares,
+  handlerBinding,
+  validateOutput: true,
+});
+`,
+  );
+
+  try {
+    let diagnostics = "";
+    try {
+      execFileSync(
+        "pnpm",
+        [
+          "exec",
+          "tsc",
+          "--noEmit",
+          "--pretty",
+          "false",
+          "--strict",
+          "--skipLibCheck",
+          "--target",
+          "ESNext",
+          "--module",
+          "NodeNext",
+          "--moduleResolution",
+          "NodeNext",
+          "--allowImportingTsExtensions",
+          "--ignoreConfig",
+          fixture,
+        ],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+      );
+    } catch (error) {
+      const processError = error as { stdout?: string; stderr?: string };
+      diagnostics = `${processError.stdout ?? ""}${processError.stderr ?? ""}`;
+    }
+
+    const refusedCalls = [
+      ...diagnostics.matchAll(
+        /fixture\.ts\((\d+),\d+\): error TS2769: No overload matches this call/g,
+      ),
+    ];
+    expect(refusedCalls).toHaveLength(2);
+    expect(new Set(refusedCalls.map((match) => match[1])).size).toBe(2);
+    expect(diagnostics).toMatch(/handlerBinding/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
