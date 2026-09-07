@@ -168,6 +168,7 @@ export {
   type SsoConnectionGuardsDeps,
 } from "./sso-connection-guards";
 export {
+  activationRecoveryReservationId,
   grandfatherCommandId,
   grandfatheredSsoConnectionId,
   legacyReplacementCommandId,

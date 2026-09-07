@@ -619,6 +619,9 @@ export const domainProofRecoveredPayloadSchema = z.object({
 
 export const connectionActivatedPayloadSchema = z.object({
   connectionId: z.string().min(1),
+  /** Links projection completion to the durable recovery reservation made
+   * before this activation fact was appended. Legacy import facts have none. */
+  activationReservationCommandId: z.string().min(1).optional(),
   /** The account whose successful test login the activation rests on; null
    *  only for a grandfathered connection, whose test login is the years of
    *  production sign-ins the strings already served. */
@@ -636,6 +639,7 @@ export const connectionSuspendedPayloadSchema = z.object({
 
 export const connectionResumedPayloadSchema = z.object({
   connectionId: z.string().min(1),
+  activationReservationCommandId: z.string().min(1).optional(),
   actor: identityActorSchema,
   ...sourced,
 });

@@ -80,6 +80,35 @@ export function newSsoConnectionCommandId(): string {
   return generate("ssocmd").toString();
 }
 
+/**
+ * The durable recovery reservation for one human transition to ACTIVE.
+ * Retries by the same actor against the same projected generation reuse it;
+ * another actor or any intervening state change cannot adopt it.
+ */
+export function activationRecoveryReservationId({
+  organizationId,
+  connectionId,
+  actorType,
+  actorId,
+  connectionUpdatedAtMs,
+  transition,
+}: {
+  organizationId: string;
+  connectionId: string;
+  actorType: string;
+  actorId: string | null;
+  connectionUpdatedAtMs: number;
+  transition: "activate" | "resume";
+}): string {
+  const digest = createHash("sha256")
+    .update(
+      `${organizationId}\0${connectionId}\0${actorType}\0${actorId ?? "system"}\0${connectionUpdatedAtMs}\0${transition}`,
+    )
+    .digest("hex")
+    .slice(0, 32);
+  return `sso-recovery:${digest}`;
+}
+
 /** One way back in, granted to one person until one date (D05). Minted here
  *  rather than beside the connection ids' consumers for the same reason they
  *  are: an id prefix is a persisted contract. */

@@ -92,7 +92,11 @@ function lifecycle(): SsoConnectionEvent[] {
     ),
     event(
       CONNECTION_ACTIVATED_EVENT_TYPE,
-      { connectionId: CONNECTION, testLoginAccountId: "acc_test" },
+      {
+        connectionId: CONNECTION,
+        testLoginAccountId: "acc_test",
+        activationReservationCommandId: "reservation_activate",
+      },
       4_000,
     ),
     event(
@@ -100,7 +104,14 @@ function lifecycle(): SsoConnectionEvent[] {
       { connectionId: CONNECTION, reason: "IdP maintenance" },
       5_000,
     ),
-    event(CONNECTION_RESUMED_EVENT_TYPE, { connectionId: CONNECTION }, 6_000),
+    event(
+      CONNECTION_RESUMED_EVENT_TYPE,
+      {
+        connectionId: CONNECTION,
+        activationReservationCommandId: "reservation_resume",
+      },
+      6_000,
+    ),
     event(
       TEARDOWN_REQUESTED_EVENT_TYPE,
       {
@@ -197,6 +208,7 @@ function persistedRow(stored: StoredProjection<SsoConnectionFoldState>) {
     CreatedAt: _created,
     UpdatedAt: _updated,
     LastEventOccurredAt: _lastOccurred,
+    ActivationReservationCommandIds: _activationReservations,
     ...columns
   } = stored.state;
   return {
@@ -269,6 +281,10 @@ describe("the sso connection projection", () => {
         testLoginAccountId: "acc_test",
         tearDownAfterMs: T0 + 100_000,
       });
+      expect(rebuilt.state.ActivationReservationCommandIds).toEqual([
+        "reservation_activate",
+        "reservation_resume",
+      ]);
     });
 
     /** @scenario "The projection replays whole-row like every identity projection" */

@@ -13,6 +13,10 @@ import type {
  */
 export class InMemoryBreakGlassBindings implements SsoBreakGlassRepository {
   readonly rows = new Map<string, BreakGlassBinding>();
+  readonly activationReservations = new Map<
+    string,
+    { organizationId: string; connectionId: string }
+  >();
 
   async findAllForOrganization({
     organizationId,
@@ -51,12 +55,10 @@ export class InMemoryBreakGlassBindings implements SsoBreakGlassRepository {
     bindingId,
     organizationId,
     nowMs,
-    recoveryMustRemain,
   }: {
     bindingId: string;
     organizationId: string;
     nowMs: number;
-    recoveryMustRemain: boolean;
   }): Promise<BreakGlassBinding> {
     const binding = this.rows.get(bindingId);
     if (!binding || binding.organizationId !== organizationId) {
@@ -71,6 +73,9 @@ export class InMemoryBreakGlassBindings implements SsoBreakGlassRepository {
         candidate.bindingId !== bindingId &&
         breakGlassIsLive({ binding: candidate, nowMs }),
     );
+    const recoveryMustRemain = [...this.activationReservations.values()].some(
+      (reservation) => reservation.organizationId === organizationId,
+    );
     if (recoveryMustRemain && !otherLive) {
       throw new SsoBreakGlassLastWayInError(
         `binding ${bindingId} is organization ${organizationId}'s only live way back in while a connection is ACTIVE`,
@@ -79,6 +84,32 @@ export class InMemoryBreakGlassBindings implements SsoBreakGlassRepository {
     const revoked = { ...binding, supersededAtMs: nowMs };
     this.rows.set(bindingId, revoked);
     return revoked;
+  }
+
+  async reserveActivationRecovery({
+    organizationId,
+    connectionId,
+    commandId,
+    nowMs,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+    nowMs: number;
+  }): Promise<boolean> {
+    const live = [...this.rows.values()].some(
+      (binding) =>
+        binding.organizationId === organizationId &&
+        breakGlassIsLive({ binding, nowMs }),
+    );
+    if (!live) {
+      return false;
+    }
+    if (this.activationReservations.has(commandId)) {
+      return true;
+    }
+    this.activationReservations.set(commandId, { organizationId, connectionId });
+    return true;
   }
 
   async recordWarningsSent({

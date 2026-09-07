@@ -26,6 +26,11 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
+import {
+  cancelActivationRecoveryReservationInTransaction,
+  consumeActivationRecoveryReservationInTransaction,
+  lockSsoRecoveryOrganizationInTransaction,
+} from "./sso-break-glass.prisma.repository";
 
 /** A connection in one of these is gone, and gone connections own nothing. */
 const TERMINAL_STATES: readonly SsoConnectionLifecycleState[] = [
@@ -166,12 +171,30 @@ export class PrismaSsoConnectionProjectionRepository
     // predecessor/replacement pair, entitled to route it. They are written
     // with the array they mirror so neither can disagree with the head.
     await this.prisma.$transaction(async (tx) => {
+      const activationCommandIds = state.ActivationReservationCommandIds ?? [];
+      const terminal = TERMINAL_STATES.includes(state.state);
+      if (activationCommandIds.length > 0 || terminal) {
+        await lockSsoRecoveryOrganizationInTransaction(tx, state.organizationId);
+      }
       await tx.ssoConnection.upsert({
         where: { id },
         create: { id, ...columns },
         update: columns,
       });
       await this.projectDomainOwnership({ tx, connectionId: id, state });
+      for (const commandId of activationCommandIds) {
+        await consumeActivationRecoveryReservationInTransaction(tx, {
+          organizationId: state.organizationId,
+          connectionId: id,
+          commandId,
+        });
+      }
+      if (terminal) {
+        await cancelActivationRecoveryReservationInTransaction(tx, {
+          organizationId: state.organizationId,
+          connectionId: id,
+        });
+      }
     });
     await this.projectEngineProvider({ connectionId: id, state });
   }

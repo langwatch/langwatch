@@ -33,8 +33,18 @@ export interface SsoBreakGlassRepository {
     bindingId: string;
     organizationId: string;
     nowMs: number;
-    recoveryMustRemain: boolean;
   }): Promise<BreakGlassBinding>;
+
+  /**
+   * Reserve the organization's current recovery path until the matching
+   * activation fact is projected. Repeating the same command is idempotent.
+   */
+  reserveActivationRecovery(args: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+    nowMs: number;
+  }): Promise<boolean>;
 
   /** Record that a warning was sent, so a second sweep the same day is silent. */
   recordWarningsSent(args: {

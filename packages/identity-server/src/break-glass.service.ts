@@ -43,17 +43,6 @@ export interface SsoBreakGlassServiceDeps {
   notifier: SsoBreakGlassWarningNotifier;
   newBindingId: () => string;
   /**
-   * Whether this organization's sign-in is currently decided by an ACTIVE
-   * connection. Revoking the last live way back in is refused exactly while
-   * this answers true: the one lever that exists for the identity provider
-   * failing must not be removable while the identity provider is in charge.
-   * A closure over the connection projection, answered by the composition
-   * root — this service never reads connections itself.
-   */
-  organizationHasActiveConnection: (args: {
-    organizationId: string;
-  }) => Promise<boolean>;
-  /**
    * Whether this person could actually use the way in they are being given.
    *
    * The precondition activation enforces is "somebody can still get in if the
@@ -225,8 +214,16 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
       bindingId,
       organizationId,
       nowMs,
-      recoveryMustRemain: await this.deps.organizationHasActiveConnection({ organizationId }),
     });
+  }
+
+  async reserveActivationRecovery(args: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+    nowMs: number;
+  }): Promise<boolean> {
+    return this.deps.bindings.reserveActivationRecovery(args);
   }
 
   /** Every binding an organization has held, so the history reads whole. */

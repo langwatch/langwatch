@@ -823,6 +823,19 @@ model SsoBreakGlassBinding {
   @@index([userId])
 }
 
+/// A durable claim on one live recovery path while activation is between its
+/// guard and projected ACTIVE fact. It has no expiry: only projection of the
+/// matching activation, or an explicit cancellation, may consume it.
+model SsoActivationRecoveryReservation {
+  commandId      String   @id
+  organizationId String
+  connectionId   String
+  createdAt      DateTime
+
+  @@unique([organizationId, connectionId])
+  @@index([organizationId])
+}
+
 /// The join-request pipeline's projection (ADR-117, D12 - see
 /// specs/identity/join-requests.feature). A pure event-truth head like
 /// `Identifier` and `SsoConnection`: every column is fold-written, rows are

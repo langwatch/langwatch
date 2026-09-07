@@ -111,7 +111,19 @@ export type SsoConnectionFoldState = SsoConnectionState & {
   CreatedAt: number;
   UpdatedAt: number;
   LastEventOccurredAt: number;
+  /** Reservations carried by activation events in the current fold batch. */
+  ActivationReservationCommandIds?: readonly string[];
 };
+
+function appendReservationCommandId(
+  held: readonly string[] | undefined,
+  commandId: string | undefined,
+): readonly string[] | undefined {
+  if (commandId === undefined || held?.includes(commandId)) {
+    return held;
+  }
+  return [...(held ?? []), commandId];
+}
 
 /**
  * The connection pipeline's operational projection (D04, ADR-117 §5): one
@@ -261,7 +273,13 @@ export class SsoConnectionStateFoldProjection
     event: ConnectionActivatedEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
-    return this.fold(event, state);
+    return {
+      ...this.fold(event, state),
+      ActivationReservationCommandIds: appendReservationCommandId(
+        state.ActivationReservationCommandIds,
+        event.data.activationReservationCommandId,
+      ),
+    };
   }
 
   handleIdentityConnectionSuspended(
@@ -275,7 +293,13 @@ export class SsoConnectionStateFoldProjection
     event: ConnectionResumedEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
-    return this.fold(event, state);
+    return {
+      ...this.fold(event, state),
+      ActivationReservationCommandIds: appendReservationCommandId(
+        state.ActivationReservationCommandIds,
+        event.data.activationReservationCommandId,
+      ),
+    };
   }
 
   handleIdentityTeardownRequested(

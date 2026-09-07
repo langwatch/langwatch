@@ -2,6 +2,7 @@ import {
   breakGlassIsLive,
   type BreakGlassBinding,
   SsoBreakGlassLastWayInError,
+  SsoConnectionActivationBlockedError,
 } from "@langwatch/identity";
 import type { SsoBreakGlassRepository } from "@langwatch/identity-server";
 import type {
@@ -83,12 +84,10 @@ export class PrismaSsoBreakGlassRepository implements SsoBreakGlassRepository {
     bindingId,
     organizationId,
     nowMs,
-    recoveryMustRemain,
   }: {
     bindingId: string;
     organizationId: string;
     nowMs: number;
-    recoveryMustRemain: boolean;
   }): Promise<BreakGlassBinding> {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId}, 0))`;
@@ -103,7 +102,17 @@ export class PrismaSsoBreakGlassRepository implements SsoBreakGlassRepository {
       const binding = rowToBinding(row);
       if (!breakGlassIsLive({ binding, nowMs })) return binding;
 
-      if (recoveryMustRemain) {
+      const protectedConnection = await tx.ssoConnection.findFirst({
+        where: { organizationId, state: "ACTIVE" },
+        select: { id: true },
+      });
+      const pendingReservations = await tx.$queryRaw<Array<{ commandId: string }>>`
+        SELECT "commandId"
+        FROM "SsoActivationRecoveryReservation"
+        WHERE "organizationId" = ${organizationId}
+        LIMIT 1
+      `;
+      if (protectedConnection !== null || pendingReservations.length > 0) {
         const otherLive = await tx.ssoBreakGlassBinding.count({
           where: {
             organizationId,
@@ -124,6 +133,61 @@ export class PrismaSsoBreakGlassRepository implements SsoBreakGlassRepository {
         data: { supersededAt: new Date(nowMs) },
       });
       return rowToBinding(revoked);
+    });
+  }
+
+  async reserveActivationRecovery({
+    organizationId,
+    connectionId,
+    commandId,
+    nowMs,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+    nowMs: number;
+  }): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      await lockOrganization(tx, organizationId);
+
+      const existing = await tx.$queryRaw<ActivationRecoveryReservationRow[]>`
+        SELECT "commandId", "organizationId", "connectionId"
+        FROM "SsoActivationRecoveryReservation"
+        WHERE "commandId" = ${commandId}
+           OR ("organizationId" = ${organizationId} AND "connectionId" = ${connectionId})
+      `;
+      const repeated = existing.find(
+        (reservation) =>
+          reservation.commandId === commandId &&
+          reservation.organizationId === organizationId &&
+          reservation.connectionId === connectionId,
+      );
+      if (repeated === undefined && existing.length > 0) {
+        throw new SsoConnectionActivationBlockedError(
+          `connection ${connectionId}: recovery is already reserved by another activation`,
+        );
+      }
+
+      const liveBindings = await tx.ssoBreakGlassBinding.count({
+        where: {
+          organizationId,
+          supersededAt: null,
+          expiresAt: { gt: new Date(nowMs) },
+        },
+      });
+      if (liveBindings === 0) {
+        return false;
+      }
+      if (repeated !== undefined) {
+        return true;
+      }
+
+      await tx.$executeRaw`
+        INSERT INTO "SsoActivationRecoveryReservation"
+          ("commandId", "organizationId", "connectionId", "createdAt")
+        VALUES (${commandId}, ${organizationId}, ${connectionId}, ${new Date(nowMs)})
+      `;
+      return true;
     });
   }
 
@@ -168,6 +232,62 @@ export class PrismaSsoBreakGlassRepository implements SsoBreakGlassRepository {
     });
     return rows.map(rowToBinding);
   }
+}
+
+type ActivationRecoveryReservationRow = {
+  commandId: string;
+  organizationId: string;
+  connectionId: string;
+};
+
+/**
+ * Consume an activation reservation as part of the projection transaction.
+ * The caller must already hold this organization's advisory transaction lock.
+ */
+export async function consumeActivationRecoveryReservationInTransaction(
+  tx: Prisma.TransactionClient,
+  args: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+  },
+): Promise<void> {
+  await tx.$executeRaw`
+    DELETE FROM "SsoActivationRecoveryReservation"
+    WHERE "commandId" = ${args.commandId}
+      AND "organizationId" = ${args.organizationId}
+      AND "connectionId" = ${args.connectionId}
+  `;
+}
+
+/** Clear a reservation only after the same transaction projected a terminal state. */
+export async function cancelActivationRecoveryReservationInTransaction(
+  tx: Prisma.TransactionClient,
+  args: { organizationId: string; connectionId: string },
+): Promise<void> {
+  await tx.$executeRaw`
+    DELETE FROM "SsoActivationRecoveryReservation" AS reservation
+    USING "SsoConnection" AS connection
+    WHERE reservation."organizationId" = ${args.organizationId}
+      AND reservation."connectionId" = ${args.connectionId}
+      AND connection."id" = reservation."connectionId"
+      AND connection."organizationId" = reservation."organizationId"
+      AND connection."state" IN ('DISCARDED', 'TORN_DOWN')
+  `;
+}
+
+export async function lockSsoRecoveryOrganizationInTransaction(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+): Promise<void> {
+  await lockOrganization(tx, organizationId);
+}
+
+async function lockOrganization(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+): Promise<void> {
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId}, 0))`;
 }
 
 function rowToBinding(row: SsoBreakGlassBindingRow): BreakGlassBinding {

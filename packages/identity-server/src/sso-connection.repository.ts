@@ -94,6 +94,12 @@ export interface SsoDomainClaimQueueRepository {
  */
 export interface SsoBreakGlassBindingRepository {
   hasLiveBinding(args: { organizationId: string }): Promise<boolean>;
+  reserveActivationRecovery(args: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+    nowMs: number;
+  }): Promise<boolean>;
 }
 
 /**

@@ -706,16 +706,11 @@ export const ssoEngineProviderDerivation = ({
  * command or test changed to start enforcing real bindings.
  */
 export function ssoBreakGlass(): SsoBreakGlassService {
-  const connections = new PrismaSsoConnectionReadRepository(prisma);
   const memberships = new PrismaSsoMembershipRepository(prisma);
   return new SsoBreakGlassService({
     bindings: new PrismaSsoBreakGlassRepository(prisma),
     notifier: new LoggingBreakGlassWarningNotifier(),
     newBindingId: newSsoBreakGlassBindingId,
-    // The revoke guard's one outside fact: whether an ACTIVE connection is
-    // deciding this organization's sign-in right now.
-    organizationHasActiveConnection: async ({ organizationId }) =>
-      (await connections.countActiveConnections({ organizationId })) > 0,
     // The same people `breakGlassCandidates` lists, asked on the write path.
     // A grant naming anybody else satisfies activation's precondition and
     // opens no door.

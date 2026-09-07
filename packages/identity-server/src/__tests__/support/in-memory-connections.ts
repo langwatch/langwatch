@@ -172,6 +172,10 @@ export class StubBreakGlassBindings implements SsoBreakGlassBindingRepository {
     return this.live;
   }
 
+  async reserveActivationRecovery(): Promise<boolean> {
+    return this.live;
+  }
+
   set(live: boolean): void {
     this.live = live;
   }

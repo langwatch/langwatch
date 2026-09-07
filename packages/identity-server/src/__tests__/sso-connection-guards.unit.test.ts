@@ -377,6 +377,37 @@ describe("sso connection guards", () => {
         guards.activateConnection({ ...identity, testLoginAccountId: null }),
       ).rejects.toMatchObject({ code: "sso_connection_activation_blocked" });
     });
+
+    it("reuses one actor-bound recovery reservation across activation retries", async () => {
+      const first = await guards.activateConnection({
+        ...identity,
+        commandId: "cmd_first_delivery",
+        testLoginAccountId: "acc_test",
+      });
+      const retry = await guards.activateConnection({
+        ...identity,
+        commandId: "cmd_retry_delivery",
+        testLoginAccountId: "acc_test",
+      });
+      const otherActor = await guards.activateConnection({
+        ...identity,
+        commandId: "cmd_other_actor",
+        actor: { type: "user", id: "user_other" },
+        testLoginAccountId: "acc_test",
+      });
+
+      const firstReservation = first.find(
+        (fact) => fact.type === CONNECTION_ACTIVATED_EVENT_TYPE,
+      )?.data.activationReservationCommandId;
+      const retryReservation = retry.find(
+        (fact) => fact.type === CONNECTION_ACTIVATED_EVENT_TYPE,
+      )?.data.activationReservationCommandId;
+      const otherReservation = otherActor.find(
+        (fact) => fact.type === CONNECTION_ACTIVATED_EVENT_TYPE,
+      )?.data.activationReservationCommandId;
+      expect(firstReservation).toBe(retryReservation);
+      expect(otherReservation).not.toBe(firstReservation);
+    });
   });
 
   describe("given an ACTIVE connection", () => {
@@ -395,6 +426,11 @@ describe("sso connection guards", () => {
         { connectionId: CONNECTION, organizationId: ORG },
       );
 
+      breakGlass.set(false);
+      await expect(
+        guards.resumeConnection({ ...identity }),
+      ).rejects.toMatchObject({ code: "sso_connection_activation_blocked" });
+      breakGlass.set(true);
       const resumed = await run(() => guards.resumeConnection({ ...identity }));
       expect(resumed.state.state).toBe("ACTIVE");
       expect(await connections.findDomainOwner({ domain: "acme.com" })).toEqual(
@@ -520,9 +556,8 @@ describe("sso connection guards", () => {
         }),
       ]);
 
-      // Suspend it, then try to bring it back with no break-glass binding:
-      // the activation-shaped guard is not what resume runs, so the honest
-      // check is the one a grandfathered connection would actually hit.
+      // Suspend it and bring it back through the same recovery reservation
+      // boundary as an ordinary connection.
       await run(() => guards.suspendConnection({ ...identity, reason: null }));
       stranding.set(["user_sam"]);
       await run(() => guards.resumeConnection({ ...identity }));

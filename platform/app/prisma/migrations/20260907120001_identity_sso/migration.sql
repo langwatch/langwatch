@@ -141,6 +141,18 @@ CREATE TABLE "SsoBreakGlassBinding" (
 CREATE INDEX "SsoBreakGlassBinding_organizationId_expiresAt_idx" ON "SsoBreakGlassBinding"("organizationId", "expiresAt");
 CREATE INDEX "SsoBreakGlassBinding_userId_idx" ON "SsoBreakGlassBinding"("userId");
 
+CREATE TABLE "SsoActivationRecoveryReservation" (
+  "commandId" TEXT NOT NULL,
+  "organizationId" TEXT NOT NULL,
+  "connectionId" TEXT NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "SsoActivationRecoveryReservation_pkey" PRIMARY KEY ("commandId")
+);
+CREATE UNIQUE INDEX "SsoActivationRecoveryReservation_organizationId_connectionId_key"
+  ON "SsoActivationRecoveryReservation"("organizationId", "connectionId");
+CREATE INDEX "SsoActivationRecoveryReservation_organizationId_idx"
+  ON "SsoActivationRecoveryReservation"("organizationId");
+
 CREATE TABLE "ScimRequestLog" (
   "id" TEXT NOT NULL,
   "organizationId" TEXT NOT NULL,

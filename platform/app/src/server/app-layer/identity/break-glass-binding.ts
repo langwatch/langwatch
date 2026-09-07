@@ -36,6 +36,12 @@ export class LocalDoorBreakGlassBinding
   async hasLiveBinding(_args: { organizationId: string }): Promise<boolean> {
     return this.localMethods().length > 0;
   }
+
+  async reserveActivationRecovery(args: {
+    organizationId: string;
+  }): Promise<boolean> {
+    return this.hasLiveBinding(args);
+  }
 }
 
 /**
@@ -66,5 +72,17 @@ export class RequiresLocalDoorAndBinding
   async hasLiveBinding(args: { organizationId: string }): Promise<boolean> {
     if (!(await this.deps.localDoor.hasLiveBinding(args))) return false;
     return this.deps.bindings.hasLiveBinding(args);
+  }
+
+  async reserveActivationRecovery(args: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+    nowMs: number;
+  }): Promise<boolean> {
+    if (!(await this.deps.localDoor.hasLiveBinding(args))) {
+      return false;
+    }
+    return this.deps.bindings.reserveActivationRecovery(args);
   }
 }

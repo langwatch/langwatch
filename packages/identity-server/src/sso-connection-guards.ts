@@ -102,6 +102,7 @@ import type {
   SsoConnectionRegistrationKind,
   SsoConnectionRegistrationRepository,
 } from "./sso-connection-registration.repository";
+import { activationRecoveryReservationId } from "./sso-connection-id";
 
 /**
  * The SSO connection guards (ADR-117 §5, D04): what runs BEFORE any fact
@@ -1091,8 +1092,19 @@ export class SsoConnectionGuards {
         `connection ${data.connectionId}: no recorded test login`,
       );
     }
-    const bound = await this.breakGlass.hasLiveBinding({
+    const reservationCommandId = activationRecoveryReservationId({
       organizationId: state.organizationId,
+      connectionId: data.connectionId,
+      actorType: data.actor.type,
+      actorId: data.actor.id,
+      connectionUpdatedAtMs: state.updatedAtMs,
+      transition: "activate",
+    });
+    const bound = await this.breakGlass.reserveActivationRecovery({
+      organizationId: state.organizationId,
+      connectionId: data.connectionId,
+      commandId: reservationCommandId,
+      nowMs: data.occurredAtMs,
     });
     if (!bound) {
       throw new SsoConnectionActivationBlockedError(
@@ -1104,6 +1116,7 @@ export class SsoConnectionGuards {
         type: CONNECTION_ACTIVATED_EVENT_TYPE,
         data: {
           connectionId: data.connectionId,
+          activationReservationCommandId: reservationCommandId,
           testLoginAccountId: data.testLoginAccountId,
           actor: data.actor,
           source: data.source,
@@ -1183,12 +1196,32 @@ export class SsoConnectionGuards {
   async resumeConnection(
     data: ResumeConnectionCommandData,
   ): Promise<SsoConnectionFactInput[]> {
-    await this.require(data, RESUME_CONNECTION_COMMAND_TYPE);
+    const state = await this.require(data, RESUME_CONNECTION_COMMAND_TYPE);
+    const reservationCommandId = activationRecoveryReservationId({
+      organizationId: state.organizationId,
+      connectionId: data.connectionId,
+      actorType: data.actor.type,
+      actorId: data.actor.id,
+      connectionUpdatedAtMs: state.updatedAtMs,
+      transition: "resume",
+    });
+    const bound = await this.breakGlass.reserveActivationRecovery({
+      organizationId: state.organizationId,
+      connectionId: data.connectionId,
+      commandId: reservationCommandId,
+      nowMs: data.occurredAtMs,
+    });
+    if (!bound) {
+      throw new SsoConnectionActivationBlockedError(
+        `connection ${data.connectionId}: no live break-glass binding for organization ${state.organizationId}`,
+      );
+    }
     return [
       {
         type: CONNECTION_RESUMED_EVENT_TYPE,
         data: {
           connectionId: data.connectionId,
+          activationReservationCommandId: reservationCommandId,
           actor: data.actor,
           source: data.source,
         },

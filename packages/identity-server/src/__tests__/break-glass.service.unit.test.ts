@@ -23,8 +23,6 @@ let notifier: CollectingBreakGlassNotifier;
 let clock: number;
 let minted: number;
 let service: SsoBreakGlassService;
-/** What the revoke guard's one outside fact answers, per test. */
-let connectionActive = false;
 /** Who is NOT an administrator of the organization, per test. Empty by
  *  default: a grant names somebody eligible unless a case says otherwise. */
 let ineligible = new Set<string>();
@@ -34,13 +32,11 @@ beforeEach(() => {
   notifier = new CollectingBreakGlassNotifier();
   clock = T0;
   minted = 0;
-  connectionActive = false;
   ineligible = new Set<string>();
   service = new SsoBreakGlassService({
     bindings,
     notifier,
     newBindingId: () => `ssobg_${++minted}`,
-    organizationHasActiveConnection: async () => connectionActive,
     holderIsEligible: async ({ userId }) => !ineligible.has(userId),
     now: () => clock,
   });
@@ -101,6 +97,32 @@ describe("granting a way in to somebody who could not use it", () => {
 
       expect(refusal.code).toBe("sso_break_glass_holder_ineligible");
     });
+  });
+});
+
+describe("reserving recovery for activation", () => {
+  it("refuses a retry after the binding behind its durable reservation expires", async () => {
+    const granted = await service.grant({
+      organizationId: ORG,
+      userId: "user_sam",
+      grantedByUserId: "user_ana",
+      expiresAtMs: T0 + DAY_MS,
+    });
+    const attempt = {
+      organizationId: ORG,
+      connectionId: "ssoc_activation",
+      commandId: "cmd_activation",
+    };
+
+    await expect(
+      service.reserveActivationRecovery({ ...attempt, nowMs: T0 }),
+    ).resolves.toBe(true);
+    await expect(
+      service.reserveActivationRecovery({
+        ...attempt,
+        nowMs: granted.expiresAtMs + 1,
+      }),
+    ).resolves.toBe(false);
   });
 });
 
@@ -219,12 +241,17 @@ describe("ending a way back in on purpose", () => {
 
   /** @scenario "The last way back in cannot be ended while the connection decides sign-in" */
   it("refuses to end the only live way in while a connection is ACTIVE", async () => {
-    connectionActive = true;
     const granted = await service.grant({
       organizationId: ORG,
       userId: "user_sam",
       grantedByUserId: "user_ana",
       expiresAtMs: T0 + 14 * DAY_MS,
+    });
+    await service.reserveActivationRecovery({
+      organizationId: ORG,
+      connectionId: "ssoc_active",
+      commandId: "cmd_activate",
+      nowMs: clock,
     });
 
     await expect(
@@ -247,7 +274,6 @@ describe("ending a way back in on purpose", () => {
   });
 
   it("serializes concurrent revocations so one live recovery path remains", async () => {
-    connectionActive = true;
     const first = await service.grant({
       organizationId: ORG,
       userId: "user_sam",
@@ -259,6 +285,12 @@ describe("ending a way back in on purpose", () => {
       userId: "user_ana",
       grantedByUserId: "user_ana",
       expiresAtMs: T0 + 14 * DAY_MS,
+    });
+    await service.reserveActivationRecovery({
+      organizationId: ORG,
+      connectionId: "ssoc_activating",
+      commandId: "cmd_activate",
+      nowMs: clock,
     });
 
     const attempts = await Promise.allSettled([

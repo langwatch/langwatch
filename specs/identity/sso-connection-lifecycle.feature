@@ -196,7 +196,8 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Given an ACTIVE connection for "acme"
     When a suspend command is handled
     Then the connection is SUSPENDED and stops routing its domains
-    And a resume command restores ACTIVE and routing
+    And a resume command without a live break-glass binding is refused
+    And with a live binding, resume restores ACTIVE and routing
 
   @unit
   Scenario: Teardown never strands a user
