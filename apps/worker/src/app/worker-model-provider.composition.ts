@@ -7,7 +7,7 @@ import {
   AwsStsManagedProviderCredentialAdapter,
   EnvironmentManagedProviderConfigurationAdapter,
   ManagedProviderConfigurationReporter,
-  PostgresManagedProviderAdapter,
+  ManagedProviderService as EnterpriseManagedProviderService,
 } from "@langwatch/enterprise-managed-provider-server";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
@@ -198,14 +198,14 @@ function composeWorkerManagedProviders(input: {
   environment: Readonly<Record<string, string | undefined>>;
   logger: Logger;
 }): ManagedProviderService {
-  return PostgresManagedProviderAdapter.create({
+  return EnterpriseManagedProviderService.create({
     projects: input.projects,
     configuration: EnvironmentManagedProviderConfigurationAdapter.create({
       source: input.environment,
       reporter: WorkerManagedProviderConfigurationReporter.create(input.logger),
     }),
     credentials: AwsStsManagedProviderCredentialAdapter.create(),
-  }).build();
+  });
 }
 
 /** Where the managed-provider configuration reader's own findings go. */
