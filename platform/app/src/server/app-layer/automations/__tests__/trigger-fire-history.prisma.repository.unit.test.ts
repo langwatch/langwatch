@@ -16,7 +16,7 @@ function makeRepo() {
 }
 
 describe("PrismaTriggerFireHistoryRepository", () => {
-  describe("findAllRecentByTriggerId", () => {
+  describe("given a trigger with fire history", () => {
     describe("when reading a trigger's recent fires", () => {
       it("scopes the query to the project, trigger, and requested limit", async () => {
         const { repo, findMany } = makeRepo();
@@ -61,7 +61,7 @@ describe("PrismaTriggerFireHistoryRepository", () => {
     });
   });
 
-  describe("findLatestByTriggerId", () => {
+  describe("given a trigger that has fired more than once", () => {
     describe("when reading a trigger's newest fire", () => {
       /** @scenario "The newest fire is asked for by project and trigger, newest first, one row" */
       it("asks for exactly one row, newest first, scoped to project and trigger", async () => {
