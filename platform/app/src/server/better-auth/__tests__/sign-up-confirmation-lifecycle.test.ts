@@ -29,22 +29,28 @@ const responseSchema = z.object({
   signedIn: z.boolean(),
 });
 
-function buildHarness() {
+function buildHarness({
+  existingAccount = false,
+}: {
+  existingAccount?: boolean;
+} = {}) {
   const email = "pending@example.com";
   const userId = "pending-user";
   const now = new Date("2026-09-07T08:00:00.000Z");
   const db: MemoryDB = {
-    user: [
-      {
-        id: userId,
-        name: "Pending User",
-        email,
-        emailVerified: false,
-        signupConfirmationPending: true,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ],
+    user: existingAccount
+      ? [
+          {
+            id: userId,
+            name: "Pending User",
+            email,
+            emailVerified: false,
+            signupConfirmationPending: true,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ]
+      : [],
     session: [],
     account: [],
     verification: [],
@@ -80,10 +86,13 @@ function buildHarness() {
   const verification = new SignUpVerificationService({
     tokens,
     directory: {
-      stateFor: async () =>
-        db.user[0]?.signupConfirmationPending
+      stateFor: async () => {
+        const user = db.user[0];
+        if (!user) return "unknown";
+        return user.signupConfirmationPending
           ? "awaiting_confirmation"
-          : "confirmed",
+          : "confirmed";
+      },
     },
     accounts: {
       createCredentialAccount: async () => {},
@@ -108,7 +117,9 @@ function buildHarness() {
 
   const endpoint = new SignUpConfirmationEndpoint({
     verification,
-    users: { findUserIdByEmail: async () => userId },
+    users: {
+      findUserIdByEmail: async () => db.user[0]?.id ?? null,
+    },
     minter: new BetterAuthSessionMinter(),
   });
   const auth: AuthUnderTest = betterAuth({
@@ -141,56 +152,80 @@ function buildHarness() {
 }
 
 describe("real BetterAuth sign-up confirmation lifecycle", () => {
-  /** @scenario Opening the link is what signs me in for the first time */
-  /** @scenario Opening a confirmation link a second time confirms, rather than refusing */
-  it("mints only on the fresh claim and never on replay or invalid proof", async () => {
+  /** @scenario Opening the link unlocks credential choice */
+  it("returns one proof for a fresh address without creating a user or session", async () => {
     const harness = buildHarness();
     await harness.verification.requestVerification({ email: harness.email });
     const token = harness.sentToken();
 
-    const beforeInvalid = structuredClone({
-      users: harness.db.user,
-      sessions: harness.db.session,
-    });
-    const invalid = await harness.confirm("never-issued");
-    expect(invalid.status).toBe(410);
-    expect(
-      z.object({ error: z.string() }).parse(await invalid.json()).error,
-    ).toBe("identity_verification_expired");
-    expect(invalid.headers.get("set-cookie")).toBeNull();
-    expect(
-      structuredClone({
-        users: harness.db.user,
-        sessions: harness.db.session,
-      }),
-    ).toEqual(beforeInvalid);
-
     const first = await harness.confirm(token);
+    const body = z
+      .object({
+        ...responseSchema.shape,
+        addressProof: z.string().nullable(),
+      })
+      .parse(await first.json());
 
     expect(first.status).toBe(200);
-    expect(first.headers.get("set-cookie")).toContain("session_token");
-    expect(responseSchema.parse(await first.json())).toMatchObject({
+    expect(first.headers.get("set-cookie")).toBeNull();
+    expect(body).toMatchObject({
       email: harness.email,
-      accountExists: true,
-      signedIn: true,
+      accountExists: false,
+      addressProof: expect.any(String),
+      signedIn: false,
     });
-    expect(harness.db.session).toHaveLength(1);
-    expect(harness.db.user[0]).toMatchObject({
-      emailVerified: true,
-      signupConfirmationPending: false,
-    });
+    expect(harness.db.user).toHaveLength(0);
+    expect(harness.db.session).toHaveLength(0);
+  });
 
-    harness.db.session = [];
+  it("refuses a fresh link when an account is already pending confirmation", async () => {
+    const harness = buildHarness({ existingAccount: true });
+    await harness.verification.requestVerification({ email: harness.email });
+
+    const response = await harness.confirm(harness.sentToken());
+
+    expect(response.status).toBe(410);
+    expect(
+      z.object({ error: z.string() }).parse(await response.json()).error,
+    ).toBe("identity_verification_expired");
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(harness.db.user[0]).toMatchObject({
+      emailVerified: false,
+      signupConfirmationPending: true,
+    });
+    expect(harness.db.session).toHaveLength(0);
+  });
+
+  /** @scenario Opening a confirmation link a second time confirms, rather than refusing */
+  it("returns status only when the fresh proof link is replayed", async () => {
+    const harness = buildHarness();
+    await harness.verification.requestVerification({ email: harness.email });
+    const token = harness.sentToken();
+
+    const first = await harness.confirm(token);
+    expect(first.status).toBe(200);
+
     const replay = await harness.confirm(token);
 
     expect(replay.status).toBe(200);
     expect(replay.headers.get("set-cookie")).toBeNull();
-    expect(responseSchema.parse(await replay.json()).signedIn).toBe(false);
+    expect(
+      z
+        .object({
+          ...responseSchema.shape,
+          addressProof: z.string().nullable(),
+        })
+        .parse(await replay.json()),
+    ).toMatchObject({
+      accountExists: false,
+      addressProof: null,
+      signedIn: false,
+    });
     expect(harness.db.session).toHaveLength(0);
   });
 
-  /** @scenario Simultaneous confirmation-link consumers mint one session */
-  it("allows only one simultaneous consumer to mint a session", async () => {
+  /** @scenario Simultaneous confirmation-link consumers yield one proof */
+  it("allows only one simultaneous consumer to receive a proof", async () => {
     const harness = buildHarness();
     await harness.verification.requestVerification({ email: harness.email });
     const token = harness.sentToken();
@@ -200,15 +235,25 @@ describe("real BetterAuth sign-up confirmation lifecycle", () => {
       harness.confirm(token),
     ]);
 
-    expect(
-      responses.filter((response) => response.headers.has("set-cookie")),
-    ).toHaveLength(1);
+    expect(responses.every((response) => response.status === 200)).toBe(true);
     const bodies = await Promise.all(
       responses.map(async (response) =>
-        responseSchema.parse(await response.json()),
+        z
+          .object({
+            ...responseSchema.shape,
+            addressProof: z.string().nullable(),
+          })
+          .parse(await response.json()),
       ),
     );
-    expect(bodies.filter((body) => body.signedIn)).toHaveLength(1);
-    expect(harness.db.session).toHaveLength(1);
+    expect(bodies.filter((body) => body.addressProof !== null)).toHaveLength(1);
+    expect(bodies.filter((body) => body.addressProof === null)).toHaveLength(1);
+    expect(
+      responses.every(
+        (response) => response.headers.get("set-cookie") === null,
+      ),
+    ).toBe(true);
+    expect(harness.db.user).toHaveLength(0);
+    expect(harness.db.session).toHaveLength(0);
   });
 });

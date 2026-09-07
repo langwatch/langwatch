@@ -68,112 +68,57 @@ describe("given the sign-up confirmation endpoint", () => {
     expect(SIGN_UP_CONFIRM_ADDRESS_PATH).toBe("/sign-up/confirm-address");
   });
 
-  describe("when the link confirms an account that exists", () => {
+  describe("when the link confirms a fresh address", () => {
     beforeEach(() => {
       completeVerification.mockResolvedValue({
         email: "sam@acme.com",
         accountCreated: false,
-        accountExists: true,
-        addressProof: null,
+        accountExists: false,
+        addressProof: "proof-1",
         freshClaim: true,
       });
     });
 
-    /** @scenario Opening the link is what signs me in for the first time */
-    it("opens the account's session and sets its cookie", async () => {
+    /** @scenario "Opening the link unlocks credential choice" */
+    it("hands the proof on without opening a session", async () => {
       const { ctx, createSession, json } = fakeContext({ token: "a-token" });
 
       const answer = await run(ctx);
 
-      expect(completeVerification).toHaveBeenCalledWith({ token: "a-token" });
-      expect(createSession).toHaveBeenCalledWith("user_1");
-      expect(setSessionCookie).toHaveBeenCalledWith(ctx, {
-        session: { id: "session_1" },
-        user: { id: "user_1", email: "sam@acme.com" },
-      });
+      expect(createSession).not.toHaveBeenCalled();
+      expect(setSessionCookie).not.toHaveBeenCalled();
       expect(json).toHaveBeenCalledOnce();
       expect(answer.body).toMatchObject({
         email: "sam@acme.com",
-        accountExists: true,
-        signedIn: true,
-      });
-    });
-
-    /**
-     * Asked of the directory by address rather than spelled here. Matching it
-     * whatever case the row was written in is that repository's rule, and the
-     * layering guard is what keeps it from being re-spelled at this boundary.
-     */
-    it("asks the directory for the account behind the address it confirmed", async () => {
-      const { ctx } = fakeContext({ token: "a-token" });
-
-      await run(ctx);
-
-      expect(findUserIdByEmail).toHaveBeenCalledWith({ email: "sam@acme.com" });
-    });
-
-    it("opens nothing for an address whose account the directory cannot find", async () => {
-      findUserIdByEmail.mockResolvedValue(null);
-      const { ctx, createSession } = fakeContext({ token: "a-token" });
-
-      const answer = await run(ctx);
-
-      expect(createSession).not.toHaveBeenCalled();
-      expect(answer.body).toMatchObject({ signedIn: false });
-    });
-
-    it("still confirms when no session can be opened", async () => {
-      const { ctx, createSession } = fakeContext({ token: "a-token" });
-      createSession.mockRejectedValue(new Error("session store down"));
-
-      const answer = await run(ctx);
-
-      // The address IS confirmed; the screen offers the way in instead.
-      expect(answer.body).toMatchObject({
-        accountExists: true,
+        accountExists: false,
+        addressProof: "proof-1",
         signedIn: false,
       });
-      expect(setSessionCookie).not.toHaveBeenCalled();
     });
+  });
 
-    /** @scenario Opening a confirmation link a second time confirms, rather than refusing */
-    it("does not mint another session when a spent link is reopened", async () => {
+  describe("when the fresh proof link is replayed", () => {
+    beforeEach(() => {
       completeVerification.mockResolvedValue({
         email: "sam@acme.com",
         accountCreated: false,
-        accountExists: true,
+        accountExists: false,
         addressProof: null,
         freshClaim: false,
       });
+    });
+
+    /** @scenario "Opening a confirmation link a second time confirms, rather than refusing" */
+    it("returns status only without minting a session", async () => {
       const { ctx, createSession } = fakeContext({ token: "spent-token" });
 
       const answer = await run(ctx);
 
       expect(createSession).not.toHaveBeenCalled();
       expect(setSessionCookie).not.toHaveBeenCalled();
-      expect(answer.body).toMatchObject({ signedIn: false });
-    });
-  });
-
-  describe("when the link confirms an address with no account behind it", () => {
-    /** @scenario Signing in without an account creates it through verification */
-    it("opens nothing and hands the proof on", async () => {
-      completeVerification.mockResolvedValue({
-        email: "sam@acme.com",
-        accountCreated: false,
-        accountExists: false,
-        addressProof: "proof-1",
-        freshClaim: true,
-      });
-      const { ctx, createSession } = fakeContext({ token: "a-token" });
-
-      const answer = await run(ctx);
-
-      expect(createSession).not.toHaveBeenCalled();
-      expect(setSessionCookie).not.toHaveBeenCalled();
       expect(answer.body).toMatchObject({
         accountExists: false,
-        addressProof: "proof-1",
+        addressProof: null,
         signedIn: false,
       });
     });
