@@ -165,9 +165,14 @@ func TestFormatCombinedLine(t *testing.T) {
 			t.Errorf("got %q, want the message rendered", got)
 		}
 	})
-	t.Run("a label-less provisioning line passes through", func(t *testing.T) {
-		if got := formatCombinedLine("  thuishaven: stack \"x\""); !strings.Contains(got, "thuishaven") {
-			t.Errorf("got %q, want the raw line kept", got)
+	t.Run("a label-less line passes through untouched", func(t *testing.T) {
+		for _, raw := range []string{
+			"  thuishaven: stack \"x\"",
+			"12:16:42.370  codegen           Loaded Prisma config from prisma.config.ts.",
+		} {
+			if got := formatCombinedLine(raw); got != raw {
+				t.Errorf("formatCombinedLine(%q) = %q, want the line kept as is", raw, got)
+			}
 		}
 	})
 }

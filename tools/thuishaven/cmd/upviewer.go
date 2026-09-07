@@ -806,13 +806,15 @@ func (m *viewerModel) logFooter(group string) string {
 
 // formatCombinedLine renders a combined-stream line, whose lane comes from the
 // supervisor's own label prefix ("api      | {…}") rather than from the file it
-// was read out of. A label-less line (a provisioning banner) renders with an
-// empty lane column, so it still lines up with the lines around it.
+// was read out of. A label-less line is already in its final shape — the
+// supervisor's rendered echo, haven's own console line, a provisioning
+// banner — so it passes through untouched; rendering it again would put an
+// empty time and lane column in front of the columns it already carries.
 func formatCombinedLine(raw string) string {
 	label, rest, ok := strings.Cut(raw, "|")
 	name := strings.TrimSpace(label)
 	if !ok || name == "" || strings.ContainsRune(name, ' ') {
-		return formatLogLine(logLine{text: raw}, renderHuman, false)
+		return raw
 	}
 	lane := fileToCLIService(name)
 	color := logServiceColors[lane]
