@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   requestVerificationMock,
+  enrollmentMock,
   completeVerificationMock,
   sendConfirmationMock,
   routeMock,
@@ -28,6 +29,7 @@ const {
   publicEnvRef,
 } = vi.hoisted(() => ({
   requestVerificationMock: vi.fn(),
+  enrollmentMock: vi.fn(),
   completeVerificationMock: vi.fn(),
   sendConfirmationMock: vi.fn(),
   routeMock: vi.fn(),
@@ -81,6 +83,7 @@ vi.mock("~/utils/api", async () => {
         requestSignUpVerification: {
           useMutation: useFakeMutation(requestVerificationMock),
         },
+        signUpEnrollment: { useMutation: useFakeMutation(enrollmentMock) },
         sendMyAddressConfirmation: {
           useMutation: useFakeMutation(sendConfirmationMock),
         },
@@ -195,6 +198,11 @@ describe("given the sign-up screen", () => {
     searchParamsRef.current = new URLSearchParams("");
     publicEnvRef.current = { IS_SAAS: true };
     requestVerificationMock.mockResolvedValue({ sent: true });
+    enrollmentMock.mockResolvedValue({
+      outcome: "enroll",
+      methodSet: [{ id: "password", kind: "password", connectionId: null }],
+      reasonCode: "identifier_unknown",
+    });
     routeMock.mockImplementation(
       ({ identifier }: { identifier: string | null }) =>
         Promise.resolve(identifier === null ? localPicker : unknownIdentifier),
@@ -225,7 +233,7 @@ describe("given the sign-up screen", () => {
       expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
     });
 
-    /** @scenario A verified address can create its password account */
+    /** @scenario Password registration consumes the proof exactly once */
     it("creates and signs in only after the proof returns", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token");
       completeVerificationMock.mockResolvedValue({
@@ -265,7 +273,7 @@ describe("given the sign-up screen", () => {
   });
 
   describe("when a confirmation link comes back for an account that exists", () => {
-    /** @scenario Opening the link is what signs me in for the first time */
+    /** @scenario A confirmation link for an existing account signs it in */
     it("goes straight into the app on the session the link opened", async () => {
       searchParamsRef.current = new URLSearchParams(
         "verify=a-token&callbackUrl=%2Fprojects",
@@ -291,7 +299,7 @@ describe("given the sign-up screen", () => {
       expect(routeMock).not.toHaveBeenCalled();
     });
 
-    /** @scenario Opening the link is what signs me in for the first time */
+    /** @scenario Reopening a consumed link offers fresh-link recovery */
     it("offers the way in when the link was reopened and opened no session", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token");
       completeVerificationMock.mockResolvedValue({
@@ -318,7 +326,7 @@ describe("given the sign-up screen", () => {
   });
 
   describe("when a confirmation link comes back with no account behind it", () => {
-    /** @scenario Signing in without an account creates it through verification */
+    /** @scenario Post-link routing still governs credential enrollment */
     it("offers the method choice through the same picker sign-in renders", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token");
       completeVerificationMock.mockResolvedValue({
@@ -340,10 +348,11 @@ describe("given the sign-up screen", () => {
           container.querySelector('input[type="password"]'),
         ).not.toBeNull();
       });
-      expect(routeMock).toHaveBeenCalledWith({
-        identifier: "sam@acme.com",
-        breakGlass: false,
+      expect(enrollmentMock).toHaveBeenCalledWith({
+        email: "sam@acme.com",
+        addressProof: "proof_1",
       });
+      expect(routeMock).not.toHaveBeenCalled();
     });
 
     it("offers a fresh link when a replay returns no usable proof", async () => {
@@ -375,7 +384,7 @@ describe("given the sign-up screen", () => {
         addressProof: "proof_1",
         signedIn: false,
       });
-      routeMock.mockRejectedValue(new Error("routing is down"));
+      enrollmentMock.mockRejectedValue(new Error("routing is down"));
 
       const { container } = renderScreen();
 
@@ -403,6 +412,13 @@ describe("given the sign-up screen", () => {
         ],
         reasonCode: "domain_routed",
       } satisfies RoutingDecision);
+      enrollmentMock.mockResolvedValue({
+        outcome: "redirect",
+        methodSet: [
+          { id: "okta", kind: "federated", connectionId: "conn_acme" },
+        ],
+        reasonCode: "domain_routed",
+      });
 
       const { container } = renderScreen();
 
@@ -684,12 +700,11 @@ describe("given the sign-up screen", () => {
         ],
         reasonCode: "no_domain_match",
       };
-      routeMock.mockImplementation(
-        ({ identifier }: { identifier: string | null }) =>
-          Promise.resolve(
-            identifier === null ? signupPolicy : unknownIdentifier,
-          ),
-      );
+      enrollmentMock.mockResolvedValue({
+        outcome: "enroll",
+        methodSet: signupPolicy.methodSet,
+        reasonCode: "identifier_unknown",
+      });
       searchParamsRef.current = new URLSearchParams("verify=a-token");
       completeVerificationMock.mockResolvedValue({
         email: "sam@acme.com",

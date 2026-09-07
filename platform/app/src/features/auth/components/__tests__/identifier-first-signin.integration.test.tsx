@@ -444,7 +444,7 @@ describe("given the identifier-first sign-in screen", () => {
       expect(registerMock).not.toHaveBeenCalled();
     });
 
-    /** @scenario No confirmation link is sent until a credential has been chosen */
+    /** @scenario No credential is collected until the confirmation link is opened */
     it("creates no account while the confirmation is being sent", async () => {
       refusedForAnUnheldAddress();
 
@@ -750,7 +750,7 @@ describe("given the identifier-first sign-in screen", () => {
       expect(screen.queryByLabelText(/email/i)).toBeNull();
     });
 
-    /** @scenario No confirmation link is sent until a credential has been chosen */
+    /** @scenario No credential is collected until the confirmation link is opened */
     it("mails the proof before collecting any credential", async () => {
       routeMock.mockResolvedValue(unknownIdentifier);
       requestSignUpVerificationMock.mockResolvedValue({ sent: true });
