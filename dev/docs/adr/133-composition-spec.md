@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-07
 
-**Status:** Proposed
+**Status:** App factory core accepted; transport declaration API under discussion
 
 **Behavioural contract:** [Composition specification](../../../specs/server/composition-spec.feature)
 
@@ -68,35 +68,159 @@ not an implementation plan.
 
 **One feature installer, one construction path, explicit lifecycle.**
 
-Each feature declares its required contract services, its typed config, the
-service it provides, and its transport and background contributions. Its setup
-constructs its private repositories and its service once per process. The API
-and the worker reuse that same setup.
+Each feature's server implementation declares its app contract token, required
+peer app contracts and static `create` factory. The installer selects that class
+with `.withApp(AnnotationApp)`. The framework supplies its declared dependencies
+and calls `create` once during boot. API and worker reuse the same factory.
 
-```
-  packages/features/<x>/server/src/<x>.server.ts          apps/api/src/api.app.ts
-  ┌──────────────────────────────────────────────┐        ┌────────────────────────────────────┐
-  │ serverFeature("annotation")                  │        │ createApp({ name: "langwatch-api" })│
-  │   .withConfig(schema)              declares  │        │   .withInfrastructure(infra)       │
-  │   .withDependencies({                        │───────▶│   .withFeature(userServer)         │
-  │      projects: ProjectService, … }) declares │        │   .withFeature(annotationServer)   │
-  │   .withSetup(({ prisma, projects }) => {     │        │   …one line per feature…           │
-  │      …ordinary code, run once…    constructs │        │                                    │
-  │      return { annotations, app }; })         │        │ const runtime = await app.boot({   │
-  │   .provides(AnnotationService, a =>          │        │   config, role: "api" });          │
-  │      a.annotations)                 exposes  │        │ await runtime.start();             │
-  │   .withTrpc(…)  .withRest(…)  .withWorker(…) │        └────────────────────────────────────┘
-  │   .build();                                  │
-  └──────────────────────────────────────────────┘
+```ts
+// AnnotationApp here is the server implementation, not the contract class.
+export const annotationServer = serverFeature("annotation")
+  .withApp(AnnotationApp)
+  .build();
 
-  withFeature  declares only — nothing is constructed, nothing is started
-  boot         validates the declarations, then constructs, in dependency order
-  start        begins serving: listeners bind, consumers fetch, schedulers tick
+const runtime = await createApp({ name: "langwatch-api" })
+  .withInfrastructure(infrastructure)
+  .withFeature(annotationServer)
+  .boot({ config, role: "api" });
+
+await runtime.start();
 ```
 
-The syntax above is illustrative. What is decided is the three-phase split:
-**imports and constructors never start background work**; `withFeature`
-declares; `boot` validates and constructs; `start` serves.
+Peer installers and transport contributions are omitted from this example.
+`withFeature` declares only. `boot` validates the selected graph before calling
+any factory, then constructs it in dependency order. `start` begins serving.
+Imports, declarations and constructors never start background work.
+
+### Accepted app factory shape
+
+The portable contract exports the abstract `AnnotationApp` with readonly service
+members. The server imports it as `AnnotationAppContract` and owns the concrete
+`AnnotationApp`, its private constructor and its static `create`. The contract
+has no infrastructure imports or construction logic.
+
+The server class declares `static readonly contract = AnnotationAppContract`
+and `static readonly dependencies`. Dependency values are peer app contract
+classes. Those classes are runtime keys as well as instance types; lookup never
+uses class names or parameter names. The installer derives the provided token
+and required dependencies from this metadata. It does not repeat them with
+`.provides(...)` or `.withDependencies(...)`.
+
+```ts
+const dependencies = {
+  projects: ProjectApp,
+  organizations: OrganizationApp,
+};
+
+type AnnotationSetup = FeatureSetup<
+  typeof dependencies,
+  AnnotationInfrastructure,
+  AnnotationConfig
+>;
+
+// Members and construction body omitted; FeatureSetup is the proposed helper.
+// These declarations belong on the server AnnotationApp class:
+// static readonly contract = AnnotationAppContract;
+// static readonly dependencies = dependencies;
+// static create(setup: AnnotationSetup): AnnotationApp;
+```
+
+`FeatureSetup` derives the dependency object from the declared tokens: projects
+is a `ProjectApp` instance and organizations is an `OrganizationApp` instance.
+Technical infrastructure and validated semantic config remain separately typed
+inputs. The setup context also supplies feature resource ownership for partial
+construction cleanup. App instances expose only their readonly public services;
+factory metadata lives on the class, not on those instances.
+
+The framework calls the factory with resolved dependencies, infrastructure,
+config and resource ownership. Callers do not assemble another dependency bag
+or invoke the factory themselves. Factories may extract complete services from
+peer apps to construct their own services; those services do not receive a
+root application or a dynamic lookup API.
+
+Type checking rejects access to an undeclared dependency, incompatible factory
+inputs, and a result incompatible with the linked app contract. The dependency
+map is declared once, with no handwritten mirror of its resolved instance types.
+An independently declared static method still needs a parameter annotation:
+TypeScript cannot infer that parameter backwards from a later `.withApp(...)`
+call. The helper derives this annotation; it does not use reflection or code
+generation. It is framework typing machinery, not a partial service view.
+
+Boot validates missing providers, duplicate providers and dependency cycles
+before invoking any factory. Type safety cannot prove that a deployment has
+installed every required feature. Imports remain subject to architecture lint;
+a typed setup parameter alone cannot prevent an undeclared global import.
+
+An interface plus an explicit runtime token could express the same contract.
+The abstract contract class keeps those two declarations together. It supplies
+no runtime data validation and does not justify forwarding methods or a service
+locator. Separate setup/provider calls were rejected because they repeat one
+construction decision and allow the two declarations to drift.
+
+This is the accepted target shape, not a claim that the current runtime builder
+already implements it. Transport descriptor syntax, transport-only dependency
+assembly and shared adapter ownership will be decided next. The previous
+`.withTransportDependencies/.withTransport/.withRest/.withTrpc` chain is not the
+approved replacement API. Existing transport behaviour and lifecycle guarantees
+remain required while that API is designed.
+
+### Amendment: one public app per feature (2026-09-07)
+
+Each installer provides one canonical abstract `<Feature>App` from its contract
+package, declared in `<feature>.app.ts` and exported from the contract barrel.
+The app exposes readonly properties typed as that feature's public abstract
+services. Services own behaviour; the app has no forwarding methods, callbacks,
+repositories, transport objects or dynamic lookup API. A feature with one
+cohesive service exposes one member. Repository count does not justify adding
+public services.
+
+The server app factory returns the app itself. `.withApp(AnnotationApp)`
+registers that exact object under its linked contract token, without a selector
+and without registering its services separately.
+REST, tRPC and background contributions use those same service instances in
+one process. Dependencies between converted features name their app contracts;
+services receive the complete dependencies they actually use. Root applications
+are never injected as service locators.
+
+Transport-only collaborators belong in named transport adapters, assembled only
+for the API role. A class that enriches responses or extracts actors is not the
+public feature app. Browser installation uses browser-safe contracts and the
+same feature ownership; it does not import the server graph. The server launcher
+reuses process entrypoints and tasks select the services they need without
+starting consumers or transports.
+
+This supersedes the canonical-service-only public boundary in ADR-101 and the
+strict layout ADR for every catalogue owner, core and Enterprise. Enforcement
+starts from `packages/features/catalogue.json`, independently of whether an
+installer or contract package already exists. Missing apps, missing required
+installers and displaced caller paths are migration failures, not exemptions.
+The global command remains red until those owners are migrated; no baseline
+hides incomplete adoption.
+
+A server owner requires feature-owned server assembly. Browser-only owners use
+browser composition and real browser service contracts, without fabricated
+server packages or empty apps. Existing portable browser services, such as
+SaasBrowserService, follow the same app grouping convention. Owners without a
+contract first establish the portable contract for their existing behaviour.
+
+Migration proceeds through lifecycle corrections, catalogue-wide enforcement,
+complete vertical ownership slices, then process-wide graph cutover. Each slice
+moves behaviour and callers together, deletes displaced construction, and
+preserves URLs, schemas, ordering, errors, principal handling and tenant checks.
+Annotation must put its queue workflows behind services and expose the canonical
+app on the actual process graph before it serves as the reference for others.
+A renamed transport facade is not a completed app migration.
+
+The shared declaration may contain API and worker contributions; boot constructs
+only the selected role's contributions, once. Boot is asynchronous so failed
+construction waits for cleanup, including resources acquired by partial setup.
+Start and stop are idempotent, partial start rolls back, and cleanup continues
+through individual failures. Transport contributions unavailable in a role fail
+explicitly when requested rather than returning an incorrectly typed value.
+
+Startup migration requirements remain in force. This app migration does not
+change authentication behaviour or replace the separately owned identity/SSO
+work; their app composition must preserve that work.
 
 ### Who hosts what, and who owns what
 
@@ -130,8 +254,9 @@ services.
   mapper, or a `create` of another feature's repository inside a
   `*.composition.ts` or an app root fails.
 
-**2. Complete dependencies.** Abstract contract services are the dependency
-tokens. Missing, duplicate and cyclic providers are rejected before readiness.
+**2. Complete dependencies.** Abstract app contracts are peer dependency
+tokens; named infrastructure ports remain explicit technical dependencies.
+Missing, duplicate and cyclic providers are rejected before readiness.
 There is no request-time service locator, no partial service view, and no
 automatically generated throwing proxy. A deliberately disabled feature exposes
 an explicit disabled capability state.
