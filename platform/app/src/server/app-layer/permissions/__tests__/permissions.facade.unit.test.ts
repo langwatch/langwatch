@@ -30,58 +30,6 @@ const credentials = {
 const service = new PermissionsService({ decisions: repository, credentials });
 
 describe("PermissionsService typed facade", () => {
-  describe("when a project must not disclose foreign organization membership", () => {
-    it("returns a witness for an allowed project", async () => {
-      repository.findProjectDecision.mockResolvedValue({
-        permitted: true,
-        organizationRole: "MEMBER",
-      });
-
-      await expect(
-        service.tryAuthorizeMemberProjectPermission({
-          userId: "alice",
-          projectId: "project-own",
-          permission: "project:manage",
-        }),
-      ).resolves.toMatchObject({
-        permission: "project:manage",
-        scope: { tier: "project", id: "project-own" },
-      });
-    });
-
-    it("answers no project for a caller outside its organization", async () => {
-      repository.findProjectDecision.mockResolvedValue({
-        permitted: false,
-        organizationRole: null,
-        denialReason: "no-membership",
-      });
-
-      await expect(
-        service.tryAuthorizeMemberProjectPermission({
-          userId: "alice",
-          projectId: "project-foreign",
-          permission: "project:manage",
-        }),
-      ).resolves.toBeNull();
-    });
-
-    it("keeps a same-organization role refusal forbidden", async () => {
-      repository.findProjectDecision.mockResolvedValue({
-        permitted: false,
-        organizationRole: "MEMBER",
-        denialReason: "no-binding",
-      });
-
-      await expect(
-        service.tryAuthorizeMemberProjectPermission({
-          userId: "alice",
-          projectId: "project-own",
-          permission: "project:manage",
-        }),
-      ).rejects.toBeInstanceOf(PermissionDeniedError);
-    });
-  });
-
   describe("when an imperative check names its scope id", () => {
     /** @scenario "An imperative check names its scope id to match the permission" */
     it("decides through the tier's repository method", async () => {

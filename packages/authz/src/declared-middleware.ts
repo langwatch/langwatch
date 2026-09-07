@@ -26,7 +26,12 @@ export const AUTHZ_DECLARATION = Symbol.for("langwatch.authz.declaration");
 export type EnforcedScopeFields = Partial<Record<ScopeTierField, string>>;
 
 export type AuthzDeclaration =
-  | { kind: "permission"; permission: AuthzPermission; via?: ScopeTierField }
+  | {
+      kind: "permission";
+      permission: AuthzPermission;
+      via?: ScopeTierField;
+      nondisclosure?: "not-found-outside-organization";
+    }
   | { kind: "permission-any"; permissions: readonly AuthzPermission[] }
   | {
       kind: "no-permission";
