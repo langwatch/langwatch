@@ -1,11 +1,17 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
+import type { Node } from "typescript/unstable/ast";
 import {
-  createScanner,
-  LanguageVariant,
-  SyntaxKind,
+  isClassDeclaration,
+  isConstructorDeclaration,
+  isIdentifier,
+  isMethodDeclaration,
+  isNewExpression,
+  isPrivateKeyword,
+  isStaticKeyword,
 } from "typescript/unstable/ast";
 import { describe, expect, it } from "vitest";
+import { parseSourceText } from "~/test-utils/tsAst";
 
 /**
  * ADR-129's tiers as graph facts (specs/identity/identity-service-layering.feature).
@@ -119,158 +125,46 @@ const linesMatching = (
  * comments, strings and another construction on the same line cannot widen
  * this exception.
  */
-function ownStaticFactoryRanges(source: string): SourceRange[] {
-  interface SyntaxToken {
-    kind: SyntaxKind;
-    text: string;
-    start: number;
-    end: number;
-  }
-
-  const scanner = createScanner(
-    true,
-    LanguageVariant.Standard,
-    source,
-    0,
-    source.length,
-  );
-  const tokens: SyntaxToken[] = [];
-  let previousEnd = 0;
-  for (;;) {
-    const kind = scanner.scan();
-    const start = scanner.getTokenStart();
-    const end = scanner.getTokenEnd();
-    if (end <= previousEnd) {
-      if (previousEnd >= source.length) break;
-      scanner.resetTokenState(Math.min(source.length, previousEnd + 1));
-      continue;
-    }
-    previousEnd = end;
-    if (kind === SyntaxKind.EndOfFile) break;
-    tokens.push({
-      kind,
-      text: scanner.getTokenText(),
-      start,
-      end,
-    });
-  }
-
-  const matchingToken = (
-    openIndex: number,
-    openKind: SyntaxKind,
-    closeKind: SyntaxKind,
-  ): number => {
-    let depth = 0;
-    for (let index = openIndex; index < tokens.length; index += 1) {
-      const kind = tokens[index]?.kind;
-      if (kind === openKind) depth += 1;
-      if (kind === closeKind) {
-        depth -= 1;
-        if (depth === 0) return index;
-      }
-    }
-    return -1;
-  };
-
-  const findNext = (
-    start: number,
-    end: number,
-    kind: SyntaxKind,
-  ): number => {
-    for (let index = start; index < end; index += 1) {
-      if (tokens[index]?.kind === kind) return index;
-    }
-    return -1;
-  };
-
+function ownStaticFactoryRanges(
+  source: string,
+  fileName = "identity-layering-fixture.ts",
+): SourceRange[] {
+  const sourceFile = parseSourceText({ fileName, sourceText: source });
   const ranges: SourceRange[] = [];
-
-  for (let classIndex = 0; classIndex < tokens.length; classIndex += 1) {
-    if (tokens[classIndex]?.kind !== SyntaxKind.ClassKeyword) continue;
-    const classNameToken = tokens[classIndex + 1];
-    if (classNameToken?.kind !== SyntaxKind.Identifier) continue;
-
-    const classOpen = findNext(
-      classIndex + 2,
-      tokens.length,
-      SyntaxKind.OpenBraceToken,
-    );
-    if (classOpen < 0) continue;
-    const classClose = matchingToken(
-      classOpen,
-      SyntaxKind.OpenBraceToken,
-      SyntaxKind.CloseBraceToken,
-    );
-    if (classClose < 0) continue;
-
-    let memberDepth = 0;
-    let hasPrivateConstructor = false;
-    const factoryBodies: Array<{ start: number; end: number }> = [];
-    for (let index = classOpen + 1; index < classClose; index += 1) {
-      const token = tokens[index];
-      if (memberDepth === 0) {
-        if (
-          token?.kind === SyntaxKind.PrivateKeyword &&
-          tokens[index + 1]?.kind === SyntaxKind.ConstructorKeyword
-        ) {
-          hasPrivateConstructor = true;
-        }
-        if (
-          token?.kind === SyntaxKind.StaticKeyword &&
-          tokens[index + 1]?.text === "create"
-        ) {
-          const bodyOpen = findNext(
-            index + 2,
-            classClose,
-            SyntaxKind.OpenBraceToken,
-          );
-          if (bodyOpen >= 0) {
-            const bodyClose = matchingToken(
-              bodyOpen,
-              SyntaxKind.OpenBraceToken,
-              SyntaxKind.CloseBraceToken,
-            );
-            if (bodyClose >= 0 && bodyClose <= classClose) {
-              factoryBodies.push({ start: bodyOpen, end: bodyClose });
-              index = bodyClose;
-              continue;
-            }
+  const visit = (node: Node): void => {
+    if (isClassDeclaration(node) && node.name) {
+      const hasPrivateConstructor = node.members.some(
+        (member) =>
+          isConstructorDeclaration(member) &&
+          (member.modifiers?.some(isPrivateKeyword) ?? false),
+      );
+      const factory = node.members.find(
+        (member) =>
+          isMethodDeclaration(member) &&
+          isIdentifier(member.name) &&
+          member.name.text === "create" &&
+          (member.modifiers?.some(isStaticKeyword) ?? false),
+      );
+      if (hasPrivateConstructor && factory?.body) {
+        const visitFactory = (current: Node): void => {
+          if (
+            isNewExpression(current) &&
+            isIdentifier(current.expression) &&
+            current.expression.text === node.name?.text
+          ) {
+            ranges.push({
+              start: current.getStart(sourceFile),
+              end: current.expression.getEnd(),
+            });
           }
-        }
-      }
-      if (token?.kind === SyntaxKind.OpenBraceToken) memberDepth += 1;
-      if (token?.kind === SyntaxKind.CloseBraceToken) memberDepth -= 1;
-    }
-
-    if (!hasPrivateConstructor) continue;
-    for (const body of factoryBodies) {
-      for (let index = body.start + 1; index < body.end; index += 1) {
-        const token = tokens[index];
-        if (
-          token?.kind !== SyntaxKind.NewKeyword ||
-          tokens[index + 1]?.kind !== SyntaxKind.Identifier ||
-          tokens[index + 1]?.text !== classNameToken.text
-        ) {
-          continue;
-        }
-        const openParen = index + 2;
-        const closeParen =
-          tokens[openParen]?.kind === SyntaxKind.OpenParenToken
-            ? matchingToken(
-                openParen,
-                SyntaxKind.OpenParenToken,
-                SyntaxKind.CloseParenToken,
-              )
-            : -1;
-        ranges.push({
-          start: token.start,
-          end:
-            tokens[closeParen >= 0 ? closeParen : index + 1]?.end ?? token.end,
-        });
+          current.forEachChild(visitFactory);
+        };
+        visitFactory(factory.body);
       }
     }
-  }
-
+    node.forEachChild(visit);
+  };
+  visit(sourceFile);
   return ranges;
 }
 
@@ -436,6 +330,24 @@ describe("identity service layering", () => {
           source:
             "class FixtureService { private constructor() {} static create() { return new FixtureService(), new OtherService(); } }",
           expected: 1,
+        },
+        {
+          name: "nested construction inside the own constructor arguments",
+          source:
+            "class FixtureService { private constructor(value: OtherService) {} static create() { return new FixtureService(new OtherService()); } }",
+          expected: 1,
+        },
+        {
+          name: "typed object parameter and return braces",
+          source:
+            "class FixtureService { private constructor() {} static create(options: { open: string; close: { nested: boolean } }): { value: FixtureService } { return new FixtureService(); } }",
+          expected: 0,
+        },
+        {
+          name: "braces in a template string",
+          source:
+            "class FixtureService { private constructor() {} static create() { const text = \"string braces { }\"; const template = `template braces { ${'value'} }`; return new FixtureService(); } }",
+          expected: 0,
         },
       ];
 
