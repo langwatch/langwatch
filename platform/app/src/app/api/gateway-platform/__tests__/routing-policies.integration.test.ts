@@ -43,7 +43,6 @@ const FOREIGN_ORG_ID = `org-rp-foreign-${suffix}`;
 const FOREIGN_POLICY_ID = `pol-rp-foreign-${suffix}`;
 
 let projectApiKey: string;
-let _foreignProjectApiKey: string;
 
 beforeAll(async () => {
   // Routing policies are Enterprise-gated on every route, and this suite is about
@@ -203,7 +202,6 @@ beforeAll(async () => {
 
   // Use the project's own apiKey for authentication
   projectApiKey = LEGACY_KEY;
-  _foreignProjectApiKey = SIBLING_LEGACY_KEY;
 });
 
 afterAll(async () => {
