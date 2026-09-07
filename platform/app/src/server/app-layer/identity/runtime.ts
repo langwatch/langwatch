@@ -12,6 +12,11 @@
 
 import { PlanTypes } from "@ee/billing/planTypes";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
+import {
+  normalizeIdentifierValue,
+  type SignInMethod,
+  type SignInRoutingReasonCode,
+} from "@langwatch/identity";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import {
   IdentityBackfillService,
@@ -445,9 +450,79 @@ export function signInRouter(): SignInRouterService {
   return signInRouterService;
 }
 
-export async function localSignUpIsAllowed(email: string): Promise<boolean> {
+export type LocalSignUpDecision =
+  | {
+      outcome: "enroll";
+      methodSet: readonly SignInMethod[];
+      reasonCode: SignInRoutingReasonCode;
+    }
+  | {
+      outcome: "redirect";
+      methodSet: readonly SignInMethod[];
+      reasonCode: SignInRoutingReasonCode;
+    }
+  | {
+      outcome: "existing_account";
+      methodSet: readonly [];
+      reasonCode: SignInRoutingReasonCode;
+    }
+  | {
+      outcome: "unavailable";
+      methodSet: readonly [];
+      reasonCode: SignInRoutingReasonCode;
+    };
+
+export async function localSignUpDecision(
+  email: string,
+): Promise<LocalSignUpDecision> {
   const decision = await signInRouter().route({ identifier: email });
-  return decision.outcome === "route_to_signup";
+  if (decision.outcome === "redirect_to_connection") {
+    return {
+      outcome: "redirect",
+      methodSet: decision.methodSet,
+      reasonCode: decision.reasonCode,
+    };
+  }
+  if (decision.reasonCode === "connection_suspended") {
+    return {
+      outcome: "unavailable",
+      methodSet: [],
+      reasonCode: decision.reasonCode,
+    };
+  }
+  const existing = await identityUsers.findUserIdByEmail({
+    normalizedValue: normalizeIdentifierValue(email),
+  });
+  if (existing !== null) {
+    return {
+      outcome: "existing_account",
+      methodSet: [],
+      reasonCode: "account_methods",
+    };
+  }
+  if (decision.outcome === "route_to_signup") {
+    const policy = await signInMethodPolicyPort.resolvePolicy();
+    return {
+      outcome: "enroll",
+      methodSet: policy.defaultMethods,
+      reasonCode: decision.reasonCode,
+    };
+  }
+  if (
+    decision.reasonCode === "method_not_licensed" ||
+    decision.reasonCode === "method_not_configured"
+  ) {
+    return {
+      outcome: "enroll",
+      methodSet: decision.methodSet,
+      reasonCode: decision.reasonCode,
+    };
+  }
+  return {
+    outcome: "unavailable",
+    methodSet: [],
+    reasonCode: decision.reasonCode,
+  };
 }
 
 /**
@@ -857,7 +932,15 @@ export function passwordResetSessionBridge(): PasswordResetSessionBridge {
 /** Creating an account WITH a passkey, rather than adding one to an account. */
 export function passkeySignUp(): PasskeySignUpRegistration {
   return new PasskeySignUpRegistration({
-    eligibility: { isAllowed: localSignUpIsAllowed },
+    eligibility: {
+      isAllowed: async (email, method) => {
+        const decision = await localSignUpDecision(email);
+        return (
+          decision.outcome === "enroll" &&
+          decision.methodSet.some((candidate) => candidate.kind === method)
+        );
+      },
+    },
     directory: identityUsers,
     accounts: {
       createPasskeyUser: ({ email, claimHash }) =>
