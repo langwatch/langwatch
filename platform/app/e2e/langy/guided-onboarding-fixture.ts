@@ -110,11 +110,9 @@ export function isProposalQuestion(question: {
   );
 }
 
-/** Does the question's own text open with the proposal, word for word? */
+/** Does the question's own text carry the proposal, word for word? */
 export function carriesProposalText(question: { question?: string }): boolean {
-  return (question.question ?? "")
-    .trim()
-    .startsWith(GUIDED_LINES.proposalStart);
+  return (question.question ?? "").includes(GUIDED_LINES.proposalStart);
 }
 
 /** The create option's label on the proposal question, as Langy worded it. */

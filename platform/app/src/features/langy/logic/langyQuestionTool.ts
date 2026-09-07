@@ -132,9 +132,14 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
       question,
       options,
       ...(raw.multiple === true ? { multiSelect: true } : {}),
-      // The tool's TUI always accepts a typed answer; only an explicit
-      // `custom: false` closes that door here.
-      ...(raw.custom !== false ? { allowOther: true } : {}),
+      // The tool's TUI always accepts a typed answer; an explicit
+      // `custom: false` closes that door here, and so does a bare question:
+      // its free-text route is the quiet option the ask itself provides, so
+      // an "Other…" row under it would be a third way out the ask never
+      // offered.
+      ...(raw.custom !== false && raw.bare !== true
+        ? { allowOther: true }
+        : {}),
       // The words before the call carry the question: the card draws only
       // the options.
       ...(raw.bare === true ? { bare: true } : {}),

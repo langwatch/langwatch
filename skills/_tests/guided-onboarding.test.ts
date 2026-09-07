@@ -124,19 +124,19 @@ describe("the guided-onboarding skill", () => {
         "so the proposal is the `question` field itself, verbatim",
       );
       expect(rendered).toContain(
-        "With the step 2 lines already written above it, ask with the `question` tool with `bare: true`, in that same reply, and nothing else before the call",
+        "With the three step 2 lines said, ask with the `question` tool with `bare: true`, in that same turn, with no reply text before the call",
       );
       expect(rendered).not.toContain("Say the proposal as your reply");
       expect(rendered).not.toContain("it is recorded with the answer and not drawn");
       expect(rendered).not.toContain("Sure, go ahead!");
     });
 
-    /** @scenario "The step 2 lines come before the card, and the answer is the go" */
-    it("writes the step 2 lines above the question call and goes straight to the checklist after the answer", () => {
+    /** @scenario "The step 2 lines are said before the card, and the answer is the go" */
+    it("says the step 2 lines with the say tool right before the question call and goes straight to the checklist after the answer", () => {
       const lines = rendered.indexOf(
-        "These lines of step 2, the framework you found, the pull request line and the branch line, are written before the question of step 3 is called: they go in the text of the same reply, above the call, never after the answer.",
+        "These three lines of step 2, the framework line, the pull request line and the branch line, are said with the `say` tool, one call each, in that order, right before the question of step 3 is called: never after the answer, and never in the reply text.",
       );
-      const ask = rendered.indexOf("With the step 2 lines already written above it, ask with the `question` tool");
+      const ask = rendered.indexOf("With the three step 2 lines said, ask with the `question` tool");
       const go = rendered.indexOf(
         'The answer to the question is the go. On the create option, or on the scenario agreed after "Chat about this", the next thing you do is this list, then the first command: no sentence between the answer and them, and nothing from step 2 said again; a reply that only speaks after the answer ends the turn with the path open. So, before any command, write this list into `todowrite`',
       );
@@ -146,6 +146,45 @@ describe("the guided-onboarding skill", () => {
       expect(go).toBeGreaterThan(ask);
       expect(list).toBeGreaterThan(go);
       expect(rendered).not.toContain("say nothing before the call beyond the step 2 lines");
+      expect(rendered).not.toContain("are written before the question of step 3 is called");
+    });
+
+    /** @scenario "Every scripted line is said with the say tool at its moment" */
+    it("says every scripted line with the say tool, and leaves the proposal in the question field", () => {
+      expect(rendered).toContain(
+        "**Every line below is verbatim, and said with the `say` tool.**",
+      );
+      expect(rendered).toContain(
+        "a turn whose lines were all said this way ends with no reply text at all",
+      );
+      expect(rendered).toContain(
+        "The proposal is the one exception: it is the `question` field of its bare question.",
+      );
+      // Every verbatim line is introduced by a say instruction, at its moment.
+      for (const key of [
+        "the llmops opener",
+        "the first describe fallback line",
+        "the second describe fallback line",
+        "the chat-about-this line",
+        "the two-things line",
+        "the closing line",
+        "the coding opener",
+        "the coding closer",
+        "the gateway opener",
+        "the gateway closer",
+        "the skipped tour line",
+      ] as const) {
+        const at = rendered.indexOf(VERBATIM_LINES[key]);
+        expect(at, key).toBeGreaterThan(-1);
+        const before = rendered.slice(Math.max(0, at - 900), at);
+        expect(before, key).toContain("`say`");
+      }
+      expect(rendered).toContain(
+        "Item 3 is one step: the two lines below, each said with `say`, verbatim, then the run in the same step.",
+      );
+      expect(rendered).toContain("Needs the code_access, question, say and secret_snippet tools");
+      expect(rendered).not.toContain("Say, verbatim:");
+      expect(rendered).not.toContain("Then say, verbatim");
     });
 
     it("ends every path by recording its completion", () => {
@@ -160,12 +199,12 @@ describe("the guided-onboarding skill", () => {
         "It runs right before the closing line, in the same step, with no other tool call beside it, and never before the path's work is done.",
       );
       expect(rendered).toContain(
-        "When it returns, say the closing line, verbatim, as the last line, and the turn is over: nothing after that line, and never the line twice.",
+        "When it returns, say the closing line with `say`, verbatim, as the last thing the turn does, and the turn is over: no reply text after it, and never the line twice.",
       );
       const endings: Array<[string, string]> = [
         ["langwatch onboarding complete-path llmops", VERBATIM_LINES["the closing line"]],
         ["langwatch onboarding complete-path coding", VERBATIM_LINES["the coding closer"]],
-        ["langwatch onboarding complete-path governance", "Then say in one line which source to add first on that page, as the last line, and stop."],
+        ["langwatch onboarding complete-path governance", "Then say in one line, with `say`, which source to add first on that page, as the last thing the turn does, and stop."],
       ];
       for (const [command, line] of endings) {
         const call = rendered.lastIndexOf(command);
@@ -363,7 +402,7 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain("never the env file and never `git add -A`");
       expect(rendered).toContain("with this message and no trailer");
       expect(rendered).toContain(
-        "keep that branch checked out: the agent you started runs on it, and say so in one line",
+        "keep that branch checked out: the agent you started runs on it, and the branch line is one line saying so",
       );
     });
 
@@ -377,7 +416,7 @@ describe("the guided-onboarding skill", () => {
       );
       const sentence = rendered.indexOf(VERBATIM_LINES["the pull request line"]);
       const noRemote = rendered.indexOf(
-        "No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and the step is done.",
+        "No remote, or no `gh` login: one line saying that branch `langy/<slug>` holds the commit and no pull request was opened takes the pull request line's place, and the step is done.",
       );
       const proposal = rendered.indexOf("### 3. Propose the first scenario, and stop");
       expect(commit).toBeGreaterThan(-1);
@@ -482,7 +521,7 @@ describe("the guided-onboarding skill", () => {
         "A missing remote, a missing `gh` login and a failed verdict are not errors: the step is done with its line, and the next one starts.",
       );
       expect(rendered).toContain(
-        "No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and the step is done.",
+        "No remote, or no `gh` login: one line saying that branch `langy/<slug>` holds the commit and no pull request was opened takes the pull request line's place, and the step is done.",
       );
       const noRemote = rendered.indexOf("No remote, or no `gh` login:");
       const closing = rendered.indexOf(VERBATIM_LINES["the closing line"]);
@@ -492,16 +531,16 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "Chat about this ends the turn on the line alone" */
     it("answers Chat about this with the line alone and ends the turn", () => {
       expect(rendered).toContain(
-        "say the line below as your reply, verbatim and in full, and end the turn right after saying it, so the composer takes the cursor. The line is the whole reply: no sentence before or after it, no tool call, and never an empty turn in its place:",
+        "say the line below with `say`, verbatim and in full, and end the turn right after that call, so the composer takes the cursor and the turn waits for their description. The line is the whole of the turn's words: no reply text before or after it, no other tool call, and never an empty turn in its place:",
       );
     });
 
     /** @scenario "Langy names the framework it found" */
     it("says one line naming the framework and the file before the first edit", () => {
       expect(rendered).toContain(
-        'then say one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That line is part of this step, before the branch and the first edit.',
+        'then keep one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That is the framework line: it is said with `say` right before the question of step 3, with the two lines of item 7.',
       );
-      const report = rendered.indexOf("say one line naming what you found");
+      const report = rendered.indexOf("keep one line naming what you found");
       const branch = rendered.indexOf("`git checkout -b langy/<slug> origin/<default>`");
       expect(report).toBeGreaterThan(-1);
       expect(branch).toBeGreaterThan(report);
@@ -571,7 +610,7 @@ describe("the guided-onboarding skill", () => {
         "a run that answers a verdict, passed or failed, gets the two-things line.",
       );
       expect(rendered).toContain(
-        "**If the run failed**, the explanation comes first: say in plain words what the judge saw and why the agent did not meet the criteria, and point at the run so they can replay the conversation.",
+        "**If the run failed**, the explanation comes first, said with `say`: in plain words what the judge saw and why the agent did not meet the criteria, pointing at the run so they can replay the conversation.",
       );
       expect(rendered).toContain(
         "the agent answered and the traces flowed, which is what the line says.",
@@ -589,7 +628,7 @@ describe("the guided-onboarding skill", () => {
       expect(failed).toBeGreaterThan(-1);
       const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
       expect(section).toContain(
-        "say in one line what is not done and what the error names as the cause, and end the turn",
+        "say in one line, with `say`, what is not done and what the error names as the cause, and end the turn",
       );
       expect(section).toContain("stop there, without diagnosing");
       expect(section).toContain("never the env file:");

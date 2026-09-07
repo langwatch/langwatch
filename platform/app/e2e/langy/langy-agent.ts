@@ -400,6 +400,22 @@ async function streamTurnText({
       if (entry.type === "delta" && typeof entry.text === "string") {
         assistantText += entry.text;
         textAfterLastTool += entry.text;
+      } else if (entry.type === "tool" && entry.name === "say") {
+        // A line said with the `say` tool is Langy's own words, drawn as
+        // prose where the call happened, so it reads as text here: it joins
+        // the passage in progress and the next tool frame fixes its place.
+        // It is no work of the turn: not a settled call, and it does not
+        // start the trailing-text fold on its own.
+        if (entry.phase === "start") {
+          const said = sayTextOf(entry.input);
+          if (said) {
+            const separator = textAfterLastTool.trim() === "" ? "" : "\n\n";
+            assistantText += separator + said;
+            textAfterLastTool += separator + said;
+          }
+        }
+        const toolEvent = toolEventOf({ entry, turnId: params.turnId });
+        if (toolEvent) onToolFrame?.(toolEvent);
       } else if (entry.type === "tool") {
         // The passage that was running when this call started belongs in front
         // of it. Reported here rather than at the end of the stream because
@@ -535,6 +551,12 @@ async function streamTurnText({
   throw transientInfrastructureError(
     "Langy turn produced no text and never settled — the stream closed with no terminal marker (conversation lock still held, or the stack is too loaded to answer); this is an environment failure, not a reply to grade",
   );
+}
+
+/** The words a `say` tool call carries, or null when it carries none. */
+function sayTextOf(input: unknown): string | null {
+  const text = (input as { text?: unknown } | undefined)?.text;
+  return typeof text === "string" && text.trim() !== "" ? text : null;
 }
 
 /** One thing a turn did, in the order it did it. */

@@ -139,6 +139,8 @@ describe("the question tool card", () => {
               },
             }),
           ]),
+          // Open, so the Other row would be drawn if the card offered it.
+          { onChoiceSelect: vi.fn() },
         );
 
         const card = choicesCards()[0]!;
@@ -172,6 +174,20 @@ describe("the question tool card", () => {
         ).toBeInTheDocument();
         expect(
           screen.getByRole("button", { name: "Chat about this" }),
+        ).toBeInTheDocument();
+        // The free-text route of a bare question is the quiet option the ask
+        // provides, so there is no third row under the two.
+        expect(screen.queryByRole("button", { name: "Other…" })).toBeNull();
+      });
+
+      /** @scenario "A bare question offers no Other row" */
+      it("keeps the Other row on a question that is not bare", () => {
+        renderMessage(assistantMessage([questionToolPart()]), {
+          onChoiceSelect: vi.fn(),
+        });
+
+        expect(
+          screen.getByRole("button", { name: "Other…" }),
         ).toBeInTheDocument();
       });
 

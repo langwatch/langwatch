@@ -2,7 +2,7 @@
 name: guided-onboarding
 description: Take over from the sign-up tour and set up the path the user picked (Evals & LLM Ops, Coding agents, Gateway or Governance) inside the Langy panel. Use when a user message starts with "Guided onboarding kickoff" or with "Let's set up ... then.", and never otherwise.
 license: MIT
-compatibility: Runs inside a Langy worker session only. Needs the code_access, question and secret_snippet tools and the langwatch CLI.
+compatibility: Runs inside a Langy worker session only. Needs the code_access, question, say and secret_snippet tools and the langwatch CLI.
 metadata:
   category: skill
 ---
@@ -22,7 +22,7 @@ The brief is the whole input. Never run `langwatch onboarding state` during a gu
 - **Provider** is already connected when the brief names one. Never ask for a key.
 - **Gateway** is the address an app on this instance points at; the gateway path prints it.
 - **Virtual key** names the key the tour minted, with its preview (the first characters) and its reveal id, or says none was minted. When it names a reveal id, the line itself says what to do, and that is the whole gateway path: show the key with `secret_snippet` using this reveal id, and do not list, ask or create keys. The secret is never in the brief: the reveal id is what shows it, once, through the `secret_snippet` card.
-- **Tour: skipped** adds one line before the path's own opener, exactly:
+- **Tour: skipped** adds one line, said with `say`, before the path's own opener, exactly:
 
   No worries! Everything the tour covers is in the menu on the left. I'll be right here when you need me.
 
@@ -31,8 +31,8 @@ Say nothing about the brief itself: the panel draws it as a card, and the user n
 ## Rules that hold on every path
 
 - **Never act unasked.** Before anything is created or run on the project, the user has picked the create option on the proposal or its equivalent on a question. Reading code, detecting the framework and wiring tracing are part of the setup they asked for by sharing the code; creating scenarios, suites and runs are not until they say so.
-- **Every line below is verbatim.** The openers, the fallback lines, the proposal, the why-a-scenario line and the closers are product copy: say them word for word, with nothing added before them. Fill only the braces.
-- **Stay on the path.** A typed question mid-setup gets one line in the same tone and the setup continues where it was, for example: "We'll get to that! Let me finish getting you set up first, then I'm all yours." Never drop the path.
+- **Every line below is verbatim, and said with the `say` tool.** The openers, the fallback lines, the step 2 lines, the why-a-scenario line, the running line, the two-things line and the closers are product copy: say each with the `say` tool, word for word, at its moment in the script, with nothing added before it. Fill only the braces. The tool draws the text in place, where the call happens, so the person reads it before the next call runs; the reply text at the end of the turn is not where these lines go, and a turn whose lines were all said this way ends with no reply text at all. Never say a line twice, and never repeat in the reply text a line already said. The proposal is the one exception: it is the `question` field of its bare question.
+- **Stay on the path.** A typed question mid-setup gets one line, said with `say`, in the same tone, and the setup continues where it was, for example: "We'll get to that! Let me finish getting you set up first, then I'm all yours." Never drop the path.
 - **Quiet options.** Where a script says an option is quiet, pass `quiet: true` on that option of the `question` tool. It renders as a link under the bordered options and answers like one.
 - **Close the path.** The last command of every path is
 
@@ -40,7 +40,7 @@ Say nothing about the brief itself: the panel draws it as a card, and the user n
   langwatch onboarding complete-path <path>
   ```
 
-  with `<path>` one of `llmops`, `coding`, `gateway`, `governance`. It is idempotent. It runs right before the closing line, in the same step, with no other tool call beside it, and never before the path's work is done. It closes a path that ended as written, never one that stopped at a failed step (see "When a step fails"). When it returns, say the closing line, verbatim, as the last line, and the turn is over: nothing after that line, and never the line twice. Whatever the command printed is the panel's to show, not yours.
+  with `<path>` one of `llmops`, `coding`, `gateway`, `governance`. It is idempotent. It runs right before the closing line, in the same step, with no other tool call beside it, and never before the path's work is done. It closes a path that ended as written, never one that stopped at a failed step (see "When a step fails"). When it returns, say the closing line with `say`, verbatim, as the last thing the turn does, and the turn is over: no reply text after it, and never the line twice. Whatever the command printed is the panel's to show, not yours.
 
 ## llmops: Evals & LLM Ops
 
@@ -48,17 +48,17 @@ The goal: the user's agent is traced, connected, and covered by a first scenario
 
 ### 1. Ask for the code
 
-Say, verbatim:
+Say with `say`, verbatim:
 
 Ok, let's set up your agent with LangWatch. Can I access your code? If I can see it, I can figure out your agent myself and wire everything up for you.
 
 Then, in the same step and right after the line, call `code_access` with `offer_describe: true` and the reason "wire tracing in and write the first scenario against your agent". The line is said first and the card follows it, never the other way round. The card offers the local folder, GitHub, and a quiet "I'd rather describe it". Nothing goes between the opener and the card: when the tool waits for the user, the turn is over, so say nothing more.
 
-**If the user picks "I'd rather describe it"**, the next message reads exactly that. Say, verbatim:
+**If the user picks "I'd rather describe it"**, the next message reads exactly that. Say with `say`, verbatim:
 
 No problem. What does your agent do? One line is enough.
 
-Take their line, then say, verbatim:
+Take their line, then say with `say`, verbatim:
 
 Perfect. To write a scenario for that and run it against your real agent, and wire tracing in while I'm at it, I still need to reach the code. How should I connect?
 
@@ -68,7 +68,7 @@ and call `code_access` again, this time without `offer_describe`. Keep their des
 
 ### 2. Read the code and wire it
 
-With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language, then say one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That line is part of this step, before the branch and the first edit.
+With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language, then keep one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That is the framework line: it is said with `say` right before the question of step 3, with the two lines of item 7.
 
 Work on a branch of your own, never on the branch the user has checked out: `git checkout -b langy/<slug> origin/<default>` (a worktree when the tree is dirty), as step 2 of `code-changes` says. On that branch, load the `tracing` and `connect-agent` skills with the `skill` tool, then, in this order:
 
@@ -89,17 +89,17 @@ Work on a branch of your own, never on the branch the user has checked out: `git
 git add <the files you changed> && git commit -m "Add LangWatch tracing and the connect endpoint"
 ```
 
-7. Push the branch and open the pull request, as steps 5 and 6 of `code-changes` say, with the title `Add LangWatch tracing and the connect endpoint`. Then say, verbatim, with the braces filled with the address `gh pr create` printed:
+7. Push the branch and open the pull request, as steps 5 and 6 of `code-changes` say, with the title `Add LangWatch tracing and the connect endpoint`. The pull request line is this, verbatim, with the braces filled with the address `gh pr create` printed:
 
 I opened a pull request with the tracing change: {link}. You can merge it already.
 
-No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and the step is done. Either way, keep that branch checked out: the agent you started runs on it, and say so in one line. These lines of step 2, the framework you found, the pull request line and the branch line, are written before the question of step 3 is called: they go in the text of the same reply, above the call, never after the answer. The proposal of step 3 comes right after them, in the same turn.
+No remote, or no `gh` login: one line saying that branch `langy/<slug>` holds the commit and no pull request was opened takes the pull request line's place, and the step is done. Either way, keep that branch checked out: the agent you started runs on it, and the branch line is one line saying so. These three lines of step 2, the framework line, the pull request line and the branch line, are said with the `say` tool, one call each, in that order, right before the question of step 3 is called: never after the answer, and never in the reply text. The proposal of step 3 comes right after them, in the same turn.
 
 ### 3. Propose the first scenario, and stop
 
 This question is the gate of step 4: no `scenario create`, no run and no suite before the person has answered it. Whatever arrives first, a message describing a scenario, a question, or a setup that stopped at a failed step and was then fixed, finish step 2 and ask it; a scenario the person described before the question becomes `{title}` in it, and the answer is still theirs to give.
 
-Do not create it yet. With the step 2 lines already written above it, ask with the `question` tool with `bare: true`, in that same reply, and nothing else before the call: a bare question draws its `question` field as ordinary reply prose above the options, so the proposal is the `question` field itself, verbatim, with the braces filled from what you read:
+Do not create it yet. With the three step 2 lines said, ask with the `question` tool with `bare: true`, in that same turn, with no reply text before the call: a bare question draws its `question` field as ordinary reply prose above the options, so the proposal is the `question` field itself, verbatim, and only the proposal, with the braces filled from what you read:
 
 Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is {title}, because {reason}.
 
@@ -110,7 +110,7 @@ Options, in this order, with the same `{title}`:
 
 The first scenario is the agent's golden path: the thing the agent exists to do, end to end, with inputs the code accepts. Refusals, expired inputs and edge cases come in the suite after it, never first. `{title}` names that path in a few words, for example "Guest completes checkout"; `{reason}` says in one clause why it goes first.
 
-**"Chat about this"**: say the line below as your reply, verbatim and in full, and end the turn right after saying it, so the composer takes the cursor. The line is the whole reply: no sentence before or after it, no tool call, and never an empty turn in its place:
+**"Chat about this"**: say the line below with `say`, verbatim and in full, and end the turn right after that call, so the composer takes the cursor and the turn waits for their description. The line is the whole of the turn's words: no reply text before or after it, no other tool call, and never an empty turn in its place:
 
 Of course. Tell me what the scenario should cover and I'll write it with you.
 
@@ -147,7 +147,7 @@ langwatch navigate open <scenario_id>
 
 The scenario editor drawer opens beside the panel with the draft in it, and the panel stays open.
 
-Item 3 is one step: the two lines below, verbatim, and the run in the same step. Never end the turn on the running line: a turn that ends there ran nothing.
+Item 3 is one step: the two lines below, each said with `say`, verbatim, then the run in the same step. Never end the turn on the running line: a turn that ends there ran nothing.
 
 Before I run it, why a scenario and not a plain test? A scenario is a simulated user talking to your agent turn by turn while a judge checks the outcome, so one run covers a whole conversation instead of a single input and output. And tracing captures every step underneath while it runs.
 
@@ -159,9 +159,9 @@ langwatch scenario run <scenario_id> --target connected:<agent name> --wait --fo
 
 ### 5. From one run to a suite
 
-Item 4: a run that answers a verdict, passed or failed, gets the two-things line. **If the run failed**, the explanation comes first: say in plain words what the judge saw and why the agent did not meet the criteria, and point at the run so they can replay the conversation. A failed first run is a finding, not a blocker: the agent answered and the traces flowed, which is what the line says. A run that answers an error instead of a verdict is not a failed run: see "When a step fails".
+Item 4: a run that answers a verdict, passed or failed, gets the two-things line. **If the run failed**, the explanation comes first, said with `say`: in plain words what the judge saw and why the agent did not meet the criteria, pointing at the run so they can replay the conversation. A failed first run is a finding, not a blocker: the agent answered and the traces flowed, which is what the line says. A run that answers an error instead of a verdict is not a failed run: see "When a step fails".
 
-Say, verbatim:
+Say with `say`, verbatim:
 
 That one run just proved two things: your agent answers scenarios, and traces are flowing in. Let me add a few more scenarios so every change you ship gets checked against real conversations.
 
@@ -182,17 +182,17 @@ Item 10, only once item 8 is done, so the suite ran and its run is open, and nev
 langwatch onboarding complete-path llmops
 ```
 
-Then, in the same step, say, verbatim, as the last line, and stop:
+Then, in the same step, say with `say`, verbatim, as the last thing the turn does, and stop, with no reply text after it:
 
 All ready! Let me know if there is anything I can help with.
 
 ### When a step fails
 
-A step fails when a command answers an error, never when a judge answers a verdict: a scenario or suite run that comes back failed is a finding about the agent, and step 5 goes on with the explanation, the two-things line and the suite. The credentials call answers that the key was refused, the tracing edit cannot be applied, the agent is not online after two minutes, or a scenario or suite run answers an error instead of a verdict (a 422, a target it cannot find, a run that never starts, a connected agent call that times out): stop there, without diagnosing. No further reads or commands, and never the env file: say in one line what is not done and what the error names as the cause, and end the turn with the open items left open. One exception to the reads: when the agent is not online after two minutes, the cause is in the agent process itself, so read the log the background command named (`local_read` on the path its result printed) and report its last lines, the exception if there is one, as the reason. Never a guess about the CLI, the login or the project in its place. Nothing later in the script happens: no scenario or suite runs against an agent that is not online, the why-a-scenario line, the two-things line and the closing line are not said, and `langwatch onboarding complete-path` does not run. When the credentials call was refused, the line says that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT go into the env file by hand, from the project's settings page.
+A step fails when a command answers an error, never when a judge answers a verdict: a scenario or suite run that comes back failed is a finding about the agent, and step 5 goes on with the explanation, the two-things line and the suite. The credentials call answers that the key was refused, the tracing edit cannot be applied, the agent is not online after two minutes, or a scenario or suite run answers an error instead of a verdict (a 422, a target it cannot find, a run that never starts, a connected agent call that times out): stop there, without diagnosing. No further reads or commands, and never the env file: say in one line, with `say`, what is not done and what the error names as the cause, and end the turn with the open items left open. One exception to the reads: when the agent is not online after two minutes, the cause is in the agent process itself, so read the log the background command named (`local_read` on the path its result printed) and report its last lines, the exception if there is one, as the reason. Never a guess about the CLI, the login or the project in its place. Nothing later in the script happens: no scenario or suite runs against an agent that is not online, the why-a-scenario line, the two-things line and the closing line are not said, and `langwatch onboarding complete-path` does not run. When the credentials call was refused, the line says that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT go into the env file by hand, from the project's settings page.
 
 ## coding: Coding agents
 
-Say, verbatim, with the command block as part of the copy:
+Say with `say`, verbatim, with the command block as part of the copy:
 
 You're a developer, so this one is easy. Run this in any repo where you use Claude Code:
 
@@ -206,7 +206,7 @@ Then, in the same step, close the path:
 langwatch onboarding complete-path coding
 ```
 
-Then say, verbatim, as the last line, and stop:
+Then say with `say`, verbatim, as the last thing the turn does, and stop:
 
 Then I can show you around once your first traces are flying through.
 
@@ -234,7 +234,7 @@ The gateway address is the value after `Gateway:` in the brief, exactly as it st
 
 Never write a placeholder in a snippet: no angle brackets, no "your key here", nothing that stands in for a value. A snippet is either complete, with the key shown through the card, or it is described in words, as below.
 
-Say, verbatim:
+Say with `say`, verbatim:
 
 Your key production-app is live. Point your app at the gateway with it and every call gets budgets, routing and tracing for free:
 
@@ -245,7 +245,7 @@ export OPENAI_BASE_URL=the address after Gateway: in the brief, in double quotes
 export OPENAI_API_KEY="{{secret}}"
 ```
 
-When the brief says no gateway is configured, skip the snippet and say in one line that the gateway is not set up on this instance yet.
+When the brief says no gateway is configured, skip the snippet and say in one line, with `say`, that the gateway is not set up on this instance yet.
 
 Then, in the same step, close the path:
 
@@ -253,13 +253,13 @@ Then, in the same step, close the path:
 langwatch onboarding complete-path gateway
 ```
 
-Then say, verbatim, as the last line, and stop:
+Then say with `say`, verbatim, as the last thing the turn does, and stop:
 
 That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
 
 ### No reveal id in hand: ask first
 
-Reached only from case 2: the brief carries no reveal id and a `production-app` row exists. Do not open with the live line. Say, verbatim, then ask with the `question` tool:
+Reached only from case 2: the brief carries no reveal id and a `production-app` row exists. Do not open with the live line. Say with `say`, verbatim, then ask with the `question` tool:
 
 Your production-app key was created earlier and its secret was shown once, at creation. Do you still have it?
 
@@ -268,9 +268,9 @@ Options, in this order:
 1. "Create a new key"
 2. "I saved it"
 
-On "Create a new key": mint one with `--reveal-once` as above, using the next free name (`production-app-2`, then `-3`), say the live line with that name, and show the snippet through the `secret_snippet` card with the reveal id the create printed.
+On "Create a new key": mint one with `--reveal-once` as above, using the next free name (`production-app-2`, then `-3`), say the live line with `say`, with that name, and show the snippet through the `secret_snippet` card with the reveal id the create printed.
 
-On "I saved it": there is no card to show, so describe the two lines instead of writing a snippet. Say that the app needs two environment variables: `OPENAI_BASE_URL` set to the gateway address (write the address itself, from the brief), and `OPENAI_API_KEY` set to the production-app key they saved. Write the address in full and the key line in words; never put a value in angle brackets or a stand-in where the key goes.
+On "I saved it": there is no card to show, so describe the two lines instead of writing a snippet. Say, with `say`, that the app needs two environment variables: `OPENAI_BASE_URL` set to the gateway address (write the address itself, from the brief), and `OPENAI_API_KEY` set to the production-app key they saved. Write the address in full and the key line in words; never put a value in angle brackets or a stand-in where the key goes.
 
 Either way, in the same step, close the path:
 
@@ -278,7 +278,7 @@ Either way, in the same step, close the path:
 langwatch onboarding complete-path gateway
 ```
 
-Then say, verbatim, as the last line, and stop:
+Then say with `say`, verbatim, as the last thing the turn does, and stop:
 
 That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
 
@@ -305,4 +305,4 @@ Then, in the same step, close the path:
 langwatch onboarding complete-path governance
 ```
 
-Then say in one line which source to add first on that page, as the last line, and stop.
+Then say in one line, with `say`, which source to add first on that page, as the last thing the turn does, and stop.

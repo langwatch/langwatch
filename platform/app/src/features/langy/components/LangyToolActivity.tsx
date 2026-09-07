@@ -62,6 +62,7 @@ import {
   isQuestionToolPart,
   questionToolCardParts,
 } from "../logic/langyQuestionTool";
+import { isSayToolPart } from "../logic/langySayTool";
 import { isSecretSnippetToolPart } from "../logic/langySecretSnippetTool";
 import {
   type LangyToolErrorPresentation,
@@ -584,6 +585,10 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     if (isQuestionToolPart(part) && questionToolCardParts(part).length > 0) {
       return;
     }
+    // The `say` tool is a line of Langy's own words, drawn as reply prose
+    // where the call happened (MessageContent); an activity row for it would
+    // only say a line was said.
+    if (isSayToolPart(part)) return;
     // The `code_access` tool is the code access card (ADR-129), for the same
     // reason: it speaks to the person, not to the model, and the card carries
     // its whole life.

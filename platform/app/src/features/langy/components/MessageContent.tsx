@@ -50,6 +50,7 @@ import {
   foldReasoningTitles,
   stripReasoningTitles,
 } from "../logic/langyReasoningTitles";
+import { sayToolText } from "../logic/langySayTool";
 import { secretSnippetCalls } from "../logic/langySecretSnippetTool";
 import { stripToolNarration } from "../logic/langyToolNarration";
 import { langyRunText, langyTranscriptRuns } from "../logic/langyTranscript";
@@ -238,7 +239,9 @@ function MessageContentImpl({
   // the turn went on to answer after, which is what makes a failure in it a
   // step the turn RECOVERED from rather than the story of the turn.
   const lastAnswerRunIndex = runs.findLastIndex(
-    (run) => run.kind === "answer" && langyRunText(run.parts).trim().length > 0,
+    (run) =>
+      run.kind === "say" ||
+      (run.kind === "answer" && langyRunText(run.parts).trim().length > 0),
   );
 
   // The agent's `question` TOOL call, mapped onto the choices contract
@@ -641,6 +644,8 @@ function MessageContentImpl({
                 </LangyCardBoundary>
               ) : null}
             </Fragment>
+          ) : run.kind === "say" ? (
+            <SayRun key={`say-${index}`} parts={run.parts} />
           ) : (
             <AnswerRun
               key={`answer-${index}`}
@@ -745,6 +750,45 @@ interface AnswerBlockContext {
  * smaller than the user's `sm` bubble and a step dimmer than `fg`, so a glance
  * separates "what I said" from "what it said".
  */
+/**
+ * Lines said with the `say` tool: Langy's own words, drawn where they were
+ * said, in the reply's own prose style. No frame, no activity row, and never
+ * folded into the receipt: the line was for the reader, at that moment, and
+ * it stays there on reload.
+ */
+function SayRun({ parts }: { parts: readonly unknown[] }) {
+  const lines = parts
+    .map((part) => sayToolText(part))
+    .filter((line): line is string => line !== null);
+  if (lines.length === 0) return null;
+  return (
+    <Box
+      data-langy-say
+      paddingX="2px"
+      display="flex"
+      flexDirection="column"
+      gap={2}
+      css={{
+        "& > div > :first-child": { marginTop: 0 },
+        "& > div > :last-child": { marginBottom: 0 },
+        "& table": { display: "block", overflowX: "auto" },
+      }}
+    >
+      {lines.map((line, index) => (
+        <Markdown
+          // A said line has no id of its own; its place in the run is stable.
+          key={`${index}-${line.length}`}
+          fontSize="langyAnswer"
+          linkVariant="langy"
+          color="langy.answerFg"
+        >
+          {line}
+        </Markdown>
+      ))}
+    </Box>
+  );
+}
+
 function AnswerRun({
   parts,
   isStreaming,

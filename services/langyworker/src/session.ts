@@ -33,6 +33,7 @@ import {
   createLocalWorkspaceExtension,
 } from "./tools/local-workspace.js";
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
+import { SAY_TOOL_NAME, createSayExtension } from "./tools/say.js";
 import {
   SECRET_SNIPPET_TOOL_NAME,
   createSecretSnippetExtension,
@@ -52,6 +53,7 @@ export const ENABLED_TOOLS = [
   TODOWRITE_TOOL_NAME,
   SKILL_TOOL_NAME,
   QUESTION_TOOL_NAME,
+  SAY_TOOL_NAME,
   SECRET_SNIPPET_TOOL_NAME,
   CODE_ACCESS_TOOL_NAME,
   ...LOCAL_TOOL_NAMES,
@@ -165,6 +167,7 @@ export async function createLangySession({
       createTodowriteExtension(),
       createSkillExtension(config.skillsDir),
       createQuestionExtension({ turnContext }),
+      createSayExtension(),
       createSecretSnippetExtension(),
       createLocalWorkspaceExtension({ turnContext }),
     ],

@@ -28,6 +28,38 @@ Feature: Langy asks a real question with selectable options
   # Ask, settle, answer — the turn lifecycle is untouched
   # ===========================================================================
 
+  Rule: A line Langy says with the say tool is drawn where it was said
+
+    # A model that writes its reply once its calls are done puts every line at
+    # the end of the turn, under the cards. The worker's say tool gives a line
+    # a place of its own: a tool part by shape, Langy's own words by meaning.
+    # The manager titles it, the panel draws it as reply prose in the order
+    # the parts carry, live and from the record, and the activity spine leaves
+    # it out. The e2e adapter folds a said line into the words the judge reads.
+    @unit
+    Scenario: A line said with the say tool is drawn where the call happened
+      Given a turn that ran calls, said a line with the say tool, ran more calls and said another
+      When the message renders, live or from the record
+      Then each said line is drawn as reply prose where the call happened, between the cards
+      And no said line is an activity row, a card, or folded into the receipt
+      And the tool answers "Said." and refuses an empty line
+
+    @unit
+    Scenario: A turn whose lines were all said with the say tool is not an empty turn
+      Given a turn that said its lines with the say tool and wrote no reply text
+      When the turn reaches its terminal marker
+      Then no fallback line is appended
+
+    # A bare question's free-text route is the quiet option the ask provides,
+    # so an "Other…" row under it would be a third way out the ask never
+    # offered.
+    @unit
+    Scenario: A bare question offers no Other row
+      Given a bare question with two options, one of them quiet
+      When the card renders open
+      Then there is no "Other…" row under the options
+      And a question that is not bare keeps its "Other…" row
+
   Scenario: A question card ends the turn and waits
     Given Langy's reply ends with a choices card
     When the turn settles

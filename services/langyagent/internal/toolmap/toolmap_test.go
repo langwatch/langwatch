@@ -216,6 +216,7 @@ func TestToolTitle(t *testing.T) {
 	}{
 		{"code_access", "Code access"},
 		{"question", "Question"},
+		{"say", "Say"},
 		{"secret_snippet", "Secret snippet"},
 		{"local_read", "Read on your machine"},
 		{"local_write", "Write on your machine"},
@@ -296,5 +297,29 @@ func TestToolCallTracker_PlanToolSettleContributesNoTiming(t *testing.T) {
 	}
 	if strings.Contains(frame.JSON(), "batchDurationMs") {
 		t.Fatalf("todowrite settle timing leaked into the sample: %s", frame.JSON())
+	}
+}
+
+// A line said to the person is not work either: its settle contributes no
+// timing, and it carries a title so the frame names it.
+func TestToolCallTracker_SayToolSettleContributesNoTiming(t *testing.T) {
+	now := time.Unix(100, 0)
+	tracker := NewToolCallTrackerWithClock(func() time.Time { return now })
+
+	tracker.StartIfNew("say_1")
+	now = now.Add(5 * time.Second)
+	tracker.EndIfNew("say_1", "say")
+
+	frame, ok := tracker.MeasuredProgressFromPlan([]frames.PlanItem{
+		{Content: "Scanning — 1/10", Status: "in_progress"},
+	})
+	if !ok {
+		t.Fatalf("expected a measured progress frame")
+	}
+	if strings.Contains(frame.JSON(), "batchDurationMs") {
+		t.Fatalf("say settle timing leaked into the sample: %s", frame.JSON())
+	}
+	if !IsSayTool("Say") || IsSayTool("bash") {
+		t.Fatalf("IsSayTool must match the say tool by name, case-insensitively")
 	}
 }

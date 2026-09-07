@@ -743,7 +743,7 @@ Feature: Langy guides the first setup after sign-up
       And Langy starts the agent
       And Langy asks with a bare question whose own text reads "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is Guest completes checkout, because it is the path most of your users take and it crosses the discount, payment and confirmation steps in one conversation."
       And that text is drawn as a reply paragraph above the options "Create "Guest completes checkout" as your first scenario test" and the quiet "Chat about this"
-      And the framework line, the pull request line and the branch line come before the card, in the same reply, with nothing else said before it
+      And the framework line, the pull request line and the branch line are said with the say tool right before the card, in that order, with no reply text before it
       And no scenario exists yet
 
     @e2e
@@ -754,17 +754,31 @@ Feature: Langy guides the first setup after sign-up
       And the composer takes the cursor
       And no scenario exists yet
 
-    # A film had the model call the question with no text, write the step 2
-    # lines after the answer, and end the turn there: prose after a tool
-    # result reads as the end of a reply. The lines go above the call, and
-    # the answer is followed by the checklist and the command, never a
-    # sentence. The tool result itself carries the go as well
-    # (langy-choice-questions: "The tool result carries the go").
+    # Two films had the model call the question with no text and write the
+    # step 2 lines with the rest of its reply, at the end of the turn, under
+    # every card: a model that only writes text once its calls are done puts
+    # any line asked for "above the call" after the answer instead. The lines
+    # go through the say tool, one call each, right before the question, so
+    # their place no longer depends on when the model writes. The answer is
+    # followed by the checklist and the command, never a sentence. The tool
+    # result itself carries the go as well (langy-choice-questions: "The tool
+    # result carries the go").
     @unit
-    Scenario: The step 2 lines come before the card, and the answer is the go
+    Scenario: The step 2 lines are said before the card, and the answer is the go
       When the compiled guided-onboarding skill is read
-      Then the framework line, the pull request line and the branch line are written in the text of the reply that calls the question, above the call
+      Then the framework line, the pull request line and the branch line are said with the say tool, one call each, right before the question is called, never in the reply text
       And on the create option the next thing is the checklist and the first command, with no sentence between the answer and them
+
+    # The same films put the why-a-scenario line, the running line, the
+    # two-things line and the closing line in that one block at the end. Every
+    # scripted line goes through the say tool at its moment, and a turn whose
+    # lines were all said that way ends with no reply text.
+    @unit
+    Scenario: Every scripted line is said with the say tool at its moment
+      When the compiled guided-onboarding skill is read
+      Then the openers, the fallback lines, the why-a-scenario line, the running line, the two-things line and the closers are each said with the say tool, at their moment
+      And the closing line of every path is said after complete-path, with no reply text after it
+      And the proposal stays the question field of the bare question
 
     @e2e
     Scenario: Going ahead creates the scenario in the drawer beside the panel

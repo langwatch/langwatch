@@ -14,20 +14,28 @@
  * `langyAnswerSegments` for the answer, `LangyActivityParts` for the activity —
  * so this module decides ordering and nothing else.
  *
- * Reasoning parts belong to neither: the model's thinking is not the answer,
- * and it is folded into the turn's process record elsewhere
+ * A line said with the `say` tool is a third kind: a tool part by shape, but
+ * Langy's own words by meaning, so it is drawn as prose where the call
+ * happened and never joins an activity run (logic/langySayTool).
+ *
+ * Reasoning parts belong to none of them: the model's thinking is not the
+ * answer, and it is folded into the turn's process record elsewhere
  * (logic/langyReasoningTitles).
  */
 import {
   LANGY_CARD_FAILED_PART_TYPE,
   LANGY_CARD_PART_TYPE,
 } from "@langwatch/langy";
+import { isQuestionToolPart } from "./langyQuestionTool";
+import { isSayToolPart } from "./langySayTool";
 
 export type LangyTranscriptRun =
   /** Prose, and the card blocks stamped into the reply's own flow. */
   | { kind: "answer"; parts: readonly unknown[] }
   /** Tool calls, rendered as the activity cards for the work they did. */
-  | { kind: "activity"; parts: readonly unknown[] };
+  | { kind: "activity"; parts: readonly unknown[] }
+  /** Lines said with the `say` tool, drawn as prose where they were said. */
+  | { kind: "say"; parts: readonly unknown[] };
 
 /** Parts that are the reply itself rather than the work behind it. */
 const ANSWER_PART_TYPES = new Set<string>([
@@ -55,18 +63,26 @@ export function langyTranscriptRuns(
   parts: readonly unknown[],
 ): LangyTranscriptRun[] {
   const runs: LangyTranscriptRun[] = [];
+  // A question's card is drawn after the run that holds the call, so the run
+  // ends on the question: the calls that follow the answer start a new run
+  // and their rows sit under the card, not between the question and it.
+  let closed = false;
 
   for (const part of parts) {
     const type = partType(part);
     if (type !== undefined && INERT_PART_TYPES.has(type)) continue;
-    const kind =
-      type !== undefined && ANSWER_PART_TYPES.has(type) ? "answer" : "activity";
+    const kind: LangyTranscriptRun["kind"] = isSayToolPart(part)
+      ? "say"
+      : type !== undefined && ANSWER_PART_TYPES.has(type)
+        ? "answer"
+        : "activity";
     const open = runs.at(-1);
-    if (open?.kind === kind) {
+    if (open?.kind === kind && !closed) {
       open.parts = [...open.parts, part];
-      continue;
+    } else {
+      runs.push({ kind, parts: [part] });
     }
-    runs.push({ kind, parts: [part] });
+    closed = kind === "activity" && isQuestionToolPart(part);
   }
 
   return runs;
