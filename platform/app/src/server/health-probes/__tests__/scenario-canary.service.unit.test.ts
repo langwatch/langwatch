@@ -373,6 +373,7 @@ describe("runScenarioCanary", () => {
         } as Awaited<ReturnType<typeof launchScenarioRun>>);
         const config: CanaryConfig = {
           projectId: "canary-project",
+          runPlanId: "canary-plan",
           scenarioId: "canary-scenario",
           target: { type: "prompt", referenceId: "canary-prompt" },
         };
@@ -543,6 +544,7 @@ describe("runScenarioCanary with a wedged boundary await", () => {
 
 describe("parseRunPlanConfig", () => {
   const validSuite = {
+    id: "canary-plan",
     projectId: "canary-project",
     scenarioIds: ["canary-scenario"],
     targets: [{ type: "prompt", referenceId: "canary-prompt-id" }],
@@ -555,6 +557,7 @@ describe("parseRunPlanConfig", () => {
 
       expect(result).toEqual({
         projectId: "canary-project",
+        runPlanId: "canary-plan",
         scenarioId: "canary-scenario",
         target: { type: "prompt", referenceId: "canary-prompt-id" },
       });
@@ -574,6 +577,7 @@ describe("parseRunPlanConfig", () => {
 
       expect(result).toEqual({
         projectId: "canary-project",
+        runPlanId: "canary-plan",
         scenarioId: "canary-scenario",
         target: { type, referenceId: "ref" },
       });
@@ -953,6 +957,66 @@ describe("runScenarioHealthCanary", () => {
         scenarioRunId: "canary-run-2",
       });
       expect(launchScenarioRun).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given concurrent requests naming the same plan by id and by slug", () => {
+    /** @scenario "A concurrent canary while one is in flight starts no second run" */
+    it("keys single flight by the resolved plan id, so the slug request sees busy and launches nothing", async () => {
+      fakeSuiteTable([
+        {
+          id: "flight-plan-id",
+          slug: "flight-plan-slug",
+          projectId: "flight-project",
+          scenarioIds: ["plan-scenario"],
+          targets: [{ type: "prompt", referenceId: "plan-prompt" }],
+          kind: "run_plan",
+          archivedAt: null,
+        },
+      ]);
+      // Hold the first launch open until the second request has been answered,
+      // so the first run is provably still in flight when the slug request lands.
+      type Launched = Awaited<ReturnType<typeof launchScenarioRun>>;
+      let releaseLaunch!: (value: Launched) => void;
+      vi.mocked(launchScenarioRun).mockReturnValue(
+        new Promise<Launched>((resolve) => {
+          releaseLaunch = resolve;
+        }),
+      );
+      vi.mocked(getApp).mockReturnValue({
+        simulations: {
+          runs: {
+            getScenarioRunData: async () => ({
+              status: ScenarioRunStatus.SUCCESS,
+              results: verdictResults(Verdict.SUCCESS),
+            }),
+          },
+        },
+      } as unknown as ReturnType<typeof getApp>);
+
+      const byId = runScenarioHealthCanary({
+        projectId: "flight-project",
+        runPlanId: "flight-plan-id",
+      });
+      // Let the id request resolve its plan and take the lock before the slug
+      // request resolves the same plan.
+      await vi.waitFor(() =>
+        expect(launchScenarioRun).toHaveBeenCalledTimes(1),
+      );
+
+      const bySlug = await runScenarioHealthCanary({
+        projectId: "flight-project",
+        runPlanId: "flight-plan-slug",
+      });
+
+      expect(bySlug).toEqual({ busy: true });
+      expect(launchScenarioRun).toHaveBeenCalledTimes(1);
+
+      releaseLaunch({ scenarioRunId: "canary-run-3" } as Launched);
+      expect(await byId).toMatchObject({
+        healthy: true,
+        scenarioRunId: "canary-run-3",
+      });
     });
   });
 

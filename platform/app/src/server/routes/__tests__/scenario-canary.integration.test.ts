@@ -90,10 +90,15 @@ describe("GET /api/health/scenarios", () => {
 
   describe("given the request carries a project API key that matches no project", () => {
     /** @scenario "A request with an unknown project API key is refused before any run is queued" */
-    it.each([
-      ["X-Auth-Token", { "x-auth-token": "wrong-key" }],
-      ["Authorization: Bearer", { authorization: "Bearer wrong-key" }],
-    ])("responds 401 via %s and queues no scenario run", async (_label, headers) => {
+    it.each<{ label: string; headers: Record<string, string> }>([
+      { label: "X-Auth-Token", headers: { "x-auth-token": "wrong-key" } },
+      {
+        label: "Authorization: Bearer",
+        headers: { authorization: "Bearer wrong-key" },
+      },
+    ])("responds 401 via $label and queues no scenario run", async ({
+      headers,
+    }) => {
       const app = await getApp();
 
       const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
@@ -201,9 +206,11 @@ describe("GET /api/health/scenarios", () => {
 
     /** @scenario "A blank runPlanId is a bad request" */
     it.each([
-      ["empty", "?runPlanId="],
-      ["whitespace-only", "?runPlanId=%20%20"],
-    ])("responds 400 and queues no run when runPlanId is %s", async (_label, query) => {
+      { label: "empty", query: "?runPlanId=" },
+      { label: "whitespace-only", query: "?runPlanId=%20%20" },
+    ])("responds 400 and queues no run when runPlanId is $label", async ({
+      query,
+    }) => {
       const app = await getApp();
 
       const res = await app.request(`/api/health/scenarios${query}`, AUTHED);
@@ -214,20 +221,27 @@ describe("GET /api/health/scenarios", () => {
 
     /** @scenario "Canary responses are never cacheable" */
     it.each([
-      [
-        200,
-        { healthy: true, scenarioRunId: "canary-run-abc", durationMs: 1000 },
-      ],
-      [
-        503,
-        {
+      {
+        status: 200,
+        result: {
+          healthy: true,
+          scenarioRunId: "canary-run-abc",
+          durationMs: 1000,
+        },
+      },
+      {
+        status: 503,
+        result: {
           healthy: false,
           reason: "run_failed",
           scenarioRunId: "canary-run-abc",
           durationMs: 9000,
         },
-      ],
-    ])("sets Cache-Control no-store on a %s", async (status, result) => {
+      },
+    ])("sets Cache-Control no-store on a $status", async ({
+      status,
+      result,
+    }) => {
       runScenarioHealthCanary.mockResolvedValue(result);
       const app = await getApp();
 

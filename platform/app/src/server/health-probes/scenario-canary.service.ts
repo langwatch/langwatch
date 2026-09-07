@@ -309,6 +309,12 @@ const CANARY_ACTOR: RunActor = { id: "scenario-canary", label: "api" };
 /** The validated server-side config a canary run needs to launch. */
 export interface CanaryConfig {
   projectId: string;
+  /**
+   * The resolved run plan's own `SimulationSuite.id`, whatever the caller
+   * named it by (id or slug), so the single-flight guard has one canonical key
+   * per plan.
+   */
+  runPlanId: string;
   scenarioId: string;
   target: SimulationTarget;
 }
@@ -327,7 +333,12 @@ export interface CanaryConfig {
  * type system, so an unknown target type is caught here.
  */
 export function parseRunPlanConfig(
-  suite: { projectId: string; scenarioIds: string[]; targets: unknown } | null,
+  suite: {
+    id: string;
+    projectId: string;
+    scenarioIds: string[];
+    targets: unknown;
+  } | null,
 ): CanaryConfig | { invalid: string } {
   if (!suite) {
     return { invalid: "run plan not found" };
@@ -351,6 +362,7 @@ export function parseRunPlanConfig(
   const target = targets[0]!;
   return {
     projectId: suite.projectId,
+    runPlanId: suite.id,
     scenarioId: suite.scenarioIds[0]!,
     target: { type: target.type, referenceId: target.referenceId },
   };
@@ -554,10 +566,12 @@ export async function runScenarioHealthCanary({
     );
     return { healthy: false, reason: "run_failed", durationMs: 0 };
   }
-  // Keyed per project AND plan: two projects may legitimately reuse a slug,
-  // and their monitors must never block each other.
+  // Keyed per project AND resolved plan id, never the caller's spelling: two
+  // projects may legitimately reuse a slug and must not block each other, and
+  // one plan named by its id in one request and its slug in another is still
+  // ONE plan — the second request must see busy, not launch a parallel run.
   return singleFlightCanary({
-    key: `${projectId}/${runPlanId}`,
+    key: `${projectId}/${resolved.runPlanId}`,
     deps: buildProductionDeps(resolved),
     hardDeadline,
   });
