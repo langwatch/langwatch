@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { eventLogRetentionCategorySqlPredicate } from "../event-log-retention-policy";
 import {
   RETENTION_TABLE_CATEGORY_MAP,
   type RetentionCategory,
@@ -27,9 +28,7 @@ interface TriggerRetroactiveUpdateParams {
 export class RetroactiveMutationInProgressError extends Error {
   readonly name = "RetroactiveMutationInProgressError" as const;
   constructor(public readonly blocked: MutationProgress[]) {
-    const summary = blocked
-      .map((m) => `${m.table} (${m.mutationId})`)
-      .join(", ");
+    const summary = blocked.map((m) => `${m.table} (${m.mutationId})`).join(", ");
     super(
       `Retroactive update already in progress for: ${summary}. ` +
         `Wait for completion or kill the listed mutation(s) before starting another.`,
@@ -66,9 +65,7 @@ function tenantFilterParams(projectId: string): Record<string, string> {
 }
 
 export class RetroactiveUpdateService {
-  constructor(
-    private readonly resolveClickHouseClient: ClickHouseClientResolver | null,
-  ) {}
+  constructor(private readonly resolveClickHouseClient: ClickHouseClientResolver | null) {}
 
   async triggerUpdate({
     projectId,
@@ -79,9 +76,10 @@ export class RetroactiveUpdateService {
       throw new Error("ClickHouse not available");
     }
 
-    const tables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
+    const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, cat]) => cat === category)
       .map(([table]) => table);
+    const tables = [...new Set([...categoryTables, "event_log"])];
 
     const client = await this.resolveClickHouseClient(projectId);
 
@@ -98,12 +96,15 @@ export class RetroactiveUpdateService {
     // the retention value can — and must — flow through query_params so we
     // don't reinvent string escaping for ClickHouse SQL.
     for (const table of tables) {
+      const eventLogCategoryFilter =
+        table === "event_log" ? ` AND (${eventLogRetentionCategorySqlPredicate(category)})` : "";
       await client.command({
         query:
           `ALTER TABLE ${table} ` +
           `UPDATE _retention_days = {retentionDays:UInt16} ` +
           `WHERE TenantId = {tenantId:String} ` +
-          `AND _retention_days != {retentionDays:UInt16}`,
+          `AND _retention_days != {retentionDays:UInt16}` +
+          eventLogCategoryFilter,
         query_params: {
           tenantId: projectId,
           retentionDays: newRetentionDays,
@@ -114,11 +115,7 @@ export class RetroactiveUpdateService {
     return { tables };
   }
 
-  async getMutationProgress({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<MutationProgress[]> {
+  async getMutationProgress({ projectId }: { projectId: string }): Promise<MutationProgress[]> {
     if (!this.resolveClickHouseClient) return [];
 
     const client = await this.resolveClickHouseClient(projectId);
@@ -162,9 +159,7 @@ export class RetroactiveUpdateService {
 
     const client = await this.resolveClickHouseClient(projectId);
     await client.command({
-      query:
-        `KILL MUTATION WHERE mutation_id = {mutationId:String} ` +
-        `AND ${TENANT_FILTER_SQL}`,
+      query: `KILL MUTATION WHERE mutation_id = {mutationId:String} ` + `AND ${TENANT_FILTER_SQL}`,
       query_params: { mutationId, ...tenantFilterParams(projectId) },
     });
   }
@@ -219,7 +214,6 @@ export class RetroactiveUpdateService {
     isDone: r.isDone === 1,
     partsToDo: r.partsToDo,
     createTime: r.createTime,
-    category:
-      RETENTION_TABLE_CATEGORY_MAP[r.table as RetentionManagedTable] ?? null,
+    category: RETENTION_TABLE_CATEGORY_MAP[r.table as RetentionManagedTable] ?? null,
   });
 }

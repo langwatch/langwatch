@@ -20,7 +20,16 @@ Feature: Retroactive retention changes
     And confirms in the "Apply retention to existing data?" dialog
     Then a ClickHouse mutation is issued for each trace-category table
     And the mutation updates _retention_days = 91 for this tenant
-    And the update applies uniformly to every retention-managed table including event_log
+    And the event_log mutation updates only trace-class rows
+    And the event_log mutation preserves every row classified as indefinite
+
+  Scenario: Retroactive updates select the matching event-log category
+    When the admin applies a retention change to existing scenario data
+    Then simulation_runs and suite_runs are updated
+    And only simulation-run, simulation-set, and suite-run rows in event_log are updated
+    When the admin applies a retention change to existing experiment data
+    Then experiment_runs and experiment_run_items are updated
+    And only experiment-run rows in event_log are updated
 
   Scenario: Retroactive update progress is tracked
     When a retroactive update is in progress
