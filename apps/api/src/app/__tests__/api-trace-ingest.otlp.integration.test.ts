@@ -1,3 +1,9 @@
+import type {
+  GovernanceService,
+  GovernanceOtlpPolicyInput,
+} from "@langwatch/enterprise-governance-contract";
+import { TestGovernanceService } from "../../../../../packages/enterprise/features/governance/server/src/app/__tests__/support/test-governance-service.ts";
+import { buildIngestKeyReceiverPolicies } from "../../../../../packages/enterprise/features/governance/server/src/rules/ingest-key-provenance.rules.ts";
 /**
  * `POST /api/otel/v1/traces` end to end, through the real Hono app this process mounts
  * and the real ingestion service it composes.
@@ -32,6 +38,84 @@ const PROJECT_ID = "project-otlp";
 const API_KEY_ID = "key-from-the-credential";
 
 describe("given the API process composed a command queue", () => {
+  it("composes ingestion-source policy and retains the authenticated key after stamping", async () => {
+    const governance = new TestGovernanceService();
+    const resolve = vi.fn(async (input: GovernanceOtlpPolicyInput) =>
+      buildIngestKeyReceiverPolicies(input, true),
+    );
+    governance.resolveOtlpReceiverPolicies = resolve;
+    const { api, commands } = mount({ governance, sourceType: "otel_generic" });
+    const response = await api.fetch("/api/otel/v1/traces", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-auth-token": "token" },
+      body: JSON.stringify(jsonExport()),
+    });
+    expect(response.status).toBe(200);
+    expect(resolve).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      sourceType: "otel_generic",
+      templateId: null,
+    });
+    expect(commands).toHaveLength(1);
+    expect(commands[0]?.resource?.attributes).toEqual(
+      expect.arrayContaining([
+        { key: "langwatch.api_key.id", value: { stringValue: API_KEY_ID } },
+        { key: "langwatch.organization_id", value: { stringValue: "org-1" } },
+        { key: "langwatch.origin", value: { stringValue: "ai_tool" } },
+        { key: "langwatch.cost.non_billable", value: { stringValue: "true" } },
+      ]),
+    );
+  });
+
+  it("refuses an ingestion source without policy rather than accepting unattributed traffic", async () => {
+    const { api, commands } = mount({ sourceType: "otel_generic" });
+    const response = await api.fetch("/api/otel/v1/traces", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-auth-token": "token" },
+      body: JSON.stringify(jsonExport()),
+    });
+    expect(response.status).toBe(503);
+    expect(commands).toEqual([]);
+  });
+
+  it("preserves a handled policy refusal after valid body parsing", async () => {
+    const governance = new TestGovernanceService();
+    governance.resolveOtlpReceiverPolicies = async () => {
+      throw new HandledError("policy_refused", "Policy refused this source", {
+        httpStatus: 409,
+        fault: "customer",
+      });
+    };
+    const { api, commands } = mount({ governance, sourceType: "otel_generic" });
+    const response = await api.fetch("/api/otel/v1/traces", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-auth-token": "token" },
+      body: JSON.stringify(jsonExport()),
+    });
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "policy_refused",
+      fault: "customer",
+      message: "Policy refused this source",
+    });
+    expect(commands).toEqual([]);
+  });
+
+  it("keeps malformed-body refusal ahead of a failed policy lookup", async () => {
+    const governance = new TestGovernanceService();
+    governance.resolveOtlpReceiverPolicies = async () => {
+      throw new Error("policy unavailable");
+    };
+    const { api, commands } = mount({ governance, sourceType: "otel_generic" });
+    const response = await api.fetch("/api/otel/v1/traces", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-auth-token": "token" },
+      body: "{",
+    });
+    expect(response.status).toBe(400);
+    expect(commands).toEqual([]);
+  });
+
   describe("when an exporter posts a protobuf OTLP export", () => {
     it("hands the producer a recordSpan command for that span", async () => {
       const { api, commands } = mount();
@@ -318,6 +402,8 @@ describe("given the API process composed no command queue", () => {
 // --------------------------------------------------------------------------
 
 type MountOverrides = {
+  sourceType?: string;
+  governance?: GovernanceService;
   credential?: ApiHandlerManagedCredentials["authenticate"];
   allowance?: ApiTraceIngestAllowance;
   report?: (capability: "command-queue" | "dedup" | "plan-allowance") => void;
@@ -338,7 +424,8 @@ function mount(overrides: MountOverrides = {}) {
   const ingest = composeApiTraceIngest({
     eventing: recordingEventing(send),
     redis: null,
-    credentials: credentialsStub(overrides.credential),
+    credentials: credentialsStub(overrides.credential, overrides.sourceType),
+    governance: overrides.governance,
     ...(overrides.allowance ? { allowance: overrides.allowance } : {}),
     ...(overrides.report ? { report: { absent: overrides.report } as never } : {}),
     ...(overrides.media ? { media: overrides.media } : {}),
@@ -389,6 +476,7 @@ function recordingEventing(send: (data: RecordSpanCommandData) => Promise<void>)
 /** The credential this process would have resolved, or the given refusal. */
 function credentialsStub(
   authenticate?: ApiHandlerManagedCredentials["authenticate"],
+  sourceType?: string,
 ): ApiHandlerManagedCredentials {
   return {
     authenticate:
@@ -410,7 +498,7 @@ function credentialsStub(
             apiKeyId: API_KEY_ID,
             userId: null,
             organizationId: "org-1",
-            ingestSourceType: null,
+            ingestSourceType: sourceType ?? null,
             ingestionTemplateId: null,
             project: {
               id: PROJECT_ID,

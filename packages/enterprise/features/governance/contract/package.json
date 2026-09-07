@@ -25,6 +25,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "zod": "^4.4.3"
   },

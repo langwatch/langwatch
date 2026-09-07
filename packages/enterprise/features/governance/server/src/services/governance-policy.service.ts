@@ -1,3 +1,8 @@
+import type {
+  GovernanceOtlpPolicyInput,
+  GovernanceOtlpReceiverPolicies,
+} from "@langwatch/enterprise-governance-contract";
+import { buildIngestKeyReceiverPolicies } from "../rules/ingest-key-provenance.rules.ts";
 import type { TraceDepartmentInput } from "@langwatch/enterprise-governance-contract";
 import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
 import {
@@ -34,6 +39,13 @@ export class PostgresGovernancePolicyService {
       diagnostics?: GovernanceDiagnosticsPort;
     } = {},
   ) {}
+
+  async resolveOtlpReceiverPolicies(
+    input: GovernanceOtlpPolicyInput,
+  ): Promise<GovernanceOtlpReceiverPolicies> {
+    const nonBillable = await this.resolveSourceNonBillable(input);
+    return buildIngestKeyReceiverPolicies(input, nonBillable);
+  }
 
   async resolveSourceNonBillable(input: {
     organizationId: string;

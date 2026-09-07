@@ -234,7 +234,6 @@ export {
   type GovernanceIngestSpendPort,
   type GovernanceIngestTraceCollectionPort,
 } from "./transport/api-rest/governance-ingest.api.ts";
-export { GovernanceIngestKeyProvenancePort } from "./ports/governance-ingest-key-provenance.port.ts";
 export { GovernanceProjectPort } from "./ports/governance-project.port.ts";
 export {
   GovernanceIngestRateLimitPort,

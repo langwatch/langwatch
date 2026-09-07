@@ -43,3 +43,10 @@ export {
   readCorrectedPath,
   stampCorrectedPath,
 } from "./path-canonicalisation.ts";
+
+export {
+  applyOtlpReceiverPolicy,
+  otlpReceiverPolicySchema,
+  type OtlpReceiverPolicy,
+  type OtlpReceiverRequest,
+} from "./receiver-policy.ts";

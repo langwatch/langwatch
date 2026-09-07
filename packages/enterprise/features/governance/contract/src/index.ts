@@ -33,3 +33,8 @@ export * from "./pulled-usage.commands.ts";
 export * from "./pulled-usage.events.ts";
 export * from "./quarantine-fill.ts";
 export * from "./routing-policy.ts";
+
+export type {
+  GovernanceOtlpPolicyInput,
+  GovernanceOtlpReceiverPolicies,
+} from "./otlp-receiver-policy.ts";

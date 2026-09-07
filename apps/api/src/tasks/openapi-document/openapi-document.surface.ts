@@ -2,7 +2,6 @@
  * The API process's REST surface, composed for description rather than for service.
  */
 import { Hono } from "hono";
-import { ApiGovernanceIngestKeyProvenance } from "../../features/enterprise/governance-ingest-rest.mount.ts";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
@@ -314,7 +313,6 @@ function processPorts(): ApiProcessRestPorts {
       // only `repositories/prisma/**` and the Postgres adapters may spell
       // `PrismaClient`, and a description task is neither.
       directory: refuse("The member directory") as GovernanceIngestRestPorts["directory"],
-      keyProvenance: ApiGovernanceIngestKeyProvenance.create(),
     },
     publicBaseUrl: PUBLIC_BASE_URL,
     healthProbes: opaque(),

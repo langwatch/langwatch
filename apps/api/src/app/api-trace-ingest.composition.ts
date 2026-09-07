@@ -1,3 +1,5 @@
+import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import { ApiOtlpCredentialPolicyAdapter } from "./api-otlp-credential-policy.adapter.ts";
 /**
  * The OTLP receiver, composed from this process's own graph. Ingestion is the one path
  * where this process is a WRITER rather than a reader, and everything below follows from
@@ -87,6 +89,7 @@ export type ApiTraceIngestOptions = Readonly<{
   redis: RedisConnection | null | undefined;
   /** The one credential resolution both this door and the chain use. */
   credentials: ApiHandlerManagedCredentials;
+  governance?: GovernanceService;
   /**
    * The plan's monthly allowance, or none.
    */
@@ -176,12 +179,18 @@ export function composeApiTraceIngest(
     report,
   });
 
+  const credentialPolicy = ApiOtlpCredentialPolicyAdapter.create(options.governance);
+
   const authenticate = (request: Request) =>
     options.credentials.authenticate({ request, permission: "traces:create" });
 
   return {
     otlp: {
-      credential: async ({ request }) => toOtlpCredential(await authenticate(request)),
+      credential: async ({ request }) => {
+        const credential = toOtlpCredential(await authenticate(request));
+
+        return credentialPolicy.enrich(credential);
+      },
       usageLimit,
       traces: ({ tenantId, traceRequest }) =>
         ingestion.handleOtlpTraceRequest(tenantId, traceRequest, DEFAULT_PII_REDACTION_LEVEL),

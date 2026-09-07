@@ -1,3 +1,4 @@
+import { applyOtlpReceiverPolicy } from "@langwatch/otlp";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
@@ -56,7 +57,6 @@ import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { parseOtlpLogs, parseOtlpMetrics, parseOtlpTraces, readOtlpBody } from "@langwatch/otlp";
 import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port.ts";
-import type { GovernanceIngestKeyProvenancePort } from "../../ports/governance-ingest-key-provenance.port.ts";
 import type { GovernanceProjectPort } from "../../ports/governance-project.port.ts";
 import type {
   IExportLogsServiceRequest,
@@ -175,8 +175,6 @@ export type GovernanceIngestRestPorts = Readonly<{
   directory: () => GovernanceDirectoryPort;
   /** The per-caller throttle, where this deployment composed a counter. */
   rateLimit?: GovernanceIngestRateLimitPort | undefined;
-  /** Drops a payload-supplied API-key attribution before anything folds it. */
-  keyProvenance: GovernanceIngestKeyProvenancePort;
 }>;
 
 /**
@@ -529,7 +527,7 @@ export function createGovernanceIngestRestApp(options: {
               kind: "internal_governance",
             });
             stampOriginAttrs(parsed.request, source);
-            ports.keyProvenance.dropOnTraceRequest(parsed.request);
+            applyOtlpReceiverPolicy(parsed.request, "traces", null);
             const result = await ports.traceCollection({
               tenantId: govProject.id,
               traceRequest: parsed.request,
@@ -699,7 +697,7 @@ export function createGovernanceIngestRestApp(options: {
                 kind: "internal_governance",
               });
               stampLogOriginAttrs(parsed.request, source);
-              ports.keyProvenance.dropOnLogRequest(parsed.request);
+              applyOtlpReceiverPolicy(parsed.request, "logs", null);
               try {
                 await logCollection({
                   tenantId: govProject.id,
@@ -800,7 +798,7 @@ export function createGovernanceIngestRestApp(options: {
           kind: "internal_governance",
         });
         stampMetricOriginAttrs({ request: parsedRequest, source });
-        ports.keyProvenance.dropOnMetricRequest(parsedRequest);
+        applyOtlpReceiverPolicy(parsedRequest, "metrics", null);
         const result = await metricCollection({
           tenantId: govProject.id,
           organizationId: source.organizationId,

@@ -102,6 +102,7 @@ export class TestGovernanceService extends GovernanceService {
     unsupported<GovernanceService["personalVirtualKeyRevokeAllForUser"]>();
   quarantineFillEvaluate = unsupported<GovernanceService["quarantineFillEvaluate"]>();
   resolveSetupState = unsupported<GovernanceService["resolveSetupState"]>();
+  resolveOtlpReceiverPolicies = unsupported<GovernanceService["resolveOtlpReceiverPolicies"]>();
   resolveSourceNonBillable = unsupported<GovernanceService["resolveSourceNonBillable"]>();
   resolveTraceDepartment = unsupported<GovernanceService["resolveTraceDepartment"]>();
   routingPolicyCreate = unsupported<GovernanceService["routingPolicyCreate"]>();

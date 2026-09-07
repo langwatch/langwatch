@@ -9,8 +9,11 @@ import {
   type MountableRestApp,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import {
+  applyOtlpReceiverPolicy,
+  type OtlpReceiverPolicy,
+  type OtlpReceiverRequest,
   decodeBase64OpenTelemetryId,
   OTLP_CORRECTED_PATH_HEADER,
   OTLP_MAX_BODY_BYTES,
@@ -27,15 +30,6 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { getLangWatchTracer } from "langwatch";
 
-import {
-  dropForeignScopesForVscodeKey,
-  enforceApiKeyIdOnLogRequest,
-  enforceApiKeyIdOnMetricRequest,
-  enforceApiKeyIdOnTraceRequest,
-  stampIngestKeyProvenanceOnLogRequest,
-  stampIngestKeyProvenanceOnMetricRequest,
-  stampIngestKeyProvenanceOnTraceRequest,
-} from "../../rules/ingest-key-provenance.rules.ts";
 import type { TraceRequestCollectionResult } from "../../services/trace-ingestion.service.ts";
 import { nowInstant } from "@langwatch/time";
 
@@ -68,7 +62,7 @@ export type OtlpIngestProject = Readonly<{
 export type OtlpIngestIdentity = Readonly<{
   /**
    * The scoped key's id, or null for a legacy project key. Rewritten onto
-   * every authenticated request (see {@link enforceApiKeyIdOnTraceRequest})
+   * every authenticated request (see {@link applyOtlpReceiverPolicy})
    * and must never become conditional: the redaction deny-list exempts this
    * attribute name, sound only while the value cannot come from the payload.
    */
@@ -77,6 +71,9 @@ export type OtlpIngestIdentity = Readonly<{
   /** Set only on an INGESTION key: which tool's feed this is. */
   ingestSourceType: string | null;
   ingestionTemplateId: string | null;
+  sourcePolicy?:
+    | { status: "ready"; policies: Record<"traces" | "logs" | "metrics", OtlpReceiverPolicy> }
+    | { status: "failed"; error: unknown };
 }>;
 
 /** A resolved credential, or the refusal this family publishes for it. */
@@ -103,12 +100,6 @@ export type OtlpIngestUsageLimitPort = (input: {
   /** Best-effort, for correlating a rejection to a customer-supplied id. */
   customerTraceIds: string[];
 }) => Promise<void>;
-
-/** Whether a tool's direct-OTLP usage is bundled rather than billed. */
-export type OtlpIngestNonBillablePort = (input: {
-  organizationId: string;
-  sourceType: string;
-}) => Promise<boolean>;
 
 /** The trace signal's collection: raw OTLP in, per-span tally out. */
 export type OtlpTraceCollectionPort = (input: {
@@ -161,7 +152,6 @@ export type OtlpIngestRestPorts = Readonly<{
   traces?: OtlpTraceCollectionPort | undefined;
   logs?: OtlpLogCollectionPort | undefined;
   metrics?: OtlpMetricCollectionPort | undefined;
-  nonBillable?: OtlpIngestNonBillablePort | undefined;
   reportError?: OtlpIngestErrorReportPort | undefined;
 }>;
 
@@ -296,94 +286,34 @@ async function authenticate(
   };
 }
 
-/**
- * Everything the receiver writes onto an OTLP request on its own authority,
- * for one signal. Two rules with different scopes live together since they
- * are the same concern — what the payload may not decide — and must not
- * drift apart.
- */
-async function applyReceiverProvenance({
+function applyReceiverProvenance({
   request,
   identity,
-  nonBillable,
   signal,
   logger,
 }: {
-  request: unknown;
+  request: OtlpReceiverRequest;
   identity: OtlpIngestIdentity;
-  nonBillable: OtlpIngestNonBillablePort | undefined;
   signal: "traces" | "logs" | "metrics";
-  logger: ReturnType<typeof createLogger>;
-}): Promise<void> {
-  if (signal === "traces") {
-    enforceApiKeyIdOnTraceRequest(
-      request as Parameters<typeof enforceApiKeyIdOnTraceRequest>[0],
-      identity.apiKeyId,
-    );
-  } else if (signal === "logs") {
-    enforceApiKeyIdOnLogRequest(
-      request as Parameters<typeof enforceApiKeyIdOnLogRequest>[0],
-      identity.apiKeyId,
-    );
-  } else {
-    enforceApiKeyIdOnMetricRequest(
-      request as Parameters<typeof enforceApiKeyIdOnMetricRequest>[0],
-      identity.apiKeyId,
-    );
+  logger: Logger;
+}): void {
+  const isIngestionKey = identity.apiKeyId !== null && Boolean(identity.ingestSourceType);
+  const source = identity.sourcePolicy;
+  if (isIngestionKey && !source) {
+    throw new OtlpIngestSourceBillingUnavailableError(identity.ingestSourceType ?? "");
   }
 
-  const sourceType = identity.ingestSourceType;
-  if (identity.apiKeyId === null || !sourceType) return;
-
-  // A copilot_vscode key rides spec-standard OTEL_* env in a long-lived editor; processes VS Code
-  // spawns outside integrated terminals inherit it, so a developer's own instrumented service
-  // could POST here under this key. Only Copilot's instrumentation scopes pass; metrics needs the
-  // same gate, since the code() env enables OTEL_METRICS_EXPORTER too.
-  if (signal !== "logs") {
-    const droppedForeign = dropForeignScopesForVscodeKey(
-      request as Parameters<typeof dropForeignScopesForVscodeKey>[0],
-      sourceType,
-    );
-    if (droppedForeign > 0) {
-      logger.warn(
-        { droppedForeign, apiKeyId: identity.apiKeyId },
-        "dropped non-copilot instrumentation scopes posted on a copilot_vscode ingest key",
-      );
-    }
+  if (isIngestionKey && source?.status === "failed") {
+    throw source.error;
   }
 
-  if (!nonBillable) throw new OtlpIngestSourceBillingUnavailableError(sourceType);
+  const policy = isIngestionKey && source?.status === "ready" ? source.policies[signal] : void 0;
+  const { droppedScopes } = applyOtlpReceiverPolicy(request, signal, identity.apiKeyId, policy);
 
-  // Whether this tool's direct-OTLP usage is bundled (non-billed per token).
-  // Log-based tools (Claude Code et al. emit OTLP logs, not spans) need the
-  // same resolution the trace path does; without it a bundled coding session
-  // reads as real spend.
-  const bundled = await nonBillable({
-    organizationId: identity.organizationId,
-    sourceType,
-  });
-  const stamp = {
-    apiKeyId: identity.apiKeyId,
-    sourceType,
-    organizationId: identity.organizationId,
-    templateId: identity.ingestionTemplateId,
-  };
-  if (signal === "traces") {
-    stampIngestKeyProvenanceOnTraceRequest(
-      request as Parameters<typeof stampIngestKeyProvenanceOnTraceRequest>[0],
-      { ...stamp, nonBillable: bundled },
-    );
-  } else if (signal === "logs") {
-    stampIngestKeyProvenanceOnLogRequest(
-      request as Parameters<typeof stampIngestKeyProvenanceOnLogRequest>[0],
-      { ...stamp, nonBillable: bundled },
-    );
-  } else {
-    // The metric stamp carries no billing marker: a metric point is not a
-    // token, so there is nothing on it to price.
-    stampIngestKeyProvenanceOnMetricRequest(
-      request as Parameters<typeof stampIngestKeyProvenanceOnMetricRequest>[0],
-      stamp,
+  if (droppedScopes > 0) {
+    logger.warn(
+      { droppedForeign: droppedScopes, apiKeyId: identity.apiKeyId },
+      "dropped instrumentation scopes outside the authenticated ingestion policy",
     );
   }
 }
@@ -503,10 +433,9 @@ async function handleTracesRequest(
   // Body successfully parsed — only now is the key marked used.
   markUsed();
 
-  await applyReceiverProvenance({
+  applyReceiverProvenance({
     request: parsed.request,
     identity,
-    nonBillable: ports.nonBillable,
     signal: "traces",
     logger: loggerTraces,
   });
@@ -585,10 +514,9 @@ async function handleLogsRequest(
 
   markUsed();
 
-  await applyReceiverProvenance({
+  applyReceiverProvenance({
     request: parsed.request,
     identity,
-    nonBillable: ports.nonBillable,
     signal: "logs",
     logger: loggerLogs,
   });
@@ -677,10 +605,9 @@ async function handleMetricsRequest(
     return c.json({ error: "Failed to parse metrics" }, { status: 400 });
   }
 
-  await applyReceiverProvenance({
+  applyReceiverProvenance({
     request: parsed.request,
     identity,
-    nonBillable: ports.nonBillable,
     signal: "metrics",
     logger: loggerMetrics,
   });

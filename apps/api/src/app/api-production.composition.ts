@@ -1631,6 +1631,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       logger: createLogger("langwatch:api:trace-ingest:edge-spool"),
     });
     const otlpIngest = composeApiTraceIngest({
+      governance: this.resolveEnterprise()?.governance,
       eventing: this.composedEventing?.eventSourcing,
       redis: this.composedQueueRedis,
       credentials: handlerManagedCredentials,

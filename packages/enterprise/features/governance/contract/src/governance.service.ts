@@ -1,4 +1,8 @@
 import type {
+  GovernanceOtlpPolicyInput,
+  GovernanceOtlpReceiverPolicies,
+} from "./otlp-receiver-policy.ts";
+import type {
   ConfigureIngestionPullCommand,
   DisableIngestionPullCommand,
   RecordIngestionPullRunCompletedCommand,
@@ -6,7 +10,11 @@ import type {
 } from "./ingestion-pull.commands.ts";
 import type { RecordPulledUsageCommand } from "./pulled-usage.commands.ts";
 import type { TraceDepartmentInput } from "./department.ts";
-import type { AnomalyRule, CreateAnomalyRuleInput, UpdateAnomalyRuleInput } from "./anomaly-rule.ts";
+import type {
+  AnomalyRule,
+  CreateAnomalyRuleInput,
+  UpdateAnomalyRuleInput,
+} from "./anomaly-rule.ts";
 import type { Department, DepartmentAssignments } from "./department.ts";
 import type { CanonicalCostEvent, OtlpLogsRequest } from "./canonical-cost.ts";
 import type {
@@ -156,6 +164,10 @@ export abstract class GovernanceService {
   ): Promise<void>;
   abstract ingestionRecordRunFailed(input: RecordIngestionPullRunFailedCommand): Promise<void>;
   abstract usageRecord(input: RecordPulledUsageCommand): Promise<void>;
+
+  abstract resolveOtlpReceiverPolicies(
+    input: GovernanceOtlpPolicyInput,
+  ): Promise<GovernanceOtlpReceiverPolicies>;
 
   abstract resolveSourceNonBillable(input: {
     organizationId: string;

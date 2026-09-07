@@ -6,7 +6,6 @@ import type {
   GovernanceIngestTraceCollectionPort,
 } from "@langwatch/enterprise-governance-server";
 import {
-  GovernanceIngestKeyProvenancePort,
   GovernanceIngestRateLimitPort,
   PostgresGovernanceDirectoryAdapter,
 } from "@langwatch/enterprise-governance-server";
@@ -18,11 +17,6 @@ import type { GovernanceService } from "@langwatch/enterprise-governance-contrac
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
 import { nowInstant } from "@langwatch/time";
-import {
-  enforceApiKeyIdOnLogRequest,
-  enforceApiKeyIdOnMetricRequest,
-  enforceApiKeyIdOnTraceRequest,
-} from "@langwatch/trace-server";
 
 /** The process's ONE fixed-window counter, as the ingest throttle. */
 export class ApiGovernanceIngestRateLimit extends GovernanceIngestRateLimitPort {
@@ -65,34 +59,6 @@ export class ApiGovernanceIngestRateLimit extends GovernanceIngestRateLimitPort 
   }
 }
 
-/**
- * The trace receiver's own API-key attribution rule, handed to the governance receivers
- * rather than restated by them.
- */
-export class ApiGovernanceIngestKeyProvenance extends GovernanceIngestKeyProvenancePort {
-  static create(): ApiGovernanceIngestKeyProvenance {
-    return new ApiGovernanceIngestKeyProvenance();
-  }
-
-  dropOnTraceRequest(request: unknown): void {
-    enforceApiKeyIdOnTraceRequest(
-      request as Parameters<typeof enforceApiKeyIdOnTraceRequest>[0],
-      null,
-    );
-  }
-
-  dropOnLogRequest(request: unknown): void {
-    enforceApiKeyIdOnLogRequest(request as Parameters<typeof enforceApiKeyIdOnLogRequest>[0], null);
-  }
-
-  dropOnMetricRequest(request: unknown): void {
-    enforceApiKeyIdOnMetricRequest(
-      request as Parameters<typeof enforceApiKeyIdOnMetricRequest>[0],
-      null,
-    );
-  }
-}
-
 export type ApiGovernanceIngestRestOptions = Readonly<{
   /** The Enterprise governance capability, where the deployment composed one. */
   governance: GovernanceService | undefined;
@@ -118,26 +84,11 @@ export type ApiGovernanceIngestRestOptions = Readonly<{
  * Composes the receiver ports, or none. Absent without the governance capability, the
  * project mint, the trace collection or the database.
  */
-type RequiredGovernanceIngestPorts = {
-  governance: GovernanceService;
-  projects: Pick<GovernanceInternalProjectPort, "ensureInternal">;
-  traceCollection: GovernanceIngestTraceCollectionPort;
-  prisma: PrismaClient;
-};
-
-/** Narrows to the ingest ports only when every one of them is present. */
-function hasAllGovernanceIngestPorts(
-  options: ApiGovernanceIngestRestOptions,
-): options is ApiGovernanceIngestRestOptions & RequiredGovernanceIngestPorts {
-  const { governance, projects, traceCollection, prisma } = options;
-  return Boolean(governance && projects && traceCollection && prisma);
-}
-
 export function composeApiGovernanceIngestRest(
   options: ApiGovernanceIngestRestOptions,
 ): GovernanceIngestRestPorts | undefined {
-  if (!hasAllGovernanceIngestPorts(options)) return undefined;
   const { governance, projects, traceCollection, prisma } = options;
+  if (!governance || !projects || !traceCollection || !prisma) return undefined;
 
   return {
     governance: () => governance,
@@ -145,6 +96,5 @@ export function composeApiGovernanceIngestRest(
     traceCollection,
     directory: () => PostgresGovernanceDirectoryAdapter.create({ database: prisma }),
     rateLimit: ApiGovernanceIngestRateLimit.create(options.rateLimit),
-    keyProvenance: ApiGovernanceIngestKeyProvenance.create(),
   };
 }

@@ -448,7 +448,6 @@ export {
   type OtlpIngestCredentialPort,
   type OtlpIngestErrorReportPort,
   type OtlpIngestIdentity,
-  type OtlpIngestNonBillablePort,
   type OtlpIngestProject,
   type OtlpIngestRestPorts,
   type OtlpIngestUsageLimitPort,
@@ -459,26 +458,6 @@ export {
   type OtlpTraceCollectionPort,
 } from "./transport/api-rest/otlp-ingest.api.ts";
 export { createOtlpPathAliasRestApp } from "./transport/api-rest/otlp-path-alias.api.ts";
-export {
-  AI_TOOL_ORIGIN_VALUE,
-  CODING_AGENT_ORIGIN_VALUE,
-  COPILOT_VSCODE_ALLOWED_SCOPES,
-  dropForeignScopesForVscodeKey,
-  enforceApiKeyIdOnLogRequest,
-  enforceApiKeyIdOnMetricRequest,
-  enforceApiKeyIdOnTraceRequest,
-  originForIngestSourceType,
-  PROVENANCE_ATTR_API_KEY_ID,
-  PROVENANCE_ATTR_NON_BILLABLE,
-  PROVENANCE_ATTR_ORGANIZATION_ID,
-  PROVENANCE_ATTR_ORIGIN,
-  PROVENANCE_ATTR_SOURCE,
-  PROVENANCE_ATTR_TEMPLATE_ID,
-  stampIngestKeyProvenanceOnLogRequest,
-  stampIngestKeyProvenanceOnMetricRequest,
-  stampIngestKeyProvenanceOnTraceRequest,
-  type IngestKeyProvenance,
-} from "./rules/ingest-key-provenance.rules.ts";
 export type { TraceRequestCollectionResult } from "./services/trace-ingestion.service.ts";
 
 // The download half of the trace read: streaming CSV/JSONL export — the

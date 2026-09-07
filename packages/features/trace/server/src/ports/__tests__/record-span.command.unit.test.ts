@@ -11,11 +11,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { EventingRecordSpanAdapter } from "../../adapters/eventing.record-span.adapter.ts";
-import {
-  enforceApiKeyIdOnTraceRequest,
-  PROVENANCE_ATTR_API_KEY_ID,
-  stampIngestKeyProvenanceOnTraceRequest,
-} from "../../rules/ingest-key-provenance.rules.ts";
+import { applyOtlpReceiverPolicy } from "@langwatch/otlp";
 import {
   TraceSpanContentDropPort,
   TraceSpanCostEnrichmentPort,
@@ -254,12 +250,14 @@ describe("RecordSpanCommand", () => {
     async function emittedResourceAfterReceiver(apiKeyId: string | null) {
       const input = commandData({ resource: { attributes: [] } });
       const request = { resourceSpans: [{ resource: input.resource }] };
-      stampIngestKeyProvenanceOnTraceRequest(request, {
-        apiKeyId: "key_abc",
-        sourceType: "claude_code",
-        organizationId: "org_1",
+      applyOtlpReceiverPolicy(request, "traces", apiKeyId, {
+        resourceAttributeKeysToRemove: [],
+        resourceAttributes: [
+          { key: "langwatch.source", value: { stringValue: "claude_code" } },
+          { key: "langwatch.organization_id", value: { stringValue: "org_1" } },
+          { key: "langwatch.origin", value: { stringValue: "coding_agent" } },
+        ],
       });
-      enforceApiKeyIdOnTraceRequest(request, apiKeyId);
       input.resource = request.resourceSpans[0]!.resource;
 
       const { handler } = harness();
@@ -274,7 +272,7 @@ describe("RecordSpanCommand", () => {
     it("keeps the API key id on the emitted resource", async () => {
       const emitted = await emittedResourceAfterReceiver("key_abc");
 
-      const stampedId = emitted.find((attribute) => attribute.key === PROVENANCE_ATTR_API_KEY_ID);
+      const stampedId = emitted.find((attribute) => attribute.key === "langwatch.api_key.id");
       expect(stampedId?.value.stringValue).toBe("key_abc");
     });
 
@@ -288,7 +286,7 @@ describe("RecordSpanCommand", () => {
     it("emits no API key id when the request had no ApiKey row", async () => {
       const emitted = await emittedResourceAfterReceiver(null);
 
-      expect(emitted.some((attribute) => attribute.key === PROVENANCE_ATTR_API_KEY_ID)).toBe(false);
+      expect(emitted.some((attribute) => attribute.key === "langwatch.api_key.id")).toBe(false);
     });
   });
 });

@@ -2199,6 +2199,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../handled-error
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../../../otlp
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../../../features/project/contract

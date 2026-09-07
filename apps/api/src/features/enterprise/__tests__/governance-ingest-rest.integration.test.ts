@@ -3,7 +3,6 @@
  * mounts and the real trace ingestion it composes.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import { ApiGovernanceIngestKeyProvenance } from "../governance-ingest-rest.mount.ts";
 import type { GovernanceIngestRestPorts } from "@langwatch/enterprise-governance-server";
 import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
@@ -166,7 +165,6 @@ function ingestWorld(options: { sourceType?: string } = {}) {
       }) as never,
     traceCollection: ingest.otlp.traces!,
     directory: () => ({}) as never,
-    keyProvenance: ApiGovernanceIngestKeyProvenance.create(),
   };
 
   return { commands, recordedEvents, ports };

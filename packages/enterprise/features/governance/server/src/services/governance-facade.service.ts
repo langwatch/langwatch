@@ -1,3 +1,7 @@
+import type {
+  GovernanceOtlpPolicyInput,
+  GovernanceOtlpReceiverPolicies,
+} from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GovernanceService } from "@langwatch/enterprise-governance-contract";
@@ -76,6 +80,12 @@ export class DefaultGovernanceService extends GovernanceService {
 
   readonly departmentAssignProject: GovernanceService["departmentAssignProject"] = (...args) =>
     this.rules.departmentAssignProject(...args);
+
+  resolveOtlpReceiverPolicies(
+    input: GovernanceOtlpPolicyInput,
+  ): Promise<GovernanceOtlpReceiverPolicies> {
+    return this.rules.resolveOtlpReceiverPolicies(input);
+  }
 
   readonly resolveSourceNonBillable: GovernanceService["resolveSourceNonBillable"] = (...args) =>
     this.rules.resolveSourceNonBillable(...args);
