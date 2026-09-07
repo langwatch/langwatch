@@ -85,8 +85,25 @@ type BatchRunsSidebarProps = {
 };
 
 /**
+ * Color for a run's status dot: stopped and interrupted override the stable
+ * per-run color assigned by the parent.
+ */
+function runStatusColor(params: {
+  stoppedAt: BatchRunSummary["timestamps"]["stoppedAt"];
+  interrupted: boolean;
+  runId: string;
+  runColors: Record<string, string>;
+}): string {
+  const { stoppedAt, interrupted, runId, runColors } = params;
+  if (stoppedAt) return "red.400";
+  if (interrupted) return "orange.400";
+  return runColors[runId] ?? getColorForString("colors", runId).color;
+}
+
+/**
  * Check if a run was interrupted (no explicit finish/stop but stale)
  */
+
 const isRunInterrupted = (timestamps: BatchRunSummary["timestamps"]): boolean => {
   // Has explicit finish or stop - not interrupted
   if (timestamps.finishedAt ?? timestamps.stoppedAt) {
@@ -158,14 +175,12 @@ export function BatchRunsSidebar({
       window.getSelection()?.removeAllRanges();
     }
 
+    const entersCompareViaShiftClick =
+      event.shiftKey && selectedRunId && onEnterCompareWithRuns && runId !== selectedRunId;
+
     if (compareMode && onToggleRunSelection) {
       onToggleRunSelection(runId);
-    } else if (
-      event.shiftKey &&
-      selectedRunId &&
-      onEnterCompareWithRuns &&
-      runId !== selectedRunId
-    ) {
+    } else if (entersCompareViaShiftClick && onEnterCompareWithRuns && selectedRunId) {
       // Shift+click enters compare mode with current and clicked run
       onEnterCompareWithRuns(selectedRunId, runId);
     } else {
@@ -292,11 +307,15 @@ export function BatchRunsSidebar({
 
             // Use stable color from parent (based on position in full runs list)
             // Override with red for stopped runs, orange for interrupted
-            const runColor = run.timestamps.stoppedAt
-              ? "red.400"
-              : interrupted
-                ? "orange.400"
-                : (runColors[run.runId] ?? getColorForString("colors", run.runId).color);
+            const runColor = runStatusColor({
+              stoppedAt: run.timestamps.stoppedAt,
+              interrupted,
+              runId: run.runId,
+              runColors,
+            });
+            // Compare-mode selection and single-run selection both render the
+            // same highlighted look.
+            const isHighlighted = (compareMode && isSelectedForComparison) || isSelected;
 
             return (
               <HStack
@@ -305,24 +324,11 @@ export function BatchRunsSidebar({
                 paddingY={2}
                 cursor="pointer"
                 role="button"
-                bg={
-                  compareMode && isSelectedForComparison
-                    ? "blue.subtle"
-                    : isSelected
-                      ? "blue.subtle"
-                      : "transparent"
-                }
-                color={
-                  compareMode && isSelectedForComparison ? "blue.fg" : isSelected ? "blue.fg" : "fg"
-                }
+                bg={isHighlighted ? "blue.subtle" : "transparent"}
+                color={isHighlighted ? "blue.fg" : "fg"}
                 borderRadius="md"
                 _hover={{
-                  bg:
-                    compareMode && isSelectedForComparison
-                      ? "blue.muted"
-                      : isSelected
-                        ? "blue.muted"
-                        : "bg.muted",
+                  bg: isHighlighted ? "blue.muted" : "bg.muted",
                 }}
                 onClick={(e) => handleRunClick(run.runId, e)}
                 gap={2}

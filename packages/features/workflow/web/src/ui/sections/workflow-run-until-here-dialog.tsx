@@ -42,6 +42,18 @@ const isEntryWorkflowNode = (node: Node<Component>): node is EntryWorkflowNode =
 export const getWorkflowEntryNode = (nodes: Node<Component>[]): EntryWorkflowNode | undefined =>
   nodes.find(isEntryWorkflowNode);
 
+/** Subtitle text for the dialog, based on which view is showing and the target node. */
+function runUntilHereDescription(params: {
+  view: "table" | "fields";
+  targetNode: Node<Component> | undefined;
+}): string {
+  if (params.view === "table") return "Pick the dataset row to run with.";
+  if (params.targetNode) {
+    return `Runs "${getNodeDisplayName(params.targetNode)}" and everything it depends on with these values.`;
+  }
+  return "Runs the selected node and everything it depends on with these values.";
+}
+
 const stringifyValue = (value: unknown): string => {
   if (value === null || value === void 0) return "";
   if (typeof value === "string") return value;
@@ -173,22 +185,18 @@ export function WorkflowRunUntilHereDialog({
           <VStack align="start" gap={1}>
             <Dialog.Title>Run until here</Dialog.Title>
             <Text fontSize="13px" color="fg.muted">
-              {view === "table"
-                ? "Pick the dataset row to run with."
-                : targetNode
-                  ? `Runs "${getNodeDisplayName(targetNode)}" and everything it depends on with these values.`
-                  : "Runs the selected node and everything it depends on with these values."}
+              {runUntilHereDescription({ view, targetNode })}
             </Text>
           </VStack>
         </Dialog.Header>
         <Dialog.Body>
-          {view === "table" ? (
+          {view === "table" &&
             renderDatasetPreview({
               rows: previewRows,
               columns: datasetColumns,
               onRowClick: setSelectedRowIndex,
-            })
-          ) : fields.length > 0 ? (
+            })}
+          {view !== "table" && fields.length > 0 && (
             <VStack width="full" align="start" gap={3}>
               {fields.map((field) => (
                 <Field.Root key={field.identifier} width="full">
@@ -216,7 +224,8 @@ export function WorkflowRunUntilHereDialog({
                 </Field.Root>
               ))}
             </VStack>
-          ) : (
+          )}
+          {view !== "table" && fields.length === 0 && (
             <Text fontSize="13px" color="fg.muted">
               The entry point has no inputs, the run starts with an empty entry.
             </Text>

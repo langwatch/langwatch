@@ -4,6 +4,16 @@ import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type { TargetConfig } from "../../model/experiments-v3/types.ts";
 import { type NamedEntity, pickTargetName } from "@langwatch/experiment-contract";
 
+/** Picks the value matching a target's type, defaulting to the evaluator branch. */
+function selectByTargetType<T>(
+  type: TargetConfig["type"] | undefined,
+  values: { prompt: T; agent: T; evaluator: T },
+): T {
+  if (type === "prompt") return values.prompt;
+  if (type === "agent") return values.agent;
+  return values.evaluator;
+}
+
 /**
  * Hook to fetch the display name for a target from the database.
  * Returns the name from the loaded entity (prompt, agent, or evaluator).
@@ -46,13 +56,12 @@ export const useTargetName = (target: TargetConfig): string => {
   );
 
   const entity: NamedEntity | undefined =
-    (target.type === "prompt" ? prompt : target.type === "agent" ? agent : evaluator) ?? undefined;
-  const isLoading =
-    target.type === "prompt"
-      ? promptLoading
-      : target.type === "agent"
-        ? agentLoading
-        : evaluatorLoading;
+    selectByTargetType(target.type, { prompt, agent, evaluator }) ?? undefined;
+  const isLoading = selectByTargetType(target.type, {
+    prompt: promptLoading,
+    agent: agentLoading,
+    evaluator: evaluatorLoading,
+  });
 
   return pickTargetName({ target, entity, isLoading });
 };
@@ -101,12 +110,11 @@ export const useTargetNames = (targets: (TargetConfig | undefined)[]): string[] 
   );
 
   const names = targets.map((target, index) => {
-    const query =
-      target?.type === "prompt"
-        ? promptQueries[index]
-        : target?.type === "agent"
-          ? agentQueries[index]
-          : evaluatorQueries[index];
+    const query = selectByTargetType(target?.type, {
+      prompt: promptQueries[index],
+      agent: agentQueries[index],
+      evaluator: evaluatorQueries[index],
+    });
     return pickTargetName({
       target,
       entity: (query?.data as NamedEntity | null | undefined) ?? undefined,

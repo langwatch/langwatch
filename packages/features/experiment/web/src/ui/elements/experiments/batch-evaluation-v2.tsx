@@ -68,6 +68,12 @@ export function BatchEvaluationV2({
     tenantId: project.id,
   });
 
+  // A 404 (no runs yet) still reads as "loading" — the real error state below
+  // is for a failed fetch, not simply nothing to show yet.
+  const showRunsSkeleton =
+    batchEvaluationRuns.isLoading ||
+    (batchEvaluationRuns.error && batchEvaluationRuns.error.data?.httpStatus === 404);
+
   return (
     <HStack align="start" width="full" height="full" gap={0}>
       <BatchEvaluationV2RunList
@@ -119,18 +125,19 @@ export function BatchEvaluationV2({
               </Link>
             )}
           </HStack>
-          {batchEvaluationRuns.isLoading ||
-          (batchEvaluationRuns.error && batchEvaluationRuns.error.data?.httpStatus === 404) ? (
-            <Skeleton width="100%" height="30px" />
-          ) : batchEvaluationRuns.error ? (
+          {showRunsSkeleton && <Skeleton width="100%" height="30px" />}
+          {!showRunsSkeleton && batchEvaluationRuns.error && (
             <Alert.Root status="error">
               <Alert.Indicator />
               Error loading experiment runs
             </Alert.Root>
-          ) : batchEvaluationRuns.data?.runs.length === 0 ? (
-            <Text>Waiting for results...</Text>
-          ) : (
-            <>
+          )}
+          {!showRunsSkeleton &&
+            !batchEvaluationRuns.error &&
+            batchEvaluationRuns.data?.runs.length === 0 && <Text>Waiting for results...</Text>}
+          {!showRunsSkeleton &&
+            !batchEvaluationRuns.error &&
+            batchEvaluationRuns.data?.runs.length !== 0 && (
               <Card.Root width="100%" overflow="hidden">
                 <Card.Header>
                   <Heading as="h2" size="md">
@@ -146,13 +153,22 @@ export function BatchEvaluationV2({
                   />
                 </Card.Body>
               </Card.Root>
-            </>
-          )}
+            )}
         </VStack>
         {selectedRun && <BatchEvaluationV2EvaluationSummary run={selectedRun} showProgress />}
       </VStack>
     </HStack>
   );
+}
+
+/** Poll interval for the batch runs list: fastest while catching up on a fresh run. */
+function batchRunsRefetchInterval(params: {
+  keepFetching: boolean;
+  isSomeRunning: boolean;
+}): number {
+  if (params.keepFetching) return 1;
+  if (params.isSomeRunning) return 3000;
+  return 10_000;
 }
 
 /**
@@ -212,7 +228,7 @@ export const useBatchEvaluationState = ({
       experimentId: experiment?.id ?? "",
     },
     {
-      refetchInterval: keepFetching ? 1 : isSomeRunning ? 3000 : 10_000,
+      refetchInterval: batchRunsRefetchInterval({ keepFetching, isSomeRunning }),
       enabled: !!project && !!experiment,
     },
   );
@@ -252,11 +268,10 @@ export const useBatchEvaluationState = ({
   }, [selectedRun]);
 
   useEffect(() => {
-    if (
-      batchEvaluationRuns.data?.runs.some(
-        (r: any) => getFinishedAt(r.timestamps, nowInstant().epochMilliseconds) === undefined,
-      )
-    ) {
+    const hasUnfinishedRun = batchEvaluationRuns.data?.runs.some(
+      (r: any) => getFinishedAt(r.timestamps, nowInstant().epochMilliseconds) === undefined,
+    );
+    if (hasUnfinishedRun) {
       setIsSomeRunning(true);
     } else {
       setIsSomeRunning(false);
@@ -318,7 +333,7 @@ export function BatchEvaluationV2RunList({
           Evaluation Runs
         </Heading>
       )}
-      {batchEvaluationRuns.isLoading ? (
+      {batchEvaluationRuns.isLoading && (
         <>
           {Array.from({ length: 3 }).map((_, index) => (
             <HStack key={index} paddingX={6} paddingY={2} width="100%">
@@ -326,133 +341,140 @@ export function BatchEvaluationV2RunList({
             </HStack>
           ))}
         </>
-      ) : batchEvaluationRuns.error ? (
+      )}
+      {!batchEvaluationRuns.isLoading && batchEvaluationRuns.error && (
         <Alert.Root status="error">
           <Alert.Indicator />
           Error loading experiment runs
         </Alert.Root>
-      ) : batchEvaluationRuns.data?.runs.length === 0 ? (
-        <Text paddingX={6} paddingY={4}>
-          Waiting for runs...
-        </Text>
-      ) : (
-        <>
-          {!batchEvaluationRuns.data?.runs.find((r: any) => r.runId === selectedRunId) && (
-            <HStack
-              paddingX={size === "sm" ? 2 : 4}
-              paddingY={size === "sm" ? 2 : 3}
-              width="100%"
-              cursor="pointer"
-              role="button"
-              background="gray.200"
-              _hover={{
-                background: "gray.100",
-              }}
-              gap={3}
-            >
-              <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
-              <VStack align="start" gap={2} width="100%" paddingRight={2}>
-                <HStack width="100%">
-                  <Skeleton height="12px" background="gray.400" flexGrow={1} />
-                  <Spinner size="xs" flexShrink={0} />
-                </HStack>
-                <Skeleton width="100%" height="12px" background="gray.400" />
-              </VStack>
-            </HStack>
-          )}
-          {batchEvaluationRuns.data?.runs.map((run: any, index: any) => {
-            const runCost = (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
-            const runName = getRunDisplayName({
-              commitMessage: run.workflowVersion?.commitMessage,
-              index,
-            });
-
-            return (
+      )}
+      {!batchEvaluationRuns.isLoading &&
+        !batchEvaluationRuns.error &&
+        batchEvaluationRuns.data?.runs.length === 0 && (
+          <Text paddingX={6} paddingY={4}>
+            Waiting for runs...
+          </Text>
+        )}
+      {!batchEvaluationRuns.isLoading &&
+        !batchEvaluationRuns.error &&
+        batchEvaluationRuns.data?.runs.length !== 0 && (
+          <>
+            {!batchEvaluationRuns.data?.runs.find((r: any) => r.runId === selectedRunId) && (
               <HStack
-                key={run?.runId ?? "new"}
                 paddingX={size === "sm" ? 2 : 4}
                 paddingY={size === "sm" ? 2 : 3}
                 width="100%"
                 cursor="pointer"
                 role="button"
-                background={selectedRun?.runId === run.runId ? "gray.200" : "none"}
+                background="gray.200"
                 _hover={{
-                  background: selectedRun?.runId === run.runId ? "gray.200" : "gray.100",
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedRunId(run.runId);
+                  background: "gray.100",
                 }}
                 gap={3}
               >
-                {run.workflowVersion ? (
-                  <VersionBox
-                    version={run.workflowVersion}
-                    minWidth={hasAnyVersion ? "48px" : "0"}
-                  />
-                ) : (
-                  <VersionBox
-                    minWidth={hasAnyVersion ? "48px" : "0"}
-                    backgroundColor={
-                      run.timestamps.stoppedAt
-                        ? "red.200"
-                        : getColorForString("colors", run.runId).color
-                    }
-                  />
-                )}
-                <VStack align="start" gap={0}>
-                  <OverflownTextWithTooltip
-                    fontSize={size === "sm" ? "13px" : "14px"}
-                    lineClamp={1}
-                    wordBreak="break-all"
-                  >
-                    {runName}
-                    {getFinishedAt(run.timestamps, nowInstant().epochMilliseconds) ===
-                      undefined && (
-                      <Spinner
-                        size="xs"
-                        display="inline-block"
-                        marginLeft={2}
-                        marginBottom="-2px"
-                      />
-                    )}
-                  </OverflownTextWithTooltip>
-                  <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"} gap={1}>
-                    {Object.values(run.summary.evaluations)
-                      .slice(0, 2)
-                      .map((evaluation: any, index: number) => (
-                        <React.Fragment key={evaluation.name}>
-                          {index > 0 && <Text>·</Text>}
-                          <Tooltip content={evaluation.name} positioning={{ placement: "top" }}>
-                            <Text>{formatEvaluationSummary(evaluation, true)}</Text>
-                          </Tooltip>
-                        </React.Fragment>
-                      ))}
-                    {!!runCost && (
-                      <>
-                        {Object.keys(run.summary.evaluations).length > 0 && <Text>·</Text>}
-                        <Text whiteSpace="nowrap">
-                          <FormatMoney amount={runCost} currency="USD" format="$0.00[0]" />
-                        </Text>
-                      </>
-                    )}
+                <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
+                <VStack align="start" gap={2} width="100%" paddingRight={2}>
+                  <HStack width="100%">
+                    <Skeleton height="12px" background="gray.400" flexGrow={1} />
+                    <Spinner size="xs" flexShrink={0} />
                   </HStack>
-                  <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"}>
-                    <Text whiteSpace="nowrap" lineClamp={1}>
-                      {run.timestamps.createdAt
-                        ? formatTimeAgo(run.timestamps.createdAt, "yyyy-MM-dd HH:mm", 5)
-                        : "Waiting for steps..."}
-                    </Text>
-                    {run.timestamps.stoppedAt && (
-                      <Box width="6px" height="6px" background="red.300" borderRadius="full" />
-                    )}
-                  </HStack>
+                  <Skeleton width="100%" height="12px" background="gray.400" />
                 </VStack>
               </HStack>
-            );
-          })}
-        </>
-      )}
+            )}
+            {batchEvaluationRuns.data?.runs.map((run: any, index: any) => {
+              const runCost = (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
+              const runName = getRunDisplayName({
+                commitMessage: run.workflowVersion?.commitMessage,
+                index,
+              });
+
+              return (
+                <HStack
+                  key={run?.runId ?? "new"}
+                  paddingX={size === "sm" ? 2 : 4}
+                  paddingY={size === "sm" ? 2 : 3}
+                  width="100%"
+                  cursor="pointer"
+                  role="button"
+                  background={selectedRun?.runId === run.runId ? "gray.200" : "none"}
+                  _hover={{
+                    background: selectedRun?.runId === run.runId ? "gray.200" : "gray.100",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedRunId(run.runId);
+                  }}
+                  gap={3}
+                >
+                  {run.workflowVersion ? (
+                    <VersionBox
+                      version={run.workflowVersion}
+                      minWidth={hasAnyVersion ? "48px" : "0"}
+                    />
+                  ) : (
+                    <VersionBox
+                      minWidth={hasAnyVersion ? "48px" : "0"}
+                      backgroundColor={
+                        run.timestamps.stoppedAt
+                          ? "red.200"
+                          : getColorForString("colors", run.runId).color
+                      }
+                    />
+                  )}
+                  <VStack align="start" gap={0}>
+                    <OverflownTextWithTooltip
+                      fontSize={size === "sm" ? "13px" : "14px"}
+                      lineClamp={1}
+                      wordBreak="break-all"
+                    >
+                      {runName}
+                      {getFinishedAt(run.timestamps, nowInstant().epochMilliseconds) ===
+                        undefined && (
+                        <Spinner
+                          size="xs"
+                          display="inline-block"
+                          marginLeft={2}
+                          marginBottom="-2px"
+                        />
+                      )}
+                    </OverflownTextWithTooltip>
+                    <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"} gap={1}>
+                      {Object.values(run.summary.evaluations)
+                        .slice(0, 2)
+                        .map((evaluation: any, index: number) => (
+                          <React.Fragment key={evaluation.name}>
+                            {index > 0 && <Text>·</Text>}
+                            <Tooltip content={evaluation.name} positioning={{ placement: "top" }}>
+                              <Text>{formatEvaluationSummary(evaluation, true)}</Text>
+                            </Tooltip>
+                          </React.Fragment>
+                        ))}
+                      {!!runCost && (
+                        <>
+                          {Object.keys(run.summary.evaluations).length > 0 && <Text>·</Text>}
+                          <Text whiteSpace="nowrap">
+                            <FormatMoney amount={runCost} currency="USD" format="$0.00[0]" />
+                          </Text>
+                        </>
+                      )}
+                    </HStack>
+                    <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"}>
+                      <Text whiteSpace="nowrap" lineClamp={1}>
+                        {run.timestamps.createdAt
+                          ? formatTimeAgo(run.timestamps.createdAt, "yyyy-MM-dd HH:mm", 5)
+                          : "Waiting for steps..."}
+                      </Text>
+                      {run.timestamps.stoppedAt && (
+                        <Box width="6px" height="6px" background="red.300" borderRadius="full" />
+                      )}
+                    </HStack>
+                  </VStack>
+                </HStack>
+              );
+            })}
+          </>
+        )}
     </VStack>
   );
 }

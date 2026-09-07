@@ -1438,10 +1438,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/experiment/web/src/ui/elements/navigation-footer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/experiment/web/src/ui/sections/batch-evaluation-results.aggregates.ts",
       "measured": "2026-09-06"
     },
@@ -5726,10 +5722,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/experiment/web/src/screens/experiments/experiment-detail.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/experiment/web/src/screens/experiments/experiments.screen.tsx",
       "measured": "2026-09-06"
     },
@@ -5742,10 +5734,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/experiment/web/src/ui/elements/experiments/ds-py-experiment.tsx",
       "measured": "2026-09-06"
     },
@@ -5754,15 +5742,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/batch-runs-sidebar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/comparison-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -5771,10 +5751,6 @@
     },
     {
       "key": "condition-shape|packages/features/experiment/web/src/ui/sections/experiments-v3/comparison-cell.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -7578,19 +7554,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/experiment/web/src/behavior/experiments-v3/use-target-name.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/screens/experiments/experiment-detail.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/experiment/web/src/screens/experiments/experiments.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -7599,34 +7563,6 @@
     },
     {
       "key": "nested-ternary|packages/features/experiment/web/src/ui/elements/experiments/ds-py-experiment.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/elements/navigation-footer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/batch-evaluation-results/batch-evaluation-results.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/batch-results/batch-runs-sidebar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/experiments-v3/TargetSection/target-header.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/experiment/web/src/ui/sections/experiments-v3/target-type-selector-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8182,15 +8118,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-autosave.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-node-execution.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/workflow/web/src/ui/sections/workflow-run-until-here-dialog.tsx",
       "measured": "2026-09-06"
     },
     {

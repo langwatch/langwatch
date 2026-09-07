@@ -955,11 +955,9 @@ export function EvaluationsV3Table({
     const targetMatch = evaluatorId
       ? state.targets.find((t) => t.targetEvaluatorId === evaluatorId)
       : undefined;
-    const initialComparison = evaluatorMatch
-      ? toComparisonConfig(evaluatorMatch)
-      : targetMatch
-        ? toComparisonConfig(targetMatch)
-        : undefined;
+    let initialComparison: ReturnType<typeof toComparisonConfig> | undefined;
+    if (evaluatorMatch) initialComparison = toComparisonConfig(evaluatorMatch);
+    else if (targetMatch) initialComparison = toComparisonConfig(targetMatch);
     const comparisonContext = {
       ...(initialComparison ? { initialComparison } : {}),
       targets: variantOptions,
@@ -1471,7 +1469,8 @@ export function EvaluationsV3Table({
             // Phantom empty rows render nothing in target columns — the
             // dataset side keeps the click-to-add affordance, but there's
             // no input to run a target against.
-            if (info.row.original.isEmpty) return null;
+            const isEmptyRow = info.row.original.isEmpty;
+            if (isEmptyRow) return null;
             const data = info.getValue() as {
               output: unknown;
               evaluators: Record<string, unknown>;
@@ -1518,7 +1517,8 @@ export function EvaluationsV3Table({
             );
           },
           cell: (info) => {
-            if (info.row.original.isEmpty) return null;
+            const isEmptyRow = info.row.original.isEmpty;
+            if (isEmptyRow) return null;
             const meta = info.table.options.meta as TableMeta | undefined;
             const variantTargets = variantIds.map((id) => meta?.targetsMap.get(id));
             const rowData = info.row.original.targets[anchorVariantId];

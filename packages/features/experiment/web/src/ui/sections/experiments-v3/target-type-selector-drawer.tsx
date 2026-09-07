@@ -188,23 +188,16 @@ type TargetTypeCardProps = {
   onClick: () => void;
 };
 
+const TARGET_CARD_STYLE: Record<TargetCardKey, { iconColor: string; iconBg: string }> = {
+  prompt: { iconColor: "green", iconBg: "green.subtle" },
+  evaluator: { iconColor: "green", iconBg: "green.subtle" },
+  comparison: { iconColor: "purple", iconBg: "purple.subtle" },
+  agent: { iconColor: "blue", iconBg: "blue.subtle" },
+  workflow: { iconColor: "blue", iconBg: "blue.subtle" },
+};
+
 function TargetTypeCard({ type, icon: Icon, title, description, onClick }: TargetTypeCardProps) {
-  const iconColor =
-    type === "prompt"
-      ? "green"
-      : type === "evaluator"
-        ? "green"
-        : type === "comparison"
-          ? "purple"
-          : "blue";
-  const iconBg =
-    type === "prompt"
-      ? "green.subtle"
-      : type === "evaluator"
-        ? "green.subtle"
-        : type === "comparison"
-          ? "purple.subtle"
-          : "blue.subtle";
+  const { iconColor, iconBg } = TARGET_CARD_STYLE[type];
 
   return (
     <VStack align="start">
