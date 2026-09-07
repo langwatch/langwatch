@@ -71,8 +71,8 @@ export class PrismaIdentityUsersRepository
   /**
    * The legacy method answer for an unlatched sign-in. Password presence is
    * evaluated inside Prisma, so no credential hash crosses this boundary.
-   * Finding a user with only provider accounts is still an account answer;
-   * the router then preserves the deployment's existing Auth0/Okta method.
+   * Provider ids cross verbatim so the router can retain each configured
+   * Auth0/Okta method the user actually holds, including alongside a passkey.
    */
   async findLegacySignInAccount({
     normalizedValue,
@@ -86,14 +86,22 @@ export class PrismaIdentityUsersRepository
       select: {
         id: true,
         accounts: {
-          where: { provider: "credential", password: { not: "" } },
-          select: { id: true },
-          take: 1,
+          where: {
+            OR: [
+              { provider: { not: "credential" } },
+              { provider: "credential", password: { not: "" } },
+            ],
+          },
+          select: { provider: true },
         },
         accountCredentials: {
-          where: { provider: "credential", password: { not: "" } },
-          select: { id: true },
-          take: 1,
+          where: {
+            OR: [
+              { provider: { not: "credential" } },
+              { provider: "credential", password: { not: "" } },
+            ],
+          },
+          select: { provider: true },
         },
         passkeys: { select: { id: true }, take: 1 },
       },
@@ -101,14 +109,19 @@ export class PrismaIdentityUsersRepository
     if (!user) {
       return null;
     }
+    const providers = [
+      ...user.accounts.map((account) => account.provider),
+      ...user.accountCredentials.map((account) => account.provider),
+    ];
 
     return {
       userId: user.id,
       methods: {
-        hasPassword:
-          user.accounts.length > 0 || user.accountCredentials.length > 0,
+        hasPassword: providers.includes("credential"),
         hasPasskey: user.passkeys.length > 0,
-        // Legacy providers are instance methods, not D04 connection ids.
+        providerIds: [
+          ...new Set(providers.filter((provider) => provider !== "credential")),
+        ],
         connectionIds: [],
       },
     };
