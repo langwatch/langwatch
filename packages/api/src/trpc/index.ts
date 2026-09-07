@@ -92,3 +92,4 @@ export {
 } from "./trpc-service-builder.ts";
 export { createTrpcRuntimePolicy, type TrpcRuntimePolicyPorts } from "./trpc-runtime-policy.ts";
 export { createScopeLineageGuard } from "./trpc-scope-lineage.ts";
+export { trpcApi, type TrpcApiDescriptor } from "./trpc-api.ts";
