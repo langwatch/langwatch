@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { type Instant, toDate } from "@langwatch/time";
 import {
   datasetColumnsSchema,
   datasetSchema,
@@ -102,11 +103,11 @@ export class PrismaDatasetRepository extends DatasetRepository {
     id: string;
     projectId: string;
     slug: string;
-    archivedAt: Date | null;
+    archivedAt: Instant | null;
   }): Promise<Dataset> {
     const row = await this.database.dataset.updateMany({
       where: { id: input.id, projectId: input.projectId },
-      data: { slug: input.slug, archivedAt: input.archivedAt },
+      data: { slug: input.slug, archivedAt: input.archivedAt ? toDate(input.archivedAt) : null },
     });
     if (row.count === 0) {
       throw new Error("Dataset was not found while archiving");

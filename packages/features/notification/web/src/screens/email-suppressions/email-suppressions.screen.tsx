@@ -28,6 +28,7 @@ import {
 import { MailX, Trash2 } from "lucide-react";
 import { notificationApi } from "../../behavior/notification-api.ts";
 import { useNotificationHost } from "../../model/notification-host.ts";
+import { readableDate } from "../../model/readable-date.ts";
 
 /** The grant the platform page asked for, unchanged. */
 export const EMAIL_SUPPRESSIONS_PAGE_PERMISSION = "triggers:view";
@@ -130,7 +131,7 @@ function EmailSuppressionsPage({
                         <Badge colorPalette="gray">{row.triggerName ?? "Notification"}</Badge>
                       )}
                     </Table.Cell>
-                    <Table.Cell>{new Date(row.createdAt).toLocaleDateString()}</Table.Cell>
+                    <Table.Cell>{readableDate(row.createdAt).toLocaleDateString()}</Table.Cell>
                     <Table.Cell textAlign="end">
                       {canManage && (
                         <Button

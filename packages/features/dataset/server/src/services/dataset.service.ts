@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import {
   DatasetService as DatasetServiceContract,
@@ -248,7 +249,7 @@ export class DatasetService extends DatasetServiceContract {
       id: dataset.id,
       projectId: parsed.projectId,
       slug: `${dataset.slug}-archived-${this.generateId()}`,
-      archivedAt: new Date(),
+      archivedAt: nowInstant(),
     });
 
     return { id: dataset.id, archived: true };

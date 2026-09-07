@@ -23,6 +23,7 @@ import {
   type TracePinInput,
 } from "@langwatch/share-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
+import { fromDate, type Instant, nowInstant, toEpochMs } from "@langwatch/time";
 import { createHash } from "node:crypto";
 import { customAlphabet } from "nanoid";
 import {
@@ -193,9 +194,11 @@ export class ShareService extends ShareServiceContract {
       }
     }
 
+    const { expiresAt, ...resource } = parsed;
     const share = await this.options.repository.create({
       token: generateShareToken(),
-      ...parsed,
+      ...resource,
+      expiresAt: expiresAt ? fromDate(expiresAt) : null,
     });
 
     if (parsed.resourceType === "TRACE") {
@@ -370,8 +373,11 @@ export class ShareService extends ShareServiceContract {
     return `${token}:${fingerprint}`;
   }
 
-  private static isExpired(share: { expiresAt: Date | null }, now: Date = new Date()): boolean {
-    return share.expiresAt != null && share.expiresAt.getTime() <= now.getTime();
+  private static isExpired(
+    share: Pick<ShareLink, "expiresAt">,
+    now: Instant = nowInstant(),
+  ): boolean {
+    return share.expiresAt != null && toEpochMs(share.expiresAt) <= now.epochMilliseconds;
   }
 
   private static isViewExhausted(share: { maxViews: number | null; viewCount: number }): boolean {

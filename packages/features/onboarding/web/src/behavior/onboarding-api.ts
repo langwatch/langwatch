@@ -28,6 +28,7 @@
 
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import type { TimeInput } from "@langwatch/time";
 
 /** What a signing-up reader told us about themselves, verbatim. */
 type SignUpData = Readonly<Record<string, unknown>>;
@@ -154,7 +155,7 @@ export type OnboardingApiMap = {
               name: string;
               slug: string;
               apiKey?: string | null;
-              createdAt?: string | Date | null;
+              createdAt?: TimeInput | null;
             }>;
           }>;
         }>;

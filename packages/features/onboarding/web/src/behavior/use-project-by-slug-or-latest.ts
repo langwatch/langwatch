@@ -1,3 +1,4 @@
+import { toEpochMs, type TimeInput } from "@langwatch/time";
 import { useMemo } from "react";
 import { useRouter } from "@langwatch/ui-host/use-router";
 
@@ -6,7 +7,7 @@ export interface MinimalProject {
   slug: string;
   name: string;
   apiKey?: string;
-  createdAt?: Date | string | null;
+  createdAt?: TimeInput | null;
 }
 
 export interface MinimalTeam {
@@ -37,10 +38,9 @@ export function useProjectBySlugOrLatest(organization?: MinimalOrganization) {
 
     if (!allProjects.length) return undefined;
 
-    const normalizeDate = (value?: Date | string | null): number => {
+    const normalizeDate = (value?: TimeInput | null): number => {
       if (!value) return 0;
-      if (value instanceof Date) return value.getTime();
-      const time = new Date(value).getTime();
+      const time = toEpochMs(value);
       return Number.isNaN(time) ? 0 : time;
     };
 

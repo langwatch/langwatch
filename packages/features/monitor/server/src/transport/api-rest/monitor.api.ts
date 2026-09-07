@@ -11,6 +11,7 @@ import {
   type ProjectScopedContext,
   resolver,
 } from "@langwatch/api/rest";
+import type { Monitor } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ErrorHandler } from "hono";
 import { z } from "zod";
@@ -72,23 +73,23 @@ const preconditionsSchema = z.array(
   }),
 );
 
-function toMonitorResponse(monitor: {
-  id: string;
-  name: string;
-  slug: string;
-  checkType: string;
-  enabled: boolean;
-  executionMode: string;
-  sample: number;
-  level: string;
-  evaluatorId: string | null;
-  preconditions: unknown;
-  parameters: unknown;
-  mappings: unknown;
-  threadIdleTimeout: number | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function toMonitorResponse(
+  monitor: {
+    id: string;
+    name: string;
+    slug: string;
+    checkType: string;
+    enabled: boolean;
+    executionMode: string;
+    sample: number;
+    level: string;
+    evaluatorId: string | null;
+    preconditions: unknown;
+    parameters: unknown;
+    mappings: unknown;
+    threadIdleTimeout: number | null;
+  } & Pick<Monitor, "createdAt" | "updatedAt">,
+) {
   return {
     id: monitor.id,
     name: monitor.name,
@@ -201,10 +202,7 @@ export function createMonitorRestApp(options: {
     return withPlatformUrl(monitor, project.slug);
   };
 
-  const createHandler = async (
-    c: MonitorContext,
-    input: z.infer<typeof createMonitorSchema>,
-  ) => {
+  const createHandler = async (c: MonitorContext, input: z.infer<typeof createMonitorSchema>) => {
     const project = projectOf(c);
     logger.info({ projectId: project.id }, "Creating monitor");
 

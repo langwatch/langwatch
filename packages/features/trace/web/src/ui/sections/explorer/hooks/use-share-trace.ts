@@ -2,7 +2,8 @@ import {
   type CreateShareLinkDraft,
   type ShareLinkView,
 } from "@langwatch/share-web/surfaces/share-link-views";
-import { expiryToDate } from "@langwatch/share-web/surfaces/share-links";
+import { expiryToInstant } from "@langwatch/share-web/surfaces/share-links";
+import { toDate } from "@langwatch/time";
 import { useCallback } from "react";
 import { showErrorToast } from "../../errors/index.ts";
 import { api } from "../../../../behavior/trace-api.ts";
@@ -78,6 +79,7 @@ function useShareLinkMutations({
   const createLink = useCallback(
     ({ visibility, expiry, isSingleView }: CreateShareLinkDraft) => {
       if (!projectId) return;
+      const expiresAt = expiryToInstant({ option: expiry });
       // TRACE only — thread sharing is parked until the share viewer can
       // render the surrounding conversation. See ADR-057's follow-ups.
       createMutation.mutate({
@@ -85,7 +87,7 @@ function useShareLinkMutations({
         resourceType: "TRACE",
         resourceId: traceId,
         visibility,
-        expiresAt: expiryToDate({ option: expiry }),
+        expiresAt: expiresAt ? toDate(expiresAt) : null,
         maxViews: isSingleView ? 1 : null,
       });
     },

@@ -29,6 +29,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
     "react-icons": "^5.7.0"

@@ -1,4 +1,5 @@
 import { formatQueryParams } from "@clickhouse/client/dist/common";
+import { Temporal } from "@langwatch/time";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { MetricDataPointClickHouseRepository } from "../clickhouse.metric-data-point.repository.ts";
@@ -217,8 +218,8 @@ describe("MetricDataPointClickHouseRepository", () => {
     await expect(
       repositoryInstance.queryUsageEstimates({
         organizationId: "organization-1",
-        from: new Date("2026-01-01T00:00:00Z"),
-        to: new Date("2026-02-01T00:00:00Z"),
+        from: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+        to: Temporal.Instant.from("2026-02-01T00:00:00Z"),
         groupBy: "organization",
       }),
     ).resolves.toEqual([

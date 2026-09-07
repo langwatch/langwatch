@@ -273,13 +273,11 @@ export const createDatasetFromUploadInputSchema = z.object({
 });
 export type CreateDatasetFromUploadInput = z.infer<typeof createDatasetFromUploadInputSchema>;
 
-export type CreateDatasetFromUploadResult = {
+export type CreateDatasetFromUploadResult = Pick<Dataset, "createdAt" | "updatedAt"> & {
   id: string;
   name: string;
   slug: string;
   columnTypes: DatasetColumns;
-  createdAt: Date;
-  updatedAt: Date;
   recordsCreated: number;
 };
 

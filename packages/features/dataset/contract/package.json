@@ -22,6 +22,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "papaparse": "^5.5.3",
     "zod": "^4.4.3"

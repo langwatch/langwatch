@@ -1,4 +1,6 @@
 import { describeAnnotationAnchor, readableAnnotationAnchor } from "@langwatch/annotation-contract";
+import { toEpochMs, type TimeInput } from "@langwatch/time";
+import { readableDate, type DisplayMoment } from "./readable-date.ts";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 
 export type AnnotationUser = {
@@ -172,8 +174,8 @@ export type AnnotationRow = {
   queueItemId: string | null;
   traceId: string;
   occurredAtMs?: number;
-  date: Date | null;
-  doneAt: Date | null;
+  date: DisplayMoment | null;
+  doneAt: DisplayMoment | null;
   createdByUser: AnnotationUser | null;
   trace?: AnnotationTrace;
   annotations: AnnotationWithUser[];
@@ -185,22 +187,22 @@ export function toOccurredAtMsHint(
   if (startedAt === null || startedAt === void 0) {
     return void 0;
   }
-  const milliseconds = typeof startedAt === "number" ? startedAt : Date.parse(startedAt);
+  const milliseconds = typeof startedAt === "number" ? startedAt : toEpochMs(startedAt);
   return Number.isFinite(milliseconds) && milliseconds > 0 ? Math.floor(milliseconds) : void 0;
 }
 
-function toDate(value: Date | string | null | undefined): Date | null {
+function readMoment(value: TimeInput | null | undefined): DisplayMoment | null {
   if (!value) {
     return null;
   }
-  const date = value instanceof Date ? value : new Date(value);
+  const date = readableDate(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function lastAnnotatedAt(annotations: AnnotationWithUser[]): Date | null {
-  let newest: Date | null = null;
+export function lastAnnotatedAt(annotations: AnnotationWithUser[]): DisplayMoment | null {
+  let newest: DisplayMoment | null = null;
   for (const annotation of annotations) {
-    const created = toDate(annotation.createdAt);
+    const created = readMoment(annotation.createdAt);
     if (created && (!newest || created > newest)) {
       newest = created;
     }
@@ -211,8 +213,8 @@ export function lastAnnotatedAt(annotations: AnnotationWithUser[]): Date | null 
 export type QueueItemLike = {
   id: string;
   traceId: string;
-  doneAt?: Date | string | null;
-  createdAt?: Date | string | null;
+  doneAt?: TimeInput | null;
+  createdAt?: TimeInput | null;
   createdByUser?: AnnotationUser | null;
   trace?: AnnotationTrace | null;
   annotations?: AnnotationWithUser[] | null;
@@ -224,8 +226,8 @@ export function queueItemsToRows(items: QueueItemLike[]): AnnotationRow[] {
     queueItemId: item.id,
     traceId: item.traceId,
     occurredAtMs: toOccurredAtMsHint(item.trace?.timestamps?.started_at),
-    date: toDate(item.createdAt),
-    doneAt: toDate(item.doneAt),
+    date: readMoment(item.createdAt),
+    doneAt: readMoment(item.doneAt),
     createdByUser: item.createdByUser ?? null,
     trace: item.trace ?? void 0,
     annotations: item.annotations ?? [],

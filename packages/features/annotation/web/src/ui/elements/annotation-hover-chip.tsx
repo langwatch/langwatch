@@ -2,7 +2,9 @@ import { Box, HStack, HoverCard, Portal, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import type { TimeInput } from "@langwatch/time";
 import { annotationAnchorLabel } from "../../model/annotation-row.ts";
+import { readableDate } from "../../model/readable-date.ts";
 
 export function AnnotationHoverChip({
   annotations,
@@ -120,11 +122,11 @@ function AnnotationHoverEntry({
   );
 }
 
-function formatAnnotationTime(createdAt: Date | string | null): string {
+function formatAnnotationTime(createdAt: TimeInput | null): string {
   if (!createdAt) {
     return "";
   }
-  const date = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  const date = readableDate(createdAt);
   if (Number.isNaN(date.getTime())) {
     return "";
   }

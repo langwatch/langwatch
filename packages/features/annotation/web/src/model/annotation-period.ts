@@ -6,10 +6,24 @@
  * picked" is a unit test, not a rendered assertion. Narrowed: no `daysDifference`.
  */
 
-import { differenceInCalendarDays, startOfDay, subDays, toEpochMs } from "@langwatch/time";
+import type { ListAnnotationsInput } from "@langwatch/annotation-contract";
+import {
+  differenceInCalendarDays,
+  fromDate,
+  nowInstant,
+  startOfDay,
+  subDays,
+  toDate,
+  toEpochMs,
+  type TimeInput,
+} from "@langwatch/time";
+import { readableDate } from "./readable-date.ts";
 
-/** Date range used for time-based filtering. */
-export type AnnotationPeriod = { startDate: Date; endDate: Date };
+/** Date range used for time-based filtering, in the shape the list query sends. */
+export type AnnotationPeriod = Required<Pick<ListAnnotationsInput, "startDate" | "endDate">>;
+
+/** One end of a range, and the anchor every reading is taken against. */
+export type AnnotationPeriodMoment = AnnotationPeriod["endDate"];
 
 /** Whether the range is a named lookback or two picked timestamps. */
 export type AnnotationPeriodMode = "relative" | "absolute";
@@ -42,7 +56,7 @@ const isPresetKey = (value: unknown): value is AnnotationPeriodPresetKey =>
 
 const isValidDateString = (value: string) => !Number.isNaN(toEpochMs(value));
 
-const daysBetween = (startDate: Date, endDate: Date) =>
+const daysBetween = (startDate: TimeInput, endDate: TimeInput) =>
   differenceInCalendarDays(endDate, startDate) + 1;
 
 /**
@@ -53,12 +67,15 @@ const daysBetween = (startDate: Date, endDate: Date) =>
  */
 export function computeRelativeWindow(
   presetKey: AnnotationPeriodPresetKey,
-  now: Date,
+  now: AnnotationPeriodMoment,
 ): AnnotationPeriod {
   const preset = PRESETS_BY_KEY.get(presetKey);
   if (!preset) return { startDate: startOfDay(subDays(now, 29)), endDate: now };
   if (preset.minutes !== null) {
-    return { startDate: new Date(now.getTime() - preset.minutes * 60_000), endDate: now };
+    return {
+      startDate: toDate(fromDate(now).subtract({ milliseconds: preset.minutes * 60_000 })),
+      endDate: now,
+    };
   }
   return { startDate: startOfDay(subDays(now, preset.days - 1)), endDate: now };
 }
@@ -81,13 +98,13 @@ export function readAnnotationPeriod({
   now,
 }: {
   query: Readonly<Record<string, string | undefined>>;
-  now: Date;
+  now: AnnotationPeriodMoment;
 }): AnnotationPeriodReading {
   const start = query.startDate;
   const end = query.endDate;
   if (start && end && isValidDateString(start) && isValidDateString(end)) {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const startDate = readableDate(start);
+    const endDate = readableDate(end);
     return {
       period: { startDate: startDate > endDate ? endDate : startDate, endDate },
       mode: "absolute",
@@ -112,11 +129,11 @@ export function absolutePeriodAddress({
   endDate,
 }: {
   current: Readonly<Record<string, string | undefined>>;
-  startDate: Date;
-  endDate: Date;
+  startDate: AnnotationPeriodMoment;
+  endDate: AnnotationPeriodMoment;
 }): Record<string, string | undefined> {
-  const safeEnd = Number.isNaN(endDate.getTime()) ? new Date() : endDate;
-  const candidate = Number.isNaN(startDate.getTime()) ? new Date() : startDate;
+  const safeEnd = Number.isNaN(endDate.getTime()) ? toDate(nowInstant()) : endDate;
+  const candidate = Number.isNaN(startDate.getTime()) ? toDate(nowInstant()) : startDate;
   const safeStart = candidate > safeEnd ? safeEnd : candidate;
   return {
     ...current,
@@ -155,7 +172,7 @@ export function matchingPreset({
   now,
 }: {
   period: AnnotationPeriod;
-  now: Date;
+  now: AnnotationPeriodMoment;
 }): (typeof ANNOTATION_PERIOD_PRESETS)[number] | undefined {
   const span = daysBetween(period.startDate, period.endDate);
   const byDays =

@@ -4,6 +4,7 @@
  * service layer's responsibility.
  */
 import type { PromptTag } from "@langwatch/prompt-contract";
+import type { TimeInput } from "@langwatch/time";
 
 export class TagValidationError extends Error {
   constructor(message: string) {
@@ -19,8 +20,8 @@ export type PromptTagAssignmentRow = {
   versionId: string;
   tagId: string;
   projectId: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: TimeInput;
+  updatedAt: TimeInput;
   createdById: string | null;
   updatedById: string | null;
 };

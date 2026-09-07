@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 export const metricKindSchema = z.enum([
@@ -124,8 +125,8 @@ export interface MetricUsageEstimateQuery {
   organizationId: string;
   tenantId?: string;
   metricName?: string;
-  from: Date;
-  to: Date;
+  from: Instant;
+  to: Instant;
   groupBy: "organization" | "project" | "metric" | "hour";
 }
 

@@ -1,4 +1,5 @@
 import type { Dataset, DatasetColumns, DatasetSummary } from "@langwatch/dataset-contract";
+import type { Instant } from "@langwatch/time";
 
 export type DatasetCreateInput = {
   projectId: string;
@@ -38,7 +39,7 @@ export abstract class DatasetRepository {
     id: string;
     projectId: string;
     slug: string;
-    archivedAt: Date | null;
+    archivedAt: Instant | null;
   }): Promise<Dataset>;
   abstract restore(input: { id: string; projectId: string; slug: string }): Promise<Dataset>;
   abstract updateMapping(input: {

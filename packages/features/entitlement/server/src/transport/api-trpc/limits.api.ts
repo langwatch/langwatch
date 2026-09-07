@@ -99,8 +99,12 @@ export type LimitsTrpcPorts = Readonly<{
       currentMonthMessagesCount: number;
       maxMonthlyUsageLimit: number;
     }>,
-  ): Promise<Readonly<{ id: string; sentAt: Date | null }> | null | undefined>;
+  ): Promise<Readonly<UsageLimitNotification> | null | undefined>;
 }>;
+
+/** The notification row the mail port answers with, as the wire declares it. */
+const usageLimitNotificationSchema = z.object({ id: z.string(), sentAt: z.date().nullable() });
+type UsageLimitNotification = z.infer<typeof usageLimitNotificationSchema>;
 
 const organizationScopeSchema = z.object({ organizationId: z.string() });
 
@@ -151,7 +155,7 @@ export class LimitsTrpcApi {
               .object({
                 sent: z.boolean(),
                 notificationId: z.string().optional(),
-                sentAt: z.date().nullable().optional(),
+                sentAt: usageLimitNotificationSchema.shape.sentAt.optional(),
               })
               .strict(),
           )

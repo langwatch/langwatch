@@ -1,36 +1,23 @@
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import type {
+  Dashboard,
+  DashboardSummary,
   Graph,
   GraphLayout,
+  SavedWorkbenchChart,
   SavedWorkbenchChartDefinition,
 } from "@langwatch/dashboard-contract";
 
 export type DashboardGraphKind = "builder" | "workbench_sql";
 
-export type DashboardRecord = {
-  id: string;
-  projectId: string;
-  name: string;
-  order: number;
-  createdAt: Date;
-  updatedAt: Date;
-};
+export type DashboardRecord = Dashboard;
 
-export type DashboardSummaryRecord = DashboardRecord & { graphCount: number };
+export type DashboardSummaryRecord = DashboardSummary;
 export type GraphRecord = Graph;
 
-export type SavedWorkbenchChartRecord = {
-  id: string;
-  projectId: string;
-  name: string;
+/** The stored chart before its definition is parsed against the contract. */
+export type SavedWorkbenchChartRecord = Omit<SavedWorkbenchChart, "definition"> & {
   definition: unknown;
-  dashboardId: string | null;
-  gridColumn: number;
-  gridRow: number;
-  colSpan: number;
-  rowSpan: number;
-  createdAt: Date;
-  updatedAt: Date;
 };
 
 /**
@@ -50,8 +37,12 @@ export type SavedViewJson =
   // Members are optional to match how a JSON object arrives from storage.
   | { [key: string]: SavedViewJson | undefined };
 
-/** A saved view as the repository hands it back. */
-export type SavedViewRecord = {
+/**
+ * A saved view as the repository hands it back, and as tRPC ships it: this
+ * surface returns the host's own row untouched, so its timestamps are the
+ * wire timestamps a dashboard row carries.
+ */
+export type SavedViewRecord = Pick<Dashboard, "createdAt" | "updatedAt"> & {
   id: string;
   projectId: string;
   userId: string | null;
@@ -61,8 +52,6 @@ export type SavedViewRecord = {
   period: SavedViewJson | null;
   order: number;
   kind: string;
-  createdAt: Date;
-  updatedAt: Date;
 };
 
 /** The one private persistence capability owned by Dashboard. */

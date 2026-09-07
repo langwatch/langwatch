@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
+import { nowInstant } from "@langwatch/time";
 import {
   AnnotationBackfillSourcePort,
   type BackfillableAnnotation,
@@ -39,7 +40,7 @@ export class AnnotationBackfillSweep {
   static create({
     source,
     sync,
-    now = () => Date.now(),
+    now = () => nowInstant().epochMilliseconds,
   }: {
     source: AnnotationBackfillSourcePort;
     sync: TraceAnnotationSyncPort;

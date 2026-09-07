@@ -7,7 +7,9 @@ import {
   type PromptCopySummary,
   type PromptScope,
   type PromptTag,
+  type VersionedPrompt as VersionedPromptWire,
 } from "@langwatch/prompt-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 import type {
   LlmConfigRepository,
   LlmConfigWithLatestVersion,
@@ -27,7 +29,10 @@ import { PromptWriteService } from "./prompt-write.service.ts";
  * This is the complete shape that should be returned to API consumers.
  * Uses camelCase for professional external API.
  */
-export type VersionedPrompt = {
+export type VersionedPrompt = Pick<
+  VersionedPromptWire,
+  "versionCreatedAt" | "createdAt" | "updatedAt"
+> & {
   id: string;
   /**
    * @deprecated Use handle instead
@@ -37,7 +42,6 @@ export type VersionedPrompt = {
   scope: PromptScope;
   version: number;
   versionId: string;
-  versionCreatedAt: Date;
   model: string;
   temperature?: number;
   maxTokens?: number;
@@ -74,8 +78,6 @@ export type VersionedPrompt = {
   demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
   promptingTechnique?: LatestConfigVersionSchema["configData"]["prompting_technique"];
   commitMessage?: string;
-  updatedAt: Date;
-  createdAt: Date;
   copiedFromPromptId?: string | null;
   _count?: {
     copiedPrompts: number;
@@ -319,7 +321,7 @@ export class PromptService extends PromptServiceContract {
       scope: config.scope,
       version: config.latestVersion.version ?? 0,
       versionId: config.latestVersion.id ?? "",
-      versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
+      versionCreatedAt: config.latestVersion.createdAt ?? toDate(nowInstant()),
       model: configData.model,
       temperature: configData.temperature,
       maxTokens: configData.max_tokens,

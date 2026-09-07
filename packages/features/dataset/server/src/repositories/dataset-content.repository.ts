@@ -1,4 +1,5 @@
 import type { DatasetRow } from "../ports/dataset.port.ts";
+import type { Instant, TimeInput } from "@langwatch/time";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type DatasetJsonObject = { [Key in string]?: DatasetJsonValue };
@@ -17,9 +18,9 @@ export type DatasetWriteFields = {
   name?: string;
   slug?: string;
   columnTypes?: DatasetJsonValue;
-  createdAt?: Date | string;
-  updatedAt?: Date | string;
-  archivedAt?: Date | string | null;
+  createdAt?: TimeInput;
+  updatedAt?: TimeInput;
+  archivedAt?: TimeInput | null;
   mapping?: DatasetJsonValue | null;
   useS3?: boolean;
   s3RecordCount?: number | null;
@@ -102,7 +103,7 @@ export abstract class DatasetContentRepository {
   abstract markProcessingRedriven(input: { id: string; projectId: string }): Promise<number>;
   abstract findStaleProcessing(input: {
     projectId: string;
-    olderThan: Date;
+    olderThan: Instant;
   }): Promise<DatasetRow[]>;
   abstract tryFindPendingUploadByStagingKey(input: {
     projectId: string;
@@ -110,7 +111,7 @@ export abstract class DatasetContentRepository {
   }): Promise<DatasetRow | null>;
   abstract findStalePendingUploads(input: {
     projectId: string;
-    olderThan: Date;
+    olderThan: Instant;
   }): Promise<DatasetRow[]>;
   abstract findAllSlugs(input: { projectId: string }): Promise<Array<{ slug: string }>>;
   abstract listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{

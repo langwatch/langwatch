@@ -1,7 +1,11 @@
 /**
  * The version half of prompt persistence, as the services see it.
  */
-import type { LatestConfigVersionSchema, SchemaVersion } from "@langwatch/prompt-contract";
+import type {
+  LatestConfigVersionSchema,
+  SchemaVersion,
+  VersionedPrompt,
+} from "@langwatch/prompt-contract";
 
 /** The person a version is attributed to, as far as any reader here cares. */
 export type PromptVersionAuthor = {
@@ -21,7 +25,8 @@ export type PromptVersionRow = {
   configData: unknown;
   schemaVersion: string;
   runtimeParameters: unknown;
-  createdAt: Date;
+  /** The moment the wire calls `versionCreatedAt`. */
+  createdAt: VersionedPrompt["versionCreatedAt"];
   projectId: string;
 };
 

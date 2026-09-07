@@ -9502,62 +9502,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/annotation/contract/src/annotation.queue.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/contract/src/annotation.record.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/server/src/tasks/annotation-clickhouse-backfill.task.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/server/src/transport/api-trpc/annotation.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/web/src/behavior/annotation-api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/web/src/behavior/use-annotation-period.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/web/src/behavior/use-annotation-queues.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/web/src/model/annotation-export.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/web/src/model/annotation-period.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/web/src/model/annotation-row.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/web/src/ui/blocks/annotation-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/web/src/ui/blocks/annotation-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/web/src/ui/elements/annotation-hover-chip.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/annotation/web/src/ui/elements/period-picker.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/api-key/contract/src/api-key.list.ts",
       "measured": "2026-09-06"
     },
@@ -9747,66 +9691,6 @@
     },
     {
       "key": "temporal-only|packages/features/automation/web/src/screens/automations/automations.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dashboard/server/src/ports/dashboard.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dashboard/server/src/transport/api-rest/graph.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/data-privacy/contract/src/data-privacy.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/data-privacy/server/src/services/data-privacy-cache.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/contract/src/dataset-file.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/contract/src/dataset.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/server/src/ports/dataset.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/server/src/repositories/dataset-content.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/server/src/repositories/dataset.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/server/src/services/dataset.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/web/src/model/convert-record-values.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/web/src/screens/datasets/datasets.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/web/src/ui/blocks/dataset-picker-list.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/web/src/ui/sections/datasets/upload-csv-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/entitlement/server/src/transport/api-trpc/limits.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10154,10 +10038,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/hosted-mcp/server/src/transport/api-rest/mcp-authorize.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/identity/server/src/rules/identity-storage-ports.rules.ts",
       "measured": "2026-09-06"
     },
@@ -10199,26 +10079,6 @@
     },
     {
       "key": "temporal-only|packages/features/langy/server/src/services/langy-turn-preparation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/log/server/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/log/server/src/repositories/clickhouse/clickhouse.canonical-log-record.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/metric/contract/src/schemas/metric-processing/metric-data-point.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/metric/server/src/repositories/clickhouse/clickhouse.metric-data-point.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/metric/server/src/repositories/clickhouse/clickhouse.metric-data-point.repository.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10271,26 +10131,6 @@
     },
     {
       "key": "temporal-only|packages/features/model-provider/web/src/ui/sections/model-provider-form.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/monitor/server/src/transport/api-rest/monitor.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/notification/web/src/behavior/notification-api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/notification/web/src/screens/email-suppressions/email-suppressions.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/onboarding/web/src/behavior/onboarding-api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/onboarding/web/src/behavior/use-project-by-slug-or-latest.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10451,26 +10291,6 @@
     },
     {
       "key": "temporal-only|packages/features/project/server/src/services/project.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/prompt/server/src/repositories/prompt-tag-assignment.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/prompt/server/src/repositories/prompt-version.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/prompt/server/src/repositories/prompt.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/prompt/server/src/services/prompt.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/prompt/web/src/model/prompt-form/version-metadata.schemas.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10699,30 +10519,6 @@
     },
     {
       "key": "temporal-only|packages/features/scenario/web/src/ui/sections/use-scenario-target.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/secret/web/src/screens/secret/secrets.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/share/server/src/repositories/ledger/ledger.share.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/share/server/src/repositories/share.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/share/server/src/services/share.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/share/web/src/share-expiry.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/share/web/src/share-link-status.ts",
       "measured": "2026-09-06"
     },
     {

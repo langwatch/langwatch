@@ -48,6 +48,7 @@ import { Edit, Key, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { secretApi } from "../../behavior/secret-api.ts";
 import { useSecretHost } from "../../model/secret-host.ts";
+import { readableDate } from "../../model/readable-date.ts";
 import { describeSecretRefusal } from "../../model/secret-refusal-copy.ts";
 
 /** The grant every write control on this page is behind. */
@@ -196,7 +197,7 @@ export default function SecretsScreen() {
                       <Text>{secret.createdBy?.name ?? "-"}</Text>
                     </Table.Cell>
                     <Table.Cell>
-                      <Text>{new Date(secret.updatedAt).toLocaleDateString()}</Text>
+                      <Text>{readableDate(secret.updatedAt).toLocaleDateString()}</Text>
                     </Table.Cell>
                     <Table.Cell textAlign="right">
                       {canManageSecrets && (

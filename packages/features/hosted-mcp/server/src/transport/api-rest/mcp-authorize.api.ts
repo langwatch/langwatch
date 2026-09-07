@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 
 import type { HostedMcpRedis } from "../../ports/hosted-mcp.port.ts";
 import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, type TimeInput } from "@langwatch/time";
 
 const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 const AUTH_CODE_TTL_SECONDS = 600;
@@ -55,7 +55,8 @@ export type McpAuthorizeSession = Readonly<{ user: Readonly<{ id: string }> }>;
 export type McpAuthorizeProject = Readonly<{
   id: string;
   apiKey: string;
-  archivedAt: Date | null;
+  /** When the project was archived, in whatever shape the host holds one. */
+  archivedAt: TimeInput | null;
 }>;
 
 /** What the authorize step reaches that it does not own. */

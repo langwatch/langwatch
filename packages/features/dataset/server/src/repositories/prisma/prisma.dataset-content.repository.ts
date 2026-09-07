@@ -1,4 +1,5 @@
 import type { DatasetRow } from "../../ports/dataset.port.ts";
+import { type Instant, toDate } from "@langwatch/time";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   DatasetContentRepository,
@@ -264,14 +265,17 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    * predates `olderThan`. Drives the poll-triggered re-drive (see
    * `DatasetService.reapStaleProcessing`). Not `createdAt`: a retry re-enters.
    */
-  async findStaleProcessing(input: { projectId: string; olderThan: Date }): Promise<DatasetRow[]> {
+  async findStaleProcessing(input: {
+    projectId: string;
+    olderThan: Instant;
+  }): Promise<DatasetRow[]> {
     return await this.prisma.dataset.findMany({
       where: {
         projectId: input.projectId,
         status: "processing",
         archivedAt: null,
         stagingKey: { not: null },
-        updatedAt: { lt: input.olderThan },
+        updatedAt: { lt: toDate(input.olderThan) },
       },
     });
   }
@@ -302,14 +306,14 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    */
   async findStalePendingUploads(input: {
     projectId: string;
-    olderThan: Date;
+    olderThan: Instant;
   }): Promise<DatasetRow[]> {
     return await this.prisma.dataset.findMany({
       where: {
         projectId: input.projectId,
         status: "uploading",
         archivedAt: null,
-        createdAt: { lt: input.olderThan },
+        createdAt: { lt: toDate(input.olderThan) },
       },
     });
   }

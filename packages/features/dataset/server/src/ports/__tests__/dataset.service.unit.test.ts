@@ -1,4 +1,5 @@
 import { DatasetRepository } from "../../repositories/dataset.repository.ts";
+import { type Instant, toDate } from "@langwatch/time";
 import { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import {
   datasetSchema,
@@ -9,7 +10,11 @@ import {
 } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 import { DatasetService } from "../../services/dataset.service.ts";
-import { DatasetContentPort, DatasetNormalizeQueuePort, DatasetUploadPort } from "../dataset.port.ts";
+import {
+  DatasetContentPort,
+  DatasetNormalizeQueuePort,
+  DatasetUploadPort,
+} from "../dataset.port.ts";
 import type { FinalizeUploadInput, RetryNormalizeInput } from "@langwatch/dataset-contract";
 
 const makeDataset = (overrides: Partial<Dataset> = {}): Dataset =>
@@ -81,9 +86,14 @@ class MemoryDatasetRepository extends DatasetRepository {
     id: string;
     projectId: string;
     slug: string;
-    archivedAt: Date | null;
+    archivedAt: Instant | null;
   }): Promise<Dataset> {
-    this.dataset = makeDataset({ ...this.dataset, ...input });
+    const { archivedAt, ...rest } = input;
+    this.dataset = makeDataset({
+      ...this.dataset,
+      ...rest,
+      archivedAt: archivedAt ? toDate(archivedAt) : null,
+    });
     return this.dataset;
   }
   async restore(input: { id: string; projectId: string; slug: string }): Promise<Dataset> {

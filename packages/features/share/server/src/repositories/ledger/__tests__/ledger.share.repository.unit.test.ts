@@ -1,4 +1,5 @@
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import { Temporal } from "@langwatch/time";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ShareLink } from "@langwatch/share-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -209,7 +210,7 @@ describe("LedgerShareRepository", () => {
         const { repository, legacy, writer } = buildRepository({
           onEngine: true,
         });
-        const expiresAt = new Date("2026-01-01T00:00:00.000Z");
+        const expiresAt = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
         const row = await repository.create({
           ...createParams,
@@ -229,7 +230,7 @@ describe("LedgerShareRepository", () => {
             token: "tok_new",
             permission: "traces:view",
             kind: "trace",
-            expiresAtMs: expiresAt.getTime(),
+            expiresAtMs: expiresAt.epochMilliseconds,
             maxViews: 3,
             createdByUserId: "user_1",
           },

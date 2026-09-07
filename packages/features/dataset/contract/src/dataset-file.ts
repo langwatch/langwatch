@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
 import type { DatasetColumns } from "./dataset.ts";
 
 const getSafeColumnName = (columnName: string, existingNames: Set<string>): string => {
@@ -196,9 +197,9 @@ export function convertValueToColumnType(
     // Preserve empty/missing cells: `new Date(null)` is the Unix epoch, which
     // would silently rewrite a nullable date column's blanks to 1970-01-01.
     if (value === null || value === undefined || value === "") return value;
-    const dateAttempt = new Date(value as string);
-    return dateAttempt.toString() !== "Invalid Date"
-      ? dateAttempt.toISOString().split("T")[0]
+    const epochMs = toEpochMs(value as TimeInput);
+    return Number.isFinite(epochMs)
+      ? toDate(Temporal.Instant.fromEpochMilliseconds(epochMs)).toISOString().split("T")[0]
       : value;
   }
   // Image is a URL string; string passes through unchanged.

@@ -1,4 +1,5 @@
 import { SecurityError } from "@langwatch/eventing";
+import { toDate } from "@langwatch/time";
 import type { MetricUsageEstimate, MetricUsageEstimateQuery } from "@langwatch/metric-contract";
 import type {
   MetricDataPointBulkWrite,
@@ -13,6 +14,7 @@ import {
   type MetricClickHouseClient,
   type MetricClickHouseClientResolver,
 } from "./clickhouse.metric-data-point-append.repository.ts";
+import { clickHouseTimestamp } from "./clickhouse.metric-data-point.mapper.ts";
 
 const USAGE_DIMENSIONS: Record<MetricUsageEstimateQuery["groupBy"], string[]> = {
   organization: ["OrganizationId"],
@@ -143,7 +145,7 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
         tenantId,
         attributeKey,
         attributeValue,
-        fromMs: new Date(fromMs),
+        fromMs: clickHouseTimestamp(fromMs),
       },
       format: "JSONEachRow",
     });
@@ -218,8 +220,8 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
       `,
       query_params: {
         organizationId: query.organizationId,
-        from: query.from,
-        to: query.to,
+        from: toDate(query.from),
+        to: toDate(query.to),
         ...(query.tenantId ? { tenantId: query.tenantId } : {}),
         ...(query.metricName ? { metricName: query.metricName } : {}),
       },

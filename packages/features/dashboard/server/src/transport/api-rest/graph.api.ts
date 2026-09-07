@@ -10,6 +10,7 @@ import {
   type RouteResponse,
 } from "@langwatch/api/rest";
 import {
+  type Graph,
   graphDeletedResponseSchema,
   graphListRestResponseSchema,
   graphRestResponseSchema,
@@ -59,19 +60,7 @@ const updateGraphSchema = z.object({
   filters: z.record(z.string(), z.unknown()).optional(),
 });
 
-function toGraphResponse(graph: {
-  id: string;
-  name: string;
-  graph: Record<string, unknown>;
-  filters: Record<string, unknown> | null;
-  dashboardId: string | null;
-  gridColumn: number;
-  gridRow: number;
-  colSpan: number;
-  rowSpan: number;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function toGraphResponse(graph: Graph) {
   return {
     id: graph.id,
     name: graph.name,

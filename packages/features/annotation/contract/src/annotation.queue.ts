@@ -11,17 +11,19 @@
  *
  * These shapes are exactly what the narrowed selects return.
  */
+import type { Annotation } from "./annotation.record.ts";
 
-/** One annotation queue, as its own row. */
-export interface AnnotationQueueRecord {
+/**
+ * One annotation queue, as its own row. Its timestamps are the wire
+ * timestamps every annotation row in this contract carries.
+ */
+export type AnnotationQueueRecord = Pick<Annotation, "createdAt" | "updatedAt"> & {
   id: string;
   name: string;
   slug: string;
   projectId: string;
   description: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
+};
 
 /** A queue in the picker: enough to name it and to link to it. */
 export interface AnnotationQueueListEntry {
@@ -41,7 +43,7 @@ export interface AnnotationQueueScoreView {
 }
 
 /** One queue with the two lists the drawer and the queue page render. */
-export interface AnnotationQueueDetail extends AnnotationQueueRecord {
+export type AnnotationQueueDetail = AnnotationQueueRecord & {
   members: AnnotationQueueMemberView[];
   AnnotationQueueScores: AnnotationQueueScoreView[];
-}
+};

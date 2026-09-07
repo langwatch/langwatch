@@ -1,3 +1,4 @@
+import type { TimeInput } from "@langwatch/time";
 import { z } from "zod";
 import { annotationAnchorColumnsSchema, annotationAnchorScopeSchema } from "./annotation.anchor.ts";
 import { annotationScoreOptionsSchema } from "./annotation.score.ts";
@@ -194,7 +195,7 @@ export type AnnotationWithUser = {
   anchorKind: string | null;
   anchorId: string | null;
   anchorPath: string | null;
-  createdAt: Date | string | null;
-  updatedAt: Date | string | null;
+  createdAt: TimeInput | null;
+  updatedAt: TimeInput | null;
   user?: { id: string; name: string | null; image?: string | null } | null;
 };

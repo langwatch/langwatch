@@ -1,4 +1,5 @@
 import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   buildDataPrivacyChain,
   resolveDataPrivacy,
@@ -12,7 +13,7 @@ export class DataPrivacyPolicyCacheService {
   static create(
     repository: DataPrivacyPolicyRepository,
     ttlMs = 60_000,
-    now: () => number = () => Date.now(),
+    now: () => number = () => nowInstant().epochMilliseconds,
   ): DataPrivacyPolicyCacheService {
     return new DataPrivacyPolicyCacheService(repository, ttlMs, now);
   }
@@ -22,7 +23,7 @@ export class DataPrivacyPolicyCacheService {
   private constructor(
     private readonly repository: DataPrivacyPolicyRepository,
     private readonly ttlMs = 60_000,
-    private readonly now: () => number = () => Date.now(),
+    private readonly now: () => number = () => nowInstant().epochMilliseconds,
   ) {}
 
   async resolve(input: {

@@ -14,15 +14,22 @@
  */
 
 import { useMemo } from "react";
+import type { AnnotationPeriodMoment } from "../model/annotation-period.ts";
 import { annotationApi } from "./annotation-api.ts";
 import type { AnnotationQueueItemRead } from "./annotation-api.ts";
 
+/** Either end of the range, when the caller narrowed the read to one. */
+type AnnotationPeriodRange = {
+  startDate?: AnnotationPeriodMoment;
+  endDate?: AnnotationPeriodMoment;
+};
+
 /** The date range, only when there is one, so it spreads into the input. */
-function dateRangeInput({ startDate, endDate }: { startDate?: Date; endDate?: Date }): {
-  startDate?: Date;
-  endDate?: Date;
+function dateRangeInput({ startDate, endDate }: AnnotationPeriodRange): {
+  startDate?: AnnotationPeriodMoment;
+  endDate?: AnnotationPeriodMoment;
 } {
-  const range: { startDate?: Date; endDate?: Date } = {};
+  const range: AnnotationPeriodRange = {};
   if (startDate) range.startDate = startDate;
   if (endDate) range.endDate = endDate;
   return range;
@@ -62,8 +69,8 @@ export function useAnnotationQueues({
   pageOffset: number;
   pageSize: number;
   /** Narrows the read to items queued inside this range. */
-  startDate?: Date;
-  endDate?: Date;
+  startDate?: AnnotationPeriodMoment;
+  endDate?: AnnotationPeriodMoment;
   /** Off where the caller already has its rows and only needs the shape. */
   enabled?: boolean;
 }): AnnotationQueuesReading {

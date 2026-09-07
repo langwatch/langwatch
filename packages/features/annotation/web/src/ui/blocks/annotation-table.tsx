@@ -20,6 +20,7 @@ import { AnnotationCommentsChip } from "../elements/annotation-comments-chip.tsx
 import { AnnotationSuggestionsChip } from "../elements/annotation-suggestions-chip.tsx";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import type { AnnotationRow, AnnotationUser } from "../../model/annotation-row.ts";
+import type { DisplayMoment } from "../../model/readable-date.ts";
 
 const ChakraButton = chakra("button");
 
@@ -309,7 +310,7 @@ function RowActions({
   );
 }
 
-function formatRowDate(date: Date | null): string {
+function formatRowDate(date: DisplayMoment | null): string {
   return date ? date.toLocaleDateString() : "-";
 }
 

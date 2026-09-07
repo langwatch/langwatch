@@ -1,7 +1,8 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { describeShareLink, isShareLinkSpent, type ShareLinkView } from "../share-link-status.ts";
 
-const NOW = new Date("2026-08-27T12:00:00.000Z");
+const NOW = Temporal.Instant.from("2026-08-27T12:00:00.000Z");
 
 function buildLink(overrides: Partial<ShareLinkView> = {}): ShareLinkView {
   return {
@@ -16,8 +17,8 @@ function buildLink(overrides: Partial<ShareLinkView> = {}): ShareLinkView {
     expiresAt: null,
     maxViews: null,
     viewCount: 0,
-    createdAt: NOW.toISOString(),
-    updatedAt: NOW.toISOString(),
+    createdAt: NOW.toString({ fractionalSecondDigits: 3 }),
+    updatedAt: NOW.toString({ fractionalSecondDigits: 3 }),
     ...overrides,
   };
 }
@@ -35,12 +36,16 @@ describe("share link status", () => {
 
   describe("given a link whose expiry has passed", () => {
     it("is spent", () => {
-      const link = buildLink({ expiresAt: new Date(NOW.getTime() - 1).toISOString() });
+      const link = buildLink({
+        expiresAt: NOW.subtract({ milliseconds: 1 }).toString({ fractionalSecondDigits: 3 }),
+      });
       expect(isShareLinkSpent({ link, now: NOW })).toBe(true);
     });
 
     it("reads as expired", () => {
-      const link = buildLink({ expiresAt: new Date(NOW.getTime() - 1).toISOString() });
+      const link = buildLink({
+        expiresAt: NOW.subtract({ milliseconds: 1 }).toString({ fractionalSecondDigits: 3 }),
+      });
       expect(describeShareLink({ link, now: NOW })).toBe("Expired");
     });
   });
@@ -49,7 +54,7 @@ describe("share link status", () => {
     // The service treats `expiresAt <= now` as expired; the row must not read
     // as live while the server refuses it.
     it("is already spent", () => {
-      const link = buildLink({ expiresAt: NOW.toISOString() });
+      const link = buildLink({ expiresAt: NOW.toString({ fractionalSecondDigits: 3 }) });
       expect(isShareLinkSpent({ link, now: NOW })).toBe(true);
     });
   });

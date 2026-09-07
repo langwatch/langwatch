@@ -10,6 +10,7 @@ import {
   type AuthzService,
   authzShareAudience,
 } from "@langwatch/authz-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import type { ShareLink } from "@langwatch/share-contract";
 import type { ShareDatabase, ShareTransactionDatabase } from "../../ports/share-database.port.ts";
@@ -139,7 +140,7 @@ export class LedgerShareRepository extends ShareRepository {
         token: params.token,
         permission: AUTHZ_SHARE_PERMISSION,
         kind: params.resourceType === "THREAD" ? "thread" : "trace",
-        ...(params.expiresAt ? { expiresAtMs: params.expiresAt.getTime() } : {}),
+        ...(params.expiresAt ? { expiresAtMs: params.expiresAt.epochMilliseconds } : {}),
         ...(params.maxViews != null ? { maxViews: params.maxViews } : {}),
         ...(params.userId ? { createdByUserId: params.userId } : {}),
       },
@@ -303,7 +304,7 @@ export class LedgerShareRepository extends ShareRepository {
             projectId,
             ...(capped ? { viewCount: { lt: maxViews } } : {}),
           },
-          data: { viewCount: { increment: 1 }, lastViewedAt: new Date() },
+          data: { viewCount: { increment: 1 }, lastViewedAt: toDate(nowInstant()) },
         });
         return true;
       } catch (error) {
@@ -342,7 +343,7 @@ export class LedgerShareRepository extends ShareRepository {
             organizationId,
             projectId,
             viewCount: 1,
-            lastViewedAt: new Date(),
+            lastViewedAt: toDate(nowInstant()),
           },
         });
         await mirror(tx);

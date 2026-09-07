@@ -21,7 +21,8 @@
  * import below is the only one in the package.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { type FeatureApi, createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import type { TimeInput } from "@langwatch/time";
 
 /** The project every suppression procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -40,7 +41,7 @@ export type EmailSuppressionRow = {
   triggerId: string | null;
   triggerName: string | null;
   reason: string | null;
-  createdAt: Date;
+  createdAt: TimeInput;
 };
 
 export type NotificationApiMap = {
@@ -60,4 +61,5 @@ export type NotificationApiMap = {
  * The notification family's typed tRPC hooks. Same machinery, same transport
  * and same React Query cache as the application's `api` proxy.
  */
-export const notificationApi = createFeatureApi<NotificationApiMap>();
+export const notificationApi: FeatureApi<NotificationApiMap> =
+  createFeatureApi<NotificationApiMap>();

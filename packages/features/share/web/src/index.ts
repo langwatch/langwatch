@@ -1,7 +1,7 @@
 export { copyShareLink } from "./copy-share-link.ts";
 export { CreateShareLinkForm, type CreateShareLinkDraft } from "./create-share-link-form.tsx";
 export {
-  expiryToDate,
+  expiryToInstant,
   isShareExpiryOption,
   SHARE_EXPIRY_OPTIONS,
   type ShareExpiryOption,

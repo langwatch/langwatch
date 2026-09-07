@@ -1,4 +1,5 @@
 import { shareLinkSchema, shareWithProjectSchema, type ShareLink } from "@langwatch/share-contract";
+import { toDate } from "@langwatch/time";
 import type { ShareDatabase } from "../../ports/share-database.port.ts";
 import {
   ShareRepository,
@@ -123,7 +124,7 @@ export class PrismaShareRepository extends ShareRepository {
         resourceType,
         resourceId,
         visibility: visibility ?? "PUBLIC",
-        expiresAt: expiresAt ?? null,
+        expiresAt: expiresAt ? toDate(expiresAt) : null,
         maxViews: maxViews ?? null,
         userId: userId ?? null,
       },

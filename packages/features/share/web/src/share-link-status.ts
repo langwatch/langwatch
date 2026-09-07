@@ -1,4 +1,6 @@
 import type { ShareLink } from "@langwatch/share-contract";
+import { type Instant, nowInstant, toEpochMs } from "@langwatch/time";
+import { readableDate } from "./readable-date.ts";
 
 /**
  * A share link the way the BROWSER holds one.
@@ -16,12 +18,12 @@ export type ShareLinkView = Omit<ShareLink, "expiresAt" | "createdAt" | "updated
 /** A link stops working once it expires or its view cap is spent. */
 export function isShareLinkSpent({
   link,
-  now = new Date(),
+  now = nowInstant(),
 }: {
   link: ShareLinkView;
-  now?: Date;
+  now?: Instant;
 }): boolean {
-  const expired = !!link.expiresAt && new Date(link.expiresAt).getTime() <= now.getTime();
+  const expired = !!link.expiresAt && toEpochMs(link.expiresAt) <= now.epochMilliseconds;
   const consumed = link.maxViews != null && link.viewCount >= link.maxViews;
 
   return expired || consumed;
@@ -30,10 +32,10 @@ export function isShareLinkSpent({
 /** The one-line summary under a link: its view budget, then its expiry. */
 export function describeShareLink({
   link,
-  now = new Date(),
+  now = nowInstant(),
 }: {
   link: ShareLinkView;
-  now?: Date;
+  now?: Instant;
 }): string {
   const parts: string[] = [];
 
@@ -45,10 +47,10 @@ export function describeShareLink({
 
   if (!link.expiresAt) {
     parts.push("No expiry");
-  } else if (new Date(link.expiresAt).getTime() <= now.getTime()) {
+  } else if (toEpochMs(link.expiresAt) <= now.epochMilliseconds) {
     parts.push("Expired");
   } else {
-    parts.push(`Expires ${new Date(link.expiresAt).toLocaleDateString()}`);
+    parts.push(`Expires ${readableDate(link.expiresAt).toLocaleDateString()}`);
   }
 
   return parts.join(" · ");

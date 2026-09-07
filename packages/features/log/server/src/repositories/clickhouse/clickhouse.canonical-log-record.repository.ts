@@ -3,11 +3,19 @@ import { EventUtils } from "@langwatch/eventing";
 import type { CanonicalLogRecord, CanonicalTraceLogRecord } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
 import { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import {
   ClickHouseCanonicalLogRecordAppendRepository,
   type LogClickHouseClientResolver,
 } from "./clickhouse.canonical-log-record-append.repository.ts";
+
+/**
+ * A DateTime64(3) column value. The ClickHouse client serialises a `Date`;
+ * an instant serialises to an empty object, so the conversion lives here.
+ */
+function clickHouseTimestamp(epochMs: number) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
+}
 
 const logger = createLogger("langwatch:log:canonical-log-record-repository");
 
@@ -86,8 +94,8 @@ export class ClickHouseCanonicalLogRecordRepository extends CanonicalLogRecordRe
       typeof occurredAtMs === "number" && occurredAtMs > 0
         ? occurredAtMs
         : nowInstant().epochMilliseconds;
-    const from = new Date(center - 14 * 24 * 60 * 60 * 1000);
-    const to = new Date(center + 2 * 24 * 60 * 60 * 1000);
+    const from = clickHouseTimestamp(center - 14 * 24 * 60 * 60 * 1000);
+    const to = clickHouseTimestamp(center + 2 * 24 * 60 * 60 * 1000);
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `

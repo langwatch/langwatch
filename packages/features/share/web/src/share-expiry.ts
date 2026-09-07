@@ -1,3 +1,5 @@
+import { type Instant, nowInstant } from "@langwatch/time";
+
 /** The expiry choices the share dialog offers, in the order it offers them. */
 export const SHARE_EXPIRY_OPTIONS = ["never", "1h", "24h", "7d", "30d"] as const;
 
@@ -15,16 +17,16 @@ export function isShareExpiryOption(value: unknown): value is ShareExpiryOption 
 }
 
 /** `never` is the absence of an expiry, which the contract spells `null`. */
-export function expiryToDate({
+export function expiryToInstant({
   option,
-  now = new Date(),
+  now = nowInstant(),
 }: {
   option: ShareExpiryOption;
-  now?: Date;
-}): Date | null {
+  now?: Instant;
+}): Instant | null {
   if (option === "never") {
     return null;
   }
 
-  return new Date(now.getTime() + EXPIRY_MS[option]);
+  return now.add({ milliseconds: EXPIRY_MS[option] });
 }

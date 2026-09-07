@@ -18,6 +18,7 @@
  * window should move.
  */
 
+import { nowInstant, toDate } from "@langwatch/time";
 import { useMemo } from "react";
 import { readAnnotationPeriod, type AnnotationPeriodReading } from "../model/annotation-period.ts";
 
@@ -35,7 +36,7 @@ export function useAnnotationPeriod(
     () =>
       readAnnotationPeriod({
         query: { period: named, startDate: start, endDate: end },
-        now: new Date(),
+        now: toDate(nowInstant()),
       }),
     [named, start, end],
   );

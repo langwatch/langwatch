@@ -6,6 +6,7 @@ import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { z } from "zod";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import type { AnnotationUser } from "../../model/annotation-row.ts";
+import { readableDate } from "../../model/readable-date.ts";
 
 interface ScoreEntry {
   name: string;
@@ -251,7 +252,7 @@ function Author({
           <ApiAuthor email={annotation.email ?? null} />
         )}
         <Text textStyle="2xs" color="fg.subtle">
-          {annotation.createdAt ? new Date(annotation.createdAt).toLocaleString() : ""}
+          {annotation.createdAt ? readableDate(annotation.createdAt).toLocaleString() : ""}
         </Text>
       </VStack>
     </>

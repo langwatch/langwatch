@@ -155,17 +155,6 @@ export function resolveAudience(audience?: Audience): ResolvedAudience {
   };
 }
 
-export interface DataPrivacyPolicy {
-  id: string;
-  organizationId: string;
-  scopeType: DataPrivacyScopeType;
-  scopeId: string;
-  personalOnly: boolean;
-  config: DataPrivacyConfig;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export const dataPrivacyPolicySchema = z
   .object({
     id: z.string().min(1),
@@ -178,6 +167,7 @@ export const dataPrivacyPolicySchema = z
     updatedAt: z.date(),
   })
   .strict();
+export type DataPrivacyPolicy = z.infer<typeof dataPrivacyPolicySchema>;
 
 export const dataPrivacyRowSchema = z
   .object({

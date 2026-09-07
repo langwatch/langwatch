@@ -15,6 +15,7 @@ import type {
 import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { AnnotationPeriod, AnnotationPeriodMoment } from "../model/annotation-period.ts";
 import type { AnnotationTrace } from "../model/annotation-row.ts";
 
 /** The project every annotation procedure is scoped to. */
@@ -71,8 +72,8 @@ export type AnnotationApiMap = {
           queueId: string;
           showQueueAndUser: boolean;
           allQueueItems: boolean;
-          startDate?: Date;
-          endDate?: Date;
+          startDate?: AnnotationPeriodMoment;
+          endDate?: AnnotationPeriodMoment;
         };
         output: {
           assignedQueueItems: AnnotationQueueItemRead[];
@@ -90,7 +91,7 @@ export type AnnotationApiMap = {
      */
     getAll: {
       query: {
-        input: ProjectScope & { startDate: Date; endDate: Date };
+        input: ProjectScope & AnnotationPeriod;
         output: AnnotationWithUser[];
       };
     };

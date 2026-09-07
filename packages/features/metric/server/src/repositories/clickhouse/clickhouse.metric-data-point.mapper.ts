@@ -6,6 +6,15 @@ import type {
   MetricKind,
   MetricRollupRow,
 } from "@langwatch/metric-contract";
+import { Temporal, toDate } from "@langwatch/time";
+
+/**
+ * A DateTime64(3) column value. The ClickHouse client serialises a `Date`;
+ * an instant serialises to an empty object, so the conversion lives here.
+ */
+export function clickHouseTimestamp(epochMs: number) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
+}
 
 /**
  * ReplacingMergeTree keeps the largest version, so inverting the acceptance
@@ -231,7 +240,7 @@ export class MetricDataPointMapper {
       PointAttributeKeys: point.pointAttributeKeys,
       StartTimeUnixNano: point.startTimeUnixNano,
       TimeUnixNano: point.timeUnixNano,
-      TimeUnixMs: new Date(point.timeUnixMs),
+      TimeUnixMs: clickHouseTimestamp(point.timeUnixMs),
       Flags: point.flags,
       ValueType: point.valueType,
       ValueInt: point.valueInt,
@@ -251,8 +260,8 @@ export class MetricDataPointMapper {
       NegativeBucketCounts: point.negativeBucketCounts,
       SummaryQuantilesJson: point.summaryQuantilesJson,
       CanonicalPayload: point.canonicalPayload,
-      OccurredAt: new Date(point.occurredAt),
-      AcceptedAt: new Date(point.acceptedAt),
+      OccurredAt: clickHouseTimestamp(point.occurredAt),
+      AcceptedAt: clickHouseTimestamp(point.acceptedAt),
       // Keep the first acceptance when the same PointId is retried.
       DedupVersion: MetricDataPointMapper.firstAcceptanceWinsVersion(point.acceptedAt),
       _retention_days: retentionDays,
@@ -286,7 +295,7 @@ export class MetricDataPointMapper {
       IsMonotonic: point.isMonotonic,
       PointAttributesJson: point.pointAttributesJson,
       PointAttributeKeys: point.pointAttributeKeys,
-      LastSeenAt: new Date(point.timeUnixMs),
+      LastSeenAt: clickHouseTimestamp(point.timeUnixMs),
       _retention_days: retentionDays,
       _size_bytes: 0,
     };
@@ -303,8 +312,8 @@ export class MetricDataPointMapper {
       PointId: point.pointId,
       SeriesId: point.seriesId,
       MetricName: point.metricName,
-      AcceptedAt: new Date(point.acceptedAt),
-      AcceptedHour: new Date(Math.floor(point.acceptedAt / 3_600_000) * 3_600_000),
+      AcceptedAt: clickHouseTimestamp(point.acceptedAt),
+      AcceptedHour: clickHouseTimestamp(Math.floor(point.acceptedAt / 3_600_000) * 3_600_000),
       CanonicalSourceBytes: point.canonicalSizeBytes,
       DedupVersion: MetricDataPointMapper.firstAcceptanceWinsVersion(point.acceptedAt),
     };
@@ -319,8 +328,8 @@ export class MetricDataPointMapper {
       MetricKind: row.metricKind,
       AggregationTemporality: row.aggregationTemporality,
       IsMonotonic: row.isMonotonic,
-      BucketStart: new Date(row.bucketStartMs),
-      BucketEnd: new Date(row.bucketEndMs),
+      BucketStart: clickHouseTimestamp(row.bucketStartMs),
+      BucketEnd: clickHouseTimestamp(row.bucketEndMs),
       GaugeLast: row.gaugeLast,
       Min: row.min,
       Max: row.max,
@@ -338,7 +347,7 @@ export class MetricDataPointMapper {
       ResetCount: row.resetCount,
       GapCount: row.gapCount,
       SourcePointCount: row.sourcePointCount,
-      UpdatedAt: new Date(row.updatedAt),
+      UpdatedAt: clickHouseTimestamp(row.updatedAt),
       _retention_days: retentionDays,
       _size_bytes: 0,
     };

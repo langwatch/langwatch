@@ -7,15 +7,21 @@ import type {
   PromptCopySummary,
   PromptScope,
   SchemaVersion,
+  VersionedPrompt,
 } from "@langwatch/prompt-contract";
+import type { TimeInput } from "@langwatch/time";
 import type {
   CreateLlmConfigVersionParams,
   LlmConfigVersionsRepository,
   PromptVersionRow,
 } from "./prompt-version.repository.ts";
 
-/** A stored prompt config row. */
-export type PromptConfigRow = {
+/**
+ * A stored prompt config row. Its two visible timestamps are the ones the
+ * contract puts on the wire; `deletedAt` never leaves the repository, so it
+ * is only a moment in whatever shape storage handed one back.
+ */
+export type PromptConfigRow = Pick<VersionedPrompt, "createdAt" | "updatedAt"> & {
   id: string;
   handle: string | null;
   name: string;
@@ -23,9 +29,7 @@ export type PromptConfigRow = {
   organizationId: string;
   scope: PromptScope;
   copiedFromPromptId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt: Date | null;
+  deletedAt: TimeInput | null;
 };
 
 /**

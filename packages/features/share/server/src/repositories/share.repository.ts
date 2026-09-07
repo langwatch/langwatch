@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import type {
   ShareLink,
   ShareResourceType,
@@ -13,7 +14,7 @@ export interface CreateShareLinkParams {
   resourceType: ShareResourceType;
   resourceId: string;
   visibility?: ShareVisibility;
-  expiresAt?: Date | null;
+  expiresAt?: Instant | null;
   maxViews?: number | null;
   userId?: string | null;
 }

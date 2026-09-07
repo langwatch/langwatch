@@ -15,6 +15,8 @@
  */
 
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { nowInstant, type TimeInput } from "@langwatch/time";
+import { readableDate } from "./readable-date.ts";
 import {
   annotationRatingExportLabel,
   annotationScores,
@@ -33,8 +35,11 @@ export type AnnotationExport = {
 export type ActiveScoreType = { id: string; name: string };
 
 /** `<name> - YYYY-MM-DD.csv`, the file name every export here uses. */
-export function csvFileName(name: string, today = new Date()): string {
-  return `${name} - ${today.toISOString().split("T")[0]}.csv`;
+export function csvFileName(
+  name: string,
+  today: TimeInput = nowInstant().epochMilliseconds,
+): string {
+  return `${name} - ${readableDate(today).toISOString().split("T")[0]}.csv`;
 }
 
 /** Every distinct annotator on a row, in the order they first appear. */
@@ -138,12 +143,7 @@ export function allAnnotationsExport({
     ],
     rows: annotations.map((annotation) => {
       const trace = traceById.get(annotation.traceId);
-      const createdAt =
-        annotation.createdAt instanceof Date
-          ? annotation.createdAt
-          : annotation.createdAt
-            ? new Date(annotation.createdAt)
-            : null;
+      const createdAt = annotation.createdAt ? readableDate(annotation.createdAt) : null;
       return [
         annotation.user?.name ?? "",
         trace?.input?.value ?? "",

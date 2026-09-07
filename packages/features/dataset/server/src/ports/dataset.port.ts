@@ -39,15 +39,12 @@ import type {
  * throw on the retry and cancel paths for a row those paths never look inside.
  * This states the shape without changing when anything is validated.
  */
-export type DatasetRow = {
+export type DatasetRow = Pick<Dataset, "createdAt" | "updatedAt" | "archivedAt"> & {
   id: string;
   projectId: string;
   name: string;
   slug: string;
   columnTypes: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-  archivedAt: Date | null;
   mapping: unknown;
   useS3: boolean;
   s3RecordCount: number | null;

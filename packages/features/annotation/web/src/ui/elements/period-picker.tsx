@@ -8,15 +8,17 @@
 
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
-import { format } from "@langwatch/time";
+import { format, nowInstant, toDate } from "@langwatch/time";
 import { Calendar, ChevronDown } from "lucide-react";
 import {
   ANNOTATION_PERIOD_PRESETS,
   matchingPreset,
   type AnnotationPeriod,
   type AnnotationPeriodMode,
+  type AnnotationPeriodMoment,
   type AnnotationPeriodPresetKey,
 } from "../../model/annotation-period.ts";
+import { readableDate } from "../../model/readable-date.ts";
 
 export function PeriodPicker({
   period,
@@ -34,7 +36,7 @@ export function PeriodPicker({
    * applying.
    */
   label?: string;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: AnnotationPeriodMoment, endDate: AnnotationPeriodMoment) => void;
   setRelativePeriod: (presetKey: AnnotationPeriodPresetKey) => void;
   /**
    * Takes the range back off, offered as "All time". Only lists that show
@@ -48,7 +50,7 @@ export function PeriodPicker({
 
   const triggerLabel = () => {
     if (mode === "relative") {
-      const preset = matchingPreset({ period, now: new Date() });
+      const preset = matchingPreset({ period, now: toDate(nowInstant()) });
       if (preset) return preset.label;
     }
     return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
@@ -84,7 +86,7 @@ export function PeriodPicker({
                 <Input
                   type="datetime-local"
                   value={format(startDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(event) => setPeriod(new Date(event.target.value), endDate)}
+                  onChange={(event) => setPeriod(readableDate(event.target.value), endDate)}
                 />
               </Field.Root>
               <Field.Root>
@@ -92,7 +94,7 @@ export function PeriodPicker({
                 <Input
                   type="datetime-local"
                   value={format(endDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(event) => setPeriod(startDate, new Date(event.target.value))}
+                  onChange={(event) => setPeriod(startDate, readableDate(event.target.value))}
                 />
               </Field.Root>
             </VStack>

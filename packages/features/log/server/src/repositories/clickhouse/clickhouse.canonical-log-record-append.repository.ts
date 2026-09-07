@@ -2,7 +2,16 @@ import type { ClickHouseSettings, DataFormat } from "@clickhouse/client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
+import { Temporal, toDate } from "@langwatch/time";
 import { CanonicalLogRecordAppendRepository } from "../canonical-log-record-append.repository.ts";
+
+/**
+ * A DateTime64(3) column value. The ClickHouse client serialises a `Date`;
+ * an instant serialises to an empty object, so the conversion lives here.
+ */
+function clickHouseTimestamp(epochMs: number) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
+}
 
 export interface LogClickHouseClient {
   insert(params: {
@@ -73,7 +82,7 @@ function toLogRecordRow(record: CanonicalLogRecord, retentionDays: number) {
     CorrelationSource: record.correlationSource,
     TimeUnixNano: record.timeUnixNano,
     ObservedTimeUnixNano: record.observedTimeUnixNano,
-    TimeUnixMs: new Date(record.timeUnixMs),
+    TimeUnixMs: clickHouseTimestamp(record.timeUnixMs),
     SeverityNumber: record.severityNumber,
     SeverityText: record.severityText,
     BodyType: record.bodyType,
@@ -93,8 +102,8 @@ function toLogRecordRow(record: CanonicalLogRecord, retentionDays: number) {
     ProviderPromptId: record.providerPromptId,
     PiiRedactionLevel: record.piiRedactionLevel,
     CanonicalPayload: record.canonicalPayload,
-    OccurredAt: new Date(record.occurredAt),
-    AcceptedAt: new Date(record.acceptedAt),
+    OccurredAt: clickHouseTimestamp(record.occurredAt),
+    AcceptedAt: clickHouseTimestamp(record.acceptedAt),
     DedupVersion: dedupVersion(record.acceptedAt),
     _retention_days: retentionDays,
     _size_bytes: record.canonicalSizeBytes,
@@ -107,8 +116,8 @@ function toUsageEstimateRow(record: CanonicalLogRecord) {
     TenantId: record.tenantId,
     RecordId: record.recordId,
     ProviderKind: record.providerKind,
-    AcceptedAt: new Date(record.acceptedAt),
-    AcceptedHour: new Date(Math.floor(record.acceptedAt / 3_600_000) * 3_600_000),
+    AcceptedAt: clickHouseTimestamp(record.acceptedAt),
+    AcceptedHour: clickHouseTimestamp(Math.floor(record.acceptedAt / 3_600_000) * 3_600_000),
     CanonicalSourceBytes: record.canonicalSizeBytes,
     DedupVersion: dedupVersion(record.acceptedAt),
   };
