@@ -13,7 +13,11 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describe, expect, it, vi } from "vitest";
 
-import { createPromptsRestApp, type PromptRestPorts, type PromptRestService } from "../prompt.api.ts";
+import {
+  createPromptsRestApp,
+  type PromptRestPorts,
+  type PromptRestService,
+} from "../prompt.api.ts";
 
 const AUTHORIZED_PROJECT = "project_authorized";
 const OWNING_PROJECT = "project_owner";
@@ -68,6 +72,7 @@ function buildApi() {
   } as unknown as PromptRestService;
 
   const ports: PromptRestPorts = {
+    mayManagePromptsIn: async () => true,
     organizationMiddleware: async (c, next) => {
       c.set("organization", { id: ORGANIZATION_ID });
       await next();
@@ -77,7 +82,12 @@ function buildApi() {
     uniqueConstraintTargets: () => [],
   };
 
-  const app = createPromptsRestApp({ security: testSecurity(), prompts: () => service, ports });
+  const app = createPromptsRestApp({
+    security: testSecurity(),
+    prompts: () => service,
+    tagCatalog: () => ({ assertMayManageTagCatalog: async () => undefined }),
+    ports,
+  });
 
   return {
     assignTag,

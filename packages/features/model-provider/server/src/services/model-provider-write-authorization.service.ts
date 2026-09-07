@@ -1,6 +1,7 @@
 import {
   ModelDefaultScopeForbiddenError,
   ModelProviderScopeForbiddenError,
+  type ModelDefaultApiKeyPrincipal,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
@@ -18,23 +19,42 @@ export class ModelProviderWriteAuthorizationService {
   }
 
   async assertCanWrite(actorId: string, scopes: ModelDefaultScope[]): Promise<void> {
-    await this.assertScopes(actorId, scopes, "provider");
+    await this.assertScopes(scopes, "provider", (scope) =>
+      this.authorization.canWrite(actorId, scope),
+    );
   }
 
   async assertCanWriteDefault(actorId: string, scopes: ModelDefaultScope[]): Promise<void> {
-    await this.assertScopes(actorId, scopes, "default");
+    await this.assertScopes(scopes, "default", (scope) =>
+      this.authorization.canWrite(actorId, scope),
+    );
+  }
+
+  /**
+   * The same scope-by-scope check against the CREDENTIAL a request arrived on
+   * rather than against its owner. One mapping, one refusal, two principals:
+   * a transport that authorizes the owner alone lets a deliberately narrow key
+   * write with its owner's grants.
+   */
+  async assertApiKeyCanWriteDefault(
+    apiKey: ModelDefaultApiKeyPrincipal,
+    scopes: ModelDefaultScope[],
+  ): Promise<void> {
+    await this.assertScopes(scopes, "default", (scope) =>
+      this.authorization.apiKeyCanWrite(apiKey, scope),
+    );
   }
 
   private async assertScopes(
-    actorId: string,
     scopes: ModelDefaultScope[],
     target: "provider" | "default",
+    permits: (scope: ModelDefaultScope) => Promise<boolean>,
   ): Promise<void> {
     const uniqueScopes = new Map(
       scopes.map((scope) => [`${scope.scopeType}:${scope.scopeId}`, scope]),
     );
     for (const scope of uniqueScopes.values()) {
-      if (await this.authorization.canWrite(actorId, scope)) {
+      if (await permits(scope)) {
         continue;
       }
 

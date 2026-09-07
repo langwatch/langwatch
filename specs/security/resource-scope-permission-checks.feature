@@ -106,3 +106,41 @@ Feature: Permissions are resolved at the scope of the resource acted on
     Given a project-scoped key that may manage gateway cache rules in its own project
     When it changes a cache rule the whole organization shares
     Then the request is refused and the rule is unchanged
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # The 2026-09-07 read-only endpoint review: REST doors that authorize the
+  # authenticated project, or the key OWNER, instead of every scope the
+  # operation affects. The tRPC half of each pair already did it correctly, so
+  # the policy moves into the feature's application and both doors call it.
+  # ────────────────────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: A key renaming a prompt tag is held to every project the catalog reaches
+    Given an API key that may manage prompts in its own project only
+    And a tag catalog shared with a sibling project of the same organization
+    When the key renames a tag over the REST API
+    Then the request is refused with the insufficient-permission code and no tag is renamed
+
+  @integration
+  Scenario: A key renaming a prompt tag succeeds when it reaches the whole catalog
+    Given an API key that may manage prompts in every project of its organization
+    When the key renames a tag over the REST API
+    Then the tag is renamed
+
+  @unit
+  Scenario: A model-defaults write is authorized against the key, not its owner
+    Given a project-restricted API key minted by an organization administrator
+    When it writes a default-model config scoped to the whole organization
+    Then the request is refused and no config is saved
+
+  @unit
+  Scenario: A model-defaults write the key itself may make is allowed
+    Given a project-restricted API key minted by an organization administrator
+    When it writes a default-model config scoped to its own project
+    Then the config is saved
+
+  @integration
+  Scenario: An API key reading a stored object is held to the permission its purpose maps to
+    Given an API key that may view traces but not simulations
+    When it reads a stored object whose purpose is simulation media
+    Then the request is refused, and a trace-media object of the same project still streams

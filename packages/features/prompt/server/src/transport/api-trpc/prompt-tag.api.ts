@@ -15,23 +15,22 @@ import type {
 /**
  * A tag definition is one organization row and its assignments cascade to every project in
  * that organization, so the project the caller named is only the first of the scopes the
- * write reaches.
+ * write reaches. Which projects, and the refusal, belong to the application — the REST door
+ * asks the same question of its own credential; only the translation to a tRPC code is this
+ * transport's.
  */
 async function assertMayManageEveryProject(
   ctx: PromptTrpcContext,
   input: { projectId: string },
 ): Promise<void> {
-  const projectIds = await ctx.app.prompts.projectsSharingTagCatalog(input);
-  for (const projectId of projectIds) {
-    if (projectId === input.projectId) continue;
-    if (await ctx.can("prompts:manage", { projectId })) continue;
-
-    const denied = new PermissionDeniedError({
-      permission: "prompts:manage",
-      scope: { type: "project", id: projectId },
-      denialReason: "no-binding",
+  try {
+    await ctx.app.prompts.assertMayManageTagCatalog({
+      projectId: input.projectId,
+      mayManage: ({ projectId }) => ctx.can("prompts:manage", { projectId }),
     });
-    throw new TRPCError({ code: "UNAUTHORIZED", message: denied.message, cause: denied });
+  } catch (error) {
+    if (!(error instanceof PermissionDeniedError)) throw error;
+    throw new TRPCError({ code: "UNAUTHORIZED", message: error.message, cause: error });
   }
 }
 

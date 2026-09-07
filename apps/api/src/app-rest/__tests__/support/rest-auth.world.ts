@@ -205,6 +205,11 @@ export class RestAuthWorld {
     return this.apiKeyService();
   }
 
+  /** The engine a family asks its own scope questions of, the one the chain uses. */
+  authz(): AuthzService {
+    return this.authzService();
+  }
+
   private apiKeyService(): ApiKeyService {
     const keys = this.keys;
     const used = this.used;

@@ -407,6 +407,28 @@ export const modelDefaultConfigWriteInputSchema = z
   .strict();
 export type ModelDefaultConfigWriteInput = z.infer<typeof modelDefaultConfigWriteInputSchema>;
 
+/**
+ * The API key a model-defaults write arrived on. A key's own decision is its
+ * scope restrictions intersected with what its owner may still do, which is
+ * why the credential is carried instead of only the person behind it.
+ */
+export const modelDefaultApiKeyPrincipalSchema = z
+  .object({
+    apiKeyId: z.string().min(1),
+    userId: z.string().nullable(),
+    organizationId: z.string().min(1),
+  })
+  .strict();
+export type ModelDefaultApiKeyPrincipal = z.infer<typeof modelDefaultApiKeyPrincipalSchema>;
+
+export const modelDefaultApiKeyScopeCheckSchema = z
+  .object({
+    apiKey: modelDefaultApiKeyPrincipalSchema,
+    scopes: z.array(modelDefaultScopeSchema),
+  })
+  .strict();
+export type ModelDefaultApiKeyScopeCheck = z.infer<typeof modelDefaultApiKeyScopeCheckSchema>;
+
 export const modelDefaultDeleteInputSchema = z
   .object({ id: z.string().min(1), actorId: z.string().min(1).optional() })
   .strict();

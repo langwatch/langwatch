@@ -1,5 +1,8 @@
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
+import type {
+  ModelDefaultScope,
+  ModelDefaultApiKeyPrincipal,
+} from "@langwatch/model-provider-contract";
 
 /** Every permission a model-provider scope check can name, read or write. */
 type ModelProviderPermission =
@@ -32,6 +35,39 @@ export class ModelProviderAuthorizationService {
       scope,
       ModelProviderAuthorizationService.writePermission(scope.scopeType),
     );
+  }
+
+  /**
+   * The same question asked of the CREDENTIAL rather than of the person who
+   * minted it: an API key's own scope restrictions intersected with what its
+   * owner may still do. A key narrowed to one project answers `false` for its
+   * organization even when its owner is an administrator.
+   */
+  async apiKeyCanWrite(
+    apiKey: ModelDefaultApiKeyPrincipal,
+    scope: ModelDefaultScope,
+  ): Promise<boolean> {
+    const permission = ModelProviderAuthorizationService.writePermission(scope.scopeType);
+    if (scope.scopeType === "PROJECT") {
+      // A project scope needs its team to be checked, which only the engine
+      // can resolve from the id the caller sent.
+      const decision = await this.authz.getApiKeyProjectDecision({
+        apiKeyId: apiKey.apiKeyId,
+        userId: apiKey.userId,
+        organizationId: apiKey.organizationId,
+        projectId: scope.scopeId,
+        permission,
+      });
+      return decision.outcome === "allowed";
+    }
+
+    return await this.authz.hasApiKeyPermission({
+      apiKeyId: apiKey.apiKeyId,
+      userId: apiKey.userId,
+      organizationId: apiKey.organizationId,
+      scope: { type: scope.scopeType === "ORGANIZATION" ? "org" : "team", id: scope.scopeId },
+      permission,
+    });
   }
 
   /**

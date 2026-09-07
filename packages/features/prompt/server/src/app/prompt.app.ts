@@ -22,7 +22,16 @@ import {
   type UpdatePromptHandleCommand,
   type VersionedPrompt,
 } from "@langwatch/prompt-contract";
+import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { ProjectService } from "@langwatch/project-contract";
+
+/**
+ * Whether the caller may manage prompts in one project. Asked of whatever
+ * credential the request arrived on — a session user at the tRPC door, the
+ * API key itself at the REST one — so the policy below is written once and
+ * neither transport carries its own copy.
+ */
+export type PromptTagCatalogAuthorizer = (input: { projectId: string }) => Promise<boolean>;
 
 /** Who a write is attributed to. */
 export interface PromptCaller {
@@ -382,6 +391,30 @@ export class PromptApp {
   async projectsSharingTagCatalog(input: { projectId: string }): Promise<string[]> {
     const organizationId = await this.organizationOf(input.projectId);
     return this.dependencies.projects.listIdsByOrganization({ organizationId });
+  }
+
+  /**
+   * Refuses unless the caller may manage prompts in EVERY project the tag
+   * catalog reaches. A tag definition is one organization row and its
+   * assignments cascade across the organization, so authorizing only the
+   * project the caller named lets one project's grant rename and delete what
+   * every sibling project resolves. The refusal names the first project the
+   * caller cannot manage.
+   */
+  async assertMayManageTagCatalog(input: {
+    projectId: string;
+    mayManage: PromptTagCatalogAuthorizer;
+  }): Promise<void> {
+    const projectIds = await this.projectsSharingTagCatalog({ projectId: input.projectId });
+    for (const projectId of projectIds) {
+      if (await input.mayManage({ projectId })) continue;
+
+      throw new PermissionDeniedError({
+        permission: "prompts:manage",
+        scope: { type: "project", id: projectId },
+        denialReason: "no-binding",
+      });
+    }
   }
 
   /** Renames a tag and every assignment that carries it. */

@@ -327,7 +327,11 @@ import {
 import { ApiSecretRestFeature } from "../api-secret-rest.feature.ts";
 import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security.ts";
 import { requestTraceIds } from "@langwatch/api/rest";
-import type { AppRestManagementAuditPort, AppRestSecurity } from "@langwatch/api/rest";
+import type {
+  AppRestManagementAuditPort,
+  AppRestSecurity,
+  RestCredentialPrincipal,
+} from "@langwatch/api/rest";
 import { ApiRateLimitInfrastructure } from "../platform/infrastructure/api-rate-limit.infrastructure.ts";
 import {
   ApiAuthAbsenceReportPort,
@@ -1741,7 +1745,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // applications would let the public door and the dashboard disagree about
     // what a metric means, and two prompt services about what a project holds.
     const analytics = this.composedAnalytics.analytics;
-    const prompts = this.composedPrompt.app.promptService;
+    const promptApp = this.composedPrompt.app;
     // The governed-SQL family. Every collaborator is the analytics half's own,
     // so the API key's door and the workbench's door run one validator against
     // one catalogue; the saved charts sit on the same Dashboard application
@@ -1754,7 +1758,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             featureFlags: () => analyticsFeature.featureFlags,
             projects: () => projects,
             langWatchQL: () => analyticsFeature.langWatchQL,
-            protectionsFor: (input: { projectId: string }) =>
+            protectionsFor: (input: { projectId: string; credential: RestCredentialPrincipal }) =>
               analyticsFeature.apiKeyProtections(input),
           },
           dashboard: () => analyticsFeature.dashboard,
@@ -2174,7 +2178,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ...(annotations ? { annotations: () => annotations } : {}),
         analytics: () => analytics,
         ...(langWatchQL ? { langWatchQL } : {}),
-        ...(prompts ? { prompts: () => prompts } : {}),
+        ...(promptApp
+          ? {
+              prompts: {
+                service: () => promptApp.promptService,
+                tagCatalog: () => promptApp,
+                permissions: () => authz,
+              },
+            }
+          : {}),
         ...(organizationManagement ? { organizationManagement } : {}),
         ...(traceExport ? { traceExport } : {}),
         ...(scenarioRunExport ? { scenarioRunExport } : {}),

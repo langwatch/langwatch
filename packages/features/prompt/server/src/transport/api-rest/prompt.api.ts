@@ -174,8 +174,39 @@ export type ApiResponsePrompt = z.infer<typeof apiResponsePromptWithVersionDataS
  */
 export type PromptRestService = PromptApp["promptService"];
 
+/**
+ * The organization-wide guard a tag rename or delete must pass. The prompt
+ * application owns it, and the tRPC door calls the same method, so the two
+ * transports cannot drift apart on which scopes a tag write reaches.
+ */
+export type PromptTagCatalogAuthorization = Pick<PromptApp, "assertMayManageTagCatalog">;
+
+/**
+ * The credential a request arrived on, as this family reads it off its own door.
+ * A legacy project key names no key row, so it can only ever answer for the one
+ * project it is pinned to.
+ */
+export type PromptRestCredential =
+  | Readonly<{
+      type: "apiKey";
+      apiKeyId: string;
+      userId: string | null;
+      organizationId: string;
+    }>
+  | Readonly<{ type: "legacyProjectKey"; projectId: string }>;
+
 /** What this family dispatches through that the prompt feature does not own. */
 export interface PromptRestPorts {
+  /**
+   * Whether the CREDENTIAL this request arrived on — not the person who minted
+   * it — may manage prompts in one project of its own organization. The
+   * process owns the answer because it owns the credential; which projects get
+   * asked about, and the refusal, belong to the prompt application.
+   */
+  mayManagePromptsIn(input: {
+    credential: PromptRestCredential;
+    projectId: string;
+  }): Promise<boolean>;
   /**
    * Organization resolution, applied per route after the access chain has
    * authenticated the caller and set `project`.
@@ -337,6 +368,8 @@ export function createPromptsRestApp(options: {
    * what lets the OpenAPI spec generator build this app with none.
    */
   prompts: () => PromptRestService;
+  /** The prompt application's organization-wide tag guard. @see PromptTagCatalogAuthorization */
+  tagCatalog: () => PromptTagCatalogAuthorization;
   ports: PromptRestPorts;
 }): MountableRestApp {
   // Organization resolution runs after the access chain, which authenticates
@@ -348,7 +381,7 @@ export function createPromptsRestApp(options: {
     bareMount: true,
     routeMiddleware: [options.ports.organizationMiddleware],
   });
-  registerPromptRoutes(family, options.prompts, options.ports);
+  registerPromptRoutes(family, options.prompts, options.ports, options.tagCatalog);
   return family.service.build();
 }
 
@@ -356,8 +389,40 @@ export function registerPromptRoutes(
   family: RestApiVersionedFamily,
   prompts: () => PromptRestService,
   ports: PromptRestPorts,
+  tagCatalog: () => PromptTagCatalogAuthorization,
 ): void {
   const { service, policy } = family;
+
+  /**
+   * The credential this request arrived on. Absent `resolvedToken` means a door
+   * that resolved no key row, which is treated as a key pinned to its project.
+   */
+  const credentialOf = (c: PromptContext): PromptRestCredential => {
+    const resolved = c.get("resolvedToken");
+    if (resolved?.type === "apiKey") {
+      return {
+        type: "apiKey",
+        apiKeyId: resolved.apiKeyId,
+        userId: resolved.userId ?? null,
+        organizationId: resolved.organizationId,
+      };
+    }
+    return { type: "legacyProjectKey", projectId: projectOf(c).id };
+  };
+
+  /**
+   * A tag definition is one organization row whose assignments cascade across
+   * the organization. The family's own door authorizes `prompts:manage` on the
+   * project the key resolved to and nothing else, so a rename or delete asks
+   * the application about every project the catalog reaches.
+   */
+  const assertMayManageTagCatalog = async (c: PromptContext): Promise<void> => {
+    const credential = credentialOf(c);
+    await tagCatalog().assertMayManageTagCatalog({
+      projectId: projectOf(c).id,
+      mayManage: ({ projectId }) => ports.mayManagePromptsIn({ credential, projectId }),
+    });
+  };
 
   // Get all prompts
   service.registerRoute(
@@ -602,6 +667,7 @@ export function registerPromptRoutes(
     async (c: PromptContext, input: z.infer<typeof tagParamsSchema> & { name: string }) => {
       const organization = organizationOf(c);
       const { tag: oldName, name: newName } = input;
+      await assertMayManageTagCatalog(c);
       try {
         const tag = await prompts().renameTag({
           organizationId: organization.id,
@@ -658,6 +724,7 @@ export function registerPromptRoutes(
     async (c: PromptContext, input: z.infer<typeof tagParamsSchema>) => {
       const organization = organizationOf(c);
       const { tag: tagName } = input;
+      await assertMayManageTagCatalog(c);
       try {
         const tag = await prompts().tryDeleteTagByName({
           organizationId: organization.id,

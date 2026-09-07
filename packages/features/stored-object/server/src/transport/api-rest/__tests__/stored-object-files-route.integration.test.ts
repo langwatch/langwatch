@@ -47,6 +47,20 @@ function availableRead(): StoredObjectFileRead {
   };
 }
 
+/** The same row as `availableRead`, carrying the purpose that maps to `traces:view`. */
+function traceContentRead(): StoredObjectFileRead {
+  return {
+    row: {
+      id: OBJECT_ID,
+      purpose: "trace_content",
+      owner_kind: "trace",
+      media_type: "audio/mpeg",
+      size_bytes: BYTES.length,
+    },
+    stream: Readable.from([BYTES]),
+  };
+}
+
 function missingRead(): StoredObjectFileRead {
   return {
     row: {
@@ -239,7 +253,45 @@ describe("given the /api/files family", () => {
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
 
       expect(response.status).toBe(200);
-      expect(asked).toEqual(["traces:view", "scenarios:view"]);
+      // The first two are the pre-read gate trying each category; the third is
+      // the post-read gate asking for the one this object's purpose maps to.
+      expect(asked).toEqual(["traces:view", "scenarios:view", "scenarios:view"]);
+    });
+  });
+
+  describe("when the key holds trace access only and the object it names is scenario media", () => {
+    /** @scenario "An API key reading a stored object is held to the permission its purpose maps to" */
+    it("refuses on the purpose gate with the key's own code, and streams nothing", async () => {
+      const api = mount({
+        read: async () => availableRead(),
+        caller: { apiKeyProjectId: OWNER_PROJECT },
+        apiKeyCeiling: async (permission) => {
+          if (permission !== "traces:view") throw new ApiKeyPermissionDeniedTestError();
+        },
+      });
+
+      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({ error: "api_key_permission_denied" });
+    });
+  });
+
+  describe("when the key holds trace access only and the object it names is trace media", () => {
+    /** @scenario "An API key reading a stored object is held to the permission its purpose maps to" */
+    it("answers 200, because the purpose maps to the permission the key holds", async () => {
+      const api = mount({
+        read: async () => traceContentRead(),
+        caller: { apiKeyProjectId: OWNER_PROJECT },
+        apiKeyCeiling: async (permission) => {
+          if (permission !== "traces:view") throw new ApiKeyPermissionDeniedTestError();
+        },
+      });
+
+      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
+
+      expect(response.status).toBe(200);
+      await expect(response.text()).resolves.toBe(BYTES.toString("utf8"));
     });
   });
 

@@ -9,6 +9,7 @@ import type {
   AppRestSecurity,
   MountableRestApp,
 } from "@langwatch/api/rest";
+import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
@@ -49,7 +50,7 @@ import { createCronRestApp, type CronRestPorts } from "../features/cron/cron-res
 
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { PromptRestService } from "@langwatch/prompt-server";
+import type { PromptRestService, PromptTagCatalogAuthorization } from "@langwatch/prompt-server";
 
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -144,12 +145,21 @@ import {
 
 /**
  * The project credential a handler-managed family resolves through.
+ *
+ * The resolved token travels with the answer because a family that asks a
+ * SECOND permission question of its caller — costs, say — has to ask it of the
+ * credential and not of whoever holds it.
  */
 export type ApiHandlerManagedCredentialPort = (input: {
   request: Request;
   permission: AuthzPermission;
 }) => Promise<
-  | Readonly<{ ok: true; project: Readonly<{ id: string }>; markUsed: () => void }>
+  | Readonly<{
+      ok: true;
+      project: Readonly<{ id: string }>;
+      resolved: ResolvedApiKeyToken;
+      markUsed: () => void;
+    }>
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>
 >;
 
@@ -173,8 +183,19 @@ export type ApiProcessRestServices = Readonly<{
         dashboard: () => DashboardApp;
       }>
     | undefined;
-  /** The prompt library `/api/prompts` reads and writes. */
-  prompts?: (() => PromptRestService) | undefined;
+  /**
+   * The prompt library `/api/prompts` reads and writes, plus the two things its
+   * tag doors need beyond the service: the application's organization-wide tag
+   * guard, and the engine that answers whether the CREDENTIAL a request arrived
+   * on may act in a sibling project.
+   */
+  prompts?:
+    | Readonly<{
+        service: () => PromptRestService;
+        tagCatalog: () => PromptTagCatalogAuthorization;
+        permissions: () => AuthzService;
+      }>
+    | undefined;
   /**
    * The organization directory a project-scoped family resolves a tenant through.
    */
@@ -436,7 +457,9 @@ export function createApiProcessRestFeatures(options: {
     features.push(
       mountPromptsRest({
         security,
-        prompts,
+        prompts: prompts.service,
+        tagCatalog: prompts.tagCatalog,
+        permissions: prompts.permissions,
         organizations,
         publicBaseUrl: ports.publicBaseUrl,
       }),

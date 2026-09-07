@@ -248,7 +248,15 @@ function mount(options: MountOptions) {
     security: passThroughSecurity(),
     services: {
       ...(options.analytics ? { analytics: () => options.analytics! } : {}),
-      ...(options.prompts ? { prompts: () => options.prompts! } : {}),
+      ...(options.prompts
+        ? {
+            prompts: {
+              service: () => options.prompts!,
+              tagCatalog: () => ({ assertMayManageTagCatalog: async () => undefined }),
+              permissions: () => ({}) as AuthzService,
+            },
+          }
+        : {}),
       organizations: () => ({
         getTeamById: async () => {
           if (options.organizationsFail) {

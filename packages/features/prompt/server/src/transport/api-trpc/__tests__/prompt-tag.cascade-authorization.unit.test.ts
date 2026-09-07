@@ -4,34 +4,40 @@
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { ProjectService } from "@langwatch/project-contract";
+import type { PromptService } from "@langwatch/prompt-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import type { PromptApp } from "#app/prompt.app";
+import { PromptApp } from "#app/prompt.app";
 import { PromptTagTrpcApi } from "../prompt-tag.api.ts";
 import type { PromptTrpcContext } from "../../../rules/prompt-trpc-context.rules.ts";
 
 const ORGANIZATION_PROJECTS = ["project_a", "project_b"];
 
-function buildCaller(options: { manageable: readonly string[]; app?: Partial<PromptApp> }) {
-  const renameTagForProject = vi.fn(async () => ({
+/**
+ * The real application, so the cascade this suite is about is the one the REST
+ * door also calls rather than a second copy written for the test.
+ */
+function buildCaller(options: { manageable: readonly string[] }) {
+  const prompts = PromptApp.create({
+    prompts: {} as unknown as PromptService,
+    projects: {
+      getOrganizationId: async () => "organization_1",
+      listIdsByOrganization: async () => ORGANIZATION_PROJECTS,
+    } as unknown as ProjectService,
+  });
+
+  const renameTagForProject = vi.spyOn(prompts, "renameTagForProject").mockResolvedValue({
     id: "tag_1",
     organizationId: "organization_1",
     name: "release",
-  }));
-  const deleteTagForProject = vi.fn(async () => ({
+  } as never);
+  const deleteTagForProject = vi.spyOn(prompts, "deleteTagForProject").mockResolvedValue({
     id: "tag_1",
     organizationId: "organization_1",
     name: "production",
-  }));
-  const projectsSharingTagCatalog = vi.fn(async () => ORGANIZATION_PROJECTS);
-
-  const prompts = {
-    renameTagForProject,
-    deleteTagForProject,
-    projectsSharingTagCatalog,
-    ...options.app,
-  } as unknown as PromptApp;
+  } as never);
 
   const can = vi.fn(async (_permission: AuthzPermission, target: { projectId: string }) =>
     options.manageable.includes(target.projectId),

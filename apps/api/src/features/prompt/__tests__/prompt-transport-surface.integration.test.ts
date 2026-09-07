@@ -118,6 +118,9 @@ describe("given the prompt transports mounted on the process's own roots", () =>
       const app = createPromptsRestApp({
         security: projectSecurity(),
         prompts: prompts as never,
+        tagCatalog: () => {
+          throw new Error("mounting must not construct the prompt application");
+        },
         ports: {
           organizationMiddleware: (async (_c, next) => {
             await next();

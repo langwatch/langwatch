@@ -4,6 +4,7 @@ import type {
   ModelCostEstimateInput,
   ModelCostListInput,
   ModelCostWriteInput,
+  ModelDefaultApiKeyScopeCheck,
   ModelDefaultAssignmentInput,
   ModelDefaultConfig,
   ModelDefaultConfigWriteInput,
@@ -99,6 +100,12 @@ export abstract class ModelProviderService {
   }): Promise<ModelProviderAlternateResolution>;
   abstract setDefault(input: ModelDefaultAssignmentInput): Promise<void>;
   abstract saveDefaultConfig(input: ModelDefaultConfigWriteInput): Promise<ModelDefaultConfig>;
+  /**
+   * Refuses unless the API KEY itself may write every scope named. The write
+   * already checks the key owner; a transport that stops there lets a key
+   * restricted to one project change what the whole organization resolves.
+   */
+  abstract assertApiKeyMayWriteDefaultScopes(input: ModelDefaultApiKeyScopeCheck): Promise<void>;
   abstract tryGetDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null>;
   abstract deleteDefaultConfig(input: ModelDefaultDeleteInput): Promise<void>;
   abstract listCosts(input: ModelCostListInput): Promise<ModelCost[]>;

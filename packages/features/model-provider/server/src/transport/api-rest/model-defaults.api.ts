@@ -4,6 +4,8 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   ModelDefaultUserKeyRequiredError,
+  type ModelDefaultApiKeyPrincipal,
+  type ModelDefaultScope,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import { apiKeyPermission, requires } from "@langwatch/api";
@@ -25,7 +27,7 @@ import {
 
 const logger = createLogger("langwatch:api:model-defaults");
 
-/** Ceiling on the project a key resolved to — the service checks scopes against the owning user. */
+/** Ceiling on the project a key resolved to. Every scope the write NAMES is checked separately, below. */
 const MODEL_DEFAULTS_WRITE_PERMISSION = "project:manage" as const;
 
 const configIdParamsSchema = z.object({ id: z.string().min(1) });
@@ -62,6 +64,35 @@ export function createModelDefaultsRestApp(options: {
   const projectId = (c: ModelDefaultsContext): string => projectOf(c).id;
   const actorId = (c: ModelDefaultsContext): string | undefined => c.get("apiKeyUserId");
 
+  /**
+   * The API key this request arrived on, or none for a credential that is not
+   * one (a legacy project key names no key row).
+   */
+  const apiKeyPrincipal = (c: ModelDefaultsContext): ModelDefaultApiKeyPrincipal | undefined => {
+    const resolved = c.get("resolvedToken");
+    if (resolved?.type !== "apiKey") return undefined;
+    return {
+      apiKeyId: resolved.apiKeyId,
+      userId: resolved.userId ?? null,
+      organizationId: resolved.organizationId,
+    };
+  };
+
+  /**
+   * The scopes a write NAMES, authorized against the credential rather than
+   * against its owner. The service checks the same scopes against the key
+   * owner; without this a project-restricted key minted by an administrator
+   * wrote the organization's defaults with the administrator's grants.
+   */
+  const authorizeRequestedScopes = async (
+    c: ModelDefaultsContext,
+    scopes: ModelDefaultScope[] | undefined,
+  ): Promise<void> => {
+    const apiKey = apiKeyPrincipal(c);
+    if (!apiKey || !scopes?.length) return;
+    await modelProviders().assertApiKeyMayWriteDefaultScopes({ apiKey, scopes });
+  };
+
   const snapshotHandler = async (c: ModelDefaultsContext) => {
     const snapshot = await modelProviders().getDefaultSnapshot({
       projectId: projectId(c),
@@ -95,6 +126,7 @@ export function createModelDefaultsRestApp(options: {
     const userId = actorId(c);
     try {
       if (!userId) throw new ModelDefaultUserKeyRequiredError();
+      await authorizeRequestedScopes(c, input.scopes);
       const saved = await modelProviders().saveDefaultConfig({
         config: input.config,
         scopes: input.scopes,
@@ -120,6 +152,7 @@ export function createModelDefaultsRestApp(options: {
     const userId = actorId(c);
     try {
       if (!userId) throw new ModelDefaultUserKeyRequiredError();
+      await authorizeRequestedScopes(c, input.scopes);
       const saved = await modelProviders().saveDefaultConfig({
         id: input.id,
         config: input.config,
@@ -163,10 +196,11 @@ export function createModelDefaultsRestApp(options: {
           responses: baseResponses,
         }),
       )
-      // The canonical service gates every target scope against the KEY OWNER,
-      // so the route declares the API-key ceiling on top: without it a
-      // deliberately narrow key wrote the organization's defaults with its
-      // owner's grants.
+      // The canonical service gates every target scope against the KEY OWNER.
+      // Two things sit on top: the API-key ceiling on the project the key
+      // resolved to, and `authorizeRequestedScopes`, which asks the same
+      // scope-by-scope question of the CREDENTIAL. The ceiling alone let a
+      // narrow key write the organization with its owner's grants.
       .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
         policy(apiKeyPermission(MODEL_DEFAULTS_WRITE_PERMISSION))(b)
           .withInput(createModelDefaultConfigInputSchema)

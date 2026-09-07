@@ -28,6 +28,8 @@ export {
   type ApiResponsePrompt,
   type PromptAppVariables,
   type PromptOrganizationVariables,
+  type PromptRestCredential,
   type PromptRestPorts,
   type PromptRestService,
+  type PromptTagCatalogAuthorization,
 } from "./transport/api-rest/prompt.api.ts";

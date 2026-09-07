@@ -17,7 +17,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { PrismaPromptTagRepository } from "../../../repositories/prisma/prisma.prompt-tag.repository.ts";
 import type { PromptTagDatabase } from "../../../repositories/prisma/prisma.prompt-tag.repository.ts";
 import { PromptTagService } from "../../../services/prompt-tag.service.ts";
-import { createPromptsRestApp, type PromptRestPorts, type PromptRestService } from "../prompt.api.ts";
+import {
+  createPromptsRestApp,
+  type PromptRestPorts,
+  type PromptRestService,
+} from "../prompt.api.ts";
 
 const ORGANIZATION_ID = "org_tags";
 
@@ -150,6 +154,7 @@ function buildApi() {
   } as unknown as PromptRestService;
 
   const ports: PromptRestPorts = {
+    mayManagePromptsIn: async () => true,
     organizationMiddleware: async (c, next) => {
       c.set("organization", { id: ORGANIZATION_ID });
       await next();
@@ -159,7 +164,12 @@ function buildApi() {
     uniqueConstraintTargets: () => [],
   };
 
-  const app = createPromptsRestApp({ security: testSecurity(), prompts: () => service, ports });
+  const app = createPromptsRestApp({
+    security: testSecurity(),
+    prompts: () => service,
+    tagCatalog: () => ({ assertMayManageTagCatalog: async () => undefined }),
+    ports,
+  });
 
   return {
     repository,

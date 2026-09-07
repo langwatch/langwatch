@@ -202,7 +202,11 @@ function processServices(): ApiProcessRestServices {
       collaborators: opaque(),
       dashboard: refuse("Dashboards"),
     },
-    prompts: refuse("Prompts"),
+    prompts: {
+      service: refuse("Prompts"),
+      tagCatalog: refuse("The prompt application"),
+      permissions: refuse("Authorization"),
+    },
     organizations: refuse("The organization directory"),
     organizationManagement: {
       organizations: refuse("Organization management"),

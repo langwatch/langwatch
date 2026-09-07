@@ -229,24 +229,41 @@ export function createFilesRestApp<
 
   /**
    * Purpose-specific authorization, applied once the row (and so its purpose) is known: `trace_content` objects
-   * require `traces:view`, everything else (the scenario purposes) requires `scenarios:view`. An API-key caller was
-   * already pinned to the owning project and capped by its own ceiling in `authorizeFileRead`.
+   * require `traces:view`, everything else (the scenario purposes) requires `scenarios:view`. Every caller passes
+   * through it. `authorizeFileRead` admits a caller holding EITHER category, because the purpose is not yet known;
+   * a key that stopped there read a scenario object on `traces:view` alone, so the key branch asks its own ceiling
+   * for the one permission this purpose maps to, and the session branch asks the same of the user.
    */
   async function authorizeFilePurpose({
+    apiKeyProjectId,
+    apiKeyCeiling,
     userId,
     ownerProjectId,
     purpose,
   }: {
+    apiKeyProjectId: string | undefined;
+    apiKeyCeiling: FilesDualAuthVariables["apiKeyCeiling"];
     userId: string | undefined;
     ownerProjectId: string;
     purpose: string;
   }): Promise<void> {
+    const permission = requiredPermissionForPurpose(purpose);
+    if (apiKeyProjectId) {
+      if (!apiKeyCeiling) {
+        // Same broken contract `authorizeFileRead` refuses on: the verifier
+        // sets this for every key it resolves.
+        throw new HTTPException(500, { message: "api key ceiling unresolved" });
+      }
+      // The key's own refusal, with its own code — the shape `authorizeFileRead` already lets through.
+      await apiKeyCeiling(permission);
+      return;
+    }
     if (!userId) return;
     try {
       await requireProjectPermission({
         userId,
         projectId: ownerProjectId,
-        permission: requiredPermissionForPurpose(purpose),
+        permission,
       });
     } catch (err) {
       if (!isPermissionDenial(err)) throw err;
@@ -351,6 +368,8 @@ export function createFilesRestApp<
     // Step 4.5: purpose gate — now that the row is known, enforce the
     // permission category the object's purpose maps to.
     await authorizeFilePurpose({
+      apiKeyProjectId,
+      apiKeyCeiling: c.get("apiKeyCeiling"),
       userId,
       ownerProjectId: authorizedProjectId,
       purpose: result.row.purpose,

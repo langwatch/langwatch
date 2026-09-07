@@ -5,6 +5,7 @@ import {
   type ModelCostDeleteInput,
   type ModelCostEstimateInput,
   type ModelCostWriteInput,
+  type ModelDefaultApiKeyScopeCheck,
   type ModelDefaultAssignmentInput,
   type ModelDefaultConfig,
   type ModelDefaultConfigWriteInput,
@@ -90,12 +91,14 @@ export class ModelProviderService extends ModelProviderServiceContract {
   private readonly execution: ModelProviderExecutionService;
   private readonly query: ModelProviderQueryService;
   private readonly resolution: ModelProviderResolutionService;
+  private readonly writeAuthorization: ModelProviderWriteAuthorizationService;
 
   private constructor(private readonly options: ModelProviderServiceOptions) {
     super();
 
     const authorization = ModelProviderAuthorizationService.create(options.authorization);
     const writeAuthorization = ModelProviderWriteAuthorizationService.create(authorization);
+    this.writeAuthorization = writeAuthorization;
     const scopes = ModelProviderScopeService.create({
       projects: options.projects,
       organizations: options.organizations,
@@ -274,6 +277,10 @@ export class ModelProviderService extends ModelProviderServiceContract {
 
   saveDefaultConfig(input: ModelDefaultConfigWriteInput): Promise<ModelDefaultConfig> {
     return this.defaultWrites.save(input);
+  }
+
+  assertApiKeyMayWriteDefaultScopes(input: ModelDefaultApiKeyScopeCheck): Promise<void> {
+    return this.writeAuthorization.assertApiKeyCanWriteDefault(input.apiKey, input.scopes);
   }
 
   tryGetDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null> {
