@@ -5,7 +5,9 @@ keywords: langwatch, agent testing, evaluators, golden answer, golden sql, test 
 description: Attach an evaluator to a test suite and every scenario run is checked against the golden answer the scenario holds, such as a reference SQL query, with a required evaluator failing the run when the check fails.
 ---
 
-This guide sets up the test suite of a text-to-SQL agent in the LangWatch interface: two fields, `golden_sql` and `table_schema`, a required **SQL Query Equivalence** evaluator that reads the query the agent ran from its `run_sql` tool call, and a score judge that reports without gating. By the end, every run of the suite shows one verdict per evaluator beside the judge's, and a wrong query fails the run.
+This guide sets up the test suite of a text-to-SQL agent in the LangWatch interface: two fields, `golden_sql` and `table_schema`, a required **SQL Query Equivalence** evaluator that reads the query the agent ran from its `run_sql` tool call, and a score judge that reports without gating.
+
+By the end, every run of the suite shows one result per evaluator beside the judge's verdict, a pass or fail, a score, or the reason it was skipped, and a wrong query fails the run.
 
 ## Before you start
 
@@ -55,7 +57,7 @@ This guide sets up the test suite of a text-to-SQL agent in the LangWatch interf
     The **Evaluators** block of the run dialog: the two chips inherited from the suite, and a PII Leak Scanner added on this run.
   </Step>
   <Step title="Read the results">
-    The run header shows one pill per evaluator: the pass rate of a pass or fail evaluator, the mean of a score. Every row shows the verdict or the score of each evaluator, and a skipped one in grey.
+    The run header shows one pill per evaluator: the pass rate of a pass or fail evaluator, the mean of a score. Every row shows one pill per evaluator: its verdict, its score, or `Skipped` in grey when the scenario had no value for it.
 
     Press a row: the drawer lists the evaluators under **EVALUATORS**, below the criteria, with the `REQUIRED` mark, the verdict, the evaluator's explanation and its **Inputs**. A run the required evaluator failed reads `Verdict: FAILED · SQL Query Equivalence`, with the judge's criteria kept.
 

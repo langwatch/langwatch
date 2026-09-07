@@ -42,9 +42,9 @@ Press a run plan. The sidebar lists its runs as **Run #n** with the note, the ti
 
 **Show run settings** opens the configuration the run used: **Started**, **Targets**, **Parameters**, **Repeat**, **Simulator model** and **Judge model**.
 
-The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The **Evaluators** column appears only on a run that has evaluators, and its cell shows one pill per evaluator that ran, with its verdict or its score; a row whose evaluators are still running reads `Grading`.
+The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The **Evaluators** column appears only on a run that has evaluators, and its cell shows one pill per attached evaluator, with its verdict, its score or its status when it was skipped or hit an error; a row whose evaluators are still running reads `Grading`.
 
-The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`.
+The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`, or in `Evaluating` while the evaluators of the run are still reporting.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-grid.png" alt="The Grid view of a run, one card per scenario execution" />
@@ -70,11 +70,11 @@ An [evaluator](/agent-testing/evaluators) attached to the test suite or to the r
 <img className="block" src="/images/agent-testing/results-run-evaluator-pills.png" alt="The results page of a run: the header pills SQL Query Equivalence 67%, Answer clarity score 9.25 and PII Leak Scanner 100%, and one pill per evaluator on each row, one of them Skipped and one Fail" />
 </Frame>
 
-The header pills, one per evaluator, and the **Evaluators** column with one pill per evaluator on every row. A skipped evaluator keeps its pill, in grey.
+The header shows one pill per evaluator, and the **Evaluators** column shows one pill per evaluator on every row. A skipped evaluator keeps its pill, in grey.
 
 | Status | Meaning |
 |---|---|
-| `passed`, `failed` | The evaluator's verdict, and what a required input the trace never delivered is recorded as: no such tool call, or no retrieved contexts. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
+| `passed`, `failed` | The evaluator's verdict, and what a required input the trace never delivered is recorded as: no such tool call, no retrieved contexts, or no spans in the trace. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
 | `scored` | The score of an evaluator with no pass or fail verdict. A score never fails a scenario. |
 | `skipped` | The scenario has no value for a field the mapping reads. The reason names the field. |
 | `error` | The evaluator itself failed to run. The reason says why. |

@@ -32760,7 +32760,7 @@ For example, on a text-to-SQL agent the suite declares `golden_sql` and `table_s
 <img className="block" src="/images/agent-testing/evaluator-drawer-mappings-required.png" alt="The SQL Query Equivalence drawer with output mapped to tool_calls.run_sql.input, expected_output to Scenario.fields.golden_sql, expected_contexts to Scenario.fields.table_schema, and Required to pass switched on" />
 </Frame>
 
-The drawer on that attachment: one mapping per input under **Variables**, and the **Required to pass** switch under them. The step by step is in [Grade runs with evaluators](/agent-testing/grade-runs-with-evaluators).
+The drawer on that attachment: one mapping per input under **Variables**, and the **Required to pass** switch under them. The steps to set this up are on [Grade runs with evaluators](/agent-testing/grade-runs-with-evaluators).
 
 ## Required evaluators and scores
 
@@ -32831,7 +32831,9 @@ keywords: langwatch, agent testing, evaluators, golden answer, golden sql, test 
 description: Attach an evaluator to a test suite and every scenario run is checked against the golden answer the scenario holds, such as a reference SQL query, with a required evaluator failing the run when the check fails.
 ---
 
-This guide sets up the test suite of a text-to-SQL agent in the LangWatch interface: two fields, `golden_sql` and `table_schema`, a required **SQL Query Equivalence** evaluator that reads the query the agent ran from its `run_sql` tool call, and a score judge that reports without gating. By the end, every run of the suite shows one verdict per evaluator beside the judge's, and a wrong query fails the run.
+This guide sets up the test suite of a text-to-SQL agent in the LangWatch interface: two fields, `golden_sql` and `table_schema`, a required **SQL Query Equivalence** evaluator that reads the query the agent ran from its `run_sql` tool call, and a score judge that reports without gating.
+
+By the end, every run of the suite shows one result per evaluator beside the judge's verdict, a pass or fail, a score, or the reason it was skipped, and a wrong query fails the run.
 
 ## Before you start
 
@@ -32881,7 +32883,7 @@ This guide sets up the test suite of a text-to-SQL agent in the LangWatch interf
     The **Evaluators** block of the run dialog: the two chips inherited from the suite, and a PII Leak Scanner added on this run.
   </Step>
   <Step title="Read the results">
-    The run header shows one pill per evaluator: the pass rate of a pass or fail evaluator, the mean of a score. Every row shows the verdict or the score of each evaluator, and a skipped one in grey.
+    The run header shows one pill per evaluator: the pass rate of a pass or fail evaluator, the mean of a score. Every row shows one pill per evaluator: its verdict, its score, or `Skipped` in grey when the scenario had no value for it.
 
     Press a row: the drawer lists the evaluators under **EVALUATORS**, below the criteria, with the `REQUIRED` mark, the verdict, the evaluator's explanation and its **Inputs**. A run the required evaluator failed reads `Verdict: FAILED · SQL Query Equivalence`, with the judge's criteria kept.
 
@@ -33748,9 +33750,9 @@ Press a run plan. The sidebar lists its runs as **Run #n** with the note, the ti
 
 **Show run settings** opens the configuration the run used: **Started**, **Targets**, **Parameters**, **Repeat**, **Simulator model** and **Judge model**.
 
-The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The **Evaluators** column appears only on a run that has evaluators, and its cell shows one pill per evaluator that ran, with its verdict or its score; a row whose evaluators are still running reads `Grading`.
+The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The **Evaluators** column appears only on a run that has evaluators, and its cell shows one pill per attached evaluator, with its verdict, its score or its status when it was skipped or hit an error; a row whose evaluators are still running reads `Grading`.
 
-The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`.
+The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`, or in `Evaluating` while the evaluators of the run are still reporting.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-grid.png" alt="The Grid view of a run, one card per scenario execution" />
@@ -33776,11 +33778,11 @@ An [evaluator](/agent-testing/evaluators) attached to the test suite or to the r
 <img className="block" src="/images/agent-testing/results-run-evaluator-pills.png" alt="The results page of a run: the header pills SQL Query Equivalence 67%, Answer clarity score 9.25 and PII Leak Scanner 100%, and one pill per evaluator on each row, one of them Skipped and one Fail" />
 </Frame>
 
-The header pills, one per evaluator, and the **Evaluators** column with one pill per evaluator on every row. A skipped evaluator keeps its pill, in grey.
+The header shows one pill per evaluator, and the **Evaluators** column shows one pill per evaluator on every row. A skipped evaluator keeps its pill, in grey.
 
 | Status | Meaning |
 |---|---|
-| `passed`, `failed` | The evaluator's verdict, and what a required input the trace never delivered is recorded as: no such tool call, or no retrieved contexts. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
+| `passed`, `failed` | The evaluator's verdict, and what a required input the trace never delivered is recorded as: no such tool call, no retrieved contexts, or no spans in the trace. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
 | `scored` | The score of an evaluator with no pass or fail verdict. A score never fails a scenario. |
 | `skipped` | The scenario has no value for a field the mapping reads. The reason names the field. |
 | `error` | The evaluator itself failed to run. The reason says why. |
