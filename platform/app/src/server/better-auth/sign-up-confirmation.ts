@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { BetterAuthPlugin, GenericEndpointContext } from "better-auth";
+import type { BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
 import { z } from "zod";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
@@ -44,7 +44,6 @@ export interface SignUpConfirmationDirectoryPort {
  */
 export interface ConfirmSignUpAddressContext extends SessionMintingContext {
   body: { token: string };
-  setStatus: GenericEndpointContext["setStatus"];
   json: (body: Record<string, unknown> | null) => unknown;
 }
 
@@ -111,8 +110,7 @@ export class SignUpConfirmationEndpoint {
       // an `APIError`.
       if (HandledError.isHandled(error)) {
         const { statusCode, body } = handledErrorResponseBody(error);
-        ctx.setStatus(statusCode);
-        return ctx.json(body as Record<string, unknown>);
+        return Response.json(body, { status: statusCode });
       }
       throw error;
     }

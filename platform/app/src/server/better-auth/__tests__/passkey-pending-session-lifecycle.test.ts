@@ -31,7 +31,9 @@ const cborLength = (major: number, length: number) => {
   return Uint8Array.of((major << 5) | 25, length >> 8, length & 0xff);
 };
 
-const cbor = (value: string | number | Uint8Array | Map<unknown, unknown>) => {
+const cbor = (
+  value: string | number | Uint8Array | Map<unknown, unknown>,
+): Uint8Array => {
   if (typeof value === "number") {
     return value >= 0 ? cborLength(0, value) : cborLength(1, -1 - value);
   }
