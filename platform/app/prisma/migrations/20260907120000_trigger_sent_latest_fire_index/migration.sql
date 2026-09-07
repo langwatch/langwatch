@@ -41,6 +41,12 @@
 -- went from a 68 ms parallel sequential scan to a 0.013 ms index scan on
 -- the same data. Read the build times as an order of magnitude: expect
 -- roughly ten seconds against production, not five.
+--
+-- ORDERING NOTE: the creates come before the drops on purpose. `prisma
+-- migrate diff` emits the drops first; in that order the ACCESS EXCLUSIVE
+-- lock the drops take is held through the whole build above, and reads
+-- block for those ten seconds too, not just writes. Keep this order if the
+-- file is ever regenerated.
 CREATE INDEX "TriggerSent_projectId_triggerId_createdAt_idx" ON "TriggerSent"("projectId", "triggerId", "createdAt");
 CREATE INDEX "TriggerSent_projectId_createdAt_idx" ON "TriggerSent"("projectId", "createdAt");
 
