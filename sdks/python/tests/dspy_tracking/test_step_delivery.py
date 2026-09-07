@@ -84,6 +84,7 @@ class TestWhenTheStepPostFails:
         assert langwatch_dspy.steps_buffer == []
 
     # @scenario "A client error is a real answer, not a blip"
+    @pytest.mark.unit
     def test_does_not_retry_a_client_error(self, posts, caplog):
         posts.statuses.extend([422])
 
@@ -95,6 +96,7 @@ class TestWhenTheStepPostFails:
         assert "Could not log optimizer step 0" in caplog.text
 
     # @scenario "The buffer is bounded while the platform is down"
+    @pytest.mark.unit
     def test_drops_the_oldest_steps_at_the_bound(self, posts, monkeypatch, caplog):
         monkeypatch.setattr(langwatch.dspy, "MAX_BUFFERED_STEPS", 2)
         posts.statuses.extend([502] * 12)
