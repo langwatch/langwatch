@@ -8,7 +8,7 @@ import { models } from "../config/models";
 type Row = Record<string, unknown>;
 
 describe("real BetterAuth pending sign-up session gate", () => {
-  /** @scenario Client session flags cannot bypass address confirmation */
+  /** @scenario Pending password sign-in cannot mint a session */
   it("blocks pending credentials but preserves legacy unverified sign-in", async () => {
     const email = "pending-password@example.com";
     const password = "password-123";
