@@ -177,6 +177,44 @@ describe("feature API contract lint", () => {
       );
     },
   );
+  it.each([
+    'get: WidgetApi["get"] = () => this.#service.get();',
+    'get = function() { return "value"; };',
+  ])("accepts a declared callable field %s", (operation) => {
+    install("defined");
+    const file = join(root, server, "src/widget.server.ts");
+    write(
+      `${server}/src/widget.server.ts`,
+      readFileSync(file, "utf8").replace("get() { return this.#service.get(); }", operation),
+    );
+    expect(findings()).toEqual([]);
+  });
+  it.each([
+    "get = service.get;",
+    "get?: () => string;",
+    "get: () => string;",
+    'get get() { return () => "value"; }',
+    "get = service;",
+    'helper = () => "value";',
+  ])("rejects an opaque or undeclared callable field %s", (operation) => {
+    install("defined");
+    const file = join(root, server, "src/widget.server.ts");
+    write(
+      `${server}/src/widget.server.ts`,
+      readFileSync(file, "utf8").replace("get() { return this.#service.get(); }", operation),
+    );
+    expect(findings().some((item) => item.message.includes("different public surface"))).toBe(true);
+  });
+  it("accepts overloads of one public operation", () => {
+    api("get(id: string): string; get(id: number): string;");
+    install("defined");
+    expect(findings()).toEqual([]);
+  });
+  it("rejects a leaking overload even when another signature is valid", () => {
+    api("get(id: string): string; get(id: number): WidgetService;");
+    install("defined");
+    expect(findings().some((item) => item.message.includes("callable operations only"))).toBe(true);
+  });
   it("rejects a public helper method outside the API", () => {
     install("defined", "helper() { return this.#service.get(); }");
     expect(findings().some((item) => item.message.includes("different public surface"))).toBe(true);

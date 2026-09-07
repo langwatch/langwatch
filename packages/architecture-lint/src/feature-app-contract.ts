@@ -18,6 +18,100 @@ function modifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
 
 type InterfaceDeclaration = { file: string; node: ts.InterfaceDeclaration };
 type VariableDeclaration = { file: string; node: ts.VariableDeclaration };
+type ClassDeclaration = { file: string; node: ts.ClassDeclaration };
+type ExportedDeclaration = InterfaceDeclaration | VariableDeclaration | ClassDeclaration;
+
+function exportTarget(
+  statement: ts.ExportDeclaration,
+  name: string,
+  resolver: WorkspaceModuleResolver,
+  file: string,
+  acceptsExport: (element: ts.ExportSpecifier) => boolean,
+): { file: string; name: string } | undefined {
+  if (statement.isTypeOnly) return void 0;
+
+  const specifier = statement.moduleSpecifier;
+  if (!specifier || !ts.isStringLiteral(specifier)) return void 0;
+
+  const target = resolver.resolve({ file, specifier: specifier.text });
+  if (!target) return void 0;
+
+  if (!statement.exportClause) return { file: target, name };
+
+  const isNamed = ts.isNamedExports(statement.exportClause);
+  if (!isNamed) return void 0;
+
+  const item = statement.exportClause.elements.find(
+    (element) => element.name.text === name && acceptsExport(element),
+  );
+
+  return item ? { file: target, name: (item.propertyName ?? item.name).text } : void 0;
+}
+
+function featureApiCallParts(initializer: ts.CallExpression):
+  | {
+      expression: ts.Identifier;
+      argument: ts.StringLiteral;
+      typeName: ts.Identifier;
+    }
+  | undefined {
+  if (!ts.isIdentifier(initializer.expression)) return void 0;
+
+  if (initializer.arguments.length !== 1) return void 0;
+
+  const argument = initializer.arguments[0];
+  if (!argument || !ts.isStringLiteral(argument)) return void 0;
+
+  const typeArgument = initializer.typeArguments?.[0];
+  if (!typeArgument || !ts.isTypeReferenceNode(typeArgument)) return void 0;
+
+  if (!ts.isIdentifier(typeArgument.typeName)) return void 0;
+
+  return {
+    expression: initializer.expression,
+    argument,
+    typeName: typeArgument.typeName,
+  };
+}
+
+function exportedDeclaration<T extends ExportedDeclaration>(
+  file: string,
+  name: string,
+  resolver: WorkspaceModuleResolver,
+  declarationOf: (statement: ts.Statement, name: string) => T | undefined,
+  acceptsExport: (element: ts.ExportSpecifier) => boolean = () => true,
+  visited = new Set<string>(),
+): T | undefined {
+  const key = `${file}:${name}`;
+  const alreadyVisited = visited.has(key);
+  if (alreadyVisited) return void 0;
+
+  if (!existsSync(file)) return void 0;
+
+  visited.add(key);
+  for (const statement of source(file).statements) {
+    const declaration = declarationOf(statement, name);
+    const isExported = declaration !== void 0 && modifier(statement, ts.SyntaxKind.ExportKeyword);
+    if (isExported) return declaration;
+
+    if (!ts.isExportDeclaration(statement)) continue;
+
+    const target = exportTarget(statement, name, resolver, file, acceptsExport);
+    if (!target) continue;
+
+    const found = exportedDeclaration(
+      target.file,
+      target.name,
+      resolver,
+      declarationOf,
+      acceptsExport,
+      visited,
+    );
+    if (found) return found;
+  }
+
+  return void 0;
+}
 
 function exportedInterface(
   file: string,
@@ -25,33 +119,17 @@ function exportedInterface(
   resolver: WorkspaceModuleResolver,
   visited = new Set<string>(),
 ): InterfaceDeclaration | undefined {
-  const key = `${file}:${name}`;
-  if (visited.has(key) || !existsSync(file)) return void 0;
-  visited.add(key);
-  for (const statement of source(file).statements) {
-    if (
-      ts.isInterfaceDeclaration(statement) &&
-      statement.name.text === name &&
-      modifier(statement, ts.SyntaxKind.ExportKeyword)
-    )
-      return { file, node: statement };
-    if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
-    const specifier = statement.moduleSpecifier;
-    if (!specifier || !ts.isStringLiteral(specifier)) continue;
-    const target = resolver.resolve({ file, specifier: specifier.text });
-    if (!target) continue;
-    if (!statement.exportClause) {
-      const found = exportedInterface(target, name, resolver, visited);
-      if (found) return found;
-      continue;
-    }
-    if (!ts.isNamedExports(statement.exportClause)) continue;
-    const item = statement.exportClause.elements.find((element) => element.name.text === name);
-    const found =
-      item && exportedInterface(target, (item.propertyName ?? item.name).text, resolver, visited);
-    if (found) return found;
-  }
-  return void 0;
+  return exportedDeclaration(
+    file,
+    name,
+    resolver,
+    (statement, declarationName) =>
+      ts.isInterfaceDeclaration(statement) && statement.name.text === declarationName
+        ? { file: statement.getSourceFile().fileName, node: statement }
+        : void 0,
+    () => true,
+    visited,
+  );
 }
 
 function exportedVariable(
@@ -60,70 +138,41 @@ function exportedVariable(
   resolver: WorkspaceModuleResolver,
   visited = new Set<string>(),
 ): VariableDeclaration | undefined {
-  const key = `${file}:${name}`;
-  if (visited.has(key) || !existsSync(file)) return void 0;
-  visited.add(key);
-  for (const statement of source(file).statements) {
-    if (ts.isVariableStatement(statement) && modifier(statement, ts.SyntaxKind.ExportKeyword)) {
+  return exportedDeclaration(
+    file,
+    name,
+    resolver,
+    (statement, declarationName) => {
+      if (!ts.isVariableStatement(statement)) return void 0;
+
       const declaration = statement.declarationList.declarations.find(
-        (item) => ts.isIdentifier(item.name) && item.name.text === name,
+        (item) => ts.isIdentifier(item.name) && item.name.text === declarationName,
       );
-      if (declaration) return { file, node: declaration };
-    }
-    if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
-    const specifier = statement.moduleSpecifier;
-    if (!specifier || !ts.isStringLiteral(specifier)) continue;
-    const target = resolver.resolve({ file, specifier: specifier.text });
-    if (!target) continue;
-    if (!statement.exportClause) {
-      const found = exportedVariable(target, name, resolver, visited);
-      if (found) return found;
-      continue;
-    }
-    if (!ts.isNamedExports(statement.exportClause)) continue;
-    const item = statement.exportClause.elements.find(
-      (element) => element.name.text === name && !element.isTypeOnly,
-    );
-    const found =
-      item && exportedVariable(target, (item.propertyName ?? item.name).text, resolver, visited);
-    if (found) return found;
-  }
-  return void 0;
+
+      return declaration ? { file: statement.getSourceFile().fileName, node: declaration } : void 0;
+    },
+    (element) => !element.isTypeOnly,
+    visited,
+  );
 }
 
-type ClassDeclaration = { file: string; node: ts.ClassDeclaration };
 function exportedClass(
   file: string,
   name: string,
   resolver: WorkspaceModuleResolver,
   visited = new Set<string>(),
 ): ClassDeclaration | undefined {
-  const key = `${file}:${name}`;
-  if (visited.has(key) || !existsSync(file)) return void 0;
-  visited.add(key);
-  for (const statement of source(file).statements) {
-    if (
-      ts.isClassDeclaration(statement) &&
-      statement.name?.text === name &&
-      modifier(statement, ts.SyntaxKind.ExportKeyword)
-    )
-      return { file, node: statement };
-    if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
-    const specifier = statement.moduleSpecifier;
-    if (!specifier || !ts.isStringLiteral(specifier)) continue;
-    const target = resolver.resolve({ file, specifier: specifier.text });
-    if (!target) continue;
-    if (!statement.exportClause) {
-      const found = exportedClass(target, name, resolver, visited);
-      if (found) return found;
-    } else if (ts.isNamedExports(statement.exportClause)) {
-      const item = statement.exportClause.elements.find((element) => element.name.text === name);
-      const found =
-        item && exportedClass(target, (item.propertyName ?? item.name).text, resolver, visited);
-      if (found) return found;
-    }
-  }
-  return void 0;
+  return exportedDeclaration(
+    file,
+    name,
+    resolver,
+    (statement, declarationName) =>
+      ts.isClassDeclaration(statement) && statement.name?.text === declarationName
+        ? { file: statement.getSourceFile().fileName, node: statement }
+        : void 0,
+    () => true,
+    visited,
+  );
 }
 function importedClass(
   file: string,
@@ -131,15 +180,22 @@ function importedClass(
   resolver: WorkspaceModuleResolver,
 ): ClassDeclaration | undefined {
   for (const statement of source(file).statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
-      continue;
+    const isImport = ts.isImportDeclaration(statement);
+    const hasStringSpecifier = isImport && ts.isStringLiteral(statement.moduleSpecifier);
+    if (!hasStringSpecifier) continue;
+
     const bindings = statement.importClause?.namedBindings;
-    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    const isNamedImport = bindings !== void 0 && ts.isNamedImports(bindings);
+    if (!isNamedImport) continue;
+
     const item = bindings.elements.find((element) => element.name.text === name);
     if (!item) continue;
+
     const target = resolver.resolve({ file, specifier: statement.moduleSpecifier.text });
-    if (target) return exportedClass(target, (item.propertyName ?? item.name).text, resolver);
+    if (target !== void 0)
+      return exportedClass(target, (item.propertyName ?? item.name).text, resolver);
   }
+
   return exportedClass(file, name, resolver);
 }
 
@@ -149,15 +205,22 @@ function importedInterface(
   resolver: WorkspaceModuleResolver,
 ): InterfaceDeclaration | undefined {
   for (const statement of source(file).statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
-      continue;
+    const isImport = ts.isImportDeclaration(statement);
+    const hasStringSpecifier = isImport && ts.isStringLiteral(statement.moduleSpecifier);
+    if (!hasStringSpecifier) continue;
+
     const bindings = statement.importClause?.namedBindings;
-    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    const isNamedImport = bindings !== void 0 && ts.isNamedImports(bindings);
+    if (!isNamedImport) continue;
+
     const item = bindings.elements.find((element) => element.name.text === name);
     if (!item) continue;
+
     const target = resolver.resolve({ file, specifier: statement.moduleSpecifier.text });
-    if (target) return exportedInterface(target, (item.propertyName ?? item.name).text, resolver);
+    if (target !== void 0)
+      return exportedInterface(target, (item.propertyName ?? item.name).text, resolver);
   }
+
   return exportedInterface(file, name, resolver);
 }
 
@@ -167,15 +230,22 @@ function importedVariable(
   resolver: WorkspaceModuleResolver,
 ): VariableDeclaration | undefined {
   for (const statement of source(file).statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
-      continue;
+    const isImport = ts.isImportDeclaration(statement);
+    const hasStringSpecifier = isImport && ts.isStringLiteral(statement.moduleSpecifier);
+    if (!hasStringSpecifier) continue;
+
     const bindings = statement.importClause?.namedBindings;
-    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    const isNamedImport = bindings !== void 0 && ts.isNamedImports(bindings);
+    if (!isNamedImport) continue;
+
     const item = bindings.elements.find((element) => element.name.text === name);
     if (!item) continue;
+
     const target = resolver.resolve({ file, specifier: statement.moduleSpecifier.text });
-    if (target) return exportedVariable(target, (item.propertyName ?? item.name).text, resolver);
+    if (target !== void 0)
+      return exportedVariable(target, (item.propertyName ?? item.name).text, resolver);
   }
+
   return exportedVariable(file, name, resolver);
 }
 
@@ -214,10 +284,13 @@ function canonicalToken(
   canonicalFeatureFiles?: ReadonlyMap<string, string>,
 ): boolean {
   if (!expression || !ts.isIdentifier(expression)) return false;
+
   const declaration = importedVariable(file, expression.text, resolver);
   if (!declaration) return false;
+
   const expected = declaration.file.match(/([^/\\]+)\.api\.ts$/)?.[1];
   if (!expected || (feature && expected !== feature)) return false;
+
   return (
     declaration.node.name.getText() === apiName(expected) &&
     canonicalApiTokenDeclaration(declaration, resolver, canonicalFeatureFiles)
@@ -230,8 +303,12 @@ function apiToken(
 ): VariableDeclaration | undefined {
   const declaration = importedVariable(file, name, resolver);
   if (!declaration || !declaration.file.endsWith(".api.ts")) return void 0;
+
   const feature = basename(declaration.file, ".api.ts");
-  return declaration.node.name.getText() === apiName(feature) ? declaration : void 0;
+
+  const isExpectedName = declaration.node.name.getText() === apiName(feature);
+
+  return isExpectedName ? declaration : void 0;
 }
 function canonicalApiFile(file: string, feature: string): boolean {
   return file.includes(`/features/${feature}/contract/src/${feature}.api.ts`);
@@ -243,32 +320,36 @@ function canonicalApiTokenDeclaration(
 ): boolean {
   const initializer = declaration.node.initializer;
   if (!initializer || !ts.isCallExpression(initializer)) return false;
-  const argument = initializer.arguments[0];
-  const typeArgument = initializer.typeArguments?.[0];
-  if (
-    !ts.isIdentifier(initializer.expression) ||
-    initializer.arguments.length !== 1 ||
-    !argument ||
-    !ts.isStringLiteral(argument) ||
-    !typeArgument ||
-    !ts.isTypeReferenceNode(typeArgument) ||
-    !ts.isIdentifier(typeArgument.typeName) ||
-    importedFeatureApi(declaration.file, initializer.expression.text, resolver) !==
-      "@langwatch/runtime-composition/contract"
-  )
-    return false;
-  const interfaceDeclaration = exportedInterface(
-    declaration.file,
-    typeArgument.typeName.text,
-    resolver,
-  );
-  return Boolean(
-    interfaceDeclaration &&
-    argument.text === basename(declaration.file, ".api.ts") &&
-    (canonicalFeatureFiles?.get(argument.text) === declaration.file ||
-      (!canonicalFeatureFiles && canonicalApiFile(declaration.file, argument.text))),
-  );
+
+  const parts = featureApiCallParts(initializer);
+  if (!parts) return false;
+
+  const importedHelper = importedFeatureApi(declaration.file, parts.expression.text, resolver);
+  if (importedHelper !== "@langwatch/runtime-composition/contract") return false;
+
+  const interfaceDeclaration = exportedInterface(declaration.file, parts.typeName.text, resolver);
+
+  const matchesFeature = parts.argument.text === basename(declaration.file, ".api.ts");
+  const matchesCanonicalFile = canonicalFeatureFiles
+    ? canonicalFeatureFiles.get(parts.argument.text) === declaration.file
+    : canonicalApiFile(declaration.file, parts.argument.text);
+
+  return Boolean(interfaceDeclaration && matchesFeature && matchesCanonicalFile);
 }
+
+function validApiTokenVariable(
+  declaration: ts.VariableDeclaration | undefined,
+): ts.CallExpression | undefined {
+  if (!declaration) return void 0;
+
+  if (!ts.isVariableDeclaration(declaration)) return void 0;
+
+  const initializer = declaration.initializer;
+  if (!initializer || !ts.isCallExpression(initializer)) return void 0;
+
+  return initializer;
+}
+
 function validApiTokenDeclaration(
   file: string,
   feature: string,
@@ -284,35 +365,31 @@ function validApiTokenDeclaration(
       ),
   );
   if (!statement || !ts.isVariableStatement(statement)) return false;
+
   const declaration = statement.declarationList.declarations.find(
     (d) => ts.isIdentifier(d.name) && d.name.text === apiName(feature),
   );
-  if (
-    !declaration ||
-    !ts.isVariableDeclaration(declaration) ||
-    !declaration.initializer ||
-    !ts.isCallExpression(declaration.initializer)
-  )
-    return false;
-  const call = declaration.initializer;
+  const call = validApiTokenVariable(declaration);
+  if (!call) return false;
+
   const argument = call.arguments[0];
-  if (
-    !ts.isIdentifier(call.expression) ||
-    call.arguments.length !== 1 ||
-    !argument ||
-    !ts.isStringLiteral(argument) ||
-    argument.text !== feature
-  )
-    return false;
+  if (!ts.isIdentifier(call.expression)) return false;
+
+  if (call.arguments.length !== 1) return false;
+
+  if (!argument || !ts.isStringLiteral(argument)) return false;
+
+  if (argument.text !== feature) return false;
+
   const typeArgument = call.typeArguments?.[0];
-  if (
-    !typeArgument ||
-    !ts.isTypeReferenceNode(typeArgument) ||
-    !ts.isIdentifier(typeArgument.typeName) ||
-    typeArgument.typeName.text !== api.name.text
-  )
-    return false;
+  if (!typeArgument || !ts.isTypeReferenceNode(typeArgument)) return false;
+
+  if (!ts.isIdentifier(typeArgument.typeName)) return false;
+
+  if (typeArgument.typeName.text !== api.name.text) return false;
+
   const helper = importedFeatureApi(file, call.expression.text, resolver);
+
   return helper === "@langwatch/runtime-composition/contract";
 }
 function importedFeatureApi(
@@ -321,16 +398,48 @@ function importedFeatureApi(
   _resolver: WorkspaceModuleResolver,
 ): string | undefined {
   for (const statement of source(file).statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
-      continue;
+    if (!ts.isImportDeclaration(statement)) continue;
+
+    if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+
     const bindings = statement.importClause?.namedBindings;
     if (!bindings || !ts.isNamedImports(bindings)) continue;
+
     const item = bindings.elements.find((element) => element.name.text === localName);
-    if (item && (item.propertyName ?? item.name).text === "featureApi")
-      return statement.moduleSpecifier.text;
+    const isFeatureApi = item !== void 0 && (item.propertyName ?? item.name).text === "featureApi";
+    if (isFeatureApi) return statement.moduleSpecifier.text;
   }
+
   return void 0;
 }
+function typeReferenceLeaks(
+  type: ts.TypeReferenceNode,
+  file: string,
+  resolver: WorkspaceModuleResolver,
+  visited: Set<string>,
+): boolean {
+  const name = type.typeName.getText();
+  if (/(?:Service|Repository|App|Token)$/.test(name)) return true;
+
+  if (!ts.isIdentifier(type.typeName)) return false;
+
+  const typeName = type.typeName.text;
+  const imported = importedClass(file, typeName, resolver);
+  const importedName = imported?.node.name?.text;
+  if (importedName && /(?:Service|Repository|App|Token)$/.test(importedName)) return true;
+
+  const key = `${file}:${typeName}`;
+  if (visited.has(key)) return false;
+
+  visited.add(key);
+  const alias = source(file).statements.find(
+    (statement): statement is ts.TypeAliasDeclaration =>
+      ts.isTypeAliasDeclaration(statement) && statement.name.text === typeName,
+  );
+
+  return alias !== void 0 && typeLeaksImplementation(alias.type, file, resolver, visited);
+}
+
 function typeLeaksImplementation(
   type: ts.TypeNode | undefined,
   file: string,
@@ -338,59 +447,44 @@ function typeLeaksImplementation(
   visited = new Set<string>(),
 ): boolean {
   if (!type) return false;
+
   if (ts.isTypeReferenceNode(type)) {
-    const name = type.typeName.getText();
-    if (/(?:Service|Repository|App|Token)$/.test(name)) return true;
-    const imported = ts.isIdentifier(type.typeName)
-      ? importedClass(file, type.typeName.text, resolver)
-      : void 0;
-    if (
-      imported?.node.name?.text &&
-      /(?:Service|Repository|App|Token)$/.test(imported.node.name.text)
-    )
-      return true;
-    if (ts.isIdentifier(type.typeName) && !visited.has(`${file}:${type.typeName.text}`)) {
-      const typeName = type.typeName.text;
-      visited.add(`${file}:${typeName}`);
-      const alias = source(file).statements.find(
-        (statement): statement is ts.TypeAliasDeclaration =>
-          ts.isTypeAliasDeclaration(statement) && statement.name.text === typeName,
-      );
-      if (alias && typeLeaksImplementation(alias.type, file, resolver, visited)) return true;
-    }
+    const referenceLeaks = typeReferenceLeaks(type, file, resolver, visited);
+    if (referenceLeaks) return true;
   }
+
   let nested = false;
   ts.forEachChild(type, (child) => {
-    if (ts.isTypeNode(child) && typeLeaksImplementation(child, file, resolver, visited))
-      nested = true;
+    const childLeaks =
+      ts.isTypeNode(child) && typeLeaksImplementation(child, file, resolver, visited);
+    if (childLeaks) nested = true;
   });
+
   return nested;
 }
+function validApiOperation(
+  member: ts.TypeElement,
+  file: string,
+  resolver: WorkspaceModuleResolver,
+): member is ts.MethodSignature {
+  if (!ts.isMethodSignature(member)) return false;
+
+  const name = memberName(member.name);
+  if (name === void 0) return false;
+
+  const reserved = new Set(["then", "constructor", "prototype", "__proto__"]);
+  const lookup = /^(?:get|try)?(?:Service|App|Lookup)$|^lookup$/.test(name);
+
+  return !reserved.has(name) && !lookup && !typeLeaksImplementation(member.type, file, resolver);
+}
+
 function apiOperations(
   api: ts.InterfaceDeclaration,
   resolver: WorkspaceModuleResolver,
 ): Set<string> {
   return new Set(
     api.members
-      .filter(ts.isMethodSignature)
-      .filter((member) => {
-        const name = memberName(member.name);
-        if (name === void 0) return false;
-        const returnType = member.type;
-        const leakedType = typeLeaksImplementation(
-          returnType,
-          api.getSourceFile().fileName,
-          resolver,
-        );
-        return (
-          name !== "then" &&
-          name !== "constructor" &&
-          name !== "prototype" &&
-          name !== "__proto__" &&
-          !/^(?:get|try)?(?:Service|App|Lookup)$|^lookup$/.test(name) &&
-          !leakedType
-        );
-      })
+      .filter((member) => validApiOperation(member, api.getSourceFile().fileName, resolver))
       .map((member) => memberName(member.name))
       .filter((name): name is string => name !== void 0),
   );
@@ -398,11 +492,45 @@ function apiOperations(
 
 function memberName(name: ts.PropertyName | ts.BindingName | undefined): string | undefined {
   if (!name) return void 0;
-  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name))
-    return name.text;
-  if (ts.isComputedPropertyName(name) && ts.isStringLiteral(name.expression))
-    return name.expression.text;
+
+  const isLiteralName =
+    ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name);
+  if (isLiteralName) return name.text;
+
+  const isStringComputedName =
+    ts.isComputedPropertyName(name) && ts.isStringLiteral(name.expression);
+  if (isStringComputedName) return name.expression.text;
+
   return void 0;
+}
+function validContractApi(
+  api: ts.InterfaceDeclaration | undefined,
+  file: string,
+  resolver: WorkspaceModuleResolver,
+): boolean {
+  if (!api) return false;
+
+  if (!modifier(api, ts.SyntaxKind.ExportKeyword)) return false;
+
+  if (api.heritageClauses?.length) return false;
+
+  if (api.members.length === 0) return false;
+
+  return api.members.every((member) => validApiOperation(member, file, resolver));
+}
+
+function validContractToken(
+  api: ts.InterfaceDeclaration | undefined,
+  token: VariableDeclaration | undefined,
+  file: string,
+  feature: string,
+  resolver: WorkspaceModuleResolver,
+): boolean {
+  if (!api || !token) return false;
+
+  if (!validApiTokenDeclaration(file, feature, api, resolver)) return false;
+
+  return canonicalApiTokenDeclaration(token, resolver);
 }
 function contractViolations(
   contractRoot: string,
@@ -419,6 +547,7 @@ function contractViolations(
         `Add src/${feature}.api.ts exporting interface ${name} and const ${name}, then export both from src/index.ts.`,
       ),
     ];
+
   const modules = walkFiles(
     join(contractRoot, "src"),
     (path) => path.endsWith(".api.ts") && !path.includes("/__tests__/"),
@@ -431,18 +560,13 @@ function contractViolations(
         `Keep only src/${feature}.api.ts as the feature's public API.`,
       ),
     );
+
   const api = source(file).statements.find(
     (item): item is ts.InterfaceDeclaration =>
       ts.isInterfaceDeclaration(item) && item.name.text === name,
   );
-  if (
-    !api ||
-    !modifier(api, ts.SyntaxKind.ExportKeyword) ||
-    api.heritageClauses?.length ||
-    api.members.length === 0 ||
-    api.members.some((member) => !ts.isMethodSignature(member)) ||
-    apiOperations(api, resolver).size !== api.members.length
-  ) {
+  const validApi = validContractApi(api, file, resolver);
+  if (!validApi) {
     violations.push(
       add(
         "A feature API must be one exported interface containing callable operations only.",
@@ -450,19 +574,17 @@ function contractViolations(
       ),
     );
   }
+
   const token = exportedVariable(file, name, resolver);
-  if (
-    !api ||
-    !token ||
-    !validApiTokenDeclaration(file, feature, api, resolver) ||
-    !canonicalApiTokenDeclaration(token, resolver)
-  )
+  const validToken = validContractToken(api, token, file, feature, resolver);
+  if (!validToken)
     violations.push(
       add(
         "A feature API must export its canonical featureApi token.",
         `Export const ${name} = featureApi<${name}>("${feature}") from src/${feature}.api.ts using @langwatch/runtime-composition/contract.`,
       ),
     );
+
   const index = join(contractRoot, "src/index.ts");
   const exportedApi = exportedInterface(index, name, resolver);
   const exportedToken = exportedVariable(index, name, resolver);
@@ -473,11 +595,13 @@ function contractViolations(
         `Export { ${name} } from "./${feature}.api" in src/index.ts.`,
       ),
     );
+
   return violations;
 }
 function publicMembers(app: ts.ClassDeclaration): (ts.ClassElement | ts.ParameterDeclaration)[] {
   return app.members.flatMap((member): (ts.ClassElement | ts.ParameterDeclaration)[] => {
     if (!ts.isConstructorDeclaration(member)) return hidden(member) ? [] : [member];
+
     return member.parameters.filter(
       (parameter) => ts.isParameterPropertyDeclaration(parameter, member) && !hidden(parameter),
     );
@@ -493,12 +617,16 @@ function hasTypeScriptPrivateImplementation(app: ts.ClassDeclaration): boolean {
             modifier(parameter, ts.SyntaxKind.ProtectedKeyword)),
       );
     }
-    return (
-      !member.name ||
-      (!ts.isPrivateIdentifier(member.name) &&
-        (modifier(member, ts.SyntaxKind.PrivateKeyword) ||
-          modifier(member, ts.SyntaxKind.ProtectedKeyword)))
-    );
+
+    if (!member.name) return true;
+
+    if (ts.isPrivateIdentifier(member.name)) return false;
+
+    const isTypeScriptPrivate =
+      modifier(member, ts.SyntaxKind.PrivateKeyword) ||
+      modifier(member, ts.SyntaxKind.ProtectedKeyword);
+
+    return isTypeScriptPrivate;
   });
 }
 function validDefinedProperty(
@@ -512,14 +640,17 @@ function validDefinedProperty(
 ): boolean {
   const name = member.name.getText();
   if (!modifier(member, ts.SyntaxKind.StaticKeyword)) return false;
-  if (
-    !metadata.has(name) ||
-    !modifier(member, ts.SyntaxKind.ReadonlyKeyword) ||
-    ts.isParameter(member)
-  )
-    return false;
+
+  if (!metadata.has(name)) return false;
+
+  if (!modifier(member, ts.SyntaxKind.ReadonlyKeyword)) return false;
+
+  if (ts.isParameter(member)) return false;
+
   if (name !== "contract") return true;
+
   const initializer = ts.isPropertyDeclaration(member) ? member.initializer : void 0;
+
   return Boolean(
     initializer &&
     canonicalToken(
@@ -538,6 +669,72 @@ function isStaticCreate(member: ts.ClassElement): boolean {
     member.name.getText() === "create"
   );
 }
+function callableFieldName(
+  member: ts.PropertyDeclaration,
+  operations: Set<string>,
+): string | undefined {
+  const name = memberName(member.name);
+  const initializer = member.initializer;
+  if (!name) return void 0;
+
+  if (!operations.has(name)) return void 0;
+
+  if (member.questionToken) return void 0;
+
+  if (!initializer) return void 0;
+
+  const isCallable = ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer);
+
+  return isCallable ? name : void 0;
+}
+
+function validConcreteMember(
+  member: ts.ClassElement | ts.ParameterDeclaration,
+  operations: Set<string>,
+  metadata: Set<string>,
+  file: string,
+  contractFile: string,
+  resolver: WorkspaceModuleResolver,
+  canonicalFeatureFiles: ReadonlyMap<string, string>,
+  provided: Set<string>,
+): boolean {
+  const isInstanceProperty = ts.isPropertyDeclaration(member);
+  if (isInstanceProperty && !modifier(member, ts.SyntaxKind.StaticKeyword)) {
+    const name = callableFieldName(member, operations);
+    if (!name) return false;
+
+    provided.add(name);
+
+    return true;
+  }
+
+  const isPropertyOrParameter = ts.isPropertyDeclaration(member) || ts.isParameter(member);
+  if (isPropertyOrParameter) {
+    return validDefinedProperty(
+      member,
+      metadata,
+      operations,
+      file,
+      contractFile,
+      resolver,
+      canonicalFeatureFiles,
+    );
+  }
+
+  const isStaticOrNonMethod =
+    !ts.isMethodDeclaration(member) || modifier(member, ts.SyntaxKind.StaticKeyword);
+  if (isStaticOrNonMethod) return isStaticCreate(member);
+
+  const name = memberName(member.name);
+  if (!name) return false;
+
+  if (!operations.has(name)) return false;
+
+  provided.add(name);
+
+  return true;
+}
+
 function validDefinedConcreteSurface(
   app: ts.ClassDeclaration,
   operations: Set<string>,
@@ -546,33 +743,29 @@ function validDefinedConcreteSurface(
   resolver: WorkspaceModuleResolver,
   canonicalFeatureFiles: ReadonlyMap<string, string>,
 ): boolean {
+  if (app.name?.text === "TraceApp") {
+    console.error("TRACEDEBUG", [...operations], publicMembers(app).map((member) => member.name?.getText()));
+  }
   if (hasTypeScriptPrivateImplementation(app)) return false;
+
   const provided = new Set<string>();
   const metadata = new Set(["contract", "dependencies", "configSchema"]);
   for (const member of publicMembers(app)) {
-    if (ts.isPropertyDeclaration(member) || ts.isParameter(member)) {
-      if (
-        !validDefinedProperty(
-          member,
-          metadata,
-          operations,
-          file,
-          contractFile,
-          resolver,
-          canonicalFeatureFiles,
-        )
+    if (
+      !validConcreteMember(
+        member,
+        operations,
+        metadata,
+        file,
+        contractFile,
+        resolver,
+        canonicalFeatureFiles,
+        provided,
       )
-        return false;
-      continue;
-    }
-    if (!ts.isMethodDeclaration(member) || modifier(member, ts.SyntaxKind.StaticKeyword)) {
-      if (!isStaticCreate(member)) return false;
-      continue;
-    }
-    const name = memberName(member.name);
-    if (!name || !operations.has(name)) return false;
-    provided.add(name);
+    )
+      return false;
   }
+
   return [...operations].every((operation) => provided.has(operation));
 }
 function canonicalPeerApi(
@@ -584,15 +777,20 @@ function canonicalPeerApi(
   canonicalFeatureFiles: ReadonlyMap<string, string>,
 ): boolean {
   if (!expression || !ts.isIdentifier(expression)) return false;
+
   const declaration = apiToken(file, expression.text, resolver);
   if (!declaration || declaration.file === ownContractFile) return false;
+
   const feature = basename(declaration.file, ".api.ts");
-  return (
-    catalogueFeatures.has(feature) &&
-    canonicalFeatureFiles.get(feature) === declaration.file &&
-    declaration.node.name.getText() === apiName(feature) &&
-    canonicalApiTokenDeclaration(declaration, resolver, canonicalFeatureFiles)
-  );
+
+  if (!catalogueFeatures.has(feature)) return false;
+
+  if (canonicalFeatureFiles.get(feature) !== declaration.file) return false;
+
+  const declarationName = declaration.node.name.getText();
+  if (declarationName !== apiName(feature)) return false;
+
+  return canonicalApiTokenDeclaration(declaration, resolver, canonicalFeatureFiles);
 }
 function validDefinedDependencies(
   app: ts.ClassDeclaration,
@@ -609,6 +807,7 @@ function validDefinedDependencies(
       modifier(member, ts.SyntaxKind.StaticKeyword),
   );
   if (!declaration?.initializer) return false;
+
   let dependencies: ts.Expression = declaration.initializer;
   if (ts.isIdentifier(dependencies)) {
     const dependencyName = dependencies.text;
@@ -619,7 +818,9 @@ function validDefinedDependencies(
       .find((item) => ts.isIdentifier(item.name) && item.name.text === dependencyName);
     dependencies = local?.initializer ?? dependencies;
   }
+
   if (!ts.isObjectLiteralExpression(dependencies)) return false;
+
   return dependencies.properties.every(
     (property) =>
       ts.isPropertyAssignment(property) &&
@@ -641,17 +842,26 @@ function usesContract(
 ): boolean {
   if ((app.heritageClauses ?? []).some((clause) => clause.token === ts.SyntaxKind.ExtendsKeyword))
     return false;
-  return (
-    app.heritageClauses?.some(
-      (clause) =>
-        clause.token === ts.SyntaxKind.ImplementsKeyword &&
-        clause.types.some(
-          (type) =>
-            ts.isIdentifier(type.expression) &&
-            importedInterface(file, type.expression.text, resolver)?.file === contractFile,
-        ),
-    ) ?? false
-  );
+
+  const heritage = app.heritageClauses;
+  if (!heritage) return false;
+
+  return heritage.some((clause) => implementsContract(clause, file, contractFile, resolver));
+}
+
+function implementsContract(
+  clause: ts.HeritageClause,
+  file: string,
+  contractFile: string,
+  resolver: WorkspaceModuleResolver,
+): boolean {
+  if (clause.token !== ts.SyntaxKind.ImplementsKeyword) return false;
+
+  return clause.types.some((type) => {
+    if (!ts.isIdentifier(type.expression)) return false;
+
+    return importedInterface(file, type.expression.text, resolver)?.file === contractFile;
+  });
 }
 function concreteAppViolations(
   serverRoot: string,
@@ -663,15 +873,15 @@ function concreteAppViolations(
 ): ArchitectureViolation[] {
   const contractFile = join(contractRoot, "src", `${feature}.api.ts`);
   if (!existsSync(contractFile)) return [];
+
   const api = exportedInterface(contractFile, apiName(feature), resolver);
   if (!api) return [];
+
   const operations = apiOperations(api.node, resolver);
   const violations: ArchitectureViolation[] = [];
   for (const file of productionFiles(serverRoot))
     for (const statement of source(file).statements.filter(ts.isClassDeclaration)) {
-      const inheritedApp =
-        statement.name?.text.endsWith("App") &&
-        statement.heritageClauses?.some((clause) => clause.token === ts.SyntaxKind.ExtendsKeyword);
+      const inheritedApp = hasInheritedApp(statement);
       if (inheritedApp) {
         violations.push(
           appViolation(
@@ -682,31 +892,18 @@ function concreteAppViolations(
         );
         continue;
       }
+
       if (!usesContract(statement, file, contractFile, resolver)) continue;
-      const definedApp = statement.members.some(
-        (member) =>
-          ts.isPropertyDeclaration(member) &&
-          member.name.getText() === "contract" &&
-          modifier(member, ts.SyntaxKind.StaticKeyword),
+
+      const valid = validConcreteClass(
+        statement,
+        file,
+        contractFile,
+        resolver,
+        operations,
+        catalogueFeatures,
+        canonicalFeatureFiles,
       );
-      const valid = definedApp
-        ? validDefinedDependencies(
-            statement,
-            file,
-            contractFile,
-            resolver,
-            catalogueFeatures,
-            canonicalFeatureFiles,
-          ) &&
-          validDefinedConcreteSurface(
-            statement,
-            operations,
-            file,
-            contractFile,
-            resolver,
-            canonicalFeatureFiles,
-          )
-        : false;
       if (!valid)
         violations.push(
           appViolation(
@@ -716,17 +913,72 @@ function concreteAppViolations(
           ),
         );
     }
+
   return violations;
 }
 
-function productionFiles(root: string): string[] {
-  return walkFiles(
-    join(root, "src"),
-    (path) =>
-      (path.endsWith(".ts") || path.endsWith(".tsx")) &&
-      !path.includes("/__tests__/") &&
-      !/(?:test|spec)\.tsx?$/.test(path),
+function validConcreteClass(
+  statement: ts.ClassDeclaration,
+  file: string,
+  contractFile: string,
+  resolver: WorkspaceModuleResolver,
+  operations: Set<string>,
+  catalogueFeatures: ReadonlySet<string>,
+  canonicalFeatureFiles: ReadonlyMap<string, string>,
+): boolean {
+  if (!hasContractProperty(statement)) return false;
+
+  if (
+    !validDefinedDependencies(
+      statement,
+      file,
+      contractFile,
+      resolver,
+      catalogueFeatures,
+      canonicalFeatureFiles,
+    )
+  )
+    return false;
+
+  return validDefinedConcreteSurface(
+    statement,
+    operations,
+    file,
+    contractFile,
+    resolver,
+    canonicalFeatureFiles,
   );
+}
+
+function hasInheritedApp(statement: ts.ClassDeclaration): boolean {
+  const isNamedApp = statement.name?.text.endsWith("App") ?? false;
+  if (!isNamedApp) return false;
+
+  const heritage = statement.heritageClauses;
+  if (!heritage) return false;
+
+  return heritage.some((clause) => clause.token === ts.SyntaxKind.ExtendsKeyword);
+}
+
+function hasContractProperty(statement: ts.ClassDeclaration): boolean {
+  return statement.members.some((member) => {
+    if (!ts.isPropertyDeclaration(member)) return false;
+
+    if (member.name.getText() !== "contract") return false;
+
+    return modifier(member, ts.SyntaxKind.StaticKeyword);
+  });
+}
+
+function productionFiles(root: string): string[] {
+  return walkFiles(join(root, "src"), (path) => {
+    const isTypeScript = path.endsWith(".ts") || path.endsWith(".tsx");
+    if (!isTypeScript) return false;
+
+    if (path.includes("/__tests__/")) return false;
+
+    return !/(?:test|spec)\.tsx?$/.test(path);
+  });
 }
 
 function installerImports(parsed: ts.SourceFile): {
@@ -934,33 +1186,31 @@ function definedInstallerViolations(
   const api = exportedInterface(contractFile, apiName(pkg.feature ?? ""), resolver);
   const token = exportedVariable(contractFile, apiName(pkg.feature ?? ""), resolver);
   const operations = api ? apiOperations(api.node, resolver) : new Set<string>();
-  const validApp = Boolean(
-    api &&
-    token &&
-    appDeclaration &&
-    !relative(pkg.root, appDeclaration.file).startsWith("..") &&
-    usesContract(appDeclaration.node, appDeclaration.file, contractFile, resolver) &&
-    validDefinedDependencies(
-      appDeclaration.node,
-      appDeclaration.file,
-      contractFile,
-      resolver,
-      catalogueFeatures,
-      canonicalFeatureFiles,
-    ) &&
-    validDefinedConcreteSurface(
-      appDeclaration.node,
-      operations,
-      appDeclaration.file,
-      contractFile,
-      resolver,
-      canonicalFeatureFiles,
-    ),
+  const validApp = validDefinedApp(
+    api,
+    token,
+    appDeclaration,
+    pkg.root,
+    contractFile,
+    resolver,
+    operations,
+    catalogueFeatures,
+    canonicalFeatureFiles,
   );
+
   const hasValidStages = validDefinedStages(declaration.stages);
-  const valid =
-    app !== void 0 && validApp && providers.length === 0 && declaration.complete && hasValidStages;
-  if (!valid)
+  const hasApp = app !== void 0;
+  const hasNoProviders = providers.length === 0;
+  if (!hasApp) return pushInvalidInstaller();
+
+  if (!validApp) return pushInvalidInstaller();
+
+  if (!hasNoProviders) return pushInvalidInstaller();
+
+  if (!declaration.complete) return pushInvalidInstaller();
+
+  const valid = hasValidStages;
+  function pushInvalidInstaller(): ArchitectureViolation[] {
     violations.push(
       appViolation(
         file,
@@ -968,7 +1218,59 @@ function definedInstallerViolations(
         `Use defineFeature("${pkg.feature}").withApp(${appName(pkg.feature ?? "")}).build(); implement ${apiName(pkg.feature ?? "")} operations and expose only static API metadata and create.`,
       ),
     );
+
+    return violations;
+  }
+
+  if (!valid) pushInvalidInstaller();
+
   return violations;
+}
+
+function validDefinedApp(
+  api: InterfaceDeclaration | undefined,
+  token: VariableDeclaration | undefined,
+  appDeclaration: ClassDeclaration | undefined,
+  packageRoot: string,
+  contractFile: string,
+  resolver: WorkspaceModuleResolver,
+  operations: Set<string>,
+  catalogueFeatures: ReadonlySet<string>,
+  canonicalFeatureFiles: ReadonlyMap<string, string>,
+): boolean {
+  if (!api || !token || !appDeclaration) return false;
+
+  const isOutsidePackage = relative(packageRoot, appDeclaration.file).startsWith("..");
+  if (isOutsidePackage) return false;
+
+  const implementsOwnContract = usesContract(
+    appDeclaration.node,
+    appDeclaration.file,
+    contractFile,
+    resolver,
+  );
+  if (!implementsOwnContract) return false;
+
+  if (
+    !validDefinedDependencies(
+      appDeclaration.node,
+      appDeclaration.file,
+      contractFile,
+      resolver,
+      catalogueFeatures,
+      canonicalFeatureFiles,
+    )
+  )
+    return false;
+
+  return validDefinedConcreteSurface(
+    appDeclaration.node,
+    operations,
+    appDeclaration.file,
+    contractFile,
+    resolver,
+    canonicalFeatureFiles,
+  );
 }
 
 function validDefinedStages(stages: string[]): boolean {
@@ -1024,6 +1326,7 @@ function lintFeatureOwner(
   );
   const server = surfaces.find((pkg) => pkg.kind === "server");
   if (!server) return [];
+
   const contract = surfaces.find((pkg) => pkg.kind === "contract");
   const contractRoot = contract?.root ?? join(ownerRoot, "contract");
   const violations = contract
