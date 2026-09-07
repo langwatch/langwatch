@@ -70,3 +70,12 @@ export function mergeAutoDetectedInputs({
       return a.identifier.localeCompare(b.identifier);
     });
 }
+
+/** Nominal boundary over {@link mergeAutoDetectedInputs}. */
+export abstract class PromptMergeAutoDetectedInputsPort {
+  abstract merge(input: {
+    prompt: string;
+    messages: Array<{ role: string; content: string }>;
+    inputs: PromptInput[];
+  }): PromptInput[];
+}

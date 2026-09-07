@@ -1,13 +1,16 @@
 import type { ProjectService } from "@langwatch/project-contract";
 import type { AdminWorkspaceViewOcsfPort } from "../ports/admin-workspace-view-audit.port.ts";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
-import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
+import {
+  PrismaAdminWorkspaceViewAuditRepository,
+  type AdminWorkspaceViewAuditDatabase,
+} from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 
 export class PostgresAdminWorkspaceViewAuditAdapter {
   private constructor(
     private readonly options: {
-      database: object;
+      database: AdminWorkspaceViewAuditDatabase;
       projects?: ProjectService;
       ocsf?: AdminWorkspaceViewOcsfPort;
       diagnostics?: GovernanceDiagnosticsPort;
@@ -16,7 +19,7 @@ export class PostgresAdminWorkspaceViewAuditAdapter {
   ) {}
 
   static create(options: {
-    database: object;
+    database: AdminWorkspaceViewAuditDatabase;
     projects?: ProjectService;
     ocsf?: AdminWorkspaceViewOcsfPort;
     diagnostics?: GovernanceDiagnosticsPort;

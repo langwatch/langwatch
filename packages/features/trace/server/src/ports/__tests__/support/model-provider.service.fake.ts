@@ -104,6 +104,10 @@ export class TestModelProviderService extends ModelProviderService {
     throw new Error("Not used by Trace tests.");
   }
 
+  assertApiKeyMayWriteDefaultScopes(): Promise<never> {
+    throw new Error("Not used by Trace tests.");
+  }
+
   tryGetDefaultConfig(): Promise<null> {
     return Promise.resolve(null);
   }

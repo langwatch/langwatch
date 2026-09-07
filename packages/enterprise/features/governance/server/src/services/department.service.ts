@@ -4,12 +4,12 @@ import {
   type Department,
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
-import type { DepartmentRepository } from "../ports/department.port.ts";
+import type { DepartmentPort } from "../ports/department.port.ts";
 
 export class DepartmentService {
-  private constructor(private readonly repository: DepartmentRepository) {}
+  private constructor(private readonly repository: DepartmentPort) {}
 
-  static create(options: { repository: DepartmentRepository }): DepartmentService {
+  static create(options: { repository: DepartmentPort }): DepartmentService {
     return new DepartmentService(options.repository);
   }
 

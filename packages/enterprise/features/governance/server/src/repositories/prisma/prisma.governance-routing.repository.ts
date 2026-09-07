@@ -14,17 +14,26 @@ import type {
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import { RoutingPolicyRepository } from "../../ports/routing-policy.port.ts";
+import { RoutingPolicyPort } from "../../ports/routing-policy.port.ts";
 
 type PolicyRow = PrismaRoutingPolicy & { scopes: PrismaRoutingPolicyScope[] };
 
-export class PrismaRoutingPolicyRepository extends RoutingPolicyRepository {
-  private constructor(private readonly database: PrismaClient) {
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type RoutingPolicyDatabase = Pick<
+  PrismaClient,
+  "modelProvider" | "project" | "routingPolicy" | "team" | "$transaction"
+>;
+
+export class PrismaRoutingPolicyRepository extends RoutingPolicyPort {
+  private constructor(private readonly database: RoutingPolicyDatabase) {
     super();
   }
 
-  static create(database: object): PrismaRoutingPolicyRepository {
-    return new PrismaRoutingPolicyRepository(database as PrismaClient);
+  static create(database: RoutingPolicyDatabase): PrismaRoutingPolicyRepository {
+    return new PrismaRoutingPolicyRepository(database);
   }
 
   async list(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {

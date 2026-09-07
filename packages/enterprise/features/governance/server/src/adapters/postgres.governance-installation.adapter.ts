@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   GovernanceOttlGateway,
   GovernanceService,
@@ -27,7 +28,7 @@ import {
 import { PullDestinationService } from "../services/pull-destination.service.ts";
 import { PostgresAdminWorkspaceViewAuditAdapter } from "./postgres.admin-workspace-view-audit.adapter.ts";
 import { PostgresAiToolCatalogAdapter } from "./postgres.ai-tool-catalog.adapter.ts";
-import { PostgresGovernanceAdapter, type GovernanceDatabase } from "./postgres.governance.adapter.ts";
+import { PostgresGovernanceAdapter } from "./postgres.governance.adapter.ts";
 import { PostgresGovernanceOcsfExportAdapter } from "./postgres.ocsf-export.adapter.ts";
 import { PostgresGovernanceSetupStateAdapter } from "./postgres.governance-setup-state.adapter.ts";
 import { PostgresIngestionTemplateAdapter } from "./postgres.ingestion-template.adapter.ts";
@@ -68,7 +69,7 @@ import { QuarantineFillEvaluatorService } from "../services/quarantine-fill.serv
  * Governance repositories and collaborating service construction.
  */
 export type GovernanceInstallationOptions = {
-  database: GovernanceDatabase;
+  database: PrismaClient;
   organizations: OrganizationService;
   projects: ProjectService;
   gatewayBaseUrl: string;

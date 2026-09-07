@@ -22,9 +22,9 @@ import {
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
-import { AuthzGrantsCommandDispatcher } from "../../ports/authz-grants-command-dispatcher.port.ts";
+import { AuthzGrantsCommandDispatcherPort } from "../../ports/authz-grants-command-dispatcher.port.ts";
 import type { AuthzGrantsCommandSenders } from "../../ports/authz-grants-command-dispatcher.port.ts";
-import type { PostgresAuthzDatabase } from "../../ports/postgres-authz-database.port.ts";
+import type { PostgresAuthzDatabasePort } from "../../ports/postgres-authz-database.port.ts";
 import { PostgresAuthzAdapter } from "../postgres.authz.adapter.ts";
 import { EventingAuthzCommandDispatcherAdapter } from "../eventing.authz-command-dispatcher.adapter.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../eventing.authz.adapter.ts";
@@ -89,7 +89,7 @@ const COMMANDS = [
   ["deleteRole", { ...IDENTITY, roleId: "role-1", actor: ACTOR, occurredAtMs: 1 }],
 ] as const;
 
-class NullDispatcher extends AuthzGrantsCommandDispatcher {
+class NullDispatcher extends AuthzGrantsCommandDispatcherPort {
   async commands(): Promise<{ commands: AuthzGrantsCommandSenders }> {
     throw new Error("unused");
   }
@@ -127,7 +127,7 @@ function producerRuntime() {
 
 function buildAuthz() {
   return PostgresAuthzAdapter.create({
-    database: { auditLog: { createMany: vi.fn() } } as unknown as PostgresAuthzDatabase,
+    database: { auditLog: { createMany: vi.fn() } } as unknown as PostgresAuthzDatabasePort,
     redis: null,
     dispatcher: new NullDispatcher(),
     newBindingId: () => "rolebinding_test",

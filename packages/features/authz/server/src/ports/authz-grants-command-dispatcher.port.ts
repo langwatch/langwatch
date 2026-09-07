@@ -22,7 +22,7 @@ export type AuthzGrantsCommandSenders = {
 };
 
 /** Runtime-owned command resolution; implementations may cache per instance. */
-export abstract class AuthzGrantsCommandDispatcher {
+export abstract class AuthzGrantsCommandDispatcherPort {
   abstract commands(): Promise<{ commands: AuthzGrantsCommandSenders }>;
 }
 

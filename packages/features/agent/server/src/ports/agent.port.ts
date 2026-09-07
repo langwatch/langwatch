@@ -4,24 +4,27 @@ import type {
   RelatedAgentEntities,
 } from "@langwatch/agent-contract";
 
-export interface AgentsWorkflowPort {
-  fields(input: { projectId: string; workflowIds: string[] }): Promise<Record<string, AgentFields>>;
-  related(input: {
+export abstract class AgentsWorkflowPort {
+  abstract fields(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<Record<string, AgentFields>>;
+  abstract related(input: {
     projectId: string;
     workflowId: string;
   }): Promise<RelatedAgentEntities["workflow"]>;
-  copy(input: {
+  abstract copy(input: {
     workflowId: string;
     sourceProjectId: string;
     targetProjectId: string;
     actorUserId: string;
   }): Promise<{ workflowId: string }>;
-  archive(input: { workflowId: string; projectId: string }): Promise<{ id: string }>;
-  remove(input: { workflowId: string; projectId: string }): Promise<void>;
+  abstract archive(input: { workflowId: string; projectId: string }): Promise<{ id: string }>;
+  abstract remove(input: { workflowId: string; projectId: string }): Promise<void>;
 }
 
-export interface AgentsAuditLogPort {
-  history(input: {
+export abstract class AgentsAuditLogPort {
+  abstract history(input: {
     agentId: string;
     projectId: string;
     limit: number;

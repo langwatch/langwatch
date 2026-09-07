@@ -5,11 +5,11 @@ import {
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { type AuthzMetricsPort, UncountedAuthzMetrics } from "../ports/authz-metrics.port.ts";
-import type { PostgresAuthzDatabase } from "../ports/postgres-authz-database.port.ts";
+import type { PostgresAuthzDatabasePort } from "../ports/postgres-authz-database.port.ts";
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
 import type {
-  AuthzGrantsCommandDispatcher,
+  AuthzGrantsCommandDispatcherPort,
   AuthzGrantsCommandSenders,
 } from "../ports/authz-grants-command-dispatcher.port.ts";
 import {
@@ -64,9 +64,9 @@ type InternalPostgresAuthzDatabase = AuthzLedgerDatabase &
   AuthzProjectionDatabase;
 
 export type PostgresAuthzAdapterOptions = {
-  database: PostgresAuthzDatabase;
+  database: PostgresAuthzDatabasePort;
   redis: AuthzEpochRedis | null;
-  dispatcher: AuthzGrantsCommandDispatcher;
+  dispatcher: AuthzGrantsCommandDispatcherPort;
   /**
    * Where the two AuthZ counters go, on a process that renders any.
    *
@@ -104,7 +104,7 @@ export type PostgresAuthzBuild = Readonly<{
  * availability/error policy.
  */
 class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
-  constructor(private readonly dispatcher: AuthzGrantsCommandDispatcher) {}
+  constructor(private readonly dispatcher: AuthzGrantsCommandDispatcherPort) {}
 
   private async commands(): Promise<AuthzGrantsCommandSenders> {
     return (await this.dispatcher.commands()).commands;
@@ -178,7 +178,7 @@ export class PostgresAuthzAdapter {
    * see what the engine sees (the share ledger's cut-over check does). The
    * repository stays private; this is the one door to it.
    */
-  static createReader({ database }: { database: PostgresAuthzDatabase }) {
+  static createReader({ database }: { database: PostgresAuthzDatabasePort }) {
     return PrismaAuthzReadRepository.create(database as unknown as AuthzDatabase);
   }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger, type Logger } from "@langwatch/observability";
-import { BillingErrorReporter } from "../ports/error-reporter.port.ts";
+import { BillingErrorReporterPort } from "../ports/error-reporter.port.ts";
 
 const defaultLogger = createLogger("langwatch:billing:errorReporter");
 
@@ -21,7 +21,7 @@ const defaultLogger = createLogger("langwatch:billing:errorReporter");
  * does not appear in PostHog. It appears in the logs, under the same
  * `handler`, `organizationId` and `billingMonth` fields the capture carried.
  */
-export class ObservabilityBillingErrorAdapter extends BillingErrorReporter {
+export class ObservabilityBillingErrorAdapter extends BillingErrorReporterPort {
   static create(target: Pick<Logger, "error"> = defaultLogger): ObservabilityBillingErrorAdapter {
     return new ObservabilityBillingErrorAdapter(target);
   }

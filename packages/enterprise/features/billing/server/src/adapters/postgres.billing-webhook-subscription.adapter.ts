@@ -19,7 +19,7 @@ import {
 } from "../ports/billing-webhook-subscription.port.ts";
 import type {
   BillingSubscriptionRecord,
-  BillingSubscriptionRepository,
+  BillingSubscriptionPort,
   BillingSubscriptionWithOrganization,
 } from "../ports/subscription.port.ts";
 
@@ -30,14 +30,14 @@ export type BillingWebhookTrialLicenseDatabase = Pick<PrismaClient, "organizatio
 
 export class PostgresBillingWebhookSubscriptionAdapter extends BillingWebhookSubscriptionPort {
   private constructor(
-    private readonly subscriptions: BillingSubscriptionRepository,
+    private readonly subscriptions: BillingSubscriptionPort,
     private readonly database: BillingWebhookTrialLicenseDatabase,
   ) {
     super();
   }
 
   static create(options: {
-    subscriptions: BillingSubscriptionRepository;
+    subscriptions: BillingSubscriptionPort;
     database: BillingWebhookTrialLicenseDatabase;
   }): PostgresBillingWebhookSubscriptionAdapter {
     return new PostgresBillingWebhookSubscriptionAdapter(options.subscriptions, options.database);

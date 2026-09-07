@@ -4,7 +4,10 @@ import type {
   IngestionSourceEntitlementsPort,
   IngestionSourceLifecyclePort,
 } from "../ports/ingestion-source.port.ts";
-import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
+import {
+  PrismaIngestionSourceRepository,
+  type IngestionSourceDatabase,
+} from "../repositories/prisma/prisma.ingestion-source.repository.ts";
 import type { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import type { IngestionSecretService } from "../services/ingestion-source-secret.service.ts";
 import { IngestionSourceService } from "../services/ingestion-source.service.ts";
@@ -14,7 +17,7 @@ import type { PullDestinationService } from "../services/pull-destination.servic
 export class PostgresIngestionSourceAdapter {
   private constructor(
     private readonly options: {
-      database: object;
+      database: IngestionSourceDatabase;
       projects: ProjectService;
       entitlements: IngestionSourceEntitlementsPort;
       lifecycle: IngestionSourceLifecyclePort;
@@ -27,7 +30,7 @@ export class PostgresIngestionSourceAdapter {
   ) {}
 
   static create(options: {
-    database: object;
+    database: IngestionSourceDatabase;
     projects: ProjectService;
     entitlements: IngestionSourceEntitlementsPort;
     lifecycle: IngestionSourceLifecyclePort;

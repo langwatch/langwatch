@@ -23,6 +23,7 @@ import {
   createWorkerGovernanceAnomalySchedule,
   WorkerAnomalyAlertTransportPort,
 } from "../worker-governance-anomaly.composition.ts";
+import type { SpendSpikeAnomalyWorkerDependencies } from "@langwatch/enterprise-worker";
 import { WorkerProductionComposition } from "../worker-production.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
@@ -157,7 +158,7 @@ describe("createWorkerGovernanceAnomalySchedule", () => {
       const transport = new RecordingTransport();
 
       const schedule = createWorkerGovernanceAnomalySchedule({
-        database: database.models,
+        database: database.models as unknown as SpendSpikeAnomalyWorkerDependencies["database"],
         resolveClickHouseClient: spikeClickHouse() as never,
         transport,
       });
@@ -202,7 +203,7 @@ describe("createWorkerGovernanceAnomalySchedule", () => {
       const transport = new RecordingTransport();
 
       const schedule = createWorkerGovernanceAnomalySchedule({
-        database: database.models,
+        database: database.models as unknown as SpendSpikeAnomalyWorkerDependencies["database"],
         resolveClickHouseClient: spikeClickHouse() as never,
         transport,
       });
@@ -233,7 +234,7 @@ describe("createWorkerGovernanceAnomalySchedule", () => {
       const database = anomalyDatabase(LOOPBACK_DESTINATION);
 
       const schedule = createWorkerGovernanceAnomalySchedule({
-        database: database.models,
+        database: database.models as unknown as SpendSpikeAnomalyWorkerDependencies["database"],
         resolveClickHouseClient: spikeClickHouse() as never,
         transport: new RecordingTransport(),
       });

@@ -17,7 +17,10 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/enterprise-webhook-contract";
-import { WebhookEndpointAdapter } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+import {
+  WebhookEndpointAdapter,
+  type WebhookEndpointServiceOptions,
+} from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
 import { WebhookIdPort } from "../webhook-id.port.ts";
 import { WebhookSecretPort } from "../webhook-secret.port.ts";
 import { WebhookApp } from "../../app/webhook.app.ts";
@@ -85,7 +88,7 @@ function buildMockPrisma() {
 
 function buildCaller(prisma: ReturnType<typeof buildMockPrisma>) {
   const endpoints = WebhookEndpointAdapter.create({
-    prisma,
+    prisma: prisma as unknown as WebhookEndpointServiceOptions["prisma"],
     ids: new TestIdPort(),
     secrets: new TestSecretPort(),
   });

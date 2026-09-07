@@ -17,7 +17,7 @@ import {
 import { LangyTurnRelayAdapter, type LangyRelayRedis } from "./langy-turn-relay.adapter.ts";
 import {
   LangyFeedbackPromptPolicy,
-  type LangyFeedbackPromptRedis,
+  type LangyFeedbackPromptRedisPort,
 } from "../ports/langy-feedback-prompt.port.ts";
 import { LangyConversationService } from "../services/langy-conversation.service.ts";
 import { LangyMessageService } from "../services/langy-message.service.ts";
@@ -94,7 +94,7 @@ export type LangyServiceCompositionOptions = {
   events?: LangyConversationEventsReader | null;
   runtime?: LangyConversationRuntime;
   relay?: LangyRelayCompositionOptions;
-  feedbackPromptRedis?: LangyFeedbackPromptRedis | null;
+  feedbackPromptRedis?: LangyFeedbackPromptRedisPort | null;
   /** The block-salvage counter. Absent composes `NullLangyBlockMetricsAdapter`: nothing published. */
   blockMetrics?: LangyBlockMetricsPort;
 };

@@ -79,9 +79,17 @@ const EMPTY_DESTINATION: StoredDestination = {
  *  will actually have. */
 const KEPT_SECRET = "__langwatch_kept_secret__";
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type WebhookEndpointDatabase = Pick<
+  PrismaClient,
+  "webhookEndpoint" | "webhookEndpointDelivery" | "$queryRaw"
+>;
+
 export interface WebhookEndpointDeps {
-  /** Kept opaque at the package root so generated database types never leak. */
-  prisma: unknown;
+  prisma: WebhookEndpointDatabase;
   ids: WebhookIdPort;
   secrets: WebhookSecretPort;
   configuration?: WebhookEndpointConfiguration;
@@ -109,11 +117,11 @@ export interface WebhookEndpointDeps {
 export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContract {
   private readonly configuration: WebhookEndpointConfiguration;
   private readonly policy = WebhookEndpointPolicyService.create();
-  private readonly prisma: PrismaClient;
+  private readonly prisma: WebhookEndpointDatabase;
 
   private constructor(private readonly deps: WebhookEndpointDeps) {
     super();
-    this.prisma = deps.prisma as PrismaClient;
+    this.prisma = deps.prisma;
     this.configuration = deps.configuration ?? WebhookEndpointConfiguration.create();
   }
 

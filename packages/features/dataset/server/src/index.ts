@@ -35,15 +35,18 @@ export {
   DatasetContentPort,
 } from "./ports/dataset.port.ts";
 export {
-  DatasetAzureConfigResolver,
-  DatasetS3ClientResolver,
-  DatasetStorageResolver,
+  DatasetAzureConfigResolverPort,
+  DatasetS3ClientResolverPort,
+  DatasetStorageResolverPort,
   type DatasetStorage,
   type DatasetAzureConfig,
   type DatasetS3Client,
   type DatasetS3ClientLease,
 } from "./ports/dataset-storage.port.ts";
-export { S3DatasetStorage, S3DatasetStorageAdapter } from "./adapters/s3.dataset-storage.adapter.ts";
+export {
+  S3DatasetStorage,
+  S3DatasetStorageAdapter,
+} from "./adapters/s3.dataset-storage.adapter.ts";
 export {
   AzureDatasetStorage,
   AzureDatasetStorageAdapter,
@@ -75,8 +78,8 @@ export { DatasetChunkService } from "./services/dataset-chunk.service.ts";
 export type {
   DatasetMutationRecord,
   RecomputedDatasetCounts,
-} from "./services/dataset-chunk.service.ts";
-export { MAX_INMEMORY_COLUMN_EDIT_BYTES } from "./services/dataset-chunk.service.ts";
+} from "./rules/dataset-chunk-lines.rules.ts";
+export { MAX_INMEMORY_COLUMN_EDIT_BYTES } from "./rules/dataset-chunk-lines.rules.ts";
 export * from "./rules/presigned-upload.rules.ts";
 export * from "./rules/dataset-sanitize.rules.ts";
 export * from "@langwatch/dataset-contract";

@@ -19,7 +19,7 @@ import type {
   DatasetUploadPort,
   DatasetContentPort,
 } from "../ports/dataset.port.ts";
-import type { DatasetStorageResolver } from "../ports/dataset-storage.port.ts";
+import type { DatasetStorageResolverPort } from "../ports/dataset-storage.port.ts";
 import { DatasetUploadAdapter } from "./dataset-upload.adapter.ts";
 import {
   PrismaDatasetContentRepository,
@@ -40,7 +40,7 @@ export type PostgresDatasetAdapterOptions = {
   storage?: DatasetUploadPort;
   queue?: DatasetNormalizeQueuePort;
   content?: DatasetContentPort;
-  storageResolver?: DatasetStorageResolver;
+  storageResolver?: DatasetStorageResolverPort;
   generateId?: () => string;
 };
 

@@ -7,10 +7,13 @@ import type {
   SignupNotificationPayload,
   SubscriptionNotificationPayload,
 } from "@langwatch/enterprise-billing-contract";
-import { NullBillingErrorReporter, type BillingErrorReporter } from "../ports/error-reporter.port.ts";
+import {
+  NullBillingErrorReporter,
+  type BillingErrorReporterPort,
+} from "../ports/error-reporter.port.ts";
 import {
   NullUsageLimitEmailAdapter,
-  type UsageLimitEmailAdapter,
+  type UsageLimitEmailPort,
 } from "../ports/usage-limit-email.port.ts";
 
 const logger = createLogger("ee:notification-service");
@@ -76,8 +79,8 @@ type NotificationServiceOptions = {
   };
   createSlackWebhook?: (url: string) => Pick<IncomingWebhook, "send">;
   fetchFn?: typeof fetch;
-  errorReporter?: BillingErrorReporter;
-  usageLimitEmail?: UsageLimitEmailAdapter;
+  errorReporter?: BillingErrorReporterPort;
+  usageLimitEmail?: UsageLimitEmailPort;
 };
 
 // ---------------------------------------------------------------------------
@@ -92,8 +95,8 @@ export class NotificationService {
   private readonly config: NotificationServiceOptions["config"];
   private readonly createSlackWebhook: (url: string) => Pick<IncomingWebhook, "send">;
   private readonly fetchFn: typeof fetch;
-  private readonly errorReporter: BillingErrorReporter;
-  private readonly usageLimitEmail: UsageLimitEmailAdapter;
+  private readonly errorReporter: BillingErrorReporterPort;
+  private readonly usageLimitEmail: UsageLimitEmailPort;
 
   private constructor(options: NotificationServiceOptions) {
     this.config = options.config;

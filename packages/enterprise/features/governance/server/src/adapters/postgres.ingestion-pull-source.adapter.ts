@@ -1,6 +1,9 @@
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
 import { IngestionPullSourcePort } from "../ports/ingestion-pull-worker.port.ts";
-import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
+import {
+  PrismaIngestionSourceRepository,
+  type IngestionSourceDatabase,
+} from "../repositories/prisma/prisma.ingestion-source.repository.ts";
 
 /** Prisma-backed source lookup for the process-owned pull worker. */
 export class PostgresIngestionPullSourceAdapter extends IngestionPullSourcePort {
@@ -8,7 +11,7 @@ export class PostgresIngestionPullSourceAdapter extends IngestionPullSourcePort 
     super();
   }
 
-  static create(database: object): PostgresIngestionPullSourceAdapter {
+  static create(database: IngestionSourceDatabase): PostgresIngestionPullSourceAdapter {
     return new PostgresIngestionPullSourceAdapter(PrismaIngestionSourceRepository.create(database));
   }
 

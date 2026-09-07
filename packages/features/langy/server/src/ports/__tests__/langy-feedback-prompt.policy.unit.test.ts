@@ -3,12 +3,12 @@ import {
   FEEDBACK_LONG_CONVERSATION_ANSWERS,
   FEEDBACK_QUIET_PERIOD_MS,
   LangyFeedbackPromptPolicy,
-  type LangyFeedbackPromptRedis,
+  type LangyFeedbackPromptRedisPort,
 } from "../langy-feedback-prompt.port.ts";
 
 const NOW = 1_700_000_000_000;
 
-function memoryRedis(): LangyFeedbackPromptRedis & { store: Map<string, string> } {
+function memoryRedis(): LangyFeedbackPromptRedisPort & { store: Map<string, string> } {
   const store = new Map<string, string>();
   return {
     store,
@@ -20,7 +20,7 @@ function memoryRedis(): LangyFeedbackPromptRedis & { store: Map<string, string> 
   };
 }
 
-function service(redis: LangyFeedbackPromptRedis | null, now = NOW): LangyFeedbackPromptPolicy {
+function service(redis: LangyFeedbackPromptRedisPort | null, now = NOW): LangyFeedbackPromptPolicy {
   return LangyFeedbackPromptPolicy.create({ redis, now: () => now });
 }
 
@@ -89,7 +89,7 @@ describe("LangyFeedbackPromptPolicy", () => {
 
   /** @scenario "feedback prompt is safe when Redis is unavailable" */
   it("fails closed on reads and keeps writes best-effort", async () => {
-    const broken: LangyFeedbackPromptRedis = {
+    const broken: LangyFeedbackPromptRedisPort = {
       get: async () => {
         throw new Error("redis down");
       },
@@ -148,7 +148,7 @@ describe("LangyFeedbackPromptPolicy", () => {
     ).resolves.toBe(true);
 
     const calls: unknown[][] = [];
-    const recordingRedis: LangyFeedbackPromptRedis = {
+    const recordingRedis: LangyFeedbackPromptRedisPort = {
       get: redis.get,
       set: async (...args) => {
         calls.push(args);

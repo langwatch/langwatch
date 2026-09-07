@@ -16,6 +16,8 @@ import {
 import {
   PostgresIngestionPullSourceAdapter,
   type IngestionPullLifecycleDatabase,
+  type IngestionPullRunProjectionDatabase,
+  type IngestionSourceDatabase,
 } from "@langwatch/enterprise-governance-server";
 import { GatewayBudgetLedgerAdapter } from "@langwatch/gateway-server";
 import { createSsrfUrlValidator, fetchValidatedDestination } from "@langwatch/egress";
@@ -30,7 +32,9 @@ import type { WorkerConfig } from "../platform/config/worker.config.ts";
 export type WorkerGovernanceIngestionOptions = Readonly<{
   config: WorkerConfig;
   /** The one Prisma client this process opened, narrowed to what pull reads. */
-  database: IngestionPullLifecycleDatabase;
+  database: IngestionPullLifecycleDatabase &
+    IngestionSourceDatabase &
+    IngestionPullRunProjectionDatabase;
   /** The deployment's tenant-keyed ClickHouse client. */
   resolveClickHouseClient: EventingClickHouseClientResolver;
   /** The two project reads a pull makes; see GovernanceInternalProjectPort. */

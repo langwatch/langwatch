@@ -6,13 +6,22 @@ import {
 
 const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type GovernanceSetupStateDatabase = Pick<
+  PrismaClient,
+  "anomalyRule" | "ingestionSource" | "project" | "routingPolicy" | "virtualKey"
+>;
+
 export class PrismaGovernanceSetupStateRepository extends GovernanceSetupStateRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: GovernanceSetupStateDatabase) {
     super();
   }
 
-  static create(database: object): PrismaGovernanceSetupStateRepository {
-    return new PrismaGovernanceSetupStateRepository(database as PrismaClient);
+  static create(database: GovernanceSetupStateDatabase): PrismaGovernanceSetupStateRepository {
+    return new PrismaGovernanceSetupStateRepository(database);
   }
 
   async counts(organizationId: string): Promise<GovernanceSetupCounts> {

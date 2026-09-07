@@ -10,7 +10,7 @@ import {
   type UpdateDatasetRecordInput,
 } from "@langwatch/dataset-contract";
 import { DatasetContentPort } from "../ports/dataset.port.ts";
-import type { DatasetStorageResolver } from "../ports/dataset-storage.port.ts";
+import type { DatasetStorageResolverPort } from "../ports/dataset-storage.port.ts";
 import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { ChunkOffset } from "../rules/dataset-chunking.rules.ts";
 import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
@@ -22,7 +22,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
 
   private constructor(
     private readonly datasets: DatasetContentRepository,
-    private readonly storageResolver: DatasetStorageResolver,
+    private readonly storageResolver: DatasetStorageResolverPort,
   ) {
     super();
     this.chunks = DatasetChunkService.create({ datasets });
@@ -30,7 +30,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
 
   static create(options: {
     datasets: DatasetContentRepository;
-    storageResolver: DatasetStorageResolver;
+    storageResolver: DatasetStorageResolverPort;
   }): DatasetContentAdapter {
     return new DatasetContentAdapter(options.datasets, options.storageResolver);
   }

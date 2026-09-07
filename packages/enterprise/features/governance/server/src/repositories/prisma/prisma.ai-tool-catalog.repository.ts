@@ -20,13 +20,29 @@ type EntryRow = PrismaAiToolEntry & {
   departments: Pick<AiToolEntryDepartment, "departmentId">[];
 };
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type AiToolCatalogDatabase = Pick<
+  PrismaClient,
+  | "aiToolEntry"
+  | "department"
+  | "modelProvider"
+  | "organizationUser"
+  | "routingPolicy"
+  | "team"
+  | "teamUser"
+  | "$transaction"
+>;
+
 export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: AiToolCatalogDatabase) {
     super();
   }
 
-  static create(database: object): PrismaAiToolCatalogRepository {
-    return new PrismaAiToolCatalogRepository(database as PrismaClient);
+  static create(database: AiToolCatalogDatabase): PrismaAiToolCatalogRepository {
+    return new PrismaAiToolCatalogRepository(database);
   }
 
   async listVisible(input: {

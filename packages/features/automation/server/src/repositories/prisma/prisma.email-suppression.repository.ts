@@ -2,12 +2,18 @@ import { emailSuppressionSchema, type EmailSuppression } from "@langwatch/automa
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { EmailSuppressionRepository } from "../email-suppression.repository.ts";
 const map = (row: unknown): EmailSuppression => emailSuppressionSchema.parse(row);
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type EmailSuppressionDatabase = Pick<PrismaClient, "emailSuppression">;
+
 export class PrismaEmailSuppressionRepository extends EmailSuppressionRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: EmailSuppressionDatabase) {
     super();
   }
-  static create(database: object): PrismaEmailSuppressionRepository {
-    return new PrismaEmailSuppressionRepository(database as PrismaClient);
+  static create(database: EmailSuppressionDatabase): PrismaEmailSuppressionRepository {
+    return new PrismaEmailSuppressionRepository(database);
   }
   async findAll(input: { projectId: string }): Promise<EmailSuppression[]> {
     return (

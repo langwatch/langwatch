@@ -8,7 +8,7 @@ import {
   StagedUploadNotFoundError,
 } from "@langwatch/dataset-contract";
 import {
-  DatasetAzureConfigResolver,
+  DatasetAzureConfigResolverPort,
   type DatasetBlobDriver,
 } from "../../ports/dataset-storage.port.ts";
 
@@ -44,7 +44,7 @@ function fakeDriver(): DatasetBlobDriver {
   };
 }
 
-class FixedAzureConfigResolver extends DatasetAzureConfigResolver {
+class FixedAzureConfigResolver extends DatasetAzureConfigResolverPort {
   readonly resolve = vi.fn(async () => ({
     driver: fakeDriver(),
     accountName: "lwacct",
@@ -96,7 +96,7 @@ describe("AzureDatasetStorageAdapter", () => {
       /** @scenario "Datasets round-trip through Azure Blob when azure is the configured backend" */
       /** @scenario "An Azure-only installation supports every shared object-storage workload" */
       it("reads the same rows back in order", async () => {
-        class InMemoryAzureConfigResolver extends DatasetAzureConfigResolver {
+        class InMemoryAzureConfigResolver extends DatasetAzureConfigResolverPort {
           private readonly driver = inMemoryDriver();
           resolve = vi.fn(async () => ({
             driver: this.driver,

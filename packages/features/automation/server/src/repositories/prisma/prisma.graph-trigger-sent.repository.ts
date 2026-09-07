@@ -6,8 +6,17 @@ import {
 import { parseSeriesIndex } from "@langwatch/automation-contract";
 
 /** Prisma-backed graph-alert incident ledger, private to Automation server. */
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type GraphTriggerSentDatabase = Pick<
+  PrismaClient,
+  "customGraph" | "project" | "trigger" | "triggerSent"
+>;
+
 export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: GraphTriggerSentDatabase) {
     super();
   }
 
@@ -15,8 +24,8 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
     return `graph-alert:${triggerId}`;
   }
 
-  static create(database: object): PrismaGraphTriggerSentRepository {
-    return new PrismaGraphTriggerSentRepository(database as PrismaClient);
+  static create(database: GraphTriggerSentDatabase): PrismaGraphTriggerSentRepository {
+    return new PrismaGraphTriggerSentRepository(database);
   }
 
   async findProjectsWithGraphTriggers(): Promise<string[]> {

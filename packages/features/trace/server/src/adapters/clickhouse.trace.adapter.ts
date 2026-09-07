@@ -19,11 +19,7 @@ import { TracePayloadReaderPort } from "../ports/trace-payload-reader.port.ts";
 import { TraceFullIoPort } from "../ports/trace-full-io.port.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
 import { NullQueryFieldValuesAdapter } from "./null-query-field-values.adapter.ts";
-import {
-  TraceRepository,
-  type TraceSpanPage,
-  type TraceSpanSummaryRecord,
-} from "../ports/trace.port.ts";
+import { TracePort, type TraceSpanPage, type TraceSpanSummaryRecord } from "../ports/trace.port.ts";
 import { TraceService } from "../services/trace.service.ts";
 
 export type ClickHouseTraceAdapterOptions = {
@@ -94,7 +90,7 @@ class ResolverTraceClickHousePort extends TraceClickHousePort {
   }
 }
 
-class NullTraceRepository extends TraceRepository {
+class NullTraceRepository extends TracePort {
   async findEvaluationSpans(): Promise<[]> {
     return [];
   }

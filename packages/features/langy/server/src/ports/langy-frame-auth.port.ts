@@ -137,3 +137,16 @@ export function mintRunToken(): string {
 export function newFrameNonce(): string {
   return randomBytes(16).toString("hex");
 }
+
+/** The frame-authentication boundary: sign, verify, mint, and generate a nonce. */
+export abstract class LangyFrameAuthPort {
+  abstract computeFrameMac(runToken: string, frame: LangyFrameSigned): string;
+  abstract signFrame(
+    runToken: string,
+    identity: LangyFrameIdentity,
+    payload: string,
+  ): LangyFrameEnvelope;
+  abstract verifyFrame(runToken: string, frame: LangyFrameEnvelope): boolean;
+  abstract mintRunToken(): string;
+  abstract newFrameNonce(): string;
+}

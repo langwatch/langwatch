@@ -48,11 +48,11 @@ import type { TraceSummaryReaderPort } from "../ports/trace-summary-reader.port.
 import type { TraceRecordPort } from "../ports/trace-record.port.ts";
 import type { TraceEventDerivationPort } from "../ports/trace-event-derivation.port.ts";
 import type { TraceFullRecordPort } from "../ports/trace-full-record.port.ts";
-import { TraceRepository, type TraceSpanSummaryRecord } from "../ports/trace.port.ts";
+import { TracePort, type TraceSpanSummaryRecord } from "../ports/trace.port.ts";
 import { TraceQueryFieldCatalogueService } from "./trace-query-field-catalogue.service.ts";
 
 type TraceComposition = {
-  repository: TraceRepository;
+  repository: TracePort;
   modelProviders: ModelProviderService;
   queryFieldValues: TraceQueryFieldValuesPort;
   queryClassification: TraceQueryClassificationPort;

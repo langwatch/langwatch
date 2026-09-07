@@ -5,7 +5,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { MAX_FILE_SIZE_BYTES } from "@langwatch/dataset-contract";
-import type { DatasetStorage, DatasetStorageResolver } from "../../ports/dataset-storage.port.ts";
+import type {
+  DatasetStorage,
+  DatasetStorageResolverPort,
+} from "../../ports/dataset-storage.port.ts";
 import type { DatasetRow } from "../../ports/dataset.port.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordContentRepository } from "../../repositories/prisma/dataset-record-content.repository.ts";
@@ -91,7 +94,7 @@ function harness({
 
   const storageResolver = {
     forProject: async () => storage,
-  } as unknown as DatasetStorageResolver;
+  } as unknown as DatasetStorageResolverPort;
 
   return {
     adapter: DatasetUploadAdapter.create({ datasets, records, storageResolver }),

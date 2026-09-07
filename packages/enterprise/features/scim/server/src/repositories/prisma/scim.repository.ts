@@ -68,7 +68,7 @@ export class PrismaScimRepository extends ScimRepositoryPort {
   private constructor(private readonly prisma: ScimDatabase) {
     super();
   }
-  static create(database: object): PrismaScimRepository {
+  static create(database: PrismaClient): PrismaScimRepository {
     if (!isScimDatabase(database)) {
       throw new Error("SCIM requires a Prisma database with SCIM models");
     }

@@ -6,12 +6,15 @@ import type {
 } from "@langwatch/enterprise-webhook-contract";
 import type { WebhookIdPort } from "../ports/webhook-id.port.ts";
 import type { WebhookSecretPort } from "../ports/webhook-secret.port.ts";
-import { PrismaWebhookEndpointRepository } from "../repositories/prisma/prisma.webhook-endpoint.repository.ts";
+import {
+  PrismaWebhookEndpointRepository,
+  type WebhookEndpointDatabase,
+} from "../repositories/prisma/prisma.webhook-endpoint.repository.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 import type { WebhookEndpointConfiguration } from "../services/webhook-endpoint-policy.service.ts";
 
 export type WebhookEndpointServiceOptions = {
-  prisma: unknown;
+  prisma: WebhookEndpointDatabase;
   ids: WebhookIdPort;
   secrets: WebhookSecretPort;
   configuration?: WebhookEndpointConfiguration;

@@ -8,7 +8,10 @@ import { ActiveTriggerCacheService } from "../services/active-trigger-cache.serv
 /**
  * The one table this read touches, named here and nowhere above it.
  */
-export type AutomationTraceTriggerCatalogueDatabase = Pick<PrismaClient, "trigger">;
+export type AutomationTraceTriggerCatalogueDatabase = Pick<
+  PrismaClient,
+  "trigger" | "triggerSent" | "$queryRaw"
+>;
 
 /**
  * A project's trace automations, read the way the ingestion path needs them.

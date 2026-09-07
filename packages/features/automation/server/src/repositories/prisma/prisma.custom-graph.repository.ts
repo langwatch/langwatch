@@ -4,13 +4,19 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 const BUILDER_CHART_KIND = "builder";
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type CustomGraphDatabase = Pick<PrismaClient, "customGraph">;
+
 export class PrismaCustomGraphRepository extends CustomGraphRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: CustomGraphDatabase) {
     super();
   }
 
-  static create(database: object): PrismaCustomGraphRepository {
-    return new PrismaCustomGraphRepository(database as PrismaClient);
+  static create(database: CustomGraphDatabase): PrismaCustomGraphRepository {
+    return new PrismaCustomGraphRepository(database);
   }
 
   async tryFindById(input: {

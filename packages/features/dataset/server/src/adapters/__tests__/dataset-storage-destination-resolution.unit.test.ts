@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.adapter.ts";
 import { S3DatasetStorageAdapter } from "../s3.dataset-storage.adapter.ts";
 import {
-  DatasetAzureConfigResolver,
-  DatasetS3ClientResolver,
+  DatasetAzureConfigResolverPort,
+  DatasetS3ClientResolverPort,
   type DatasetAzureConfig,
   type DatasetBlobDriver,
   type DatasetS3Client,
@@ -60,7 +60,7 @@ function blobDriver(): DatasetBlobDriver {
   };
 }
 
-class SequencedS3Resolver extends DatasetS3ClientResolver {
+class SequencedS3Resolver extends DatasetS3ClientResolverPort {
   readonly releases: Array<ReturnType<typeof vi.fn>> = [];
 
   readonly acquire = vi.fn(async () => {
@@ -81,7 +81,7 @@ function streamS3Client(body: Readable): S3Client {
   return s3Client();
 }
 
-class SequencedAzureResolver extends DatasetAzureConfigResolver {
+class SequencedAzureResolver extends DatasetAzureConfigResolverPort {
   readonly resolve = vi.fn(async () => {
     const next = this.configurations.shift();
     if (!next) throw new Error("Test resolver was called too many times");

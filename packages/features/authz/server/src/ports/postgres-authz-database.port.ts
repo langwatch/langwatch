@@ -15,24 +15,24 @@ type PostgresAuthzDelegate = {
  * Structural database surface accepted at the application composition root.
  * Concrete repository requirements remain private to the adapter build.
  */
-export type PostgresAuthzDatabase = Readonly<{
-  apiKey: PostgresAuthzDelegate;
-  auditLog: PostgresAuthzDelegate;
-  customRole: PostgresAuthzDelegate;
-  grant: PostgresAuthzDelegate;
-  grantUsage: PostgresAuthzDelegate;
-  group: PostgresAuthzDelegate;
-  groupMembership: PostgresAuthzDelegate;
-  organization: PostgresAuthzDelegate;
-  organizationInvite: PostgresAuthzDelegate;
-  organizationUser: PostgresAuthzDelegate;
-  project: PostgresAuthzDelegate;
-  role: PostgresAuthzDelegate;
-  roleBinding: PostgresAuthzDelegate;
-  shareLink: PostgresAuthzDelegate;
-  systemMigrationTenantState: PostgresAuthzDelegate;
-  team: PostgresAuthzDelegate;
-  teamUser: PostgresAuthzDelegate;
-  user: PostgresAuthzDelegate;
-  $transaction: (...args: any[]) => Promise<any>;
-}>;
+export abstract class PostgresAuthzDatabasePort {
+  abstract readonly apiKey: PostgresAuthzDelegate;
+  abstract readonly auditLog: PostgresAuthzDelegate;
+  abstract readonly customRole: PostgresAuthzDelegate;
+  abstract readonly grant: PostgresAuthzDelegate;
+  abstract readonly grantUsage: PostgresAuthzDelegate;
+  abstract readonly group: PostgresAuthzDelegate;
+  abstract readonly groupMembership: PostgresAuthzDelegate;
+  abstract readonly organization: PostgresAuthzDelegate;
+  abstract readonly organizationInvite: PostgresAuthzDelegate;
+  abstract readonly organizationUser: PostgresAuthzDelegate;
+  abstract readonly project: PostgresAuthzDelegate;
+  abstract readonly role: PostgresAuthzDelegate;
+  abstract readonly roleBinding: PostgresAuthzDelegate;
+  abstract readonly shareLink: PostgresAuthzDelegate;
+  abstract readonly systemMigrationTenantState: PostgresAuthzDelegate;
+  abstract readonly team: PostgresAuthzDelegate;
+  abstract readonly teamUser: PostgresAuthzDelegate;
+  abstract readonly user: PostgresAuthzDelegate;
+  abstract readonly $transaction: (...args: any[]) => Promise<any>;
+}

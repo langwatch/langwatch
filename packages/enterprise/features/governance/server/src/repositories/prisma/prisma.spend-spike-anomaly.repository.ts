@@ -9,13 +9,22 @@ import { SpendSpikeAnomalyRepository } from "../../ports/spend-spike-anomaly.por
 
 const GOVERNANCE_PROJECT_KIND = "internal_governance";
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type SpendSpikeAnomalyDatabase = Pick<
+  PrismaClient,
+  "anomalyAlert" | "anomalyRule" | "project"
+>;
+
 export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: SpendSpikeAnomalyDatabase) {
     super();
   }
 
-  static create(database: object): PrismaSpendSpikeAnomalyRepository {
-    return new PrismaSpendSpikeAnomalyRepository(database as PrismaClient);
+  static create(database: SpendSpikeAnomalyDatabase): PrismaSpendSpikeAnomalyRepository {
+    return new PrismaSpendSpikeAnomalyRepository(database);
   }
 
   async listActiveRules(): Promise<AnomalyRule[]> {

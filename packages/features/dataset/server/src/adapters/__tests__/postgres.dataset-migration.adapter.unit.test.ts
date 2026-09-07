@@ -8,8 +8,8 @@ import type {
   PresignedUpload,
 } from "../../ports/dataset-storage.port.ts";
 import {
-  DatasetAzureConfigResolver,
-  DatasetStorageResolver,
+  DatasetAzureConfigResolverPort,
+  DatasetStorageResolverPort,
 } from "../../ports/dataset-storage.port.ts";
 import {
   toJsonlChunks,
@@ -53,7 +53,7 @@ class FixtureStorage implements DatasetStorage {
   }
 }
 
-class FixtureStorageResolver extends DatasetStorageResolver {
+class FixtureStorageResolver extends DatasetStorageResolverPort {
   readonly forProject = vi.fn(async () => this.storage);
 
   constructor(private readonly storage: DatasetStorage) {
@@ -155,7 +155,7 @@ describe("given a deployment whose dataset destination is Azure Blob", () => {
         delete: async () => undefined,
       };
       const azure = AzureDatasetStorageAdapter.create(
-        new (class extends DatasetAzureConfigResolver {
+        new (class extends DatasetAzureConfigResolverPort {
           async resolve() {
             return { driver, accountName: "lwacct", container: "datasets" };
           }

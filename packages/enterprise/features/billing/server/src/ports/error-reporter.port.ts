@@ -1,8 +1,8 @@
-export abstract class BillingErrorReporter {
+export abstract class BillingErrorReporterPort {
   abstract capture(error: Error, context?: Record<string, unknown>): void;
 }
 
-export class NullBillingErrorReporter extends BillingErrorReporter {
+export class NullBillingErrorReporter extends BillingErrorReporterPort {
   private constructor() {
     super();
   }

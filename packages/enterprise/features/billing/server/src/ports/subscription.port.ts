@@ -23,7 +23,7 @@ export type BillingSubscriptionWithOrganization = BillingSubscriptionRecord & {
   organization: BillingOrganizationRecord;
 };
 
-export abstract class BillingSubscriptionRepository {
+export abstract class BillingSubscriptionPort {
   abstract tryFindActive(organizationId: string): Promise<BillingSubscriptionRecord | null>;
   abstract tryFindLastNonCancelled(
     organizationId: string,

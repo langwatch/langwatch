@@ -98,7 +98,7 @@ export class ApiAuthzComposition {
 
     const built = PostgresAuthzAdapter.create({
       // The typed client satisfies the feature's structural database port on
-      // its own terms: `PostgresAuthzDatabase` describes eighteen delegates in
+      // its own terms: `PostgresAuthzDatabasePort` describes eighteen delegates in
       // `unknown` arguments so no generated type crosses into the package, and
       // a guarded `PrismaClient` is assignable to every one of them. No
       // assertion sits at this seam, and none should — an assertion here would

@@ -24,7 +24,7 @@ export type TraceIngestLagSample = {
 };
 
 /** The single projected Trace persistence boundary. */
-export abstract class TraceRepository {
+export abstract class TracePort {
   abstract findEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
 
   abstract findEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;

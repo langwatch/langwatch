@@ -96,7 +96,9 @@ describe("given a project attached to a team and organization", () => {
     /** @scenario "a provider may be visible at project, team, or organization scope" */
     it("returns the providers attached at any of those scopes, and no other project's", async () => {
       const repository = PrismaModelProviderRepository.create(
-        databaseThatFilters(),
+        databaseThatFilters() as unknown as Parameters<
+          typeof PrismaModelProviderRepository.create
+        >[0],
         new PlainTextCredentials(),
       );
 

@@ -28,7 +28,7 @@ import {
 import {
   WAREHOUSE_COST_MAX_HOLD_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
-} from "../../services/puller-databricks-warehouse-cost.service.ts";
+} from "../../rules/warehouse-cost.rules.ts";
 import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 import { FetchHttpPort } from "../../__tests__/support/puller-test-ports.ts";
 

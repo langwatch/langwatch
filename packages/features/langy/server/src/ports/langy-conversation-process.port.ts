@@ -77,3 +77,11 @@ export const langyProcessEventViewSchema = z.object({
   titleTouched: z.boolean(),
 });
 export type LangyProcessEventView = z.infer<typeof langyProcessEventViewSchema>;
+
+/**
+ * The content boundary every pipeline event crosses before the process
+ * manager sees it: identities and flags only, never parts/tokens/titles.
+ */
+export abstract class LangyProcessEventViewPort {
+  abstract toView(event: unknown): LangyProcessEventView;
+}

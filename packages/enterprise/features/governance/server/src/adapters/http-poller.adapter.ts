@@ -20,7 +20,7 @@ import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
 import type { GovernanceHttpPort, GovernanceHttpResponse } from "../ports/governance-http.port.ts";
 import {
-  NullIngestionPullDiagnosticsPort,
+  NullIngestionPullDiagnosticsAdapter,
   type IngestionPullDiagnosticsPort,
 } from "../ports/ingestion-pull-worker.port.ts";
 
@@ -93,7 +93,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
 
   protected constructor(
     private readonly http: GovernanceHttpPort,
-    private readonly diagnostics: IngestionPullDiagnosticsPort = new NullIngestionPullDiagnosticsPort(),
+    private readonly diagnostics: IngestionPullDiagnosticsPort = new NullIngestionPullDiagnosticsAdapter(),
   ) {}
 
   static create(options: {
@@ -102,7 +102,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
   }): HttpPollingPullerAdapter {
     return new HttpPollingPullerAdapter(
       options.http,
-      options.diagnostics ?? new NullIngestionPullDiagnosticsPort(),
+      options.diagnostics ?? new NullIngestionPullDiagnosticsAdapter(),
     );
   }
 

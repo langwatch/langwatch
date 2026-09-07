@@ -6,13 +6,21 @@ import {
   type AdminWorkspaceTarget,
 } from "../../ports/admin-workspace-view-audit.port.ts";
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type AdminWorkspaceViewAuditDatabase = Pick<PrismaClient, "auditLog" | "team">;
+
 export class PrismaAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewAuditRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: AdminWorkspaceViewAuditDatabase) {
     super();
   }
 
-  static create(database: object): PrismaAdminWorkspaceViewAuditRepository {
-    return new PrismaAdminWorkspaceViewAuditRepository(database as PrismaClient);
+  static create(
+    database: AdminWorkspaceViewAuditDatabase,
+  ): PrismaAdminWorkspaceViewAuditRepository {
+    return new PrismaAdminWorkspaceViewAuditRepository(database);
   }
 
   async tryFindTarget(input: {

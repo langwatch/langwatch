@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PostgresIngestionPullRunProjectionAdapter } from "../postgres.ingestion-pull-run-projection.adapter.ts";
 import type { IngestionPullRunStatusData } from "../../projections/ingestion-pull-run-status-eventing.projection.ts";
 import type { StoredProjection } from "@langwatch/eventing";
@@ -58,7 +59,9 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
         findUnique,
       },
     };
-    const repository = PostgresIngestionPullRunProjectionAdapter.create(prisma).build();
+    const repository = PostgresIngestionPullRunProjectionAdapter.create(
+      prisma as unknown as PrismaClient,
+    ).build();
 
     await expect(
       repository.tryLoad(SOURCE_ID, {
@@ -86,7 +89,9 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
     const prisma = {
       $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
     };
-    const repository = PostgresIngestionPullRunProjectionAdapter.create(prisma).build();
+    const repository = PostgresIngestionPullRunProjectionAdapter.create(
+      prisma as unknown as PrismaClient,
+    ).build();
 
     await expect(
       repository.store(storedProjection(), {

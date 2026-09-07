@@ -1,9 +1,18 @@
 import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
 import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
 import { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port.ts";
-import { PrismaEmailSuppressionRepository } from "../repositories/prisma/prisma.email-suppression.repository.ts";
-import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository.ts";
-import { PrismaWebhookDeliveryRepository } from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
+import {
+  PrismaEmailSuppressionRepository,
+  type EmailSuppressionDatabase,
+} from "../repositories/prisma/prisma.email-suppression.repository.ts";
+import {
+  PrismaTriggerRepository,
+  type TriggerDatabase,
+} from "../repositories/prisma/prisma.trigger.repository.ts";
+import {
+  PrismaWebhookDeliveryRepository,
+  type WebhookDeliveryDatabase,
+} from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
@@ -21,7 +30,7 @@ export class PostgresAutomationGraphDeliveryAdapter extends AutomationGraphDeliv
   }
 
   static create(input: {
-    database: object;
+    database: TriggerDatabase & EmailSuppressionDatabase & WebhookDeliveryDatabase;
     clock: AutomationClockPort;
   }): PostgresAutomationGraphDeliveryAdapter {
     return new PostgresAutomationGraphDeliveryAdapter(

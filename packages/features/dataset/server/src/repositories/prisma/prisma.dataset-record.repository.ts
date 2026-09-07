@@ -19,8 +19,8 @@ export class PrismaDatasetRecordRepository extends DatasetRecordRepository {
     super();
   }
 
-  static create(database: object): PrismaDatasetRecordRepository {
-    return new PrismaDatasetRecordRepository(database as Database);
+  static create(database: Database): PrismaDatasetRecordRepository {
+    return new PrismaDatasetRecordRepository(database);
   }
 
   async list(input: {

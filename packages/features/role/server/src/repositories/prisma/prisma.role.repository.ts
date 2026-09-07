@@ -57,13 +57,13 @@ export class PrismaRoleRepository extends RoleRepository {
   }
 
   static create(options: {
-    database: object;
+    database: PrismaClient;
     writer: AuthzGrantsService;
     access: AuthzService;
     newBindingId: () => string;
   }): PrismaRoleRepository {
     return new PrismaRoleRepository(
-      options.database as PrismaClient,
+      options.database,
       options.writer,
       options.access,
       options.newBindingId,

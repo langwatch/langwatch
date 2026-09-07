@@ -6,10 +6,10 @@ import {
   ClickHouseBillingAdapter,
   DeploymentPlanSourcesService,
   NotificationService as BillingNotificationService,
-  UsageLimitEmailAdapter,
+  UsageLimitEmailPort,
   UsageWarningService,
   type BillingNextStepResolver,
-  type BillingSubscriptionRepository,
+  type BillingSubscriptionPort,
   type UsageLimitEmailData,
 } from "@langwatch/enterprise-billing-server";
 import {
@@ -78,7 +78,7 @@ export type ApiPlanProviderOptions = Readonly<{
    * self-hosted deployment has none to read, and because a host may compose the provider
    * itself.
    */
-  subscriptions?: BillingSubscriptionRepository;
+  subscriptions?: BillingSubscriptionPort;
   /**
    * The operator allow-list, for the ONE thing the subscription source does
    * with it: an impersonating staff member sees the organization's real
@@ -432,7 +432,7 @@ class ApiComposedUsageStats extends ApiUsageStatsPort {
  * than a rendered body handed back: one recipient, one subject, no BCC fan-out and no
  * footer to sign, so there is no envelope decision left for this process to make.
  */
-export class ApiUsageLimitEmailAdapter extends UsageLimitEmailAdapter {
+export class ApiUsageLimitEmailAdapter extends UsageLimitEmailPort {
   static create(mail: ApiMailComposition): ApiUsageLimitEmailAdapter {
     return new ApiUsageLimitEmailAdapter(mail);
   }

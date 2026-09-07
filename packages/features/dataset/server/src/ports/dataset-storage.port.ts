@@ -14,7 +14,7 @@ export type DatasetS3Client = { s3Client: S3Client; s3Bucket: string };
 /** A per-operation S3 client lease. Callers release it once their I/O has settled. */
 export type DatasetS3ClientLease = DatasetS3Client & { release(): void };
 
-export abstract class DatasetS3ClientResolver {
+export abstract class DatasetS3ClientResolverPort {
   /**
    * Resolves the current tenant target and acquires its process-owned client
    * for one storage operation. The release makes a target change safe while
@@ -37,7 +37,7 @@ export type DatasetAzureConfig = {
   container: string;
 };
 
-export abstract class DatasetAzureConfigResolver {
+export abstract class DatasetAzureConfigResolverPort {
   abstract resolve(projectId: string): Promise<DatasetAzureConfig>;
 }
 
@@ -131,6 +131,6 @@ export interface DatasetStorage {
 }
 
 /** Runtime-selected storage. The app supplies this once during composition. */
-export abstract class DatasetStorageResolver {
+export abstract class DatasetStorageResolverPort {
   abstract forProject(projectId: string): Promise<DatasetStorage>;
 }

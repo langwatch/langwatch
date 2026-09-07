@@ -4,7 +4,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 import {
-  AnomalyRuleRepository,
+  AnomalyRulePort,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
 } from "../anomaly-rule.port.ts";
@@ -37,7 +37,7 @@ function rule(overrides: Partial<AnomalyRule> = {}): AnomalyRule {
   };
 }
 
-class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
+class MemoryAnomalyRuleRepository extends AnomalyRulePort {
   readonly rows = new Map<string, AnomalyRule>();
 
   constructor(initial: AnomalyRule[] = []) {

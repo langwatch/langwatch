@@ -9,7 +9,7 @@ import {
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AnnotationRepository } from "../annotation.port.ts";
+import { AnnotationPort } from "../annotation.port.ts";
 import { AnnotationService } from "../../services/annotation.service.ts";
 import {
   createAnnotationTestOrganizations,
@@ -33,7 +33,7 @@ const annotation = {
   updatedAt: new Date(),
 } satisfies Annotation;
 
-class FakeRepository extends AnnotationRepository {
+class FakeRepository extends AnnotationPort {
   readonly getById = vi.fn(async (): Promise<Annotation> => annotation);
   create = vi.fn(async () => annotation);
   update = vi.fn(async () => annotation);

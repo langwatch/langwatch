@@ -3,7 +3,7 @@ export type BillableEventsWindow = {
   endDate: string;
 };
 
-export abstract class BillableEventsRepository {
+export abstract class BillableEventsPort {
   abstract findTotal(input: { organizationId: string } & BillableEventsWindow): Promise<number>;
   abstract findTotalUniq(input: { organizationId: string } & BillableEventsWindow): Promise<number>;
   abstract findTraceSummariesTotalUniq(

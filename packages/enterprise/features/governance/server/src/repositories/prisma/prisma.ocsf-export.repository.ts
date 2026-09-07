@@ -3,13 +3,19 @@ import { GovernanceOcsfExportRepository } from "../../ports/ocsf-export.port.ts"
 
 const GOVERNANCE_PROJECT_KIND = "internal_governance";
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type GovernanceOcsfExportDatabase = Pick<PrismaClient, "project">;
+
 export class PrismaGovernanceOcsfExportRepository extends GovernanceOcsfExportRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: GovernanceOcsfExportDatabase) {
     super();
   }
 
-  static create(database: object): PrismaGovernanceOcsfExportRepository {
-    return new PrismaGovernanceOcsfExportRepository(database as PrismaClient);
+  static create(database: GovernanceOcsfExportDatabase): PrismaGovernanceOcsfExportRepository {
+    return new PrismaGovernanceOcsfExportRepository(database);
   }
 
   async tryResolveGovernanceTenantId(organizationId: string): Promise<string | null> {

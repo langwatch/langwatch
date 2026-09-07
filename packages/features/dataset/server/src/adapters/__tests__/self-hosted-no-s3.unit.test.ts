@@ -6,15 +6,15 @@ import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordContentRepository } from "../../repositories/prisma/dataset-record-content.repository.ts";
-import type { DatasetStorageResolver } from "../../ports/dataset-storage.port.ts";
+import type { DatasetStorageResolverPort } from "../../ports/dataset-storage.port.ts";
 import { DatasetUploadAdapter } from "../dataset-upload.adapter.ts";
 import { LocalDatasetStorage } from "../local.dataset-storage.adapter.ts";
 
 /** A no-S3 (single-replica self-host) resolver: every project's storage is the
  * real LocalDatasetStorage on a temp filesystem root — no S3 configured. */
-function localOnlyResolver(root: string): DatasetStorageResolver {
+function localOnlyResolver(root: string): DatasetStorageResolverPort {
   const storage = new LocalDatasetStorage(root);
-  return { forProject: async () => storage } as unknown as DatasetStorageResolver;
+  return { forProject: async () => storage } as unknown as DatasetStorageResolverPort;
 }
 
 describe("Dataset self-hosted storage", () => {

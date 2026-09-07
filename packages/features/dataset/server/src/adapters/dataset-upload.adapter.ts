@@ -23,7 +23,7 @@ import type {
 import type { Readable } from "node:stream";
 import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-record-content.repository.ts";
-import type { DatasetStorageResolver } from "../ports/dataset-storage.port.ts";
+import type { DatasetStorageResolverPort } from "../ports/dataset-storage.port.ts";
 import type { DatasetRow, DatasetUploadPort } from "../ports/dataset.port.ts";
 import {
   DatasetConflictError,
@@ -47,7 +47,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
   static create(options: {
     datasets: DatasetContentRepository;
     records: DatasetRecordContentRepository;
-    storageResolver: DatasetStorageResolver;
+    storageResolver: DatasetStorageResolverPort;
   }): DatasetUploadAdapter {
     return new DatasetUploadAdapter(options.datasets, options.records, options.storageResolver);
   }
@@ -56,7 +56,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
   constructor(
     private readonly datasets: DatasetContentRepository,
     private readonly records: DatasetRecordContentRepository,
-    private readonly storageResolver: DatasetStorageResolver,
+    private readonly storageResolver: DatasetStorageResolverPort,
   ) {
     this.chunks = DatasetChunkService.create({ datasets });
   }

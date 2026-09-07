@@ -22,6 +22,7 @@ import {
   type AwsClientConfigPort,
   type WebhookDeliveryProcessDeps,
   type WebhookDispatchRequest,
+  type WebhookEndpointServiceOptions,
 } from "@langwatch/enterprise-webhook-server";
 import {
   ClickHouseGatewayOpenAdmissionsAdapter,
@@ -53,7 +54,8 @@ import type { GatewaySpendWorkerCapability } from "../features/gateway/gateway-s
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /** The Prisma models the spend graph's debit and webhook paths read and write. */
-export type WorkerGatewaySpendDatabase = GatewayBudgetResolutionDatabase;
+export type WorkerGatewaySpendDatabase = GatewayBudgetResolutionDatabase &
+  WebhookEndpointServiceOptions["prisma"];
 
 /**
  * Reports composition decisions the spend graph would otherwise hide, each

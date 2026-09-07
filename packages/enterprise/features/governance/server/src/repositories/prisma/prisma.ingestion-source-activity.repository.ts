@@ -327,19 +327,28 @@ type PulledEventRow = {
   rawPayload: string;
 };
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type ActivityMonitorDatabase = Pick<
+  PrismaClient,
+  "anomalyAlert" | "department" | "ingestionSource" | "organizationUser" | "project"
+>;
+
 export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
   private constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: ActivityMonitorDatabase,
     private readonly clickhouse: GovernanceClickHouseResolverPort,
   ) {
     super();
   }
 
   static create(options: {
-    prisma: object;
+    prisma: ActivityMonitorDatabase;
     clickhouse: GovernanceClickHouseResolverPort;
   }): PrismaActivityMonitorRepository {
-    return new PrismaActivityMonitorRepository(options.prisma as PrismaClient, options.clickhouse);
+    return new PrismaActivityMonitorRepository(options.prisma, options.clickhouse);
   }
 
   /**

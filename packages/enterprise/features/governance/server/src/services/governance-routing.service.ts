@@ -20,16 +20,14 @@ import {
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import type { RoutingPolicyRepository } from "../ports/routing-policy.port.ts";
+import type { RoutingPolicyPort } from "../ports/routing-policy.port.ts";
 
 const MOVING_MODEL_NAME = /^(openai|anthropic|gemini)\/(latest|latest-mini)$/;
 
 export class DefaultGovernanceRoutingPolicyService {
-  private constructor(private readonly repository: RoutingPolicyRepository) {}
+  private constructor(private readonly repository: RoutingPolicyPort) {}
 
-  static create(options: {
-    repository: RoutingPolicyRepository;
-  }): DefaultGovernanceRoutingPolicyService {
+  static create(options: { repository: RoutingPolicyPort }): DefaultGovernanceRoutingPolicyService {
     return new DefaultGovernanceRoutingPolicyService(options.repository);
   }
 

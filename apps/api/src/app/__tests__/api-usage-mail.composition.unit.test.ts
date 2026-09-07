@@ -16,7 +16,7 @@ import type { ApiMailComposition } from "../api-mail.composition.ts";
  * the per-project breakdown it reads out of ClickHouse and the mail gateway it
  * composed; nothing between the tRPC port and the gateway is a stub. That is
  * what makes these assertions worth anything: the absence they replace claimed
- * "the only `UsageLimitEmailAdapter` in the tree sends nothing", and a test
+ * "the only `UsageLimitEmailPort` in the tree sends nothing", and a test
  * that only checked `sent: true` would have passed against the null adapter.
  */
 class RecordingGateway extends EmailDeliveryPort {

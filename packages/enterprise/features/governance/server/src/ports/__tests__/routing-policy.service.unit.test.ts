@@ -5,7 +5,7 @@ import {
   RoutingPolicyProviderScopeError,
   type RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
-import { RoutingPolicyRepository } from "../routing-policy.port.ts";
+import { RoutingPolicyPort } from "../routing-policy.port.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../../services/governance-routing.service.ts";
 
 const policy: RoutingPolicy = {
@@ -25,7 +25,7 @@ const policy: RoutingPolicy = {
   scopes: [{ scopeType: "ORGANIZATION", scopeId: "organization" }],
 };
 
-class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
+class MemoryRoutingPolicyRepository extends RoutingPolicyPort {
   reachable = 1;
   create = vi.fn(async () => policy);
   update = vi.fn(async () => policy);

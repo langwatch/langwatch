@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import type { DatasetStorage } from "../../ports/dataset-storage.port.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
-import { DatasetChunkService, type DatasetMutationRecord } from "../dataset-chunk.service.ts";
+import { DatasetChunkService } from "../dataset-chunk.service.ts";
+import { type DatasetMutationRecord } from "../../rules/dataset-chunk-lines.rules.ts";
 
 type Update = { id: string; content: Record<string, unknown>; transactional: boolean };
 

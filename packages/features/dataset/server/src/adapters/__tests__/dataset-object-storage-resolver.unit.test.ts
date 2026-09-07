@@ -10,7 +10,7 @@ import {
 } from "../dataset-object-storage-resolver.adapter.ts";
 import { LocalDatasetStorageAdapter } from "../local.dataset-storage.adapter.ts";
 import { S3DatasetStorageAdapter } from "../s3.dataset-storage.adapter.ts";
-import { DatasetS3ClientResolver } from "../../ports/dataset-storage.port.ts";
+import { DatasetS3ClientResolverPort } from "../../ports/dataset-storage.port.ts";
 
 class FixedDestination extends DatasetStorageDestinationPort {
   constructor(private readonly destination: DatasetStorageDestination) {
@@ -21,7 +21,7 @@ class FixedDestination extends DatasetStorageDestinationPort {
   }
 }
 
-class RecordingS3Resolver extends DatasetS3ClientResolver {
+class RecordingS3Resolver extends DatasetS3ClientResolverPort {
   readonly acquire = vi.fn(async () => {
     throw new Error("The S3 client must never be acquired for a non-S3 destination");
   });

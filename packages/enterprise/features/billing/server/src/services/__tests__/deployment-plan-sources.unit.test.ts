@@ -7,7 +7,7 @@ import type { EntitlementSource, Plan } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
 import type {
   BillingSubscriptionRecord,
-  BillingSubscriptionRepository,
+  BillingSubscriptionPort,
 } from "../../ports/subscription.port.ts";
 import { DeploymentPlanSourcesService } from "../deployment-plan-sources.service.ts";
 
@@ -34,10 +34,10 @@ const subscription = (
 });
 
 /** The one read the subscription source makes; nothing else is exercised. */
-function subscriptions(active: BillingSubscriptionRecord | null): BillingSubscriptionRepository {
+function subscriptions(active: BillingSubscriptionRecord | null): BillingSubscriptionPort {
   return {
     tryFindActive: async () => active,
-  } as unknown as BillingSubscriptionRepository;
+  } as unknown as BillingSubscriptionPort;
 }
 
 describe("given the plan sources a deployment resolves through", () => {

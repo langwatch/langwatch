@@ -5,7 +5,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import { DepartmentRepository } from "../department.port.ts";
+import { DepartmentPort } from "../department.port.ts";
 import { DepartmentService } from "../../services/department.service.ts";
 
 function department(overrides: Partial<Department> = {}): Department {
@@ -19,7 +19,7 @@ function department(overrides: Partial<Department> = {}): Department {
   };
 }
 
-class MemoryDepartmentRepository extends DepartmentRepository {
+class MemoryDepartmentRepository extends DepartmentPort {
   readonly assignUser = vi.fn(async () => true);
   readonly assignTeam = vi.fn(async () => true);
   readonly assignProject = vi.fn(async () => true);

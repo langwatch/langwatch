@@ -6,7 +6,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import {
   GovernanceDiagnosticsPort,
-  NullGovernanceDiagnosticsPort,
+  NullGovernanceDiagnosticsAdapter,
 } from "../ports/governance-diagnostics.port.ts";
 import type {
   AnomalySpendReaderPort,
@@ -41,7 +41,7 @@ export class SpendSpikeAnomalyEvaluatorService {
       options.repository,
       options.spend,
       options.dispatcher,
-      options.diagnostics ?? new NullGovernanceDiagnosticsPort(),
+      options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
     );
   }
 

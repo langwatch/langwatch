@@ -5,7 +5,10 @@
  * the list hands a trace identifier to a viewer who may not read traces.
  */
 import { describe, expect, it } from "vitest";
-import { PrismaTriggerFireHistoryRepository } from "../prisma.trigger-fire-history.repository.ts";
+import {
+  PrismaTriggerFireHistoryRepository,
+  type TriggerFireHistoryDatabase,
+} from "../prisma.trigger-fire-history.repository.ts";
 
 const STORED_ROW = {
   id: "fire_1",
@@ -39,7 +42,9 @@ describe("PrismaTriggerFireHistoryRepository", () => {
       /** @scenario "History never exposes trace content" */
       it("returns what fired and when, and never the trace id", async () => {
         const { database } = databaseHolding([STORED_ROW]);
-        const repository = PrismaTriggerFireHistoryRepository.create(database);
+        const repository = PrismaTriggerFireHistoryRepository.create(
+          database as unknown as TriggerFireHistoryDatabase,
+        );
 
         const forProject = await repository.findAllRecentForProject({
           projectId: "project_1",
@@ -69,7 +74,9 @@ describe("PrismaTriggerFireHistoryRepository", () => {
       /** @scenario "History never exposes trace content" */
       it("scopes every read to the project asking", async () => {
         const { database, queries } = databaseHolding([STORED_ROW]);
-        const repository = PrismaTriggerFireHistoryRepository.create(database);
+        const repository = PrismaTriggerFireHistoryRepository.create(
+          database as unknown as TriggerFireHistoryDatabase,
+        );
 
         await repository.findAllRecentForProject({ projectId: "project_1", limit: 10 });
 

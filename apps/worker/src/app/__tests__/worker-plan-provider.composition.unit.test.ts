@@ -1,5 +1,5 @@
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
-import type { BillingSubscriptionRepository } from "@langwatch/enterprise-billing-server";
+import type { BillingSubscriptionPort } from "@langwatch/enterprise-billing-server";
 import { OrganizationLicensePort } from "@langwatch/enterprise-licensing-server";
 import {
   ENTERPRISE_LICENSE_KEY,
@@ -34,7 +34,7 @@ import {
  * disagreeing with the table it stands for.
  */
 type SubscriptionRecord = NonNullable<
-  Awaited<ReturnType<BillingSubscriptionRepository["tryFindActive"]>>
+  Awaited<ReturnType<BillingSubscriptionPort["tryFindActive"]>>
 >;
 
 const subscription = (overrides: Partial<SubscriptionRecord> = {}): SubscriptionRecord => ({
@@ -54,10 +54,10 @@ const subscription = (overrides: Partial<SubscriptionRecord> = {}): Subscription
 });
 
 /** The one read the subscription source makes; nothing else is exercised. */
-function subscriptions(active: SubscriptionRecord | null): BillingSubscriptionRepository {
+function subscriptions(active: SubscriptionRecord | null): BillingSubscriptionPort {
   return {
     tryFindActive: async () => active,
-  } as unknown as BillingSubscriptionRepository;
+  } as unknown as BillingSubscriptionPort;
 }
 
 /**

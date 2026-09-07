@@ -1,10 +1,13 @@
-import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository.ts";
+import {
+  PrismaRoutingPolicyRepository,
+  type RoutingPolicyDatabase,
+} from "../repositories/prisma/prisma.governance-routing.repository.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
 
 export class PostgresRoutingPolicyAdapter {
-  private constructor(private readonly database: object) {}
+  private constructor(private readonly database: RoutingPolicyDatabase) {}
 
-  static create(options: { database: object }): PostgresRoutingPolicyAdapter {
+  static create(options: { database: RoutingPolicyDatabase }): PostgresRoutingPolicyAdapter {
     return new PostgresRoutingPolicyAdapter(options.database);
   }
 

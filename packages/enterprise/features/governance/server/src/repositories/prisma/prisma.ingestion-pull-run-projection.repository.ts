@@ -31,11 +31,22 @@ function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
   };
 }
 
-export class PrismaIngestionPullRunProjectionRepository implements StateProjectionStore<IngestionPullRunStatusData> {
-  private constructor(private readonly prisma: PrismaClient) {}
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type IngestionPullRunProjectionDatabase = Pick<
+  PrismaClient,
+  "ingestionPullRunProjection" | "ingestionSource" | "$transaction"
+>;
 
-  static create(database: object): PrismaIngestionPullRunProjectionRepository {
-    return new PrismaIngestionPullRunProjectionRepository(database as PrismaClient);
+export class PrismaIngestionPullRunProjectionRepository implements StateProjectionStore<IngestionPullRunStatusData> {
+  private constructor(private readonly prisma: IngestionPullRunProjectionDatabase) {}
+
+  static create(
+    database: IngestionPullRunProjectionDatabase,
+  ): PrismaIngestionPullRunProjectionRepository {
+    return new PrismaIngestionPullRunProjectionRepository(database);
   }
 
   async tryLoad(

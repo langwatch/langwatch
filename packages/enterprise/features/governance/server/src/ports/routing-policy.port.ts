@@ -8,7 +8,7 @@ import type {
   UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
 
-export abstract class RoutingPolicyRepository {
+export abstract class RoutingPolicyPort {
   abstract list(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
   abstract tryFindById(id: string): Promise<RoutingPolicy | null>;
   abstract countReachableModelProviders(input: {

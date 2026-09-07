@@ -90,11 +90,14 @@ export { IngestionPullEventingAdapter } from "./adapters/ingestion-pull.adapter.
 export { PostgresAnomalyRuleAdapter } from "./adapters/postgres.anomaly-rule.adapter.ts";
 export { PostgresDepartmentAdapter } from "./adapters/postgres.department.adapter.ts";
 export { PostgresSpendSpikeAnomalyAdapter } from "./adapters/postgres.spend-spike-anomaly.adapter.ts";
+export type { SpendSpikeAnomalyDatabase } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 export { PostgresIngestionSourceActivityAdapter } from "./adapters/postgres.ingestion-source-activity.adapter.ts";
 export { PostgresIngestionSourceAdapter } from "./adapters/postgres.ingestion-source.adapter.ts";
 export { PostgresIngestionPullLifecycleAdapter } from "./adapters/postgres.ingestion-pull-lifecycle.adapter.ts";
 export { PostgresIngestionPullSourceAdapter } from "./adapters/postgres.ingestion-pull-source.adapter.ts";
+export type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
 export { PostgresIngestionPullRunProjectionAdapter } from "./adapters/postgres.ingestion-pull-run-projection.adapter.ts";
+export type { IngestionPullRunProjectionDatabase } from "./repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts";
 export { PostgresIngestionTemplateAdapter } from "./adapters/postgres.ingestion-template.adapter.ts";
 export { PulledUsageEventingAdapter } from "./adapters/pulled-usage.adapter.ts";
 
@@ -189,7 +192,10 @@ export {
   AnomalyRulesTrpcApi,
   type AnomalyRulesTrpcContext,
 } from "./transport/api-trpc/anomaly-rules.api.ts";
-export { GovernanceTrpcApi, type GovernanceTrpcContext } from "./transport/api-trpc/governance.api.ts";
+export {
+  GovernanceTrpcApi,
+  type GovernanceTrpcContext,
+} from "./transport/api-trpc/governance.api.ts";
 export {
   IngestionSourcesTrpcApi,
   toIngestionSourceDto,

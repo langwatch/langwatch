@@ -5,7 +5,7 @@ import {
   EventingAuthzLedgerAdapter,
 } from "../../eventing.authz-ledger.adapter.ts";
 import {
-  AuthzGrantsCommandDispatcher,
+  AuthzGrantsCommandDispatcherPort,
   type AuthzGrantsCommandSenders,
 } from "../../../ports/authz-grants-command-dispatcher.port.ts";
 import {
@@ -13,7 +13,7 @@ import {
   PostgresAuthzCutoverAdapter,
 } from "../../postgres.authz-cutover.adapter.ts";
 import type { AuthzEpochPort } from "../../../ports/authz-epoch.port.ts";
-import { AuthzRevocationTelemetry } from "../../../ports/authz-revocation-telemetry.port.ts";
+import { AuthzRevocationTelemetryPort } from "../../../ports/authz-revocation-telemetry.port.ts";
 import { PrismaAuthzRevocationRepository } from "../../../repositories/prisma/prisma.authz-revocation.repository.ts";
 import { StubAuthzEpoch } from "../../../ports/__tests__/support/authz-epoch.stub.ts";
 
@@ -33,11 +33,11 @@ class SilentReporter extends AuthzCutoverFailureReporter {
   report(): void {}
 }
 
-class SilentRevocationTelemetry extends AuthzRevocationTelemetry {
+class SilentRevocationTelemetry extends AuthzRevocationTelemetryPort {
   record(): void {}
 }
 
-class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
+class RecordingDispatcher extends AuthzGrantsCommandDispatcherPort {
   constructor(private readonly sent: Array<{ verb: string; data: unknown }>) {
     super();
   }
@@ -74,7 +74,7 @@ export function harness({
 }: {
   onLedger: boolean;
   poll?: { intervalMs: number; timeoutMs: number };
-  dispatcher?: AuthzGrantsCommandDispatcher;
+  dispatcher?: AuthzGrantsCommandDispatcherPort;
   epoch?: AuthzEpochPort;
 }) {
   const sent: Array<{ verb: string; data: unknown }> = [];

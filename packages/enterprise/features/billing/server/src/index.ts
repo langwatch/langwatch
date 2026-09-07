@@ -41,19 +41,13 @@ export {
 } from "./adapters/stripe.usage-reporting.adapter.ts";
 export { ObservabilityBillingErrorAdapter } from "./adapters/observability.billing-error.adapter.ts";
 export { EventingBillingReportingAdapter } from "./adapters/eventing.billing-reporting.adapter.ts";
-export { BillingErrorReporter, NullBillingErrorReporter } from "./ports/error-reporter.port.ts";
+export { BillingErrorReporterPort, NullBillingErrorReporter } from "./ports/error-reporter.port.ts";
 export { BillingOrganizationPort } from "./ports/organization.port.ts";
 export { NullBillingOrganizationAdapter } from "./adapters/null-organization.adapter.ts";
 export { BillingSubscriptionNotifierPort } from "./ports/subscription-notifier.port.ts";
 export { NullBillingSubscriptionNotifierAdapter } from "./adapters/null-subscription-notifier.adapter.ts";
-export {
-  NullUsageLimitEmailAdapter,
-  UsageLimitEmailAdapter,
-} from "./ports/usage-limit-email.port.ts";
-export {
-  BillableEventsRepository,
-  type BillableEventsWindow,
-} from "./ports/billable-events.port.ts";
+export { NullUsageLimitEmailAdapter, UsageLimitEmailPort } from "./ports/usage-limit-email.port.ts";
+export { BillableEventsPort, type BillableEventsWindow } from "./ports/billable-events.port.ts";
 export {
   BillableEventsMeterPort,
   type BillableEventRecord,
@@ -89,8 +83,8 @@ export {
   type BillingTenantOrganizationPersistence,
 } from "./adapters/postgres.tenant-organization.adapter.ts";
 export { PlanLimitsPlanCatalogueAdapter } from "./adapters/plan-limits.plan-catalogue.adapter.ts";
-export { OrganizationPricingRepository } from "./ports/organization-pricing.port.ts";
-export { BillingSubscriptionRepository } from "./ports/subscription.port.ts";
+export { OrganizationPricingPort } from "./ports/organization-pricing.port.ts";
+export { BillingSubscriptionPort } from "./ports/subscription.port.ts";
 export {
   ANNUAL_EVENTS_BILLING_THRESHOLD,
   AnnualEventsBillingThresholdService,

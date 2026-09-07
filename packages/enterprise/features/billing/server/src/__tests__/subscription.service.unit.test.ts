@@ -6,7 +6,7 @@ import {
   BillingSubscriptionService,
   SeatEventSubscriptionService,
   RECENT_INVOICES_LIMIT,
-  type BillingSubscriptionRepository,
+  type BillingSubscriptionPort,
   type BillingOrganizationPort,
   type BillingSubscriptionNotifierPort,
   type SubscriptionItemCalculatorService,
@@ -36,7 +36,7 @@ const createMockStripe = () => ({
 });
 
 const createMockRepository = (): {
-  [K in keyof BillingSubscriptionRepository]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingSubscriptionPort]: ReturnType<typeof vi.fn>;
 } => ({
   tryFindActive: vi.fn(),
   tryFindLastNonCancelled: vi.fn(),
@@ -94,7 +94,7 @@ const createServiceWithSeatEventFns = ({
   seatEventService: ReturnType<typeof createMockSeatEventService>;
 }) =>
   BillingSubscriptionService.create({
-    repository: repository as unknown as BillingSubscriptionRepository,
+    repository: repository as unknown as BillingSubscriptionPort,
     organizationRepository: orgRepo as unknown as BillingOrganizationPort,
     stripe: stripeInstance as unknown as Stripe,
     itemCalculator: calc as unknown as SubscriptionItemCalculatorService,
@@ -114,7 +114,7 @@ describe("BillingSubscriptionService", () => {
     /** @scenario "New class implements the same interface as old factory" */
     it("implements the SubscriptionService app-layer interface", () => {
       const localService = BillingSubscriptionService.create({
-        repository: createMockRepository() as unknown as BillingSubscriptionRepository,
+        repository: createMockRepository() as unknown as BillingSubscriptionPort,
         organizationRepository:
           createMockOrganizationRepository() as unknown as BillingOrganizationPort,
         stripe: createMockStripe() as unknown as Stripe,
@@ -138,7 +138,7 @@ describe("BillingSubscriptionService", () => {
     itemCalculator = createMockItemCalculator();
     organizationRepository = createMockOrganizationRepository();
     service = BillingSubscriptionService.create({
-      repository: repository as unknown as BillingSubscriptionRepository,
+      repository: repository as unknown as BillingSubscriptionPort,
       organizationRepository: organizationRepository as unknown as BillingOrganizationPort,
       stripe: stripe as unknown as Stripe,
       itemCalculator: itemCalculator as unknown as SubscriptionItemCalculatorService,

@@ -1,6 +1,6 @@
 import type { UsageLimitEmailData } from "../services/billing-usage-notice.service.ts";
 
-export abstract class UsageLimitEmailAdapter {
+export abstract class UsageLimitEmailPort {
   abstract send(input: {
     to: string;
     organizationName: string;
@@ -8,7 +8,7 @@ export abstract class UsageLimitEmailAdapter {
   }): Promise<void>;
 }
 
-export class NullUsageLimitEmailAdapter extends UsageLimitEmailAdapter {
+export class NullUsageLimitEmailAdapter extends UsageLimitEmailPort {
   private constructor() {
     super();
   }

@@ -6,7 +6,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { PostgresBillingWebhookSubscriptionAdapter } from "../postgres.billing-webhook-subscription.adapter.ts";
 import {
-  BillingSubscriptionRepository,
+  BillingSubscriptionPort,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
 } from "../../ports/subscription.port.ts";
@@ -37,7 +37,7 @@ function recordNotFound(): Error & { code: string } {
   return Object.assign(new Error("No Subscription found"), { code: "P2025" });
 }
 
-function repositoryDouble(overrides: Partial<BillingSubscriptionRepository> = {}) {
+function repositoryDouble(overrides: Partial<BillingSubscriptionPort> = {}) {
   return {
     tryFindActive: vi.fn(),
     tryFindLastNonCancelled: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
@@ -53,12 +53,12 @@ function repositoryDouble(overrides: Partial<BillingSubscriptionRepository> = {}
     migrateToSeatEvent: vi.fn(() => Promise.resolve([])),
     updateQuantities: vi.fn(() => Promise.resolve(WITH_ORGANIZATION)),
     ...overrides,
-  } as unknown as BillingSubscriptionRepository;
+  } as unknown as BillingSubscriptionPort;
 }
 
 function compose(
   options: {
-    repository?: BillingSubscriptionRepository;
+    repository?: BillingSubscriptionPort;
     license?: string | null;
   } = {},
 ) {
@@ -125,7 +125,7 @@ describe("PostgresBillingWebhookSubscriptionAdapter", () => {
       const { adapter } = compose({
         repository: repositoryDouble({
           activate: vi.fn(() => Promise.reject(recordNotFound())),
-        } as Partial<BillingSubscriptionRepository>),
+        } as Partial<BillingSubscriptionPort>),
       });
 
       await expect(
@@ -140,7 +140,7 @@ describe("PostgresBillingWebhookSubscriptionAdapter", () => {
       const { adapter } = compose({
         repository: repositoryDouble({
           activate: vi.fn(() => Promise.reject(new Error("connection refused"))),
-        } as Partial<BillingSubscriptionRepository>),
+        } as Partial<BillingSubscriptionPort>),
       });
 
       await expect(

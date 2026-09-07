@@ -3,7 +3,6 @@ import {
   DatasetService as DatasetServiceContract,
   copyDatasetInputSchema,
   datasetLookupInputSchema,
-  datasetNameInputSchema,
   listDatasetsInputSchema,
   type CopyDatasetInput,
   type CreateDatasetRecordsInput,
@@ -43,11 +42,12 @@ import {
   DatasetConflictError,
   DatasetNotFoundError,
   DatasetNotReadyError,
-  InvalidColumnError,
 } from "@langwatch/dataset-contract";
 import { DatasetRecordService } from "./dataset-record.service.ts";
+import { DatasetNamingService } from "./dataset-naming.service.ts";
+import { assertKnownColumns } from "../rules/dataset-columns.rules.ts";
 import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
-import type { DatasetStorageResolver } from "../ports/dataset-storage.port.ts";
+import type { DatasetStorageResolverPort } from "../ports/dataset-storage.port.ts";
 import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository.ts";
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository.ts";
 
@@ -57,7 +57,7 @@ export type DatasetServiceOptions = {
   uploads?: DatasetUploadPort;
   queue?: DatasetNormalizeQueuePort;
   content?: DatasetContentPort;
-  storageResolver?: DatasetStorageResolver;
+  storageResolver?: DatasetStorageResolverPort;
   generateId?: () => string;
 };
 
@@ -66,14 +66,17 @@ export class DatasetService extends DatasetServiceContract {
 
   private readonly records: DatasetRecordService;
 
+  private readonly naming: DatasetNamingService;
+
   private constructor(private readonly options: DatasetServiceOptions) {
     super();
     this.generateId = options.generateId ?? nanoid;
+    this.naming = DatasetNamingService.create(options.repository);
     this.records = DatasetRecordService.create({
       options,
       getBySlugOrId: (input) => this.getBySlugOrId(input),
       assertReady: (dataset) => this.assertReady(dataset),
-      assertKnownColumns: (columns) => DatasetService.assertKnownColumns(columns),
+      assertKnownColumns: (columns) => assertKnownColumns(columns),
       generateId: () => this.generateId(),
     });
   }
@@ -153,44 +156,12 @@ export class DatasetService extends DatasetServiceContract {
     return created;
   }
 
-  async validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult> {
-    const parsed = datasetNameInputSchema.parse(input);
-    const slug = datasetSlugOf(parsed.proposedName);
-    const conflict = await this.options.repository.tryFindBySlug({
-      projectId: parsed.projectId,
-      slug,
-      excludeId: parsed.excludeDatasetId,
-    });
-
-    return {
-      available: conflict === null,
-      slug,
-      ...(conflict ? { conflictsWith: conflict.id } : {}),
-    };
+  validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult> {
+    return this.naming.validateDatasetName(input);
   }
 
-  async findNextAvailableName(input: DatasetNameInput): Promise<string> {
-    const parsed = datasetNameInputSchema.parse(input);
-    const baseName = parsed.proposedName.trim();
-    if ((await this.validateDatasetName(parsed)).available) {
-      return baseName;
-    }
-
-    for (let index = 2; index < 10_000; index += 1) {
-      const candidate = `${baseName} ${index}`;
-      if (
-        (
-          await this.validateDatasetName({
-            ...parsed,
-            proposedName: candidate,
-          })
-        ).available
-      ) {
-        return candidate;
-      }
-    }
-
-    throw new DatasetConflictError("Unable to find an available dataset name");
+  findNextAvailableName(input: DatasetNameInput): Promise<string> {
+    return this.naming.findNextAvailableName(input);
   }
 
   async getBySlugOrId(input: DatasetLookupInput): Promise<Dataset> {
@@ -491,36 +462,6 @@ export class DatasetService extends DatasetServiceContract {
     }
 
     return target;
-  }
-
-  /**
-   * A key the dataset does not define is refused, not dropped. The fill below writes only
-   * defined columns, so an unknown key would vanish and the caller would read a 201 for data
-   * nothing stored.
-   */
-  private static assertKnownColumns({
-    datasetName,
-    columns,
-    entries,
-  }: {
-    datasetName: string;
-    columns: string[];
-    entries: ReadonlyArray<Record<string, unknown>>;
-  }): void {
-    const valid = new Set(columns);
-    for (const entry of entries) {
-      for (const key of Object.keys(entry)) {
-        if (key === "id" || valid.has(key)) {
-          continue;
-        }
-
-        throw new InvalidColumnError({
-          columnName: key,
-          datasetName,
-          validColumns: columns,
-        });
-      }
-    }
   }
 
   private assertReady(dataset: Dataset): void {

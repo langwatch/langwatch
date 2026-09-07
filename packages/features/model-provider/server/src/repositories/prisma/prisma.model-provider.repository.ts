@@ -45,7 +45,7 @@ export class PrismaModelProviderRepository extends ModelProviderRepository {
   }
 
   static create(
-    database: object,
+    database: Database,
     credentials: ModelProviderCredentialCodec,
   ): PrismaModelProviderRepository {
     if (!PrismaModelProviderRepository.isModelProviderDatabase(database)) {

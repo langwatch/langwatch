@@ -8,10 +8,13 @@
  * Covers @unit scenarios from
  * specs/security/feature-surface-secret-disclosure.feature.
  */
-import { SHARED_SECRET_REDACTED, type AnomalyRule } from "@langwatch/enterprise-governance-contract";
+import {
+  SHARED_SECRET_REDACTED,
+  type AnomalyRule,
+} from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { AnomalyRuleRepository, type AnomalyRuleChanges } from "../../ports/anomaly-rule.port.ts";
+import { AnomalyRulePort, type AnomalyRuleChanges } from "../../ports/anomaly-rule.port.ts";
 import { AnomalyRuleService } from "../anomaly-rule.service.ts";
 
 const STORED_SECRET = "TheRealSigningSecret";
@@ -36,7 +39,7 @@ function storedRule(destinationConfig: unknown): AnomalyRule {
   } as AnomalyRule;
 }
 
-class InMemoryAnomalyRules extends AnomalyRuleRepository {
+class InMemoryAnomalyRules extends AnomalyRulePort {
   applied: AnomalyRuleChanges | null = null;
 
   constructor(private readonly row: AnomalyRule) {

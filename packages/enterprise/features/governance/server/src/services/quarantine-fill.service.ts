@@ -6,7 +6,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import {
   GovernanceDiagnosticsPort,
-  NullGovernanceDiagnosticsPort,
+  NullGovernanceDiagnosticsAdapter,
 } from "../ports/governance-diagnostics.port.ts";
 import type {
   QuarantineTenantPort,
@@ -30,7 +30,7 @@ export class QuarantineFillEvaluatorService {
     return new QuarantineFillEvaluatorService(
       options.tenant,
       options.traceActivity,
-      options.diagnostics ?? new NullGovernanceDiagnosticsPort(),
+      options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
       options.now ?? Date.now,
     );
   }

@@ -11,7 +11,7 @@ import {
   IngestionCredentialsService,
   IngestionPullSourcePort,
   IngestionPullWorkerService,
-  NullIngestionPullDiagnosticsPort,
+  NullIngestionPullDiagnosticsAdapter,
   PulledUsageEntitlementPort,
   PulledUsagePricingService,
   PulledUsageRecordService,
@@ -160,7 +160,7 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
   const registry = PullerRegistryService.create();
   registry.register(doubles.adapter);
   const pricing = PulledUsagePricingService.create(new TestRatePort());
-  const diagnostics = new NullIngestionPullDiagnosticsPort();
+  const diagnostics = new NullIngestionPullDiagnosticsAdapter();
   const projects = new CompleteTestProjectService();
   projects.ensureInternal = async () => {
     const project = await doubles.ensureProject();

@@ -27,7 +27,7 @@ import {
 import type {
   DatasetStorage,
   PresignedUpload,
-  DatasetS3ClientResolver,
+  DatasetS3ClientResolverPort,
   DatasetS3Client,
 } from "../ports/dataset-storage.port.ts";
 import {
@@ -38,10 +38,10 @@ import {
 import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "../rules/presigned-upload.rules.ts";
 
 export class S3DatasetStorageAdapter implements DatasetStorage {
-  static create(resolver: DatasetS3ClientResolver): S3DatasetStorageAdapter {
+  static create(resolver: DatasetS3ClientResolverPort): S3DatasetStorageAdapter {
     return new S3DatasetStorageAdapter(resolver);
   }
-  constructor(private readonly resolver: DatasetS3ClientResolver) {}
+  constructor(private readonly resolver: DatasetS3ClientResolverPort) {}
 
   private async withClient<T>(
     projectId: string,

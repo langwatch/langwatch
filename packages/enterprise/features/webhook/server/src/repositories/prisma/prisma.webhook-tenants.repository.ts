@@ -6,8 +6,8 @@ export class PrismaWebhookTenantsRepository extends WebhookTenantsRepository {
     super();
   }
 
-  static create(client: unknown): PrismaWebhookTenantsRepository {
-    return new PrismaWebhookTenantsRepository(client as PrismaClient);
+  static create(client: PrismaClient): PrismaWebhookTenantsRepository {
+    return new PrismaWebhookTenantsRepository(client);
   }
 
   async tenantIdsForOrganization(organizationId: string): Promise<string[]> {

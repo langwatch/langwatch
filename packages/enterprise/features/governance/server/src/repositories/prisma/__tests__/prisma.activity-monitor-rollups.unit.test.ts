@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   GovernanceClickHouseClientPort,
@@ -50,7 +51,7 @@ function activityMonitor(options: {
   const clickhouse = new RecordedClickHouseClient(options.rowsForQuery);
   const resolver = new RecordedClickHouseResolver(clickhouse);
   const service = PrismaActivityMonitorRepository.create({
-    prisma: options.prisma,
+    prisma: options.prisma as unknown as PrismaClient,
     clickhouse: resolver,
   });
 

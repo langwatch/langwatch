@@ -24,8 +24,8 @@ export class PrismaDatasetRepository extends DatasetRepository {
     super();
   }
 
-  static create(database: object): PrismaDatasetRepository {
-    return new PrismaDatasetRepository(database as Database);
+  static create(database: Database): PrismaDatasetRepository {
+    return new PrismaDatasetRepository(database);
   }
 
   async tryFindById(input: {

@@ -5,7 +5,10 @@ import type {
   CioOrgTraits,
   CioPersonTraits,
 } from "@langwatch/enterprise-billing-contract";
-import { NullBillingErrorReporter, type BillingErrorReporter } from "../ports/error-reporter.port.ts";
+import {
+  NullBillingErrorReporter,
+  type BillingErrorReporterPort,
+} from "../ports/error-reporter.port.ts";
 
 const logger = createLogger("ee:nurturing-service");
 
@@ -28,7 +31,7 @@ export type NurturingServiceOptions = {
     customerIoRegion?: string;
   };
   fetchFn?: typeof fetch;
-  errorReporter?: BillingErrorReporter;
+  errorReporter?: BillingErrorReporterPort;
 };
 
 // ---------------------------------------------------------------------------
@@ -46,7 +49,7 @@ export class NurturingService {
   private readonly apiKey: string | undefined;
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
-  private readonly errorReporter: BillingErrorReporter;
+  private readonly errorReporter: BillingErrorReporterPort;
 
   private constructor(options: NurturingServiceOptions) {
     this.apiKey = options.config.customerIoApiKey;

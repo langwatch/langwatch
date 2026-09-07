@@ -1,6 +1,6 @@
 import {
   GovernanceDiagnosticsPort,
-  NullGovernanceDiagnosticsPort,
+  NullGovernanceDiagnosticsAdapter,
 } from "../ports/governance-diagnostics.port.ts";
 import type {
   IngestionPullLifecycleCommandPort,
@@ -29,7 +29,7 @@ export class IngestionPullLifecycleService {
       options.repository,
       options.tenant,
       options.commands,
-      options.diagnostics ?? new NullGovernanceDiagnosticsPort(),
+      options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
       options.now ?? Date.now,
     );
   }

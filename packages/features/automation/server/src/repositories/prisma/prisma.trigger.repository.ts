@@ -34,15 +34,21 @@ function toPrismaJsonObject(value: Record<string, unknown>): Prisma.InputJsonObj
   return result;
 }
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type TriggerDatabase = Pick<PrismaClient, "trigger" | "triggerSent" | "$queryRaw">;
+
 export class PrismaTriggerRepository extends TriggerRepository {
   private constructor(
-    private readonly database: PrismaClient,
+    private readonly database: TriggerDatabase,
     private readonly clock: AutomationClockPort,
   ) {
     super();
   }
-  static create(database: object, clock: AutomationClockPort): PrismaTriggerRepository {
-    return new PrismaTriggerRepository(database as PrismaClient, clock);
+  static create(database: TriggerDatabase, clock: AutomationClockPort): PrismaTriggerRepository {
+    return new PrismaTriggerRepository(database, clock);
   }
   async findActiveForProject(projectId: string): Promise<TriggerSummary[]> {
     const rows = await this.database.trigger.findMany({

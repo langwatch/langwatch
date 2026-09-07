@@ -10,7 +10,7 @@ import {
 import type { AnomalyAlertHttpPort } from "../ports/anomaly-alert-http.port.ts";
 import {
   GovernanceDiagnosticsPort,
-  NullGovernanceDiagnosticsPort,
+  NullGovernanceDiagnosticsAdapter,
 } from "../ports/governance-diagnostics.port.ts";
 
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -35,7 +35,7 @@ export class AnomalyAlertDispatcherService {
   }): AnomalyAlertDispatcherService {
     return new AnomalyAlertDispatcherService(
       options.http,
-      options.diagnostics ?? new NullGovernanceDiagnosticsPort(),
+      options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
       options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       options.maxRetries ?? DEFAULT_MAX_RETRIES,
       options.retryBackoffMs ?? DEFAULT_RETRY_BACKOFF_MS,

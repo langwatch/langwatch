@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { AutomationService } from "../services/automation.service.ts";
 import type { AutomationService as AutomationCapability } from "@langwatch/automation-contract";
 import type { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port.ts";
@@ -32,7 +33,7 @@ import type { AutomationPersistCapService } from "../services/persist-cap.servic
 export class PostgresAutomationAdapter {
   private constructor(
     private readonly input: {
-      database: object;
+      database: PrismaClient;
       verifier: UnsubscribeTokenVerifierPort;
       jobs: ScheduledJobStorePort;
       clock: AutomationClockPort;
@@ -52,7 +53,7 @@ export class PostgresAutomationAdapter {
   ) {}
 
   static create(input: {
-    database: object;
+    database: PrismaClient;
     verifier: UnsubscribeTokenVerifierPort;
     jobs: ScheduledJobStorePort;
     clock: AutomationClockPort;

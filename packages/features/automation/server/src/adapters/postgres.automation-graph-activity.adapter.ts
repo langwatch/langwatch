@@ -40,7 +40,14 @@ import { WebhookProviderAdapter } from "./webhook-provider.adapter.ts";
  */
 export type AutomationGraphActivityDatabase = Pick<
   PrismaClient,
-  "trigger" | "customGraph" | "triggerSent" | "emailSuppression" | "webhookEndpointDelivery"
+  | "trigger"
+  | "customGraph"
+  | "triggerSent"
+  | "emailSuppression"
+  | "webhookEndpointDelivery"
+  | "project"
+  | "$queryRaw"
+  | "$executeRaw"
 >;
 
 /**

@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { RoleService as RoleServiceContract } from "@langwatch/role-contract";
 import { RolePermissionPort, RoleScopePort } from "../ports/role.port.ts";
@@ -5,7 +6,7 @@ import { PrismaRoleRepository } from "../repositories/prisma/prisma.role.reposit
 import { RoleService, type RoleServiceDependencies } from "../services/role.service.ts";
 
 export interface PostgresRoleAdapterOptions {
-  database: object;
+  database: PrismaClient;
   grants: AuthzGrantsService;
   permissions: AuthzService;
   newBindingId: () => string;

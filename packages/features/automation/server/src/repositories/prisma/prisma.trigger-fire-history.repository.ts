@@ -11,12 +11,18 @@ const mapFire = (row: unknown): TriggerFire => {
     resolvedAt: value.resolvedAt instanceof Date ? value.resolvedAt : null,
   };
 };
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type TriggerFireHistoryDatabase = Pick<PrismaClient, "triggerSent">;
+
 export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: TriggerFireHistoryDatabase) {
     super();
   }
-  static create(database: object): PrismaTriggerFireHistoryRepository {
-    return new PrismaTriggerFireHistoryRepository(database as PrismaClient);
+  static create(database: TriggerFireHistoryDatabase): PrismaTriggerFireHistoryRepository {
+    return new PrismaTriggerFireHistoryRepository(database);
   }
   async create(input: {
     projectId: string;

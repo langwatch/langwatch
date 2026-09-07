@@ -6,6 +6,7 @@ import {
   type AnomalyAlertHttpPort,
   type AnomalySpendReaderPort,
   PostgresSpendSpikeAnomalyAdapter,
+  type SpendSpikeAnomalyDatabase,
 } from "@langwatch/enterprise-governance-server";
 /**
  * Periodic spend-spike anomaly evaluation tick.
@@ -41,7 +42,7 @@ export interface SpendSpikeAnomalyWorkerHandle {
 }
 
 export type SpendSpikeAnomalyWorkerDependencies = {
-  database: object;
+  database: SpendSpikeAnomalyDatabase;
   /**
    * Where the current and baseline windows are read from.
    *

@@ -36,7 +36,7 @@
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { AuthzLedgerUnavailableError } from "@langwatch/authz-contract";
 import {
-  AuthzGrantsCommandDispatcher,
+  AuthzGrantsCommandDispatcherPort,
   KsuidAuthzBindingIdAdapter,
   PostgresAuthzAdapter,
   type AuthzGrantsCommandSenders,
@@ -176,7 +176,7 @@ export function createWorkerTenancy(options: WorkerTenancyCompositionOptions): W
 
   const built = PostgresAuthzAdapter.create({
     // The typed client satisfies the feature's structural database port on its
-    // own terms: `PostgresAuthzDatabase` describes its delegates in `unknown`
+    // own terms: `PostgresAuthzDatabasePort` describes its delegates in `unknown`
     // arguments so no generated type crosses into the package, and a guarded
     // `PrismaClient` is assignable to every one of them. No assertion sits at
     // this seam, and none should.
@@ -231,7 +231,7 @@ export function createWorkerTenancy(options: WorkerTenancyCompositionOptions): W
  * can retry reads the same code it would read from a tier whose ledger was
  * genuinely unavailable.
  */
-class WorkerUnregisteredAuthzGrantCommands extends AuthzGrantsCommandDispatcher {
+class WorkerUnregisteredAuthzGrantCommands extends AuthzGrantsCommandDispatcherPort {
   async commands(): Promise<{ commands: AuthzGrantsCommandSenders }> {
     throw new AuthzLedgerUnavailableError();
   }

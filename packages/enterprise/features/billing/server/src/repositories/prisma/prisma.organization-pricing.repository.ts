@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { OrganizationPricingRepository } from "../../ports/organization-pricing.port.ts";
+import { OrganizationPricingPort } from "../../ports/organization-pricing.port.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -7,13 +7,13 @@ import { OrganizationPricingRepository } from "../../ports/organization-pricing.
  */
 export type BillingOrganizationPricingDatabase = Pick<PrismaClient, "organization">;
 
-export class PrismaOrganizationPricingRepository extends OrganizationPricingRepository {
+export class PrismaOrganizationPricingRepository extends OrganizationPricingPort {
   private constructor(private readonly prisma: BillingOrganizationPricingDatabase) {
     super();
   }
 
-  static create(database: object): PrismaOrganizationPricingRepository {
-    return new PrismaOrganizationPricingRepository(database as PrismaClient);
+  static create(database: BillingOrganizationPricingDatabase): PrismaOrganizationPricingRepository {
+    return new PrismaOrganizationPricingRepository(database);
   }
 
   async tryGetPricingModel(organizationId: string): Promise<string | null> {

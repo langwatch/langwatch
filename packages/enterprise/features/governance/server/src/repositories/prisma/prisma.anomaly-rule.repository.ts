@@ -1,18 +1,24 @@
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { anomalyRuleSchema, type AnomalyRule } from "@langwatch/enterprise-governance-contract";
 import {
-  AnomalyRuleRepository,
+  AnomalyRulePort,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
 } from "../../ports/anomaly-rule.port.ts";
 
-export class PrismaAnomalyRuleRepository extends AnomalyRuleRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type AnomalyRuleDatabase = Pick<PrismaClient, "anomalyRule">;
+
+export class PrismaAnomalyRuleRepository extends AnomalyRulePort {
+  private constructor(private readonly prisma: AnomalyRuleDatabase) {
     super();
   }
 
-  static create(database: object): PrismaAnomalyRuleRepository {
-    return new PrismaAnomalyRuleRepository(database as PrismaClient);
+  static create(database: AnomalyRuleDatabase): PrismaAnomalyRuleRepository {
+    return new PrismaAnomalyRuleRepository(database);
   }
 
   async list(organizationId: string): Promise<AnomalyRule[]> {

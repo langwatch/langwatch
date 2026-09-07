@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
@@ -10,7 +11,7 @@ import { PrismaScimRepository } from "../repositories/prisma/scim.repository.ts"
 import { ScimService } from "../services/scim.service.ts";
 
 export interface PostgresScimAdapterOptions {
-  database: object;
+  database: PrismaClient;
   writer: AuthzGrantsService;
   users: UserService;
   auth: AuthService;

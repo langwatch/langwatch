@@ -22,7 +22,14 @@ import {
 /** The four tables settlement's ledger touches, named here and nowhere above it. */
 export type AutomationSettlementLedgerDatabase = Pick<
   PrismaClient,
-  "trigger" | "triggerSent" | "emailSuppression" | "webhookEndpointDelivery" | "$queryRaw"
+  | "trigger"
+  | "triggerSent"
+  | "emailSuppression"
+  | "webhookEndpointDelivery"
+  | "project"
+  | "customGraph"
+  | "$queryRaw"
+  | "$executeRaw"
 >;
 
 /**

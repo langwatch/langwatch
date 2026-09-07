@@ -2,6 +2,7 @@ import { AppGovernanceKpisAdapter } from "@langwatch/enterprise-api/governance/g
 import { SsrfSafeAnomalyAlertHttpAdapter } from "@langwatch/enterprise-api/governance/ssrf-safe-anomaly-alert-http.adapter";
 import {
   startSpendSpikeAnomalyWorker,
+  type SpendSpikeAnomalyWorkerDependencies,
   type SpendSpikeAnomalyWorkerHandle,
 } from "@langwatch/enterprise-worker";
 import {
@@ -95,7 +96,7 @@ export class FencedAnomalyAlertTransport extends WorkerAnomalyAlertTransportPort
 
 export type WorkerGovernanceAnomalyOptions = Readonly<{
   /** The one Prisma client this process opened: AnomalyRule and AnomalyAlert. */
-  database: object;
+  database: SpendSpikeAnomalyWorkerDependencies["database"];
   /** The deployment's tenant-keyed ClickHouse client, for `governance_kpis`. */
   resolveClickHouseClient: EventingClickHouseClientResolver;
   /** How an admitted destination is reached. */

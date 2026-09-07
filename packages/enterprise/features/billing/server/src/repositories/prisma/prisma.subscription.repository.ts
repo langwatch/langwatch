@@ -6,7 +6,7 @@ import type {
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { NUMERIC_OVERRIDE_FIELDS } from "../../services/plan-provider.service.ts";
 import {
-  BillingSubscriptionRepository,
+  BillingSubscriptionPort,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
 } from "../../ports/subscription.port.ts";
@@ -24,13 +24,13 @@ export type BillingSubscriptionDatabase = Pick<
   "organization" | "subscription" | "$transaction"
 >;
 
-export class PrismaSubscriptionRepository extends BillingSubscriptionRepository {
+export class PrismaSubscriptionRepository extends BillingSubscriptionPort {
   private constructor(private readonly prisma: BillingSubscriptionDatabase) {
     super();
   }
 
-  static create(database: object): PrismaSubscriptionRepository {
-    return new PrismaSubscriptionRepository(database as PrismaClient);
+  static create(database: BillingSubscriptionDatabase): PrismaSubscriptionRepository {
+    return new PrismaSubscriptionRepository(database);
   }
 
   async tryFindActive(organizationId: string): Promise<BillingSubscriptionRecord | null> {

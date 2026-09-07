@@ -1,10 +1,13 @@
-import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository.ts";
+import {
+  PrismaDepartmentRepository,
+  type DepartmentDatabase,
+} from "../repositories/prisma/prisma.department.repository.ts";
 import { DepartmentService } from "../services/department.service.ts";
 
 export class PostgresDepartmentAdapter {
-  private constructor(private readonly database: object) {}
+  private constructor(private readonly database: DepartmentDatabase) {}
 
-  static create(options: { database: object }): PostgresDepartmentAdapter {
+  static create(options: { database: DepartmentDatabase }): PostgresDepartmentAdapter {
     return new PostgresDepartmentAdapter(options.database);
   }
 

@@ -89,3 +89,9 @@ export function transformSnakeToCamel(data: Record<string, unknown>): Record<str
 
   return result;
 }
+
+/** Nominal boundary over this module's camelCase/snake_case transforms. */
+export abstract class PromptTransformDbPort {
+  abstract toDb(data: Record<string, unknown>): Record<string, unknown>;
+  abstract fromDb(data: Record<string, unknown>): Record<string, unknown>;
+}

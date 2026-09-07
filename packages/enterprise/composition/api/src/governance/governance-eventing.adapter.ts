@@ -20,6 +20,7 @@ import {
   PulledUsageLedgerPort,
   PulledUsageLedgerProcess,
   type IngestionPullLifecycleDatabase,
+  type IngestionPullRunProjectionDatabase,
   type IngestionPullWorkerService,
   type PulledUsageLedgerRow,
 } from "@langwatch/enterprise-governance-server";
@@ -195,14 +196,14 @@ export class AppIngestionPullExecutionRuntime {
 /** Complete lifecycle collaborators for durable ingestion-pull scheduling. */
 export class AppIngestionPullLifecycleRuntime {
   private constructor(
-    readonly database: IngestionPullLifecycleDatabase,
+    readonly database: IngestionPullLifecycleDatabase & IngestionPullRunProjectionDatabase,
     readonly projects: GovernanceInternalProjectPort,
     readonly schedule: GovernanceIngestionPullSchedulePort,
     readonly runsWorkers: boolean,
   ) {}
 
   static create(
-    database: IngestionPullLifecycleDatabase,
+    database: IngestionPullLifecycleDatabase & IngestionPullRunProjectionDatabase,
     projects: GovernanceInternalProjectPort,
     schedule: GovernanceIngestionPullSchedulePort,
     runsWorkers: boolean,

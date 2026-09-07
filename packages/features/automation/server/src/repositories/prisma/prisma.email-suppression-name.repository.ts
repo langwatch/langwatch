@@ -3,12 +3,18 @@ import {
   EmailSuppressionNameRepository,
   type UnsubscribeNames,
 } from "../email-suppression-name.repository.ts";
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type EmailSuppressionNameDatabase = Pick<PrismaClient, "project" | "trigger">;
+
 export class PrismaEmailSuppressionNameRepository extends EmailSuppressionNameRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: EmailSuppressionNameDatabase) {
     super();
   }
-  static create(database: object): PrismaEmailSuppressionNameRepository {
-    return new PrismaEmailSuppressionNameRepository(database as PrismaClient);
+  static create(database: EmailSuppressionNameDatabase): PrismaEmailSuppressionNameRepository {
+    return new PrismaEmailSuppressionNameRepository(database);
   }
   async tryLookupNames(input: {
     projectId: string;

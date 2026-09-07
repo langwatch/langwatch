@@ -41,11 +41,11 @@ import {
 } from "@langwatch/annotation-contract";
 import { OrganizationService, UserNotInOrganizationError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError, ProjectService } from "@langwatch/project-contract";
-import { AnnotationRepository } from "../ports/annotation.port.ts";
+import { AnnotationPort } from "../ports/annotation.port.ts";
 
 export class AnnotationService extends AnnotationServiceContract {
   private constructor(
-    private readonly repository: AnnotationRepository,
+    private readonly repository: AnnotationPort,
     private readonly projects: ProjectService,
     private readonly organizations: OrganizationService,
   ) {
@@ -53,7 +53,7 @@ export class AnnotationService extends AnnotationServiceContract {
   }
 
   static create(options: {
-    repository: AnnotationRepository;
+    repository: AnnotationPort;
     projects: ProjectService;
     organizations: OrganizationService;
   }): AnnotationService {

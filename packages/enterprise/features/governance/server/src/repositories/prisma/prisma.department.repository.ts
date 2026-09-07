@@ -4,15 +4,24 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { DepartmentRepository } from "../../ports/department.port.ts";
+import { DepartmentPort } from "../../ports/department.port.ts";
 
-export class PrismaDepartmentRepository extends DepartmentRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type DepartmentDatabase = Pick<
+  PrismaClient,
+  "department" | "organizationUser" | "project" | "team"
+>;
+
+export class PrismaDepartmentRepository extends DepartmentPort {
+  private constructor(private readonly prisma: DepartmentDatabase) {
     super();
   }
 
-  static create(database: object): PrismaDepartmentRepository {
-    return new PrismaDepartmentRepository(database as PrismaClient);
+  static create(database: DepartmentDatabase): PrismaDepartmentRepository {
+    return new PrismaDepartmentRepository(database);
   }
 
   async getAll(organizationId: string): Promise<Department[]> {

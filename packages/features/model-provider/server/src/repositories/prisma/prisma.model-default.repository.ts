@@ -24,7 +24,7 @@ export class PrismaModelDefaultRepository extends ModelDefaultRepository {
     super();
   }
 
-  static create(database: object): PrismaModelDefaultRepository {
+  static create(database: RootDatabase): PrismaModelDefaultRepository {
     if (!isModelDefaultDatabase(database)) {
       throw new Error("Model Default repository requires a Prisma database adapter");
     }

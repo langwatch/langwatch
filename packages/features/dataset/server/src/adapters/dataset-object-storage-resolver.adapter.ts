@@ -9,9 +9,9 @@ import { AzureDatasetStorageAdapter } from "./azure.dataset-storage.adapter.ts";
 import { LocalDatasetStorageAdapter } from "./local.dataset-storage.adapter.ts";
 import { S3DatasetStorageAdapter } from "./s3.dataset-storage.adapter.ts";
 import {
-  DatasetAzureConfigResolver,
-  DatasetS3ClientResolver,
-  DatasetStorageResolver,
+  DatasetAzureConfigResolverPort,
+  DatasetS3ClientResolverPort,
+  DatasetStorageResolverPort,
   type DatasetS3ClientLease,
   type DatasetStorage,
 } from "../ports/dataset-storage.port.ts";
@@ -42,7 +42,7 @@ export abstract class DatasetStorageDestinationPort {
  * An S3 client for one project's dataset objects, built fresh per operation from the process's
  * own AWS transport.
  */
-export class DatasetObjectStorageS3ClientResolverAdapter extends DatasetS3ClientResolver {
+export class DatasetObjectStorageS3ClientResolverAdapter extends DatasetS3ClientResolverPort {
   static create(options: {
     aws: AwsClientProcessRuntime;
     lookupProjectTarget: (projectId: string) => Promise<DatasetS3Target | null>;
@@ -87,14 +87,14 @@ export class DatasetObjectStorageS3ClientResolverAdapter extends DatasetS3Client
  * Resolves one project's `DatasetStorage` from a destination decision this module does not make
  * itself.
  */
-export class DatasetObjectStorageResolverAdapter extends DatasetStorageResolver {
+export class DatasetObjectStorageResolverAdapter extends DatasetStorageResolverPort {
   private azure: AzureDatasetStorageAdapter | undefined;
   private readonly s3: S3DatasetStorageAdapter;
 
   private constructor(
     private readonly destination: DatasetStorageDestinationPort,
-    s3ClientResolver: DatasetS3ClientResolver,
-    private readonly azureConfig: DatasetAzureConfigResolver | undefined,
+    s3ClientResolver: DatasetS3ClientResolverPort,
+    private readonly azureConfig: DatasetAzureConfigResolverPort | undefined,
   ) {
     super();
     this.s3 = S3DatasetStorageAdapter.create(s3ClientResolver);
@@ -102,8 +102,8 @@ export class DatasetObjectStorageResolverAdapter extends DatasetStorageResolver 
 
   static create(options: {
     destination: DatasetStorageDestinationPort;
-    s3ClientResolver: DatasetS3ClientResolver;
-    azureConfig?: DatasetAzureConfigResolver;
+    s3ClientResolver: DatasetS3ClientResolverPort;
+    azureConfig?: DatasetAzureConfigResolverPort;
   }): DatasetObjectStorageResolverAdapter {
     return new DatasetObjectStorageResolverAdapter(
       options.destination,

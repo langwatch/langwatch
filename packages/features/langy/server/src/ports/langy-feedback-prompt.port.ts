@@ -5,9 +5,9 @@
  * the cadence record do not become part of the feature boundary.
  */
 
-export interface LangyFeedbackPromptRedis {
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
+export abstract class LangyFeedbackPromptRedisPort {
+  abstract get(key: string): Promise<string | null>;
+  abstract set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
 }
 
 export const FEEDBACK_MIN_ANSWERS = 2;
@@ -25,13 +25,13 @@ const keyFor = (userId: string) => `langy:feedback:last-asked:${userId}`;
 export class LangyFeedbackPromptPolicy {
   private constructor(
     private readonly deps: {
-      redis: LangyFeedbackPromptRedis | null;
+      redis: LangyFeedbackPromptRedisPort | null;
       now?: () => number;
     },
   ) {}
 
   static create(options: {
-    redis: LangyFeedbackPromptRedis | null;
+    redis: LangyFeedbackPromptRedisPort | null;
     now?: () => number;
   }): LangyFeedbackPromptPolicy {
     return new LangyFeedbackPromptPolicy(options);

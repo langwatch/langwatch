@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationPricingRepository } from "../ports/organization-pricing.port.ts";
+import type { OrganizationPricingPort } from "../ports/organization-pricing.port.ts";
 import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 
 const logger = createLogger("langwatch:billing:seatSync");
@@ -8,12 +8,12 @@ const logger = createLogger("langwatch:billing:seatSync");
 export class SeatSyncService {
   private constructor(
     private readonly seatEvents: SeatEventSubscriptionService,
-    private readonly organizations: OrganizationPricingRepository,
+    private readonly organizations: OrganizationPricingPort,
   ) {}
 
   static create(options: {
     seatEvents: SeatEventSubscriptionService;
-    organizations: OrganizationPricingRepository;
+    organizations: OrganizationPricingPort;
   }): SeatSyncService {
     return new SeatSyncService(options.seatEvents, options.organizations);
   }

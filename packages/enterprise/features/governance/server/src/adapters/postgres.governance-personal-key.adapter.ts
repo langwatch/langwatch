@@ -1,6 +1,9 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PersonalVirtualKeyIssuerPort } from "../ports/personal-virtual-key.port.ts";
-import { PrismaPersonalVirtualKeyRepository } from "../repositories/prisma/prisma.governance-personal-key.repository.ts";
+import {
+  PrismaPersonalVirtualKeyRepository,
+  type PersonalVirtualKeyDatabase,
+} from "../repositories/prisma/prisma.governance-personal-key.repository.ts";
 import { DefaultGovernancePersonalVirtualKeyService } from "../services/governance-personal-key.service.ts";
 
 type RoutingPolicyReader = {
@@ -21,7 +24,7 @@ type RoutingPolicyReader = {
 export class PostgresPersonalVirtualKeyAdapter {
   private constructor(
     private readonly options: {
-      database: object;
+      database: PersonalVirtualKeyDatabase;
       issuer: PersonalVirtualKeyIssuerPort;
       organizations: OrganizationService;
       policies: RoutingPolicyReader;
@@ -30,7 +33,7 @@ export class PostgresPersonalVirtualKeyAdapter {
   ) {}
 
   static create(options: {
-    database: object;
+    database: PersonalVirtualKeyDatabase;
     issuer: PersonalVirtualKeyIssuerPort;
     organizations: OrganizationService;
     policies: RoutingPolicyReader;

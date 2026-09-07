@@ -15,10 +15,7 @@
  *     (per-tenant routing lands on the same org's instance either way).
  */
 import type { DataFormat } from "@clickhouse/client";
-import {
-  BillableEventsRepository,
-  type BillableEventsWindow,
-} from "../../ports/billable-events.port.ts";
+import { BillableEventsPort, type BillableEventsWindow } from "../../ports/billable-events.port.ts";
 
 /**
  * The one read shape these queries issue, rather than a vendor client.
@@ -48,7 +45,7 @@ export type ClickHouseClientResolver = (
   tenantId: string,
 ) => Promise<BillableEventsClickHouseClient>;
 
-export class BillableEventsClickHouseRepository extends BillableEventsRepository {
+export class BillableEventsClickHouseRepository extends BillableEventsPort {
   private constructor(
     private readonly resolveClient: ClickHouseClientResolver,
     private readonly resolveOrganizationClient: ClickHouseClientResolver,

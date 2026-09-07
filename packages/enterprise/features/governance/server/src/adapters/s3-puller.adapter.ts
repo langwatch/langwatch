@@ -28,7 +28,7 @@ import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
 import type { GovernanceObjectStoragePort } from "../ports/governance-object-storage.port.ts";
 import {
-  NullIngestionPullDiagnosticsPort,
+  NullIngestionPullDiagnosticsAdapter,
   type IngestionPullDiagnosticsPort,
 } from "../ports/ingestion-pull-worker.port.ts";
 
@@ -73,7 +73,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
 
   protected constructor(
     private readonly objects: GovernanceObjectStoragePort,
-    private readonly diagnostics: IngestionPullDiagnosticsPort = new NullIngestionPullDiagnosticsPort(),
+    private readonly diagnostics: IngestionPullDiagnosticsPort = new NullIngestionPullDiagnosticsAdapter(),
   ) {}
 
   static create(options: {

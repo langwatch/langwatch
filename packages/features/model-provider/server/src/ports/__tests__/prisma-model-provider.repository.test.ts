@@ -42,7 +42,7 @@ describe("PrismaModelProviderRepository", () => {
         modelProvider: {},
         gatewayChangeEvent: {},
         $transaction: vi.fn(),
-      },
+      } as unknown as Parameters<typeof PrismaModelProviderRepository.create>[0],
       new Credentials(),
     );
     const routingHandleConflict = new Prisma.PrismaClientKnownRequestError("conflict", {
@@ -68,7 +68,7 @@ describe("PrismaModelProviderRepository", () => {
         modelProvider: { findFirst },
         gatewayChangeEvent: {},
         $transaction: vi.fn(),
-      },
+      } as unknown as Parameters<typeof PrismaModelProviderRepository.create>[0],
       new Credentials(),
     );
 
@@ -98,7 +98,7 @@ describe("PrismaModelProviderRepository", () => {
             modelProvider: { create },
             gatewayChangeEvent: { create: appendChange },
           }),
-      },
+      } as unknown as Parameters<typeof PrismaModelProviderRepository.create>[0],
       new Credentials(),
     );
 
@@ -142,7 +142,7 @@ describe("PrismaModelProviderRepository", () => {
             modelProvider: { update },
             gatewayChangeEvent: { create: appendChange },
           }),
-      },
+      } as unknown as Parameters<typeof PrismaModelProviderRepository.create>[0],
       new Credentials(),
     );
 
@@ -175,7 +175,7 @@ describe("PrismaModelProviderRepository", () => {
         modelProvider: { findMany },
         gatewayChangeEvent: {},
         $transaction: vi.fn(),
-      },
+      } as unknown as Parameters<typeof PrismaModelProviderRepository.create>[0],
       new Credentials(),
     );
 

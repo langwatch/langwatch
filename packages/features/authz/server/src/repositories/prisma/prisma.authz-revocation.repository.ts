@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import {
   type AuthzRevocationReason,
-  AuthzRevocationTelemetry,
+  AuthzRevocationTelemetryPort,
 } from "../../ports/authz-revocation-telemetry.port.ts";
 import type { AuthzDatabase } from "../authz-read.repository.ts";
 
@@ -15,7 +15,7 @@ type RevocationDatabase = {
 
 export type PrismaAuthzRevocationRepositoryOptions = {
   database: AuthzDatabase;
-  telemetry: AuthzRevocationTelemetry;
+  telemetry: AuthzRevocationTelemetryPort;
 };
 
 /** Synchronous deny effect; it can only mark live grants revoked. */

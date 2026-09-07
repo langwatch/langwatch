@@ -61,7 +61,7 @@ export abstract class IngestionPullDiagnosticsPort {
   abstract capture(error: Error, context: Record<string, unknown>): void;
 }
 
-export class NullIngestionPullDiagnosticsPort extends IngestionPullDiagnosticsPort {
+export class NullIngestionPullDiagnosticsAdapter extends IngestionPullDiagnosticsPort {
   info(): void {}
   warn(): void {}
   error(): void {}

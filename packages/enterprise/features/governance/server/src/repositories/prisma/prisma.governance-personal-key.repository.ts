@@ -11,13 +11,19 @@ type KeyRow = VirtualKey & { scopes: VirtualKeyScope[] };
 
 const includeScopes = { scopes: true } as const;
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type PersonalVirtualKeyDatabase = Pick<PrismaClient, "modelProvider" | "virtualKey">;
+
 export class PrismaPersonalVirtualKeyRepository extends PersonalVirtualKeyRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: PersonalVirtualKeyDatabase) {
     super();
   }
 
-  static create(database: object): PrismaPersonalVirtualKeyRepository {
-    return new PrismaPersonalVirtualKeyRepository(database as PrismaClient);
+  static create(database: PersonalVirtualKeyDatabase): PrismaPersonalVirtualKeyRepository {
+    return new PrismaPersonalVirtualKeyRepository(database);
   }
 
   async tryFindDefault(input: {

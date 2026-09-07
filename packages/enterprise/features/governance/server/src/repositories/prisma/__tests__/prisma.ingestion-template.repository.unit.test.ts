@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 import { PrismaIngestionTemplateRepository } from "../prisma.ingestion-template.repository.ts";
 
@@ -89,7 +90,7 @@ describe("PrismaIngestionTemplateRepository", () => {
     ]);
     const repository = PrismaIngestionTemplateRepository.create({
       ingestionTemplate: { findMany },
-    });
+    } as unknown as PrismaClient);
 
     const rows = await repository.listUserVisible("organization-1");
 
@@ -122,7 +123,9 @@ describe("PrismaIngestionTemplateRepository", () => {
     /** @scenario "Ingestion template authoring is tenant safe and auditable" */
     it("writes the row and its audit entry in one transaction", async () => {
       const prisma = transactionalPrisma();
-      const repository = PrismaIngestionTemplateRepository.create(prisma.database);
+      const repository = PrismaIngestionTemplateRepository.create(
+        prisma.database as unknown as PrismaClient,
+      );
 
       await repository.createWithAudit({
         template: {
@@ -145,7 +148,9 @@ describe("PrismaIngestionTemplateRepository", () => {
 
     it("records which surface the write came from, and never publishes the row", async () => {
       const prisma = transactionalPrisma();
-      const repository = PrismaIngestionTemplateRepository.create(prisma.database);
+      const repository = PrismaIngestionTemplateRepository.create(
+        prisma.database as unknown as PrismaClient,
+      );
 
       await repository.createWithAudit({
         template: {
@@ -187,7 +192,9 @@ describe("PrismaIngestionTemplateRepository", () => {
      */
     it("stamps the archival and takes the row out of the listings", async () => {
       const prisma = transactionalPrisma({ existing: storedRow() });
-      const repository = PrismaIngestionTemplateRepository.create(prisma.database);
+      const repository = PrismaIngestionTemplateRepository.create(
+        prisma.database as unknown as PrismaClient,
+      );
       const archivedAt = new Date("2026-08-25T00:00:00.000Z");
 
       const result = await repository.archiveWithAudit({
@@ -215,7 +222,9 @@ describe("PrismaIngestionTemplateRepository", () => {
       const prisma = transactionalPrisma({
         existing: storedRow({ organizationId: null, platformPublished: true }),
       });
-      const repository = PrismaIngestionTemplateRepository.create(prisma.database);
+      const repository = PrismaIngestionTemplateRepository.create(
+        prisma.database as unknown as PrismaClient,
+      );
 
       const result = await repository.archiveWithAudit({
         id: "template-1",
@@ -232,7 +241,9 @@ describe("PrismaIngestionTemplateRepository", () => {
 
     it("reports a row this organization cannot reach as absent", async () => {
       const prisma = transactionalPrisma({ existing: null });
-      const repository = PrismaIngestionTemplateRepository.create(prisma.database);
+      const repository = PrismaIngestionTemplateRepository.create(
+        prisma.database as unknown as PrismaClient,
+      );
 
       const result = await repository.archiveWithAudit({
         id: "template-of-another-org",

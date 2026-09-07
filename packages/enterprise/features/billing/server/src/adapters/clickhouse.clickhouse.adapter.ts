@@ -2,7 +2,7 @@ import {
   BillableEventsClickHouseRepository,
   type BillableEventsClickHouseClient,
 } from "../repositories/clickhouse/clickhouse.billable-events.repository.ts";
-import type { BillableEventsRepository } from "../ports/billable-events.port.ts";
+import type { BillableEventsPort } from "../ports/billable-events.port.ts";
 
 export type BillingClickHouseClientResolver = (
   tenantId: string,
@@ -22,7 +22,7 @@ export class ClickHouseBillingAdapter {
     return new ClickHouseBillingAdapter(options.resolveClient, options.resolveOrganizationClient);
   }
 
-  build(): BillableEventsRepository {
+  build(): BillableEventsPort {
     return BillableEventsClickHouseRepository.create({
       resolveClient: this.resolveClient,
       resolveOrganizationClient: this.resolveOrganizationClient,

@@ -17,3 +17,8 @@ export function toHandleSlug(input: string): string {
 
   return slug || "prompt";
 }
+
+/** Nominal boundary over {@link toHandleSlug}. */
+export abstract class PromptHandleSlugPort {
+  abstract toSlug(input: string): string;
+}

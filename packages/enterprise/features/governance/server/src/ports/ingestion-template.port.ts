@@ -12,7 +12,7 @@ export type IngestionTemplateMutationResult =
   | { status: "platform" }
   | { status: "not_found" };
 
-export abstract class IngestionTemplateRepository {
+export abstract class IngestionTemplatePort {
   abstract listUserVisible(organizationId: string): Promise<IngestionTemplate[]>;
   abstract listAdminVisible(organizationId: string): Promise<IngestionTemplate[]>;
   abstract tryFindVisible(input: {

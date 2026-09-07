@@ -17,7 +17,7 @@ import {
 import type {
   DatasetStorage,
   PresignedUpload,
-  DatasetAzureConfigResolver,
+  DatasetAzureConfigResolverPort,
 } from "../ports/dataset-storage.port.ts";
 import {
   ChunkTooLargeError,
@@ -47,10 +47,10 @@ async function streamToString(stream: Readable): Promise<string> {
 }
 
 export class AzureDatasetStorageAdapter implements DatasetStorage {
-  static create(resolver: DatasetAzureConfigResolver): AzureDatasetStorageAdapter {
+  static create(resolver: DatasetAzureConfigResolverPort): AzureDatasetStorageAdapter {
     return new AzureDatasetStorageAdapter(resolver);
   }
-  constructor(private readonly resolver: DatasetAzureConfigResolver) {}
+  constructor(private readonly resolver: DatasetAzureConfigResolverPort) {}
 
   private uriFor({
     accountName,

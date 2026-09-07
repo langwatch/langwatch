@@ -1,18 +1,21 @@
 import type { AiToolProviderCatalogPort, AiToolSlugPort } from "../ports/ai-tool-catalog.port.ts";
-import { PrismaAiToolCatalogRepository } from "../repositories/prisma/prisma.ai-tool-catalog.repository.ts";
+import {
+  PrismaAiToolCatalogRepository,
+  type AiToolCatalogDatabase,
+} from "../repositories/prisma/prisma.ai-tool-catalog.repository.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
 
 export class PostgresAiToolCatalogAdapter {
   private constructor(
     private readonly options: {
-      database: object;
+      database: AiToolCatalogDatabase;
       slugs: AiToolSlugPort;
       providers: AiToolProviderCatalogPort;
     },
   ) {}
 
   static create(options: {
-    database: object;
+    database: AiToolCatalogDatabase;
     slugs: AiToolSlugPort;
     providers: AiToolProviderCatalogPort;
   }): PostgresAiToolCatalogAdapter {

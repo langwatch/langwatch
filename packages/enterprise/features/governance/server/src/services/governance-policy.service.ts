@@ -1,7 +1,7 @@
 import type { TraceDepartmentInput } from "@langwatch/enterprise-governance-contract";
 import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
 import {
-  NullGovernanceDiagnosticsPort,
+  NullGovernanceDiagnosticsAdapter,
   type GovernanceDiagnosticsPort,
 } from "../ports/governance-diagnostics.port.ts";
 import { z } from "zod";
@@ -59,7 +59,7 @@ export class PostgresGovernancePolicyService {
         );
       });
     } catch (error) {
-      const diagnostics = this.options.diagnostics ?? new NullGovernanceDiagnosticsPort();
+      const diagnostics = this.options.diagnostics ?? new NullGovernanceDiagnosticsAdapter();
       diagnostics.warn("failed to resolve bundled-plan policy; defaulting to non-billable", {
         error,
         organizationId: input.organizationId,

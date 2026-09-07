@@ -13,7 +13,7 @@ import {
 } from "@langwatch/notification-contract";
 import { NotificationService } from "./billing-usage-notice.service.ts";
 import { UsageWarningService } from "./usage-warning.service.ts";
-import type { BillingErrorReporter } from "../ports/error-reporter.port.ts";
+import type { BillingErrorReporterPort } from "../ports/error-reporter.port.ts";
 import {
   MIN_DAYS_BETWEEN_ALERTS,
   planLimitCooldown,
@@ -44,7 +44,7 @@ export class UsageLimitService {
   private readonly usageService: BillingUsageCounter;
   private readonly notificationService: NotificationService;
   private readonly planProvider: BillingPlanResolver;
-  private readonly errorReporter: BillingErrorReporter;
+  private readonly errorReporter: BillingErrorReporterPort;
   private readonly resourceCooldown: BillingCooldownCache;
   private readonly planCooldown: BillingCooldownCache;
   private readonly isSaas: boolean;
@@ -68,7 +68,7 @@ export class UsageLimitService {
     usageService: BillingUsageCounter;
     notificationService: NotificationService;
     planProvider: BillingPlanResolver;
-    errorReporter?: BillingErrorReporter;
+    errorReporter?: BillingErrorReporterPort;
     resourceCooldown?: BillingCooldownCache;
     planCooldown?: BillingCooldownCache;
     isSaas: boolean;
@@ -115,7 +115,7 @@ export class UsageLimitService {
     planProvider: BillingPlanResolver;
     isSaas?: boolean;
     baseHost?: string;
-    errorReporter?: BillingErrorReporter;
+    errorReporter?: BillingErrorReporterPort;
     resourceCooldown?: BillingCooldownCache;
     planCooldown?: BillingCooldownCache;
   }): UsageLimitService {

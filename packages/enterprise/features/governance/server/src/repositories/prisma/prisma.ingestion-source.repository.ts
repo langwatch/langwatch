@@ -41,13 +41,19 @@ function toIngestionSource(row: IngestionSource): GovernanceIngestionSource {
   };
 }
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type IngestionSourceDatabase = Pick<PrismaClient, "ingestionSource" | "$transaction">;
+
 export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: IngestionSourceDatabase) {
     super();
   }
 
-  static create(database: object): PrismaIngestionSourceRepository {
-    return new PrismaIngestionSourceRepository(database as PrismaClient);
+  static create(database: IngestionSourceDatabase): PrismaIngestionSourceRepository {
+    return new PrismaIngestionSourceRepository(database);
   }
 
   async list(organizationId: string): Promise<GovernanceIngestionSource[]> {

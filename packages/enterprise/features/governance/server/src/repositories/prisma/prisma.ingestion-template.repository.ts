@@ -7,20 +7,29 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
-  IngestionTemplateRepository,
+  IngestionTemplatePort,
   type IngestionTemplateMutationResult,
   type NewIngestionTemplate,
 } from "../../ports/ingestion-template.port.ts";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 
-export class PrismaIngestionTemplateRepository extends IngestionTemplateRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type IngestionTemplateDatabase = Pick<
+  PrismaClient,
+  "ingestionTemplate" | "auditLog" | "$transaction"
+>;
+
+export class PrismaIngestionTemplateRepository extends IngestionTemplatePort {
+  private constructor(private readonly prisma: IngestionTemplateDatabase) {
     super();
   }
 
-  static create(database: object): PrismaIngestionTemplateRepository {
-    return new PrismaIngestionTemplateRepository(database as PrismaClient);
+  static create(database: IngestionTemplateDatabase): PrismaIngestionTemplateRepository {
+    return new PrismaIngestionTemplateRepository(database);
   }
 
   async listUserVisible(organizationId: string): Promise<IngestionTemplate[]> {

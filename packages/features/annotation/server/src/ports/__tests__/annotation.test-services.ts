@@ -1,3 +1,4 @@
+import type { UserService } from "@langwatch/user-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { vi } from "vitest";
@@ -82,4 +83,31 @@ export function createAnnotationTestOrganizations() {
     getSettings: unavailable,
     updateSettings: unavailable,
   } satisfies OrganizationService;
+}
+
+export function createAnnotationTestUsers() {
+  return {
+    getProfiles: async () => [],
+    tryFindById: unavailable,
+    tryFindByEmail: unavailable,
+    create: unavailable,
+    createCredentialUser: unavailable,
+    createPasskeyUser: unavailable,
+    hasPassword: unavailable,
+    setFirstPassword: unavailable,
+    getPasskeyNudgeStatus: unavailable,
+    dismissPasskeyNudge: unavailable,
+    updateProfile: unavailable,
+    getAccountInfo: unavailable,
+    getSsoStatus: unavailable,
+    getTraceExplorerTourPreference: unavailable,
+    dismissTraceExplorerTour: unavailable,
+    updateLastLogin: unavailable,
+    tryGetLastHomePath: unavailable,
+    setLastHomePath: unavailable,
+    deactivate: unavailable,
+    reactivate: unavailable,
+    setAvatar: unavailable,
+    removeAvatar: unavailable,
+  } satisfies UserService;
 }

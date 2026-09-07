@@ -18,7 +18,7 @@ import type {
 } from "@langwatch/annotation-contract";
 
 /** Private persistence capability for the Annotation service. */
-export abstract class AnnotationRepository {
+export abstract class AnnotationPort {
   abstract create(input: CreateAnnotationInput): Promise<Annotation>;
   abstract update(input: UpdateAnnotationInput): Promise<Annotation>;
   abstract delete(input: DeleteAnnotationInput): Promise<Annotation>;

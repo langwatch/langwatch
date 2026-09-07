@@ -8,11 +8,11 @@ import {
 } from "@langwatch/dataset-contract";
 import {
   AzureDatasetStorageAdapter,
-  DatasetAzureConfigResolver,
+  DatasetAzureConfigResolverPort,
   DatasetNormalizationService,
   DatasetNormalizeAdapter,
-  DatasetS3ClientResolver,
-  DatasetStorageResolver,
+  DatasetS3ClientResolverPort,
+  DatasetStorageResolverPort,
   LocalDatasetStorageAdapter,
   PostgresDatasetAdapter,
   S3DatasetStorageAdapter,
@@ -99,7 +99,7 @@ class WorkerDatasetNormalizationAdapter extends DatasetNormalizationWorkerPort {
  * policy the rest of this process's object storage uses — so dataset
  * chunks, the trace spool, and every other stored object agree on account.
  */
-export class WorkerDatasetStorageResolver extends DatasetStorageResolver {
+export class WorkerDatasetStorageResolver extends DatasetStorageResolverPort {
   private readonly s3: S3DatasetStorageAdapter;
   /** Built once, on first use — matching the general registry's Azure laziness. */
   private azure: AzureDatasetStorageAdapter | undefined;
@@ -132,7 +132,7 @@ export class WorkerDatasetStorageResolver extends DatasetStorageResolver {
  * one-account model `WorkerAzureStorageAdapter` uses for the general path.
  * `projectId` is unread: this process composes no per-project Azure routing.
  */
-class WorkerDatasetAzureConfigResolver extends DatasetAzureConfigResolver {
+class WorkerDatasetAzureConfigResolver extends DatasetAzureConfigResolverPort {
   constructor(private readonly azure: WorkerStorageConfig["azure"]) {
     super();
   }
@@ -153,7 +153,7 @@ class WorkerDatasetAzureConfigResolver extends DatasetAzureConfigResolver {
  * RELEASE: one normalize job per dataset, so a fresh client per job removes
  * the lifecycle the application's shared manager needs.
  */
-class WorkerDatasetS3ClientResolver extends DatasetS3ClientResolver {
+class WorkerDatasetS3ClientResolver extends DatasetS3ClientResolverPort {
   constructor(
     private readonly aws: AwsClientProcessRuntime,
     private readonly projects: WorkerProjectS3SourcePort,

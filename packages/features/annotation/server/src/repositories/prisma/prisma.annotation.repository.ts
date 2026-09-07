@@ -29,7 +29,7 @@ import {
   type UpsertAnnotationScoreInput,
 } from "@langwatch/annotation-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { AnnotationRepository } from "../../ports/annotation.port.ts";
+import { AnnotationPort } from "../../ports/annotation.port.ts";
 
 type AnnotationRow = {
   id: string;
@@ -163,7 +163,7 @@ export type AnnotationDatabase = Pick<
   "annotation" | "annotationQueue" | "annotationScore" | "annotationQueueItem" | "$transaction"
 >;
 
-export class PrismaAnnotationRepository extends AnnotationRepository {
+export class PrismaAnnotationRepository extends AnnotationPort {
   private constructor(private readonly database: AnnotationDatabase) {
     super();
   }

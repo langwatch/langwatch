@@ -8,13 +8,19 @@ import { WebhookDeliveryRepository } from "../webhook-delivery.repository.ts";
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type WebhookDeliveryDatabase = Pick<PrismaClient, "webhookEndpointDelivery" | "$executeRaw">;
+
 export class PrismaWebhookDeliveryRepository extends WebhookDeliveryRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: WebhookDeliveryDatabase) {
     super();
   }
 
-  static create(database: object): PrismaWebhookDeliveryRepository {
-    return new PrismaWebhookDeliveryRepository(database as PrismaClient);
+  static create(database: WebhookDeliveryDatabase): PrismaWebhookDeliveryRepository {
+    return new PrismaWebhookDeliveryRepository(database);
   }
 
   async create(input: WebhookDeliveryInput): Promise<void> {

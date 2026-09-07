@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type BillableEventsRepository, BillableEventsQueryService } from "../index.ts";
+import { type BillableEventsPort, BillableEventsQueryService } from "../index.ts";
 
 const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
   findTraceSummariesTotalUniq: vi.fn(),
@@ -7,7 +7,7 @@ const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
 
 let billableEvents: { findTraceSummariesTotalUniq: typeof findTraceSummariesTotalUniq } | undefined;
 const service = () =>
-  BillableEventsQueryService.create(billableEvents as unknown as BillableEventsRepository);
+  BillableEventsQueryService.create(billableEvents as unknown as BillableEventsPort);
 
 describe("billingMonthDateRange", () => {
   describe("when given a mid-year billing month", () => {
