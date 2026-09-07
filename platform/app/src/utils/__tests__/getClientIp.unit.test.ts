@@ -102,7 +102,7 @@ describe("getDirectPeerIp()", () => {
 });
 
 describe("getTrustedProxyClientIp()", () => {
-  /** @scenario Two callers behind one trusted proxy keep separate budgets */
+  /** @scenario Auth throttles distinguish callers behind a trusted ingress */
   it("resolves two forwarded clients behind the same trusted peer separately", () => {
     const from = (forwardedFor: string) =>
       getTrustedProxyClientIp(

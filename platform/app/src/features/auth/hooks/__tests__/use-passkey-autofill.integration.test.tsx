@@ -208,7 +208,7 @@ describe("given a deployment that offers passkeys", () => {
         error: onError.mock.calls[0]?.[0],
         fallbackTitle: "Could not use a passkey",
       });
-      expect(copy.title).toBe("That passkey isn't one we recognize");
+      expect(copy.title).toBe("We couldn't use that passkey");
       expect(copy.description).not.toBe(UNKNOWN_ERROR_PRESENTATION.description);
       expect(navigateMock).not.toHaveBeenCalled();
     });
@@ -238,7 +238,7 @@ describe("given a deployment that offers passkeys", () => {
    * the ceremony it started — and going away is what a sign-in that WORKED
    * does. The client reports the tear-down as a refusal carrying a 400, which
    * is the status that means the server turned the credential down, so a
-   * password sign-in ended by flashing "That passkey isn't one we recognize"
+   * password sign-in ended by flashing "We couldn't use that passkey"
    * across the moment before the next page arrived.
    */
   describe("when the screen goes away with an offer still pending", () => {
@@ -316,7 +316,7 @@ describe("given a deployment that offers passkeys", () => {
         error: onError.mock.calls[0]?.[0],
         fallbackTitle: "Could not use a passkey",
       });
-      expect(copy.title).toBe("That passkey isn't one we recognize");
+      expect(copy.title).toBe("We couldn't use that passkey");
     });
   });
 

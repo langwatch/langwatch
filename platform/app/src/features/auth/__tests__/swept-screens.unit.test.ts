@@ -45,7 +45,6 @@ const SWEPT_SCREENS: readonly string[] = [
   "pages/auth/reset-password.tsx",
   "pages/auth/verify-email.tsx",
   "pages/auth/error.tsx",
-  "pages/auth/join.tsx",
   "pages/invite/accept.tsx",
 ];
 
@@ -70,7 +69,6 @@ const STILL_CARRY_A_LEGACY_TWIN: readonly string[] = [];
 /** The cards those screens draw, including the ones swept in this pass. */
 const SWEPT_CARDS: readonly string[] = [
   "features/auth/components/InviteLanding.tsx",
-  "features/auth/components/JoinBeforeCreateInterstitial.tsx",
   "features/auth/components/TwoStepChallengePanel.tsx",
   "features/auth/components/AuthPrimaryButton.tsx",
 ];
@@ -78,7 +76,6 @@ const SWEPT_CARDS: readonly string[] = [
 describe("given every unauthenticated screen", () => {
   describe("when one of them draws itself", () => {
     /** @scenario The sign-in error screen is the same card as the door it came from */
-    /** @scenario The invitation and join screens stand on the same ground */
     it("stands on the auth screens' ground rather than the app's own furniture", () => {
       for (const screen of SWEPT_SCREENS) {
         const source = repoFile(screen);
@@ -99,7 +96,6 @@ describe("given every unauthenticated screen", () => {
       for (const screen of [
         "pages/auth/verify-email.tsx",
         "pages/auth/error.tsx",
-        "pages/auth/join.tsx",
         "pages/invite/accept.tsx",
         "features/auth/components/InviteLanding.tsx",
       ]) {
@@ -176,7 +172,6 @@ describe("given every unauthenticated screen", () => {
         "pages/auth/reset-password.tsx",
         "pages/auth/error.tsx",
         "features/auth/components/SignUpCredentialForm.tsx",
-        "features/auth/components/JoinBeforeCreateInterstitial.tsx",
         "features/auth/components/InviteLanding.tsx",
         "features/auth/components/TwoStepChallengePanel.tsx",
       ]) {

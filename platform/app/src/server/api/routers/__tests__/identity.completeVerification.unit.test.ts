@@ -103,6 +103,7 @@ vi.mock(
     mfaCeremonies: () => ({}),
     mfaEnrollments: () => ({}),
     organizationMfa: () => ({}),
+    sessionCallbackEvidence: () => ({}),
     sessionClaims: () => ({}),
     sessionInventory: () => ({}),
     signUpHealth: () => ({}),
