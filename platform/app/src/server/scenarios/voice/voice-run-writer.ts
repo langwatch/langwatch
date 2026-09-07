@@ -18,12 +18,27 @@
  * over injected ports.
  */
 
+import { AgentRepository } from "~/server/agents/agent.repository";
 import { VOICE_CALL_SCENARIO_SET_ID } from "~/server/agents/voice/voice-agent.config";
 import { getApp } from "~/server/app-layer/app";
+import { prisma } from "~/server/db";
 import type { CallRecord } from "./call-record";
 
 /** How the run records who spoke as the caller: a person, not a simulator. */
 export const HUMAN_CALLER_KIND = "human";
+
+/**
+ * The agent row a finish names does not exist in the project. The row id comes
+ * from the signed token, but it is still checked against the project before a
+ * run is written under it, so a stale or forged row id cannot create a run.
+ */
+export class VoiceAgentNotFoundError extends Error {
+  readonly code = "voice_agent_not_found" as const;
+  constructor() {
+    super("The voice agent was not found in this project");
+    this.name = "VoiceAgentNotFoundError";
+  }
+}
 
 interface VoiceRunMessage {
   id: string;
@@ -66,6 +81,14 @@ export async function writeVoiceCallRun({
   record: CallRecord;
   scenario?: VoiceRunScenario;
 }): Promise<void> {
+  // The row id is trusted only as far as the token that carried it; the row
+  // itself must exist in this project before a run is written under it.
+  const agent = await new AgentRepository(prisma).findById({
+    projectId,
+    id: agentRowId,
+  });
+  if (!agent) throw new VoiceAgentNotFoundError();
+
   // A scenario call lands under the real scenario and its set; a drawer call
   // lands in the voice-call set under a synthetic per-agent id.
   const scenarioId = scenario?.scenarioId ?? `voiceagent_${agentRowId}`;

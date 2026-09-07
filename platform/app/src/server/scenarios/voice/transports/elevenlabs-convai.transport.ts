@@ -139,6 +139,7 @@ interface ElevenLabsTranscriptEntry {
 
 interface ElevenLabsConversationResponse {
   conversation_id?: string;
+  agent_id?: string;
   status?: string;
   transcript?: ElevenLabsTranscriptEntry[];
   metadata?: {
@@ -224,6 +225,7 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     const record: CallRecord = {
       conversationId,
       transport: "elevenlabs_convai",
+      ...(body.agent_id ? { agentExternalId: body.agent_id } : {}),
       startedAt,
       endedAt: startedAt + durationMs,
       durationMs,
@@ -238,6 +240,12 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     // control, no error (AC15).
     if (body.has_audio) record.audioUrl = audioProxyUrl;
     return record;
+  },
+
+  async endCall(adapter): Promise<void> {
+    // The SDK adapter exposes `disconnect()`; the cast is sealed in this one
+    // vendor module rather than living at the child's call site.
+    await (adapter as { disconnect?: () => Promise<void> }).disconnect?.();
   },
 
   createAgentAdapter({ agentId, credential, maxCallSeconds }): AgentAdapter {

@@ -66,6 +66,63 @@ describe("TalkToItPanel", () => {
     });
   });
 
+  describe("when the finished call has a recording", () => {
+    /** @scenario "The finished call plays its recording through the same-origin proxy url" */
+    it("plays the recording through the same-origin proxy url from finish", async () => {
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: {
+          getUserMedia: vi.fn(async () => ({ getTracks: () => [] })),
+        },
+      });
+      const audioUrl = "/api/voice/session/conv_1/audio?projectId=p1";
+      const json = (value: unknown) =>
+        new Response(JSON.stringify(value), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) =>
+          String(url).endsWith("/api/voice/session")
+            ? json({
+                transport: "elevenlabs_convai",
+                sessionToken: "signed.token",
+                maxDurationSeconds: 300,
+                connect: { signedUrl: "wss://x" },
+              })
+            : json({
+                runId: "voicecall_x",
+                agentId: "agent_1",
+                source: "provider",
+                fetchFailed: false,
+                hasAudio: true,
+                audioUrl,
+              }),
+        ),
+      );
+      // The transport reports the call connected, then hands back a session.
+      openCall.mockImplementationOnce(
+        async ({
+          handlers,
+        }: {
+          handlers: { onConnected: (i: { conversationId: string }) => void };
+        }) => {
+          handlers.onConnected({ conversationId: "conv_1" });
+          return { hangUp: vi.fn(async () => {}), getInputVolume: () => 0 };
+        },
+      );
+
+      renderPanel();
+
+      const hangUp = await screen.findByTestId("talk-hang-up");
+      hangUp.click();
+
+      const player = await screen.findByTestId("talk-play");
+      expect(player.querySelector("audio")).toHaveAttribute("src", audioUrl);
+    });
+  });
+
   describe("when the microphone is denied", () => {
     it("shows the retry notice and never stays on connecting", async () => {
       Object.defineProperty(navigator, "mediaDevices", {

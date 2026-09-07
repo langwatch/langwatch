@@ -238,6 +238,105 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then no tRPC response, client bundle or log line contains the ElevenLabs API key
 
   # ---------------------------------------------------------------------------
+  # Session binding and audio ownership (integration)
+  # ---------------------------------------------------------------------------
+
+  # AC13
+  @integration
+  Scenario: An unauthenticated Talk to it request is refused
+    Given a request to mint a voice session with no logged-in user
+    When the request is handled
+    Then it is refused as unauthenticated and no session is minted
+
+  # AC13
+  @integration
+  Scenario: A Talk to it request for another project is refused
+    Given a logged-in user without permission on the requested project
+    When a voice session is minted for that project
+    Then it is refused as forbidden and no session is minted
+
+  # AC13
+  @integration
+  Scenario: A session mint without a provider key is refused with the key-missing code
+    Given the requested project has no ElevenLabs key
+    When a voice session is minted
+    Then it is refused with the key-missing code and no session is minted
+
+  # AC13
+  @integration
+  Scenario: A finish with an invalid or expired session token is refused
+    Given a finish request whose session token fails signature or expiry checks
+    When the finish is handled
+    Then it is refused with the session-invalid code and no run is written
+
+  # AC13
+  @integration
+  Scenario: A finish whose conversation ran against another agent is refused
+    Given a finish request whose fetched conversation names a different vendor agent than the token
+    When the finish is handled
+    Then it is refused with the conversation-mismatch code and no run is written
+
+  # AC15
+  @integration
+  Scenario: The recording proxy refuses a conversation with no run in the project
+    Given a recording is requested for a conversation with no run in the authorised project
+    When the proxy is handled
+    Then it answers "Recording unavailable" and never fetches the provider
+
+  # AC13
+  @integration
+  Scenario: The finished call plays its recording through the same-origin proxy url
+    Given a finished call whose provider record has audio
+    When the post-call view is drawn
+    Then the panel plays the recording through the same-origin proxy url
+
+  # ---------------------------------------------------------------------------
+  # Voice run preparation (unit)
+  # ---------------------------------------------------------------------------
+
+  # AC19
+  @unit
+  Scenario: A voice target resolves its ElevenLabs credential from the project provider
+    Given a voice agent and a project with an enabled ElevenLabs provider
+    When the run data is prefetched for that voice target
+    Then the prepared voice target carries the resolved credential
+
+  # AC19
+  @unit
+  Scenario: A voice target with no ElevenLabs provider resolves a null credential
+    Given a voice agent and a project with no ElevenLabs provider
+    When the run data is prefetched for that voice target
+    Then the prepared voice target carries a null credential
+
+  # AC20
+  @unit
+  Scenario: A voice target carries the scenario caller voice to the child
+    Given a scenario with a caller voice and a voice target
+    When the run data is prefetched
+    Then the scenario's caller voice is carried on the prepared data
+
+  # AC19
+  @unit
+  Scenario: A voice agent is refused by the agent-test path
+    Given a voice target on the agent-test path
+    When the run data is prefetched
+    Then it is refused because voice agents are tested by talking to them or by running a scenario
+
+  # AC18
+  @unit
+  Scenario: The enabled ElevenLabs provider row is resolved for a project
+    Given a project whose accessible providers include an enabled ElevenLabs row
+    When the ElevenLabs provider for the project is resolved
+    Then the enabled ElevenLabs row is returned
+
+  # AC18
+  @unit
+  Scenario: A project with no enabled ElevenLabs provider resolves none
+    Given a project whose accessible providers include only disabled or non-ElevenLabs rows
+    When the ElevenLabs provider for the project is resolved
+    Then no provider is returned
+
+  # ---------------------------------------------------------------------------
   # Pure logic (unit)
   # ---------------------------------------------------------------------------
 

@@ -79,7 +79,8 @@ export async function prefetchAgentTestData({
   if (target.type === "voice") {
     return {
       success: false,
-      error: "Voice agents are tested by talking to them or by running a scenario",
+      error:
+        "Voice agents are tested by talking to them or by running a scenario",
     };
   }
 

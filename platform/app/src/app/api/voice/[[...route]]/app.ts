@@ -34,16 +34,25 @@ import {
 } from "~/server/gateway/elevenLabsCredential.service";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { ScenarioRepository } from "~/server/scenarios/scenario.repository";
+import { scenarioRunIdForConversation } from "~/server/scenarios/voice/call-record";
 import { voiceCallMaxSeconds } from "~/server/scenarios/voice/voice-limits";
-import { writeVoiceCallRun } from "~/server/scenarios/voice/voice-run-writer";
+import {
+  VoiceAgentNotFoundError,
+  writeVoiceCallRun,
+} from "~/server/scenarios/voice/voice-run-writer";
 import {
   finishVoiceSession,
   mintVoiceSession,
+  VoiceConversationMismatchError,
   VoiceKeyMissingError,
   VoiceMintFailedError,
   VoiceNameRequiredError,
   type VoiceSessionPorts,
 } from "~/server/scenarios/voice/voice-session.service";
+import {
+  signVoiceSessionToken,
+  verifyVoiceSessionToken,
+} from "~/server/scenarios/voice/voice-session-token";
 import type { VoiceTransportCredential } from "~/server/scenarios/voice/voice-transport.registry";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 
@@ -109,8 +118,11 @@ const ports: VoiceSessionPorts = {
         : getOnPlatformSetId(projectId),
     };
   },
-  audioProxyUrl: ({ conversationId }) =>
-    `/api/voice/session/${encodeURIComponent(conversationId)}/audio`,
+  audioProxyUrl: ({ conversationId, projectId }) =>
+    `/api/voice/session/${encodeURIComponent(
+      conversationId,
+    )}/audio?projectId=${encodeURIComponent(projectId)}`,
+  signSessionToken: signVoiceSessionToken,
   now: () => Date.now(),
   newSessionId: () => nanoid(),
 };
@@ -148,10 +160,11 @@ secured
         projectId: z.string().min(1),
         transport: transportSchema,
         agentId: z.string().trim().min(1).max(128),
+        agentRowId: z.string().min(1).optional(),
       }),
     ),
     async (c) => {
-      const { projectId, transport, agentId } = c.req.valid("json");
+      const { projectId, transport, agentId, agentRowId } = c.req.valid("json");
       const gate = await requireProject(
         c.req.raw,
         projectId,
@@ -164,6 +177,7 @@ secured
           projectId,
           transport,
           agentId,
+          agentRowId,
           maxDurationSeconds: voiceCallMaxSeconds(),
         });
         return c.json(result, 200);
@@ -195,9 +209,9 @@ secured
       "json",
       z.object({
         projectId: z.string().min(1),
-        transport: transportSchema,
-        agentId: z.string().trim().min(1).max(128),
-        agentRowId: z.string().min(1).optional(),
+        // The signed session token replaces the bare id and carries the
+        // project, transport, agent row and vendor agent id the finish trusts.
+        sessionToken: z.string().min(1),
         name: z.string().trim().max(200).optional(),
         conversationId: z.string().trim().max(200).optional(),
         transcript: z
@@ -217,7 +231,6 @@ secured
       }),
     ),
     async (c) => {
-      const sessionId = c.req.param("sessionId");
       const body = c.req.valid("json");
       const gate = await requireProject(
         c.req.raw,
@@ -226,12 +239,41 @@ secured
       );
       if (!gate.ok) return c.json({ error: "Forbidden" }, gate.status);
 
+      // The token must verify, and its project must be the authorised one, or
+      // the finish is refused before anything is read or written.
+      const token = verifyVoiceSessionToken(body.sessionToken, Date.now());
+      if (!token || token.projectId !== body.projectId) {
+        return c.json(
+          {
+            code: "voice_session_invalid",
+            message: "The session is invalid or has expired",
+          },
+          400,
+        );
+      }
+
       try {
-        const result = await finishVoiceSession(ports, { ...body, sessionId });
+        const result = await finishVoiceSession(ports, {
+          token,
+          projectId: body.projectId,
+          name: body.name,
+          conversationId: body.conversationId,
+          transcript: body.transcript,
+          startedAt: body.startedAt,
+          endedAt: body.endedAt,
+          cutAtLimit: body.cutAtLimit,
+          scenarioId: body.scenarioId,
+        });
         return c.json(result, 200);
       } catch (error) {
-        if (error instanceof VoiceNameRequiredError) {
+        if (
+          error instanceof VoiceNameRequiredError ||
+          error instanceof VoiceConversationMismatchError
+        ) {
           return c.json({ code: error.code, message: error.message }, 400);
+        }
+        if (error instanceof VoiceAgentNotFoundError) {
+          return c.json({ code: error.code, message: error.message }, 404);
         }
         throw error;
       }
@@ -250,12 +292,24 @@ export const route = secured
   )
   .get(
     "/session/:conversationId/audio",
+    zValidator(
+      "param",
+      z.object({ conversationId: z.string().min(1).max(200) }),
+    ),
     zValidator("query", z.object({ projectId: z.string().min(1) })),
     async (c) => {
-      const conversationId = c.req.param("conversationId");
+      const { conversationId } = c.req.valid("param");
       const { projectId } = c.req.valid("query");
       const gate = await requireProject(c.req.raw, projectId, "scenarios:view");
       if (!gate.ok) return c.json({ error: "Forbidden" }, gate.status);
+
+      // Only proxy when a run for this conversation exists in the authorised
+      // project — otherwise one project could stream another's recording.
+      const run = await getApp().simulations.runs.getScenarioRunData({
+        projectId,
+        scenarioRunId: scenarioRunIdForConversation(conversationId),
+      });
+      if (!run) return c.json({ error: "Recording unavailable" }, 404);
 
       // Drawer calls only run on ElevenLabs today.
       const credential = await resolveCredential({

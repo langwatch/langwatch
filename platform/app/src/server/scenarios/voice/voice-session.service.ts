@@ -16,6 +16,7 @@ import {
   type CallRecord,
   scenarioRunIdForConversation,
 } from "./call-record";
+import type { VoiceSessionTokenPayload } from "./voice-session-token";
 import {
   type VoiceTransportCredential,
   type VoiceTransportRunner,
@@ -47,6 +48,19 @@ export class VoiceMintFailedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "VoiceMintFailedError";
+  }
+}
+
+/**
+ * The finished conversation ran against a different vendor agent than the
+ * session token was minted for. Reported without writing anything, so one
+ * project cannot pull another's conversation into its runs.
+ */
+export class VoiceConversationMismatchError extends Error {
+  readonly code = "voice_conversation_mismatch" as const;
+  constructor() {
+    super("This conversation does not belong to the minted session");
+    this.name = "VoiceConversationMismatchError";
   }
 }
 
@@ -87,8 +101,11 @@ export interface VoiceSessionPorts {
     projectId: string;
     scenarioId: string;
   }): Promise<{ scenarioSetId: string } | null>;
-  /** Same-origin proxy path the browser plays the recording through. */
-  audioProxyUrl(input: { conversationId: string }): string;
+  /** Same-origin proxy path the browser plays the recording through. Carries
+   *  the project so the proxy can authorise the fetch. */
+  audioProxyUrl(input: { conversationId: string; projectId: string }): string;
+  /** Sign the session claims into the token the browser carries mint→finish. */
+  signSessionToken(payload: VoiceSessionTokenPayload): string;
   now(): number;
   newSessionId(): string;
   registry?: Record<VoiceTransport, VoiceTransportRunner>;
@@ -101,11 +118,16 @@ function runnerFor(
   return (ports.registry ?? voiceTransportRegistry)[transport];
 }
 
+/** Extra grace beyond the call budget before a session token expires: a call
+ *  runs at most the budget, and finish arrives soon after. */
+export const VOICE_SESSION_TOKEN_GRACE_MS = 10 * 60 * 1000;
+
 export interface MintResult {
   transport: VoiceTransport;
-  /** Our correlation id for the call until the provider assigns one. Also the
-   *  conversation id the browser reports back if the provider gives it none. */
-  sessionId: string;
+  /** The signed session token binding this call to its project and agent. The
+   *  browser carries it back to finish; it replaces the bare id and never
+   *  carries the provider key. */
+  sessionToken: string;
   maxDurationSeconds: number;
   connect: { signedUrl: string };
 }
@@ -122,11 +144,15 @@ export async function mintVoiceSession(
     projectId,
     transport,
     agentId,
+    agentRowId,
     maxDurationSeconds,
   }: {
     projectId: string;
     transport: VoiceTransport;
+    /** The vendor agent id the session is minted for. */
     agentId: string;
+    /** The saved agent row id, when the drawer already has one. */
+    agentRowId?: string;
     maxDurationSeconds: number;
   },
 ): Promise<MintResult> {
@@ -143,9 +169,20 @@ export async function mintVoiceSession(
     );
   }
 
+  // The token binds the call to its project and agent for the whole of its
+  // life plus a grace window; finish rejects anything outside these claims.
+  const sessionToken = ports.signSessionToken({
+    sessionId: ports.newSessionId(),
+    projectId,
+    agentId: agentRowId ?? null,
+    agentExternalId: agentId,
+    transport,
+    exp: ports.now() + maxDurationSeconds * 1000 + VOICE_SESSION_TOKEN_GRACE_MS,
+  });
+
   return {
     transport,
-    sessionId: ports.newSessionId(),
+    sessionToken,
     maxDurationSeconds,
     connect,
   };
@@ -160,9 +197,92 @@ export interface FinishResult {
    *  the panel shows the fetch-failed notice (AC15). */
   fetchFailed: boolean;
   hasAudio: boolean;
+  /** The same-origin proxy URL the panel plays the recording through, when the
+   *  provider returned audio. Absent otherwise, and the panel renders no
+   *  player. */
+  audioUrl?: string;
   /** The set the run landed in, so the panel links to it. Set only for a
    *  "Call it myself" run written under a scenario. */
   scenarioSetId?: string;
+}
+
+/**
+ * Read the provider's record for a conversation, or fall back. Returns the
+ * record (null when the provider has none yet or there is no key) and whether
+ * the fetch itself failed (as opposed to "not ready"), so the caller can mark
+ * the fetch-failed notice (AC15).
+ */
+async function fetchProviderRecord(
+  ports: VoiceSessionPorts,
+  {
+    transport,
+    conversationId,
+    projectId,
+  }: { transport: VoiceTransport; conversationId: string; projectId: string },
+): Promise<{ record: CallRecord | null; fetchFailed: boolean }> {
+  const credential = await ports.resolveCredential({ projectId, transport });
+  if (!credential) return { record: null, fetchFailed: false };
+  try {
+    const record = await runnerFor(ports, transport).fetchCallRecord({
+      conversationId,
+      credential,
+      audioProxyUrl: ports.audioProxyUrl({ conversationId, projectId }),
+    });
+    return { record, fetchFailed: false };
+  } catch {
+    return { record: null, fetchFailed: true };
+  }
+}
+
+/**
+ * Resolve the agent row the run is written under: reuse the one the token
+ * carries, else create it from the form values. A create needs a name; without
+ * one the panel collects it and retries (throws {@link VoiceNameRequiredError}).
+ */
+async function resolveAgentRow(
+  ports: VoiceSessionPorts,
+  {
+    token,
+    projectId,
+    transport,
+    name,
+  }: {
+    token: VoiceSessionTokenPayload;
+    projectId: string;
+    transport: VoiceTransport;
+    name?: string;
+  },
+): Promise<{ agentRowId: string; agentDisplayName: string }> {
+  const trimmedName = name?.trim() ?? "";
+  if (token.agentId) {
+    return {
+      agentRowId: token.agentId,
+      agentDisplayName: trimmedName || token.agentExternalId,
+    };
+  }
+  if (!trimmedName) throw new VoiceNameRequiredError();
+  const created = await ports.createVoiceAgent({
+    projectId,
+    name: trimmedName,
+    transport,
+    agentId: token.agentExternalId,
+  });
+  return { agentRowId: created.id, agentDisplayName: trimmedName };
+}
+
+/**
+ * Resolve the scenario a "Call it myself" run is written under and the set it
+ * shares with that scenario's simulated runs (AC23). Undefined for a drawer
+ * call, or when the named scenario is gone.
+ */
+async function resolveScenarioContext(
+  ports: VoiceSessionPorts,
+  { projectId, scenarioId }: { projectId: string; scenarioId?: string },
+): Promise<{ scenarioId: string; scenarioSetId: string } | undefined> {
+  if (!scenarioId) return undefined;
+  const scenario = await ports.resolveScenarioSet?.({ projectId, scenarioId });
+  if (!scenario) return undefined;
+  return { scenarioId, scenarioSetId: scenario.scenarioSetId };
 }
 
 /**
@@ -177,37 +297,30 @@ export interface FinishResult {
 export async function finishVoiceSession(
   ports: VoiceSessionPorts,
   input: {
+    /** The verified session token: the project, transport, agent row and
+     *  vendor agent id are read from here, never from the request body. */
+    token: VoiceSessionTokenPayload;
     projectId: string;
-    transport: VoiceTransport;
-    agentId: string;
-    agentRowId?: string;
     name?: string;
     transcript: BrowserTranscriptTurn[];
     startedAt: number;
     endedAt: number;
     cutAtLimit: boolean;
     conversationId?: string;
-    sessionId: string;
     /** Set for a "Call it myself" run: the scenario the call is scored under
      *  (AC23). Absent for a drawer call. */
     scenarioId?: string;
   },
 ): Promise<FinishResult> {
-  const conversationId = input.conversationId?.trim() || input.sessionId;
+  const { token } = input;
+  const transport = token.transport;
+  const conversationId = input.conversationId?.trim() || token.sessionId;
   const scenarioRunId = scenarioRunIdForConversation(conversationId);
 
-  // A scenario call resolves the set its scenario's runs live in, so the run
-  // lands beside that scenario's simulated runs and the panel can link to it.
-  const scenario = input.scenarioId
-    ? await ports.resolveScenarioSet?.({
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-      })
-    : null;
-  const scenarioContext =
-    input.scenarioId && scenario
-      ? { scenarioId: input.scenarioId, scenarioSetId: scenario.scenarioSetId }
-      : undefined;
+  const scenarioContext = await resolveScenarioContext(ports, {
+    projectId: input.projectId,
+    scenarioId: input.scenarioId,
+  });
 
   const existing = await ports.findExistingRun({
     projectId: input.projectId,
@@ -216,65 +329,49 @@ export async function finishVoiceSession(
   if (existing) {
     return {
       runId: scenarioRunId,
-      agentId: input.agentRowId ?? existing.agentId ?? "",
+      agentId: token.agentId ?? existing.agentId ?? "",
       source: "provider",
       fetchFailed: false,
       hasAudio: false,
-      ...(scenarioContext
-        ? { scenarioSetId: scenarioContext.scenarioSetId }
-        : {}),
+      scenarioSetId: scenarioContext?.scenarioSetId,
     };
   }
 
-  // Resolve the agent row: reuse the one the drawer saved, else create it now.
-  // A create needs a name; without one the panel collects it and retries.
-  let agentRowId = input.agentRowId;
-  let agentDisplayName = input.name?.trim() ?? "";
-  if (!agentRowId) {
-    if (!agentDisplayName) throw new VoiceNameRequiredError();
-    const created = await ports.createVoiceAgent({
-      projectId: input.projectId,
-      name: agentDisplayName,
-      transport: input.transport,
-      agentId: input.agentId,
-    });
-    agentRowId = created.id;
-  }
-  if (!agentDisplayName) agentDisplayName = input.agentId;
-
   // Prefer the provider's record; fall back to the live transcript when it is
-  // not ready (null) or the fetch fails (throws).
-  const runner = runnerFor(ports, input.transport);
-  const credential = await ports.resolveCredential({
-    projectId: input.projectId,
-    transport: input.transport,
-  });
-  let record: CallRecord | null = null;
-  let fetchFailed = false;
-  if (credential) {
-    try {
-      record = await runner.fetchCallRecord({
-        conversationId,
-        credential,
-        audioProxyUrl: ports.audioProxyUrl({ conversationId }),
-      });
-    } catch {
-      fetchFailed = true;
-    }
+  // not ready or the fetch fails. Fetched BEFORE the agent row is created so a
+  // mismatched conversation is rejected without leaving an orphan agent behind.
+  const { record: providerRecord, fetchFailed } = await fetchProviderRecord(
+    ports,
+    { transport, conversationId, projectId: input.projectId },
+  );
+
+  // A provider record must have run against the very agent the token was minted
+  // for. Anything else — including a record with no agent id at all — is a
+  // conversation this session has no claim to, and nothing is written (AC13).
+  if (
+    providerRecord &&
+    providerRecord.agentExternalId !== token.agentExternalId
+  ) {
+    throw new VoiceConversationMismatchError();
   }
 
-  if (record) {
-    record.cutAtLimit = input.cutAtLimit;
-  } else {
-    record = browserTranscriptToCallRecord({
-      conversationId,
-      transport: input.transport,
-      transcript: input.transcript,
-      startedAt: input.startedAt,
-      endedAt: input.endedAt,
-      cutAtLimit: input.cutAtLimit,
-    });
-  }
+  const { agentRowId, agentDisplayName } = await resolveAgentRow(ports, {
+    token,
+    projectId: input.projectId,
+    transport,
+    name: input.name,
+  });
+
+  const record = providerRecord
+    ? { ...providerRecord, cutAtLimit: input.cutAtLimit }
+    : browserTranscriptToCallRecord({
+        conversationId,
+        transport,
+        transcript: input.transcript,
+        startedAt: input.startedAt,
+        endedAt: input.endedAt,
+        cutAtLimit: input.cutAtLimit,
+      });
 
   await ports.writeCallRun({
     projectId: input.projectId,
@@ -291,8 +388,7 @@ export async function finishVoiceSession(
     source: record.source,
     fetchFailed,
     hasAudio: Boolean(record.audioUrl),
-    ...(scenarioContext
-      ? { scenarioSetId: scenarioContext.scenarioSetId }
-      : {}),
+    audioUrl: record.audioUrl,
+    scenarioSetId: scenarioContext?.scenarioSetId,
   };
 }

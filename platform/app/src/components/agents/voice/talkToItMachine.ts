@@ -54,6 +54,8 @@ export type TalkState =
       agentId: string;
       transcript: VoiceTurn[];
       hasAudio: boolean;
+      /** Same-origin proxy URL to play the recording, when there is one. */
+      audioUrl?: string;
       fetchFailed: boolean;
       cutAtLimit: boolean;
     }
@@ -77,6 +79,7 @@ export type TalkEvent =
       runId: string;
       agentId: string;
       hasAudio: boolean;
+      audioUrl?: string;
       fetchFailed: boolean;
     }
   | { type: "NAME_REQUIRED" }
@@ -154,6 +157,7 @@ export function talkReducer(state: TalkState, event: TalkEvent): TalkState {
         runId: event.runId,
         agentId: event.agentId,
         hasAudio: event.hasAudio,
+        audioUrl: event.audioUrl,
         fetchFailed: event.fetchFailed,
         transcript: transcriptOf(state),
         cutAtLimit: "cutAtLimit" in state ? state.cutAtLimit : false,

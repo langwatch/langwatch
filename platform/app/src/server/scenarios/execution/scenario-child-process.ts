@@ -32,6 +32,7 @@ import {
   DEFAULT_CALLER_VOICE,
 } from "../voice/caller-voice.config";
 import { buildCallerVoiceSimulatorConfig } from "../voice/caller-voice.simulator";
+import { voiceTransportRegistry } from "../voice/voice-transport.registry";
 import { buildAgentTestRun } from "./agent-test-script";
 import { createChildProcessLogger } from "./child-logger";
 import { selectRoleModelParams } from "./job-model-params";
@@ -178,9 +179,11 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
           onLimit: () => {
             logger.warn("voice call reached the max duration; ending the call");
             // End the transport gracefully so the drained transcript is judged.
-            void (adapter as { disconnect?: () => Promise<void> })
-              .disconnect?.()
-              ?.catch(() => {
+            // "Hang up now" is on the runner contract, not cast out of the
+            // adapter here.
+            void voiceTransportRegistry[adapterData.voiceTarget.transport]
+              .endCall(adapter)
+              .catch(() => {
                 // Cleanup failure must not mask the run result.
               });
           },

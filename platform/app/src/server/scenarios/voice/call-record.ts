@@ -28,6 +28,11 @@ export type CallRecordSource = "provider" | "browser";
 export interface CallRecord {
   conversationId: string;
   transport: VoiceTransport;
+  /** The vendor agent id the finished conversation actually ran against, when
+   *  the provider record exposes it. Finish rejects a record whose id differs
+   *  from the session token's, so one project cannot ingest another's call. A
+   *  browser-fallback record carries none. */
+  agentExternalId?: string;
   startedAt: number;
   endedAt: number;
   durationMs: number;

@@ -18,6 +18,7 @@ import {
   useForm,
 } from "react-hook-form";
 import { z } from "zod";
+import { Slider } from "~/components/ui/slider";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
 import {
   CALLER_VOICE_EFFECTS,
@@ -280,17 +281,26 @@ function CallerVoiceSection({
                   <Text fontSize="13px" fontWeight="medium">
                     Interrupts: {percent}%
                   </Text>
-                  <Input
-                    type="range"
+                  <Slider.Root
+                    size="sm"
                     min={0}
                     max={100}
                     step={5}
-                    aria-label="Interrupts"
-                    value={percent}
-                    onChange={(event) =>
-                      field.onChange(Number(event.target.value) / 100)
+                    aria-label={["Interrupts"]}
+                    value={[percent]}
+                    onValueChange={(details) =>
+                      field.onChange((details.value[0] ?? 0) / 100)
                     }
-                  />
+                  >
+                    <Slider.Control>
+                      <Slider.Track>
+                        <Slider.Range />
+                      </Slider.Track>
+                      <Slider.Thumb index={0}>
+                        <Slider.HiddenInput />
+                      </Slider.Thumb>
+                    </Slider.Control>
+                  </Slider.Root>
                 </Field.Root>
               );
             }}

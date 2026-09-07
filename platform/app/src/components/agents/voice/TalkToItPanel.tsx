@@ -37,7 +37,7 @@ const MODEL_PROVIDERS_ROUTE = "/settings/model-providers";
 
 interface MintResponse {
   transport: VoiceTransport;
-  sessionId: string;
+  sessionToken: string;
   maxDurationSeconds: number;
   connect: { signedUrl: string };
 }
@@ -80,6 +80,8 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
   const sessionRef = useRef<VoiceCallSession | null>(null);
   const startedAtRef = useRef<number>(0);
   const conversationIdRef = useRef<string | undefined>(undefined);
+  // The signed session token from mint, carried back verbatim to finish.
+  const sessionTokenRef = useRef<string | undefined>(undefined);
   const maxSecondsRef = useRef<number>(300);
   // The set the finished run landed in, learned from the finish response, so a
   // scenario call links to the scenario's set rather than the voice-call set.
@@ -102,9 +104,7 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
         "transcript" in state ? state.transcript : ([] as never[]);
       const body = {
         projectId: props.projectId,
-        transport: props.transport,
-        agentId: props.agentId,
-        agentRowId: createdRowIdRef.current,
+        sessionToken: sessionTokenRef.current ?? "",
         name: nameOverride ?? props.name,
         conversationId: conversationIdRef.current,
         transcript,
@@ -153,6 +153,7 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
         runId: String(data.runId ?? ""),
         agentId: String(data.agentId ?? ""),
         hasAudio: Boolean(data.hasAudio),
+        audioUrl: typeof data.audioUrl === "string" ? data.audioUrl : undefined,
         fetchFailed: Boolean(data.fetchFailed),
       });
     },
@@ -196,6 +197,9 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
           projectId: props.projectId,
           transport: props.transport,
           agentId: props.agentId,
+          // Undefined is dropped by JSON.stringify, so an unsaved agent sends
+          // no row id.
+          agentRowId: createdRowIdRef.current,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as Record<
@@ -222,7 +226,7 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
     }
 
     maxSecondsRef.current = mint.maxDurationSeconds;
-    conversationIdRef.current = mint.sessionId;
+    sessionTokenRef.current = mint.sessionToken;
     startedAtRef.current = Date.now();
 
     try {
@@ -445,10 +449,10 @@ function DoneView({
           </Text>
         ))}
       </VStack>
-      {state.hasAudio && runHref && (
+      {state.audioUrl && (
         <Box data-testid="talk-play">
           {/* biome-ignore lint/a11y/useMediaCaption: recording playback, no caption track */}
-          <audio controls preload="none" />
+          <audio controls preload="none" src={state.audioUrl} />
         </Box>
       )}
       {runHref && (

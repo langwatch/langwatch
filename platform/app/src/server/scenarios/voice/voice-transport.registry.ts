@@ -52,6 +52,13 @@ export interface VoiceTransportRunner {
     credential: VoiceTransportCredential;
     audioProxyUrl: string;
   }): Promise<CallRecord | null>;
+  /**
+   * End the live call now. Called when the whole-call limit elapses, so the
+   * drained transcript is still judged (AC28). The "hang up" verb lives on the
+   * runner contract rather than being cast out of the adapter at the call site,
+   * so a later transport ends its call its own way.
+   */
+  endCall(adapter: AgentAdapter): Promise<void>;
   /** Customer-facing failure when the project has no key for this transport. */
   readonly missingKeyMessage: string;
 }
