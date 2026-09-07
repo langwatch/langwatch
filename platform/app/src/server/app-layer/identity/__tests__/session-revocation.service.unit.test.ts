@@ -324,6 +324,7 @@ describe("given a person changing their password from one of several devices", (
 
 describe("given a person signed in through two different methods", () => {
   describe("when the sessions one method minted are revoked", () => {
+    /** @scenario "Ending the sessions one sign-in method minted leaves the others alone" */
     it("ends that method's sessions and leaves the others listed in the cache", async () => {
       const stores = revocationOver({
         sessions: [
@@ -382,6 +383,7 @@ describe("given a person signed in through two different methods", () => {
   });
 
   describe("when the sessions one method minted are revoked and the identifier is somebody else's", () => {
+    /** @scenario "Ending sessions for a sign-in method that is not yours ends nothing" */
     it("ends nothing", async () => {
       const stores = revocationOver({
         sessions: [

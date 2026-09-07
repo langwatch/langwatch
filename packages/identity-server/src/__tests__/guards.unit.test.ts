@@ -221,6 +221,7 @@ describe("attachIdentifier guard", () => {
 
   describe("when the heads already carry the identifier", () => {
     /** @scenario "A fact the heads already carry is not stated again" */
+    /** @scenario "Adding an address already on the account changes nothing" */
     it("states nothing, whatever the command id", async () => {
       const heads = new InMemoryHeads();
       const guards = new IdentityGuards(heads, users, new InMemoryReservations());
