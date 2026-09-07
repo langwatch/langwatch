@@ -425,6 +425,10 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/table-display.feature",
   "specs/experiments-v3/undo-redo.feature",
   "specs/features/agent-cli.feature",
+  // Issue #7947's spec ships ahead of the implementation, every scenario
+  // @unimplemented on purpose: the coder PR(s) that build each surface bind
+  // their own scenarios. Remove this entry with the first binding.
+  "specs/features/agents/voice-agents-v1.feature",
   "specs/features/analytics-cli.feature",
   "specs/features/annotation-cli.feature",
   "specs/features/dashboard-cli.feature",
