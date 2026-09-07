@@ -171,6 +171,9 @@ export function CostFilterBar({
           </MenuItem>
         ))}
       </FilterChip>
+      <Text width="full" fontSize="xs" color="fg.muted">
+        Department filters only the Cost by department chart.
+      </Text>
     </HStack>
   );
 }

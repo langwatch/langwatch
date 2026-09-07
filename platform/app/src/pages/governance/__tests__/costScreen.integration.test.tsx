@@ -116,6 +116,7 @@ vi.mock("~/utils/api", () => {
   };
 });
 
+import BilledPage from "../billed";
 import CostsPage from "../costs";
 
 /** Every string a reader — eyes or screen reader — could get from a subtree. */
@@ -185,6 +186,20 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("the governance cost screen", () => {
+  describe("given an admin with Costs enabled", () => {
+    /** @scenario "The unfinished Billed address stays unavailable when Costs is enabled" */
+    it("shows not found at the unfinished Billed address", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <BilledPage />
+        </ChakraProvider>,
+      );
+      expect(screen.getByText("this page does not exist")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "Billed" }),
+      ).not.toBeInTheDocument();
+    });
+  });
   describe("given a permitted viewer and both lanes reporting", () => {
     /** @scenario "Each lane renders its own labeled total" */
     it("renders each lane's own amount under its own label", () => {

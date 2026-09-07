@@ -364,10 +364,9 @@ describe("the product sidebar", () => {
       expect(screen.getByText("Inventory")).toBeInTheDocument();
       expect(screen.getByText("Anomaly Rules")).toBeInTheDocument();
       expect(screen.getByText("People")).toBeInTheDocument();
-      // The flag mock reports every flag enabled, so the billed-cost
-      // placeholders are visible here too.
+      // Enabling Costs must not expose the unfinished Billed destination.
       expect(screen.getByText("Costs")).toBeInTheDocument();
-      expect(screen.getByText("Billed")).toBeInTheDocument();
+      expect(screen.queryByText("Billed")).not.toBeInTheDocument();
       // Tool Tiles folded into Inventory's Catalog tab.
       expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
     });

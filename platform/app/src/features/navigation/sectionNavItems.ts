@@ -116,13 +116,6 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     featureFlag: "release_ui_governance_billed_cost_enabled",
   },
   {
-    label: "Billed",
-    href: "/governance/billed",
-    includePath: "/governance/billed",
-    icon: ReceiptText,
-    featureFlag: "release_ui_governance_billed_cost_enabled",
-  },
-  {
     label: "Inventory",
     href: "/governance/inventory",
     includePath: "/governance/inventory",
