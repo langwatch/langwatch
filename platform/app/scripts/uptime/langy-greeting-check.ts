@@ -33,6 +33,8 @@ export const LANGY_GREETING_WAIT_SECONDS = 90;
 
 export const LANGY_CONVERSATIONS_PATH = "/api/langy/conversations";
 
+export const REDACTED_SECRET = "<redacted>";
+
 export const GREETING_FAILURE_REASONS = [
   "not_settled",
   "turn_failed",
@@ -310,8 +312,6 @@ export async function runLangyGreetingCheck(input: {
     durationMs,
   };
 }
-
-export const REDACTED_SECRET = "<redacted>";
 
 /** An empty secret would split between every character; there is nothing to hide. */
 function scrubSecret(text: string, secret: string): string {

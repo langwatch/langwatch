@@ -19,7 +19,7 @@
  */
 
 import { readFileSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const BETTERSTACK_API_BASE = "https://uptime.betterstack.com/api/v2";
@@ -291,11 +291,39 @@ async function main(): Promise<void> {
   }
 }
 
-const invokedDirectly =
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
+/**
+ * A plain compare of argv[1] against import.meta.url is fail-open through a
+ * symlink (a .bin shim, a worktree linked into place): the guard declines to
+ * run and the process exits 0 having provisioned nothing. Both sides are
+ * resolved through realpathSync; a path that does not exist falls back to its
+ * lexical form so it stays a mismatch rather than a crash.
+ */
+export function isEntryModule({
+  invokedPath,
+  modulePath,
+}: {
+  invokedPath: string | undefined;
+  modulePath: string;
+}): boolean {
+  if (invokedPath === undefined) return false;
+  return realPathOrResolved(invokedPath) === realPathOrResolved(modulePath);
+}
 
-if (invokedDirectly) {
+function realPathOrResolved(p: string): string {
+  const abs = resolve(p);
+  try {
+    return realpathSync(abs);
+  } catch {
+    return abs;
+  }
+}
+
+if (
+  isEntryModule({
+    invokedPath: process.argv[1],
+    modulePath: fileURLToPath(import.meta.url),
+  })
+) {
   main().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`upsert-langy-greeting-monitor: ${message}`);
