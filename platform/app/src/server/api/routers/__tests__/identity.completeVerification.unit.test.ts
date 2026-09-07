@@ -9,7 +9,10 @@
  *
  * Corresponds to specs/identity/identifier-model.feature.
  */
-import { IdentityVerificationInvalidError } from "@langwatch/identity";
+import {
+  IdentityDetachStrandsUserError,
+  IdentityVerificationInvalidError,
+} from "@langwatch/identity";
 import type { TRPCError } from "@trpc/server";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,8 +20,9 @@ import type * as IdentityRuntime from "~/server/app-layer/identity/runtime";
 import { createInnerTRPCContext } from "../../trpc";
 import { identityRouter } from "../identity";
 
-const { mockComplete } = vi.hoisted(() => ({
+const { mockComplete, mockRemoveIdentifier } = vi.hoisted(() => ({
   mockComplete: vi.fn<(...args: unknown[]) => Promise<void>>(),
+  mockRemoveIdentifier: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }));
 
 /**
@@ -99,7 +103,7 @@ vi.mock(
     // above is exhaustive on purpose: a new runtime export has to be looked
     // at here, and this suite reaches none of them.
     BACKUP_CODE_COUNT: 0,
-    accountIdentifiers: () => ({}),
+    accountIdentifiers: () => ({ removeIdentifier: mockRemoveIdentifier }),
     mfaCeremonies: () => ({}),
     mfaEnrollments: () => ({}),
     organizationMfa: () => ({}),
@@ -213,6 +217,31 @@ describe("identity.completeVerification", () => {
       await expect(caller.completeVerification(input)).rejects.toMatchObject({
         message: "identity_verification_invalid",
       });
+    });
+  });
+});
+
+describe("identity.removeIdentifier", () => {
+  beforeEach(() => {
+    mockRemoveIdentifier.mockReset();
+    mockRemoveIdentifier.mockRejectedValue(
+      new IdentityDetachStrandsUserError("the remaining way in is required"),
+    );
+  });
+
+  /** @scenario "The detach route refuses the last way in whatever the screen drew" */
+  it("asks the guard-backed service again and preserves its refusal", async () => {
+    const caller = callerFor({
+      user: { id: "user_sam", email: "sam@acme.com" },
+    });
+
+    await expect(
+      caller.removeIdentifier({ identifierId: "idf_last" }),
+    ).rejects.toMatchObject({ message: "identity_detach_strands_user" });
+
+    expect(mockRemoveIdentifier).toHaveBeenCalledWith({
+      userId: "user_sam",
+      identifierId: "idf_last",
     });
   });
 });

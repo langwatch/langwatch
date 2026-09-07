@@ -22,6 +22,7 @@ describe("project.regenerateApiKey integration", () => {
   const testNamespace = `regen-api-key-${nanoid(8)}`;
   let projectId: string;
   let siblingProjectId: string;
+  let foreignProjectId: string;
   let caller: ReturnType<typeof appRouter.createCaller>;
   let memberCaller: ReturnType<typeof appRouter.createCaller>;
   let projectAdminCaller: ReturnType<typeof appRouter.createCaller>;
@@ -76,6 +77,31 @@ describe("project.regenerateApiKey integration", () => {
       },
     });
     siblingProjectId = siblingProject.id;
+
+    const foreignOrganization = await prisma.organization.create({
+      data: {
+        name: "Foreign Organization",
+        slug: `--test-org-${testNamespace}-foreign`,
+      },
+    });
+    const foreignTeam = await prisma.team.create({
+      data: {
+        name: "Foreign Team",
+        slug: `--test-team-${testNamespace}-foreign`,
+        organizationId: foreignOrganization.id,
+      },
+    });
+    const foreignProject = await prisma.project.create({
+      data: {
+        name: "Foreign Project",
+        slug: `--test-project-${testNamespace}-foreign`,
+        apiKey: `sk-lw-foreign-${nanoid()}`,
+        teamId: foreignTeam.id,
+        language: "en",
+        framework: "test",
+      },
+    });
+    foreignProjectId = foreignProject.id;
 
     const user = await prisma.user.create({
       data: {
@@ -215,7 +241,7 @@ describe("project.regenerateApiKey integration", () => {
       .catch(() => {});
     await prisma.organization
       .deleteMany({
-        where: { slug: `--test-org-${testNamespace}` },
+        where: { slug: { startsWith: `--test-org-${testNamespace}` } },
       })
       .catch(() => {});
     await prisma.user
@@ -271,6 +297,15 @@ describe("project.regenerateApiKey integration", () => {
           projectId: siblingProjectId,
         }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+
+    /** @scenario "A project in another organization is not disclosed" */
+    it("answers a foreign project like an absent one and never returns its key", async () => {
+      const attempt = caller.project.getProjectAPIKey({
+        projectId: foreignProjectId,
+      });
+
+      await expect(attempt).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
   });
 
