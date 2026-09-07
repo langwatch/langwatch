@@ -1149,6 +1149,22 @@ export function partProse(part: Record<string, unknown>): string | null {
   return typeof said === "string" && said.trim() !== "" ? said : null;
 }
 
+/**
+ * What one settled tool call returned.
+ *
+ * A call that failed stores its reason in `errorText` and no output at all, so
+ * reading the output alone hands the judge an empty string where the reason
+ * for the failure was.
+ */
+export function toolOutputText(part: Record<string, unknown>): string {
+  if (part.state === "output-error" && typeof part.errorText === "string") {
+    return part.errorText;
+  }
+  return typeof part.output === "string"
+    ? part.output
+    : JSON.stringify(part.output ?? "");
+}
+
 /** Whether one stored part is a tool call rather than something Langy wrote. */
 export function isToolCallPart(part: Record<string, unknown>): boolean {
   return (
@@ -1159,12 +1175,23 @@ export function isToolCallPart(part: Record<string, unknown>): boolean {
   );
 }
 
-/** Everything a stored message says, in the order the panel draws it. */
+/**
+ * Everything a stored message says, in the order the panel draws it.
+ *
+ * A turn that ends on a `say` call is folded into a reply carrying that same
+ * line, so the last line arrives twice. It is one line, and a judge reading it
+ * twice grades a turn that repeated itself.
+ */
 export function storedProse(parts: Array<Record<string, unknown>>): string {
-  return parts
-    .map((part) => partProse(part))
-    .filter((text): text is string => text !== null)
-    .join("\n");
+  const said: string[] = [];
+  for (const part of parts) {
+    const text = partProse(part);
+    if (text === null || text.trim() === said[said.length - 1]?.trim()) {
+      continue;
+    }
+    said.push(text);
+  }
+  return said.join("\n");
 }
 
 /**
@@ -1551,10 +1578,7 @@ export function watchLangyConversation({
                 part.state === "output-error"
                   ? ("error-text" as const)
                   : ("text" as const),
-              value:
-                typeof part.output === "string"
-                  ? part.output
-                  : JSON.stringify(part.output ?? ""),
+              value: toolOutputText(part),
             },
           })),
         });
@@ -1569,7 +1593,10 @@ export function watchLangyConversation({
         // A passage after a call opens the next stretch of work, so the calls
         // already gathered close here and keep their place in front of it.
         if (batch.length > 0) flush();
-        narration.push(said);
+        // The reply a turn folds down to repeats the line it ended on.
+        if (said.trim() !== narration[narration.length - 1]?.trim()) {
+          narration.push(said);
+        }
         endedOnText = true;
         continue;
       }
