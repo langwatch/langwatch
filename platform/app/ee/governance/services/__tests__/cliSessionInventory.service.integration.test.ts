@@ -285,33 +285,35 @@ describe("CliSessionInventoryService with the keys a session owns", () => {
   });
 
   describe("given two people in the same organization, each signed in", () => {
-    /** @scenario "User sees only their own credentials on the devices tab (never other users')" */
-    it("lists only the caller's session, carrying the login key its ingest keys hang off", async () => {
-      const mine = await openSession({
-        hostname: "mine",
-        sessionStartedAtMs: Date.now() - 400,
-      });
-      const theirs = await openSession({
-        hostname: "theirs",
-        sessionStartedAtMs: Date.now() - 300,
-        userId: OTHER_USER_ID,
-      });
+    describe("when they list their sessions", () => {
+      /** @scenario "User sees only their own credentials on the devices tab (never other users')" */
+      it("lists only the caller's session, carrying the login key its ingest keys hang off", async () => {
+        const mine = await openSession({
+          hostname: "mine",
+          sessionStartedAtMs: Date.now() - 400,
+        });
+        const theirs = await openSession({
+          hostname: "theirs",
+          sessionStartedAtMs: Date.now() - 300,
+          userId: OTHER_USER_ID,
+        });
 
-      const listed = await service.listForUser({ userId: USER_ID });
+        const listed = await service.listForUser({ userId: USER_ID });
 
-      expect(listed.map((session) => session.cliApiKeyId)).toEqual([
-        mine.loginKeyId,
-      ]);
-      expect(
-        listed.some((session) => session.cliApiKeyId === theirs.loginKeyId),
-      ).toBe(false);
+        expect(listed.map((session) => session.cliApiKeyId)).toEqual([
+          mine.loginKeyId,
+        ]);
+        expect(
+          listed.some((session) => session.cliApiKeyId === theirs.loginKeyId),
+        ).toBe(false);
 
-      const theirListing = await service.listForUser({
-        userId: OTHER_USER_ID,
+        const theirListing = await service.listForUser({
+          userId: OTHER_USER_ID,
+        });
+        expect(theirListing.map((session) => session.cliApiKeyId)).toEqual([
+          theirs.loginKeyId,
+        ]);
       });
-      expect(theirListing.map((session) => session.cliApiKeyId)).toEqual([
-        theirs.loginKeyId,
-      ]);
     });
   });
 });

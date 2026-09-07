@@ -606,6 +606,42 @@ export class CliLoginKeyService {
       projectIds: projects.map((project) => project.id).sort(),
     };
   }
+
+  /**
+   * The organization's ceiling on one session, how old that session is, and
+   * whether the two have parted ways.
+   *
+   * `sessionAnchorMs` is when the session began, which the refresh path
+   * carries across every rotation. A ceiling of zero days is no ceiling at
+   * all, which nothing can exceed.
+   */
+  async sessionCeiling({
+    organizationId,
+    sessionAnchorMs,
+    now = Date.now(),
+  }: {
+    organizationId: string;
+    sessionAnchorMs: number;
+    now?: number;
+  }): Promise<{
+    maxDurationDays: number;
+    sessionAgeMs: number;
+    exceeded: boolean;
+  }> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { maxSessionDurationDays: true },
+    });
+    const maxDurationDays = org?.maxSessionDurationDays ?? 0;
+    const sessionAgeMs = now - sessionAnchorMs;
+    return {
+      maxDurationDays,
+      sessionAgeMs,
+      exceeded:
+        maxDurationDays > 0 &&
+        sessionAgeMs > maxDurationDays * 24 * 60 * 60 * 1000,
+    };
+  }
 }
 
 /**

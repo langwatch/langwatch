@@ -153,6 +153,43 @@ describe("IngestionKeyService", () => {
       });
     });
 
+    describe("given a login key revoked while the mint was in flight", () => {
+      /** @scenario "A key minted as its session is being retired does not outlive it" */
+      it("retires the key it just wrote and answers signed out", async () => {
+        // Live when the mint checks, revoked by the time the row exists: the
+        // cascade revoked the parent and listed its children in between.
+        apiKeyRepo.findByIdInOrg
+          .mockResolvedValueOnce(loginKey())
+          .mockResolvedValueOnce(loginKey({ revoked: true }));
+
+        await expect(
+          service.mint({
+            userId: USER,
+            organizationId: ORG,
+            sourceType: "claude_code",
+            parentApiKeyId: LOGIN_KEY,
+          }),
+        ).rejects.toBeInstanceOf(IngestionKeySessionRevokedError);
+
+        expect(apiKeys.create).toHaveBeenCalledTimes(1);
+        expect(apiKeys.revoke).toHaveBeenCalledWith(
+          expect.objectContaining({ id: "ak_new", cause: "session" }),
+        );
+      });
+
+      it("leaves a key alone when the session is still live after the write", async () => {
+        const issued = await service.mint({
+          userId: USER,
+          organizationId: ORG,
+          sourceType: "claude_code",
+          parentApiKeyId: LOGIN_KEY,
+        });
+
+        expect(issued.apiKeyId).toBe("ak_new");
+        expect(apiKeys.revoke).not.toHaveBeenCalled();
+      });
+    });
+
     describe("given a CLI session whose login key was revoked", () => {
       /** @scenario "A mint from a session whose login key is revoked is refused as signed out" */
       it("refuses as signed out and mints nothing", async () => {

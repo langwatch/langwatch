@@ -10884,7 +10884,9 @@ Three consequences:
 
 - **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `ik-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
 - **`source_type` selects the shaping**: the mint body's `source_type` records which upstream tool the key ingests for, so the gateway can apply the matching ingestion-template OTTL transform when traces arrive on that key. A key minted for an org-authored template carries that template's id.
-- **A CLI key follows its session**: a key the CLI mints stores the session's login key as `parentApiKeyId`. Logout, a devices-tab revoke, a re-login from the same device and session expiry all revoke that login key, and every key parented to it goes with it under cause `session`, `expired` or `offboarded`. A mint from a revoked session answers 401. `install` and the MCP mint accept only source types a published template names; a tool the CLI wraps answers `ingestion_key_source_not_allowed`.
+- **A personal CLI key follows its session**: a personal key the CLI mints stores the session's login key as `parentApiKeyId`. Logout, a devices-tab revoke, a re-login from the same device and session expiry all revoke that login key, and every key parented to it goes with it under cause `session`, `expired` or `offboarded`. A mint from a revoked session answers 401.
+- **A project CLI key does not**: a key minted into a named team project carries no parent and outlives the session that asked for it.
+- **Only the CLI mints for a tool it wraps**: `install` and the MCP mint accept only source types a published template names, and a wrapped tool answers `ingestion_key_source_not_allowed`.
 
 The Zod schemas backing each request and response body are the same schemas the corresponding service-layer function consumes. The OpenAPI generator (`describeRoute` + `hono-openapi`) reads them directly, so the spec and the runtime are guaranteed in sync.
 
@@ -10954,12 +10956,15 @@ The `organization:view` caller plus a project-scoped ingest-only RoleBinding is 
 
 The `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` is the defense against external HTTP callers forging in-process surface tags: the only value the Hono surface accepts inbound is `cli`, everything else falls through to the route's default `"hono"`. With the cross-surface uniformity test this pins the umbrella spec's `@audit-uniform` invariant.
 
+`cli` itself is a hint from an already-authenticated caller rather than a claim the route can verify, since the CLI presents the same credentials any other HTTP client does. Read it as "which client said it did this", never as a permission.
+
 To run locally:
 
 ```bash
 cd platform/app
 pnpm test:integration governance-rest-api.integration.test.ts
-pnpm test:integration governance-ingestion-keys.integration.test.ts
+pnpm test:integration auth-cli-ingestion-key-personal.integration.test.ts
+pnpm test:integration auth-cli-ingestion-key-project.integration.test.ts
 pnpm test:integration governance-tools.audit-uniform.integration.test.ts
 pnpm test:integration auditSurface.crossSurface.integration.test.ts
 pnpm test:unit no-bypass.unit.test.ts

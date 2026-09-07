@@ -747,20 +747,26 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
      * cross-tenant hatch, which is what keeps that hatch at exactly the three
      * clauses above.
      */
-    it("passes the guard when a ceiling change scopes the sweep to one organization", async () => {
+    it("passes the guard on both reads when a ceiling change scopes them to one organization", async () => {
       const { client, calls } = guardedReadPrisma([]);
 
+      // A positive ceiling is what makes the first read happen at all: the
+      // live-key read that re-derives expiries, and then the expiry sweep.
       await expect(
         applySessionCeiling({
           prisma: client as unknown as PrismaClient,
           organizationId: "org_1",
-          maxSessionDurationDays: 0,
+          maxSessionDurationDays: 7,
           now: new Date("2026-09-07T12:00:00Z"),
           loginKeys: { revokeSessionKey: vi.fn() },
         }),
       ).resolves.toBe(0);
 
-      expect(calls[0]).toMatchObject({ where: { organizationId: "org_1" } });
+      expect(calls).toHaveLength(2);
+      expect(calls[0]).toMatchObject({
+        where: { organizationId: "org_1", expiresAt: { not: null } },
+      });
+      expect(calls[1]).toMatchObject({ where: { organizationId: "org_1" } });
     });
   });
 

@@ -1128,7 +1128,10 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
 
   const sessionAnchorMs =
     record.client_info?.session_started_at ?? record.issued_at;
-  const ceiling = await sessionCeiling({ record, sessionAnchorMs });
+  const ceiling = await CliLoginKeyService.create(prisma).sessionCeiling({
+    organizationId: record.organization_id,
+    sessionAnchorMs,
+  });
   const { maxDurationDays } = ceiling;
   if (ceiling.exceeded) {
     // Reject + invalidate the old refresh token to prevent further
@@ -1284,41 +1287,6 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     200,
   );
 });
-
-/**
- * The organization's ceiling on this session, how old the session is, and
- * whether it has run past it.
- *
- * The anchor is `client_info.session_started_at`, written at /exchange and
- * carried across every rotation; a session started before that field existed
- * falls back to the record's own issue time. Zero days means the
- * organization sets no ceiling at all, which nothing can exceed.
- */
-async function sessionCeiling({
-  record,
-  sessionAnchorMs,
-}: {
-  record: RefreshTokenRecord;
-  sessionAnchorMs: number;
-}): Promise<{
-  maxDurationDays: number;
-  sessionAgeMs: number;
-  exceeded: boolean;
-}> {
-  const org = await prisma.organization.findUnique({
-    where: { id: record.organization_id },
-    select: { maxSessionDurationDays: true },
-  });
-  const maxDurationDays = org?.maxSessionDurationDays ?? 0;
-  const sessionAgeMs = Date.now() - sessionAnchorMs;
-  return {
-    maxDurationDays,
-    sessionAgeMs,
-    exceeded:
-      maxDurationDays > 0 &&
-      sessionAgeMs > maxDurationDays * 24 * 60 * 60 * 1000,
-  };
-}
 
 /**
  * A refused refresh is the end of the session, so the login key it minted

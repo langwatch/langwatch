@@ -219,7 +219,7 @@ export class IngestionKeyService {
       throw new IngestionKeyWorkspaceMissingError();
     }
 
-    return await this.issueForProject({
+    const issued = await this.issueForProject({
       callerUserId: userId,
       ownerUserId: userId,
       organizationId,
@@ -229,6 +229,65 @@ export class IngestionKeyService {
       createdByDeviceLabel,
       parentApiKeyId,
     });
+
+    if (parentApiKeyId) {
+      await this.retireIfSessionEndedDuringMint({
+        issuedApiKeyId: issued.apiKeyId,
+        parentApiKeyId,
+        userId,
+        organizationId,
+      });
+    }
+    return issued;
+  }
+
+  /**
+   * Close the window between the session check and the row this mint writes.
+   *
+   * The cascade revokes a login key first and lists its children second, so
+   * reading the parent once more after the child exists leaves nowhere for
+   * the child to hide: either this read sees the revoke, and the key it just
+   * wrote is retired here, or the revoke lands afterwards and the listing
+   * behind it finds the row. Without it a mint that began a moment before a
+   * logout could leave a live key under a dead session, which no later sweep
+   * would look for.
+   */
+  private async retireIfSessionEndedDuringMint({
+    issuedApiKeyId,
+    parentApiKeyId,
+    userId,
+    organizationId,
+  }: {
+    issuedApiKeyId: string;
+    parentApiKeyId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
+    const stillLive = await this.isSessionLive({
+      parentApiKeyId,
+      userId,
+      organizationId,
+    });
+    if (stillLive) return;
+
+    try {
+      await this.apiKeys.revoke({
+        id: issuedApiKeyId,
+        callerUserId: userId,
+        callerIsAdmin: false,
+        organizationId,
+        awaitProjection: false,
+        cause: "session",
+      });
+    } catch (error) {
+      if (!ApiKeyAlreadyRevokedError.is(error)) {
+        logger.warn(
+          { error, apiKeyId: issuedApiKeyId, parentApiKeyId },
+          "could not retire a key whose session ended while it was minted",
+        );
+      }
+    }
+    throw new IngestionKeySessionRevokedError();
   }
 
   /**
@@ -516,13 +575,29 @@ export class IngestionKeyService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
+    const live = await this.isSessionLive({
+      parentApiKeyId,
+      userId,
+      organizationId,
+    });
+    if (!live) throw new IngestionKeySessionRevokedError();
+  }
+
+  /** Whether that login key is still this caller's and still unrevoked. */
+  private async isSessionLive({
+    parentApiKeyId,
+    userId,
+    organizationId,
+  }: {
+    parentApiKeyId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean> {
     const parent = await this.apiKeyRepo.findByIdInOrg({
       id: parentApiKeyId,
       organizationId,
     });
-    if (!parent || parent.userId !== userId || parent.revokedAt !== null) {
-      throw new IngestionKeySessionRevokedError();
-    }
+    return !!parent && parent.userId === userId && parent.revokedAt === null;
   }
 
   /**

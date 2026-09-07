@@ -56,6 +56,9 @@ export function DevicesPanel() {
     onKeyRevoked: () => setPendingRevokeKeyId(null),
   });
 
+  // Both lists gate the empty state: a person with no session but a key
+  // minted from the tile still has something to see, and reading "No devices
+  // signed in" off a sessions list that arrived first would hide it.
   const sessions = sessionsQuery.data ?? [];
   const { keysBySession, orphanKeys } = groupKeysBySession({
     sessions,
@@ -87,7 +90,7 @@ export function DevicesPanel() {
         onConfirm={revocation.revokeEveryDevice}
       />
 
-      {!ready || sessionsQuery.isLoading ? (
+      {!ready || sessionsQuery.isLoading || keysQuery.isLoading ? (
         <Text fontSize="sm" color="fg.muted" paddingY={8}>
           Loading devices…
         </Text>

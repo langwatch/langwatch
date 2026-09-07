@@ -161,6 +161,16 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And no ingestion key is created
     # The CLI reads a 401 here as "sign in again", which is the repair.
 
+  @unit @ingest-api-key @issue @personal @session
+  Scenario: A key minted as its session is being retired does not outlive it
+    Given a login key that is live when the mint checks it
+    When the session is retired while that mint is still writing its key
+    Then the new key is revoked with cause "session"
+    And the mint answers signed out
+    # The cascade revokes the login key before it lists the children, so a
+    # second look at the parent after the row exists leaves the key nowhere
+    # to hide: this read sees the revoke, or the listing behind it sees the row.
+
   # ---------------------------------------------------------------------------
   # A personal key lives and dies with its CLI session
   # ---------------------------------------------------------------------------
