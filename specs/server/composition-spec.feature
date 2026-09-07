@@ -5,7 +5,7 @@
 # and constructors never start background work.
 #
 # Accepted app factory target: defineFeature(...).withApp(ServerApp), with
-# static contract, dependencies and create on the server class. Scenarios tagged
+# static API, dependencies and create on the server class. Scenarios tagged
 # @unimplemented describe the agreed API still to be built. withTransports takes
 # variadic inbound declarations; namespaces derive from the owner.
 
@@ -24,7 +24,7 @@ Feature: Composing a process from feature installers
 
     @unit
     Scenario: A feature whose dependency nobody provides never serves
-      Given a feature that requires a peer app contract
+      Given a feature that requires a peer API token
       And an application root where no installed feature provides it
       When the application boots
       Then boot fails naming the feature, the dependency key and the token
@@ -34,44 +34,98 @@ Feature: Composing a process from feature installers
   Rule: the server app class owns its factory and dependency declaration
 
     @unimplemented @unit
-    Scenario: The framework supplies declared dependencies to the app factory
-      Given an annotation server app linked to its portable app contract
-      And its dependency map declares project and organization app contracts
+    Scenario: The framework supplies declared API dependencies to the app factory
+      Given an annotation server app linked to its portable callable API
+      And its dependency map declares project and organization API tokens
       And the process installs providers for both contracts
       When the process boots with the annotation server app selected through withApp
       Then its static create factory receives the resolved project and organization apps
       And the factory is called once with typed infrastructure and validated config
-      And the returned object is registered under the linked annotation app contract
+      And the returned object is registered under the linked annotation API token
       And no separate setup, dependency map or provider declaration is required on the installer
 
     @unimplemented @typecheck
-    Scenario: Dependency member types are derived from the declared tokens
+    Scenario: Dependency member types are derived from API tokens
       Given an app factory context typed from its declared dependency map
       When the factory reads its declared projects dependency
-      Then its type is the project app contract without a handwritten dependency type mirror
+      Then its type is the project API without a handwritten dependency type mirror
       And accessing an undeclared users dependency fails type checking
       And supplying an incompatible factory context fails type checking
 
-    @unimplemented @typecheck
-    Scenario: A factory must return its linked app contract
-      Given a server app linked to an annotation contract with queues and annotations members
-      When its factory returns an object missing queues
+    @typecheck
+    Scenario: An app must implement its linked callable API
+      Given a server app linked to an annotation API with callable use cases
+      When its factory returns an object missing one use case
       Then selecting that server app through withApp fails type checking
 
+    @unit
+    Scenario: Reciprocal API dependencies bind before readiness
+      Given two server apps that declare each other through API tokens
+      When the process boots
+      Then each app is constructed once without accessing the peer
+      And both APIs are bound before the process becomes ready
+      And calls work in either direction after boot
+
     @unimplemented @unit
-    Scenario: App dependencies are validated before any factory runs
-      Given server apps whose declared dependency maps contain a cycle
+    Scenario: Legacy constructor dependency cycles fail before construction
+      Given legacy installers whose constructor-token dependencies contain a cycle
       When the process boots
       Then boot fails naming the dependency cycle
       And no app factory is called
 
+    @unimplemented @unit
+    Scenario: A peer can depend only on a callable API token
+      Given a feature with a peer feature API dependency
+      When the peer is selected through the composition graph
+      Then the peer service and repository remain private
+      And no cross-feature service token or app lookup is available
+
+    @unit
+    Scenario: Incomplete API bindings fail before publication
+      Given a graph whose app reads or calls a peer before peer binding completes
+      When boot constructs the graph
+      Then boot fails with a named early-access error
+      And no incomplete app is published
+
     @unimplemented @architecture
     Scenario: Construction stays outside the portable contract
-      Given an annotation app contract consumed by another feature and the browser
+      Given an annotation API consumed by another feature and the browser
       When architecture boundaries are checked
       Then the contract imports no server implementation or infrastructure
       And the static factory and its dependency metadata belong to the owning server implementation
-      And the public app instance exposes only its readonly service members
+      And the public app instance exposes only callable API methods
+
+  Rule: in-process clients forward typed calls without a transport boundary
+
+    @unit
+    Scenario: Local forwarding preserves application values and errors
+      Given a booted feature with a typed in-process client
+      When a caller invokes an API operation with a domain value
+      Then the App receives the same argument instance
+      And the caller receives the same result or promise instance
+      And a thrown domain error reaches the caller unchanged
+      And the operation retains the App as its receiver
+      And no serialization or inbound auth or schema middleware runs
+
+    @unit
+    Scenario: Client reflection cannot expose application internals
+      Given an App with private state and an implementation getter
+      When a caller probes the getter or Object prototype methods through its client
+      Then the getter is not evaluated
+      And the underlying App is not returned
+
+    @unit
+    Scenario: Retained clients close after startup or cleanup failure
+      Given a caller retains a bound API operation
+      When process startup fails or shutdown encounters a resource cleanup error
+      Then the retained operation refuses further calls
+      And cleanup still attempts every acquired resource
+
+    @typecheck
+    Scenario: A provided client must implement the complete interface
+      Given a root providing an implementation through a feature API token
+      When the root explicitly widens its generic API type to an empty object
+      Then type checking rejects the incomplete implementation
 
   Rule: transports declare routers and use the installed app
 
@@ -88,7 +142,7 @@ Feature: Composing a process from feature installers
 
     @unimplemented @typecheck
     Scenario: A process cannot mount a router against an incompatible host
-      Given a router whose app contract requires annotation queues
+      Given a router whose app API requires annotation operations
       When its native router factory is mounted against a host without that contract
       Then type checking rejects the mount
 
@@ -308,7 +362,7 @@ Feature: Composing a process from feature installers
       Then both reach the same app services with the same authorisation and response contract
       And the alias does not construct a second app or change the feature namespace
 
-  Rule: a feature publishes one app containing its public services
+  Rule: a feature publishes one app implementing its callable API
 
     @unit
     Scenario: The provided app is the setup result

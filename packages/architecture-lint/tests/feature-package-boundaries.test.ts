@@ -208,7 +208,9 @@ describe("feature package boundary lint", () => {
         'import type { Agent } from "@langwatch/agent-contract"; export type AgentView = Agent;',
     });
 
-    expect(lintWorkspace({ root, declarations: false })).toEqual([]);
+    const violations = lintWorkspace({ root, declarations: false });
+    expect(violations.filter((item) => item.policy !== "feature-app-contract")).toEqual([]);
+    expect(violations.filter((item) => item.policy === "feature-app-contract")).toHaveLength(2);
   });
 
   /** @scenario Physical package names match their feature roles */
@@ -662,6 +664,36 @@ describe("strict feature source layout", () => {
     expect(policies()).not.toContain("feature-source-layout");
   });
 
+  it("accepts a canonical API contract as the portable capability module", () => {
+    featurePackage({
+      feature: "widget",
+      role: "contract",
+      dependencies: { "@langwatch/runtime-composition": "workspace:*" },
+    });
+    rmSync(join(root, "packages/features/widget/contract/src/widget.service.ts"));
+    write(
+      "packages/features/widget/contract/src/widget.api.ts",
+      'import { featureApi } from "@langwatch/runtime-composition/contract"; export interface WidgetApi { get(): string; } export const WidgetApi = featureApi<WidgetApi>("widget");',
+    );
+
+    expect(policies()).not.toContain("feature-source-layout");
+  });
+
+  it("rejects the runtime composition root from a portable API contract", () => {
+    featurePackage({
+      feature: "widget",
+      role: "contract",
+      dependencies: { "@langwatch/runtime-composition": "workspace:*" },
+    });
+    rmSync(join(root, "packages/features/widget/contract/src/widget.service.ts"));
+    write(
+      "packages/features/widget/contract/src/widget.api.ts",
+      'import { featureApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = featureApi<WidgetApi>("widget");',
+    );
+
+    expect(policies()).toContain("feature-source-layout");
+  });
+
   /**
    * A test is named for the behaviour it pins, never for an artifact, so the source grammar has
    * nothing useful to say about it.
@@ -913,7 +945,8 @@ describe("Prisma client containment", () => {
       "export    const   createAgent=(name:string)=>({name})\n\n\n",
     );
 
-    expect(lintWorkspace({ root, declarations: false })).toEqual([]);
+    const violations = lintWorkspace({ root, declarations: false });
+    expect(violations.map((item) => item.policy)).toEqual([]);
   });
 
   /** @scenario Prisma cannot leak through public declarations */

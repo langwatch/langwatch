@@ -54,9 +54,34 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
     const path = workspacePath(`${pkg.root}/src`, file);
     if (TEST_DIRECTORY.test(path)) return false;
 
-    return CONTRACT_ARTIFACT.test(path.slice(path.lastIndexOf("/") + 1));
+    const filename = path.slice(path.lastIndexOf("/") + 1);
+    return CONTRACT_ARTIFACT.test(filename) || filename === `${pkg.feature}.api.ts`;
   });
-  if (services.length > 0) return [];
+  const violations: ArchitectureViolation[] = [];
+  if (services.length > 0) {
+    const api = `${pkg.root}/src/${pkg.feature}.api.ts`;
+    if (existsSync(api)) {
+      const parsed = ts.createSourceFile(
+        api,
+        readFileSync(api, "utf8"),
+        ts.ScriptTarget.Latest,
+        true,
+      );
+      for (const statement of parsed.statements) {
+        if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+          continue;
+        if (statement.moduleSpecifier.text !== "@langwatch/runtime-composition") continue;
+        violations.push(
+          violation(
+            api,
+            "A portable feature API may import only the runtime-composition contract subpath.",
+            'Import featureApi from "@langwatch/runtime-composition/contract"; the runtime root is a composition boundary.',
+          ),
+        );
+      }
+    }
+    return violations;
+  }
 
   return [
     violation(

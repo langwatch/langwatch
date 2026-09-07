@@ -23,14 +23,19 @@ the accepted ADRs and the architecture linter.
 - Strict features use `feature.json` with `layoutVersion: 0` and the exact
   lower-kebab/dotted-role layout in the strict-feature ADR.
 - A feature contract exposes portable values, errors, schemas, and one
-  canonical abstract service for ordinary callers. A second public service
-  requires a genuinely different lifecycle or trust boundary recorded in its
-  ADR.
+  callable `<Feature>Api` interface in `<feature>.api.ts` with a same-named
+  runtime API token. Concrete `<Feature>App` implementations own services
+  privately and implement that API; callable forwarding methods are the public
+  boundary. Apps expose no service fields, repositories, transport objects or
+  lookup API. Peers depend only on API tokens. ADR-133 applies this boundary to
+  every server feature, including Enterprise implementations; missing adoption
+  is a lint failure. Browser-only features need no fabricated server or API.
+  App state and nonpublic helpers use ECMAScript `#private` members.
 - Repository count does not determine service count. Merge duplicate ways of
   loading the same domain data when doing so leaves one coherent owner.
 - A concrete service has a private constructor and `static create`. Construct
   one instance per process. Do not construct services in request handlers.
-- A service receives its own private repositories and complete services from
+- A service receives its own private repositories and complete peer APIs from
   other feature contracts. Do not pass callback bags, service locators,
   `Pick`/`Omit` views, `Parameters`/`ReturnType` mirrors, or another feature's
   repository.
@@ -57,9 +62,12 @@ the accepted ADRs and the architecture linter.
 - One feature installer, one construction path, explicit lifecycle
   ([ADR-133](dev/docs/adr/133-composition-spec.md), spec
   `specs/server/composition-spec.feature`). A feature declares its required
-  contract services, typed config, provided service and transport/background
-  contributions; its setup constructs its repositories and service once per
+  contract dependencies, typed config, provided app and transport/background
+  contributions; its setup returns the app and constructs its services once per
   process; API and worker reuse that setup.
+- Peer API clients forward directly to installed Apps without serialization or
+  repeated auth/schema middleware. Boot allocates clients before constructing
+  Apps; factories store peers but never read or call them before readiness.
 - Declaring installs nothing. Boot validates the declarations and constructs;
   start begins serving. Imports and constructors never start background work.
 - System migrations run one framework in two modes: startup (blocking, gates

@@ -7,8 +7,8 @@
 # but they are one implementation, because a rule that exists twice answers
 # differently the first time one copy changes.
 #
-# The feature's App holds every service and port the feature needs and exposes
-# the operations both doors call. It reaches a handler as `c.app`. Who is
+# The feature's App implements a callable API while keeping services and ports
+# private. It reaches a handler as `c.app`. Who is
 # calling reaches it as `c.auth`. Both are typed from what the composition root
 # supplied, so a handler cannot read something the process never provided, and
 # cannot believe a shape nobody wrote down.
@@ -25,10 +25,11 @@ Feature: The feature application and its transports
   # ─── The application ────────────────────────────────────────────────────
 
   @unimplemented @unit
-  Scenario: The application holds every service and port the feature needs
+  Scenario: The application implements its callable API
     Given a feature package with services, ports and repositories
     When its application is composed at a composition root
-    Then it receives every service and port the feature's operations use
+    Then it implements every callable use case the feature publishes
+    And its services and ports remain private to the app
     And no transport composes a dependency of its own
 
   @unimplemented @unit
@@ -38,6 +39,13 @@ Feature: The feature application and its transports
     Then both reach the same implementation on the application
     And neither door can reach a different answer by branching on its own
 
+  @unimplemented @architecture
+  Scenario: A feature exposes no service field or lookup surface
+    Given a feature API interface with callable use cases
+    When a concrete app is checked
+    Then service-valued fields, getters and lookup methods are rejected
+    And another feature can import only the API token
+
   @unimplemented @unit
   Scenario: A door may shape what it asks for without forking the rule
     Given a public endpoint that pages with cursors and a smaller limit ceiling
@@ -46,13 +54,20 @@ Feature: The feature application and its transports
     Then each supplies its own paging and limit arguments
     And the operation that answers them is the same one
 
+  @unimplemented @typecheck
+  Scenario: A future remote client implements the same API with a real transport
+    Given a browser or remote client has a real transport and explicit wire transforms
+    When it implements the feature API
+    Then domain errors and streams have explicit mappings
+    And no empty client implementation is introduced merely to satisfy the interface
+
   # ─── The typed context ──────────────────────────────────────────────────
 
   @unit
   Scenario: The context exposes the application the composition root supplied
     Given a transport composed with a feature application
     When a handler reads the application off its context
-    Then the type it sees is the application that was supplied
+    Then the type it sees is the callable API that was supplied
     And an operation the application does not expose fails to compile
 
   @unimplemented @unit

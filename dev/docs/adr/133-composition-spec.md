@@ -72,8 +72,8 @@ not an implementation plan.
 
 **One feature installer, one construction path, explicit lifecycle.**
 
-Each feature's server implementation declares its app contract token, required
-peer app contracts and static `create` factory. The installer selects that class
+Each feature's server implementation declares its API token, required peer API
+tokens and static `create` factory. The installer selects that class
 with `.withApp(AnnotationApp)`. The framework supplies its declared dependencies
 and calls `create` once during boot. API and worker reuse the same factory.
 
@@ -93,27 +93,27 @@ await runtime.start();
 
 Peer installers and transport contributions are omitted from this example.
 `withFeature` declares only. `boot` validates the selected graph before calling
-any factory, then constructs it in dependency order. `start` begins serving.
+any factory, then constructs it with stable peer clients. `start` begins serving.
 Imports, declarations and constructors never start background work.
 
 ### Accepted app factory shape
 
-The portable contract exports the abstract `AnnotationApp` with readonly service
-members. The server imports it as `AnnotationAppContract` and owns the concrete
-`AnnotationApp`, its private constructor and its static `create`. The contract
-has no infrastructure imports or construction logic.
+The portable contract exports a `<Feature>Api` interface from
+`contract/src/<feature>.api.ts`. It contains only callable public use cases;
+it has no service-valued properties, getters, repositories, transport objects
+or lookup methods. The contract also exports a same-named runtime token:
+`export const AnnotationApi = featureApi<AnnotationApi>("annotation")`.
+The token is the only cross-feature dependency surface.
 
-The server class declares `static readonly contract = AnnotationAppContract`
-and `static readonly dependencies`. Dependency values are peer app contract
-classes. Those classes are runtime keys as well as instance types; lookup never
-uses class names or parameter names. The installer derives the provided token
-and required dependencies from this metadata. It does not repeat them with
-`.provides(...)` or `.withDependencies(...)`.
+The server owns a concrete `AnnotationApp` that implements `AnnotationApi`.
+Its services and peer `*Api` dependencies use ECMAScript `#private` members. Thin forwarding
+methods are intentional at this boundary: they expose the callable API while
+keeping service ownership and construction behind the app.
 
 ```ts
 const dependencies = {
-  projects: ProjectApp,
-  organizations: OrganizationApp,
+  projects: ProjectApi,
+  organizations: OrganizationApi,
 };
 
 type AnnotationSetup = FeatureSetup<
@@ -124,42 +124,68 @@ type AnnotationSetup = FeatureSetup<
 
 // Members and construction body omitted; FeatureSetup is the proposed helper.
 // These declarations belong on the server AnnotationApp class:
-// static readonly contract = AnnotationAppContract;
+// static readonly contract = AnnotationApi;
 // static readonly dependencies = dependencies;
 // static create(setup: AnnotationSetup): AnnotationApp;
 ```
 
 `FeatureSetup` derives the dependency object from the declared tokens: projects
-is a `ProjectApp` instance and organizations is an `OrganizationApp` instance.
+is a `ProjectApi` and organizations is an `OrganizationApi`.
 Technical infrastructure and validated semantic config remain separately typed
 inputs. The setup context also supplies feature resource ownership for partial
-construction cleanup. App instances expose only their readonly public services;
+construction cleanup. App instances expose only callable API methods;
 factory metadata lives on the class, not on those instances.
 
 The framework calls the factory with resolved dependencies, infrastructure,
 config and resource ownership. Callers do not assemble another dependency bag
-or invoke the factory themselves. Factories may extract complete services from
-peer apps to construct their own services; those services do not receive a
-root application or a dynamic lookup API.
+or invoke the factory themselves. Factories may use complete peer APIs to
+construct private services, but never import another feature's service or
+repository. A root application is never a dynamic lookup API.
 
 Type checking rejects access to an undeclared dependency, incompatible factory
-inputs, and a result incompatible with the linked app contract. The dependency
+inputs, and a result incompatible with the linked API. The dependency
 map is declared once, with no handwritten mirror of its resolved instance types.
 An independently declared static method still needs a parameter annotation:
 TypeScript cannot infer that parameter backwards from a later `.withApp(...)`
 call. The helper derives this annotation; it does not use reflection or code
 generation. It is framework typing machinery, not a partial service view.
 
-Boot validates missing providers, duplicate providers and dependency cycles
-before invoking any factory. Type safety cannot prove that a deployment has
+Boot validates missing and duplicate providers before invoking any factory.
+Reciprocal API dependencies are supported through two-phase bindings. Legacy
+constructor-token dependency cycles are rejected before construction. Type safety cannot prove that a deployment has
 installed every required feature. Imports remain subject to architecture lint;
 a typed setup parameter alone cannot prevent an undeclared global import.
 
-An interface plus an explicit runtime token could express the same contract.
-The abstract contract class keeps those two declarations together. It supplies
-no runtime data validation and does not justify forwarding methods or a service
-locator. Separate setup/provider calls were rejected because they repeat one
+The interface plus explicit runtime token keeps the portable callable contract
+usable by server and future client implementations without exposing a server
+class. The installed in-process client is a dynamic proxy over that interface:
+it forwards calls to the bound App, preserving arguments, return values, promises
+and thrown errors without serialization, authentication or schema middleware.
+Methods retain the App as their receiver, including access to its private state.
+A future remote client can implement the same interface with explicit wire
+transforms, domain-error mapping, cancellation and stream semantics. Network
+trust controls belong to that transport. Inbound transports validate input
+and output and apply authorization; local calls do not repeat that middleware.
+The authenticated actor is authoritative and payload identity never overrides
+it. Separate setup/provider calls were rejected because they repeat one
 construction decision and allow the two declarations to drift.
+
+Runtime construction is two-phase: boot allocates every peer API binding,
+constructs each app once without reading or calling an incomplete peer, then
+binds completed API tokens and marks the graph ready. Early access produces a
+named boot error. A failed graph publishes nothing and cleans up acquired
+resources in reverse order. There is no per-request or network construction.
+Clients are allocated before Apps, so reciprocal dependencies do not impose an
+App construction order. This does not prevent recursive operation calls.
+Shutdown drains process hosts before closing clients and then feature resources;
+retained client methods refuse calls after closure, including failed startup.
+
+Client forwarding reads callable data descriptors only: getters are never
+invoked, and `Object.prototype` methods cannot expose the underlying App.
+The architecture lint requires the public operation set to match the API and
+rejects App inheritance, service-valued results and non-`#private` implementation
+members. `then` and prototype control names are reserved. Tokens are invariant
+in their API type, so a root cannot widen a token to supply an incomplete client.
 
 ### Transport declarations and inferred namespaces
 
@@ -277,21 +303,21 @@ runtime, type tests, global lint and process callers adopt them.
 
 ### Amendment: one public app per feature (2026-09-07)
 
-Each installer provides one canonical abstract `<Feature>App` from its contract
-package, declared in `<feature>.app.ts` and exported from the contract barrel.
-The app exposes readonly properties typed as that feature's public abstract
-services. Services own behaviour; the app has no forwarding methods, callbacks,
-repositories, transport objects or dynamic lookup API. A feature with one
-cohesive service exposes one member. Repository count does not justify adding
-public services.
+Each installer provides one canonical `<Feature>Api` token from its contract
+package, declared alongside the callable API interface. The concrete app
+implements that interface and keeps its services private. The app has no
+service-valued public fields, getters, repositories, transport objects or
+lookup API; callable methods are the deliberate public boundary.
+This shape is the approved migration target for the annotation, project,
+organization, user and trace feature batch.
 
 The server app factory returns the app itself. `.withApp(AnnotationApp)`
-registers that exact object under its linked contract token, without a selector
+registers that exact object under its linked API token, without a selector
 and without registering its services separately.
-REST, tRPC and background contributions use those same service instances in
-one process. Dependencies between converted features name their app contracts;
-services receive the complete dependencies they actually use. Root applications
-are never injected as service locators.
+REST, tRPC and background contributions use that same API instance in one
+process. Dependencies between converted features name their `*Api` tokens;
+cross-feature services and repositories are forbidden. Root applications are
+never injected as service locators.
 
 Transport adaptation stays in API-only routers and mapping functions. Domain
 collaborators belong behind the app services, not in router dependency bags. A class that enriches responses or extracts actors is not the
@@ -351,8 +377,8 @@ roles, with browser-safe dependencies.
 Each requirement below names the guard that enforces it **today**, or says
 **no guard yet**, and names the guard **proposed**.
 
-**1. Feature-owned assembly.** The installer constructs its repositories, its
-collaborators and its canonical service. Process roots choose implementations
+**1. Feature-owned assembly.** The installer constructs its repositories,
+private collaborators and canonical API implementation. Process roots choose implementations
 and configuration and contain no domain queries, no mappers and no duplicate
 services.
 
@@ -365,8 +391,8 @@ services.
   mapper, or a `create` of another feature's repository inside a
   `*.composition.ts` or an app root fails.
 
-**2. Complete dependencies.** Abstract app contracts are peer dependency
-tokens; named infrastructure ports remain explicit technical dependencies.
+**2. Complete dependencies.** Callable `*Api` tokens are peer dependencies;
+named infrastructure ports remain explicit technical dependencies.
 Missing, duplicate and cyclic providers are rejected before readiness.
 There is no request-time service locator, no partial service view, and no
 automatically generated throwing proxy. A deliberately disabled feature exposes
