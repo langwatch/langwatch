@@ -174,7 +174,9 @@ describe("PrismaPasskeyRemovalRepository", () => {
       routesToIdentity: async () => gate,
     });
 
-    expect(await repository.deleteIfAnotherWayInRemains({ passkeyId })).toBe(expected);
+    expect(await repository.deleteIfAnotherWayInRemains({ passkeyId })).toBe(
+      expected,
+    );
     expect(await prisma.passkey.count({ where: { id: passkeyId } })).toBe(
       expected === "deleted" ? 0 : 1,
     );
@@ -203,7 +205,8 @@ describe("PrismaLastWayInRepository", () => {
       strands: false,
     },
     {
-      label: "sees the compatibility password while the identity gate is closed",
+      label:
+        "sees the compatibility password while the identity gate is closed",
       gate: false,
       legacyPassword: "legacy-hash",
       identityPassword: void 0,
@@ -237,6 +240,8 @@ describe("PrismaLastWayInRepository", () => {
       records: new PrismaLastWayInRepository(prisma, async () => gate),
     });
 
-    await expect(preflight.passkeyRemovalStrandsUser({ userId, passkeyId })).resolves.toBe(strands);
+    await expect(
+      preflight.passkeyRemovalStrandsUser({ userId, passkeyId }),
+    ).resolves.toBe(strands);
   });
 });
