@@ -185,12 +185,16 @@ describe("given the sign-up confirmation endpoint", () => {
       completeVerification.mockRejectedValue(
         new IdentityVerificationExpiredError(),
       );
-      const { ctx, createSession, setStatus } = fakeContext({ token: "stale" });
+      const { ctx, createSession } = fakeContext({ token: "stale" });
 
-      const answer = await run(ctx);
+      const answer = await endpoint().confirmSignUpAddress(ctx);
 
-      expect(setStatus).toHaveBeenCalledWith(410);
-      expect(answer.body).toMatchObject({
+      expect(answer).toBeInstanceOf(Response);
+      if (!(answer instanceof Response)) {
+        throw new Error("Expected the endpoint's HTTP refusal");
+      }
+      expect(answer.status).toBe(410);
+      expect(await answer.json()).toMatchObject({
         error: "identity_verification_expired",
       });
       expect(createSession).not.toHaveBeenCalled();
