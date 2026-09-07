@@ -69,18 +69,14 @@ export function EmailIdentifiersSection({
    *  they were two subjects. */
   trailingActions?: ReactNode;
 } = {}) {
-  const utils = api.useUtils();
   const identifiers = api.identity.myIdentifiers.useQuery({});
   // The account's own address and whether it is confirmed — the same read the
   // app shell's nudge makes, so the two can never disagree about it.
   const confirmation = api.auth.myAddressConfirmation.useQuery();
-  const resendOwnAddress = api.auth.sendMyAddressConfirmation.useMutation();
   const resendAdded = api.identity.resendIdentifierConfirmation.useMutation();
   // When each address last got somebody in. Answers the one question a list
   // of addresses otherwise cannot: which of these am I still relying on.
   const lastUsed = api.identity.myMethodsLastUsed.useQuery({});
-  const addAddress = api.identity.addEmailIdentifier.useMutation();
-  const removeIdentifier = api.identity.removeIdentifier.useMutation();
 
   const [resentTo, setResentTo] = useState<string | null>(null);
   // WHICH address is being resent, not whether ANY is. Two unconfirmed
@@ -93,32 +89,11 @@ export function EmailIdentifiersSection({
   const emailRows = rows.filter((row) => row.provider === "email");
   const ownAddress = confirmation.data?.email ?? null;
 
-  const refresh = async () => {
-    await Promise.all([
-      utils.identity.myIdentifiers.invalidate(),
-      utils.auth.myAddressConfirmation.invalidate(),
-    ]);
-  };
+  const refresh = useRefreshEmailIdentifiers();
 
-  const add = async (email: string): Promise<boolean> => {
-    if (!email) return false;
-    try {
-      const { codeVerifier, codeChallenge } = await mintAddressCeremony();
-      const { identifierId } = await addAddress.mutateAsync({
-        email,
-        codeChallenge,
-      });
-      rememberAddressVerifier({ identifierId, codeVerifier });
-      setResentTo(email);
-      await refresh();
-      return true;
-    } catch (error) {
-      // Refused, so the field stays open holding what was typed: retyping an
-      // address to correct one character is the worst possible answer to it.
-      showErrorToast({ error, fallbackTitle: "Couldn't add that address" });
-      return false;
-    }
-  };
+  const addAction = useAddEmailAddress({ refresh, setResentTo });
+  const ownResend = useOwnAddressResend({ ownAddress, setResentTo });
+  const removeAction = useRemoveEmailAddress({ refresh });
 
   /**
    * Returns the server's own wait when it refused for rate limiting, so the
@@ -154,20 +129,150 @@ export function EmailIdentifiersSection({
     }
   };
 
-  const draft = useAddAddressDraft({ onAdd: add });
+  const draft = useAddAddressDraft({ onAdd: addAction.add });
 
-  const remove = async (row: (typeof rows)[number]) => {
+  return (
+    <EmailIdentifiersContent
+      identifiersPending={identifiers.isPending}
+      confirmationPending={confirmation.isPending}
+      identifiersError={identifiers.error}
+      onConfirmed={refresh}
+      emailRows={emailRows}
+      ownAddress={ownAddress}
+      ownAddressConfirmed={confirmation.data?.confirmed === true}
+      ownAddressResendable={confirmation.data?.confirmed === false}
+      ownAddressSending={ownResend.isPending}
+      sentTo={sentTo}
+      lastUsedByIdentifier={lastUsed.data?.byIdentifier}
+      resendingId={resendingId}
+      removing={removeAction.isPending}
+      resendOwnAddress={ownResend.resend}
+      onResend={async (row) => {
+        setResendingId(row.identifierId);
+        try {
+          return await resend(row);
+        } finally {
+          setResendingId(null);
+        }
+      }}
+      onRemove={(row) => void removeAction.remove(row)}
+      draft={draft}
+      adding={addAction.isPending}
+      providerRows={providerRows}
+      trailingActions={trailingActions}
+    />
+  );
+}
+
+function useRefreshEmailIdentifiers() {
+  const utils = api.useUtils();
+  return async () => {
+    await Promise.all([
+      utils.identity.myIdentifiers.invalidate(),
+      utils.auth.myAddressConfirmation.invalidate(),
+    ]);
+  };
+}
+
+function useRemoveEmailAddress({ refresh }: { refresh: () => Promise<void> }) {
+  const mutation = api.identity.removeIdentifier.useMutation();
+  const remove = async (row: AccountIdentifier) => {
     try {
-      await removeIdentifier.mutateAsync({ identifierId: row.identifierId });
+      await mutation.mutateAsync({ identifierId: row.identifierId });
       forgetAddressVerifier({ identifierId: row.identifierId });
       toaster.success({ title: "Address removed" });
       await refresh();
     } catch (error) {
-      // The guard's refusal, in the guard's registered words.
       showErrorToast({ error, fallbackTitle: "Couldn't remove that address" });
     }
   };
+  return { remove, isPending: mutation.isPending };
+}
 
+function useAddEmailAddress({
+  refresh,
+  setResentTo,
+}: {
+  refresh: () => Promise<void>;
+  setResentTo: (email: string) => void;
+}) {
+  const mutation = api.identity.addEmailIdentifier.useMutation();
+  const add = async (email: string): Promise<boolean> => {
+    if (!email) return false;
+    try {
+      const { codeVerifier, codeChallenge } = await mintAddressCeremony();
+      const { identifierId } = await mutation.mutateAsync({
+        email,
+        codeChallenge,
+      });
+      rememberAddressVerifier({ identifierId, codeVerifier });
+      setResentTo(email);
+      await refresh();
+      return true;
+    } catch (error) {
+      showErrorToast({ error, fallbackTitle: "Couldn't add that address" });
+      return false;
+    }
+  };
+  return { add, isPending: mutation.isPending };
+}
+
+function useOwnAddressResend({
+  ownAddress,
+  setResentTo,
+}: {
+  ownAddress: string | null;
+  setResentTo: (email: string) => void;
+}) {
+  const mutation = api.auth.sendMyAddressConfirmation.useMutation();
+  const resend = async () => {
+    if (!ownAddress) return null;
+    try {
+      await mutation.mutateAsync({});
+      setResentTo(ownAddress);
+      return null;
+    } catch (error) {
+      showErrorToast({ error, fallbackTitle: "Couldn't send that link" });
+      const retryAfter = readHandledError(error)?.meta?.retryAfterSeconds;
+      return typeof retryAfter === "number" ? retryAfter : null;
+    }
+  };
+  return { resend, isPending: mutation.isPending };
+}
+
+interface EmailIdentifiersContentProps {
+  identifiersPending: boolean;
+  confirmationPending: boolean;
+  identifiersError: unknown;
+  onConfirmed: () => Promise<void>;
+  emailRows: AccountIdentifier[];
+  ownAddress: string | null;
+  ownAddressConfirmed: boolean;
+  ownAddressResendable: boolean;
+  ownAddressSending: boolean;
+  sentTo: string | null;
+  lastUsedByIdentifier: Record<string, string | null | undefined> | undefined;
+  resendingId: string | null;
+  removing: boolean;
+  resendOwnAddress: () => Promise<number | null>;
+  onResend: (row: AccountIdentifier) => Promise<number | null>;
+  onRemove: (row: AccountIdentifier) => void;
+  draft: ReturnType<typeof useAddAddressDraft>;
+  adding: boolean;
+  providerRows?: ReactNode;
+  trailingActions?: ReactNode;
+}
+
+function EmailIdentifiersContent(props: EmailIdentifiersContentProps) {
+  const {
+    identifiersPending,
+    confirmationPending,
+    identifiersError,
+    onConfirmed,
+    draft,
+    adding,
+    trailingActions,
+  } = props;
   return (
     <VStack
       width="full"
@@ -175,11 +280,9 @@ export function EmailIdentifiersSection({
       gap={4}
       data-testid="email-identifiers-section"
     >
-      <AddressConfirmationLanding onConfirmed={refresh} />
+      <AddressConfirmationLanding onConfirmed={onConfirmed} />
 
-      {identifiers.isPending || confirmation.isPending ? (
-        <Spinner size="sm" />
-      ) : null}
+      {identifiersPending || confirmationPending ? <Spinner size="sm" /> : null}
 
       {/* The list is the identity heads and the row below is the shell's own
             read of one address, so a failed read still shows the address we
@@ -187,7 +290,7 @@ export function EmailIdentifiersSection({
             the rest could not be loaded. A list that is quietly short is worse
             than a short list somebody was told about. */}
       <SectionErrorNotice
-        error={identifiers.error}
+        error={identifiersError}
         fallbackTitle="Couldn't load the addresses on this account"
       />
 
@@ -195,148 +298,138 @@ export function EmailIdentifiersSection({
           kind of thing — a way this account is known — and to the detach guard
           they literally are, which is why the same refusal can come from
           either. */}
-      <VStack width="full" align="stretch" gap={2}>
-        {emailRows.length > 0 ? (
-          emailRows.map((row) => (
-            <AddressRow
-              key={row.identifierId}
-              row={row}
-              linkJustSent={sentTo !== null && sentTo === row.value}
-              lastUsedAt={lastUsed.data?.byIdentifier[row.identifierId] ?? null}
-              isSending={resendingId === row.identifierId}
-              isRemoving={removeIdentifier.isPending}
-              onResend={async () => {
-                setResendingId(row.identifierId);
-                try {
-                  return await resend(row);
-                } finally {
-                  setResendingId(null);
-                }
-              }}
-              onRemove={() => void remove(row)}
-            />
-          ))
-        ) : ownAddress ? (
-          // Before this account's identifiers exist, its one address is still
-          // a fact worth stating — and the shell's own read is what states it.
-          // Through the same row, so the two states of an account look alike.
+      <EmailIdentifierList props={props} />
+
+      <IdentifierActions
+        draft={draft}
+        adding={adding}
+        trailingActions={trailingActions}
+      />
+    </VStack>
+  );
+}
+
+function EmailIdentifierList({
+  props,
+}: {
+  props: EmailIdentifiersContentProps;
+}) {
+  return (
+    <VStack width="full" align="stretch" gap={2}>
+      {props.emailRows.length > 0 ? (
+        props.emailRows.map((row) => (
           <AddressRow
-            row={{
-              identifierId: ownAddress,
-              accountId: null,
-              provider: "email",
-              value: ownAddress,
-              // The account's own address IS the primary one — it is the
-              // address on `User.email`, the one sign-in finds and the one
-              // every notification goes to. Hardcoding false here left the
-              // Primary badge off the single row that always earns it, so
-              // before an account had identifiers the section showed a list
-              // of addresses with nothing marking which one the account
-              // actually answers to.
-              isPrimary: true,
-              confirmed: confirmation.data?.confirmed === true,
-              resendable: confirmation.data?.confirmed === false,
-              removable: false,
-              refusalCode: null,
-              demotesFirst: false,
-            }}
-            linkJustSent={sentTo !== null && sentTo === ownAddress}
-            lastUsedAt={null}
-            isSending={resendOwnAddress.isPending}
-            isRemoving={false}
-            onResend={async () => {
-              try {
-                await resendOwnAddress.mutateAsync({});
-                setResentTo(ownAddress);
-                return null;
-              } catch (error) {
-                showErrorToast({
-                  error,
-                  fallbackTitle: "Couldn't send that link",
-                });
-                // The same rule the other rows follow: their window, not ours.
-                const retryAfter =
-                  readHandledError(error)?.meta?.retryAfterSeconds;
-                return typeof retryAfter === "number" ? retryAfter : null;
-              }
-            }}
-            onRemove={() => void 0}
-            hideRemove
+            key={row.identifierId}
+            row={row}
+            linkJustSent={props.sentTo !== null && props.sentTo === row.value}
+            lastUsedAt={props.lastUsedByIdentifier?.[row.identifierId] ?? null}
+            isSending={props.resendingId === row.identifierId}
+            isRemoving={props.removing}
+            onResend={() => props.onResend(row)}
+            onRemove={() => props.onRemove(row)}
           />
-        ) : null}
+        ))
+      ) : props.ownAddress ? (
+        // Before this account's identifiers exist, its one address is still
+        // a fact worth stating — and the shell's own read is what states it.
+        // Through the same row, so the two states of an account look alike.
+        <AddressRow
+          row={{
+            identifierId: props.ownAddress,
+            accountId: null,
+            provider: "email",
+            value: props.ownAddress,
+            // The account's own address IS the primary one — it is the
+            // address on `User.email`, the one sign-in finds and the one
+            // every notification goes to. Hardcoding false here left the
+            // Primary badge off the single row that always earns it, so
+            // before an account had identifiers the section showed a list
+            // of addresses with nothing marking which one the account
+            // actually answers to.
+            isPrimary: true,
+            confirmed: props.ownAddressConfirmed,
+            resendable: props.ownAddressResendable,
+            removable: false,
+            refusalCode: null,
+            demotesFirst: false,
+          }}
+          linkJustSent={
+            props.sentTo !== null && props.sentTo === props.ownAddress
+          }
+          lastUsedAt={null}
+          isSending={props.ownAddressSending}
+          isRemoving={false}
+          onResend={props.resendOwnAddress}
+          onRemove={() => void 0}
+          hideRemove
+        />
+      ) : null}
 
-        {providerRows}
-      </VStack>
+      {props.providerRows}
+    </VStack>
+  );
+}
 
-      {/* ONE action row for the whole band. Offered whatever the list did:
-          standing a control down because a neighbouring read failed hides a
-          working action behind a broken one, and if the add is refused too it
-          says so in its own words. */}
-      {/* Ranged RIGHT, under the rows they act on. The addresses above are a
-          list of things that exist; these are the ways to add another, and a
-          left-ranged action row read as one more list item with a border
-          around it. Against the right edge they read as controls for the band
-          rather than as another member of it — and the edge they align to is
-          the one the rows' own actions ("Send the link again") already sit
-          on, so the card has one action column instead of two. */}
-      {/* THE ROW DOES NOT MOVE. "Add email address" used to become the field
-          in place, and a field is far wider than the button it replaced, so
-          pressing it shoved every Connect button sideways — the reader's eye
-          was still on the button they had just pressed and the whole row had
-          walked off under it. The field opens BELOW instead: the offers keep
-          their places, and what appears is obviously a new thing rather than
-          the old thing rearranged. */}
-      <VStack width="full" align="stretch" gap={3}>
-        <HStack
-          width="full"
-          gap={4}
-          flexWrap="wrap"
-          align="center"
-          // The two clusters hold the row's two edges — the add button flush
-          // left, the provider offers flush right — so the row spans exactly
-          // the measure of the lists above it instead of drifting toward one
-          // end with an accidental-looking gap.
-          justify="space-between"
-          data-testid="identifier-action-row"
-        >
-          <AddAddressButton
-            isOpen={draft.isOpen}
-            onOpen={draft.open}
-            onCancel={draft.close}
-          />
-          {trailingActions ? (
-            <HStack gap={4} align="center" flexWrap="wrap">
-              {/* Two families on one row: what this account is reached at, and
+function IdentifierActions({
+  draft,
+  adding,
+  trailingActions,
+}: {
+  draft: ReturnType<typeof useAddAddressDraft>;
+  adding: boolean;
+  trailingActions?: ReactNode;
+}) {
+  return (
+    <VStack width="full" align="stretch" gap={3}>
+      <HStack
+        width="full"
+        gap={4}
+        flexWrap="wrap"
+        align="center"
+        // The two clusters hold the row's two edges — the add button flush
+        // left, the provider offers flush right — so the row spans exactly
+        // the measure of the lists above it instead of drifting toward one
+        // end with an accidental-looking gap.
+        justify="space-between"
+        data-testid="identifier-action-row"
+      >
+        <AddAddressButton
+          isOpen={draft.isOpen}
+          onOpen={draft.open}
+          onCancel={draft.close}
+        />
+        {trailingActions ? (
+          <HStack gap={4} align="center" flexWrap="wrap">
+            {/* Two families on one row: what this account is reached at, and
                   who vouches for it. Set on the emphasized border so it holds
                   in the dark theme, where the muted one all but vanished and
                   left the gap looking like a spacing mistake. The rule
                   disappears where the row wraps — a hairline dangling at a
                   line break reads as a mistake. */}
-              <Box
-                display={{ base: "none", md: "block" }}
-                width="1px"
-                // The height of the buttons it stands between, so it reads as
-                // a division of the row rather than as a tick floating in it.
-                height="8"
-                backgroundColor="border.emphasized"
-                flexShrink={0}
-                aria-hidden="true"
-              />
-              {trailingActions}
-            </HStack>
-          ) : null}
-        </HStack>
-
-        {draft.isOpen ? (
-          <AddAddressForm
-            address={draft.address}
-            onAddressChange={draft.setAddress}
-            onSubmit={() => void draft.submit()}
-            onCancel={draft.close}
-            isSending={addAddress.isPending}
-          />
+            <Box
+              display={{ base: "none", md: "block" }}
+              width="1px"
+              // The height of the buttons it stands between, so it reads as
+              // a division of the row rather than as a tick floating in it.
+              height="8"
+              backgroundColor="border.emphasized"
+              flexShrink={0}
+              aria-hidden="true"
+            />
+            {trailingActions}
+          </HStack>
         ) : null}
-      </VStack>
+      </HStack>
+
+      {draft.isOpen ? (
+        <AddAddressForm
+          address={draft.address}
+          onAddressChange={draft.setAddress}
+          onSubmit={() => void draft.submit()}
+          onCancel={draft.close}
+          isSending={adding}
+        />
+      ) : null}
     </VStack>
   );
 }

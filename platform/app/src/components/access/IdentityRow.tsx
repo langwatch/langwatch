@@ -57,7 +57,7 @@ export function IdentityRow({
   "data-testid"?: string;
 }) {
   const label = name ?? address ?? "Somebody with no name yet";
-  const interactive = !!onOpen;
+  const interaction = identityRowInteraction(onOpen, label);
 
   return (
     <HStack
@@ -67,25 +67,16 @@ export function IdentityRow({
       paddingY={3}
       align="center"
       opacity={muted ? 0.6 : 1}
-      cursor={interactive ? "pointer" : undefined}
+      cursor={interaction.cursor}
       transition="background 0.15s ease"
-      _hover={interactive ? { background: "bg.muted" } : undefined}
+      _hover={interaction.hover}
       // The row is the target, not the name inside it: a name-sized hit area
       // in a list of forty people is a list nobody opens twice.
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : undefined}
-      aria-label={interactive ? `Open ${label}` : undefined}
+      role={interaction.role}
+      tabIndex={interaction.tabIndex}
+      aria-label={interaction.ariaLabel}
       onClick={onOpen}
-      onKeyDown={
-        interactive
-          ? (event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onOpen?.();
-              }
-            }
-          : undefined
-      }
+      onKeyDown={interaction.onKeyDown}
       data-testid={testId}
     >
       <RandomColorAvatar id={id} size="xs" name={label} image={image} />
@@ -119,6 +110,36 @@ export function IdentityRow({
       ) : null}
     </HStack>
   );
+}
+
+function identityRowInteraction(
+  onOpen: (() => void) | undefined,
+  label: string,
+) {
+  if (!onOpen) {
+    return {
+      cursor: void 0,
+      hover: void 0,
+      role: void 0,
+      tabIndex: void 0,
+      ariaLabel: void 0,
+      onKeyDown: void 0,
+    };
+  }
+
+  return {
+    cursor: "pointer" as const,
+    hover: { background: "bg.muted" },
+    role: "button" as const,
+    tabIndex: 0,
+    ariaLabel: `Open ${label}`,
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onOpen();
+      }
+    },
+  };
 }
 
 /**

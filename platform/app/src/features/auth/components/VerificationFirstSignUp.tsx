@@ -213,6 +213,11 @@ export function VerificationFirstSignUp() {
             return;
           }
 
+          if (!addressProof) {
+            setProofRecoveryEmail(email);
+            return;
+          }
+
           await resolveEnrollment(email, addressProof);
         },
       )

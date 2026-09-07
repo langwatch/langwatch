@@ -100,54 +100,63 @@ export function PasskeyCeremonyPanel({
         </Text>
       </VStack>
 
-      <VStack width="full" align="stretch" gap="9px">
-        {unanswered ? (
-          <Button
-            className="lw-auth-primary"
-            width="full"
-            minHeight="44px"
-            fontSize="14px"
-            fontWeight={600}
-            borderRadius={SHAPE.control}
-            backgroundColor="auth.action"
-            color="auth.onAction"
-            _hover={{ backgroundColor: "auth.actionHover" }}
-            onClick={retryPasskeyCeremony}
-            data-testid="passkey-ceremony-retry"
-          >
-            Try again
-          </Button>
-        ) : null}
-        {/* Always here, in both states. A waiting panel with no way out is a
-            trap, and an unanswered one with only "try again" is the same trap
-            wearing a suggestion. */}
+      <PasskeyCeremonyActions ceremony={ceremony} unanswered={unanswered} />
+    </VStack>
+  );
+}
+
+function PasskeyCeremonyActions({
+  ceremony,
+  unanswered,
+}: {
+  ceremony: PasskeyCeremonyState;
+  unanswered: boolean;
+}) {
+  return (
+    <VStack width="full" align="stretch" gap="9px">
+      {unanswered ? (
         <Button
-          variant="outline"
+          className="lw-auth-primary"
           width="full"
           minHeight="44px"
           fontSize="14px"
+          fontWeight={600}
           borderRadius={SHAPE.control}
-          borderColor="auth.fieldBorder"
-          onClick={cancelPasskeyCeremony}
-          data-testid="passkey-ceremony-cancel"
+          backgroundColor="auth.action"
+          color="auth.onAction"
+          _hover={{ backgroundColor: "auth.actionHover" }}
+          onClick={retryPasskeyCeremony}
+          data-testid="passkey-ceremony-retry"
         >
-          Cancel
+          Try again
         </Button>
-        {ceremonyOffersOtherMethods(ceremony) ? (
-          <Button
-            variant="plain"
-            size="sm"
-            alignSelf="center"
-            fontSize="13px"
-            textDecoration="underline"
-            textUnderlineOffset="3px"
-            onClick={leavePasskeyCeremonyForOtherMethods}
-            data-testid="passkey-ceremony-other-methods"
-          >
-            Use a different method
-          </Button>
-        ) : null}
-      </VStack>
+      ) : null}
+      <Button
+        variant="outline"
+        width="full"
+        minHeight="44px"
+        fontSize="14px"
+        borderRadius={SHAPE.control}
+        borderColor="auth.fieldBorder"
+        onClick={cancelPasskeyCeremony}
+        data-testid="passkey-ceremony-cancel"
+      >
+        Cancel
+      </Button>
+      {ceremonyOffersOtherMethods(ceremony) ? (
+        <Button
+          variant="plain"
+          size="sm"
+          alignSelf="center"
+          fontSize="13px"
+          textDecoration="underline"
+          textUnderlineOffset="3px"
+          onClick={leavePasskeyCeremonyForOtherMethods}
+          data-testid="passkey-ceremony-other-methods"
+        >
+          Use a different method
+        </Button>
+      ) : null}
     </VStack>
   );
 }

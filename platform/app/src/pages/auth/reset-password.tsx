@@ -152,6 +152,14 @@ function DeadLinkCard() {
 }
 
 function ResetPasswordForm({ token }: { token: string }) {
+  const state = useResetPasswordForm(token);
+
+  if (state.isDone) return <PasswordUpdatedCard />;
+
+  return <ResetPasswordFields state={state} />;
+}
+
+function useResetPasswordForm(token: string) {
   const form = useForm<z.infer<typeof resetPasswordSchema>>({
     resolver: zodResolver(resetPasswordSchema),
     // Nothing is judged before submit; the auth screens' rule is that a
@@ -221,8 +229,15 @@ function ResetPasswordForm({ token }: { token: string }) {
     }
   };
 
-  if (isDone) return <PasswordUpdatedCard />;
+  return { form, isLoading, isDone, refusal, onSubmit };
+}
 
+function ResetPasswordFields({
+  state,
+}: {
+  state: ReturnType<typeof useResetPasswordForm>;
+}) {
+  const { form, isLoading, refusal, onSubmit } = state;
   return (
     <AuthCard
       title="Choose a new password"
@@ -316,16 +331,7 @@ function usePostResetPasskeyOffer() {
   const run = async (current: { abandoned: boolean }) => {
     try {
       const result = await authClient.passkey.addPasskey({});
-      if (current.abandoned) return;
-      if (result?.error) {
-        // Status 0 is the system prompt closed by hand. Saying "something went
-        // wrong" about a decision would be telling somebody off for deciding.
-        if (result.error.status !== 0) {
-          setFailure(passkeyFailureFrom(result.error));
-        }
-        return;
-      }
-      setIsAdded(true);
+      handlePasskeyResult({ current, result, setFailure, setIsAdded });
     } catch (error) {
       // A throw from the WebAuthn client: unsupported, an insecure origin, a
       // ceremony that never started. It never reached the server.
@@ -359,6 +365,27 @@ function usePostResetPasskeyOffer() {
     add,
     dismiss: () => setIsDismissed(true),
   };
+}
+
+function handlePasskeyResult({
+  current,
+  result,
+  setFailure,
+  setIsAdded,
+}: {
+  current: { abandoned: boolean };
+  result: Awaited<ReturnType<typeof authClient.passkey.addPasskey>>;
+  setFailure: (failure: unknown) => void;
+  setIsAdded: (isAdded: boolean) => void;
+}) {
+  if (current.abandoned) return;
+  if (!result?.error) {
+    setIsAdded(true);
+    return;
+  }
+  // Status 0 is the system prompt closed by hand. Saying "something went
+  // wrong" about a decision would be telling somebody off for deciding.
+  if (result.error.status !== 0) setFailure(passkeyFailureFrom(result.error));
 }
 
 /**

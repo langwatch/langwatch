@@ -29,6 +29,19 @@ import {
 
 type CustomRole = RouterOutputs["role"]["getAll"][number];
 
+interface CustomRolesProps {
+  roles: CustomRole[] | undefined;
+  readFailure: unknown;
+  assignments: AssignmentRow[];
+  assignmentsUnavailable: boolean;
+  canManage: boolean;
+  canReadAuditLog: boolean;
+  onCreate: () => void;
+  onEdit: (role: CustomRole) => void;
+  onDelete: (role: CustomRole) => void;
+  onOpenDetail: (role: CustomRole) => void;
+}
+
 /** The role name an assignment carries for each built-in tier. */
 const TIER_ROLE_NAME: Record<BuiltinTier, string> = {
   admin: "ADMIN",
@@ -72,6 +85,40 @@ export function RolesPanel({
   canManage: boolean;
   canReadAuditLog: boolean;
 }) {
+  const state = useRolesPanel(organizationId);
+
+  return (
+    <VStack align="stretch" width="full" gap={8}>
+      <PredefinedRoles
+        assignments={state.assignmentRows}
+        countsPending={state.countsPending}
+        readFailure={
+          state.assignmentsUnavailable ? state.assignments.error : null
+        }
+        onOpenDetail={state.openBuiltinDetail}
+      />
+      <CustomRoles
+        roles={state.roles.data}
+        readFailure={state.roles.isError ? state.roles.error : null}
+        assignments={state.assignmentRows}
+        assignmentsUnavailable={state.assignmentsUnavailable}
+        canManage={canManage}
+        canReadAuditLog={canReadAuditLog}
+        onCreate={() => state.setDialog({ kind: "create" })}
+        onEdit={(role) => state.setDialog({ kind: "edit", role })}
+        onDelete={state.setRoleToDelete}
+        onOpenDetail={state.openCustomDetail}
+      />
+      <RoleDialogs
+        {...state}
+        organizationId={organizationId}
+        organizationName={organizationName}
+      />
+    </VStack>
+  );
+}
+
+function useRolesPanel(organizationId: string) {
   const [dialog, setDialog] = useState<OpenDialog>({ kind: "none" });
   const [roleToDelete, setRoleToDelete] = useState<CustomRole | null>(null);
 
@@ -102,44 +149,53 @@ export function RolesPanel({
       showErrorToast({ error, fallbackTitle: "Couldn't delete this role" }),
   });
 
+  const openBuiltinDetail = (tier: BuiltinTier) =>
+    setDialog({
+      kind: "detail",
+      title: BUILTIN_TIER_COPY[tier].name,
+      description: BUILTIN_TIER_COPY[tier].summary,
+      permissions: builtinTierPermissions(tier),
+    });
+  const openCustomDetail = (role: CustomRole) =>
+    setDialog({
+      kind: "detail",
+      title: role.name,
+      description: role.description,
+      permissions: role.permissions,
+    });
+
+  return {
+    assignmentRows,
+    assignments,
+    assignmentsUnavailable,
+    countsPending,
+    deleteRole,
+    dialog,
+    openBuiltinDetail,
+    openCustomDetail,
+    roleToDelete,
+    roles,
+    setDialog,
+    setRoleToDelete,
+  };
+}
+
+function RoleDialogs({
+  organizationId,
+  organizationName,
+  dialog,
+  roleToDelete,
+  deleteRole,
+  setDialog,
+  setRoleToDelete,
+}: ReturnType<typeof useRolesPanel> & {
+  organizationId: string;
+  organizationName?: string;
+}) {
   const closeDialog = () => setDialog({ kind: "none" });
 
   return (
-    <VStack align="stretch" width="full" gap={8}>
-      <PredefinedRoles
-        assignments={assignmentRows}
-        countsPending={countsPending}
-        readFailure={assignmentsUnavailable ? assignments.error : null}
-        onOpenDetail={(tier) =>
-          setDialog({
-            kind: "detail",
-            title: BUILTIN_TIER_COPY[tier].name,
-            description: BUILTIN_TIER_COPY[tier].summary,
-            permissions: builtinTierPermissions(tier),
-          })
-        }
-      />
-
-      <CustomRoles
-        roles={roles.data}
-        readFailure={roles.isError ? roles.error : null}
-        assignments={assignmentRows}
-        assignmentsUnavailable={assignmentsUnavailable}
-        canManage={canManage}
-        canReadAuditLog={canReadAuditLog}
-        onCreate={() => setDialog({ kind: "create" })}
-        onEdit={(role) => setDialog({ kind: "edit", role })}
-        onDelete={setRoleToDelete}
-        onOpenDetail={(role) =>
-          setDialog({
-            kind: "detail",
-            title: role.name,
-            description: role.description,
-            permissions: role.permissions,
-          })
-        }
-      />
-
+    <>
       <RoleDialog
         open={dialog.kind === "create" || dialog.kind === "edit"}
         organizationId={organizationId}
@@ -176,7 +232,7 @@ export function RolesPanel({
           );
         }}
       />
-    </VStack>
+    </>
   );
 }
 
@@ -250,18 +306,7 @@ function CustomRoles({
   onEdit,
   onDelete,
   onOpenDetail,
-}: {
-  roles: CustomRole[] | undefined;
-  readFailure: unknown;
-  assignments: AssignmentRow[];
-  assignmentsUnavailable: boolean;
-  canManage: boolean;
-  canReadAuditLog: boolean;
-  onCreate: () => void;
-  onEdit: (role: CustomRole) => void;
-  onDelete: (role: CustomRole) => void;
-  onOpenDetail: (role: CustomRole) => void;
-}) {
+}: CustomRolesProps) {
   return (
     <VStack align="stretch" width="full" gap={4}>
       <SectionTitle
@@ -280,56 +325,16 @@ function CustomRoles({
         }
       />
 
-      {readFailure ? (
-        <SectionErrorNotice
-          error={readFailure}
-          fallbackTitle="Couldn't load your custom roles"
-        />
-      ) : roles && roles.length === 0 ? (
-        <Box
-          width="full"
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="xl"
-          padding={8}
-        >
-          <Text fontSize="sm" color="fg.muted">
-            No custom roles yet. Write one when somebody needs a narrower slice
-            of access than Admin, Member or Viewer gives them.
-          </Text>
-        </Box>
-      ) : (
-        <VStack align="stretch" width="full" gap={4}>
-          {roles?.map((role) => (
-            <CustomRoleCard
-              key={role.id}
-              role={role}
-              canManage={canManage}
-              holders={
-                assignmentsUnavailable
-                  ? []
-                  : holdersOfCustomRole({ assignments, customRoleId: role.id })
-              }
-              scopes={
-                assignmentsUnavailable
-                  ? []
-                  : scopesOfCustomRole({ assignments, customRoleId: role.id })
-              }
-              people={
-                assignmentsUnavailable
-                  ? null
-                  : peopleHoldingCustomRole({
-                      assignments,
-                      customRoleId: role.id,
-                    })
-              }
-              onOpenDetail={() => onOpenDetail(role)}
-              onEdit={() => onEdit(role)}
-              onDelete={() => onDelete(role)}
-            />
-          ))}
-        </VStack>
-      )}
+      <CustomRolesContent
+        roles={roles}
+        readFailure={readFailure}
+        assignments={assignments}
+        assignmentsUnavailable={assignmentsUnavailable}
+        canManage={canManage}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onOpenDetail={onOpenDetail}
+      />
 
       {canReadAuditLog && (
         <Text fontSize="xs" color="fg.muted">
@@ -340,6 +345,77 @@ function CustomRoles({
           .
         </Text>
       )}
+    </VStack>
+  );
+}
+
+function CustomRolesContent(
+  props: Omit<CustomRolesProps, "canReadAuditLog" | "onCreate">,
+) {
+  if (props.readFailure) {
+    return (
+      <SectionErrorNotice
+        error={props.readFailure}
+        fallbackTitle="Couldn't load your custom roles"
+      />
+    );
+  }
+  if (props.roles?.length === 0) {
+    return (
+      <Box
+        width="full"
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="xl"
+        padding={8}
+      >
+        <Text fontSize="sm" color="fg.muted">
+          No custom roles yet. Write one when somebody needs a narrower slice of
+          access than Admin, Member or Viewer gives them.
+        </Text>
+      </Box>
+    );
+  }
+
+  return <CustomRoleCards {...props} />;
+}
+
+function CustomRoleCards({
+  roles,
+  assignments,
+  assignmentsUnavailable,
+  canManage,
+  onEdit,
+  onDelete,
+  onOpenDetail,
+}: Omit<CustomRolesProps, "canReadAuditLog" | "onCreate" | "readFailure">) {
+  return (
+    <VStack align="stretch" width="full" gap={4}>
+      {roles?.map((role) => {
+        const assignmentInput = { assignments, customRoleId: role.id };
+
+        return (
+          <CustomRoleCard
+            key={role.id}
+            role={role}
+            canManage={canManage}
+            holders={
+              assignmentsUnavailable ? [] : holdersOfCustomRole(assignmentInput)
+            }
+            scopes={
+              assignmentsUnavailable ? [] : scopesOfCustomRole(assignmentInput)
+            }
+            people={
+              assignmentsUnavailable
+                ? null
+                : peopleHoldingCustomRole(assignmentInput)
+            }
+            onOpenDetail={() => onOpenDetail(role)}
+            onEdit={() => onEdit(role)}
+            onDelete={() => onDelete(role)}
+          />
+        );
+      })}
     </VStack>
   );
 }
