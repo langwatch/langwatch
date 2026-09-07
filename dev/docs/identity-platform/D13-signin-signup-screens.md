@@ -11,7 +11,7 @@ Auth0 owned the auth-screen visuals; retiring it means every screen an unauthent
 **Screen inventory** (each with golden path + failure states in its spec):
 
 - **Sign-in — identifier-first**: email step → routed outcome (IdP redirect, or the uniform method picker: password | social | passkey placeholder until D07). Same page, same timing whether or not the account exists (D03 owns the contract; this UI implements it). Self-hosted sole-connection auto-redirect and the `?local=1` break-glass variant.
-- **Sign-up**: email step → verification → method choice (password or social, reusing the picker components). After verification, the **join-before-create interstitial** (hook filled by D12): if the domain matches an org, "join Acme Corp" / auto-join leads and "create a new organization" is the secondary action. An organization is created only when the user explicitly chooses it or no match exists — sign-up stops defaulting into a fresh org nobody will ever use.
+- **Sign-up**: email step → confirmation link → single-use address proof → method choice (password or passkey). The credential is created only after the proof returns, and account creation consumes that proof. After account creation, the **join-before-create interstitial** (hook filled by D12) runs: if the domain matches an org, "join Acme Corp" / auto-join leads and "create a new organization" is the secondary action. An organization is created only when the user explicitly chooses it or no match exists — sign-up stops defaulting into a fresh org nobody will ever use.
 - **Password reset**: request + reset screens; availability under SSO/cloud mode per Open Q9; uniform response whether or not the email exists.
 - **Email verification states**: sent, verified, expired-link, resend.
 - **Invitation acceptance**: the invite-link landing — org name, inviter, and the same method picker (accept via any verified method matching the invite email, D11's rule). Signed-in variant: confirm-and-join. Signed-out variant: sign in or sign up first, the invite riding through the ceremony untouched. EXPIRED offers "ask for a new invitation" (pings the inviter, whose side is one-click resend); REVOKED ends without detail. D11 ships the acceptance logic inside today's members screens; this deliverable renders it as part of the first-party set.
@@ -27,7 +27,7 @@ Auth0 owned the auth-screen visuals; retiring it means every screen an unauthent
 unauthenticated (this deliverable)
   /auth/signin              identifier-first email step → routed outcome (picker | IdP redirect)
   /auth/signin?local=1      self-hosted break-glass local login
-  /auth/signup              email → verification → method choice → join-before-create interstitial
+  /auth/signup              email → link/proof → password or passkey → join-before-create interstitial
   /auth/reset · /auth/reset/<token>       password reset request + completion
   /auth/verify/<token>      email verification states (sent · verified · expired · resend)
   /invite/<code>            invitation acceptance (logic from D11)
@@ -54,7 +54,7 @@ authenticated identity surfaces (later deliverables — listed for orientation)
 
 1. Screen components over D03's routing contract (the router returns a decision + reason; the UI renders it — no routing logic in components).
 2. Page-level timing normalization for the enumeration guarantee.
-3. Sign-up flow with verification-first ordering and the interstitial hook API (D12 plugs matching + content in; until then the hook renders nothing and sign-up proceeds to create-org).
+3. Sign-up flow with verification-first ordering: route the address, send the link, consume its single-use proof during password or passkey registration, then enter the interstitial hook API (D12 plugs matching + content in; until then the hook renders nothing and sign-up proceeds to create-org).
 4. Deny/guidance states wired to router reason codes — the same codes the D05 ops surface displays.
 5. New Gherkin specs per screen (golden + failure paths), tagged and bound.
 6. Flip with D03; legacy screens deleted at bake end.
