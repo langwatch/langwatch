@@ -1,12 +1,13 @@
 Feature: The identifier-first sign-in router - one auth screen, routed by data
   As a person signing in to LangWatch
   I need my email to route me to the right identity provider or method set
-  So that every sign-in method works through one door, without the screen
-  ever revealing whether an account exists for the address I typed
+  So that every sign-in method works through one door and credential failures
+  never reveal whether the address or secret was wrong
 
   # D03 (ADR-117). The router is a pure decision engine over Postgres reads;
   # user-level resolution (any verified email, OAuth subject) is the
-  # ADR-116 storage adapter's job, so the router carries no per-user fork.
+  # ADR-116 storage adapter's job. The router consumes the account method
+  # answer through its lookup port; it does not read identity storage itself.
   #
   #   input                        decision                  reason code
   #   (self-hosted, 1 ACTIVE  →    redirect to the IdP       sole_active_connection
@@ -14,7 +15,9 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
   #   (?local=1)              →    local method picker       break_glass
   #   email → normalize       →    domain in ACTIVE conn?
   #     yes                   →    redirect to the IdP       domain_routed
-  #     no                    →    uniform method picker     no_domain_match
+  #     no, known account     →    account's method picker   account_methods
+  #     no, unknown account   →    continue to sign-up       identifier_unknown
+  #     lookup not wired      →    default method picker     no_domain_match
   #
   # The decision carries a reason code; the same codes drive the screens'
   # deny/guidance states (D13) and the ops surface's routing view (D05).
@@ -34,13 +37,6 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the decision is a redirect to that connection's identity provider
     And the value was normalized exactly as attach-time normalization does
     And the decision carries the reason code "domain_routed"
-
-  @unit
-  Scenario: An email with no domain match offers the uniform method picker
-    Given "home.net" belongs to no ACTIVE connection
-    When "sam@home.net" is submitted to the router
-    Then the decision is the instance's default method set
-    And the decision carries the reason code "no_domain_match"
 
   # RETIRED, and replaced by the four scenarios below (ADR-117, revision
   # 2026-08-25). The router used to answer a known address and an unknown one

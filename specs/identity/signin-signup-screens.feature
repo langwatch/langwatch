@@ -18,14 +18,12 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   #   /invite/<code>          invitation acceptance (logic from D11)
   #   /auth/join              join-before-create interstitial (content from D12)
   #
-  # Unified email-first funnel: logging in and signing up are ONE flow, and a
-  # dead end in either converts to the other door rather than refusing. Signing
-  # up with an address that already has an account quietly becomes logging in;
-  # a password typed for an address nobody holds becomes a sign-up, confirmed
-  # by email. The account-existence no-oracle is therefore retired at the
-  # SCREEN level (ADR-117 §6, Revision 2026-08-24): the router decision stays
-  # existence-independent, and the picker still renders the same methods for
-  # any address, because both are instance and organization data.
+  # Unified email-first funnel: logging in and signing up are ONE flow. After
+  # domain routing, the router now distinguishes an unknown address from an
+  # account and returns only the methods that account holds. An unknown address
+  # continues to account creation; a known one gets its real ways in. The
+  # credential boundary remains non-enumerating: a wrong password and a
+  # password for an unknown address still receive the same refusal.
   #
   # Anchors that keep holding on the new screens:
   # specs/auth/sign-in-failure-messages.feature (failures say why),
@@ -44,15 +42,16 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then a domain-routed decision sends me to my identity provider
     And any other decision shows the method picker the decision named
 
-  # Scoped to the PICKER, which is instance and organization data: the methods
-  # offered, and the one request that fetches them, cannot differ by address.
-  # What happens after a method is used may converge to the other journey, and
-  # the two scenarios below say so.
-  @integration
-  Scenario: The picker looks the same whether or not my account exists
-    When two visitors enter a registered and an unregistered email
-    Then both see the same picker, with the same methods, from the same one request
-    And the picker itself says nothing about whether an account exists
+  # Account-aware routing may name that an address is unknown; it must not turn
+  # a credential refusal into an oracle for which half of a submitted pair was
+  # wrong. Bound in `betterAuthErrorSweep.unit.test.ts`.
+  @unit
+  Scenario: A credential refusal never identifies the wrong half
+    Given one visitor enters a wrong password for a registered address
+    And another enters a password for an address nobody holds
+    When both submit their credentials
+    Then both receive the same registered refusal
+    And the refusal identifies neither the address nor password as wrong
 
   @integration
   Scenario: A deny decision explains itself in words from the registry
