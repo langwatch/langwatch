@@ -69,7 +69,13 @@ export class SessionClaimsService {
    * endpoint we have not taught this about degrades to the behaviour the
    * product had before any of it existed.
    */
-  async claimsForMint({ userId, path }: { userId: string; path: string }): Promise<SessionClaims> {
+  async claimsForMint({
+    userId,
+    path,
+  }: {
+    userId: string;
+    path: string;
+  }): Promise<SessionClaims> {
     const provider = signInProviderForPath({ path });
     if (!provider) return NO_SESSION_CLAIMS;
 
@@ -103,8 +109,7 @@ export class SessionClaimsService {
         isLocal || authenticatedAccount?.verifiedTokenClaims
           ? deriveSessionAmr({
               path,
-              providerAssertedAmr:
-                authenticatedAccount?.assertedFactors ?? [],
+              providerAssertedAmr: authenticatedAccount?.assertedFactors ?? [],
             })
           : [],
     };
