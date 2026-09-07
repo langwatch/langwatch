@@ -254,6 +254,10 @@ export function InsightsSetupDrawer({
                 mode="chat"
                 showConfigureAction
                 forFeatureLabel="for Insights"
+                // Langy is a codex-licensed surface; without its key the
+                // picker would drop the very model Langy may be configured
+                // with and paint it as unknown.
+                featureKey={LANGY_CHAT_FEATURE_KEY}
               />
             </SettingRow>
             <SettingRow
