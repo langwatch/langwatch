@@ -302,6 +302,10 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/receiver-auth-rate-limit.feature",
   "specs/ai-gateway/governance/receiver-shapes.feature",
   "specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature",
+  // Every scenario in this file is @unimplemented on purpose: the REST
+  // read endpoints ship ahead of their implementation. Remove this entry
+  // once scenarios are bound to the integration test.
+  "specs/ai-gateway/governance/routing-policy-rest-read.feature",
   "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
   "specs/ai-gateway/governance/self-hosted-setup.feature",
   "specs/ai-gateway/governance/sessions-and-devices.feature",
