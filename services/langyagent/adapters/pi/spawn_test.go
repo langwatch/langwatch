@@ -126,7 +126,6 @@ func TestProvision_WritesTheWorkerHome(t *testing.T) {
 	if hostHome, err := os.UserHomeDir(); err == nil && hostHome != "" && strings.HasPrefix(skills, hostHome) {
 		t.Errorf("skillsDir %q resolves inside the host account home", skills)
 	}
-
 }
 
 // @scenario "A worker receives live credentials without persisting them"
