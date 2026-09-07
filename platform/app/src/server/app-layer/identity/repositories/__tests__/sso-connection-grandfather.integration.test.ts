@@ -131,8 +131,9 @@ function grandfather() {
     connections: new SsoConnectionService(
       new SsoConnectionGuards({
         connections: new PrismaSsoConnectionReadRepository(prisma),
-        registrationSlots:
-          new PrismaSsoConnectionRegistrationRepository(prisma),
+        registrationSlots: new PrismaSsoConnectionRegistrationRepository(
+          prisma,
+        ),
         breakGlass: new LocalDoorBreakGlassBinding(),
         stranding: new PrismaSsoConnectionStrandingRepository(prisma),
         // The real binding, over the same prisma the rest of this suite uses:
@@ -263,8 +264,9 @@ describe("the sso connection grandfather migration against Postgres", () => {
         connections: new SsoConnectionService(
           new SsoConnectionGuards({
             connections: new PrismaSsoConnectionReadRepository(prisma),
-            registrationSlots:
-              new PrismaSsoConnectionRegistrationRepository(prisma),
+            registrationSlots: new PrismaSsoConnectionRegistrationRepository(
+              prisma,
+            ),
             breakGlass: new LocalDoorBreakGlassBinding(),
             stranding: new PrismaSsoConnectionStrandingRepository(prisma),
             // The real binding, over the same prisma the rest of this suite uses:

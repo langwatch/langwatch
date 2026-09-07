@@ -1460,12 +1460,6 @@ export function databaseHooks(): BetterAuthDatabaseHooks {
   });
 }
 
-export function clearSignUpConfirmationPending(args: {
-  userId: string;
-}): Promise<void> {
-  return identityUsers.clearSignUpConfirmationPending(args);
-}
-
 /**
  * The three compositions that used to live in satellite `*-runtime.ts` files
  * beside this one, and now do not (ADR-129).

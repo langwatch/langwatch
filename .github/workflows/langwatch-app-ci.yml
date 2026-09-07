@@ -470,7 +470,7 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/langyworker run typecheck
 
-      - name: Run unit tests (shard ${{ matrix.shard }}/4)
+      - name: Run unit tests (shard ${{ matrix.shard }}/${{ needs.changes.outputs.unit-shard-count }})
         id: unit-tests
         working-directory: platform/app
         run: |
