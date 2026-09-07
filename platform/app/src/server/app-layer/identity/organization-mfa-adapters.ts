@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { sendOrganizationMfaRequirementEmail } from "~/server/mailer/organization-mfa-requirement-email";
 import type {
   OrganizationConnectionFactorPort,
   OrganizationMemberFactorPort,
@@ -20,9 +21,7 @@ const logger = createLogger("langwatch:identity:organization-mfa");
  * which the impersonation guard already reads, so there is exactly one answer
  * to "has this person got one" across the product.
  */
-export class PrismaOrganizationMfaSettings
-  implements OrganizationMfaSettingPort
-{
+export class PrismaOrganizationMfaSettings implements OrganizationMfaSettingPort {
   constructor(private readonly prisma: PrismaClient) {}
 
   async read({ organizationId }: { organizationId: string }): Promise<{
@@ -59,9 +58,7 @@ export class PrismaOrganizationMfaSettings
 }
 
 /** Who holds a seat, and what their account carries. */
-export class PrismaOrganizationMemberFactors
-  implements OrganizationMemberFactorPort
-{
+export class PrismaOrganizationMemberFactors implements OrganizationMemberFactorPort {
   constructor(private readonly prisma: PrismaClient) {}
 
   async membersOf({ organizationId }: { organizationId: string }): Promise<
@@ -156,9 +153,7 @@ export class PrismaOrganizationMemberFactors
  * different answer from `[]` — a connection asserting nothing is a thing the
  * administrator has to be told about, and no connection is not.
  */
-export class PrismaOrganizationConnectionFactors
-  implements OrganizationConnectionFactorPort
-{
+export class PrismaOrganizationConnectionFactors implements OrganizationConnectionFactorPort {
   constructor(private readonly prisma: PrismaClient) {}
 
   async assertedFactorsFor({
@@ -254,31 +249,82 @@ export class PrismaSessionFactors implements SessionFactorPort {
 }
 
 /**
- * Telling an organization's members that the requirement now applies.
- *
- * Logged rather than mailed for now, deliberately and visibly: the members
- * area already tells a held person what to do at the gate itself, which is
- * where they will be standing, and a mail nobody wrote copy for is worse than
- * no mail. The port exists so the mail can be added without the service
- * changing shape.
+ * Telling an organization's active members when its requirement changes.
+ * Delivery uses the same mail transport as the rest of the app. Every
+ * recipient is attempted before a failure is reported, and the log names the
+ * failed count rather than claiming the whole audience was reached.
  */
-export class LoggingOrganizationMfaNotifier implements OrganizationMfaNotifier {
-  async requirementTurnedOn({
+export class EmailOrganizationMfaNotifier implements OrganizationMfaNotifier {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async requirementChanged({
     organizationId,
     actorUserId,
+    required,
     memberUserIds,
   }: {
     organizationId: string;
     actorUserId: string;
+    required: boolean;
     memberUserIds: readonly string[];
   }): Promise<void> {
-    logger.info(
-      { organizationId, actorUserId, memberCount: memberUserIds.length },
-      // Says what happened. Claiming the members were told, when this class
-      // is a logger, made the one record of the event a false one — and the
-      // administrator asking why nobody was notified would have been reading
-      // the line that said they were.
-      "organization now requires a second factor; no notification is sent yet",
+    const [organization, actor, memberships] = await Promise.all([
+      this.prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { name: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: actorUserId },
+        select: { name: true, email: true },
+      }),
+      this.prisma.organizationUser.findMany({
+        where: {
+          organizationId,
+          userId: { in: [...new Set(memberUserIds)] },
+          disabledAt: null,
+        },
+        select: { userId: true, user: { select: { email: true } } },
+      }),
+    ]);
+    if (!organization) {
+      throw new Error(
+        `organization ${organizationId} was not found while notifying members`,
+      );
+    }
+
+    const actorName = actor?.name ?? actor?.email ?? "An administrator";
+    const deliveries = memberships.map(async ({ userId, user }) => {
+      if (!user.email) {
+        throw new Error(
+          `member ${userId} has no email address for the MFA requirement notification`,
+        );
+      }
+      await sendOrganizationMfaRequirementEmail({
+        to: user.email,
+        organizationName: organization.name,
+        actorName,
+        required,
+      });
+    });
+    const results = await Promise.allSettled(deliveries);
+    const failures = results.flatMap((result) =>
+      result.status === "rejected" ? [result.reason] : [],
     );
+    if (failures.length > 0) {
+      logger.error(
+        {
+          organizationId,
+          actorUserId,
+          required,
+          attempted: memberships.length,
+          failed: failures.length,
+        },
+        "organization MFA requirement notification delivery failed",
+      );
+      throw new AggregateError(
+        failures,
+        `failed to notify ${failures.length} organization member(s) about the MFA requirement change`,
+      );
+    }
   }
 }

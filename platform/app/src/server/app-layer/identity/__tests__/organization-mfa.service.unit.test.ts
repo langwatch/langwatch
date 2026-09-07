@@ -36,7 +36,7 @@ const fixture = ({
     },
   );
   const notify = vi.fn<
-    OrganizationMfaServiceDeps["notifier"]["requirementTurnedOn"]
+    OrganizationMfaServiceDeps["notifier"]["requirementChanged"]
   >(async () => void 0);
   const entitlement = vi.fn(async () => entitled);
   const sessionReads = vi.fn(
@@ -69,7 +69,7 @@ const fixture = ({
       isMember: async ({ userId }) => factors.has(userId),
     },
     connections: { assertedFactorsFor: async () => null },
-    notifier: { requirementTurnedOn: notify },
+    notifier: { requirementChanged: notify },
     offered: () => offered,
     entitled: entitlement,
   };
@@ -102,6 +102,7 @@ describe("OrganizationMfaService requirement lifecycle", () => {
     expect(subject.notify).toHaveBeenCalledWith({
       organizationId,
       actorUserId: "admin-sam",
+      required: true,
       memberUserIds: ["ana", "olga"],
     });
     expect([...subject.sessions]).toEqual(before);
@@ -161,6 +162,25 @@ describe("OrganizationMfaService requirement lifecycle", () => {
     ).resolves.toEqual({ previous: true, next: false });
     expect(releasing.entitlement).not.toHaveBeenCalled();
     expect(releasing.required()).toBe(false);
+    expect(releasing.notify).toHaveBeenCalledWith({
+      organizationId,
+      actorUserId: "admin-sam",
+      required: false,
+      memberUserIds: ["ana", "olga"],
+    });
+  });
+
+  it("does not notify members when the requirement is unchanged", async () => {
+    const subject = fixture({ required: true });
+    await expect(
+      subject.service.setRequirement({
+        organizationId,
+        mfaRequired: true,
+        actorUserId: "admin-sam",
+      }),
+    ).resolves.toEqual({ previous: true, next: true });
+    expect(subject.write).not.toHaveBeenCalled();
+    expect(subject.notify).not.toHaveBeenCalled();
   });
 
   /** @scenario "Turning the flag off leaves people who set one up signed in" */
