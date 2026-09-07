@@ -10,14 +10,6 @@ export type RecentItemType =
   | "annotation"
   | "simulation";
 
-export type RecentItem = {
-  id: string;
-  type: RecentItemType;
-  name: string;
-  href: string;
-  updatedAt: Date;
-};
-
 export type GetRecentItemsParams = {
   userId: string;
   projectId: string;

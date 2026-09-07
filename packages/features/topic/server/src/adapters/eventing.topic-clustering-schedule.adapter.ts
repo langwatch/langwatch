@@ -1,5 +1,6 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../processes/topic-clustering.process.ts";
+import { Temporal, type Instant } from "@langwatch/time";
 import { TopicClusteringSchedulePort } from "../ports/topic-clustering-schedule.port.ts";
 
 /** Reads Topic's durable wake from the generic process-manager store. */
@@ -12,7 +13,7 @@ export class EventingTopicClusteringScheduleAdapter extends TopicClusteringSched
     super();
   }
 
-  async tryGetNextWakeAt(input: { projectId: string }): Promise<Date | null> {
+  async tryGetNextWakeAt(input: { projectId: string }): Promise<Instant | null> {
     const instance = await this.processStore.findByRef({
       ref: {
         processName: TOPIC_CLUSTERING_PROCESS_NAME,
@@ -21,6 +22,6 @@ export class EventingTopicClusteringScheduleAdapter extends TopicClusteringSched
       },
     });
     if (!instance || instance.nextWakeAt === null) return null;
-    return new Date(instance.nextWakeAt);
+    return Temporal.Instant.fromEpochMilliseconds(instance.nextWakeAt);
   }
 }

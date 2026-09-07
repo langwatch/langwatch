@@ -7,11 +7,12 @@
  * @see specs/coding-agent/project-menu-links.feature
  */
 import { describe, expect, it } from "vitest";
+import { Temporal } from "@langwatch/time";
 import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../coding-agent-activity.ts";
 
-const NOW = new Date("2026-08-16T12:00:00.000Z");
+const NOW = Temporal.Instant.from("2026-08-16T12:00:00.000Z");
 
-const daysBefore = (days: number): Date => new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000);
+const daysBefore = (days: number): number => NOW.epochMilliseconds - days * 24 * 60 * 60 * 1000;
 
 describe("withinDays", () => {
   describe("given a moment inside the window", () => {
@@ -28,7 +29,9 @@ describe("withinDays", () => {
     it("accepts the same moment written as a string", () => {
       expect(
         withinDays({
-          at: daysBefore(14).toISOString(),
+          at: Temporal.Instant.fromEpochMilliseconds(daysBefore(14)).toString({
+            fractionalSecondDigits: 3,
+          }),
           days: CODING_AGENT_LINK_WINDOW_DAYS,
           now: NOW,
         }),
@@ -101,7 +104,7 @@ describe("withinDays", () => {
     it("reads as recent", () => {
       expect(
         withinDays({
-          at: new Date(NOW.getTime() + 60_000),
+          at: NOW.add({ milliseconds: 60_000 }).epochMilliseconds,
           days: CODING_AGENT_LINK_WINDOW_DAYS,
           now: NOW,
         }),

@@ -1,6 +1,7 @@
 import type { BudgetOverviewItemView } from "@langwatch/gateway-web/surfaces/budget-overview";
 import { useMemo } from "react";
 
+import { readableDate } from "../model/display-formatters.ts";
 import { api } from "./personal-workspace-api.ts";
 import { useCurrentUser, useOrganizationTeamProject } from "./personal-workspace-session.ts";
 
@@ -172,14 +173,14 @@ export function usePersonalContext(): PersonalContext {
       label: row.name,
       deviceHint: row.description ?? "Personal device",
       os: "Unknown",
-      lastUsedAt: row.lastUsedAtMs === null ? null : new Date(row.lastUsedAtMs).toISOString(),
+      lastUsedAt: row.lastUsedAtMs === null ? null : readableDate(row.lastUsedAtMs).toISOString(),
       // `fmtRelative` reads back this field via `Date.now() -
       // new Date(iso).getTime()` and renders "N min/h/d ago". Sending
       // a date-only `YYYY-MM-DD` made the JS Date parse as midnight
       // UTC, so a key minted 3min ago rendered as "Created 18h ago"
       // (Ariana QA option-C dogfood — visible regression on a
       // freshly-minted key).
-      createdAt: new Date(row.createdAtMs).toISOString(),
+      createdAt: readableDate(row.createdAtMs).toISOString(),
     }));
   }, [personalKeysQuery.data]);
 
@@ -203,7 +204,9 @@ export function usePersonalContext(): PersonalContext {
     email: userEmail,
     fullName: userName,
     joinedOn: personalContextQuery.data
-      ? new Date(personalContextQuery.data.workspace.team.createdAtMs).toISOString().slice(0, 10)
+      ? readableDate(personalContextQuery.data.workspace.team.createdAtMs)
+          .toISOString()
+          .slice(0, 10)
       : "—",
     organizationName: orgName,
     organizationId: orgId,

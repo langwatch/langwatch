@@ -11,6 +11,7 @@ import type {
   JoinRequestListReadRepository,
 } from "../join-request.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, type Instant } from "@langwatch/time";
 import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository.ts";
 
 /**
@@ -63,13 +64,13 @@ export class PrismaJoinRequestReadRepository implements JoinRequestListReadRepos
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<Date | null> {
+  }): Promise<Instant | null> {
     const row = await this.prisma.joinRequest.findFirst({
       where: { userId, organizationId, state: "REJECTED" },
       orderBy: { resolvedAt: "desc" },
       select: { resolvedAt: true },
     });
-    return row?.resolvedAt ?? null;
+    return row?.resolvedAt ? fromDate(row.resolvedAt) : null;
   }
 
   /** Everything waiting on one organization, newest ask first. */

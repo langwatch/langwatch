@@ -34,7 +34,8 @@ interface CompatSession {
 const adaptSession = (data: unknown): CompatSession | null => {
   if (!data || typeof data !== "object") return null;
   const raw = data as {
-    session?: { expiresAt?: string | Date };
+    // Better Auth returns the raw session payload; the narrowing below owns its shape.
+    session?: { expiresAt?: unknown };
     user?: Record<string, unknown>;
   };
   const user = raw.user;

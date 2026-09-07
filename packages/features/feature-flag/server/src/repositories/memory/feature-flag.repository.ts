@@ -1,12 +1,13 @@
 import type { FeatureFlagRules, StoredFeatureFlag } from "@langwatch/feature-flag-contract";
 import type { FeatureFlagRow } from "../../ports/feature-flag-cache.port.ts";
+import { Temporal, nowInstant, type Instant } from "@langwatch/time";
 import { FeatureFlagRepository } from "../feature-flag.repository.ts";
 
 type MemoryRecord = {
   enabled: boolean;
   rules: FeatureFlagRules;
   lastEditedBy: string | null;
-  updatedAt: Date;
+  updatedAt: Instant;
 };
 
 /**
@@ -15,7 +16,7 @@ type MemoryRecord = {
  */
 export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
   private readonly records = new Map<string, MemoryRecord>();
-  private readonly organizations = new Map<string, Date>();
+  private readonly organizations = new Map<string, Instant>();
   /** How many times an age rule sent this repository to the organizations. */
   organizationReads = 0;
   /** Set to make the next organization read fail, the way a blip does. */
@@ -25,7 +26,9 @@ export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
     super();
   }
 
-  static create(now: () => number = Date.now): MemoryFeatureFlagRepository {
+  static create(
+    now: () => number = () => nowInstant().epochMilliseconds,
+  ): MemoryFeatureFlagRepository {
     return new MemoryFeatureFlagRepository(now);
   }
 
@@ -56,7 +59,7 @@ export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
       enabled,
       rules: existing?.rules ?? [],
       lastEditedBy,
-      updatedAt: new Date(this.now()),
+      updatedAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
     });
   }
 
@@ -76,7 +79,7 @@ export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
       enabled: existing?.enabled ?? seedEnabled,
       rules,
       lastEditedBy,
-      updatedAt: new Date(this.now()),
+      updatedAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
     });
   }
 
@@ -90,7 +93,7 @@ export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
     createdAt,
   }: {
     organizationId: string;
-    createdAt: Date;
+    createdAt: Instant;
   }): void {
     this.organizations.set(organizationId, createdAt);
   }
@@ -99,7 +102,7 @@ export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
     this.failNextOrganizationRead = true;
   }
 
-  async tryFindOrganizationCreatedAt(organizationId: string): Promise<Date | null> {
+  async tryFindOrganizationCreatedAt(organizationId: string): Promise<Instant | null> {
     this.organizationReads += 1;
     if (this.failNextOrganizationRead) {
       this.failNextOrganizationRead = false;

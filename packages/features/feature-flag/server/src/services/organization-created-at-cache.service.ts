@@ -3,6 +3,7 @@
  * organization rather than by flag, and outliving a flag-row cache window.
  */
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 /**
  * An organization's creation date never changes, so this window bounds how many rows a process
@@ -18,7 +19,7 @@ export class OrganizationCreatedAtCacheService {
 
   private readonly organizationCreatedAt = new Map<
     string,
-    { createdAt: Date | null; expiresAt: number }
+    { createdAt: Instant | null; expiresAt: number }
   >();
 
   private constructor(private readonly repository: FeatureFlagRepository) {}
@@ -28,8 +29,8 @@ export class OrganizationCreatedAtCacheService {
    * null, which matches no age rule — the same fail-closed choice the matcher makes for an
    * unknown date, so a database blip cannot hand a rollout to organizations it excludes.
    */
-  async tryGetCreatedAt(organizationId: string): Promise<Date | null> {
-    const now = Date.now();
+  async tryGetCreatedAt(organizationId: string): Promise<Instant | null> {
+    const now = nowInstant().epochMilliseconds;
     const cached = this.organizationCreatedAt.get(organizationId);
     if (cached && cached.expiresAt > now) {
       return cached.createdAt;
@@ -53,7 +54,7 @@ export class OrganizationCreatedAtCacheService {
     now,
   }: {
     organizationId: string;
-    createdAt: Date | null;
+    createdAt: Instant | null;
     now: number;
   }): void {
     if (this.organizationCreatedAt.size >= ORGANIZATION_CREATED_AT_MAX_KEYS) {

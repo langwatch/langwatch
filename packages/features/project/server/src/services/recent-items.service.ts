@@ -1,9 +1,10 @@
 import type { RecentItemsRepository } from "../repositories/recent-items.repository.ts";
+import type { RecentItem } from "@langwatch/project-contract";
+import { toDate, type Instant } from "@langwatch/time";
 import {
   ACTION_TO_TYPE_MAP,
   ENTITY_ID_EXTRACTORS,
   type GetRecentItemsParams,
-  type RecentItem,
   type RecentItemType,
 } from "../rules/recent-items.rules.ts";
 
@@ -25,7 +26,7 @@ export class RecentItemsService {
     const auditLogs = await this.repository.getRecentAuditLogEntries(params);
 
     // Process audit logs to extract unique entity references
-    const entityMap = new Map<string, { type: RecentItemType; id: string; timestamp: Date }>();
+    const entityMap = new Map<string, { type: RecentItemType; id: string; timestamp: Instant }>();
 
     for (const log of auditLogs) {
       const type = this.getTypeFromAction(log.action);
@@ -89,7 +90,7 @@ export class RecentItemsService {
   private async hydrateEntity(
     type: RecentItemType,
     id: string,
-    timestamp: Date,
+    timestamp: Instant,
     projectId: string,
   ): Promise<RecentItem | null> {
     const resolved = await this.tryResolveEntity(type, id, projectId);
@@ -102,7 +103,7 @@ export class RecentItemsService {
       type,
       name: resolved.name,
       href: resolved.href,
-      updatedAt: timestamp,
+      updatedAt: toDate(timestamp),
     };
   }
 

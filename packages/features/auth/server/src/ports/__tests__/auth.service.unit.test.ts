@@ -3,13 +3,14 @@ import { AuthService } from "@langwatch/auth-server";
 import type { UserProfile } from "@langwatch/user-contract";
 import { UserService } from "@langwatch/user-contract";
 import { IdentityEmailService } from "@langwatch/identity-contract";
+import { Temporal, type Instant } from "@langwatch/time";
 import { AuthClockPort } from "../auth-clock.port.ts";
 import { AuthSecondaryStorePort } from "../auth-secondary-store.port.ts";
 import { AuthSessionRepository } from "../../repositories/auth-session.repository.ts";
 
 class Clock extends AuthClockPort {
-  now(): Date {
-    return new Date("2026-08-28T00:00:00.000Z");
+  now(): Instant {
+    return Temporal.Instant.from("2026-08-28T00:00:00.000Z");
   }
 }
 

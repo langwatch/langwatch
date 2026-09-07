@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/identity-contract";
 import { emptyJoinRequest } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Temporal, type Instant } from "@langwatch/time";
 
 /**
  * The shared counter, as the service now takes it: a dependency rather than a
@@ -68,7 +69,7 @@ function harness({
   candidates?: JoinCandidateOrganization[];
   held?: JoinRequestAggregateState | null;
   pending?: JoinRequestAggregateState | null;
-  lastRejectionAt?: Date | null;
+  lastRejectionAt?: Instant | null;
   licensed?: boolean;
   enabled?: boolean;
   isMember?: boolean;
@@ -220,7 +221,7 @@ describe("given a person an administrator has rejected", () => {
     /** @scenario A rejected person cannot immediately ask again */
     it("refuses with the throttle code, never a rejection code", async () => {
       const { service } = harness({
-        lastRejectionAt: new Date(NOW - 60_000),
+        lastRejectionAt: Temporal.Instant.fromEpochMilliseconds(NOW - 60_000),
       });
 
       // The THROTTLE code on purpose: a person who could tell "you were
@@ -239,7 +240,9 @@ describe("given a person an administrator has rejected", () => {
   describe("when they ask after the cool-down", () => {
     it("opens a fresh request", async () => {
       const { service, requests } = harness({
-        lastRejectionAt: new Date(NOW - JOIN_REJECTION_COOLDOWN_MS - 1),
+        lastRejectionAt: Temporal.Instant.fromEpochMilliseconds(
+          NOW - JOIN_REJECTION_COOLDOWN_MS - 1,
+        ),
       });
 
       const result = await service.request({

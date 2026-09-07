@@ -113,7 +113,7 @@ export class JoinRequestAdmissionGuardsService {
       return;
     }
 
-    const clearsAt = rejectedAt.getTime() + JOIN_REJECTION_COOLDOWN_MS;
+    const clearsAt = rejectedAt.epochMilliseconds + JOIN_REJECTION_COOLDOWN_MS;
     const now = this.now();
     if (now >= clearsAt) {
       return;

@@ -73,7 +73,7 @@ export class TopicService extends TopicServiceContract {
           lastRunAt,
           lastRequestTrigger: projection?.lastRequestTrigger ?? null,
         }),
-      nextRunAt: nextWakeAt?.getTime() ?? null,
+      nextRunAt: nextWakeAt?.epochMilliseconds ?? null,
     };
 
     return topicClusteringStatusSchema.parse(status);

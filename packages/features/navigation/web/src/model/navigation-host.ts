@@ -33,8 +33,8 @@ export type NavigationProject = {
    *
    * Spec: specs/coding-agent/project-menu-links.feature
    */
-  lastCodingAgentSessionAt?: Date | string | null;
-  lastCodingAgentPullRequestAt?: Date | string | null;
+  lastCodingAgentSessionAt?: string | null;
+  lastCodingAgentPullRequestAt?: string | null;
 };
 
 /** A team, with the projects the switcher offers under it. */

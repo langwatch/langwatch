@@ -22,7 +22,7 @@ import type {
   TopicClusteringLangevalsPort,
 } from "../ports/topic-clustering-langevals.port.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant } from "@langwatch/time";
 import {
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
   type TopicClusteringPageOutcome,
@@ -209,9 +209,10 @@ export const clusterTopicsForProject = async (
   // This checks helps us getting back into batch mode if we simply delete all the topics for a given project
   const isIncrementalProcessing = topicIds.length > 0 && assignedTracesCount >= 1200;
 
-  const lastTopicCreatedAt = topics.reduce((acc, topic) => {
-    return topic.createdAt > acc ? topic.createdAt : acc;
-  }, new Date(0));
+  const lastTopicCreatedAt = topics.reduce(
+    (acc, topic) => (Temporal.Instant.compare(topic.createdAt, acc) > 0 ? topic.createdAt : acc),
+    Temporal.Instant.fromEpochMilliseconds(0),
+  );
 
   // The cadence gate throttles run STARTS only, so a continuation page
   // (searchAfter present) never re-takes it. Page 1 of a batch run writes
@@ -221,12 +222,11 @@ export const clusterTopicsForProject = async (
   // page silently stopped after page one. The run was approved when its
   // first page passed the gate; later pages are the same run.
   const daysFrequency = assignedTracesCount < 100 ? 7 : assignedTracesCount < 500 ? 3 : 2;
-  if (
-    !searchAfter &&
-    !isIncrementalProcessing &&
-    lastTopicCreatedAt >
-      new Date(nowInstant().epochMilliseconds - daysFrequency * 24 * 60 * 60 * 1000)
-  ) {
+  const cadenceHorizon = nowInstant().subtract({
+    milliseconds: daysFrequency * 24 * 60 * 60 * 1000,
+  });
+  const clusteredRecently = Temporal.Instant.compare(lastTopicCreatedAt, cadenceHorizon) > 0;
+  if (!searchAfter && !isIncrementalProcessing && clusteredRecently) {
     logger.info(
       { projectId },
       `skipping clustering for project as last topic from batch processing was created less than ${daysFrequency} days ago`,

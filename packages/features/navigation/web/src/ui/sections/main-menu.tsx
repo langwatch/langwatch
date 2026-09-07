@@ -28,6 +28,7 @@
 
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
+import { nowInstant } from "@langwatch/time";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../../model/coding-agent-activity.ts";
 import { featureIcons } from "../../model/feature-icons.ts";
@@ -108,7 +109,7 @@ function useCodingAgentLinks(): CodingAgentLinks {
   const project = host.project();
   const codingAgentPagesEnabled = host.featureFlag("release_ui_ai_governance_enabled").enabled;
   const canSeeCodingAgentActivity = codingAgentPagesEnabled && host.hasPermission("traces:view");
-  const now = new Date();
+  const now = nowInstant();
 
   return {
     shouldShowSessions:

@@ -6,6 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Temporal, nowInstant } from "@langwatch/time";
 import { WithStubNavigationHost } from "../../../testing.tsx";
 import type { NavigationProject } from "../../../model/navigation-host.ts";
 import { MainMenuSections } from "../main-menu.tsx";
@@ -17,8 +18,11 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
 }));
 
 const PROJECT: NavigationProject = { id: "project-1", slug: "project-1", name: "Project" };
-const NOW = Date.now();
-const daysAgo = (days: number) => new Date(NOW - days * 24 * 60 * 60 * 1000);
+const NOW = nowInstant().epochMilliseconds;
+const daysAgo = (days: number) =>
+  Temporal.Instant.fromEpochMilliseconds(NOW - days * 24 * 60 * 60 * 1000).toString({
+    fractionalSecondDigits: 3,
+  });
 
 function renderMenu(
   project: NavigationProject,

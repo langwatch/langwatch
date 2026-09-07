@@ -1,5 +1,6 @@
 import { CostReferenceType, CostType, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
+import { fromDate } from "@langwatch/time";
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../../processes/topic-clustering.process.ts";
 import {
   TopicClusteringRepository,
@@ -39,10 +40,11 @@ export class PrismaTopicClusteringRepository extends TopicClusteringRepository {
   }
 
   async findTopicIndexRows(projectId: string): Promise<TopicClusteringTopicIndexRow[]> {
-    return this.prisma.topic.findMany({
+    const rows = await this.prisma.topic.findMany({
       where: { projectId },
       select: { id: true, parentId: true, createdAt: true },
     });
+    return rows.map((row) => ({ ...row, createdAt: fromDate(row.createdAt) }));
   }
 
   async findModelTopics(projectId: string): Promise<TopicClusteringModelRow[]> {
@@ -121,7 +123,7 @@ export class PrismaTopicClusteringRepository extends TopicClusteringRepository {
       centroid: row.centroid as number[],
       p95Distance: row.p95Distance,
       automaticallyGenerated: row.automaticallyGenerated,
-      createdAt: row.createdAt,
+      createdAt: fromDate(row.createdAt),
     }));
   }
 

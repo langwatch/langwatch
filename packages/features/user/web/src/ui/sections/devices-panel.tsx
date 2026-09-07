@@ -3,8 +3,12 @@ import { Laptop, Monitor, Server, Smartphone } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
-import { usePersonalToaster, useShowErrorToast } from "../../behavior/personal-workspace-feedback.ts";
+import {
+  usePersonalToaster,
+  useShowErrorToast,
+} from "../../behavior/personal-workspace-feedback.ts";
 import { usePersonalContext } from "../../behavior/use-personal-context.ts";
+import { readableDate } from "../../model/display-formatters.ts";
 import { formatRelativeTime } from "../../model/relative-time.ts";
 import { InstallCliCard } from "../blocks/install-cli-card.tsx";
 
@@ -297,7 +301,7 @@ function DeviceRow({
 }
 
 const fmtAbsolute = (ms: number | null | undefined): string =>
-  !ms ? "—" : new Date(ms).toLocaleString();
+  !ms ? "—" : readableDate(ms).toLocaleString();
 
 const platformIcon = (platform: string | null) => {
   if (!platform) return Server;

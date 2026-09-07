@@ -1,4 +1,5 @@
 import { nowInstant } from "@langwatch/time";
+import { readableDate } from "./display-formatters.ts";
 /**
  * How long ago something happened, for the personal pages.
  *
@@ -25,5 +26,5 @@ export function formatRelativeTime(ms: number | null | undefined): string {
   const day = Math.floor(hr / 24);
   if (day < 30) return `${day}d ago`;
 
-  return new Date(ms).toLocaleDateString();
+  return readableDate(ms).toLocaleDateString();
 }

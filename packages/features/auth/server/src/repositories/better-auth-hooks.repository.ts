@@ -1,8 +1,10 @@
+import type { Instant } from "@langwatch/time";
+
 /** A user's SSO/session-relevant fields, as read by the Better Auth hooks. */
 export type BetterAuthHookUser = {
   id: string;
   email: string | null;
-  deactivatedAt: Date | null;
+  deactivatedAt: Instant | null;
   pendingSsoSetup: boolean;
 };
 

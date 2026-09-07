@@ -17,6 +17,8 @@
  * than replayed.
  */
 
+import type { Instant } from "@langwatch/time";
+
 /** Who holds a normalized address after a claim attempt. */
 export interface IdentifierReservationHolder {
   normalizedValue: string;
@@ -57,5 +59,5 @@ export abstract class IdentityReservationRepository {
    * residue of a ceremony that claimed and then never landed its fact. Bounded
    * per pass, like every other sweep.
    */
-  abstract reapOrphans(args: { olderThan: Date; limit: number }): Promise<number>;
+  abstract reapOrphans(args: { olderThan: Instant; limit: number }): Promise<number>;
 }

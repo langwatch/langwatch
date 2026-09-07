@@ -30,6 +30,7 @@ import type {
   ExperimentSubject,
   FeatureFlagExperimentRepository,
 } from "../repositories/feature-flag-experiment-setting.repository.ts";
+import { toDate } from "@langwatch/time";
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
 import type { FeatureFlagRowStore } from "../stores/feature-flag-row.store.ts";
 import { OrganizationCreatedAtCacheService } from "./organization-created-at-cache.service.ts";
@@ -416,7 +417,7 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
           registryDefault: definition.defaultValue,
         }),
         lastEditedBy: row?.lastEditedBy ?? null,
-        updatedAt: row?.updatedAt ?? null,
+        updatedAt: row?.updatedAt ? toDate(row.updatedAt) : null,
       };
     });
     const orphaned = stored
@@ -437,7 +438,7 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
           registryDefault: false,
         }),
         lastEditedBy: row.lastEditedBy,
-        updatedAt: row.updatedAt,
+        updatedAt: toDate(row.updatedAt),
       }));
 
     return {

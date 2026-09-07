@@ -9618,27 +9618,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/auth/server/src/ports/auth-clock.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/auth/server/src/repositories/better-auth-hooks.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/auth/server/src/services/signup-verification.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/auth/server/src/transport/better-auth/better-auth-hooks.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/auth/server/src/transport/better-auth/better-auth.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/auth/web/src/behavior/auth-client.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -9930,46 +9910,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/feature-flag/contract/src/feature-flag-rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/feature-flag/contract/src/feature-flag.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/feature-flag/server/src/adapters/prisma.feature-flag-row.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/feature-flag/server/src/adapters/redis.feature-flag-cache.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/feature-flag/server/src/repositories/feature-flag.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/feature-flag/server/src/repositories/memory/feature-flag.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/feature-flag/server/src/services/organization-created-at-cache.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/feature-flag/web/src/model/rule-editing.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/feature-flag/web/src/model/targeting-summary.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/feature-flag/web/src/operator-feature-flag-catalogue.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/gateway/contract/src/gateway-cache-rule.ts",
       "measured": "2026-09-06"
     },
@@ -10218,23 +10158,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/identity/server/src/repositories/identity-newborn.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/identity/server/src/repositories/identity-reservations.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/identity/server/src/repositories/join-request.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/identity/server/src/rules/identity-storage-ports.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/identity/server/src/services/identity-newborn-reconciliation.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10351,26 +10275,6 @@
     },
     {
       "key": "temporal-only|packages/features/monitor/server/src/transport/api-rest/monitor.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/navigation/web/src/behavior/navigation-api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/navigation/web/src/behavior/use-recent-items.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/navigation/web/src/model/coding-agent-activity.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/navigation/web/src/model/navigation-host.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/navigation/web/src/ui/sections/main-menu.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -10534,19 +10438,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/presence/server/src/adapters/broadcast-tenant-rate-limiter.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/presence/server/src/adapters/broadcast.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/presence/server/src/repositories/memory/memory.presence.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/presence/server/src/services/presence.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10558,35 +10450,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/project/server/src/repositories/recent-items.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/project/server/src/rules/recent-items.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/project/server/src/services/project.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/project/server/src/services/recent-items.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/project/server/src/transport/api-rest/project.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/project/web/src/screens/home/components/learning-resources.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/project/web/src/screens/home/components/recent-items-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/project/web/src/screens/home/components/welcome-header.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -10942,26 +10806,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/topic/server/src/adapters/eventing.topic-clustering-schedule.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/topic/server/src/intents/topic-clustering-runner.intent.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/topic/server/src/ports/topic-clustering-schedule.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/topic/server/src/processes/topic-clustering.process.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/topic/server/src/repositories/topic-clustering.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/trace/contract/src/trace-edit-overlay.contract.ts",
       "measured": "2026-09-06"
     },
@@ -11027,26 +10871,6 @@
     },
     {
       "key": "temporal-only|packages/features/user/server/src/services/user.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/user/web/src/behavior/use-personal-context.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/user/web/src/model/personal-workspace-host.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/user/web/src/model/relative-time.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/user/web/src/ui/sections/devices-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/user/web/src/ui/sections/passkeys-section.tsx",
       "measured": "2026-09-06"
     },
     {

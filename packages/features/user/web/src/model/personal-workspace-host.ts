@@ -33,6 +33,7 @@
  */
 
 import { createContext, useContext } from "react";
+import type { TimeInput } from "@langwatch/time";
 
 /** The organization and project the current page is about. */
 export type PersonalScope = {
@@ -155,7 +156,7 @@ export type PersonalDeployment = {
 export type HeldPasskey = {
   id: string;
   name?: string | null;
-  createdAt: string | Date;
+  createdAt: TimeInput;
   transports?: string | null;
 };
 

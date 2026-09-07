@@ -1,4 +1,5 @@
 import type { FeatureFlagRules, StoredFeatureFlag } from "@langwatch/feature-flag-contract";
+import type { Instant } from "@langwatch/time";
 import type { FeatureFlagRow } from "../ports/feature-flag-cache.port.ts";
 
 export abstract class FeatureFlagRepository {
@@ -35,5 +36,5 @@ export abstract class FeatureFlagRepository {
    * when this repository has no organization table to ask — all three fail
    * closed, because an age rule that cannot compare must not match.
    */
-  abstract tryFindOrganizationCreatedAt(organizationId: string): Promise<Date | null>;
+  abstract tryFindOrganizationCreatedAt(organizationId: string): Promise<Instant | null>;
 }

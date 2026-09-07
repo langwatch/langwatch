@@ -1,5 +1,6 @@
 import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
 import type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
@@ -108,7 +109,7 @@ export class PrismaIdentityReservationRepository implements IdentityReservationR
    * taken moments ago belongs to a ceremony still in flight, and reaping it
    * would hand its address to somebody else mid-ceremony.
    */
-  async reapOrphans({ olderThan, limit }: { olderThan: Date; limit: number }): Promise<number> {
+  async reapOrphans({ olderThan, limit }: { olderThan: Instant; limit: number }): Promise<number> {
     const orphans = await this.database.$queryRaw<{ normalizedValue: string }[]>`
       -- @tenancy: the sweep is fleet-wide by construction - it hunts locks
       -- that no user's live identifier backs.
@@ -117,7 +118,7 @@ export class PrismaIdentityReservationRepository implements IdentityReservationR
       LEFT JOIN "Identifier" i
         ON i."id" = r."identifierId"
        AND i."state" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})
-      WHERE r."createdAt" < ${olderThan}
+      WHERE r."createdAt" < ${toDate(olderThan)}
         AND i."id" IS NULL
       ORDER BY r."createdAt" ASC
       LIMIT ${limit}

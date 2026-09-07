@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { Temporal, fromDate, toDate, type Instant } from "@langwatch/time";
 import type {
   SignUpAccountDirectory,
   SignUpVerificationTokenStore,
@@ -21,10 +22,10 @@ export class PrismaSignUpVerificationTokenRepository implements SignUpVerificati
   }: {
     identifier: string;
     token: string;
-    expires: Date;
+    expires: Instant;
   }): Promise<void> {
     await this.prisma.verificationToken.create({
-      data: { identifier, token, expires },
+      data: { identifier, token, expires: toDate(expires) },
     });
   }
 
@@ -38,13 +39,16 @@ export class PrismaSignUpVerificationTokenRepository implements SignUpVerificati
     now,
   }: {
     token: string;
-    now: Date;
+    now: Instant;
   }): Promise<{ identifier: string } | null> {
     const claimed = await this.prisma.verificationToken
       .delete({ where: { token }, select: { identifier: true, expires: true } })
       .catch(() => null);
 
-    if (!claimed || claimed.expires <= now) return null;
+    if (!claimed) return null;
+    const expired = Temporal.Instant.compare(fromDate(claimed.expires), now) <= 0;
+    if (expired) return null;
+
     return { identifier: claimed.identifier };
   }
 }

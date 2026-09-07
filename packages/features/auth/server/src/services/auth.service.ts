@@ -9,6 +9,7 @@ import {
 import type { UserService } from "@langwatch/user-contract";
 import type { IdentityEmailService } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
+import { Temporal, fromDate } from "@langwatch/time";
 import type { AuthClockPort } from "../ports/auth-clock.port.ts";
 import type { AuthSecondaryStorePort } from "../ports/auth-secondary-store.port.ts";
 import type { AuthSessionRepository } from "../repositories/auth-session.repository.ts";
@@ -75,7 +76,10 @@ export class AuthService extends AuthCapability {
     });
 
     const impersonation = browserSessionImpersonationSchema.safeParse(stored.impersonating);
-    if (!impersonation.success || impersonation.data.expires <= this.options.clock.now()) {
+    if (
+      !impersonation.success ||
+      Temporal.Instant.compare(fromDate(impersonation.data.expires), this.options.clock.now()) <= 0
+    ) {
       return session;
     }
 

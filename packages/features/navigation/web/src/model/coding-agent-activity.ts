@@ -11,6 +11,8 @@
  * Spec: specs/coding-agent/project-menu-links.feature.
  */
 
+import { toEpochMs, type Instant, type TimeInput } from "@langwatch/time";
+
 /** How long after the last signal a coding-agent destination stays offered. */
 export const CODING_AGENT_LINK_WINDOW_DAYS = 15;
 
@@ -35,12 +37,12 @@ export function withinDays({
   days,
   now,
 }: {
-  at: Date | string | null | undefined;
+  at: TimeInput | null | undefined;
   days: number;
-  now: Date;
+  now: Instant;
 }): boolean {
   if (!at) return false;
-  const moment = at instanceof Date ? at.getTime() : Date.parse(at);
+  const moment = toEpochMs(at);
   if (Number.isNaN(moment)) return false;
-  return moment > now.getTime() - days * MS_PER_DAY;
+  return moment > now.epochMilliseconds - days * MS_PER_DAY;
 }

@@ -10,6 +10,7 @@ import {
   TOPIC_CLUSTERING_STALE_RUN_MS,
   topicClusteringSearchAfterSchema,
 } from "@langwatch/topic-contract";
+import { Temporal, toDate } from "@langwatch/time";
 import crypto from "crypto";
 import { z } from "zod";
 import type { TopicClusteringProcessingEvent } from "../adapters/eventing.topic-events.adapter.ts";
@@ -107,7 +108,10 @@ export class TopicClusteringProcess {
    * identity.
    */
   private static runIdForSlot(slotMs: number): string {
-    return new Date(slotMs).toISOString().slice(0, 19).replace(/[-:]/g, "");
+    return toDate(Temporal.Instant.fromEpochMilliseconds(slotMs))
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[-:]/g, "");
   }
 
   private static settle(
@@ -152,11 +156,9 @@ export class TopicClusteringProcess {
   /** The next occurrence of the project's daily slot strictly after `afterMs`. */
   static nextDailySlot(projectId: string, afterMs: number): number {
     const offset = TopicClusteringProcess.dailySlotOffsetMs(projectId);
-    const dayStart = Date.UTC(
-      new Date(afterMs).getUTCFullYear(),
-      new Date(afterMs).getUTCMonth(),
-      new Date(afterMs).getUTCDate(),
-    );
+    const dayStart = Temporal.Instant.fromEpochMilliseconds(afterMs)
+      .toZonedDateTimeISO("UTC")
+      .startOfDay().epochMilliseconds;
     const candidate = dayStart + offset;
     return candidate > afterMs ? candidate : candidate + 24 * 60 * 60 * 1000;
   }

@@ -2,6 +2,7 @@ import type { TopicClusteringRunHistoryEntry, Topic } from "@langwatch/topic-con
 import { TopicService } from "../../services/topic.service.ts";
 import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository.ts";
 import { describe, expect, it } from "vitest";
+import { Temporal, type Instant } from "@langwatch/time";
 import { TopicClusteringSchedulePort } from "../../ports/topic-clustering-schedule.port.ts";
 
 class FakeTopicRepository extends TopicRepository {
@@ -63,8 +64,8 @@ class FakeTopicRepository extends TopicRepository {
 }
 
 class FakeTopicSchedule extends TopicClusteringSchedulePort {
-  tryGetNextWakeAt(): Promise<Date | null> {
-    return Promise.resolve(new Date(200));
+  tryGetNextWakeAt(): Promise<Instant | null> {
+    return Promise.resolve(Temporal.Instant.fromEpochMilliseconds(200));
   }
 }
 

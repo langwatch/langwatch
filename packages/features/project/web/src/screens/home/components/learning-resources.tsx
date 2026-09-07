@@ -1,5 +1,7 @@
 import { HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+import { nowInstant } from "@langwatch/time";
+import { readableDate } from "../../../model/display-formatters.ts";
 import { LEGAL_LINKS } from "../../../model/legal-links.ts";
 import { Link } from "../../../ui/elements/app-link.tsx";
 
@@ -26,7 +28,7 @@ export function LearningResources({ trailing }: { trailing?: ReactNode }) {
           wayfinding, part typography. Docs and videos live in the Odyssey
           card now, so this row is the footer entire. */}
       <HStack gap={2} flexWrap="wrap" fontFamily="mono" fontSize="10.5px">
-        <ColophonText>LangWatch © {new Date().getFullYear()}</ColophonText>
+        <ColophonText>LangWatch © {readableDate(nowInstant()).getFullYear()}</ColophonText>
         <ColophonDot />
         <ColophonLink href="https://docs.langwatch.ai/integration/python/guide">
           Python SDK

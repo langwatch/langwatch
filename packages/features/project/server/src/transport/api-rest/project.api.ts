@@ -14,6 +14,7 @@ import {
   projectRestCreatedSchema,
   projectRestPageSchema,
   projectRestSchema,
+  type Project,
   type ProjectService,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
@@ -78,16 +79,12 @@ const updateProjectSchema = z.object({
   teamId: z.string().min(1).optional().describe("Moves the project to this team"),
 });
 
-function projectResponse(project: {
-  id: string;
-  name: string;
-  slug: string;
-  language: string;
-  framework: string;
-  teamId: string;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function projectResponse(
+  project: Pick<
+    Project,
+    "id" | "name" | "slug" | "language" | "framework" | "teamId" | "createdAt" | "updatedAt"
+  >,
+) {
   return {
     id: project.id,
     name: project.name,

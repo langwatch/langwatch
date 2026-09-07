@@ -1,7 +1,11 @@
 import { IdentityEmailInUseError } from "@langwatch/identity-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
-import type { AbandonedNewborn, IdentityNewbornRepository } from "../identity-newborn.repository.ts";
+import type {
+  AbandonedNewborn,
+  IdentityNewbornRepository,
+} from "../identity-newborn.repository.ts";
 
 /** Prisma's unique-constraint code, as the pinned-id race arrives. */
 function isUniqueViolation(error: unknown): boolean {
@@ -121,14 +125,14 @@ export class PrismaIdentityNewbornRepository implements IdentityNewbornRepositor
     olderThan,
     limit,
   }: {
-    olderThan: Date;
+    olderThan: Instant;
     limit: number;
   }): Promise<AbandonedNewborn[]> {
     const claims = await this.prisma.systemMigrationTenantState.findMany({
       where: {
         migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
         status: "migrated",
-        updatedAt: { lt: olderThan },
+        updatedAt: { lt: toDate(olderThan) },
         // The report kind is part of the QUERY, not a filter over the page.
         // A held user carries the same `migrated` status under the same
         // migration, so a fleet with more held users than the page holds
@@ -156,7 +160,7 @@ export class PrismaIdentityNewbornRepository implements IdentityNewbornRepositor
     );
     return claims
       .filter((claim) => !born.has(claim.tenantId))
-      .map((claim) => ({ userId: claim.tenantId, claimedAt: claim.updatedAt }));
+      .map((claim) => ({ userId: claim.tenantId, claimedAt: fromDate(claim.updatedAt) }));
   }
 
   /** The claim, once its stream has been erased. */

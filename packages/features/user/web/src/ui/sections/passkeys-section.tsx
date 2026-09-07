@@ -36,6 +36,7 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { readableDate } from "../../model/display-formatters.ts";
 import { isSecurityKey, passkeyLabel } from "../../model/sign-in-methods.ts";
 import {
   usePersonalWorkspaceHost,
@@ -224,7 +225,7 @@ function PasskeyGroup({
                   {passkeyLabel(passkey)}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
-                  Added {new Date(passkey.createdAt).toLocaleDateString()}
+                  Added {readableDate(passkey.createdAt).toLocaleDateString()}
                 </Text>
               </VStack>
               <Spacer />

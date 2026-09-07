@@ -7,6 +7,8 @@
  * at a sustained rate with burst headroom.
  */
 
+import { nowInstant } from "@langwatch/time";
+
 export interface BucketConfig {
   /** Maximum tokens (burst size). */
   capacity: number;
@@ -57,7 +59,7 @@ export class BroadcastTenantRateLimiterAdapter {
   tryConsume(tenantId: string, tier: "structural" | "delta"): boolean {
     const bucketConfig = this.config[tier];
     const key = `${tenantId}:${tier}`;
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
 
     let bucket = this.buckets.get(key);
     if (!bucket) {
@@ -81,7 +83,9 @@ export class BroadcastTenantRateLimiterAdapter {
     // Rate-limited — emit a single warning per tenant
     if (!this.warnedTenants.has(tenantId)) {
       this.warnedTenants.add(tenantId);
-      console.warn(`[BroadcastTenantRateLimiterAdapter] Rate limit hit for tenant "${tenantId}" on tier "${tier}"`);
+      console.warn(
+        `[BroadcastTenantRateLimiterAdapter] Rate limit hit for tenant "${tenantId}" on tier "${tier}"`,
+      );
     }
 
     return false;
@@ -96,7 +100,7 @@ export class BroadcastTenantRateLimiterAdapter {
   }
 
   private cleanupStaleBuckets(): void {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
 
     for (const [key, bucket] of this.buckets.entries()) {
       if (now - bucket.lastAccessMs >= STALE_THRESHOLD_MS) {

@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import type { GetRecentItemsParams } from "../rules/recent-items.rules.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
@@ -14,7 +15,7 @@ export type AuditLogJsonValue =
 /** One audit-trail row, restated so this port names no generated type. */
 export type AuditLog = {
   id: string;
-  createdAt: Date;
+  createdAt: Instant;
   userId: string | null;
   projectId: string | null;
   organizationId: string | null;
@@ -34,16 +35,16 @@ export type AuditLog = {
 type RecentEntityRow = {
   id: string;
   name: string;
-  updatedAt: Date;
+  updatedAt: Instant;
   projectId: string;
   project: { slug: string };
 };
 
 /** A prompt is hidden once it is soft-deleted rather than removed. */
-export type RecentPromptRow = RecentEntityRow & { deletedAt: Date | null };
+export type RecentPromptRow = RecentEntityRow & { deletedAt: Instant | null };
 
 /** Workflows and datasets are hidden once archived. */
-export type RecentArchivableRow = RecentEntityRow & { archivedAt: Date | null };
+export type RecentArchivableRow = RecentEntityRow & { archivedAt: Instant | null };
 
 /** Monitors and annotation queues are addressed by slug, not id. */
 export type RecentSluggedRow = RecentEntityRow & { slug: string };

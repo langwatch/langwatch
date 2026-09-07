@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { nowInstant } from "@langwatch/time";
 import {
   clusterTopicsForProject,
   fetchTracesFromClickHouse,
@@ -115,7 +116,7 @@ describe("clusterTopicsForProject", () => {
     // larger than one page ended after page one with a recently_clustered
     // skip and no cursor. The gate throttles run STARTS only — a
     // continuation page (searchAfter present) must go through.
-    const freshTopics = [{ id: "topic-1", parentId: null, createdAt: new Date() }];
+    const freshTopics = [{ id: "topic-1", parentId: null, createdAt: nowInstant() }];
 
     it("skips a NEW run as recently clustered", async () => {
       const mockClickHouseQuery = vi.fn();

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { toEpochMs, type Instant } from "@langwatch/time";
 import { isWithinRolloutPercentage } from "./feature-flag-bucketing.ts";
 
 /**
@@ -90,7 +91,7 @@ export const featureFlagRulesWriteSchema = featureFlagRulesSchema
       rules.every(
         (rule) =>
           rule.match.organizationCreatedAfter === undefined ||
-          !Number.isNaN(Date.parse(rule.match.organizationCreatedAfter)),
+          !Number.isNaN(toEpochMs(rule.match.organizationCreatedAfter)),
       ),
     {
       message: "A new-users targeting rule needs a date the organization was created on or after",
@@ -118,7 +119,7 @@ export interface RuleEvaluationContext {
    * (see `readNeedsOrganizationAge`). Absent means "unknown", which no age
    * rule matches.
    */
-  organizationCreatedAt?: Date | string | null;
+  organizationCreatedAt?: Instant | string | null;
 }
 
 /**
@@ -266,14 +267,14 @@ function matchesContext(
  */
 function isOrganizationNewerThan(
   createdAfter: string,
-  organizationCreatedAt: Date | string | null | undefined,
+  organizationCreatedAt: Instant | string | null | undefined,
 ): boolean {
   if (organizationCreatedAt == null) return false;
-  const boundary = Date.parse(createdAfter);
+  const boundary = toEpochMs(createdAfter);
   const createdAt =
-    organizationCreatedAt instanceof Date
-      ? organizationCreatedAt.getTime()
-      : Date.parse(organizationCreatedAt);
+    typeof organizationCreatedAt === "string"
+      ? toEpochMs(organizationCreatedAt)
+      : organizationCreatedAt.epochMilliseconds;
   if (Number.isNaN(boundary) || Number.isNaN(createdAt)) return false;
   return createdAt >= boundary;
 }

@@ -5,6 +5,7 @@
  */
 import type { IdentityReservationRepository } from "../../repositories/identity-reservations.repository.ts";
 import { describe, expect, it, vi } from "vitest";
+import { Temporal } from "@langwatch/time";
 import {
   IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
   IdentityNewbornReconciliationService,
@@ -50,7 +51,7 @@ function harness(options?: {
 
 const abandoned = (userId: string): AbandonedNewborn => ({
   userId,
-  claimedAt: new Date(NOW - IDENTITY_NEWBORN_ABANDONED_AFTER_MS - 1),
+  claimedAt: Temporal.Instant.fromEpochMilliseconds(NOW - IDENTITY_NEWBORN_ABANDONED_AFTER_MS - 1),
 });
 
 describe("the newborn reconciliation sweep", () => {
@@ -64,7 +65,9 @@ describe("the newborn reconciliation sweep", () => {
 
         expect(reapOrphans).toHaveBeenCalledWith(
           expect.objectContaining({
-            olderThan: new Date(NOW - IDENTITY_NEWBORN_ABANDONED_AFTER_MS),
+            olderThan: Temporal.Instant.fromEpochMilliseconds(
+              NOW - IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
+            ),
           }),
         );
         expect(summary.locksReaped).toBe(2);
@@ -107,7 +110,9 @@ describe("the newborn reconciliation sweep", () => {
 
         expect(findAbandoned).toHaveBeenCalledWith(
           expect.objectContaining({
-            olderThan: new Date(NOW - IDENTITY_NEWBORN_ABANDONED_AFTER_MS),
+            olderThan: Temporal.Instant.fromEpochMilliseconds(
+              NOW - IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
+            ),
           }),
         );
       });

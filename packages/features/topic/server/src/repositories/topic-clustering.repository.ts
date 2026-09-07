@@ -5,11 +5,13 @@
  * the Prisma repository; composition hands it the guarded client.
  */
 
+import type { Instant } from "@langwatch/time";
+
 /** Topic identity + age rows behind the mode decision and cadence gate. */
 export interface TopicClusteringTopicIndexRow {
   id: string;
   parentId: string | null;
-  createdAt: Date;
+  createdAt: Instant;
 }
 
 /** One model topic/subtopic row as the incremental clustering call needs it. */
@@ -30,7 +32,7 @@ export interface TopicClusteringSeedTopicRow {
   centroid: number[];
   p95Distance: number;
   automaticallyGenerated: boolean;
-  createdAt: Date;
+  createdAt: Instant;
 }
 
 export abstract class TopicClusteringRepository {

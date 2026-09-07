@@ -1,6 +1,10 @@
 import { KILL_SWITCH_CACHE_TTL_MS, featureFlagRulesSchema } from "@langwatch/feature-flag-contract";
 import { z } from "zod";
-import { FeatureFlagCachePort, type FeatureFlagCacheSlot } from "../ports/feature-flag-cache.port.ts";
+import {
+  FeatureFlagCachePort,
+  type FeatureFlagCacheSlot,
+} from "../ports/feature-flag-cache.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const CACHE_PREFIX = "feature_flag_store:v2:";
 const cacheSlotSchema = z.object({
@@ -54,7 +58,7 @@ export class RedisFeatureFlagCacheAdapter extends FeatureFlagCachePort {
   async set(key: string, slot: FeatureFlagCacheSlot): Promise<void> {
     this.memory.set(key, {
       slot,
-      expiresAt: Date.now() + KILL_SWITCH_CACHE_TTL_MS,
+      expiresAt: nowInstant().epochMilliseconds + KILL_SWITCH_CACHE_TTL_MS,
     });
 
     if (!this.redis) {
@@ -91,7 +95,7 @@ export class RedisFeatureFlagCacheAdapter extends FeatureFlagCachePort {
       return void 0;
     }
 
-    if (entry.expiresAt <= Date.now()) {
+    if (entry.expiresAt <= nowInstant().epochMilliseconds) {
       this.memory.delete(key);
       return void 0;
     }

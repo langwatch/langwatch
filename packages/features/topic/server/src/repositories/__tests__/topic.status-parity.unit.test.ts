@@ -3,6 +3,7 @@ import type {
   TopicClusteringStatus,
 } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
+import { Temporal, type Instant } from "@langwatch/time";
 import { TopicClusteringSchedulePort } from "../../ports/topic-clustering-schedule.port.ts";
 import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository.ts";
 import { TopicService } from "../../services/topic.service.ts";
@@ -59,7 +60,7 @@ class FakeTopicRepository extends TopicRepository {
 }
 
 class FakeSchedule extends TopicClusteringSchedulePort {
-  constructor(private readonly nextWakeAt: Date | null = null) {
+  constructor(private readonly nextWakeAt: Instant | null = null) {
     super();
   }
 
@@ -72,7 +73,7 @@ function service(
   options: {
     status?: TopicClusteringStatusRecord["projection"];
     history?: TopicClusteringRunHistoryEntry[];
-    nextWakeAt?: Date | null;
+    nextWakeAt?: Instant | null;
     now?: number;
   } = {},
 ) {
@@ -105,7 +106,7 @@ function run(overrides: Partial<TopicClusteringRunHistoryEntry> = {}) {
 describe("TopicService clustering status parity", () => {
   it("returns the complete empty status and the next durable wake", async () => {
     const status = await service({
-      nextWakeAt: new Date(NOW + 60_000),
+      nextWakeAt: Temporal.Instant.fromEpochMilliseconds(NOW + 60_000),
     }).getClusteringStatus({ projectId: PROJECT_ID });
 
     expect(status).toEqual({

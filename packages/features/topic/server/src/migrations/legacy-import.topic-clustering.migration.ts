@@ -128,7 +128,7 @@ export class LegacyImportTopicClusteringMigration {
         // Preserve the topic's real age: the batch cadence gate reads it, and
         // stamping "now" would pause batch clustering fleet-wide for days
         // after the deploy.
-        firstRecordedAt: row.createdAt.getTime(),
+        firstRecordedAt: row.createdAt.epochMilliseconds,
       })),
     });
     return "seeded";

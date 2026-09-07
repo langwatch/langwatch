@@ -1,6 +1,8 @@
 import { Heading } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { SERIF } from "@langwatch/langy-web/surfaces/asaplangy";
+import { nowInstant } from "@langwatch/time";
+import { readableDate } from "../../../model/display-formatters.ts";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 
 /**
@@ -57,7 +59,7 @@ export const getGreeting = ({
 export function useTimeOfDay(): TimeOfDay {
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("morning");
   useEffect(() => {
-    setTimeOfDay(getTimeOfDay(new Date().getHours()));
+    setTimeOfDay(getTimeOfDay(readableDate(nowInstant()).getHours()));
   }, []);
   return timeOfDay;
 }

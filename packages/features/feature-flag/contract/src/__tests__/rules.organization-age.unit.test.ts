@@ -11,6 +11,7 @@
  * rolling out to new signups asked for.
  */
 import { describe, expect, it } from "vitest";
+import { Temporal } from "@langwatch/time";
 import {
   evaluateRules,
   type FeatureFlagRules,
@@ -30,7 +31,7 @@ describe("given a rule naming the date a rollout starts", () => {
     it("resolves enabled from the rule", () => {
       const enabled = evaluateRules(NEW_USERS_RULE, {
         organizationId: "organization_new",
-        organizationCreatedAt: new Date("2026-07-15T09:00:00.000Z"),
+        organizationCreatedAt: Temporal.Instant.from("2026-07-15T09:00:00.000Z"),
       });
 
       expect(enabled).toBe(true);
@@ -42,7 +43,7 @@ describe("given a rule naming the date a rollout starts", () => {
     it("matches nothing, so the read falls through to the row-level default", () => {
       const enabled = evaluateRules(NEW_USERS_RULE, {
         organizationId: "organization_old",
-        organizationCreatedAt: new Date("2025-01-05T09:00:00.000Z"),
+        organizationCreatedAt: Temporal.Instant.from("2025-01-05T09:00:00.000Z"),
       });
 
       expect(enabled).toBeNull();
@@ -54,7 +55,7 @@ describe("given a rule naming the date a rollout starts", () => {
     it("matches, because an operator reads the date as 'from this day on'", () => {
       const enabled = evaluateRules(NEW_USERS_RULE, {
         organizationId: "organization_boundary",
-        organizationCreatedAt: new Date("2026-06-01T00:00:00.000Z"),
+        organizationCreatedAt: Temporal.Instant.from("2026-06-01T00:00:00.000Z"),
       });
 
       expect(enabled).toBe(true);
@@ -90,7 +91,7 @@ describe("given a stored rule whose date is not a date", () => {
     expect(
       evaluateRules(rules, {
         organizationId: "organization_new",
-        organizationCreatedAt: new Date("2030-01-01T00:00:00.000Z"),
+        organizationCreatedAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
       }),
     ).toBeNull();
   });
@@ -105,7 +106,7 @@ describe("given an age rule alongside rules for named targets", () => {
 
     const enabled = evaluateRules(rules, {
       organizationId: "organization_new",
-      organizationCreatedAt: new Date("2026-07-15T09:00:00.000Z"),
+      organizationCreatedAt: Temporal.Instant.from("2026-07-15T09:00:00.000Z"),
     });
 
     expect(enabled).toBe(false);

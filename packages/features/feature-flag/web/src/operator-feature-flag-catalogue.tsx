@@ -15,6 +15,7 @@ import type {
   OperatorFeatureFlag as StoredOperatorFeatureFlag,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
+import { readableDate } from "./model/display-formatters.ts";
 
 /** One flag as the BROWSER receives it: `updatedAt` arrives as an ISO string. */
 export type OperatorFeatureFlag = Omit<StoredOperatorFeatureFlag, "updatedAt"> & {
@@ -304,7 +305,7 @@ function FlagRow({
         ) : (
           <VStack align="start" gap={0}>
             <Text fontSize="xs">
-              {row.updatedAt ? new Date(row.updatedAt).toLocaleString() : ""}
+              {row.updatedAt ? readableDate(row.updatedAt).toLocaleString() : ""}
             </Text>
             <HStack gap={2}>
               <Text fontSize="xs" color="fg.muted">

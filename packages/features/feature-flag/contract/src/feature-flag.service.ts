@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Instant } from "@langwatch/time";
 import type { FeatureFlagKey } from "./feature-flag.ts";
 import { featureFlagRulesSchema, type FeatureFlagRules } from "./feature-flag-rules.ts";
 import type {
@@ -18,7 +19,7 @@ export interface StoredFeatureFlag {
   enabled: boolean;
   rules: FeatureFlagRules;
   lastEditedBy: string | null;
-  updatedAt: Date;
+  updatedAt: Instant;
 }
 
 /** Every browser-visible flag, resolved for one target. */

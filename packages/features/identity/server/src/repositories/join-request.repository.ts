@@ -2,6 +2,7 @@ import type {
   JoinCandidateOrganization,
   JoinRequestAggregateState,
 } from "@langwatch/identity-contract";
+import type { Instant } from "@langwatch/time";
 
 /**
  * What the join-request guards and the matcher READ (D12). Ports, not implementations: this package
@@ -31,7 +32,7 @@ export abstract class JoinRequestListReadRepository extends JoinRequestReadRepos
   abstract tryFindLastRejectionAt(args: {
     userId: string;
     organizationId: string;
-  }): Promise<Date | null>;
+  }): Promise<Instant | null>;
 
   /** Everything waiting on one organization, newest ask first. */
   abstract findPendingForOrganization(args: {

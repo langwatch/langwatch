@@ -2,6 +2,7 @@ import type { IdentityReservationRepository } from "../repositories/identity-res
 import type { IdentityCeremonyWrites } from "../rules/identity-writes.rules.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import { createLogger } from "@langwatch/observability";
+import { Temporal, nowInstant } from "@langwatch/time";
 import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository.ts";
 
 const logger = createLogger("langwatch:identity:newborn-reconciliation");
@@ -47,13 +48,13 @@ export class IdentityNewbornReconciliationService {
   private readonly abandonedAfterMs: number;
 
   private constructor(private readonly deps: IdentityNewbornReconciliationDeps) {
-    this.now = deps.now ?? Date.now;
+    this.now = deps.now ?? (() => nowInstant().epochMilliseconds);
     this.abandonedAfterMs = deps.abandonedAfterMs ?? IDENTITY_NEWBORN_ABANDONED_AFTER_MS;
   }
 
   async runPass(): Promise<IdentityNewbornSweepSummary> {
     const abandoned = await this.deps.newborns.findAbandoned({
-      olderThan: new Date(this.now() - this.abandonedAfterMs),
+      olderThan: Temporal.Instant.fromEpochMilliseconds(this.now() - this.abandonedAfterMs),
       limit: MAX_SWEPT_PER_PASS,
     });
     const summary: IdentityNewbornSweepSummary = {
@@ -92,7 +93,7 @@ export class IdentityNewbornReconciliationService {
   private async reapAddressLocks(): Promise<number> {
     try {
       return await this.deps.reservations.reapOrphans({
-        olderThan: new Date(this.now() - this.abandonedAfterMs),
+        olderThan: Temporal.Instant.fromEpochMilliseconds(this.now() - this.abandonedAfterMs),
         limit: MAX_SWEPT_PER_PASS,
       });
     } catch (error) {

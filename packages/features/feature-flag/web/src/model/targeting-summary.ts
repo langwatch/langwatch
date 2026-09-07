@@ -1,4 +1,6 @@
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
+import { toEpochMs } from "@langwatch/time";
+import { readableDate } from "./display-formatters.ts";
 
 /**
  * One line under a flag's toggle saying who a rule has already switched the
@@ -169,12 +171,12 @@ function ageRanges(rules: FeatureFlagRules): DecidedRange[] {
     return [{ date, enabled: rule.enabled }];
   });
   const boundaries = [...new Set(dated.map((rule) => rule.date))].sort(
-    (a, b) => Date.parse(a) - Date.parse(b),
+    (a, b) => toEpochMs(a) - toEpochMs(b),
   );
 
   const ranges: DecidedRange[] = [];
   boundaries.forEach((from, index) => {
-    const decided = dated.find((rule) => Date.parse(rule.date) <= Date.parse(from));
+    const decided = dated.find((rule) => toEpochMs(rule.date) <= toEpochMs(from));
     if (!decided) return;
     const until = boundaries[index + 1] ?? null;
     const previous = ranges[ranges.length - 1];
@@ -193,7 +195,7 @@ function bare(range: DecidedRange | undefined): AgeRange | null {
 }
 
 function readable(date: string): boolean {
-  return !Number.isNaN(Date.parse(date));
+  return !Number.isNaN(toEpochMs(date));
 }
 
 function describeRange({ from, until }: AgeRange): string {
@@ -232,9 +234,9 @@ function pluralize({ count, noun }: { count: number; noun: string }): string | n
  * typed into the rule.
  */
 function formatDate(value: string): string {
-  const parsed = Date.parse(value);
+  const parsed = toEpochMs(value);
   if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toLocaleDateString(undefined, {
+  return readableDate(parsed).toLocaleDateString(undefined, {
     timeZone: "UTC",
     year: "numeric",
     month: "short",

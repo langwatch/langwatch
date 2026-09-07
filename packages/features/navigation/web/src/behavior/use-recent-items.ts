@@ -23,10 +23,10 @@ export interface GroupedRecentItems {
  * Get the time group for a given timestamp.
  */
 function getTimeGroup(timestamp: number): TimeGroup {
-  const date = new Date(timestamp);
-  if (isToday(date)) return "today";
-  if (isYesterday(date)) return "yesterday";
-  if (differenceInDays(new Date(), date) < 7) return "pastWeek";
+  if (isToday(timestamp)) return "today";
+  if (isYesterday(timestamp)) return "yesterday";
+  const daysAgo = differenceInDays(nowInstant().epochMilliseconds, timestamp);
+  if (daysAgo < 7) return "pastWeek";
   return "past30Days";
 }
 

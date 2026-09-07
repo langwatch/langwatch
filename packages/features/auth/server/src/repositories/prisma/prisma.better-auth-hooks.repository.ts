@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
 
 import {
   BetterAuthHooksRepository,
@@ -17,10 +18,16 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
   }
 
   async tryFindUserForHooks({ userId }: { userId: string }): Promise<BetterAuthHookUser | null> {
-    return this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, deactivatedAt: true, pendingSsoSetup: true },
     });
+    if (user === null) return null;
+
+    return {
+      ...user,
+      deactivatedAt: user.deactivatedAt === null ? null : fromDate(user.deactivatedAt),
+    };
   }
 
   async tryFindOrganizationBySsoDomain({

@@ -1,4 +1,6 @@
 import type { FeatureFlagRuleMatch, FeatureFlagRules } from "@langwatch/feature-flag-contract";
+import { toEpochMs } from "@langwatch/time";
+import { readableDate } from "./display-formatters.ts";
 
 /**
  * The editing model behind the targeting-rules dialog.
@@ -175,7 +177,7 @@ export function findUnfillableRule(rules: UIRule[]): UIRule | undefined {
  */
 function toDateInputValue(stored: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(stored)) return stored;
-  const parsed = Date.parse(stored);
+  const parsed = toEpochMs(stored);
   if (Number.isNaN(parsed)) return "";
-  return new Date(parsed).toISOString().slice(0, 10);
+  return readableDate(parsed).toISOString().slice(0, 10);
 }

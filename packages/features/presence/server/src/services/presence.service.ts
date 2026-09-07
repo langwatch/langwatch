@@ -15,6 +15,7 @@ import {
 import type { ProjectService } from "@langwatch/project-contract";
 import type { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../ports/presence.port.ts";
 import type { PresenceRepository } from "../repositories/presence.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 export const PRESENCE_TTL_SECONDS = 30;
 
@@ -49,7 +50,7 @@ export class PresenceService extends PresenceServiceContract {
       options.projects,
       options.diagnostics,
       ttlSeconds,
-      options.now ?? (() => Date.now()),
+      options.now ?? (() => nowInstant().epochMilliseconds),
     );
   }
 

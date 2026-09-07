@@ -21,6 +21,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

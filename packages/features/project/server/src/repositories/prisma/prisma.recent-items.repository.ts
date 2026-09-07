@@ -1,8 +1,10 @@
-import type { AuditLog, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
 import type { GetRecentItemsParams } from "../../rules/recent-items.rules.ts";
 import { ACTION_TO_TYPE_MAP } from "../../rules/recent-items.rules.ts";
 import {
   RecentItemsRepository,
+  type AuditLog,
   type RecentArchivableRow,
   type RecentPromptRow,
   type RecentSluggedRow,
@@ -49,14 +51,14 @@ export class PrismaRecentItemsRepository extends RecentItemsRepository {
       take: limit * 3, // Get more to account for deduplication and deleted entities
     });
 
-    return entries;
+    return entries.map((entry) => ({ ...entry, createdAt: fromDate(entry.createdAt) }));
   }
 
   /**
    * Get prompt by ID and projectId (required for multi-tenancy)
    */
   async tryGetPromptById(id: string, projectId: string): Promise<RecentPromptRow | null> {
-    return this.prisma.llmPromptConfig.findFirst({
+    const row = await this.prisma.llmPromptConfig.findFirst({
       where: { id, projectId },
       select: {
         id: true,
@@ -69,13 +71,20 @@ export class PrismaRecentItemsRepository extends RecentItemsRepository {
         },
       },
     });
+    if (row === null) return null;
+
+    return {
+      ...row,
+      updatedAt: fromDate(row.updatedAt),
+      deletedAt: row.deletedAt === null ? null : fromDate(row.deletedAt),
+    };
   }
 
   /**
    * Get workflow by ID and projectId (required for multi-tenancy)
    */
   async tryGetWorkflowById(id: string, projectId: string): Promise<RecentArchivableRow | null> {
-    return this.prisma.workflow.findFirst({
+    const row = await this.prisma.workflow.findFirst({
       where: { id, projectId },
       select: {
         id: true,
@@ -88,13 +97,20 @@ export class PrismaRecentItemsRepository extends RecentItemsRepository {
         },
       },
     });
+    if (row === null) return null;
+
+    return {
+      ...row,
+      updatedAt: fromDate(row.updatedAt),
+      archivedAt: row.archivedAt === null ? null : fromDate(row.archivedAt),
+    };
   }
 
   /**
    * Get dataset by ID and projectId (required for multi-tenancy)
    */
   async tryGetDatasetById(id: string, projectId: string): Promise<RecentArchivableRow | null> {
-    return this.prisma.dataset.findFirst({
+    const row = await this.prisma.dataset.findFirst({
       where: { id, projectId },
       select: {
         id: true,
@@ -107,13 +123,20 @@ export class PrismaRecentItemsRepository extends RecentItemsRepository {
         },
       },
     });
+    if (row === null) return null;
+
+    return {
+      ...row,
+      updatedAt: fromDate(row.updatedAt),
+      archivedAt: row.archivedAt === null ? null : fromDate(row.archivedAt),
+    };
   }
 
   /**
    * Get monitor (evaluation) by ID and projectId (required for multi-tenancy)
    */
   async tryGetMonitorById(id: string, projectId: string): Promise<RecentSluggedRow | null> {
-    return this.prisma.monitor.findFirst({
+    const row = await this.prisma.monitor.findFirst({
       where: { id, projectId },
       select: {
         id: true,
@@ -126,13 +149,16 @@ export class PrismaRecentItemsRepository extends RecentItemsRepository {
         },
       },
     });
+    if (row === null) return null;
+
+    return { ...row, updatedAt: fromDate(row.updatedAt) };
   }
 
   /**
    * Get annotation queue by ID and projectId (required for multi-tenancy)
    */
   async tryGetAnnotationQueueById(id: string, projectId: string): Promise<RecentSluggedRow | null> {
-    return this.prisma.annotationQueue.findFirst({
+    const row = await this.prisma.annotationQueue.findFirst({
       where: { id, projectId },
       select: {
         id: true,
@@ -145,5 +171,8 @@ export class PrismaRecentItemsRepository extends RecentItemsRepository {
         },
       },
     });
+    if (row === null) return null;
+
+    return { ...row, updatedAt: fromDate(row.updatedAt) };
   }
 }

@@ -1,5 +1,6 @@
 import type { PresenceSession } from "@langwatch/presence-contract";
 import { PresenceRepository } from "../presence.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 interface StoredEntry {
   session: PresenceSession;
@@ -14,7 +15,7 @@ export class MemoryPresenceRepository extends PresenceRepository {
   }
 
   static create(options: { now?: () => number } = {}): MemoryPresenceRepository {
-    return new MemoryPresenceRepository(options.now ?? (() => Date.now()));
+    return new MemoryPresenceRepository(options.now ?? (() => nowInstant().epochMilliseconds));
   }
 
   async upsert(session: PresenceSession, ttlSeconds: number): Promise<void> {

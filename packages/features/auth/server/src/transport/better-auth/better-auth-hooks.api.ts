@@ -40,7 +40,8 @@ export const beforeUserCreate = async ({
   user,
 }: {
   repo: BetterAuthHooksRepository;
-  user: { email: string; deactivatedAt?: Date | null } & Record<string, unknown>;
+  // Better Auth hands the stored column value back untyped; only its presence is read.
+  user: { email: string; deactivatedAt?: unknown } & Record<string, unknown>;
 }): Promise<boolean | undefined> => {
   if (user.deactivatedAt) {
     logger.warn({ email: user.email }, "Blocked signup: user is deactivated");

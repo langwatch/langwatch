@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Temporal, type Instant } from "@langwatch/time";
 
 import {
   SIGN_UP_VERIFICATION_TTL_MS,
@@ -9,13 +10,13 @@ import {
  * Sign-up's address confirmation (D13, ADR-117 §6). The service is composed
  * from ports, so the whole flow runs here with no datastore and no mailer.
  */
-const NOW = new Date("2026-08-24T12:00:00.000Z");
+const NOW = Temporal.Instant.from("2026-08-24T12:00:00.000Z");
 
 /** Stands in for bcrypt: what matters is that it is not the password. */
 const FAKE_PASSWORD_HASH = "$2b$10$notthepassword";
 
 function makeService({ registered = false }: { registered?: boolean } = {}) {
-  const issued: Array<{ identifier: string; token: string; expires: Date }> = [];
+  const issued: Array<{ identifier: string; token: string; expires: Instant }> = [];
   const sent: Array<{ email: string; verificationUrl: string }> = [];
   const created: Array<{ email: string; passwordHash: string }> = [];
   /** Addresses a spent link proved. The whole job of a link now. */
@@ -31,7 +32,7 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
         const index = issued.findIndex((record) => record.token === token);
         if (index === -1) return null;
         const [record] = issued.splice(index, 1);
-        if (!record || record.expires <= now) return null;
+        if (!record || Temporal.Instant.compare(record.expires, now) <= 0) return null;
         return { identifier: record.identifier };
       },
     },
@@ -82,7 +83,7 @@ describe("given a sign-up address to confirm", () => {
       expect(harness.sent[0]?.email).toBe("sam@acme.com");
       expect(harness.sent[0]?.verificationUrl).toContain("token-1");
       expect(harness.issued[0]?.expires).toEqual(
-        new Date(NOW.getTime() + SIGN_UP_VERIFICATION_TTL_MS),
+        NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
       );
     });
 
@@ -123,7 +124,7 @@ describe("given a sign-up address to confirm", () => {
       harness.issued.push({
         identifier: "password-reset:sam@acme.com",
         token: "borrowed",
-        expires: new Date(NOW.getTime() + 1000),
+        expires: NOW.add({ milliseconds: 1000 }),
       });
 
       await expect(
@@ -179,7 +180,7 @@ describe("given a sign-up address to confirm", () => {
           passwordHash: FAKE_PASSWORD_HASH,
         })}`,
         token: "link-in-flight",
-        expires: new Date(NOW.getTime() + SIGN_UP_VERIFICATION_TTL_MS),
+        expires: NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
       });
     }
 

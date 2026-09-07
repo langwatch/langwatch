@@ -3,6 +3,7 @@ import {
   IdentityVerificationExpiredError,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 /**
  * Sign-up's address confirmation (D13, ADR-117 §6).
@@ -10,13 +11,13 @@ import {
 
 /** A single-use address-confirmation token, as storage holds it. */
 export interface SignUpVerificationTokenStore {
-  issue(input: { identifier: string; token: string; expires: Date }): Promise<void>;
+  issue(input: { identifier: string; token: string; expires: Instant }): Promise<void>;
   /**
    * Spends a token: returns the identifier it was issued for and makes it unusable, or
    * answers null for a token that never existed, was already spent, or has expired. One
    * answer for all three on purpose — see `completeVerification`.
    */
-  tryClaim(input: { token: string; now: Date }): Promise<{
+  tryClaim(input: { token: string; now: Instant }): Promise<{
     identifier: string;
   } | null>;
 }
@@ -46,7 +47,7 @@ export interface SignUpVerificationDeps {
   accounts: SignUpAccountFactory;
   /** Builds the link the email carries, from a minted token. */
   buildVerificationUrl(input: { token: string }): string;
-  now?: () => Date;
+  now?: () => Instant;
   mintToken?: () => string;
 }
 
@@ -165,7 +166,7 @@ export class SignUpVerificationService {
     await this.deps.tokens.issue({
       identifier: writePendingSignUp({ email: normalized, passwordHash }),
       token,
-      expires: new Date(this.now().getTime() + SIGN_UP_VERIFICATION_TTL_MS),
+      expires: this.now().add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
     });
 
     await this.deps.mailer.sendVerificationLink({
@@ -174,8 +175,8 @@ export class SignUpVerificationService {
     });
   }
 
-  private now(): Date {
-    return this.deps.now?.() ?? new Date();
+  private now(): Instant {
+    return this.deps.now?.() ?? nowInstant();
   }
 
   private mintToken(): string {

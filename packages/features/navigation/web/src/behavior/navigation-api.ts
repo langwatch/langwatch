@@ -48,8 +48,8 @@ export type NavigationApiMap = {
                * column offers a Sessions and a Pull requests destination only
                * while these are recent (`coding-agent-activity`).
                */
-              lastCodingAgentSessionAt?: string | Date | null;
-              lastCodingAgentPullRequestAt?: string | Date | null;
+              lastCodingAgentSessionAt?: string | null;
+              lastCodingAgentPullRequestAt?: string | null;
             }>;
           }>;
         }>;

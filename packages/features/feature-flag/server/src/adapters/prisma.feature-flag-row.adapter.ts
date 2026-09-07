@@ -3,31 +3,13 @@ import {
   type FeatureFlagRules,
   type StoredFeatureFlag,
 } from "@langwatch/feature-flag-contract";
+import { fromDate, type Instant } from "@langwatch/time";
 import type { FeatureFlagRow } from "../ports/feature-flag-cache.port.ts";
+import type {
+  FeatureFlagDelegate,
+  OrganizationDelegate,
+} from "../repositories/prisma/feature-flag.delegates.ts";
 import { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
-
-type DelegateCall<TResult> = {
-  bivariant(input: object): Promise<TResult>;
-}["bivariant"];
-
-type FeatureFlagRecord = {
-  key: string;
-  enabled: boolean;
-  rules: unknown;
-  lastEditedBy: string | null;
-  updatedAt: Date;
-};
-
-type FeatureFlagDelegate = {
-  findUnique: DelegateCall<Pick<FeatureFlagRecord, "enabled" | "rules"> | null>;
-  findMany: DelegateCall<FeatureFlagRecord[]>;
-  upsert: DelegateCall<unknown>;
-  deleteMany: DelegateCall<unknown>;
-};
-
-type OrganizationDelegate = {
-  findUnique: DelegateCall<{ createdAt: Date } | null>;
-};
 
 export type FeatureFlagDatabase = {
   featureFlag: FeatureFlagDelegate;
@@ -81,7 +63,7 @@ export class PrismaFeatureFlagRowAdapter extends FeatureFlagRepository {
       enabled: row.enabled,
       rules: parseRules(row.rules),
       lastEditedBy: row.lastEditedBy,
-      updatedAt: row.updatedAt,
+      updatedAt: fromDate(row.updatedAt),
     }));
   }
 
@@ -123,12 +105,12 @@ export class PrismaFeatureFlagRowAdapter extends FeatureFlagRepository {
     await this.database.featureFlag.deleteMany({ where: { key } });
   }
 
-  async tryFindOrganizationCreatedAt(organizationId: string): Promise<Date | null> {
+  async tryFindOrganizationCreatedAt(organizationId: string): Promise<Instant | null> {
     const organization = await this.database.organization?.findUnique({
       where: { id: organizationId },
       select: { createdAt: true },
     });
 
-    return organization?.createdAt ?? null;
+    return organization ? fromDate(organization.createdAt) : null;
   }
 }

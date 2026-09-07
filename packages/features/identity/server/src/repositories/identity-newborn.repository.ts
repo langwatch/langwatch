@@ -3,6 +3,9 @@
  * reconciliation sweep hold this;
  * cleans up after the ones that never happened (ADR-116 §3).
  */
+
+import type { Instant } from "@langwatch/time";
+
 export abstract class IdentityNewbornRepository {
   /**
    * Stake the newborn's tenant BEFORE the append, so an entrance that fails
@@ -18,7 +21,7 @@ export abstract class IdentityNewbornRepository {
     user: Record<string, unknown>;
   }): Promise<Record<string, unknown>>;
   /** Claims whose rows never landed, oldest first, bounded by `limit`. */
-  abstract findAbandoned(args: { olderThan: Date; limit: number }): Promise<AbandonedNewborn[]>;
+  abstract findAbandoned(args: { olderThan: Instant; limit: number }): Promise<AbandonedNewborn[]>;
   /** Drop one abandoned claim, once its stream has been erased. */
   abstract releaseClaim(args: { userId: string }): Promise<void>;
 }
@@ -26,5 +29,5 @@ export abstract class IdentityNewbornRepository {
 /** One newborn tenant whose facts landed and whose rows never did. */
 export interface AbandonedNewborn {
   userId: string;
-  claimedAt: Date;
+  claimedAt: Instant;
 }

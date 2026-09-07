@@ -14,6 +14,7 @@
  */
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
 import { beforeEach, describe, expect, it } from "vitest";
+import { Temporal } from "@langwatch/time";
 import { createInMemoryFeatureFlagService } from "../testing.ts";
 
 const FLAG = "ops_es_causality_loop_guard_disabled";
@@ -25,11 +26,11 @@ function buildService() {
   const graph = createInMemoryFeatureFlagService();
   graph.repository.rememberOrganization({
     organizationId: NEW_ORGANIZATION,
-    createdAt: new Date("2026-07-01T00:00:00.000Z"),
+    createdAt: Temporal.Instant.from("2026-07-01T00:00:00.000Z"),
   });
   graph.repository.rememberOrganization({
     organizationId: OLD_ORGANIZATION,
-    createdAt: new Date("2024-02-01T00:00:00.000Z"),
+    createdAt: Temporal.Instant.from("2024-02-01T00:00:00.000Z"),
   });
   return graph;
 }

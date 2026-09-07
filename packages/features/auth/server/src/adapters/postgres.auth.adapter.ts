@@ -2,6 +2,7 @@ import type { AuthService as AuthCapability } from "@langwatch/auth-contract";
 import type { UserService } from "@langwatch/user-contract";
 import type { IdentityEmailService } from "@langwatch/identity-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { AuthClockPort } from "../ports/auth-clock.port.ts";
 import { AuthSecondaryStorePort } from "../ports/auth-secondary-store.port.ts";
 import { AuthSessionRepository } from "../repositories/auth-session.repository.ts";
@@ -35,8 +36,8 @@ type PrismaAuthDatabase = {
 };
 
 class SystemAuthClock extends AuthClockPort {
-  now(): Date {
-    return new Date();
+  now(): Instant {
+    return nowInstant();
   }
 }
 

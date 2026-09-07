@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { nowInstant } from "@langwatch/time";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   IDENTITY_BORN_REPORT_KIND,
@@ -62,7 +63,7 @@ describe("PrismaIdentityNewbornRepository.findAbandoned", () => {
       it("returns the abandoned newborn, never a held user", async () => {
         const oldest = new Date(Date.now() - 3 * 60 * 60 * 1000);
         const old = new Date(Date.now() - 2 * 60 * 60 * 1000);
-        const horizon = new Date(Date.now() - 60 * 60 * 1000);
+        const horizon = nowInstant().subtract({ milliseconds: 60 * 60 * 1000 });
 
         const held: Claim[] = ["held-a", "held-b", "held-c"].map((id) => ({
           tenantId: id,

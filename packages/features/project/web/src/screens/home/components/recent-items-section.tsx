@@ -2,6 +2,7 @@ import { Box, Link as ChakraLink, HStack, Icon, Skeleton, Text, VStack } from "@
 import { keepPreviousData } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { LuCircleX } from "react-icons/lu";
+import { toEpochMs } from "@langwatch/time";
 import type { RecentItem, RecentItemType } from "../../../behavior/home-api.ts";
 import { homeApi } from "../../../behavior/home-api.ts";
 import NextLink from "../../../ui/elements/app-link.tsx";
@@ -58,7 +59,7 @@ const MAX_RECENT_ROWS = 8;
  * grid: twice the items in half the height, with recency visible at a glance.
  */
 function RecentItemRow({ item }: { item: RecentItem }) {
-  const timeAgo = formatTimeAgo(new Date(item.updatedAt).getTime());
+  const timeAgo = formatTimeAgo(toEpochMs(item.updatedAt));
   return (
     <ChakraLink asChild _hover={{ textDecoration: "none" }} width="full" display="block">
       <NextLink href={item.href}>
