@@ -2,7 +2,9 @@
 
 The guest checkout agent of the ACME online store. A LangGraph graph takes the
 guest from the cart to an order number: an assistant node talks to the guest
-with OpenAI, and four step nodes do the work.
+with OpenAI, and four step nodes do the work. Set the three `AZURE_OPENAI_`
+values instead and the assistant answers from an Azure deployment named after
+the model in `app/graph.py`.
 
 ## What it does
 
@@ -32,7 +34,7 @@ app/main.py    the FastAPI application
 ## Run it
 
 ```bash
-cp .env.example .env      # set OPENAI_API_KEY
+cp .env.example .env      # set OPENAI_API_KEY, or the three AZURE_OPENAI_ values
 uv sync
 uv run uvicorn app.main:app --reload --port 8767
 ```

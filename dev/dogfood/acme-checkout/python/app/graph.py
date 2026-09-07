@@ -1,8 +1,8 @@
 """The checkout graph: an assistant node that talks to the guest, and four step
 nodes that do the work.
 
-The assistant answers with OpenAI and asks for a step by calling one of four
-tools. The graph routes each call to its node: `cart_review`, `discount_code`,
+The assistant answers with OpenAI, or with an Azure deployment when one is
+configured, and asks for a step by calling one of four tools. The graph routes each call to its node: `cart_review`, `discount_code`,
 `payment` and `confirmation`. The node runs the step against the store,
 records the outcome in the state and answers the tool call, and the assistant
 turns that into the reply. The state of a conversation lives in the graph's
@@ -12,12 +12,13 @@ in-memory checkpointer under its thread id.
 from __future__ import annotations
 
 import json
+import os
 from typing import Annotated, Any, TypedDict
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, AnyMessage, SystemMessage, ToolMessage
-from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
+from langchain_core.runnables import Runnable, RunnableConfig
+from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -27,6 +28,10 @@ from .store import cart_totals, charge, check_discount_code, order_number
 load_dotenv()
 
 MODEL = "gpt-5-mini"
+
+# Azure names a model by its deployment, so the deployment is expected to carry
+# the name in MODEL and both sides talk about the same model.
+DEFAULT_AZURE_API_VERSION = "2024-10-21"
 
 SYSTEM_PROMPT = (
     "You are the checkout assistant of ACME, an online store, helping a guest "
@@ -105,8 +110,20 @@ class CheckoutState(TypedDict, total=False):
     order_number: str | None
 
 
-def _llm() -> ChatOpenAI:
-    return ChatOpenAI(model=MODEL).bind_tools(TOOLS, parallel_tool_calls=False)
+def _llm() -> Runnable[Any, Any]:
+    """The assistant's model: an Azure deployment when one is configured, OpenAI otherwise."""
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    if endpoint and os.getenv("AZURE_OPENAI_API_KEY"):
+        model: ChatOpenAI = AzureChatOpenAI(
+            azure_endpoint=endpoint,
+            azure_deployment=MODEL,
+            api_version=os.getenv(
+                "AZURE_OPENAI_API_VERSION", DEFAULT_AZURE_API_VERSION
+            ),
+        )
+    else:
+        model = ChatOpenAI(model=MODEL)
+    return model.bind_tools(TOOLS, parallel_tool_calls=False)
 
 
 def _pending_call(state: CheckoutState) -> dict:
