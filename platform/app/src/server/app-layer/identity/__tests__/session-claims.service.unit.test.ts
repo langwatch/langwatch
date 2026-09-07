@@ -43,6 +43,7 @@ const verifiedIdToken = (claims: Record<string, unknown>): string =>
   `header.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.signature`;
 
 describe("session claims from an identity-provider callback", () => {
+  /** @scenario An enterprise callback records the exact accepted account */
   it.each([
     ["auth0", "auth0|sam", "identifier_auth0"],
     ["okta", "okta-user-sam", "identifier_okta"],
@@ -77,6 +78,7 @@ describe("session claims from an identity-provider callback", () => {
     ]);
   });
 
+  /** @scenario Current verified Auth0 factors are recorded on the new session */
   it("carries the current verified profile's AMR into the new session", async () => {
     const assertions = new VerifiedCallbackProviderAssertions();
     const claims = new SessionClaimsService({
@@ -107,6 +109,7 @@ describe("session claims from an identity-provider callback", () => {
     expect(result.amr).toEqual(["oidc", "pwd", "otp"]);
   });
 
+  /** @scenario A stored MFA assertion cannot speak for a later callback */
   it("does not reuse a stale MFA assertion when the current callback asserted none", async () => {
     const assertions = new VerifiedCallbackProviderAssertions();
     const claims = new SessionClaimsService({
@@ -151,6 +154,7 @@ describe("session claims from an identity-provider callback", () => {
     expect(current).toEqual({ identifierId: "identifier_auth0", amr: [] });
   });
 
+  /** @scenario Simultaneous provider callbacks cannot exchange evidence */
   it("isolates simultaneous callbacks and their provider subjects", async () => {
     const assertions = new VerifiedCallbackProviderAssertions();
     const firstRecorded = deferred();
@@ -205,6 +209,7 @@ describe("session claims from an identity-provider callback", () => {
     ]);
   });
 
+  /** @scenario Unbound token claims earn no authentication credit */
   it("ignores verified evidence for a different callback provider", async () => {
     const assertions = new VerifiedCallbackProviderAssertions();
 
@@ -229,6 +234,7 @@ describe("session claims from an identity-provider callback", () => {
     });
   });
 
+  /** @scenario Unbound token claims earn no authentication credit */
   it("never reads AMR from an unverified request token", async () => {
     const assertions = new VerifiedCallbackProviderAssertions();
     const rawRequestToken = verifiedIdToken({
@@ -252,6 +258,7 @@ describe("session claims from an identity-provider callback", () => {
     });
   });
 
+  /** @scenario Unbound token claims earn no authentication credit */
   it("attributes other accepted provider accounts without trusting their token claims", async () => {
     const assertions = new VerifiedCallbackProviderAssertions();
     const identifierPort = identifiers({ answer: "identifier_google" });
@@ -291,6 +298,7 @@ describe("session claims from an identity-provider callback", () => {
     ]);
   });
 
+  /** @scenario Unbound token claims earn no authentication credit */
   it("does not trust verified token claims for a different accepted subject", async () => {
     const assertions = new VerifiedCallbackProviderAssertions();
     const claims = new SessionClaimsService({

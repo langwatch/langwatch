@@ -120,7 +120,6 @@ describe("the identifier-first sign-in router", () => {
   });
 
   describe("given a domain that belongs to no ACTIVE connection", () => {
-    /** @scenario "An email with no domain match offers the uniform method picker" */
     it("offers the instance's default method set", () => {
       const decision = route({ raw: "sam@home.net" });
 
