@@ -45,7 +45,8 @@ export class TraceEventAttributeMappingService {
         // Strict decimal gate: Number('') / Number('   ') coerce to 0 and
         // Number('0x1f') parses hex — all of which would silently project a
         // bogus metric. An absent/garbled metric must stay absent, not become 0.
-        if (DECIMAL_RE.test(value.trim())) {
+        const candidate = value.trim();
+        if (DECIMAL_RE.test(candidate)) {
           metrics[key.slice(METRICS_PREFIX.length)] = Number(value);
         }
       } else if (key.startsWith(DETAILS_PREFIX)) {

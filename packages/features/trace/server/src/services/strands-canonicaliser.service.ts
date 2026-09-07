@@ -8,7 +8,10 @@ import {
   extractSystemInstructionFromMessages,
   stripSystemMessages,
 } from "../rules/canonical-message.rules.ts";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type {
+  CanonicalAttributesPort,
+  ExtractorContext,
+} from "../ports/canonical-attributes.port.ts";
 
 /** Strands emits one event name for each message role. */
 const ROLE_EVENT_NAMES = [
@@ -42,26 +45,33 @@ const extractStrandsContent = (eventAttrs: Record<string, unknown>): unknown => 
       continue;
     }
 
-    const parsed = safeJsonParse(candidate);
+    const content = strandsContentOfCandidate(candidate);
+    if (content !== void 0) {
+      return content;
+    }
+  }
 
-    if (typeof parsed === "string" && parsed.trim().length > 0) {
-      return parsed;
+  return void 0;
+};
+
+/** One candidate attribute as content: a non-empty string, a non-empty array, or a wrapper's field. */
+const strandsContentOfCandidate = (candidate: unknown): unknown => {
+  const parsed = safeJsonParse(candidate);
+
+  if (typeof parsed === "string" && parsed.trim().length > 0) {
+    return parsed;
+  }
+
+  if (Array.isArray(parsed) && parsed.length > 0) {
+    return parsed;
+  }
+
+  if (isRecord(parsed)) {
+    if (parsed.text && typeof parsed.text === "string") {
+      return parsed.text;
     }
 
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
-    }
-
-    if (isRecord(parsed)) {
-      const obj = parsed;
-      if (obj.text && typeof obj.text === "string") {
-        return obj.text;
-      }
-
-      if (obj.content !== void 0) {
-        return obj.content;
-      }
-    }
+    return parsed.content;
   }
 
   return void 0;

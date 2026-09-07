@@ -9,7 +9,12 @@ import {
   recordValueType,
   spanTypeToGenAiOperationName,
 } from "../rules/canonical-extraction.rules.ts";
-import { asBoolean, asNumber, coerceToStringArray, isRecord } from "../rules/canonical-guard.rules.ts";
+import {
+  asBoolean,
+  asNumber,
+  coerceToStringArray,
+  isRecord,
+} from "../rules/canonical-guard.rules.ts";
 import {
   extractSystemInstructionFromMessages,
   stripSystemMessages,
@@ -191,12 +196,12 @@ export class GenAiSpanService {
     const timeToFirstChunkSeconds = asNumber(
       attrs.get(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK),
     );
-    if (
+    const canFillTimeToFirstToken =
       timeToFirstChunkSeconds !== null &&
       timeToFirstChunkSeconds >= 0 &&
       ctx.out[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN] === void 0 &&
-      !attrs.has(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN)
-    ) {
+      !attrs.has(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN);
+    if (canFillTimeToFirstToken) {
       attrs.delete(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK);
       ctx.setAttr(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN, timeToFirstChunkSeconds * 1000);
       ctx.recordRule(`${GEN_AI_RULE_PREFIX}:response.time_to_first_chunk`);

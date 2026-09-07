@@ -102,12 +102,10 @@ export function readEventPayloadField(payload: EventLogPayload, field: string): 
 
   for (const raw of payload.span?.attributes ?? []) {
     const attr = spanAttributeSchema.safeParse(raw);
-    if (
-      attr.success &&
-      attr.data.key === field &&
-      typeof attr.data.value.stringValue === "string"
-    ) {
-      return attr.data.value.stringValue;
+    if (!attr.success || attr.data.key !== field) continue;
+    const { stringValue } = attr.data.value;
+    if (typeof stringValue === "string") {
+      return stringValue;
     }
   }
 

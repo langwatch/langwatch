@@ -214,19 +214,20 @@ export function makeSpanReferencedPayload(event: SpanReceivedEvent): SpanReferen
  * which is sub-millisecond after the divide — well inside what partition
  * windowing tolerates.
  */
+function fixed64ToNanoseconds(normalized: z.infer<typeof fixed64Schema>): number {
+  if (typeof normalized === "number") return normalized;
+  if (typeof normalized === "string") return Number.parseInt(normalized, 10);
+
+  return Number((BigInt(normalized.high) << 32n) | (BigInt(normalized.low) & 0xffffffffn));
+}
+
 function parseStartTimeUnixMs(value: unknown): number | null {
   const parsed = fixed64Schema.safeParse(value);
   if (!parsed.success) {
     return null;
   }
 
-  const normalized = parsed.data;
-  const nano =
-    typeof normalized === "number"
-      ? normalized
-      : typeof normalized === "string"
-        ? Number.parseInt(normalized, 10)
-        : Number((BigInt(normalized.high) << 32n) | (BigInt(normalized.low) & 0xffffffffn));
+  const nano = fixed64ToNanoseconds(parsed.data);
 
   if (!Number.isFinite(nano) || nano <= 0) return null;
   return Math.floor(nano / 1e6);

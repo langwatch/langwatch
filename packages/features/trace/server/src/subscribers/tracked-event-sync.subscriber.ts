@@ -14,6 +14,7 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
 import { isSpanReceivedEvent, type TraceProcessingEvent } from "@langwatch/trace-contract";
 import type { OtlpAnyValue, OtlpSpan } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trace-processing:tracked-event-sync");
 
@@ -440,7 +441,7 @@ export class TrackedEventSync {
    */
   static hasSyncableFeedback(event: TraceProcessingEvent): boolean {
     if (!isSpanReceivedEvent(event)) return false;
-    if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
+    if (event.occurredAt < nowInstant().epochMilliseconds - STALE_TRACE_THRESHOLD_MS) return false;
     return TrackedEventSync.spanHasFeedbackEvents(event.data.span);
   }
 

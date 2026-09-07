@@ -166,12 +166,11 @@ export class TraceFullProtectionMapper {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 
-  /**
-   * Applies the capture/cost portions of the established Trace protection policy
-   * after a full record has been assembled. The rule is actor-independent; a
-   * later public adapter supplies viewer-derived protections at this boundary.
-   */
-  static apply(trace: TraceFullRecord, protections: TraceFullReadProtections): TraceFullRecord {
+  /** Every captured string the viewer may not see, so it can be redacted wherever it reappears. */
+  private static collectRedactions(
+    trace: TraceFullRecord,
+    protections: TraceFullReadProtections,
+  ): Set<string> {
     const redactions = new Set<string>();
     if (!protections.canSeeCapturedInput) {
       TraceFullProtectionMapper.collectStrings(trace.input?.value, redactions);
@@ -183,6 +182,17 @@ export class TraceFullProtectionMapper {
       for (const span of trace.spans)
         TraceFullProtectionMapper.collectStrings(span.output?.value, redactions);
     }
+
+    return redactions;
+  }
+
+  /**
+   * Applies the capture/cost portions of the established Trace protection policy
+   * after a full record has been assembled. The rule is actor-independent; a
+   * later public adapter supplies viewer-derived protections at this boundary.
+   */
+  static apply(trace: TraceFullRecord, protections: TraceFullReadProtections): TraceFullRecord {
+    const redactions = TraceFullProtectionMapper.collectRedactions(trace, protections);
 
     const spans = trace.spans.map((span) =>
       TraceFullProtectionMapper.protectSpan(span, protections, redactions),

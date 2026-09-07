@@ -88,8 +88,9 @@ const extractTextsFromPart = (part: unknown): string[] => {
     const input = safeStringify(part.toolUse.input);
     return input === null ? [] : [input];
   }
-  if (isRecord(part.toolResult) && isUnknownArray(part.toolResult.content)) {
-    return joinExtractedTexts(extractBedrockToolResult(part.toolResult.content));
+  const toolResultContent = isRecord(part.toolResult) ? part.toolResult.content : undefined;
+  if (isUnknownArray(toolResultContent)) {
+    return joinExtractedTexts(extractBedrockToolResult(toolResultContent));
   }
 
   return [];
@@ -162,7 +163,8 @@ export const extractSystemInstructionFromMessages = (messages: unknown): string 
   }
 
   const first = messages[0];
-  if (!isMessageLike(first) || !isSystemRole(first.role)) {
+  const isSystemMessage = isMessageLike(first) && isSystemRole(first.role);
+  if (!isSystemMessage) {
     return null;
   }
 
@@ -210,8 +212,9 @@ export const decodeMessagesPayload = (payload: unknown): unknown => {
   if (isUnknownArray(payload)) {
     return payload;
   }
-  if (isRecord(payload) && isUnknownArray(payload.messages)) {
-    return payload.messages;
+  const payloadMessages = isRecord(payload) ? payload.messages : undefined;
+  if (isUnknownArray(payloadMessages)) {
+    return payloadMessages;
   }
   return payload;
 };
@@ -222,7 +225,8 @@ export const decodeMessagesPayload = (payload: unknown): unknown => {
  */
 export const unwrapWrappedMessages = (messages: unknown[]): unknown[] => {
   return messages.map((msg) => {
-    if (isRecord(msg) && isRecord(msg.message) && Object.keys(msg).length === 1) {
+    const wrapped = isRecord(msg) && isRecord(msg.message) && Object.keys(msg).length === 1;
+    if (wrapped) {
       return msg.message;
     }
     return msg;
@@ -242,8 +246,9 @@ export const normalizeToMessages = (
   if (isUnknownArray(raw)) {
     return unwrapWrappedMessages(raw);
   }
-  if (isRecord(raw) && isUnknownArray(raw.messages)) {
-    return unwrapWrappedMessages(raw.messages);
+  const rawMessages = isRecord(raw) ? raw.messages : undefined;
+  if (isUnknownArray(rawMessages)) {
+    return unwrapWrappedMessages(rawMessages);
   }
   return [{ role: defaultRole, content: raw }];
 };

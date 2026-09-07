@@ -31,7 +31,8 @@ export function setIfMissing({
   key: string;
   value: unknown;
 }): boolean {
-  if (ctx.bag.attrs.has(key) || ctx.out[key] !== void 0) {
+  const alreadySet = ctx.bag.attrs.has(key) || ctx.out[key] !== void 0;
+  if (alreadySet) {
     return false;
   }
   ctx.setAttr(key, value);
@@ -68,14 +69,14 @@ export function canonicaliseVertexAdkCore(ctx: ExtractorContext): void {
   }
 
   const sessionId = ctx.bag.attrs.get(VERTEX_ADK_KEYS.SESSION_ID);
-  if (
+  const recordedConversationId =
     isNonEmptyString(sessionId) &&
     setIfMissing({
       ctx,
       key: ATTR_KEYS.GEN_AI_CONVERSATION_ID,
       value: sessionId,
-    })
-  ) {
+    });
+  if (recordedConversationId) {
     ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:session_id->gen_ai.conversation.id`);
   }
 }

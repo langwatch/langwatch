@@ -9,7 +9,10 @@ import {
   recordValueType,
 } from "../rules/canonical-extraction.rules.ts";
 import { safeJsonParse } from "../rules/canonical-guard.rules.ts";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type {
+  CanonicalAttributesPort,
+  ExtractorContext,
+} from "../ports/canonical-attributes.port.ts";
 
 export class LogfireCanonicaliserService implements CanonicalAttributesPort {
   static create(): LogfireCanonicaliserService {
@@ -31,28 +34,27 @@ export class LogfireCanonicaliserService implements CanonicalAttributesPort {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
     }
 
-    if (
-      extractOutputMessages(
-        ctx,
-        [
-          {
-            type: "event",
-            name: "gen_ai.choice",
-            extractor: (event: CanonicalEvent) => {
-              const eventAttrs = event.attributes;
-              const message = eventAttrs.message ?? eventAttrs.content ?? eventAttrs.text;
+    const extractedOutputMessages = extractOutputMessages(
+      ctx,
+      [
+        {
+          type: "event",
+          name: "gen_ai.choice",
+          extractor: (event: CanonicalEvent) => {
+            const eventAttrs = event.attributes;
+            const message = eventAttrs.message ?? eventAttrs.content ?? eventAttrs.text;
 
-              if (message !== void 0) {
-                return { role: "assistant", content: safeJsonParse(message) };
-              }
+            if (message !== void 0) {
+              return { role: "assistant", content: safeJsonParse(message) };
+            }
 
-              return void 0;
-            },
+            return void 0;
           },
-        ],
-        `${this.id}:event(gen_ai.choice)->gen_ai.output.messages`,
-      )
-    ) {
+        },
+      ],
+      `${this.id}:event(gen_ai.choice)->gen_ai.output.messages`,
+    );
+    if (extractedOutputMessages) {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
     }
 

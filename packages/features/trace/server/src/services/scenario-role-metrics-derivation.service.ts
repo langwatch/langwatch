@@ -2,6 +2,7 @@ import type { TraceDerivationSpanReaderPort } from "../ports/trace-derivation-sp
 import { deriveScenarioRoleMetricsFromSpans } from "../rules/scenario-role-metrics.rules.ts";
 import type { ScenarioRoleMetrics } from "../rules/scenario-role-metrics.rules.ts";
 import { SpanCostService } from "./span-cost.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Window after which a memo entry is dropped purely as a memory backstop — correctness comes from
@@ -54,7 +55,7 @@ export class ScenarioRoleMetricsDerivationService {
     return new ScenarioRoleMetricsDerivationService(
       options.spans,
       options.spanCosts,
-      options.now ?? (() => Date.now()),
+      options.now ?? (() => nowInstant().epochMilliseconds),
     );
   }
 

@@ -6,6 +6,7 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
 import { isSpanReceivedEvent, type TraceProcessingEvent } from "@langwatch/trace-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trace-processing:custom-evaluation-sync");
 
@@ -269,7 +270,7 @@ export class CustomEvaluationSync {
    */
   static hasSyncableEvaluations(event: TraceProcessingEvent): boolean {
     if (!isSpanReceivedEvent(event)) return false;
-    if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
+    if (event.occurredAt < nowInstant().epochMilliseconds - STALE_TRACE_THRESHOLD_MS) return false;
     return CustomEvaluationSync.spanHasEvaluationEvents(event.data.span);
   }
 
@@ -286,8 +287,9 @@ export class CustomEvaluationSync {
     deps: CustomEvaluationSyncSubscriberDeps,
   ): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
     return async (event, context) => {
-      if (!CustomEvaluationSync.hasSyncableEvaluations(event) || !isSpanReceivedEvent(event))
-        return;
+      const isSyncableSpanEvent =
+        CustomEvaluationSync.hasSyncableEvaluations(event) && isSpanReceivedEvent(event);
+      if (!isSyncableSpanEvent) return;
 
       const { tenantId, aggregateId: traceId } = context;
 

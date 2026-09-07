@@ -75,9 +75,10 @@ function canonicaliseOutput(ctx: ExtractorContext): void {
 
       if (messages.length === 0) {
         const obj = response.object;
+        const isSerialisable = isRecord(obj) || Array.isArray(obj);
         if (isNonEmptyString(obj)) {
           messages.push({ role: "assistant", content: obj });
-        } else if (isRecord(obj) || Array.isArray(obj)) {
+        } else if (isSerialisable) {
           messages.push({ role: "assistant", content: JSON.stringify(obj) });
         }
       }
@@ -97,11 +98,9 @@ function canonicaliseOutput(ctx: ExtractorContext): void {
 
     if (ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === void 0) {
       const obj = attrs.take(ATTR_KEYS.AI_RESPONSE_OBJECT);
-      const content = isNonEmptyString(obj)
-        ? obj
-        : isRecord(obj) || Array.isArray(obj)
-          ? JSON.stringify(obj)
-          : void 0;
+      const isSerialisableObject = isRecord(obj) || Array.isArray(obj);
+      const serialised = isSerialisableObject ? JSON.stringify(obj) : void 0;
+      const content = isNonEmptyString(obj) ? obj : serialised;
       if (content !== void 0) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [{ role: "assistant", content }]);
         ctx.recordRule(`${VERCEL_RULE_PREFIX}:ai.response.object->gen_ai.output.messages`);

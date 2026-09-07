@@ -103,6 +103,42 @@ export class TraceReadRedactionService {
     return [];
   }
 
+  /**
+   * A string value, redacted: parsed as JSON or Python repr so nested strings are
+   * reached individually, and replaced wholesale when it merely contains a secret.
+   */
+  private static redactString(value: string, redactions: Set<string>): string {
+    try {
+      const json = JSON.parse(value) as unknown;
+
+      return JSON.stringify(TraceReadRedactionService.redactObject(json, redactions));
+    } catch {
+      const fromPython = TraceReadRedactionService.redactPythonRepr(value, redactions);
+      if (fromPython !== null) {
+        return fromPython;
+      }
+
+      const present = Array.from(redactions).filter((redaction) => value.includes(redaction));
+
+      return present.length > 0 ? "[REDACTED]" : value;
+    }
+  }
+
+  /** The same for a Python repr, or null when the value is not one. */
+  private static redactPythonRepr(value: string, redactions: Set<string>): string | null {
+    try {
+      const parsed = parsePythonInsideJson({ value });
+      const isObject = typeof parsed.value === "object" && parsed.value !== null;
+      if (isObject) {
+        return JSON.stringify(TraceReadRedactionService.redactObject(parsed.value, redactions));
+      }
+    } catch {
+      // Not valid Python repr either
+    }
+
+    return null;
+  }
+
   /** Redacts sensitive values from an object. */
   static redactObject<T>(object: T, redactions: Set<string>): T {
     if (redactions.size === 0) {
@@ -110,27 +146,7 @@ export class TraceReadRedactionService {
     }
 
     if (typeof object === "string") {
-      try {
-        const json = JSON.parse(object) as unknown;
-
-        return JSON.stringify(TraceReadRedactionService.redactObject(json, redactions)) as T;
-      } catch {
-        // Try parsing as Python repr - only if it looks like an object
-        try {
-          const json_ = parsePythonInsideJson({ value: object });
-          if (typeof json_.value === "object" && json_.value !== null) {
-            return JSON.stringify(
-              TraceReadRedactionService.redactObject(json_.value, redactions),
-            ) as T;
-          }
-        } catch {
-          // Not valid Python repr either
-        }
-
-        return Array.from(redactions).filter((redaction) => object.includes(redaction)).length > 0
-          ? ("[REDACTED]" as T)
-          : object;
-      }
+      return TraceReadRedactionService.redactString(object, redactions) as T;
     }
 
     if (Array.isArray(object)) {

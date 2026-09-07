@@ -3,7 +3,10 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { ALLOWED_SPAN_TYPES } from "../rules/canonical-extraction.rules.ts";
 import { asNumber } from "../rules/canonical-guard.rules.ts";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type {
+  CanonicalAttributesPort,
+  ExtractorContext,
+} from "../ports/canonical-attributes.port.ts";
 
 export class OpenInferenceCanonicaliserService implements CanonicalAttributesPort {
   static create(): OpenInferenceCanonicaliserService {
@@ -80,13 +83,13 @@ export class OpenInferenceCanonicaliserService implements CanonicalAttributesPor
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cacheWrite);
     }
 
-    if (
+    const recordedAnyTokenCount =
       prompt !== null ||
       completion !== null ||
       reasoning !== null ||
       cacheRead !== null ||
-      cacheWrite !== null
-    ) {
+      cacheWrite !== null;
+    if (recordedAnyTokenCount) {
       ctx.recordRule(`${this.id}:llm.token_count`);
     }
   }

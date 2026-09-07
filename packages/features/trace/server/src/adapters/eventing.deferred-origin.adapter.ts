@@ -6,6 +6,7 @@ import {
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trace-processing:origin-gate");
 
@@ -36,7 +37,7 @@ export class TraceDeferredOriginEventingAdapter {
     event: TraceProcessingEvent;
     foldState: TraceSummaryData;
   }): boolean {
-    if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
+    if (event.occurredAt < nowInstant().epochMilliseconds - STALE_TRACE_THRESHOLD_MS) return false;
     return !foldState.attributes?.["langwatch.origin"];
   }
 
@@ -76,7 +77,7 @@ export class TraceDeferredOriginEventingAdapter {
         traceId: payload.traceId,
         origin: "application",
         reason: "deferred_fallback",
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
       });
     };
   }

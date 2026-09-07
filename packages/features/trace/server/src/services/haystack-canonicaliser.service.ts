@@ -3,7 +3,10 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
 import { isRecord } from "../rules/canonical-guard.rules.ts";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type {
+  CanonicalAttributesPort,
+  ExtractorContext,
+} from "../ports/canonical-attributes.port.ts";
 
 export class HaystackCanonicaliserService implements CanonicalAttributesPort {
   static create(): HaystackCanonicaliserService {
@@ -13,7 +16,8 @@ export class HaystackCanonicaliserService implements CanonicalAttributesPort {
   readonly id = "haystack";
 
   apply(ctx: ExtractorContext): void {
-    if (ctx.span.instrumentationScope.name !== "openinference.instrumentation.haystack") {
+    const scopeName = ctx.span.instrumentationScope.name;
+    if (scopeName !== "openinference.instrumentation.haystack") {
       return;
     }
 

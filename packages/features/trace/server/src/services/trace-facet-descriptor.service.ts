@@ -14,7 +14,12 @@ import type {
   RangeFacetDescriptor,
   TraceListReadPort,
 } from "@langwatch/trace-contract";
-import type { FacetDefinition, FacetTable, RangeFacetDef } from "@langwatch/trace-server";
+import type {
+  ExpressionCategoricalDef,
+  FacetDefinition,
+  FacetTable,
+  RangeFacetDef,
+} from "@langwatch/trace-server";
 import { ClickHouseFacetRegistryAdapter } from "@langwatch/trace-server";
 
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
@@ -44,53 +49,72 @@ export class TraceFacetDescriptorService {
     standaloneByKey: Map<string, FacetDescriptor>,
     discreteByKey: Map<string, DiscreteFacetResult>,
   ): Promise<FacetDescriptor | null> {
-    if (def.kind === "categorical" && isExpressionCategorical(def)) {
-      if (def.expression.includes("arrayJoin")) {
-        return standaloneByKey.get(def.key) ?? null;
-      }
-
-      const batch = batchByTable.get(def.table);
-      const raw = batch?.categoricals[def.key];
-      if (!raw) {
-        return null;
-      }
-
-      const enriched =
-        def.key === "topic" || def.key === "subtopic"
-          ? await this.topicNaming.enrichTopicNames(params.tenantId, raw)
-          : raw;
-
-      return {
-        key: def.key,
-        kind: "categorical",
-        label: def.label,
-        group: def.group,
-        topValues: enriched.values,
-        totalDistinct: enriched.totalDistinct,
-      };
+    if (isExpressionCategorical(def)) {
+      return await this.materializeCategorical(def, params, batchByTable, standaloneByKey);
     }
 
     if (def.kind === "range") {
-      const batch = batchByTable.get(def.table);
-      const range = batch?.ranges[def.key];
-      if (!range) {
-        return null;
-      }
-
-      const discrete = def.isDiscrete ? discreteByKey.get(def.key) : undefined;
-
-      return {
-        key: def.key,
-        kind: "range",
-        label: def.label,
-        group: def.group,
-        min: range.min,
-        max: range.max,
-        ...(discrete ? { discrete } : {}),
-      };
+      return this.materializeRange(def, batchByTable, discreteByKey);
     }
 
     return standaloneByKey.get(def.key) ?? null;
+  }
+
+  /** A categorical facet's descriptor: the batched top values, topic names resolved. */
+  private async materializeCategorical(
+    def: ExpressionCategoricalDef,
+    params: DiscoverParams,
+    batchByTable: Map<FacetTable, BatchedFacetResult>,
+    standaloneByKey: Map<string, FacetDescriptor>,
+  ): Promise<FacetDescriptor | null> {
+    if (def.expression.includes("arrayJoin")) {
+      return standaloneByKey.get(def.key) ?? null;
+    }
+
+    const batch = batchByTable.get(def.table);
+    const raw = batch?.categoricals[def.key];
+    if (!raw) {
+      return null;
+    }
+
+    const namesTopics = def.key === "topic" || def.key === "subtopic";
+    const enriched = namesTopics
+      ? await this.topicNaming.enrichTopicNames(params.tenantId, raw)
+      : raw;
+
+    return {
+      key: def.key,
+      kind: "categorical",
+      label: def.label,
+      group: def.group,
+      topValues: enriched.values,
+      totalDistinct: enriched.totalDistinct,
+    };
+  }
+
+  /** A range facet's descriptor: the batched bounds, plus the discrete values when it has them. */
+  private materializeRange(
+    def: RangeFacetDef,
+    batchByTable: Map<FacetTable, BatchedFacetResult>,
+    discreteByKey: Map<string, DiscreteFacetResult>,
+  ): FacetDescriptor | null {
+    const batch = batchByTable.get(def.table);
+    const range = batch?.ranges[def.key];
+    if (!range) {
+      return null;
+    }
+
+    const discrete = def.isDiscrete ? discreteByKey.get(def.key) : undefined;
+
+    return {
+      key: def.key,
+      kind: "range",
+      label: def.label,
+      group: def.group,
+      min: range.min,
+      max: range.max,
+      ...(discrete ? { discrete } : {}),
+    };
   }
 
   async discoverCategorical(

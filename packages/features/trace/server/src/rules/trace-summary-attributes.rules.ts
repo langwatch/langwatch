@@ -29,7 +29,8 @@ export function parseJsonStringArray(raw: string | undefined): string[] {
     return parsed.filter((item): item is string => typeof item === "string");
   } catch {
     const trimmed = raw.trim();
-    if (trimmed.startsWith("[") && !trimmed.endsWith("]")) return [];
+    const isTruncatedArray = trimmed.startsWith("[") && !trimmed.endsWith("]");
+    if (isTruncatedArray) return [];
     return [raw];
   }
 }

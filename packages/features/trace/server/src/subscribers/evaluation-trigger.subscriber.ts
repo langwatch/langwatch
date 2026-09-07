@@ -249,8 +249,8 @@ function readNumericAttrValue(value: unknown): number | undefined {
     const anyValue = value as Record<string, unknown>;
     raw = anyValue.intValue ?? anyValue.stringValue ?? anyValue.doubleValue ?? value;
   }
-  const n =
-    typeof raw === "number" ? raw : typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
+  const parsedFromString = typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
+  const n = typeof raw === "number" ? raw : parsedFromString;
   return Number.isFinite(n) ? n : undefined;
 }
 
@@ -433,7 +433,8 @@ function extractCustomMetadata(attrs: Record<string, string>): Record<string, st
   for (const [key, value] of Object.entries(attrs)) {
     if (!key.startsWith("metadata.")) continue;
     if (RESERVED_KEYS.has(key)) continue;
-    if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) continue;
+    const isReservedPrefix = RESERVED_PREFIXES.some((p) => key.startsWith(p));
+    if (isReservedPrefix) continue;
     // Strip "metadata." prefix for the custom key
     const customKey = key.slice("metadata.".length);
     if (customKey) {

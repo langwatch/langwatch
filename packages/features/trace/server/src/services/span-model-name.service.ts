@@ -27,12 +27,13 @@ export class SpanModelNameService {
   tryExtractModelName(span: OtlpSpan, attributeKeys: readonly string[]): string | null {
     for (const key of attributeKeys) {
       for (const attr of span.attributes) {
-        if (
-          attr.key === key &&
-          typeof attr.value.stringValue === "string" &&
-          attr.value.stringValue.length > 0
-        ) {
-          return attr.value.stringValue;
+        if (attr.key !== key) {
+          continue;
+        }
+
+        const { stringValue } = attr.value;
+        if (typeof stringValue === "string" && stringValue.length > 0) {
+          return stringValue;
         }
       }
     }

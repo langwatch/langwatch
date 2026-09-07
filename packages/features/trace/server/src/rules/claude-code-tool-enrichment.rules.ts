@@ -87,6 +87,14 @@ export function buildToolInput({
   return toJsonOrText(capPayloadString(raw, undefined, "tool_input"));
 }
 
+/** The word the summary carries for a `tool_result` whose success flag may be absent. */
+function toolOutcomeStatus(success: boolean | null): "failed" | "completed" | "unknown" {
+  if (success === false) return "failed";
+  if (success === true) return "completed";
+
+  return "unknown";
+}
+
 export function buildToolOutput({
   toolResult,
   decision,
@@ -101,12 +109,7 @@ export function buildToolOutput({
   }
 
   if (toolResult !== null) {
-    const status =
-      toolResult.success === false
-        ? "failed"
-        : toolResult.success === true
-          ? "completed"
-          : "unknown";
+    const status = toolOutcomeStatus(toolResult.success);
 
     return {
       type: "json",

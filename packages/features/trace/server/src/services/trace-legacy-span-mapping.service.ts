@@ -54,15 +54,15 @@ function extractMetrics(spanAttributes: NormalizedAttributes): SpanMetrics | nul
   });
   const cost = rawCost > 0 ? rawCost : null;
 
-  if (
+  const hasNoMetricsSignal =
     promptTokens === null &&
     completionTokens === null &&
     reasoningTokens === null &&
     cost === null &&
     cacheReadInputTokens === null &&
     cacheCreationInputTokens === null &&
-    typeof tokensEstimated !== "boolean"
-  ) {
+    typeof tokensEstimated !== "boolean";
+  if (hasNoMetricsSignal) {
     return null;
   }
 

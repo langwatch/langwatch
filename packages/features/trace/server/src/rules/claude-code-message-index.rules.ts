@@ -100,12 +100,11 @@ export function buildOutputIndex(
     // as the fallback for records ingested before the derivation existed — and
     // it keeps the `tool_use` markers, which the derived text does not, so we
     // only take the shortcut when the call asked for no tools.
-    const derived =
+    const hasToolFreeDerivedText =
       log.derivedOutputText !== null &&
       log.derivedOutputText !== undefined &&
-      (log.derivedToolCallCount ?? 0) === 0
-        ? log.derivedOutputText
-        : null;
+      (log.derivedToolCallCount ?? 0) === 0;
+    const derived = hasToolFreeDerivedText ? log.derivedOutputText : null;
     const text =
       derived ??
       traceCanonicalisation.deriveClaudeResponseContent({

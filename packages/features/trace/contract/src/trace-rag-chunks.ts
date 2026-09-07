@@ -87,12 +87,16 @@ export const maybeAddIdsToContextList = (contexts: (RAGChunk["content"] | null)[
     );
   if (!everyWithoutId) return contexts as RAGChunk[];
 
-  return contexts.filter(Boolean).map((content) => ({
-    document_id:
-      content && typeof content === "object" && "document_id" in content && content.document_id
+  return contexts.filter(Boolean).map((content) => {
+    const isRecord = content && typeof content === "object";
+    const hasDocumentId = isRecord && "document_id" in content && Boolean(content.document_id);
+    const hasContent = isRecord && "content" in content;
+
+    return {
+      document_id: hasDocumentId
         ? content.document_id
         : crypto.createHash("md5").update(extractChunkTextualContent(content)).digest("hex"),
-    content:
-      content && typeof content === "object" && "content" in content ? content.content : content,
-  }));
+      content: hasContent ? content.content : content,
+    };
+  });
 };

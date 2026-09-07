@@ -1,5 +1,6 @@
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type { TraceDerivationSpanReaderPort } from "../ports/trace-derivation-span-reader.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * How long an unused memo entry lingers. Correctness comes from the fold
@@ -47,7 +48,7 @@ export class TraceEventDerivationService {
     }
 
     const key = `${input.projectId}:${input.traceId}:${input.foldVersion}`;
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const hit = this.memo.get(key);
     if (hit && hit.expiresAt > now) {
       return hit.value;
@@ -66,7 +67,7 @@ export class TraceEventDerivationService {
     this.memo.set(key, entry);
     value.then(
       () => {
-        entry.expiresAt = Date.now() + EVENT_DERIVATION_WINDOW_MS;
+        entry.expiresAt = nowInstant().epochMilliseconds + EVENT_DERIVATION_WINDOW_MS;
       },
       // Never cache a failure: drop it so the next caller retries the read
       // rather than replaying the rejection.

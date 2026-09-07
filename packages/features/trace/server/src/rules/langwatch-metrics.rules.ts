@@ -15,8 +15,9 @@ function canonicaliseMetrics(ctx: ExtractorContext): void {
   const rawMetrics = attrs.take(ATTR_KEYS.LANGWATCH_METRICS);
   if (rawMetrics !== void 0) {
     let metricsValue: Record<string, unknown> | null = null;
-    if (isLangWatchStructuredValue(rawMetrics) && isRecord(rawMetrics.value)) {
-      metricsValue = rawMetrics.value;
+    const structured = isLangWatchStructuredValue(rawMetrics) ? rawMetrics : null;
+    if (structured && isRecord(structured.value)) {
+      metricsValue = structured.value;
     } else if (isRecord(rawMetrics)) {
       metricsValue = rawMetrics;
     }

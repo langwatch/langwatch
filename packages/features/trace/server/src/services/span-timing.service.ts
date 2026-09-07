@@ -20,11 +20,11 @@ export class SpanTimingService {
     occurredAt: number;
     totalDurationMs: number;
   } {
-    if (
-      SYNTHETIC_SPAN_NAMES.has(span.name) ||
-      !isValidTimestamp(span.startTimeUnixMs) ||
-      !isValidTimestamp(span.endTimeUnixMs)
-    ) {
+    const hasMeasurableWindow =
+      !SYNTHETIC_SPAN_NAMES.has(span.name) &&
+      isValidTimestamp(span.startTimeUnixMs) &&
+      isValidTimestamp(span.endTimeUnixMs);
+    if (!hasMeasurableWindow) {
       return {
         occurredAt: state.occurredAt,
         totalDurationMs: state.totalDurationMs,

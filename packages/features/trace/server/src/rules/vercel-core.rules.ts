@@ -50,14 +50,13 @@ function canonicaliseSpanIdentity(ctx: ExtractorContext): void {
     canonicaliseVercelToolCall(ctx);
   }
 
-  if (
-    !extractModelToBoth({
-      ctx,
-      sourceKey: ATTR_KEYS.AI_MODEL,
-      ruleId: `${VERCEL_RULE_PREFIX}:ai.model->gen_ai.*.model`,
-      transform: (raw) => normaliseModelFromAiModelObject(raw),
-    })
-  ) {
+  const extractedModel = extractModelToBoth({
+    ctx,
+    sourceKey: ATTR_KEYS.AI_MODEL,
+    ruleId: `${VERCEL_RULE_PREFIX}:ai.model->gen_ai.*.model`,
+    transform: (raw) => normaliseModelFromAiModelObject(raw),
+  });
+  if (!extractedModel) {
     attrs.take(ATTR_KEYS.AI_MODEL);
   }
 }
@@ -88,16 +87,7 @@ function canonicaliseUsage(ctx: ExtractorContext): void {
       ctx.recordRule(`${VERCEL_RULE_PREFIX}:ai.usage.cacheWrite->gen_ai.usage.cache_creation`);
     }
 
-    if ((cacheRead ?? 0) > 0 || (cacheWrite ?? 0) > 0) {
-      const freshInput =
-        noCacheTokens ?? Math.max(0, canonicalInput - (cacheRead ?? 0) - (cacheWrite ?? 0));
-      if (freshInput !== canonicalInput) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, freshInput);
-        ctx.recordRule(
-          `${VERCEL_RULE_PREFIX}:ai.usage.inputTokens->gen_ai.usage.input_tokens(fresh)`,
-        );
-      }
-    }
+    recordFreshInputTokens({ cacheRead, cacheWrite, canonicalInput, ctx, noCacheTokens });
 
     const reasoningTokens = asNumber(attrs.take(ATTR_KEYS.AI_USAGE_REASONING_TOKENS));
     if (reasoningTokens !== null && reasoningTokens > 0) {
@@ -107,4 +97,33 @@ function canonicaliseUsage(ctx: ExtractorContext): void {
       );
     }
   }
+}
+
+/**
+ * The Vercel SDK reports input tokens including the cached portion, so once a
+ * cache read or write is known the canonical input count is restated as the
+ * fresh part alone.
+ */
+function recordFreshInputTokens({
+  cacheRead,
+  cacheWrite,
+  canonicalInput,
+  ctx,
+  noCacheTokens,
+}: {
+  cacheRead: number | null;
+  cacheWrite: number | null;
+  canonicalInput: number;
+  ctx: ExtractorContext;
+  noCacheTokens: number | null;
+}): void {
+  const hasCacheTokens = (cacheRead ?? 0) > 0 || (cacheWrite ?? 0) > 0;
+  if (!hasCacheTokens) return;
+
+  const freshInput =
+    noCacheTokens ?? Math.max(0, canonicalInput - (cacheRead ?? 0) - (cacheWrite ?? 0));
+  if (freshInput === canonicalInput) return;
+
+  ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, freshInput);
+  ctx.recordRule(`${VERCEL_RULE_PREFIX}:ai.usage.inputTokens->gen_ai.usage.input_tokens(fresh)`);
 }

@@ -174,33 +174,43 @@ function findLoneBareInclude(
  * a value that's already part of a same-field OR group.
  */
 function isInsideOrGroup(ast: LiqeQuery, start: number, end: number): boolean {
-  let inside = false;
-  const visit = (node: LiqeQuery, underOr: boolean): void => {
-    if (inside) {
-      return;
-    }
-    if (node.type === "Tag") {
-      if (underOr && node.location.start === start && node.location.end === end) {
-        inside = true;
-      }
-      return;
-    }
-    if (node.type === "LogicalExpression") {
-      const isOr = node.operator.operator === "OR";
-      visit(node.left, underOr || isOr);
-      visit(node.right, underOr || isOr);
-      return;
-    }
-    if (node.type === "UnaryOperator") {
-      visit(node.operand, underOr);
-      return;
-    }
-    if (node.type === "ParenthesizedExpression") {
-      visit(node.expression, underOr);
-    }
-  };
-  visit(ast, false);
-  return inside;
+  return containsTagUnderOr({ end, node: ast, start, underOr: false });
+}
+
+/** The walk `isInsideOrGroup` runs: whether the Tag at [start, end) sits below an OR. */
+function containsTagUnderOr({
+  end,
+  node,
+  start,
+  underOr,
+}: {
+  end: number;
+  node: LiqeQuery;
+  start: number;
+  underOr: boolean;
+}): boolean {
+  if (node.type === "Tag") {
+    return underOr && node.location.start === start && node.location.end === end;
+  }
+
+  if (node.type === "LogicalExpression") {
+    const nested = underOr || node.operator.operator === "OR";
+
+    return (
+      containsTagUnderOr({ end, node: node.left, start, underOr: nested }) ||
+      containsTagUnderOr({ end, node: node.right, start, underOr: nested })
+    );
+  }
+
+  if (node.type === "UnaryOperator") {
+    return containsTagUnderOr({ end, node: node.operand, start, underOr });
+  }
+
+  if (node.type === "ParenthesizedExpression") {
+    return containsTagUnderOr({ end, node: node.expression, start, underOr });
+  }
+
+  return false;
 }
 
 /**

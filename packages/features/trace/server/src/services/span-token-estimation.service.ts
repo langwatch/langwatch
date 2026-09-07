@@ -271,7 +271,9 @@ export class OtlpSpanTokenEstimationService {
     try {
       const parsed = JSON.parse(jsonStr);
 
-      if (parsed && typeof parsed === "object" && "type" in parsed && "value" in parsed) {
+      const isTypedValue =
+        parsed && typeof parsed === "object" && "type" in parsed && "value" in parsed;
+      if (isTypedValue) {
         if (parsed.type === "chat_messages" && Array.isArray(parsed.value)) {
           return this.messagesArrayToText(parsed.value);
         }

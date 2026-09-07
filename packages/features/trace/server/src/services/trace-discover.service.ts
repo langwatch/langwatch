@@ -29,6 +29,7 @@ import { isExpressionCategorical } from "../rules/trace-facet-classification.rul
 import { TtlCache } from "./trace-ttl-cache.service.ts";
 import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 import { TraceFacetDescriptorService } from "./trace-facet-descriptor.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Stale-while-revalidate cache for the full discover payload. The table view fires `discover` on
@@ -107,13 +108,13 @@ function partitionFacetRegistry(): {
   };
 
   for (const def of ClickHouseFacetRegistryAdapter.FACET_REGISTRY) {
-    if (def.kind === "range") {
-      slotFor(def.table).ranges.push(def);
-    } else if (
+    const isGroupableCategorical =
       def.kind === "categorical" &&
       isExpressionCategorical(def) &&
-      !def.expression.includes("arrayJoin")
-    ) {
+      !def.expression.includes("arrayJoin");
+    if (def.kind === "range") {
+      slotFor(def.table).ranges.push(def);
+    } else if (isGroupableCategorical) {
       slotFor(def.table).categoricals.push(def);
     } else {
       standalone.push(def);
@@ -196,7 +197,7 @@ export class TraceDiscoverService {
       // threshold. The refresh broadcasts `discover_updated` on
       // completion so any open browser invalidates and re-reads from
       // the now-warm cache.
-      if (Date.now() - cached.timestamp > DISCOVER_REFRESH_AFTER_MS) {
+      if (nowInstant().epochMilliseconds - cached.timestamp > DISCOVER_REFRESH_AFTER_MS) {
         this.refreshDiscoverInBackground(snappedParams, cacheKey);
       }
 
@@ -230,7 +231,10 @@ export class TraceDiscoverService {
         // the slowest tenants) and self-clears on pod crash. We claim once per refresh
         // attempt — if we lose the claim, another pod is already on it and its write
         // will hydrate the value cache for every reader.
-        const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(cacheKey, Date.now());
+        const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(
+          cacheKey,
+          nowInstant().epochMilliseconds,
+        );
         if (!claimed) {
           return;
         }
@@ -238,7 +242,7 @@ export class TraceDiscoverService {
         const fresh = await this.computeDiscover(params);
         await DISCOVER_CACHE.set(cacheKey, {
           value: fresh,
-          timestamp: Date.now(),
+          timestamp: nowInstant().epochMilliseconds,
         });
         // SSE push to any browser subscribed for this tenant. Empty
         // payload — the client refetches via tRPC and hits the warm
@@ -274,12 +278,12 @@ export class TraceDiscoverService {
   private async computeDiscover(params: DiscoverParams): Promise<FacetDescriptor[]> {
     const { batched, standalone } = partitionFacetRegistry();
     const taskTimings: Array<{ label: string; durationMs: number }> = [];
-    const startedAt = Date.now();
+    const startedAt = nowInstant().epochMilliseconds;
     const wrap = <T>(label: string, p: Promise<T>): Promise<T> => {
-      const t0 = Date.now();
+      const t0 = nowInstant().epochMilliseconds;
 
       return p.finally(() => {
-        taskTimings.push({ label, durationMs: Date.now() - t0 });
+        taskTimings.push({ label, durationMs: nowInstant().epochMilliseconds - t0 });
       });
     };
 
@@ -292,7 +296,7 @@ export class TraceDiscoverService {
     const settled = await Promise.allSettled(tasks);
     this.logSlowDiscover({
       params,
-      totalMs: Date.now() - startedAt,
+      totalMs: nowInstant().epochMilliseconds - startedAt,
       taskCount: tasks.length,
       taskTimings,
     });

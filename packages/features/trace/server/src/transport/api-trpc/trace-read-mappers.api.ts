@@ -192,10 +192,12 @@ export async function deriveTraceDropPrivacy(
   try {
     const policy = await contentPrivacy.getResolvedPolicyForProject({ projectId });
     const droppedCategories: string[] = [];
-    if (policy.categories.input.disposition === "drop" && !rawHeader.input) {
+    const dropsInput = policy.categories.input.disposition === "drop";
+    const dropsOutput = policy.categories.output.disposition === "drop";
+    if (dropsInput && !rawHeader.input) {
       droppedCategories.push("input");
     }
-    if (policy.categories.output.disposition === "drop" && !rawHeader.output) {
+    if (dropsOutput && !rawHeader.output) {
       droppedCategories.push("output");
     }
     return droppedCategories.length > 0 ? { droppedCategories } : null;
@@ -720,15 +722,17 @@ export function redactTraceLogContent(
 
   // The audience label only means something when ONE category was withheld:
   // a record that shed both sides has no single audience to name.
+  const hidesDerivedInput = hiddenDerivedKeys.some((key) =>
+    key.startsWith(derivedAttrPrefixes.input),
+  );
+  const hidesDerivedOutput = hiddenDerivedKeys.some((key) =>
+    key.startsWith(derivedAttrPrefixes.output),
+  );
   const hiddenCategories = new Set<LogContentCategory>([
     ...hiddenKeys.map((entry) => entry.category),
     ...(shouldHideBody ? [bodyCategory] : []),
-    ...(hiddenDerivedKeys.some((key) => key.startsWith(derivedAttrPrefixes.input))
-      ? (["input"] as const)
-      : []),
-    ...(hiddenDerivedKeys.some((key) => key.startsWith(derivedAttrPrefixes.output))
-      ? (["output"] as const)
-      : []),
+    ...(hidesDerivedInput ? (["input"] as const) : []),
+    ...(hidesDerivedOutput ? (["output"] as const) : []),
   ]);
   const onlyHidden = hiddenCategories.size === 1 ? [...hiddenCategories][0] : null;
 

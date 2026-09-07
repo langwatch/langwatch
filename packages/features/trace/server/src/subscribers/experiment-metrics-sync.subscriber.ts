@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { ComputeExperimentRunMetricsCommandData } from "@langwatch/experiment-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trace-processing:experiment-metrics-publisher");
 
@@ -76,7 +77,7 @@ export function createExperimentMetricsSyncHandler(
         runId,
         traceId,
         totalCost: foldState.totalCost!,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
       });
     } catch (error) {
       logger.warn(

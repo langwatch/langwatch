@@ -15,6 +15,7 @@ import {
   type EventMetricValues,
   EVENT_METRIC_SEP,
 } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
 interface TraceSummaryFieldsBase {
   TraceId: string;
@@ -488,7 +489,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // touch cold (S3-tier) partitions. Suggest is interactive, so we trade
     // completeness on stale historical values for sub-second responses.
     const SUGGEST_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-    const fromMs = Date.now() - SUGGEST_WINDOW_MS;
+    const fromMs = nowInstant().epochMilliseconds - SUGGEST_WINDOW_MS;
 
     const client = await this.resolveClient(params.tenantId);
     const result = await client.query({
@@ -1273,13 +1274,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // facets (status, model, …) return undefined for all of them, so the
     // discriminator below avoids attaching an empty aggregates object to
     // every facet value.
-    if (
+    const hasNoAggregates =
       r.passed_count === undefined &&
       r.failed_count === undefined &&
       r.errored_count === undefined &&
       r.has_score === undefined &&
-      r.has_label === undefined
-    ) {
+      r.has_label === undefined;
+    if (hasNoAggregates) {
       return {};
     }
     // Reshape the `[[value, count], …]` tuples into `{ value, count }`. Drop any

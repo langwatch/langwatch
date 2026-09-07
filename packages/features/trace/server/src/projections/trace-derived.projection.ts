@@ -39,6 +39,7 @@ import {
   RESERVED_REASONING_TOKENS,
   TraceSummaryFoldProjection,
 } from "./trace-summary.projection.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Deterministic fold for the slim `trace_analytics` table: hoisted
@@ -753,7 +754,7 @@ export class TraceAnalyticsFoldProjection
     state,
     tenantId,
     version,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
   }: {
     state: TraceAnalyticsData;
     tenantId: string;

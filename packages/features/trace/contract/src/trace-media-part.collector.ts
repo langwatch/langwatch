@@ -113,7 +113,8 @@ function isRawPcmFormat(format?: string, mimeType?: string): boolean {
   const m = mimeType?.toLowerCase();
   if (!m) return false;
   if (m.includes("pcm16")) return true;
-  if (m.includes("ulaw") || m.includes("pcmu") || m === "audio/basic") return true;
+  const isUlaw = m.includes("ulaw") || m.includes("pcmu") || m === "audio/basic";
+  if (isUlaw) return true;
   return m.includes("alaw") || m.includes("pcma");
 }
 
@@ -341,7 +342,8 @@ function collectInto({
     }
     if (!containsRenderableMediaHints(value)) return;
     const trimmed = value.trim();
-    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return;
+    const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+    if (!looksLikeJson) return;
     try {
       // The role carries across the nested-JSON hop: a message whose content
       // is a stringified array of parts is still that message's content.

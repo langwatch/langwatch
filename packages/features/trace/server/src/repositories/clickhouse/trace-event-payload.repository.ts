@@ -259,8 +259,9 @@ function extractField(parsedPayload: unknown, eventId: string, field: string): s
   for (const raw of spanAttributes) {
     const attr = spanAttributeSchema.safeParse(raw);
     if (!attr.success || attr.data.key !== field) continue;
-    if (typeof attr.data.value.stringValue === "string") {
-      return attr.data.value.stringValue;
+    const { stringValue } = attr.data.value;
+    if (typeof stringValue === "string") {
+      return stringValue;
     }
   }
 

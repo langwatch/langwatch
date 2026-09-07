@@ -224,7 +224,10 @@ export class ClickHouseFacetRegistryAdapter {
       // the annotation:unannotated filter. Coalesce, matching the analytics
       // filter's HasAnnotation = false OR HasAnnotation IS NULL.
       expression: "if(ifNull(HasAnnotation, false), 'annotated', 'unannotated')",
-      read: (t) => (t.summary.annotationIds.length > 0 ? "annotated" : "unannotated"),
+      read: (t) => {
+        const annotationCount = t.summary.annotationIds.length;
+        return annotationCount > 0 ? "annotated" : "unannotated";
+      },
     },
     {
       key: "containsAi",

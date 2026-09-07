@@ -1,3 +1,5 @@
+import { nowInstant } from "@langwatch/time";
+
 /**
  * The shared cache behind the explorer's facet and discover reads. Redis when the process
  * registered one, in-memory otherwise — the fallback is the contract, not a failure: no Redis
@@ -74,7 +76,7 @@ export class TtlCache<T> {
     const lifetimeMs = ttlMs ?? this.ttlMs;
 
     // Always shadow-write to memory so fallback is warm if Redis goes down later
-    this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
+    this.memory.set(key, { value, expiresAt: nowInstant().epochMilliseconds + lifetimeMs });
 
     const r = this.redis;
     if (!r) {
@@ -106,7 +108,7 @@ export class TtlCache<T> {
         "NX",
       );
       if (result === "OK") {
-        this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
+        this.memory.set(key, { value, expiresAt: nowInstant().epochMilliseconds + lifetimeMs });
 
         return true;
       }
@@ -118,7 +120,7 @@ export class TtlCache<T> {
       return false;
     }
 
-    this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
+    this.memory.set(key, { value, expiresAt: nowInstant().epochMilliseconds + lifetimeMs });
 
     return true;
   }
@@ -144,7 +146,7 @@ export class TtlCache<T> {
       return undefined;
     }
 
-    if (Date.now() > entry.expiresAt) {
+    if (nowInstant().epochMilliseconds > entry.expiresAt) {
       this.memory.delete(key);
 
       return undefined;

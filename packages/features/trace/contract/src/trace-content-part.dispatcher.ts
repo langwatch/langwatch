@@ -6,6 +6,14 @@ import { toMediaPart } from "./trace-content-part.provider-source.ts";
 import { tryParseRecord } from "./trace-content-part.record-schema.ts";
 import type { AsyncContentPartVisitor, ContentPartVisitor } from "./trace-content-part.types.ts";
 
+/** The tool name a `tool_use` / `tool_call` part carries, under either spelling. */
+function toolCallName(o: Record<string, unknown>): string {
+  if (typeof o.name === "string") return o.name;
+  if (typeof o.toolName === "string") return o.toolName;
+
+  return "tool";
+}
+
 export function dispatchContentPart<R>(
   part: unknown,
   visitor: ContentPartVisitor<R>,
@@ -28,8 +36,8 @@ export function dispatchContentPart<R>(
   }
 
   if (o.type === "text" || (!o.type && o.text)) {
-    const text =
-      typeof o.text === "string" ? o.text : typeof o.content === "string" ? o.content : "";
+    const contentText = typeof o.content === "string" ? o.content : "";
+    const text = typeof o.text === "string" ? o.text : contentText;
     return visitor.text(text);
   }
 
@@ -115,8 +123,7 @@ export function dispatchContentPart<R>(
 
   if (o.type === "tool_use" || o.type === "tool_call") {
     return visitor.toolCall({
-      name:
-        typeof o.name === "string" ? o.name : typeof o.toolName === "string" ? o.toolName : "tool",
+      name: toolCallName(o),
       arguments: o.arguments ?? o.input ?? o.args,
     });
   }

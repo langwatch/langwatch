@@ -1,5 +1,9 @@
 import { safeUnflatten } from "./trace-attribute-unflatten.ts";
-import { flattenSpanTree, organizeSpansIntoTree, typedValueToText } from "./trace-collector-common.ts";
+import {
+  flattenSpanTree,
+  organizeSpansIntoTree,
+  typedValueToText,
+} from "./trace-collector-common.ts";
 import { extractRAGTextualContext } from "./trace-rag-chunks.ts";
 import type {
   ElasticSearchEvaluation,
@@ -148,18 +152,18 @@ export const decodeBase64OpenTelemetryId = (id: unknown): string | null => {
 
 export const convertFromUnixNano = (timeUnixNano: unknown): number => {
   let unixNano: number;
+  const hasHighLowParts =
+    timeUnixNano !== null &&
+    typeof timeUnixNano === "object" &&
+    "low" in timeUnixNano &&
+    "high" in timeUnixNano;
 
   if (typeof timeUnixNano === "number") {
     unixNano = timeUnixNano;
   } else if (typeof timeUnixNano === "string") {
     const parsed = parseInt(timeUnixNano, 10);
     unixNano = !isNaN(parsed) ? parsed : Date.now() * 1000000;
-  } else if (
-    timeUnixNano &&
-    typeof timeUnixNano === "object" &&
-    "low" in timeUnixNano &&
-    "high" in timeUnixNano
-  ) {
+  } else if (hasHighLowParts) {
     const { low = 0, high = 0 } = timeUnixNano as any;
     unixNano = high * 0x100000000 + low;
   } else {

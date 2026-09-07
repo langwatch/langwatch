@@ -90,6 +90,7 @@ import {
   withoutHiddenResourceAttrs,
 } from "./trace-view-gates.api.ts";
 import type { TraceApp, TraceLogRecordReader, TraceLogRecordReadRow } from "#app/trace.app";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api:traces-v2");
 
@@ -774,7 +775,7 @@ export class TracesV2TrpcApi {
             });
             // Window: conversation membership is timeless; cap at 1y to keep
             // partition pruning effective.
-            const now = Date.now();
+            const now = nowInstant().epochMilliseconds;
             const timeRange = { from: now - 365 * 24 * 60 * 60 * 1000, to: now };
             const filterWhere = {
               sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
@@ -1499,14 +1500,14 @@ export class TracesV2TrpcApi {
             // accordion lights up on the llm span too (matches legacy
             // SpanDetails). One extra trace-scoped read, only when the llm
             // span has no own prompt attrs.
-            if (
+            // Coding-agent traces carry no `langwatch.prompt.*` anywhere, so the
+            // full-trace ancestor walk is a guaranteed miss — skipping it makes
+            // the enriched spanDetail read CHEAPER than before for these spans.
+            const needsAncestorPromptWalk =
               spanDetail.type === "llm" &&
-              // Coding-agent traces carry no `langwatch.prompt.*` anywhere, so the
-              // full-trace ancestor walk is a guaranteed miss — skipping it makes
-              // the enriched spanDetail read CHEAPER than before for these spans.
               !ports.codingAgentEnrichment.isCodingAgentShapedSpan(span) &&
-              !ports.hasOwnPromptAttrs(spanDetail.params as Record<string, unknown> | null)
-            ) {
+              !ports.hasOwnPromptAttrs(spanDetail.params as Record<string, unknown> | null);
+            if (needsAncestorPromptWalk) {
               const enriched = await ports.resolveAncestorPromptParams({
                 tenantId: input.projectId,
                 traceId: input.traceId,

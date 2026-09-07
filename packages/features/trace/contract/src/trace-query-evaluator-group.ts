@@ -190,11 +190,11 @@ export function readEvaluatorGroupFromAst(ast: LiqeQuery, evaluatorId: string): 
     if (tag.type !== "Tag" || negated) {
       return;
     }
-    if (
+    const isEvaluatorAnchor =
       tagFieldName(tag) === EVALUATOR_FIELD &&
       tag.expression.type === "LiteralExpression" &&
-      String(tag.expression.value) === evaluatorId
-    ) {
+      String(tag.expression.value) === evaluatorId;
+    if (isEvaluatorAnchor) {
       group.present = true;
     }
   });
@@ -272,11 +272,11 @@ function stripGroup(ast: LiqeQuery, evaluatorId: string): LiqeQuery {
       return false;
     }
     // Also drop any bare (ungrouped) anchor for this evaluator.
-    if (
+    const isBareEvaluatorAnchor =
       tagFieldName(n) === EVALUATOR_FIELD &&
       n.expression.type === "LiteralExpression" &&
-      String(n.expression.value) === evaluatorId
-    ) {
+      String(n.expression.value) === evaluatorId;
+    if (isBareEvaluatorAnchor) {
       return false;
     }
     return true;
@@ -363,8 +363,8 @@ export function setEvaluatorScoreRangeInQuery({
     // Guard non-numeric bounds — `Number("")`/`Number("x")` is NaN, and
     // `evaluatorScore:[NaN TO NaN]` is a liqe SyntaxError. Mirror the read
     // side, which only treats finite bounds as a real range.
-    group.score =
-      Number.isFinite(fromNum) && Number.isFinite(toNum) ? { from: fromNum, to: toNum } : null;
+    const hasFiniteBounds = Number.isFinite(fromNum) && Number.isFinite(toNum);
+    group.score = hasFiniteBounds ? { from: fromNum, to: toNum } : null;
   });
 }
 

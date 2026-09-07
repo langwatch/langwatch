@@ -268,7 +268,8 @@ export class ClaudeCodeTruncatedRequestService {
     }
 
     const afterKey = fragment.slice(lastTextKey + key.length).trimStart();
-    if (!afterKey.startsWith('"') || this.isClosedString(afterKey)) {
+    const isOpenString = afterKey.startsWith('"') && !this.isClosedString(afterKey);
+    if (!isOpenString) {
       return null;
     }
 

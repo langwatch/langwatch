@@ -1,5 +1,5 @@
 import type { LLMModeTrace, Span, Trace } from "@langwatch/trace-contract";
-import { format, formatDistanceToNow } from "@langwatch/time";
+import { format, formatDistanceToNow, nowInstant } from "@langwatch/time";
 
 /**
  * "3 minutes ago", or a date once that stops being useful. Stated here rather than imported: a
@@ -7,13 +7,15 @@ import { format, formatDistanceToNow } from "@langwatch/time";
  * thresholds must stay identical to that copy — a customer reads both in the same sentence.
  */
 const formatTimeAgo = (timestamp: number, dateFormat = "dd/MMM HH:mm", maxHours = 24) => {
-  const timestampDate = timestamp ? new Date(timestamp) : undefined;
+  if (!timestamp) {
+    return undefined;
+  }
 
-  return timestampDate
-    ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * maxHours
-      ? format(timestampDate, dateFormat)
-      : formatDistanceToNow(timestampDate, { addSuffix: true })
-    : undefined;
+  const olderThanWindow = timestamp < nowInstant().epochMilliseconds - 1000 * 60 * 60 * maxHours;
+
+  return olderThanWindow
+    ? format(timestamp, dateFormat)
+    : formatDistanceToNow(timestamp, { addSuffix: true });
 };
 
 type SpanWithChildren = Span & { children: SpanWithChildren[] };
@@ -134,9 +136,9 @@ export class TraceFormattingService {
       ...trace,
       ascii_tree: asciiTree ?? TraceFormattingService.generateAsciiTree(trace.spans),
       timestamps: {
-        started_at: formatTimeAgo(new Date(trace.timestamps?.started_at).getTime()) ?? "",
-        inserted_at: formatTimeAgo(new Date(trace.timestamps?.inserted_at).getTime()) ?? "",
-        updated_at: formatTimeAgo(new Date(trace.timestamps?.updated_at).getTime()) ?? "",
+        started_at: formatTimeAgo(trace.timestamps?.started_at ?? NaN) ?? "",
+        inserted_at: formatTimeAgo(trace.timestamps?.inserted_at ?? NaN) ?? "",
+        updated_at: formatTimeAgo(trace.timestamps?.updated_at ?? NaN) ?? "",
       },
     };
   };

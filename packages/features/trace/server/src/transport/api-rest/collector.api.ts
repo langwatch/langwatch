@@ -28,6 +28,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { TraceCollectorSpanService } from "#services/trace-collector-span.service";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch.collector");
 
@@ -212,24 +213,26 @@ export function createCollectorRestApp(options: {
 
       // Allow objects and simple strings to be sent as labels as well
       if (body.metadata?.labels) {
-        body.metadata.labels =
-          typeof body.metadata.labels === "string"
-            ? [body.metadata.labels]
-            : Array.isArray(body.metadata.labels)
-              ? body.metadata.labels
-              : Object.entries(body.metadata.labels).map(
-                  ([key, value]) => `${key}: ${value as string}`,
-                );
+        const labels = body.metadata.labels;
+        if (typeof labels === "string") {
+          body.metadata.labels = [labels];
+        } else if (Array.isArray(labels)) {
+          body.metadata.labels = labels;
+        } else {
+          body.metadata.labels = Object.entries(labels).map(
+            ([key, value]) => `${key}: ${value as string}`,
+          );
+        }
       }
 
       for (const evaluation of body.evaluations ?? []) {
-        if (
+        const hasNoVerdict =
           evaluation.status !== "error" &&
           evaluation.status !== "skipped" &&
           (evaluation.passed === undefined || evaluation.passed === null) &&
           (evaluation.score === undefined || evaluation.score === null) &&
-          (evaluation.label === undefined || evaluation.label === null)
-        ) {
+          (evaluation.label === undefined || evaluation.label === null);
+        if (hasNoVerdict) {
           logger.error(
             { projectId: project.id, evaluationId: evaluation.id },
             "evaluation has no passed, score or label",
@@ -247,12 +250,12 @@ export function createCollectorRestApp(options: {
           evaluation.error.has_error = true;
         }
 
-        if (
+        const evaluationTimestampsNotMilliseconds =
           (evaluation.timestamps?.started_at &&
             evaluation.timestamps.started_at.toString().length !== 13) ||
           (evaluation.timestamps?.finished_at &&
-            evaluation.timestamps.finished_at.toString().length !== 13)
-        ) {
+            evaluation.timestamps.finished_at.toString().length !== 13);
+        if (evaluationTimestampsNotMilliseconds) {
           logger.error(
             { projectId: project.id, evaluationId: evaluation.id },
             "evaluation timestamps not in milliseconds",
@@ -501,12 +504,12 @@ export function createCollectorRestApp(options: {
           );
         }
 
-        if (
+        const spanTimestampsNotMilliseconds =
           (span.timestamps.started_at && span.timestamps.started_at.toString().length !== 13) ||
           (span.timestamps.finished_at && span.timestamps.finished_at.toString().length !== 13) ||
           (span.timestamps.first_token_at &&
-            span.timestamps.first_token_at.toString().length !== 13)
-        ) {
+            span.timestamps.first_token_at.toString().length !== 13);
+        if (spanTimestampsNotMilliseconds) {
           logger.error(
             { traceId, projectId: project.id },
             "timestamps not in milliseconds for span",
@@ -525,7 +528,7 @@ export function createCollectorRestApp(options: {
       // the dedup gate, so apply the same age cutoff here — otherwise the REST
       // path alone would write arbitrarily old timestamps into cold ClickHouse
       // partitions, undermining partition pruning.
-      const startedAtCutoff = Date.now() - SPAN_MAX_PAST_MS;
+      const startedAtCutoff = nowInstant().epochMilliseconds - SPAN_MAX_PAST_MS;
       const freshSpans: Span[] = [];
       let droppedOldSpans = 0;
       for (const span of spans) {
@@ -644,7 +647,7 @@ export function createCollectorRestApp(options: {
             "no evaluation pipeline on this process; collector evaluations rejected by name",
           );
         } else {
-          const occurredAt = Date.now();
+          const occurredAt = nowInstant().epochMilliseconds;
 
           for (const evaluation of params.evaluations) {
             // try/catch per evaluation so one failing dispatch does not silently

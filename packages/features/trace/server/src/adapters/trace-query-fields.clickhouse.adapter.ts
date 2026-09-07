@@ -26,20 +26,17 @@ const evaluatorStatusRead: CategoricalRead = (t) =>
 // Re-expresses the `evaluatorVerdict` multiIf in JS — `error` and `skipped`
 // win, then the 0/1/null `Passed` maps to fail/pass/unknown. Kept in lockstep
 // with the SQL expression on the `evaluatorVerdict` facet.
+function evaluatorVerdictOf(evaluation: { status?: string | null; passed?: boolean | null }) {
+  if (evaluation.status === "error") return "error";
+  if (evaluation.status === "skipped") return "skipped";
+  if (evaluation.passed === true) return "pass";
+  if (evaluation.passed === false) return "fail";
+
+  return "unknown";
+}
+
 const evaluatorVerdictRead: CategoricalRead = (t) =>
-  t.evaluations == null
-    ? UNSUPPORTED
-    : t.evaluations.map((e) =>
-        e.status === "error"
-          ? "error"
-          : e.status === "skipped"
-            ? "skipped"
-            : e.passed === true
-              ? "pass"
-              : e.passed === false
-                ? "fail"
-                : "unknown",
-      );
+  t.evaluations == null ? UNSUPPORTED : t.evaluations.map(evaluatorVerdictOf);
 
 const evaluatorScoreRead: RangeRead = (t) =>
   t.evaluations == null
@@ -57,10 +54,15 @@ const spanTypeRead: CategoricalRead = (t) =>
 const spanNameRead: CategoricalRead = (t) =>
   t.spans == null ? UNSUPPORTED : t.spans.map((s) => s.name);
 
+function spanStatusOf(statusCode: number | null | undefined): string {
+  if (statusCode === 2) return "error";
+  if (statusCode === 1) return "ok";
+
+  return "unset";
+}
+
 const spanStatusRead: CategoricalRead = (t) =>
-  t.spans == null
-    ? UNSUPPORTED
-    : t.spans.map((s) => (s.statusCode === 2 ? "error" : s.statusCode === 1 ? "ok" : "unset"));
+  t.spans == null ? UNSUPPORTED : t.spans.map((s) => spanStatusOf(s.statusCode));
 
 /**
  * How one field's definition is built. A field needs two answers that must agree: the SQL predicate a filter compiles to, and the in-memory evaluation used with no query to run. These five builders pair them so a field can't be given one without the other — a field that filters in SQL but not in memory would silently disagree with itself.

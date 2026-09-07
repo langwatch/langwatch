@@ -194,12 +194,9 @@ export function tryUnwrapJsonTextBlock(
 ): { unwrapped: true; value: unknown } | { unwrapped: false } {
   try {
     const inner = JSON.parse(t) as Record<string, unknown>;
-    if (
-      inner &&
-      typeof inner === "object" &&
-      typeof inner.type === "string" &&
-      inner.type !== "text"
-    ) {
+    const isNonTextBlock =
+      inner && typeof inner === "object" && typeof inner.type === "string" && inner.type !== "text";
+    if (isNonTextBlock) {
       // Recurse into the unwrapped block in case the inner shape
       // also has nested wrappers (e.g. tool_result.content).
       return { unwrapped: true, value: normalizeChatPayload(inner, seen) };
@@ -218,7 +215,8 @@ export function normalizeChatPayload(
 ): unknown {
   if (typeof value === "string") {
     const trimmed = value.trim();
-    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+    if (looksLikeJson) {
       try {
         const parsed = JSON.parse(trimmed);
 
@@ -253,7 +251,8 @@ export function normalizeChatPayload(
     // unwrapped block.
     if (obj.type === "text" && typeof obj.text === "string") {
       const t = obj.text.trim();
-      if (t.startsWith("{") && t.endsWith("}") && t.includes('"type":"')) {
+      const looksLikeTypedBlock = t.startsWith("{") && t.endsWith("}") && t.includes('"type":"');
+      if (looksLikeTypedBlock) {
         const result = tryUnwrapJsonTextBlock(t, seen);
         if (result.unwrapped) {
           return result.value;

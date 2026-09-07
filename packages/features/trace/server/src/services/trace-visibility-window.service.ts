@@ -1,5 +1,6 @@
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ErrorCapture, Span, SpanInputOutput, Trace } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -63,14 +64,7 @@ const teaserOfSpanIO = (
         ...io,
         value: io.value.map((message) => ({
           ...message,
-          content:
-            typeof message.content === "string"
-              ? VisibilityWindowService.teaserOf(message.content)
-              : message.content === null || message.content === undefined
-                ? message.content
-                : // Rich content (ChatRichContent[]): recursively tease every
-                  // string field — text parts, tool-call args, tool results.
-                  (deepTeaseStrings(message.content) as typeof message.content),
+          content: teaseMessageContent(message.content),
         })),
       };
     case "list":
@@ -112,6 +106,34 @@ const deepTeaseStrings = (value: unknown): unknown => {
   return value;
 };
 
+/** One chat message's content, teased: a string head, a null passthrough, or a deep walk. */
+const teaseMessageContent = <T>(content: T): T => {
+  if (typeof content === "string") {
+    return VisibilityWindowService.teaserOf(content) as T;
+  }
+
+  if (content === null || content === undefined) {
+    return content;
+  }
+
+  // Rich content (ChatRichContent[]): recursively tease every
+  // string field — text parts, tool-call args, tool results.
+  return deepTeaseStrings(content) as T;
+};
+
+/** One span param, teased: strings directly, objects through their serialisation, rest verbatim. */
+const teaseParamValue = (value: unknown): unknown => {
+  if (typeof value === "string") {
+    return VisibilityWindowService.teaserOf(value);
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return VisibilityWindowService.teaserOf(JSON.stringify(value));
+  }
+
+  return value;
+};
+
 const teaserOfParams = (
   params: Record<string, unknown> | null | undefined,
 ): Record<string, unknown> | null | undefined => {
@@ -120,14 +142,7 @@ const teaserOfParams = (
   }
 
   return Object.fromEntries(
-    Object.entries(params).map(([key, value]) => [
-      key,
-      typeof value === "string"
-        ? VisibilityWindowService.teaserOf(value)
-        : typeof value === "object" && value !== null
-          ? VisibilityWindowService.teaserOf(JSON.stringify(value))
-          : value,
-    ]),
+    Object.entries(params).map(([key, value]) => [key, teaseParamValue(value)]),
   );
 };
 
@@ -159,7 +174,7 @@ export class VisibilityWindowService {
       return null;
     }
 
-    return Date.now() - visibilityDays * DAY_MS;
+    return nowInstant().epochMilliseconds - visibilityDays * DAY_MS;
   }
 
   /** True when a trace/span started before the cutoff (content must be teased). */

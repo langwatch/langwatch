@@ -133,8 +133,9 @@ export const systemInstructionText = (raw: unknown): string | null => {
   if (Array.isArray(raw)) {
     return partsToText(raw);
   }
-  if (isRecord(raw) && Array.isArray(raw.parts)) {
-    return partsToText(raw.parts);
+  const parts = isRecord(raw) ? raw.parts : undefined;
+  if (Array.isArray(parts)) {
+    return partsToText(parts);
   }
   return null;
 };

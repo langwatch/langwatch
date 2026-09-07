@@ -152,32 +152,33 @@ export function stripAtSigils(text: string): string {
   // here on, and the @-strip pass needs to see the post-replacement chars.
   const normalized = text.replace(/\u00A0/g, " ");
   let out = "";
-  let inQuotes = false;
   let quoteChar = "";
   for (let i = 0; i < normalized.length; i++) {
     const ch = normalized.charAt(i);
-    if (inQuotes) {
+    if (quoteChar !== "") {
       out += ch;
-      if (ch === quoteChar) {
-        inQuotes = false;
-      }
+      quoteChar = ch === quoteChar ? "" : quoteChar;
       continue;
     }
     if (ch === '"' || ch === "'") {
       out += ch;
-      inQuotes = true;
       quoteChar = ch;
       continue;
     }
-    if (ch === "@") {
-      const prev = i === 0 ? void 0 : normalized[i - 1];
-      if (prev === void 0 || TOKEN_START_PRECEDERS.has(prev)) {
-        continue;
-      }
+    if (startsAToken(normalized, i)) {
+      continue;
     }
     out += ch;
   }
   return out;
+}
+
+/** Whether the `@` at `index` opens a token, and so is the sigil rather than part of a value. */
+function startsAToken(normalized: string, index: number): boolean {
+  if (normalized.charAt(index) !== "@") return false;
+  const prev = index === 0 ? void 0 : normalized[index - 1];
+
+  return prev === void 0 || TOKEN_START_PRECEDERS.has(prev);
 }
 
 // Tiny LRU around `parse`. Per keystroke the SearchBar parses twice — once

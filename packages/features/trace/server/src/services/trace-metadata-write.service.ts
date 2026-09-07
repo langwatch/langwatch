@@ -3,6 +3,7 @@ import type { TraceSpanIngestPort } from "../ports/trace-span-ingest.port.ts";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import type { CustomMetadata, ReservedTraceMetadata } from "@langwatch/trace-contract";
 import { TraceCollectorSpanService } from "./trace-collector-span.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Post-hoc trace metadata updates, applied by recording a synthetic `langwatch.metadata_update`
@@ -72,7 +73,7 @@ export class TraceMetadataWriteService {
       customMetadata: custom,
     });
 
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const nowNano = String(now * 1_000_000);
     const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 

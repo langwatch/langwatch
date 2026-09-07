@@ -50,6 +50,7 @@ import type { TraceEventDerivationPort } from "../ports/trace-event-derivation.p
 import type { TraceFullRecordPort } from "../ports/trace-full-record.port.ts";
 import { TracePort, type TraceSpanSummaryRecord } from "../ports/trace.port.ts";
 import { TraceQueryFieldCatalogueService } from "./trace-query-field-catalogue.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 type TraceComposition = {
   repository: TracePort;
@@ -188,7 +189,7 @@ export class TraceService extends TraceServiceContract {
 
   async resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number> {
     const parsed = traceIngestWaitInputSchema.parse(input);
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const cached = this.ingestWaitCache.get(parsed.projectId);
     if (cached && cached.expiresAt > now) {
       return cached.timeoutMs;

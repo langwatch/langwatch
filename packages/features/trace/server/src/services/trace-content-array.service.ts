@@ -1,3 +1,5 @@
+const HEX_DIGIT = /[0-9a-fA-F]/;
+
 /**
  * Converts a Python-repr-like string to a best-effort JSON string with a quote state machine, so
  * quote flipping and bare-identifier replacement only fire outside string literals — a naive
@@ -17,7 +19,8 @@ function readPythonHexEscape(
     return null;
   }
 
-  if (!/[0-9a-fA-F]/.test(h1) || !/[0-9a-fA-F]/.test(h2)) {
+  const bothAreHexDigits = HEX_DIGIT.test(h1) && HEX_DIGIT.test(h2);
+  if (!bothAreHexDigits) {
     return null;
   }
 
@@ -126,17 +129,18 @@ function stepInDoubleQuoted(input: string, i: number): ReprStep {
   return { emit: c, consumed: 1 };
 }
 
+const STEP_BY_STATE: Record<ReprState, (input: string, i: number) => ReprStep> = {
+  none: stepOutsideString,
+  single: stepInSingleQuoted,
+  double: stepInDoubleQuoted,
+};
+
 function pythonReprToJsonish(input: string): string {
   let out = "";
   let i = 0;
   let state: ReprState = "none";
   while (i < input.length) {
-    const step: ReprStep =
-      state === "none"
-        ? stepOutsideString(input, i)
-        : state === "single"
-          ? stepInSingleQuoted(input, i)
-          : stepInDoubleQuoted(input, i);
+    const step: ReprStep = STEP_BY_STATE[state](input, i);
     out += step.emit;
     i += step.consumed;
     if (step.state) {

@@ -52,24 +52,25 @@ export type StoredSpanRow = {
  */
 export class TraceFullRecordMapper {
   private static spanKind(value: number): NormalizedSpanKind {
-    return Object.values(NormalizedSpanKind).includes(value)
-      ? value
-      : NormalizedSpanKind.UNSPECIFIED;
+    const isKnownKind = Object.values(NormalizedSpanKind).includes(value);
+
+    return isKnownKind ? value : NormalizedSpanKind.UNSPECIFIED;
   }
 
   private static statusCode(value: number | null): NormalizedStatusCode | null {
     if (value === null) return null;
-    return Object.values(NormalizedStatusCode).includes(value) ? value : NormalizedStatusCode.UNSET;
+    const isKnownStatus = Object.values(NormalizedStatusCode).includes(value);
+
+    return isKnownStatus ? value : NormalizedStatusCode.UNSET;
   }
 
   private static jsonValue(value: unknown): TraceRecordValue | null {
-    if (
+    const isScalar =
       value === null ||
       typeof value === "string" ||
       typeof value === "number" ||
-      typeof value === "boolean"
-    )
-      return value;
+      typeof value === "boolean";
+    if (isScalar) return value;
     if (Array.isArray(value)) {
       const values: TraceRecordValue[] = [];
       for (const item of value) {
@@ -266,7 +267,8 @@ export class TraceFullRecordMapper {
       const value = TraceFullRecordMapper.valueAsRecordValue(raw);
       if (value === void 0) continue;
       const path = key.split(".");
-      if (path.some((part) => dangerousPathKeys.has(part))) continue;
+      const hasDangerousSegment = path.some((part) => dangerousPathKeys.has(part));
+      if (hasDangerousSegment) continue;
       let current = result;
       for (const [index, part] of path.entries()) {
         if (index === path.length - 1) {
@@ -303,9 +305,10 @@ export class TraceFullRecordMapper {
   private static parseStringArray(value: string): string[] | null {
     try {
       const parsed = JSON.parse(value);
-      return Array.isArray(parsed) && parsed.every((item) => typeof item === "string")
-        ? parsed
-        : null;
+      const isStringArray =
+        Array.isArray(parsed) && parsed.every((item) => typeof item === "string");
+
+      return isStringArray ? parsed : null;
     } catch {
       return null;
     }
@@ -335,10 +338,9 @@ export class TraceFullRecordMapper {
     if (value === "false") return false;
 
     const trimmed = value.trim();
-    if (
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"))
-    ) {
+    const isJsonObject = trimmed.startsWith("{") && trimmed.endsWith("}");
+    const isJsonArray = trimmed.startsWith("[") && trimmed.endsWith("]");
+    if (isJsonObject || isJsonArray) {
       try {
         return TraceFullRecordMapper.jsonValue(JSON.parse(trimmed)) ?? value;
       } catch {
@@ -348,12 +350,9 @@ export class TraceFullRecordMapper {
 
     const numeric = Number(trimmed);
     const unsafeInteger = Number.isInteger(numeric) && Math.abs(numeric) > Number.MAX_SAFE_INTEGER;
-    if (
-      trimmed !== "" &&
-      decimalNumber.test(trimmed) &&
-      Number.isFinite(numeric) &&
-      !unsafeInteger
-    ) {
+    const isSafeDecimal =
+      trimmed !== "" && decimalNumber.test(trimmed) && Number.isFinite(numeric) && !unsafeInteger;
+    if (isSafeDecimal) {
       return numeric;
     }
     return value;

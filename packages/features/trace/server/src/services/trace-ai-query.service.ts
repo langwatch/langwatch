@@ -11,7 +11,10 @@ import {
 } from "@langwatch/trace-contract";
 import { generateObject, generateText, type LanguageModel, type ModelMessage } from "ai";
 import { z } from "zod";
-import { buildActionSystemPrompt, buildSystemPrompt } from "../rules/trace-ai-query-prompt.rules.ts";
+import {
+  buildActionSystemPrompt,
+  buildSystemPrompt,
+} from "../rules/trace-ai-query-prompt.rules.ts";
 
 const logger = createLogger("langwatch:ai-query");
 
@@ -119,7 +122,9 @@ function sanitizeLlmOutput(raw: string): string {
   let out = raw.trim();
   out = out.replace(/^```[a-zA-Z]*\n?/, "").replace(/\n?```$/, "");
   out = out.replace(/^(?:query|filter|q)\s*[:=]\s*/i, "");
-  if ((out.startsWith('"') && out.endsWith('"')) || (out.startsWith("'") && out.endsWith("'"))) {
+  const isDoubleQuoted = out.startsWith('"') && out.endsWith('"');
+  const isSingleQuoted = out.startsWith("'") && out.endsWith("'");
+  if (isDoubleQuoted || isSingleQuoted) {
     out = out.slice(1, -1);
   }
 

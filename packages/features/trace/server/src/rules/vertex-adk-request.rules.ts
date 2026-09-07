@@ -14,23 +14,24 @@ export function canonicaliseVertexAdkRequest(ctx: ExtractorContext): void {
   }
   attrs.take(VERTEX_ADK_KEYS.LLM_REQUEST);
 
-  if (
+  const recordedRequestModel =
     isNonEmptyString(request.model) &&
     setIfMissing({
       ctx,
       key: ATTR_KEYS.GEN_AI_REQUEST_MODEL,
       value: request.model,
-    })
-  ) {
+    });
+  if (recordedRequestModel) {
     ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:llm_request.model->gen_ai.request.model`);
   }
 
-  if (
+  const contents = request.contents;
+  const canRecordInputMessages =
     !attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) &&
     ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] === void 0 &&
-    Array.isArray(request.contents)
-  ) {
-    const messages = request.contents.flatMap((content) =>
+    Array.isArray(contents);
+  if (canRecordInputMessages) {
+    const messages = contents.flatMap((content) =>
       convertGeminiContent({ content, defaultRole: "user" }),
     );
     if (messages.length > 0) {
@@ -57,15 +58,15 @@ export function canonicaliseVertexAdkRequest(ctx: ExtractorContext): void {
     ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:system_instruction`);
   }
 
-  if (
+  const recordedToolDefinitions =
     Array.isArray(config.tools) &&
     config.tools.length > 0 &&
     setIfMissing({
       ctx,
       key: ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS,
       value: config.tools,
-    })
-  ) {
+    });
+  if (recordedToolDefinitions) {
     ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:tools->gen_ai.tool.definitions`);
   }
 

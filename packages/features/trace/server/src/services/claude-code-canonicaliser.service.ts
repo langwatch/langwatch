@@ -57,14 +57,14 @@ export class ClaudeCodeCanonicaliserService implements CanonicalAttributesPort {
     // third. setAttrIfAbsent keeps a provider-stated split, should the span
     // ever start carrying one, ahead of this rule.
     const cacheWriteTokens = asNumber(attrs.get("cache_creation_tokens"));
-    if (
+    const writesLongLivedCache =
       cacheWriteTokens !== null &&
       cacheWriteTokens > 0 &&
       claudeCacheWritesLongLived({
         llmRequestContext: asString(attrs.get("llm_request.context")),
         querySource: asString(attrs.get("query_source")),
-      })
-    ) {
+      });
+    if (writesLongLivedCache) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS, cacheWriteTokens);
       fired = true;
     }

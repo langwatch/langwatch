@@ -80,6 +80,7 @@ import type {
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
 } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Optional blob-offload resolution dependencies injected into TraceService
@@ -164,7 +165,7 @@ export class TraceService {
           traceId.length >= MIN_TRACE_ID_PREFIX_LENGTH &&
           HEX_ONLY.test(traceId)
         ) {
-          const now = Date.now();
+          const now = nowInstant().epochMilliseconds;
           const candidates = await this.clickHouseService.resolveTraceIdByPrefix({
             projectId,
             prefix: traceId,

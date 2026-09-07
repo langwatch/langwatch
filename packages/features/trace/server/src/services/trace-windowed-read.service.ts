@@ -2,6 +2,7 @@ import {
   TraceWindowedReadMetricsPort,
   type TraceWindowedReadOutcome,
 } from "../ports/trace-windowed-read-metrics.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Where a windowed read's outcome is counted. A module-level sink rather than a parameter, because
@@ -86,7 +87,7 @@ function windowFragment(fromMs: number, toMs: number): WindowFragment {
  */
 function fallbackFragment(fallback: WindowFallback, windowMs: number): WindowFragment | null {
   if (typeof fallback === "object") {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
 
     return windowFragment(now - fallback.lookbackMs, now + windowMs);
   }

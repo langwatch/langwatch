@@ -11,6 +11,15 @@ import {
 } from "@langwatch/trace-contract";
 import type { MetricDataPointCorrelatedEvent } from "@langwatch/trace-contract";
 
+const TRACE_ID_PATTERN = /^[a-f0-9]{32}$/i;
+const SPAN_ID_PATTERN = /^[a-f0-9]{16}$/i;
+const ALL_ZEROES_PATTERN = /^0+$/;
+
+/** A W3C identifier the exemplar can point at: right width, and not the all-zero id. */
+function isHexIdentifier(value: string, pattern: RegExp): boolean {
+  return pattern.test(value) && !ALL_ZEROES_PATTERN.test(value);
+}
+
 export class EventingTraceMetricCorrelationAdapter implements CommandHandler<
   Command<RecordMetricCorrelationCommandData>,
   MetricDataPointCorrelatedEvent
@@ -29,12 +38,10 @@ export class EventingTraceMetricCorrelationAdapter implements CommandHandler<
     command: Command<RecordMetricCorrelationCommandData>,
   ): Promise<MetricDataPointCorrelatedEvent[]> {
     const data = command.data;
-    if (
-      !/^[a-f0-9]{32}$/i.test(data.traceId) ||
-      /^0+$/.test(data.traceId) ||
-      !/^[a-f0-9]{16}$/i.test(data.spanId) ||
-      /^0+$/.test(data.spanId)
-    ) {
+    const hasCorrelatableIds =
+      isHexIdentifier(data.traceId, TRACE_ID_PATTERN) &&
+      isHexIdentifier(data.spanId, SPAN_ID_PATTERN);
+    if (!hasCorrelatableIds) {
       return [];
     }
     return [

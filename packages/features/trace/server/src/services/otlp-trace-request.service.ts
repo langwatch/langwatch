@@ -80,18 +80,16 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
       return parseInt(v.intValue, 10);
     }
 
-    if (
-      typeof v.intValue === "object" &&
-      v.intValue !== null &&
-      "high" in v.intValue &&
-      "low" in v.intValue
-    ) {
-      const { high, low } = v.intValue;
+    const intValue = v.intValue;
+    const hasHighLowParts =
+      typeof intValue === "object" && intValue !== null && "high" in intValue && "low" in intValue;
+    if (hasHighLowParts) {
+      const { high, low } = intValue;
 
       return Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
     }
 
-    return v.intValue;
+    return intValue;
   }
 
   if ("doubleValue" in v && v.doubleValue) {
@@ -273,12 +271,12 @@ const normalizeOtlpAttributeValue = (
         continue;
       }
 
-      if (
+      const isPrimitive =
         typeof item === "string" ||
         typeof item === "boolean" ||
         typeof item === "number" ||
-        typeof item === "bigint"
-      ) {
+        typeof item === "bigint";
+      if (isPrimitive) {
         out.push(item);
       }
     }
@@ -286,12 +284,12 @@ const normalizeOtlpAttributeValue = (
     return out;
   }
 
-  if (
+  const isPrimitive =
     typeof v === "string" ||
     typeof v === "boolean" ||
     typeof v === "number" ||
-    typeof v === "bigint"
-  ) {
+    typeof v === "bigint";
+  if (isPrimitive) {
     return v;
   }
 

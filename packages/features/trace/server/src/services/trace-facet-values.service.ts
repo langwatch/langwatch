@@ -12,10 +12,14 @@ import type {
 } from "@langwatch/trace-contract";
 import { ClickHouseFacetRegistryAdapter } from "@langwatch/trace-server";
 
-import { facetValuesCacheKey, type FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
+import {
+  facetValuesCacheKey,
+  type FacetValuesParams,
+} from "../rules/trace-list-cache-key.rules.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 import { TtlCache } from "./trace-ttl-cache.service.ts";
 import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const facetValuesLogger = createLogger("langwatch:app-layer:traces:trace-list-facet-values");
 
@@ -66,7 +70,7 @@ export class TraceFacetValuesService {
       // Always serve the cached value immediately. If it's older than the
       // refresh threshold, fire-and-forget a recomputation so the next read
       // sees fresher data.
-      if (Date.now() - cached.timestamp > FACET_VALUES_REFRESH_AFTER_MS) {
+      if (nowInstant().epochMilliseconds - cached.timestamp > FACET_VALUES_REFRESH_AFTER_MS) {
         this.refreshFacetValuesInBackground(params, cacheKey);
       }
 
@@ -77,7 +81,7 @@ export class TraceFacetValuesService {
     const result = await this.computeFacetValues(params);
     await FACET_VALUES_CACHE.set(cacheKey, {
       value: result,
-      timestamp: Date.now(),
+      timestamp: nowInstant().epochMilliseconds,
     });
 
     return result;
@@ -94,7 +98,7 @@ export class TraceFacetValuesService {
       .then((fresh) =>
         FACET_VALUES_CACHE.set(cacheKey, {
           value: fresh,
-          timestamp: Date.now(),
+          timestamp: nowInstant().epochMilliseconds,
         }),
       )
       .catch((err) => {

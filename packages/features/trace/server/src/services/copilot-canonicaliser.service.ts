@@ -6,7 +6,10 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
 import { isNonEmptyString } from "../rules/canonical-guard.rules.ts";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type {
+  CanonicalAttributesPort,
+  ExtractorContext,
+} from "../ports/canonical-attributes.port.ts";
 
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 
@@ -59,10 +62,10 @@ export class CopilotCanonicaliserService implements CanonicalAttributesPort {
     }
 
     const reasoningTokens = attrs.get("gen_ai.usage.reasoning.output_tokens");
-    if (
+    const canLiftReasoningTokens =
       typeof reasoningTokens === "number" &&
-      ctx.out[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS] === void 0
-    ) {
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS] === void 0;
+    if (canLiftReasoningTokens) {
       attrs.take("gen_ai.usage.reasoning.output_tokens");
       ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoningTokens);
       ctx.recordRule(`${this.id}:usage.reasoning`);
@@ -74,6 +77,13 @@ export class CopilotCanonicaliserService implements CanonicalAttributesPort {
       ctx.setAttr(ATTR_KEYS.LANGWATCH_USER_ID, pseudoId);
       ctx.recordRule(`${this.id}:user.pseudo_id`);
     }
+
+    this.liftCopilotMetadata(ctx);
+  }
+
+  /** The Copilot-only attributes that become trace metadata: billing counts, repository, org. */
+  private liftCopilotMetadata(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
 
     const premiumRequests = attrs.take(`${COPILOT_ATTR_PREFIX}total_premium_requests`);
     if (premiumRequests !== void 0 && premiumRequests !== null) {

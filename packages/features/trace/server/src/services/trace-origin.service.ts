@@ -28,11 +28,10 @@ export const LEGACY_ORIGIN_RULES: Array<{
   {
     check: (s) => {
       const labels = s.spanAttributes[ATTR_KEYS.LANGWATCH_LABELS];
+      const labelsFromString = typeof labels === "string" ? parseJsonStringArray(labels) : [];
       const arr = Array.isArray(labels)
         ? labels.filter((label): label is string => typeof label === "string")
-        : typeof labels === "string"
-          ? parseJsonStringArray(labels)
-          : [];
+        : labelsFromString;
 
       return arr.includes("scenario-runner");
     },
@@ -121,12 +120,9 @@ export class TraceOriginService {
     // riding in on someone else's traceparent — its origin must NOT
     // be allowed to flip the customer trace's resolved origin.
     const rawDepth = span.spanAttributes["langwatch.reserved.causality_depth"];
+    const numericDepth = typeof rawDepth === "number" ? rawDepth : 0;
     const causalityDepth =
-      typeof rawDepth === "string"
-        ? parseInt(rawDepth, 10) || 0
-        : typeof rawDepth === "number"
-          ? rawDepth
-          : 0;
+      typeof rawDepth === "string" ? parseInt(rawDepth, 10) || 0 : numericDepth;
     const isEvalChainChild = !isRootSpan && causalityDepth >= 1;
 
     if (explicitOrigin) {

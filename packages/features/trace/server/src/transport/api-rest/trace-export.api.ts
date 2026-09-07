@@ -24,6 +24,7 @@ import {
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api:export-traces");
 
@@ -169,7 +170,7 @@ export function createExportTracesRestApp<
       const broadcast = ports.broadcast();
 
       // Build file name: {project_id} - Traces - {YYYY-MM-DD} - {mode}.{ext}
-      const today = new Date().toISOString().slice(0, 10);
+      const today = nowInstant().toString().slice(0, 10);
       const extension = request.format === "csv" ? "csv" : "jsonl";
       const fileName = `${request.projectId} - Traces - ${today} - ${request.mode}.${extension}`;
 

@@ -1,4 +1,5 @@
 import { isValidTimestamp } from "./span-timing.rules.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The storage-anchor rule of ADR-071, shared by every trace-processing fold that
@@ -82,7 +83,7 @@ export function firstUsableAnchor({
   // than a convention every caller has to keep. No production caller injects
   // `now`, but one that injected 0 would otherwise land the row in 196952 -
   // the single outcome this whole rule exists to prevent.
-  return isUsableAnchorMs(now, now) ? now : Date.now();
+  return isUsableAnchorMs(now, now) ? now : nowInstant().epochMilliseconds;
 }
 
 /** The two time fields every anchored trace-processing fold state carries. */
@@ -126,7 +127,7 @@ export interface AnchorableTraceState {
 export function anchorStorageTime<State extends AnchorableTraceState>({
   state,
   eventOccurredAtMs,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   state: State;
   eventOccurredAtMs: number | undefined;

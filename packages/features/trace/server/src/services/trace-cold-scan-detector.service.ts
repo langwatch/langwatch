@@ -44,7 +44,8 @@ export class TraceColdScanDetectorService {
 
     const sql = stripComments(query);
     const trimmed = sql.trimStart().toUpperCase();
-    if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
+    const isReadStatement = trimmed.startsWith("SELECT") || trimmed.startsWith("WITH");
+    if (!isReadStatement) {
       return null;
     }
 

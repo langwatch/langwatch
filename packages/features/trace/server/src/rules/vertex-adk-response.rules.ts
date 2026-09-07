@@ -28,10 +28,11 @@ export function canonicaliseVertexAdkResponse(ctx: ExtractorContext): void {
       );
     } else if (Array.isArray(response.candidates)) {
       for (const candidate of response.candidates) {
-        if (isRecord(candidate) && isRecord(candidate.content)) {
+        const candidateContent = isRecord(candidate) ? candidate.content : undefined;
+        if (isRecord(candidateContent)) {
           messages.push(
             ...convertGeminiContent({
-              content: candidate.content,
+              content: candidateContent,
               defaultRole: "assistant",
             }),
           );
@@ -65,14 +66,14 @@ export function canonicaliseVertexAdkResponse(ctx: ExtractorContext): void {
     }
   }
 
-  if (
+  const recordedFinishReason =
     isNonEmptyString(response.finish_reason) &&
     setIfMissing({
       ctx,
       key: ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS,
       value: [response.finish_reason],
-    })
-  ) {
+    });
+  if (recordedFinishReason) {
     ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:finish_reason`);
   }
 }

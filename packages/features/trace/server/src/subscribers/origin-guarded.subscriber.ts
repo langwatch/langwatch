@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { ORIGIN_RESOLVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trace-processing:origin-guarded-subscriber");
 
@@ -34,7 +35,7 @@ export function passesTraceOriginGuards(
   foldState: TraceSummaryData,
 ): boolean {
   // 1. Skip stale events (replay/resync re-emit old-occurredAt events).
-  if (event.occurredAt < Date.now() - OLD_TRACE_THRESHOLD_MS) return false;
+  if (event.occurredAt < nowInstant().epochMilliseconds - OLD_TRACE_THRESHOLD_MS) return false;
 
   // 2. Only genuine message events re-run side-effecting subscribers. A daily
   //    topic-clustering pass re-emits topic_assigned for thousands of
@@ -46,7 +47,10 @@ export function passesTraceOriginGuards(
   //    even on a genuine new span. Checks the TRACE START
   //    (foldState.occurredAt), not event.occurredAt — a re-emitted or late
   //    event is fresh, but the trace itself is days old.
-  if (foldState.occurredAt > 0 && foldState.occurredAt < Date.now() - MAX_TRACE_AGE_MS) {
+  if (
+    foldState.occurredAt > 0 &&
+    foldState.occurredAt < nowInstant().epochMilliseconds - MAX_TRACE_AGE_MS
+  ) {
     return false;
   }
 

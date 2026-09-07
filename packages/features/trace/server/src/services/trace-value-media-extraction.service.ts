@@ -10,6 +10,7 @@ import { parseBase64DataUri, visitContentPart } from "@langwatch/trace-contract"
 import { MAX_MEDIA_WALK_DEPTH } from "@langwatch/trace-contract";
 import type { ExtractedRef } from "../rules/content-part-extraction.rules.ts";
 import type { TraceMediaStorePort } from "../ports/trace-media-store.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Upper bound for parsing a nested JSON string (sanity guard, not a policy). */
 const MAX_NESTED_JSON_BYTES = 50 * 1024 * 1024;
@@ -156,18 +157,19 @@ async function processSite(
 
     // Route the payload through the part vocabulary so audio gets the same
     // store-time WAV wrap (and mime handling) as an explicit part would.
+    const imageOrBinaryPart = parsed.mimeType.startsWith("image/")
+      ? { type: "image_url", image_url: { url: uri } }
+      : {
+          type: "binary",
+          mimeType: parsed.mimeType,
+          data: parsed.base64,
+        };
     const asPart = parsed.mimeType.startsWith("audio/")
       ? {
           type: "input_audio",
           input_audio: { data: parsed.base64, mimeType: parsed.mimeType },
         }
-      : parsed.mimeType.startsWith("image/")
-        ? { type: "image_url", image_url: { url: uri } }
-        : {
-            type: "binary",
-            mimeType: parsed.mimeType,
-            data: parsed.base64,
-          };
+      : imageOrBinaryPart;
     const { ref } = await TraceContentExtractionService.processContentPart({
       part: asPart,
       ...params,
@@ -218,7 +220,7 @@ async function storeCandidates(
 
   const stored: StoredSite[] = [];
   for (let i = 0; i < takeable.length; i += CONCURRENT_STORES) {
-    if (Date.now() > budget.deadlineAt) {
+    if (nowInstant().epochMilliseconds > budget.deadlineAt) {
       budget.droppedByDeadline += takeable.length - i;
       break;
     }
@@ -319,7 +321,7 @@ export class TraceValueMediaExtractionService {
     return new TraceValueMediaExtractionService();
   }
 
-  static createExtractionBudget(now: number = Date.now()): ExtractionBudget {
+  static createExtractionBudget(now: number = nowInstant().epochMilliseconds): ExtractionBudget {
     return {
       deadlineAt: now + EXTRACTION_DEADLINE_MS,
       remainingParts: MAX_MEDIA_PARTS_PER_SPAN,

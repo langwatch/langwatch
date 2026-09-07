@@ -191,11 +191,11 @@ export class ClaudeCodeSpanEnrichmentService {
         continue;
       }
 
-      if (
+      const isBetterCandidate =
         best === null ||
         log.timeUnixMs > best.timeUnixMs ||
-        (log.timeUnixMs === best.timeUnixMs && rank > best.rank)
-      ) {
+        (log.timeUnixMs === best.timeUnixMs && rank > best.rank);
+      if (isBetterCandidate) {
         best = { timeUnixMs: log.timeUnixMs, rank, text };
       }
     }

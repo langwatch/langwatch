@@ -2,7 +2,10 @@
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { extractErrorInfo, inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type {
+  CanonicalAttributesPort,
+  ExtractorContext,
+} from "../ports/canonical-attributes.port.ts";
 
 export class FallbackCanonicaliserService implements CanonicalAttributesPort {
   static create(): FallbackCanonicaliserService {
@@ -21,22 +24,22 @@ export class FallbackCanonicaliserService implements CanonicalAttributesPort {
       return;
     }
 
-    if (
+    const isToolSpan =
       attrs.get(ATTR_KEYS.OPERATION_NAME) === "ai.toolCall" ||
       attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME) ||
-      attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME) === "tool"
-    ) {
+      attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME) === "tool";
+    if (isToolSpan) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "tool");
       ctx.recordRule(`${this.id}:tool`);
 
       return;
     }
 
-    if (
+    const isAgentSpan =
       attrs.has(ATTR_KEYS.GEN_AI_AGENT_NAME) ||
       attrs.has(ATTR_KEYS.AGENT_NAME) ||
-      attrs.has(ATTR_KEYS.GEN_AI_AGENT)
-    ) {
+      attrs.has(ATTR_KEYS.GEN_AI_AGENT);
+    if (isAgentSpan) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "agent");
       ctx.recordRule(`${this.id}:agent`);
 

@@ -13,6 +13,7 @@ import {
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../../ports/trace.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const STORED_SPANS_TABLE = "stored_spans";
 const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
@@ -374,7 +375,7 @@ export class ClickHouseTraceSpanRepository extends TracePort {
     const recent = await this.queryTraceOccurredAtMs({
       tenantId,
       traceId,
-      sinceMs: Date.now() - RESOLVER_RECENT_WINDOW_MS,
+      sinceMs: nowInstant().epochMilliseconds - RESOLVER_RECENT_WINDOW_MS,
     });
     return recent ?? this.queryTraceOccurredAtMs({ tenantId, traceId });
   }
@@ -534,12 +535,12 @@ export class ClickHouseTraceSpanRepository extends TracePort {
     const details: EvaluationTraceEvent["details"] = [];
 
     for (const [key, value] of Object.entries(row.Attributes)) {
-      if (
+      const isMetricKey =
         key === "vote" ||
         key === "score" ||
         key.startsWith("metrics.") ||
-        key.startsWith("event.metrics.")
-      ) {
+        key.startsWith("event.metrics.");
+      if (isMetricKey) {
         const metricKey = key.replace(/^(event\.)?metrics\./, "");
         metrics.push({ key: metricKey, value: Number(value) || 0 });
       } else {

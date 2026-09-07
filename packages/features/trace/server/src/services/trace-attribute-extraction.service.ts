@@ -164,7 +164,8 @@ export class TraceAttributeExtractionService {
     }
 
     for (const [key, value] of Object.entries(resourceAttrs)) {
-      if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) {
+      const isStandardResourceKey = STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p));
+      if (isStandardResourceKey) {
         continue;
       }
 
@@ -267,14 +268,16 @@ export class TraceAttributeExtractionService {
     // (comma-separated string or array) into langwatch.labels so the trace
     // carries the tag; langwatch.labels wins on conflict, tag.tags is unioned in.
     const tagTags = spanAttrs["tag.tags"] ?? resourceAttrs["tag.tags"];
-    const tagList = Array.isArray(tagTags)
-      ? tagTags.filter((t): t is string => typeof t === "string")
-      : typeof tagTags === "string"
+    const tagsFromString =
+      typeof tagTags === "string"
         ? tagTags
             .split(",")
             .map((t) => t.trim())
             .filter(Boolean)
         : [];
+    const tagList = Array.isArray(tagTags)
+      ? tagTags.filter((t): t is string => typeof t === "string")
+      : tagsFromString;
     if (tagList.length > 0) {
       const existing = parseJsonStringArray(result["langwatch.labels"]);
       result["langwatch.labels"] = JSON.stringify([...new Set([...existing, ...tagList])]);
@@ -372,10 +375,14 @@ export class TraceAttributeExtractionService {
   }
 
   private static attributeText(value: unknown): string {
-    return typeof value === "string"
-      ? value
-      : typeof value === "object"
-        ? JSON.stringify(value)
-        : String(value);
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (typeof value === "object") {
+      return JSON.stringify(value);
+    }
+
+    return String(value);
   }
 }

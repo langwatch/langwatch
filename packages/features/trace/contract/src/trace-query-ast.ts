@@ -52,7 +52,8 @@ export function filterAST(ast: LiqeQuery, predicate: (node: LiqeQuery) => boolea
   if (ast.type === "LogicalExpression") {
     const left = filterAST(ast.left, predicate);
     const right = filterAST(ast.right, predicate);
-    if (isEmptyAST(left) && isEmptyAST(right)) {
+    const bothSidesEmpty = isEmptyAST(left) && isEmptyAST(right);
+    if (bothSidesEmpty) {
       return EMPTY_AST;
     }
     if (isEmptyAST(left)) {

@@ -37,6 +37,7 @@ import {
   stampIngestKeyProvenanceOnTraceRequest,
 } from "../../rules/ingest-key-provenance.rules.ts";
 import type { TraceRequestCollectionResult } from "../../services/trace-ingestion.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The generated protobuf message this receiver decodes into.
@@ -247,7 +248,8 @@ function logCorrectedPath({
   // A NUL joins the pair because it cannot appear in a URL pathname, so no
   // project and path can collide with a different pair.
   const pair = [projectId, originalPath].join("\u0000");
-  if (!correctedPathIsDueToLog({ pair, now: Date.now() })) return;
+  const isDueToLog = correctedPathIsDueToLog({ pair, now: nowInstant().epochMilliseconds });
+  if (!isDueToLog) return;
 
   logger.warn(
     { projectId, originalPath, canonicalPath: c.req.path },

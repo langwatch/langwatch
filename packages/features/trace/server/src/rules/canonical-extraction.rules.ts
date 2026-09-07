@@ -86,7 +86,8 @@ const extractMessages = (
   ruleId: string,
   config: ExtractMessagesConfig,
 ): boolean => {
-  if (ctx.bag.attrs.has(config.attrKey) || ctx.out[config.attrKey] !== void 0) {
+  const alreadyPresent = ctx.bag.attrs.has(config.attrKey) || ctx.out[config.attrKey] !== void 0;
+  if (alreadyPresent) {
     return false;
   }
 
@@ -138,10 +139,10 @@ export const extractModelToBoth = ({
   ruleId: string;
   transform?: (raw: unknown) => string | null;
 }): boolean => {
-  if (
+  const modelAlreadyKnown =
     ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) ||
-    ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL)
-  ) {
+    ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL);
+  if (modelAlreadyKnown) {
     return false;
   }
 
@@ -241,7 +242,8 @@ export const extractUsageTokens = (
  */
 export const recordValueType = (ctx: ExtractorContext, attrKey: string, type: string): void => {
   const existing = ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES];
-  if (Array.isArray(existing) && existing.every((x) => typeof x === "string")) {
+  const isStringList = Array.isArray(existing) && existing.every((x) => typeof x === "string");
+  if (isStringList) {
     existing.push(`${attrKey}=${type}`);
   } else {
     ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES, [`${attrKey}=${type}`]);
@@ -275,7 +277,8 @@ export const extractErrorInfo = (ctx: ExtractorContext): void => {
   }
 
   // Priority 2: Exception type and message
-  if (isNonEmptyString(exceptionType) && isNonEmptyString(exceptionMsg)) {
+  const hasExceptionPair = isNonEmptyString(exceptionType) && isNonEmptyString(exceptionMsg);
+  if (hasExceptionPair) {
     if (!errorTypeAlreadySet) {
       ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, exceptionType);
     }
@@ -322,11 +325,11 @@ export const inferSpanTypeIfAbsent = (
   type: string,
   ruleId: string,
 ): void => {
-  if (
+  const canInferSpanType =
     !ctx.bag.attrs.has(ATTR_KEYS.SPAN_TYPE) &&
     ctx.out[ATTR_KEYS.SPAN_TYPE] === void 0 &&
-    ALLOWED_SPAN_TYPES[type] === true
-  ) {
+    ALLOWED_SPAN_TYPES[type] === true;
+  if (canInferSpanType) {
     ctx.setAttr(ATTR_KEYS.SPAN_TYPE, type);
     ctx.recordRule(ruleId);
   }

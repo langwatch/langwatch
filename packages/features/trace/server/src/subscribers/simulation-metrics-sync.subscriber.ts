@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trace-processing:simulation-metrics-publisher");
 
@@ -60,7 +61,7 @@ export function createSimulationMetricsSyncHandler(
         scenarioRunId,
         traceId,
         retryCount: 0,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
       });
     } catch (error) {
       logger.warn(

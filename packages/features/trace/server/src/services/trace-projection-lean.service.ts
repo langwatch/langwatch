@@ -235,7 +235,8 @@ export class TraceProjectionLeanService {
     }
 
     const trimmed = value.trim();
-    if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) {
+    const looksLikeJson = trimmed.startsWith("[") || trimmed.startsWith("{");
+    if (!looksLikeJson) {
       return null;
     }
 

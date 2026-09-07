@@ -15,6 +15,7 @@ import {
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
 
@@ -256,18 +257,18 @@ export class TraceIngestionService {
       return { status: "dropped", error: "span start time is invalid" };
     }
 
-    if (startTimeUnixMs < Date.now() - SPAN_MAX_PAST_MS) {
+    if (startTimeUnixMs < nowInstant().epochMilliseconds - SPAN_MAX_PAST_MS) {
       return { status: "dropped", error: "span start time is more than 31 days in the past" };
     }
 
-    if (
+    const isFilteredCodingAgentSpan =
       this.codingAgentSpanFilterEnabled &&
       this.codingAgents.shouldFilterSpan({
         scopeName: input.scope?.name,
         spanName: spanParseResult.data.name,
         attributeKeys: spanParseResult.data.attributes.map((attribute) => attribute.key),
-      })
-    ) {
+      });
+    if (isFilteredCodingAgentSpan) {
       return { status: "filtered" };
     }
 
@@ -363,7 +364,7 @@ export class TraceSpanCollectionService {
         resource: input.resource,
         instrumentationScope: input.instrumentationScope,
         piiRedactionLevel: input.piiRedactionLevel,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
       };
       const prepared = this.options.payloads
         ? await this.options.payloads.prepare(commandData)

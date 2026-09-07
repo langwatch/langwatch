@@ -34,7 +34,8 @@ function joinInstructionEntries(entries: unknown[]): string | null {
 function systemInstructionsText(value: unknown): string | null {
   if (Array.isArray(value)) return joinInstructionEntries(value);
   if (typeof value !== "string" || value.trim().length === 0) return null;
-  if (!value.trimStart().startsWith("[")) return value;
+  const looksLikeJsonArray = value.trimStart().startsWith("[");
+  if (!looksLikeJsonArray) return value;
   try {
     const parsed: unknown = JSON.parse(value);
     return Array.isArray(parsed) ? joinInstructionEntries(parsed) : value;

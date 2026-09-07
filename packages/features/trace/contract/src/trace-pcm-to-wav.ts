@@ -43,10 +43,12 @@ export function resolveRawPcmFormat(format?: string, mimeType?: string): RawPcmF
   const m = mimeType?.toLowerCase();
   if (!m) return null;
   if (m.includes("pcm16")) return "pcm16";
-  if (m.includes("ulaw") || m.includes("pcmu") || m === "audio/basic") {
+  const isUlaw = m.includes("ulaw") || m.includes("pcmu") || m === "audio/basic";
+  if (isUlaw) {
     return "g711_ulaw";
   }
-  if (m.includes("alaw") || m.includes("pcma")) return "g711_alaw";
+  const isAlaw = m.includes("alaw") || m.includes("pcma");
+  if (isAlaw) return "g711_alaw";
   return null;
 }
 

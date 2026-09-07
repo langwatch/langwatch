@@ -9,6 +9,8 @@ const responseContentBlockSchema = z.looseObject({
   input: z.unknown().optional(),
 });
 
+type ResponseContentBlock = z.infer<typeof responseContentBlockSchema>;
+
 const responseBodySchema = z.looseObject({
   content: z.array(responseContentBlockSchema).optional(),
   usage: z
@@ -101,17 +103,29 @@ export class ClaudeCodeResponseService {
     return result.success ? result.data : null;
   }
 
+  /** One assistant content block as text, or null when it carries nothing to show. */
+  private renderContentBlock(block: ResponseContentBlock): string | null {
+    if (block.type === "text") {
+      return block.text ? block.text : null;
+    }
+
+    const isToolUse = block.type === "tool_use" && Boolean(block.name);
+    if (!isToolUse) {
+      return null;
+    }
+
+    const hasInput = block.input !== void 0 && block.input !== null;
+    const args = hasInput ? this.safeStringify(block.input) : "";
+
+    return args ? `[tool_use: ${block.name}]\n${args}` : `[tool_use: ${block.name}]`;
+  }
+
   private extractAssistantOutput(parsed: ResponseBody): string | null {
     const parts: string[] = [];
     for (const block of parsed.content ?? []) {
-      if (block.type === "text") {
-        if (block.text) {
-          parts.push(block.text);
-        }
-      } else if (block.type === "tool_use" && block.name) {
-        const args =
-          block.input !== void 0 && block.input !== null ? this.safeStringify(block.input) : "";
-        parts.push(args ? `[tool_use: ${block.name}]\n${args}` : `[tool_use: ${block.name}]`);
+      const rendered = this.renderContentBlock(block);
+      if (rendered !== null) {
+        parts.push(rendered);
       }
     }
 

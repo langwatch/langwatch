@@ -39,6 +39,7 @@ import type {
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
 import type { TraceLegacyReadPort } from "../ports/trace-legacy-read.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trace:app");
 
@@ -852,7 +853,7 @@ export class TraceApp {
       traceId: input.traceId,
       newName: input.newName,
       changedByUserId: by.id,
-      occurredAt: input.occurredAt ?? Date.now(),
+      occurredAt: input.occurredAt ?? nowInstant().epochMilliseconds,
     });
   }
 

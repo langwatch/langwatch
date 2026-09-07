@@ -159,14 +159,14 @@ export class TraceAttributeAccumulationService {
       try {
         const prevObj: unknown = JSON.parse(prev);
         const nextObj: unknown = JSON.parse(next);
-        if (
+        const bothArePlainObjects =
           typeof prevObj === "object" &&
           prevObj &&
           !Array.isArray(prevObj) &&
           typeof nextObj === "object" &&
           nextObj &&
-          !Array.isArray(nextObj)
-        ) {
+          !Array.isArray(nextObj);
+        if (bothArePlainObjects) {
           merged[key] = JSON.stringify({ ...nextObj, ...prevObj });
         }
       } catch {

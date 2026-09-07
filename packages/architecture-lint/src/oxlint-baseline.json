@@ -2886,10 +2886,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/contract/src/trace-attribute-unflatten.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/contract/src/trace-collector-common.ts",
       "measured": "2026-09-06"
     },
@@ -2898,19 +2894,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/contract/src/trace-mapping.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/contract/src/trace-media-part.collector.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|packages/features/trace/contract/src/trace-media-ref.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/contract/src/trace-prompt-reference.ts",
       "measured": "2026-09-06"
     },
     {
@@ -2930,19 +2918,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/contract/src/trace-query-mutations.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/contract/src/trace-query-parser.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/server/src/adapters/__tests__/eventing.trace-projection-lean.replay-state.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/server/src/adapters/trace-query-fields.clickhouse.adapter.ts",
       "measured": "2026-09-06"
     },
     {
@@ -2955,10 +2931,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/server/src/repositories/clickhouse/stored-span-row.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/server/src/repositories/clickhouse/trace-full-protection.mapper.ts",
       "measured": "2026-09-06"
     },
     {
@@ -2979,14 +2951,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/server/src/repositories/clickhouse/trace-summary.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/server/src/rules/canonical-extraction.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/server/src/rules/canonical-json.rules.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3034,10 +2998,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/server/src/rules/vercel-core.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/server/src/rules/vercel-io.rules.ts",
       "measured": "2026-09-06"
     },
@@ -3054,15 +3014,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/server/src/services/claude-code-response.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/server/src/services/claude-code-span-enrichment.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/server/src/services/copilot-canonicaliser.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3094,15 +3046,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/server/src/services/span-status.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/server/src/services/span-token-estimation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/server/src/services/strands-canonicaliser.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3115,10 +3059,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/server/src/services/trace-eventref-parsing.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/server/src/services/trace-facet-descriptor.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3142,15 +3082,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/server/src/services/trace-read-redaction.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/server/src/services/trace-value-media-extraction.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/server/src/services/trace-visibility-window.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5035,10 +4967,6 @@
     },
     {
       "key": "complexity|packages/features/trace/server/src/rules/trace-export-csv.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/trace/server/src/services/trace-attribute-cap.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -7722,51 +7650,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-attribute-unflatten.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/trace/contract/src/trace-collector-common.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-content-part.provider-source.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-mapping.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-media-part.collector.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-media-ref.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-pcm-to-wav.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-query-ast.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-query-evaluator-group.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-rag-chunks.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-rag-extraction.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/contract/src/trace-span-io.ts",
       "measured": "2026-09-06"
     },
     {
@@ -7778,14 +7662,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/trace/server/src/adapters/eventing.trace-metric-correlation.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/adapters/trace-facet-registry.clickhouse.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/trace/server/src/adapters/trace-query-evaluation.adapter.ts",
       "measured": "2026-09-06"
     },
@@ -7794,215 +7670,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/trace/server/src/repositories/clickhouse/stored-span-row.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/repositories/clickhouse/trace-event-payload.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/repositories/clickhouse/trace-full-record.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/trace/server/src/repositories/clickhouse/trace-list.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/repositories/clickhouse/trace-span.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/canonical-extraction.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/canonical-message.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/claude-code-message-index.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/gemini-content.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/langwatch-metrics.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/trace-event-log-payload.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/trace-io-text.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/trace-summary-attributes.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/vercel-core.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/vercel-io.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/vertex-adk-core.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/vertex-adk-request.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/rules/vertex-adk-response.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/claude-code-canonicaliser.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/claude-code-span-enrichment.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/claude-code-truncated-request.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/fallback-canonicaliser.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/gen-ai-span.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/haystack-canonicaliser.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/logfire-canonicaliser.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/mastra-canonicaliser.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/mastra-value.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/openinference-canonicaliser.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/otlp-trace-request.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/span-model-name.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/span-timing.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/span-token-estimation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-ai-query.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-attribute-accumulation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-attribute-extraction.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-cold-scan-detector.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-content-array.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-discover.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-event-attribute-mapping.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-formatting.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-ingestion.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-legacy-span-mapping.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-projection-catalog.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-projection-lean.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/services/trace-read-redaction.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/subscribers/custom-evaluation-sync.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/subscribers/evaluation-trigger.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/trace/server/src/transport/api-rest/__tests__/traces.api.update-metadata.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/transport/api-rest/collector.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/transport/api-rest/otlp-ingest.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/transport/api-trpc/trace-read-mappers.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/trace/server/src/transport/api-trpc/traces-v2.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -9986,23 +9658,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/trace/contract/src/trace-content-part.dispatcher.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/contract/src/trace-content-part.provider-source.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/contract/src/trace-processing.events.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/trace/server/src/adapters/trace-query-evaluation.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/adapters/trace-query-fields.clickhouse.adapter.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10015,50 +9671,6 @@
     },
     {
       "key": "nested-ternary|packages/features/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/rules/claude-code-tool-enrichment.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/rules/vercel-io.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/services/trace-attribute-extraction.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/services/trace-content-array.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/services/trace-formatting.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/services/trace-origin.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/services/trace-projection-compile.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/services/trace-value-media-extraction.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/services/trace-visibility-window.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/subscribers/evaluation-trigger.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/trace/server/src/transport/api-rest/collector.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -13562,23 +13174,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/trace/contract/src/trace-mapping.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/trace/contract/src/trace-rag-extraction.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/adapters/eventing.deferred-origin.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/app/trace.app.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/projections/trace-derived.projection.ts",
       "measured": "2026-09-06"
     },
     {
@@ -13598,19 +13194,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-list.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-metrics-analytics.repository.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-span-storage.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-span.repository.ts",
       "measured": "2026-09-06"
     },
     {
@@ -13622,107 +13210,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/trace/server/src/rules/trace-storage-anchor.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/scenario-role-metrics-derivation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-discover.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/trace/server/src/services/trace-evaluation-mapping.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-event-derivation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-facet-values.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-formatting.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-ingestion.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-legacy-read.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-metadata-write.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-ttl-cache.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-value-media-extraction.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-visibility-window.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace-windowed-read.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/trace.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/services/tracked-event-span.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/subscribers/custom-evaluation-sync.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/subscribers/experiment-metrics-sync.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/subscribers/origin-guarded.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/subscribers/simulation-metrics-sync.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/subscribers/tracked-event-sync.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/transport/api-rest/collector.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/transport/api-rest/otlp-ingest.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/transport/api-rest/trace-export.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/trace/server/src/transport/api-rest/trace-legacy.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/trace/server/src/transport/api-trpc/traces-v2.api.ts",
       "measured": "2026-09-06"
     },
     {

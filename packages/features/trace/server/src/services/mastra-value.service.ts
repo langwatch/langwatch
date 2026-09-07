@@ -120,7 +120,9 @@ export class MastraValuesService {
     const metadata = attrs.get("mastra.metadata.modelMetadata");
     const parsed = modelMetadataSchema.safeParse(metadata);
 
-    return parsed.success && parsed.data.modelId.length > 0 ? parsed.data.modelId : null;
+    const modelId = parsed.success ? parsed.data.modelId : "";
+
+    return modelId.length > 0 ? modelId : null;
   }
 
   /**

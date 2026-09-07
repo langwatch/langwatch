@@ -63,7 +63,8 @@ export class MastraCanonicaliserService implements CanonicalAttributesPort {
    *  types inferred by earlier extractors (in ctx.out). */
   private mapSpanType(ctx: ExtractorContext, mastraType: unknown, isEvalModelStep: boolean): void {
     // User explicitly set langwatch.span.type — respect it
-    if (ctx.bag.attrs.has(ATTR_KEYS.SPAN_TYPE)) {
+    const { attrs } = ctx.bag;
+    if (attrs.has(ATTR_KEYS.SPAN_TYPE)) {
       return;
     }
 
@@ -86,10 +87,9 @@ export class MastraCanonicaliserService implements CanonicalAttributesPort {
       // Extract model name from body.model
       if (typeof modelStepBody.model === "string" && modelStepBody.model.length > 0) {
         modelName = modelStepBody.model;
-        if (
-          !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
-          !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL)
-        ) {
+        const modelUnset =
+          !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) && !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL);
+        if (modelUnset) {
           ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
           ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
           ctx.recordRule(`${this.id}:model_step.input.body.model->gen_ai.model`);
@@ -97,11 +97,11 @@ export class MastraCanonicaliserService implements CanonicalAttributesPort {
       }
 
       // Extract input messages from body.messages
-      if (
+      const canRecordInputMessages =
         Array.isArray(modelStepBody.messages) &&
         !attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) &&
-        ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] === void 0
-      ) {
+        ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] === void 0;
+      if (canRecordInputMessages) {
         const msgs = normalizeToMessages(modelStepBody.messages, "user");
         if (msgs && msgs.length > 0) {
           const systemInstruction = extractSystemInstructionFromMessages(msgs);
@@ -124,12 +124,12 @@ export class MastraCanonicaliserService implements CanonicalAttributesPort {
     // Fallback: try mastra.metadata.modelMetadata for model name
     if (!modelName) {
       modelName = mastraValuesService.tryExtractModelFromMetadata(attrs);
-      if (
-        modelName &&
+      const canRecordMetadataModel =
+        Boolean(modelName) &&
         !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
         !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL) &&
-        ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL] === void 0
-      ) {
+        ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL] === void 0;
+      if (canRecordMetadataModel) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
         ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
         ctx.recordRule(`${this.id}:metadata.modelMetadata->gen_ai.model`);
@@ -228,10 +228,10 @@ export class MastraCanonicaliserService implements CanonicalAttributesPort {
     }
 
     ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
-    if (
+    const outputMessagesUnset =
       ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === void 0 &&
-      !ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)
-    ) {
+      !ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES);
+    if (outputMessagesUnset) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [{ role: "assistant", content: text }]);
       recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
     }

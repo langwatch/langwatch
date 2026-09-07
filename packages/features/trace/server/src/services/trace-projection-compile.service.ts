@@ -188,12 +188,9 @@ function collectionElements({
   trace: ProjectableTrace;
   collection: ProjectionCollection;
 }): ProjectionSource[] {
-  const raw =
-    collection === "events"
-      ? trace.events
-      : collection === "annotations"
-        ? trace.annotations
-        : trace.evaluations;
+  const annotationsOrEvaluations =
+    collection === "annotations" ? trace.annotations : trace.evaluations;
+  const raw = collection === "events" ? trace.events : annotationsOrEvaluations;
 
   return (raw ?? []) as unknown as ProjectionSource[];
 }

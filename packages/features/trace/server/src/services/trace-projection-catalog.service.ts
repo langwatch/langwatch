@@ -291,7 +291,8 @@ export class TraceProjectionCatalogService {
   static tryResolveField(path: string): ResolvedField | null {
     // Reject prototype-pollution segments anywhere in the path (defense in depth
     // alongside the projector's setPath guard).
-    if (path.split(".").some((segment) => FORBIDDEN_SEGMENTS.has(segment))) {
+    const hasForbiddenSegment = path.split(".").some((segment) => FORBIDDEN_SEGMENTS.has(segment));
+    if (hasForbiddenSegment) {
       return null;
     }
 

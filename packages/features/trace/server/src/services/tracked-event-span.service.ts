@@ -8,6 +8,7 @@ import {
   type TrackEventRESTParamsValidator,
 } from "@langwatch/trace-contract";
 import type { TraceSpanCollectionService } from "./trace-ingestion.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The ksuid prefix every tracked-event id ever written carries.
@@ -76,7 +77,7 @@ export class TrackedEventSpanService {
     eventId: string;
   }): Promise<void> {
     const { tenantId, body, eventId } = input;
-    const timestampMs = body.timestamp ?? Date.now();
+    const timestampMs = body.timestamp ?? nowInstant().epochMilliseconds;
     const timestampNano = String(timestampMs * 1_000_000);
     const spanId = TrackedEventSpanService.spanIdFor({ traceId: body.trace_id, eventId });
     const attributes = TrackedEventSpanService.attributesFor({ body, eventId });

@@ -29,28 +29,38 @@ export function safeUnflatten(flat: Record<string, unknown>): Record<string, unk
       result[key] = value;
       continue;
     }
-    let current = result;
-    let skip = false;
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i]!;
-      if (DANGEROUS_KEYS.has(part)) {
-        skip = true;
-        break;
-      }
-      if (
-        !(part in current) ||
-        typeof current[part] !== "object" ||
-        current[part] === null ||
-        Array.isArray(current[part])
-      ) {
-        current[part] = Object.create(null);
-      }
-      current = current[part] as Record<string, unknown>;
-    }
-    if (skip) continue;
+    const current = descendToParent(result, parts);
+    if (current === null) continue;
     const leaf = parts[parts.length - 1]!;
     if (DANGEROUS_KEYS.has(leaf)) continue;
     current[leaf] = value;
   }
   return result;
+}
+
+/**
+ * Walks (creating as it goes) the containers the leaf hangs under, replacing anything
+ * that is not a plain object. Null when a segment is one of the prototype-poisoning keys.
+ */
+function descendToParent(
+  result: Record<string, unknown>,
+  parts: string[],
+): Record<string, unknown> | null {
+  let current = result;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i]!;
+    if (DANGEROUS_KEYS.has(part)) return null;
+    const existing = current[part];
+    const holdsPlainObject =
+      part in current &&
+      typeof existing === "object" &&
+      existing !== null &&
+      !Array.isArray(existing);
+    if (!holdsPlainObject) {
+      current[part] = Object.create(null);
+    }
+    current = current[part] as Record<string, unknown>;
+  }
+
+  return current;
 }

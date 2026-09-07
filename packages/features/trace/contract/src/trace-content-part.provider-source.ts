@@ -51,12 +51,8 @@ export function inlineDataToMediaPart(o: Record<string, unknown>): NormalizedMed
   if (!c) return null;
 
   const data = typeof c.data === "string" ? c.data : undefined;
-  const rawMimeType =
-    typeof c.mime_type === "string"
-      ? c.mime_type
-      : typeof c.mimeType === "string"
-        ? c.mimeType
-        : undefined;
+  const camelMimeType = typeof c.mimeType === "string" ? c.mimeType : undefined;
+  const rawMimeType = typeof c.mime_type === "string" ? c.mime_type : camelMimeType;
   if (data === undefined || rawMimeType === undefined) return null;
   const mimeType = rawMimeType.toLowerCase();
   return {
@@ -66,12 +62,12 @@ export function inlineDataToMediaPart(o: Record<string, unknown>): NormalizedMed
 }
 
 function toMediaPart(o: Record<string, unknown>): NormalizedMediaPart | null {
-  if (
-    (o.type === "image" || o.type === "audio" || o.type === "video" || o.type === "document") &&
-    o.source
-  ) {
+  const type = o.type;
+  const isMediaType =
+    type === "image" || type === "audio" || type === "video" || type === "document";
+  if (isMediaType && o.source) {
     const source = normalizeContentSource(o.source);
-    return source ? { type: o.type, source } : null;
+    return source ? { type, source } : null;
   }
   return inlineDataToMediaPart(o);
 }
