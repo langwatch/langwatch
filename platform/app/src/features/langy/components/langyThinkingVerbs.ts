@@ -4,9 +4,7 @@
  * They render standalone (`${verb}…`), one word each, and only ever while the
  * model is genuinely working: the row that shows them is derived from what is
  * on the wire (`logic/langyThinkingLine.ts`), so a turn whose worker never
- * started shows the startup ladder instead and never cycles. That is the one
- * hard rule the list used to break: cycled on a timer regardless of state, a
- * dead turn read as a healthy one for ninety-seven seconds.
+ * started shows the startup ladder instead and never cycles.
  *
  * "Thinking" is the default state of mind and shows more often than the rest,
  * so the list carries it several times. No two neighbours repeat, because the

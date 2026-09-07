@@ -187,7 +187,7 @@ export function LangyThinkingLine({
     //
     // The row wears the SHARED status-line frame (STATUS_LINE_ROW, see
     // StreamingStatusLine): same gap, same padding, and the same leading
-    // indicator slot as the status rows this line alternates with — so
+    // indicator slot as the status rows this line alternates with, so
     // "Preparing Langy's workspace…" → "Starting Langy…" → "Thinking…" reads
     // as one line changing its words, never a line hopping between layouts.
     <HStack

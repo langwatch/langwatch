@@ -508,7 +508,7 @@ export function langyThinkingLine({
     return { text: reported, tone: "working", allowWhimsy: false };
   }
 
-  // 1. A TOOL IS RUNNING. We know exactly what it is — it is on the tool
+  // 1. A TOOL IS RUNNING. We know exactly what it is: it is on the tool
   //    stream with its command in the input, or in the turn's durable record.
   //    Say the true thing, in the reader's words.
   const tool = runningTool(last);
