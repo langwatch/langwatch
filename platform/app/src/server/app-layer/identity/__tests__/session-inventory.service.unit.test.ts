@@ -37,8 +37,7 @@ const inventoryOver = (
       [...rows.values()].filter((row) => row.userId === userId),
     listForIdentifier: async ({ userId, identifierId }) =>
       [...rows.values()].filter(
-        (row) =>
-          row.userId === userId && row.identifierId === identifierId,
+        (row) => row.userId === userId && row.identifierId === identifierId,
       ),
     deleteByIds: async ({ ids }) => {
       let ended = 0;

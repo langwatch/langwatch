@@ -124,7 +124,7 @@ const fixture = ({
           providerAccountId: input.providerAccountId,
           value,
           identifierHash: null,
-          domain: value.includes("@") ? value.split("@")[1] ?? null : null,
+          domain: value.includes("@") ? (value.split("@")[1] ?? null) : null,
           connectionId: null,
           state: "ATTACHED",
           actor: input.actor,
@@ -198,7 +198,9 @@ describe("AccountIdentifiersService.addEmailIdentifier", () => {
         ceremony: { flow: "settings-add-address" },
       }),
     ]);
-    expect(subject.verificationStore.records.has(added.identifierId)).toBe(true);
+    expect(subject.verificationStore.records.has(added.identifierId)).toBe(
+      true,
+    );
     expect(subject.sent).toEqual([
       expect.objectContaining({ email: "ana.new@example.com" }),
     ]);
