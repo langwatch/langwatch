@@ -74,8 +74,24 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
   Scenario: A step that could not be sent goes out with the next one
     Given the platform answers 502 to the step post
     When log_step is called and the post fails after its retries
-    Then the step stays in the buffer
+    Then the evaluation the step reports is not failed by it
+    And the step stays in the buffer
     And the next log_step that gets through posts both steps
+
+  @unit
+  Scenario: A client error is a real answer, not a blip
+    Given the platform answers 422 to the step post
+    When log_step is called
+    Then the post is not retried
+    And the evaluation the step reports is not failed by it
+    And the step stays in the buffer
+
+  @unit
+  Scenario: The buffer is bounded while the platform is down
+    Given the platform keeps answering 502
+    When more steps than the buffer bound are logged
+    Then the oldest steps are dropped, keeping the newest
+    And a warning says how many were dropped
 
   @unit
   Scenario: The steps a failed post left behind are sent when the run ends
