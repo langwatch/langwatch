@@ -11,6 +11,10 @@
 [ADR-101: feature package surfaces](./101-feature-package-surfaces.md),
 [ADR-111: physical application workspaces](./111-physical-application-workspaces.md),
 [ADR-112: singular feature ownership](./112-singular-feature-ownership.md),
+[ADR-128: public REST and internal tRPC](./128-public-rest-and-internal-trpc.md)
+(handler context and output validation superseded here),
+[API ADR-006](../../../packages/api/adrs/006-trpc-fluent-chain.md)
+(governed handler authoring superseded here),
 [ADR-045: domain errors at the handled boundary](./045-domain-errors-handled-boundary.md),
 [service, repository, adapter, port](../best_practices/service-repository-adapter-port.md),
 [installing a feature into an app](../best_practices/feature-installation.md).
@@ -75,7 +79,7 @@ and calls `create` once during boot. API and worker reuse the same factory.
 
 ```ts
 // AnnotationApp here is the server implementation, not the contract class.
-export const annotationServer = serverFeature("annotation")
+export const annotationServer = defineFeature("annotation")
   .withApp(AnnotationApp)
   .build();
 
@@ -159,39 +163,55 @@ construction decision and allow the two declarations to drift.
 
 ### Transport declarations and inferred namespaces
 
-A feature attaches one transport declaration containing an `apis` array. Both
-REST and tRPC declarations use the property `router`. They receive the installed
-feature app and the standard request context; they declare no extra dependency
-bag, app selector or construction callback.
+A feature attaches transport declarations directly through variadic
+`withTransports`. Each declaration carries its protocol and exact native router
+factory type from its creation in `@langwatch/api`. There is no wrapper object,
+separate `restApi`/`trpcApi` call, repeated namespace or transport dependency bag.
 
 ```ts
-export const annotationTransport = transport({
-  apis: [
-    restApi({ router: annotationRestRouter }),
-    trpcApi({ router: annotationTrpcRouter }),
-  ],
-});
-
-export const annotationServer = serverFeature("annotation")
+export const annotationFeature = defineFeature("annotation")
   .withApp(AnnotationApp)
-  .withTransport(annotationTransport)
+  .withTransports(annotationRest, annotationTrpc)
   .build();
 ```
 
-The helpers preserve each router's required app type. Attaching a transport to
-an incompatible app fails type checking. Router declarations remain inert:
-route discovery and OpenAPI generation read metadata without constructing the
-app or accessing its services. During requests, both protocols use the exact
-app constructed at boot. Workers and tasks do not mount API routers.
+Transport means an inbound adapter: REST and tRPC now, potentially a queue or
+SQS consumer later. A future protocol supplies its own parsing, acknowledgement,
+redelivery and lifecycle implementation; this decision does not implement queue
+transports. The feature app remains independent of the arrival mechanism.
 
-Domain orchestration and domain collaborators belong behind app services.
-Routers own input parsing, actor extraction, transport authorisation, error
-mapping and response formatting. Shared authentication and authorisation
-machinery comes from the standard process request context. Moving an operation
-behind an app service never removes its principal or tenant checks. Ordinary
-transport mapping functions need no container registration. The API declaration
-has no `dependencies` or `create` escape hatch; a future transport-only resource
-requires a separate justified design.
+Declarations remain inert. Route discovery and OpenAPI generation do not invoke
+an app factory or access services. The process mount retains native router
+factory types and checks compatibility with its host context. Attachment alone
+cannot infer a semantic app owner from an arbitrary native router context;
+architecture lint checks canonical app ownership and rejects raw protocol
+construction outside the governed API framework. Features own their declarations. Both protocols receive the same app constructed at boot.
+
+All REST and tRPC handlers use `@langwatch/api`. The framework parses input,
+applies the declared authenticated, anonymous or share-token policy and
+authorizes that exact target before invoking a
+handler with `{ input, app, actor, scope, signal }`. It constructs explicit,
+portable actor and scope snapshots; neither an outer object spread nor a narrow
+TypeScript annotation removes hidden request data. Raw request/context, session,
+headers, response mutation and authorization callbacks stay inside the protocol
+and process adapters. Feature declarations cannot construct or replace the
+trusted policy binding. Human, project-key and service identities retain their
+actual principal kind and existing credential ceilings.
+
+Input and output schemas are mandatory, including empty-input and no-content
+operations. Handlers return the input type of the output schema; the framework
+parses and emits its output type, including transforms and removed fields.
+Validation cannot be disabled. Streaming protocols validate each item before
+emitting it; downloads and other non-JSON responses need explicit framework
+contracts. Legacy raw registration paths remain visible migration debt until
+all callers move; they are not alternative authoring APIs.
+
+Domain orchestration and collaborators belong behind app services. Conditional
+secondary permission decisions are declared policy results, preserving behavior
+such as saving a comment while declining its trace correction. The framework binds its authorization to the normalized request target. Handlers
+dispatch that target, and services verify tenant ownership of referenced resources.
+Restricted arguments alone cannot prevent a handler from inventing another ID;
+architecture checks and adversarial service/transport tests enforce that rule.
 
 The framework derives the public namespace from the singular catalogue feature
 name when attaching the transport. Authors write neither `namespace` nor
@@ -203,7 +223,7 @@ configuration belongs to the process, once.
 `FeatureName` is a literal union derived from the ownership catalogue, not an
 arbitrary string or an attempt to recognise English singular nouns. The
 catalogue remains the authority for singular owners, including established
-uncountable names. `serverFeature("annotations")` fails type checking because
+uncountable names. `defineFeature("annotations")` fails type checking because
 that plural is not a catalogue owner.
 
 A template literal type derives `PublicNamespace<F>` from that union. Regular

@@ -2,7 +2,14 @@
 
 **Date:** 2026-09-05
 
-**Status:** Accepted
+**Status:** Accepted; governed handler rules amended by
+[ADR-133](../../../../dev/docs/adr/133-composition-spec.md).
+
+The original raw `{ ctx, input }` handler, `withoutInput`/`withoutOutput`, custom
+policy decorators and optional output parsing described below are legacy
+migration forms. ADR-133 requires explicit input/output schemas, framework
+policy binding, restricted handler arguments and runtime parsing of every
+output. Feature-owned declarations continue to use the fluent API chain.
 
 ## Context
 

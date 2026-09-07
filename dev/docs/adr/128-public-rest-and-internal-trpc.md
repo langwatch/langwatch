@@ -51,11 +51,11 @@ request context. They do not construct services, import repositories, access
 Prisma or environment variables, or contain business decisions. `apps/api`
 constructs one application graph per process and composes both transport roots.
 
-Hono handlers use `context.app`, `context.actor()` and
-`context.authorize()`. tRPC procedures use the equivalent `ctx` members. A
-handler validates and authorises one target, applies transport policy, and
-calls exactly one feature service operation. It does not catch a domain error
-merely to translate it into another domain error.
+[ADR-133](./133-composition-spec.md) supersedes raw handler context access.
+Governed REST and tRPC handlers receive parsed input, the feature app and trusted
+actor/scope values. The framework owns authorization and response serialization.
+Legacy `context`/`ctx` handlers remain migration debt. A handler does not catch a
+domain error merely to translate it into another domain error.
 
 Feature web packages may depend on contract types and a small named browser
 port. They do not import a server router or the complete application-router
@@ -93,10 +93,10 @@ rate/resource policy or an explicit, reasoned opt-out.
 
 ### Internal tRPC
 
-tRPC validates input at runtime and derives its result type from the canonical
-service and any compatibility mapper. It does not add a second runtime output
-schema. This is a trusted first-party transport, not the public compatibility
-contract.
+[ADR-133](./133-composition-spec.md) supersedes the original decision to omit
+tRPC output validation. Both protocols declare input and output schemas; the
+framework parses output and returns the parsed result. First-party callers
+retain native tRPC inference while receiving the same boundary guarantees.
 
 Existing tRPC procedure names and result shapes remain stable while their
 implementation moves. A compatibility mapper may preserve an old browser
@@ -125,11 +125,9 @@ runtime output validation and explicit compatibility. The UI keeps tRPC's
 first-party type ergonomics without making the server router part of a feature
 web package's public surface.
 
-The API application owns more composition and middleware, and parity tests
-must cover every compatibility adapter. tRPC has no runtime output guard, so
-service types and compatibility characterisation remain important. Public
-REST pays the cost of output parsing because it is the untrusted, published
-boundary.
+The API application owns composition and middleware, and parity tests cover
+compatibility adapters. Both protocols pay the output parsing cost under
+ADR-133; service types and full response characterization remain necessary.
 
 Using tRPC for public integrations was rejected because it exposes a
 TypeScript-oriented protocol and weakens ordinary HTTP and OpenAPI support.

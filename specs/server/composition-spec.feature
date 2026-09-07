@@ -4,10 +4,10 @@
 # declares what it needs; boot validates and constructs; start serves. Imports
 # and constructors never start background work.
 #
-# Accepted app factory target: serverFeature(...).withApp(ServerApp), with
+# Accepted app factory target: defineFeature(...).withApp(ServerApp), with
 # static contract, dependencies and create on the server class. Scenarios tagged
-# @unimplemented describe the agreed API still to be built. Transports declare
-# an apis array with router on both protocols; namespaces derive from the owner.
+# @unimplemented describe the agreed API still to be built. withTransports takes
+# variadic inbound declarations; namespaces derive from the owner.
 
 Feature: Composing a process from feature installers
   Every process installs the same features the same way, validates the whole
@@ -76,9 +76,10 @@ Feature: Composing a process from feature installers
   Rule: transports declare routers and use the installed app
 
     @unimplemented @unit
-    Scenario: Both API protocols mount from one transport declaration
-      Given the annotation feature attaches a transport with REST and tRPC APIs
-      And each API declaration supplies its router through the router property
+    Scenario: Both API protocols mount from direct transport declarations
+      Given the annotation feature attaches REST and tRPC declarations through withTransports
+      And each declaration carries its protocol and native router factory type
+      And no separate wrapper or protocol helper is required at attachment
       When the API process boots and starts
       Then the REST router mounts at /api/v1/annotations
       And the tRPC router mounts under annotations
@@ -86,16 +87,16 @@ Feature: Composing a process from feature installers
       And the feature declares no namespace or base path
 
     @unimplemented @typecheck
-    Scenario: A router cannot attach to an incompatible app
+    Scenario: A process cannot mount a router against an incompatible host
       Given a router whose app contract requires annotation queues
-      When its transport is attached to an app without that contract
-      Then type checking rejects the attachment
+      When its native router factory is mounted against a host without that contract
+      Then type checking rejects the mount
 
     @unimplemented @architecture
     Scenario: Domain dependencies cannot leak into API declarations
       Given a REST or tRPC API declaration
       When it declares dependencies, create or an app selector callback
-      Then the declaration is rejected with guidance to use app services and standard request context
+      Then the declaration is rejected with guidance to use app services and the framework supplied handler arguments
 
     @unimplemented @unit
     Scenario: Route discovery needs no running application
@@ -110,6 +111,140 @@ Feature: Composing a process from feature installers
       When that principal requests an annotation operation on project B through either protocol
       Then access is denied using the actual principal and target project
       And no annotation data is read or mutated for project B
+
+  Rule: handler boundaries resist accidental and adversarial bypasses
+
+    @unimplemented @integration
+    Scenario Outline: Caller identity cannot replace the authenticated principal
+      Given an authenticated principal with access to project A
+      When a <protocol> request includes a forged actor, user identity or session
+      Then the handler receives only the framework authenticated principal
+      And the original principal kind and credential limits are preserved
+      And no caller supplied identity becomes the author of the operation
+
+      Examples:
+        | protocol |
+        | REST     |
+        | tRPC     |
+
+    @unimplemented @integration
+    Scenario: A contradictory target cannot cross the authorization boundary
+      Given a credential authorized for project A but not project B
+      When a request names project A in its path and project B in its body
+      Then the protocol either rejects the conflict or applies its documented path precedence
+      And the dispatched target is exactly the target authorized by the framework
+      And no read or write reaches project B
+
+    @unimplemented @integration
+    Scenario: A project key cannot inherit its owner's wider permissions
+      Given a project key restricted to project A
+      And its owner can administer project B
+      When the key requests an operation on project B
+      Then the framework denies the request before domain execution
+      And the handler never receives the owner as a human principal
+
+    @unimplemented @integration
+    Scenario: An anonymous share token keeps its exact resource grant
+      Given a valid share token granting anonymous access to one trace
+      When the share request passes through the governed handler boundary
+      Then the declared share policy permits that trace with its existing redactions
+      And the handler receives no share token or raw credential
+      And the same token cannot read another trace or project
+
+    @unimplemented @integration
+    Scenario: Substituting a foreign resource fails the service ownership check
+      Given a request authorized for project A
+      And an annotation queue item owned by project B
+      When a handler dispatches that foreign item under project A
+      Then the service denies the operation before any foreign data is returned or changed
+      And a regression that removes the ownership predicate fails the adversarial test
+
+    @unimplemented @typecheck @unit
+    Scenario: Hidden raw context cannot survive a narrow handler type
+      Given a process adapter whose actor value contains extra session and request properties
+      When the framework constructs the handler arguments
+      Then the actor and scope contain only their portable schema fields
+      And accessing raw context, headers, session or authorization callbacks fails type checking
+      And those properties are absent at runtime, including nested actor and scope values
+
+    @unimplemented @architecture
+    Scenario: A feature cannot manufacture its own trusted policy binding
+      Given a feature that supplies an actor or scope resolver in a transport declaration
+      When architecture boundaries are checked
+      Then the declaration is rejected with guidance to use the process prepared policy binding
+      And renaming or aliasing the resolver does not bypass the rule
+
+    @unimplemented @unit
+    Scenario: Declaring an output schema cannot silently disable enforcement
+      Given a handler with an output schema
+      When an author attempts to disable validation or omit the schema
+      Then the governed declaration is rejected before serving
+      And there is no withoutOutput or validation flag escape hatch
+
+    @unimplemented @integration
+    Scenario: The parsed output is the only payload emitted
+      Given an output schema that transforms a field and removes undeclared fields
+      And a handler returning a valid value with an extra private field
+      When the framework sends the response
+      Then the client receives the transformed field
+      And the private field is absent
+      When the handler returns a value rejected by the output schema
+      Then no successful or partial payload is emitted
+
+    @unimplemented @integration
+    Scenario: A malformed stream item is rejected before delivery
+      Given a streaming handler with an item output schema
+      When it yields an invalid item after a valid item
+      Then the valid item has been delivered once
+      And the invalid item is never delivered
+      And the framework closes the stream through its declared error lifecycle
+
+    @unimplemented @integration
+    Scenario: Compatibility aliases preserve the complete guarded operation
+      Given canonical and compatibility addresses for an annotation operation
+      When the same allowed and denied requests use each address
+      Then authorization, validation and error mapping agree
+      And all addresses invoke the same installed service instance
+
+    @unimplemented @integration
+    Scenario: Denying a correction does not discard an otherwise permitted comment
+      Given a user allowed to annotate a trace but denied the secondary correction permission
+      When the user submits a comment with a suggested correction
+      Then the comment is saved under that user's authorized project
+      And the trace correction is not written
+
+  Rule: migration checks must prove that plausible regressions fail
+
+    @typecheck
+    Scenario: Compiler-negative cases start from a valid declaration
+      Given a fixture whose app, dependency graph and infrastructure compile successfully
+      When one forbidden dependency, config or infrastructure change is introduced
+      Then compilation fails at the changed boundary with the expected diagnostic
+      And an unrelated error elsewhere cannot satisfy the assertion
+
+    @unimplemented @integration
+    Scenario: A review response keeps the full trace contract
+      Given a trace with offloaded content, spans, metadata, costs and timestamps
+      When an authorized reviewer reads it through an annotation queue
+      Then the response preserves all fields and full content from the characterized response
+      And restricted viewers receive the same redactions as other trace reads
+      And substituting a summary or preview fails the parity check
+
+    @unimplemented @unit
+    Scenario: UI installation cannot select an identically named settings layout
+      Given project and settings branches with the same layout component
+      When all annotation addresses are matched by the native router
+      Then every address selects its exact intended page
+      And its layout is the same route instance as an existing project page
+      And missing or duplicate project installation anchors fail before serving
+
+    @unimplemented @architecture
+    Scenario: Adoption cannot be declared complete by weakening its guards
+      Given a migration that introduces raw handler access or a foreign service import
+      When its lint fixture, baseline or suppression is changed to accept that code
+      Then the migration review rejects the weakened guard
+      And the guard is demonstrated to reject a representative forbidden change
+      And unfinished callers remain visible instead of receiving an adoption exemption
 
   Rule: singular catalogue owners determine plural public namespaces
 
@@ -134,7 +269,7 @@ Feature: Composing a process from feature installers
     @unimplemented @typecheck
     Scenario: Plural feature names cannot bypass catalogue ownership
       Given annotation is a catalogue owner and annotations is not
-      When a declaration calls serverFeature with annotations
+      When a declaration calls defineFeature with annotations
       Then type checking rejects the feature name
 
     @unimplemented @unit

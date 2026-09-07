@@ -84,17 +84,19 @@ Feature: The feature application and its transports
     Then the handler receives input already validated against that schema
     And it returns a value rather than composing a response
 
-  @unit
-  Scenario: A handler is given input only when input was declared
-    Given an endpoint that declares no input schema
-    Then its handler is given no input to read
-    And an endpoint that declares one gives its handler the validated input
+  @unimplemented @unit
+  Scenario: An empty input still has an explicit schema
+    Given an endpoint that takes no request fields
+    When its author omits the input schema
+    Then the governed declaration is rejected
+    And declaring an empty object schema gives the handler validated empty input
 
   @unimplemented @unit
-  Scenario: A handler may answer only when output was declared
-    Given an endpoint that declares no output schema
-    Then its handler answers with nothing
-    And returning a value from it does not compile
+  Scenario: A no-content response still has an explicit output schema
+    Given an endpoint that returns no response body
+    When its author omits the output schema
+    Then the governed declaration is rejected
+    And declaring a void output schema preserves the no-content response
 
   @unit
   Scenario: Answering requires an output schema
