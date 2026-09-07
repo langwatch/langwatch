@@ -194,7 +194,6 @@ describe("twoStepVerification.setRequirement", () => {
     });
   });
 
-  /** @scenario "Turning the requirement on is recorded with who did it" */
   it("uses the session actor and leaves the mutation in the audit trail", async () => {
     const caller = callerFor("ana");
 

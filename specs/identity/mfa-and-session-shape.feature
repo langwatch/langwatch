@@ -314,8 +314,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
   Scenario: Turning the requirement on is recorded with who did it
     When "ana" turns the requirement on for "acme"
     Then the change is audited with "ana" named as the actor
-    And every member of "acme" is handed to the notification boundary
-    And until notification delivery exists, the log says no notification was sent
+    And every member of "acme" is told the requirement now applies
 
   @integration
   Scenario: Turning the requirement off lets the held members straight back in
