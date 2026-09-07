@@ -201,6 +201,45 @@ function useRunDialogState({
   };
 }
 
+/**
+ * The "Call it myself" body, shown in place of the fields. Owns the project
+ * lookup the panel needs, so the dialog shell stays free of it.
+ */
+function RunDialogCallBody({
+  voiceCall,
+  onBack,
+}: {
+  voiceCall: NonNullable<ReturnType<typeof voiceCallTargetOf>>;
+  onBack: () => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  return (
+    <Dialog.Body paddingX={5} paddingY={4} maxHeight="58vh" overflowY="auto">
+      <VStack align="stretch" gap={3} data-testid="run-dialog-call">
+        <Button
+          variant="ghost"
+          size="sm"
+          alignSelf="flex-start"
+          onClick={onBack}
+          data-testid="run-dialog-call-back"
+        >
+          <ArrowLeft size={16} /> Back
+        </Button>
+        <TalkToItPanel
+          projectId={project?.id ?? ""}
+          projectSlug={project?.slug ?? ""}
+          transport={voiceCall.transport}
+          agentId={voiceCall.agentId}
+          agentRowId={voiceCall.agentRowId}
+          {...(voiceCall.scenarioId
+            ? { scenarioId: voiceCall.scenarioId }
+            : {})}
+        />
+      </VStack>
+    </Dialog.Body>
+  );
+}
+
 function RunDialogContent({
   subject,
   onClose,
@@ -216,7 +255,6 @@ function RunDialogContent({
   subject: RunDialogSubject;
   onClose: () => void;
 } & ReturnType<typeof useRunDialogState>) {
-  const { project } = useOrganizationTeamProject();
   // The panel opens in place of the fields when the person calls the agent
   // themselves; leaving the call returns to the dialog it was opened from.
   const [calling, setCalling] = useState(false);
@@ -242,34 +280,10 @@ function RunDialogContent({
       >
         <RunDialogHeader subject={subject} />
         {calling && voiceCall ? (
-          <Dialog.Body
-            paddingX={5}
-            paddingY={4}
-            maxHeight="58vh"
-            overflowY="auto"
-          >
-            <VStack align="stretch" gap={3} data-testid="run-dialog-call">
-              <Button
-                variant="ghost"
-                size="sm"
-                alignSelf="flex-start"
-                onClick={() => setCalling(false)}
-                data-testid="run-dialog-call-back"
-              >
-                <ArrowLeft size={16} /> Back
-              </Button>
-              <TalkToItPanel
-                projectId={project?.id ?? ""}
-                projectSlug={project?.slug ?? ""}
-                transport={voiceCall.transport}
-                agentId={voiceCall.agentId}
-                agentRowId={voiceCall.agentRowId}
-                {...(voiceCall.scenarioId
-                  ? { scenarioId: voiceCall.scenarioId }
-                  : {})}
-              />
-            </VStack>
-          </Dialog.Body>
+          <RunDialogCallBody
+            voiceCall={voiceCall}
+            onBack={() => setCalling(false)}
+          />
         ) : (
           <>
             <Dialog.Body

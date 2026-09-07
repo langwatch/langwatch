@@ -92,84 +92,101 @@ function transcriptOf(state: TalkState): VoiceTurn[] {
   return "transcript" in state ? state.transcript : [];
 }
 
+/**
+ * One transition per event type. A guarded transition returns the state
+ * unchanged when it fires in a state it does not apply to, so the reducer
+ * itself only looks up and calls — no branching lives in `talkReducer`.
+ */
+type TalkHandlers = {
+  [K in TalkEvent["type"]]: (
+    state: TalkState,
+    event: Extract<TalkEvent, { type: K }>,
+  ) => TalkState;
+};
+
+const talkHandlers: TalkHandlers = {
+  START: () => ({ kind: "connecting" }),
+
+  // A denied mic never leaves the panel on "Connecting" and never starts a run
+  // (AC27): it falls straight to a retryable error.
+  MIC_DENIED: () => ({
+    kind: "error",
+    code: "mic_denied",
+    message: MIC_DENIED_MESSAGE,
+  }),
+
+  MINT_FAILED: (_state, event) => ({
+    kind: "error",
+    code: event.code,
+    message:
+      event.code === "key_missing"
+        ? NO_KEY_MESSAGE
+        : `${MINT_FAILED_PREFIX}: ${event.message}`,
+  }),
+
+  CONNECTED: (state, event) => {
+    if (state.kind !== "connecting" && state.kind !== "live") return state;
+    return {
+      kind: "live",
+      conversationId: event.conversationId,
+      transcript: transcriptOf(state),
+      elapsedMs: state.kind === "live" ? state.elapsedMs : 0,
+    };
+  },
+
+  TRANSCRIPT: (state, event) =>
+    state.kind === "live"
+      ? { ...state, transcript: [...state.transcript, event.turn] }
+      : state,
+
+  TICK: (state, event) =>
+    state.kind === "live" ? { ...state, elapsedMs: event.elapsedMs } : state,
+
+  HANG_UP: (state) =>
+    state.kind === "live"
+      ? { kind: "saving", transcript: state.transcript, cutAtLimit: false }
+      : state,
+
+  // The call ends by itself at the limit — the post-call view is reached with
+  // no Hang up click (AC12) — and the run is marked cut (AC28-shaped).
+  LIMIT_REACHED: (state) =>
+    state.kind === "live"
+      ? { kind: "saving", transcript: state.transcript, cutAtLimit: true }
+      : state,
+
+  NAME_REQUIRED: (state) =>
+    state.kind === "saving"
+      ? {
+          kind: "needsName",
+          transcript: state.transcript,
+          cutAtLimit: state.cutAtLimit,
+        }
+      : state,
+
+  SAVED: (state, event) => ({
+    kind: "done",
+    runId: event.runId,
+    agentId: event.agentId,
+    hasAudio: event.hasAudio,
+    audioUrl: event.audioUrl,
+    fetchFailed: event.fetchFailed,
+    transcript: transcriptOf(state),
+    cutAtLimit: "cutAtLimit" in state ? state.cutAtLimit : false,
+  }),
+
+  SAVE_FAILED: (_state, event) => ({
+    kind: "error",
+    code: "save_failed",
+    message: event.message,
+  }),
+
+  RETRY: () => ({ kind: "idle" }),
+};
+
 export function talkReducer(state: TalkState, event: TalkEvent): TalkState {
-  switch (event.type) {
-    case "START":
-      return { kind: "connecting" };
-
-    case "MIC_DENIED":
-      // A denied mic never leaves the panel on "Connecting" and never starts a
-      // run (AC27): it falls straight to a retryable error.
-      return { kind: "error", code: "mic_denied", message: MIC_DENIED_MESSAGE };
-
-    case "MINT_FAILED":
-      return {
-        kind: "error",
-        code: event.code,
-        message:
-          event.code === "key_missing"
-            ? NO_KEY_MESSAGE
-            : `${MINT_FAILED_PREFIX}: ${event.message}`,
-      };
-
-    case "CONNECTED":
-      if (state.kind !== "connecting" && state.kind !== "live") return state;
-      return {
-        kind: "live",
-        conversationId: event.conversationId,
-        transcript: transcriptOf(state),
-        elapsedMs: state.kind === "live" ? state.elapsedMs : 0,
-      };
-
-    case "TRANSCRIPT":
-      if (state.kind !== "live") return state;
-      return { ...state, transcript: [...state.transcript, event.turn] };
-
-    case "TICK":
-      if (state.kind !== "live") return state;
-      return { ...state, elapsedMs: event.elapsedMs };
-
-    case "HANG_UP":
-      if (state.kind !== "live") return state;
-      return {
-        kind: "saving",
-        transcript: state.transcript,
-        cutAtLimit: false,
-      };
-
-    case "LIMIT_REACHED":
-      // The call ends by itself at the limit — the post-call view is reached
-      // with no Hang up click (AC12) — and the run is marked cut (AC28-shaped).
-      if (state.kind !== "live") return state;
-      return { kind: "saving", transcript: state.transcript, cutAtLimit: true };
-
-    case "NAME_REQUIRED":
-      if (state.kind !== "saving") return state;
-      return {
-        kind: "needsName",
-        transcript: state.transcript,
-        cutAtLimit: state.cutAtLimit,
-      };
-
-    case "SAVED":
-      return {
-        kind: "done",
-        runId: event.runId,
-        agentId: event.agentId,
-        hasAudio: event.hasAudio,
-        audioUrl: event.audioUrl,
-        fetchFailed: event.fetchFailed,
-        transcript: transcriptOf(state),
-        cutAtLimit: "cutAtLimit" in state ? state.cutAtLimit : false,
-      };
-
-    case "SAVE_FAILED":
-      return { kind: "error", code: "save_failed", message: event.message };
-
-    case "RETRY":
-      return { kind: "idle" };
-
-    default:
-      return state;
-  }
+  const handler = talkHandlers[event.type] as (
+    state: TalkState,
+    event: TalkEvent,
+  ) => TalkState;
+  return handler(state, event);
 }

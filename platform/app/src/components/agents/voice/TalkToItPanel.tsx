@@ -24,6 +24,7 @@ import {
   CUT_AT_LIMIT_MESSAGE,
   FETCH_FAILED_NOTICE,
   initialTalkState,
+  type TalkEvent,
   type TalkState,
   talkReducer,
 } from "./talkToItMachine";
@@ -68,6 +69,348 @@ function formatMmSs(totalSeconds: number): string {
   return `${mm}:${ss.toString().padStart(2, "0")}`;
 }
 
+/** Mutable slots the call machinery reads and writes across a session. */
+type TalkRefs = {
+  session: { current: VoiceCallSession | null };
+  startedAt: { current: number };
+  conversationId: { current: string | undefined };
+  // The signed session token from mint, carried back verbatim to finish.
+  sessionToken: { current: string | undefined };
+  maxSeconds: { current: number };
+  // The set the finished run landed in, learned from the finish response, so a
+  // scenario call links to the scenario's set rather than the voice-call set.
+  runSetId: { current: string | undefined };
+  tick: { current: ReturnType<typeof setInterval> | null };
+  createdRowId: { current: string | undefined };
+};
+
+function createTalkRefs(agentRowId: string | undefined): TalkRefs {
+  return {
+    session: { current: null },
+    startedAt: { current: 0 },
+    conversationId: { current: undefined },
+    sessionToken: { current: undefined },
+    maxSeconds: { current: 300 },
+    runSetId: { current: undefined },
+    tick: { current: null },
+    createdRowId: { current: agentRowId },
+  };
+}
+
+/** The run link the done view offers, or undefined until a run exists. */
+function runHrefOf({
+  state,
+  runSetId,
+  projectSlug,
+}: {
+  state: TalkState;
+  runSetId: string | undefined;
+  projectSlug: string;
+}): string | undefined {
+  if (state.kind !== "done" || !state.runId) return undefined;
+  return `/${projectSlug}/simulations/${
+    runSetId ?? VOICE_CALL_SCENARIO_SET_ID
+  }/${encodeURIComponent(state.runId)}`;
+}
+
+function stopTick(refs: TalkRefs): void {
+  if (refs.tick.current) {
+    clearInterval(refs.tick.current);
+    refs.tick.current = null;
+  }
+}
+
+function applyFinishFailure(
+  dispatch: (event: TalkEvent) => void,
+  data: Record<string, unknown>,
+): void {
+  if (data.code === "voice_name_required") {
+    dispatch({ type: "NAME_REQUIRED" });
+    return;
+  }
+  dispatch({
+    type: "SAVE_FAILED",
+    message:
+      typeof data.message === "string"
+        ? data.message
+        : "Could not save the call",
+  });
+}
+
+function applyFinishSuccess({
+  props,
+  refs,
+  dispatch,
+  data,
+}: {
+  props: TalkToItPanelProps;
+  refs: TalkRefs;
+  dispatch: (event: TalkEvent) => void;
+  data: Record<string, unknown>;
+}): void {
+  if (typeof data.agentId === "string" && data.agentId) {
+    refs.createdRowId.current = data.agentId;
+    if (!props.agentRowId) props.onAgentCreated?.(data.agentId);
+  }
+  if (typeof data.scenarioSetId === "string" && data.scenarioSetId) {
+    refs.runSetId.current = data.scenarioSetId;
+  }
+  dispatch({
+    type: "SAVED",
+    runId: String(data.runId ?? ""),
+    agentId: String(data.agentId ?? ""),
+    hasAudio: Boolean(data.hasAudio),
+    audioUrl: typeof data.audioUrl === "string" ? data.audioUrl : undefined,
+    fetchFailed: Boolean(data.fetchFailed),
+  });
+}
+
+async function runFinish({
+  props,
+  refs,
+  dispatch,
+  state,
+  cutAtLimit,
+  nameOverride,
+}: {
+  props: TalkToItPanelProps;
+  refs: TalkRefs;
+  dispatch: (event: TalkEvent) => void;
+  state: TalkState;
+  cutAtLimit: boolean;
+  nameOverride?: string;
+}): Promise<void> {
+  const transcript = "transcript" in state ? state.transcript : ([] as never[]);
+  const body = {
+    projectId: props.projectId,
+    sessionToken: refs.sessionToken.current ?? "",
+    name: nameOverride ?? props.name,
+    conversationId: refs.conversationId.current,
+    transcript,
+    startedAt: refs.startedAt.current || Date.now(),
+    endedAt: Date.now(),
+    cutAtLimit,
+    ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
+  };
+  const res = await fetch(
+    `/api/voice/session/${encodeURIComponent(
+      refs.conversationId.current ?? "session",
+    )}/finish`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    applyFinishFailure(dispatch, data);
+    return;
+  }
+  applyFinishSuccess({ props, refs, dispatch, data });
+}
+
+async function runEndCall({
+  refs,
+  dispatch,
+  finish,
+  cutAtLimit,
+}: {
+  refs: TalkRefs;
+  dispatch: (event: TalkEvent) => void;
+  finish: (cutAtLimit: boolean) => Promise<void>;
+  cutAtLimit: boolean;
+}): Promise<void> {
+  stopTick(refs);
+  dispatch(cutAtLimit ? { type: "LIMIT_REACHED" } : { type: "HANG_UP" });
+  try {
+    await refs.session.current?.hangUp();
+  } catch {
+    // The socket may already be closed; the finish still runs.
+  }
+  await finish(cutAtLimit);
+}
+
+/** Ask for the mic first so a denial is a clean, retryable state (AC27). */
+async function requestMic(
+  dispatch: (event: TalkEvent) => void,
+): Promise<boolean> {
+  try {
+    const media = await navigator.mediaDevices?.getUserMedia({ audio: true });
+    media?.getTracks().forEach((t) => {
+      t.stop();
+    });
+    return true;
+  } catch {
+    dispatch({ type: "MIC_DENIED" });
+    return false;
+  }
+}
+
+async function mintSession({
+  props,
+  refs,
+  dispatch,
+}: {
+  props: TalkToItPanelProps;
+  refs: TalkRefs;
+  dispatch: (event: TalkEvent) => void;
+}): Promise<MintResponse | null> {
+  try {
+    const res = await fetch("/api/voice/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        projectId: props.projectId,
+        transport: props.transport,
+        agentId: props.agentId,
+        // Undefined is dropped by JSON.stringify, so an unsaved agent sends
+        // no row id.
+        agentRowId: refs.createdRowId.current,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    if (!res.ok) {
+      dispatch({
+        type: "MINT_FAILED",
+        code: data.code === "voice_key_missing" ? "key_missing" : "mint_failed",
+        message: typeof data.message === "string" ? data.message : "Unknown",
+      });
+      return null;
+    }
+    return data as unknown as MintResponse;
+  } catch (error) {
+    dispatch({
+      type: "MINT_FAILED",
+      code: "mint_failed",
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+async function runStart({
+  props,
+  refs,
+  dispatch,
+  setMicLevel,
+  endCall,
+}: {
+  props: TalkToItPanelProps;
+  refs: TalkRefs;
+  dispatch: (event: TalkEvent) => void;
+  setMicLevel: (level: number) => void;
+  endCall: (cutAtLimit: boolean) => void;
+}): Promise<void> {
+  dispatch({ type: "START" });
+  if (!(await requestMic(dispatch))) return;
+
+  const mint = await mintSession({ props, refs, dispatch });
+  if (!mint) return;
+
+  refs.maxSeconds.current = mint.maxDurationSeconds;
+  refs.sessionToken.current = mint.sessionToken;
+  refs.startedAt.current = Date.now();
+
+  try {
+    refs.session.current = await voiceTransportClientRegistry[
+      props.transport
+    ].openCall({
+      signedUrl: mint.connect.signedUrl,
+      handlers: {
+        onConnected: ({ conversationId }) => {
+          refs.conversationId.current = conversationId;
+          dispatch({ type: "CONNECTED", conversationId });
+        },
+        onTranscript: (turn) => dispatch({ type: "TRANSCRIPT", turn }),
+        onDisconnect: () => {
+          // The provider closed the call; finish it as a normal hang-up if we
+          // have not already left the live view.
+          void endCall(false);
+        },
+        onError: (error) =>
+          dispatch({
+            type: "MINT_FAILED",
+            code: "mint_failed",
+            message: error.message,
+          }),
+      },
+    });
+  } catch (error) {
+    dispatch({
+      type: "MINT_FAILED",
+      code: "mint_failed",
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  refs.tick.current = setInterval(() => {
+    const elapsedMs = Date.now() - refs.startedAt.current;
+    dispatch({ type: "TICK", elapsedMs });
+    setMicLevel(refs.session.current?.getInputVolume?.() ?? 0);
+    if (elapsedMs >= refs.maxSeconds.current * 1000) void endCall(true);
+  }, 1000);
+}
+
+/** All the call state and callbacks the panel and its views render from. */
+function useTalkToItCall(props: TalkToItPanelProps) {
+  const [state, dispatch] = useReducer(talkReducer, initialTalkState);
+  const [micLevel, setMicLevel] = useState(0);
+  const [pendingName, setPendingName] = useState("");
+  const refsRef = useRef<TalkRefs | null>(null);
+  if (!refsRef.current) refsRef.current = createTalkRefs(props.agentRowId);
+  const refs = refsRef.current;
+
+  const finish = useCallback(
+    (cutAtLimit: boolean, nameOverride?: string) =>
+      runFinish({ props, refs, dispatch, state, cutAtLimit, nameOverride }),
+    [props, refs, state],
+  );
+  const endCall = useCallback(
+    (cutAtLimit: boolean) => runEndCall({ refs, dispatch, finish, cutAtLimit }),
+    [refs, finish],
+  );
+  const start = useCallback(
+    () => runStart({ props, refs, dispatch, setMicLevel, endCall }),
+    [props, refs, endCall],
+  );
+  const saveWithName = useCallback(
+    (cutAtLimit: boolean, name: string) => {
+      dispatch({ type: "HANG_UP" }); // back to saving
+      void finish(cutAtLimit, name);
+    },
+    [finish],
+  );
+
+  // Open the call as soon as the panel mounts: pressing "Talk to it" is the
+  // trigger, and the consent notice shows through the connecting state.
+  useEffect(() => {
+    void start();
+    return () => stopTick(refs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return {
+    state,
+    micLevel,
+    pendingName,
+    setPendingName,
+    start,
+    endCall,
+    saveWithName,
+    maxSeconds: refs.maxSeconds.current,
+    runHref: runHrefOf({
+      state,
+      runSetId: refs.runSetId.current,
+      projectSlug: props.projectSlug,
+    }),
+  };
+}
+
 /**
  * The browser call panel: idle → connecting → live → saving → done, with mic,
  * mint and fetch failures surfaced as the AC copy. Transport-agnostic — it
@@ -76,214 +419,17 @@ function formatMmSs(totalSeconds: number): string {
  * @see specs/features/agents/voice-agents-v1.feature
  */
 export function TalkToItPanel(props: TalkToItPanelProps) {
-  const [state, dispatch] = useReducer(talkReducer, initialTalkState);
-  const sessionRef = useRef<VoiceCallSession | null>(null);
-  const startedAtRef = useRef<number>(0);
-  const conversationIdRef = useRef<string | undefined>(undefined);
-  // The signed session token from mint, carried back verbatim to finish.
-  const sessionTokenRef = useRef<string | undefined>(undefined);
-  const maxSecondsRef = useRef<number>(300);
-  // The set the finished run landed in, learned from the finish response, so a
-  // scenario call links to the scenario's set rather than the voice-call set.
-  const runSetIdRef = useRef<string | undefined>(undefined);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [micLevel, setMicLevel] = useState(0);
-  const [pendingName, setPendingName] = useState("");
-  const createdRowIdRef = useRef<string | undefined>(props.agentRowId);
-
-  const clearTick = useCallback(() => {
-    if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-  }, []);
-
-  const finish = useCallback(
-    async (cutAtLimit: boolean, nameOverride?: string) => {
-      const transcript =
-        "transcript" in state ? state.transcript : ([] as never[]);
-      const body = {
-        projectId: props.projectId,
-        sessionToken: sessionTokenRef.current ?? "",
-        name: nameOverride ?? props.name,
-        conversationId: conversationIdRef.current,
-        transcript,
-        startedAt: startedAtRef.current || Date.now(),
-        endedAt: Date.now(),
-        cutAtLimit,
-        ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
-      };
-      const res = await fetch(
-        `/api/voice/session/${encodeURIComponent(
-          conversationIdRef.current ?? "session",
-        )}/finish`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
-      const data = (await res.json().catch(() => ({}))) as Record<
-        string,
-        unknown
-      >;
-      if (!res.ok) {
-        if (data.code === "voice_name_required") {
-          dispatch({ type: "NAME_REQUIRED" });
-          return;
-        }
-        dispatch({
-          type: "SAVE_FAILED",
-          message:
-            typeof data.message === "string"
-              ? data.message
-              : "Could not save the call",
-        });
-        return;
-      }
-      if (typeof data.agentId === "string" && data.agentId) {
-        createdRowIdRef.current = data.agentId;
-        if (!props.agentRowId) props.onAgentCreated?.(data.agentId);
-      }
-      if (typeof data.scenarioSetId === "string" && data.scenarioSetId) {
-        runSetIdRef.current = data.scenarioSetId;
-      }
-      dispatch({
-        type: "SAVED",
-        runId: String(data.runId ?? ""),
-        agentId: String(data.agentId ?? ""),
-        hasAudio: Boolean(data.hasAudio),
-        audioUrl: typeof data.audioUrl === "string" ? data.audioUrl : undefined,
-        fetchFailed: Boolean(data.fetchFailed),
-      });
-    },
-    [props, state],
-  );
-
-  const endCall = useCallback(
-    async (cutAtLimit: boolean) => {
-      clearTick();
-      dispatch(cutAtLimit ? { type: "LIMIT_REACHED" } : { type: "HANG_UP" });
-      try {
-        await sessionRef.current?.hangUp();
-      } catch {
-        // The socket may already be closed; the finish still runs.
-      }
-      await finish(cutAtLimit);
-    },
-    [clearTick, finish],
-  );
-
-  const start = useCallback(async () => {
-    dispatch({ type: "START" });
-    // Ask for the mic first so a denial is a clean, retryable state rather than
-    // a stuck "Connecting" (AC27).
-    try {
-      const media = await navigator.mediaDevices?.getUserMedia({ audio: true });
-      media?.getTracks().forEach((t) => {
-        t.stop();
-      });
-    } catch {
-      dispatch({ type: "MIC_DENIED" });
-      return;
-    }
-
-    let mint: MintResponse;
-    try {
-      const res = await fetch("/api/voice/session", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          projectId: props.projectId,
-          transport: props.transport,
-          agentId: props.agentId,
-          // Undefined is dropped by JSON.stringify, so an unsaved agent sends
-          // no row id.
-          agentRowId: createdRowIdRef.current,
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as Record<
-        string,
-        unknown
-      >;
-      if (!res.ok) {
-        dispatch({
-          type: "MINT_FAILED",
-          code:
-            data.code === "voice_key_missing" ? "key_missing" : "mint_failed",
-          message: typeof data.message === "string" ? data.message : "Unknown",
-        });
-        return;
-      }
-      mint = data as unknown as MintResponse;
-    } catch (error) {
-      dispatch({
-        type: "MINT_FAILED",
-        code: "mint_failed",
-        message: error instanceof Error ? error.message : String(error),
-      });
-      return;
-    }
-
-    maxSecondsRef.current = mint.maxDurationSeconds;
-    sessionTokenRef.current = mint.sessionToken;
-    startedAtRef.current = Date.now();
-
-    try {
-      sessionRef.current = await voiceTransportClientRegistry[
-        props.transport
-      ].openCall({
-        signedUrl: mint.connect.signedUrl,
-        handlers: {
-          onConnected: ({ conversationId }) => {
-            conversationIdRef.current = conversationId;
-            dispatch({ type: "CONNECTED", conversationId });
-          },
-          onTranscript: (turn) => dispatch({ type: "TRANSCRIPT", turn }),
-          onDisconnect: () => {
-            // The provider closed the call; finish it as a normal hang-up if we
-            // have not already left the live view.
-            void endCall(false);
-          },
-          onError: (error) =>
-            dispatch({
-              type: "MINT_FAILED",
-              code: "mint_failed",
-              message: error.message,
-            }),
-        },
-      });
-    } catch (error) {
-      dispatch({
-        type: "MINT_FAILED",
-        code: "mint_failed",
-        message: error instanceof Error ? error.message : String(error),
-      });
-      return;
-    }
-
-    tickRef.current = setInterval(() => {
-      const elapsedMs = Date.now() - startedAtRef.current;
-      dispatch({ type: "TICK", elapsedMs });
-      setMicLevel(sessionRef.current?.getInputVolume?.() ?? 0);
-      if (elapsedMs >= maxSecondsRef.current * 1000) void endCall(true);
-    }, 1000);
-  }, [props, endCall]);
-
-  // Open the call as soon as the panel mounts: pressing "Talk to it" is the
-  // trigger, and the consent notice shows through the connecting state.
-  useEffect(() => {
-    void start();
-    return () => clearTick();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const runHref =
-    state.kind === "done" && state.runId
-      ? `/${props.projectSlug}/simulations/${
-          runSetIdRef.current ?? VOICE_CALL_SCENARIO_SET_ID
-        }/${encodeURIComponent(state.runId)}`
-      : undefined;
+  const {
+    state,
+    micLevel,
+    pendingName,
+    setPendingName,
+    start,
+    endCall,
+    saveWithName,
+    maxSeconds,
+    runHref,
+  } = useTalkToItCall(props);
 
   return (
     <VStack align="stretch" gap={4} data-testid="talk-to-it-panel">
@@ -305,7 +451,7 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
           state={state}
           micLevel={micLevel}
           onHangUp={() => void endCall(false)}
-          maxSeconds={maxSecondsRef.current}
+          maxSeconds={maxSeconds}
         />
       )}
 
@@ -317,51 +463,77 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
       )}
 
       {state.kind === "needsName" && (
-        <VStack align="stretch" gap={2} data-testid="talk-needs-name">
-          <Text>Name this agent to save the call</Text>
-          <Input
-            value={pendingName}
-            onChange={(e) => setPendingName(e.target.value)}
-            placeholder="Enter agent name"
-            data-testid="talk-name-input"
-          />
-          <Button
-            colorPalette="blue"
-            disabled={pendingName.trim().length === 0}
-            onClick={() => {
-              dispatch({ type: "HANG_UP" }); // back to saving
-              void finish(state.cutAtLimit, pendingName.trim());
-            }}
-            data-testid="talk-name-save"
-          >
-            Save
-          </Button>
-        </VStack>
+        <NeedsNameView
+          state={state}
+          pendingName={pendingName}
+          setPendingName={setPendingName}
+          onSave={saveWithName}
+        />
       )}
 
       {state.kind === "done" && <DoneView state={state} runHref={runHref} />}
 
       {state.kind === "error" && (
-        <VStack align="stretch" gap={2} data-testid="talk-error">
-          <Text color="fg.error">{state.message}</Text>
-          {state.code === "key_missing" && (
-            <Link
-              href={MODEL_PROVIDERS_ROUTE}
-              color="blue.fg"
-              data-testid="talk-add-key"
-            >
-              Add key
-            </Link>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => void start()}
-            data-testid="talk-retry"
-          >
-            Retry
-          </Button>
-        </VStack>
+        <ErrorView state={state} onRetry={() => void start()} />
       )}
+    </VStack>
+  );
+}
+
+function NeedsNameView({
+  state,
+  pendingName,
+  setPendingName,
+  onSave,
+}: {
+  state: Extract<TalkState, { kind: "needsName" }>;
+  pendingName: string;
+  setPendingName: (value: string) => void;
+  onSave: (cutAtLimit: boolean, name: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={2} data-testid="talk-needs-name">
+      <Text>Name this agent to save the call</Text>
+      <Input
+        value={pendingName}
+        onChange={(e) => setPendingName(e.target.value)}
+        placeholder="Enter agent name"
+        data-testid="talk-name-input"
+      />
+      <Button
+        colorPalette="blue"
+        disabled={pendingName.trim().length === 0}
+        onClick={() => onSave(state.cutAtLimit, pendingName.trim())}
+        data-testid="talk-name-save"
+      >
+        Save
+      </Button>
+    </VStack>
+  );
+}
+
+function ErrorView({
+  state,
+  onRetry,
+}: {
+  state: Extract<TalkState, { kind: "error" }>;
+  onRetry: () => void;
+}) {
+  return (
+    <VStack align="stretch" gap={2} data-testid="talk-error">
+      <Text color="fg.error">{state.message}</Text>
+      {state.code === "key_missing" && (
+        <Link
+          href={MODEL_PROVIDERS_ROUTE}
+          color="blue.fg"
+          data-testid="talk-add-key"
+        >
+          Add key
+        </Link>
+      )}
+      <Button variant="outline" onClick={onRetry} data-testid="talk-retry">
+        Retry
+      </Button>
     </VStack>
   );
 }
@@ -451,7 +623,6 @@ function DoneView({
       </VStack>
       {state.audioUrl && (
         <Box data-testid="talk-play">
-          {/* biome-ignore lint/a11y/useMediaCaption: recording playback, no caption track */}
           <audio controls preload="none" src={state.audioUrl} />
         </Box>
       )}

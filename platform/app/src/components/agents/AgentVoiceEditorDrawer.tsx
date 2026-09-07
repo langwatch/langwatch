@@ -104,26 +104,93 @@ export type AgentVoiceEditorDrawerProps = {
 };
 
 // ============================================================================
-// Main Component
+// Pure helpers
 // ============================================================================
 
-/**
- * Drawer for creating/editing a voice agent.
- *
- * Mirrors {@link AgentHttpEditorDrawer}: same onSave resolution, the same
- * create/update mutations, and the same flow-callback forwarding so the run
- * dialog and the scenario editor can open it and be told about the saved
- * agent. The credential comes from the project's ElevenLabs provider row — the
- * agent stores no secret — so the drawer only says whether that key is present.
- */
-export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
-  const { project } = useOrganizationTeamProject();
-  const { closeDrawer, canGoBack, goBack } = useDrawer();
-  const complexProps = getComplexProps();
-  const drawerParams = useDrawerParams();
-  const flowCallbacksForSave = getFlowCallbacks("agentVoiceEditor");
-  const utils = api.useUtils();
+type VoiceForm = { name: string; transport: VoiceTransport; agentId: string };
 
+/**
+ * The values the form initializes to: the saved agent when editing, the draft
+ * (else empty) when creating, or null when there is nothing to seed from yet.
+ */
+function resolveInitialForm({
+  agentData,
+  isCreating,
+  isOpen,
+  projectId,
+}: {
+  agentData: { name?: string | null; config?: unknown } | undefined;
+  isCreating: boolean;
+  isOpen: boolean;
+  projectId: string;
+}): VoiceForm | null {
+  if (agentData) {
+    const config = (agentData.config ?? {}) as {
+      transport?: VoiceTransport;
+      agentId?: string;
+    };
+    return {
+      name: agentData.name ?? "",
+      transport: config.transport ?? DEFAULT_TRANSPORT,
+      agentId: config.agentId ?? "",
+    };
+  }
+  if (isCreating && isOpen && projectId) {
+    const draft = readDraft(projectId);
+    return {
+      name: draft?.name ?? "",
+      transport: draft?.transport ?? DEFAULT_TRANSPORT,
+      agentId: draft?.agentId ?? "",
+    };
+  }
+  return null;
+}
+
+/**
+ * Whether the project has an ElevenLabs key that can sign a session. The key
+ * value is never read — only whether an enabled ElevenLabs provider row carries
+ * one (or the system key).
+ */
+function hasElevenLabsKeyIn(
+  providers: readonly Record<string, unknown>[],
+): boolean {
+  return providers.some(
+    (row) =>
+      row.provider === "elevenlabs" &&
+      row.enabled &&
+      (row.isSystem ||
+        Boolean(
+          (row.customKeys as Record<string, unknown> | null | undefined)
+            ?.ELEVENLABS_API_KEY,
+        )),
+  );
+}
+
+/**
+ * Resolve the drawer inputs from its three overlapping sources: explicit props,
+ * the flow callbacks the run dialog forwards, and the drawer's URL/complex props.
+ */
+function resolveEditorInputs({
+  props,
+  closeDrawer,
+  complexProps,
+  drawerParams,
+  flowCallbacksForSave,
+}: {
+  props: AgentVoiceEditorDrawerProps;
+  closeDrawer: () => void;
+  complexProps: Record<string, unknown>;
+  drawerParams: { agentId?: string };
+  flowCallbacksForSave:
+    | { onSave?: (agent: AgentWithFields) => void }
+    | undefined;
+}): {
+  onClose: () => void;
+  onSave: AgentVoiceEditorDrawerProps["onSave"];
+  agentId: string | undefined;
+  isOpen: boolean;
+  isCreating: boolean;
+} {
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
     props.onSave ??
@@ -134,75 +201,82 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
     drawerParams.agentId ??
     (complexProps.agentId as string | undefined);
   const isOpen = props.open !== false && props.open !== undefined;
-  const isCreating = !agentId;
-  const projectId = project?.id ?? "";
+  return { onClose, onSave, agentId, isOpen, isCreating: !agentId };
+}
 
-  // Form state
+/** The Add-key detour carries the current URL back so we return with the draft. */
+function addKeyHref(): string {
+  if (typeof window === "undefined") return MODEL_PROVIDERS_ROUTE;
+  const returnTo = encodeURIComponent(window.location.href);
+  return `${MODEL_PROVIDERS_ROUTE}?returnTo=${returnTo}`;
+}
+
+/** Both required fields are filled, so the agent can be saved. */
+function isVoiceFormValid(form: {
+  name: string;
+  voiceAgentId: string;
+}): boolean {
+  return form.name.trim().length > 0 && form.voiceAgentId.trim().length > 0;
+}
+
+/** The tooltip naming whichever "Talk to it" prerequisite is still missing. */
+function talkTooltipFor({
+  voiceAgentId,
+  hasElevenLabsKey,
+}: {
+  voiceAgentId: string;
+  hasElevenLabsKey: boolean;
+}): string | undefined {
+  if (voiceAgentId.trim().length === 0) return "Enter the agent id first";
+  if (!hasElevenLabsKey) return "Add an ElevenLabs key first";
+  return undefined;
+}
+
+// ============================================================================
+// Hooks
+// ============================================================================
+
+type ApiUtils = ReturnType<typeof api.useUtils>;
+
+/** Form fields plus the effects that seed and persist them per drawer session. */
+function useVoiceFormState({
+  agentData,
+  agentId,
+  isCreating,
+  isOpen,
+  projectId,
+}: {
+  agentData: { name?: string | null; config?: unknown } | undefined;
+  agentId: string | undefined;
+  isCreating: boolean;
+  isOpen: boolean;
+  projectId: string;
+}) {
   const [name, setName] = useState("");
   const [transport, setTransport] = useState<VoiceTransport>(DEFAULT_TRANSPORT);
   const [voiceAgentId, setVoiceAgentId] = useState("");
-
-  // Talk-to-it panel state. The agent need not be saved first: the call mints
-  // from the form values, and the row is created on hang-up if it has none yet.
-  const [talkOpen, setTalkOpen] = useState(false);
-  const [createdAgentRowId, setCreatedAgentRowId] = useState<
-    string | undefined
-  >(undefined);
-
-  // Load existing agent when editing.
-  const agentQuery = api.agents.getById.useQuery(
-    { id: agentId ?? "", projectId },
-    { enabled: !!agentId && !!projectId && isOpen },
-  );
-
-  // Whether the project has an ElevenLabs key that can sign a session. The key
-  // value is never fetched — only whether an enabled ElevenLabs provider row
-  // carries one.
-  const providersQuery =
-    api.modelProvider.listAllForProjectForFrontend.useQuery(
-      { projectId },
-      { enabled: !!projectId && isOpen },
-    );
-  const hasElevenLabsKey = (providersQuery.data?.providers ?? []).some(
-    (row) =>
-      row.provider === "elevenlabs" &&
-      row.enabled &&
-      (row.isSystem ||
-        Boolean(
-          (row.customKeys as Record<string, unknown> | null | undefined)
-            ?.ELEVENLABS_API_KEY,
-        )),
-  );
-
   const formInitializedRef = useRef(false);
   const lastAgentIdRef = useRef<string | undefined>(undefined);
 
-  // Initialize the form once per drawer session: the saved agent when editing,
-  // the sessionStorage draft (else empty) when creating.
+  // Initialize once per drawer session.
   useEffect(() => {
     if (lastAgentIdRef.current !== agentId) {
       formInitializedRef.current = false;
       lastAgentIdRef.current = agentId;
     }
     if (formInitializedRef.current) return;
-
-    if (agentQuery.data) {
-      const config = agentQuery.data.config as {
-        transport?: VoiceTransport;
-        agentId?: string;
-      };
-      setName(agentQuery.data.name ?? "");
-      setTransport(config.transport ?? DEFAULT_TRANSPORT);
-      setVoiceAgentId(config.agentId ?? "");
-      formInitializedRef.current = true;
-    } else if (isCreating && isOpen && projectId) {
-      const draft = readDraft(projectId);
-      setName(draft?.name ?? "");
-      setTransport(draft?.transport ?? DEFAULT_TRANSPORT);
-      setVoiceAgentId(draft?.agentId ?? "");
-      formInitializedRef.current = true;
-    }
-  }, [agentQuery.data, agentId, isCreating, isOpen, projectId]);
+    const initial = resolveInitialForm({
+      agentData,
+      isCreating,
+      isOpen,
+      projectId,
+    });
+    if (!initial) return;
+    setName(initial.name);
+    setTransport(initial.transport);
+    setVoiceAgentId(initial.agentId);
+    formInitializedRef.current = true;
+  }, [agentData, agentId, isCreating, isOpen, projectId]);
 
   // Reset the init flag when the drawer closes so the next open re-initializes.
   useEffect(() => {
@@ -218,6 +292,27 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
     writeDraft(projectId, { name, transport, agentId: voiceAgentId });
   }, [isCreating, isOpen, projectId, name, transport, voiceAgentId]);
 
+  return {
+    name,
+    setName,
+    transport,
+    setTransport,
+    voiceAgentId,
+    setVoiceAgentId,
+  };
+}
+
+/** The create/update mutations, wired to invalidate, notify onSave and close. */
+function useVoiceAgentMutations({
+  projectId,
+  onSave,
+  onClose,
+}: {
+  projectId: string;
+  onSave: AgentVoiceEditorDrawerProps["onSave"];
+  onClose: () => void;
+}) {
+  const utils = api.useUtils();
   const createMutation = api.agents.create.useMutation({
     onSuccess: (agent) => {
       if (projectId) clearDraft(projectId);
@@ -228,7 +323,6 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
     onError: (error) =>
       showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
   });
-
   const updateMutation = api.agents.update.useMutation({
     onSuccess: (agent) => {
       void utils.agents.getAll.invalidate({ projectId });
@@ -239,70 +333,173 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
     onError: (error) =>
       showErrorToast({ error, fallbackTitle: "Couldn't save agent" }),
   });
+  return { createMutation, updateMutation, utils };
+}
+
+/** The agent (when editing) and whether the project has an ElevenLabs key. */
+function useVoiceAgentData({
+  agentId,
+  projectId,
+  isOpen,
+}: {
+  agentId: string | undefined;
+  projectId: string;
+  isOpen: boolean;
+}) {
+  const agentQuery = api.agents.getById.useQuery(
+    { id: agentId ?? "", projectId },
+    { enabled: !!agentId && !!projectId && isOpen },
+  );
+  const providersQuery =
+    api.modelProvider.listAllForProjectForFrontend.useQuery(
+      { projectId },
+      { enabled: !!projectId && isOpen },
+    );
+  const hasElevenLabsKey = hasElevenLabsKeyIn(
+    providersQuery.data?.providers ?? [],
+  );
+  return { agentQuery, hasElevenLabsKey };
+}
+
+/** Create or update the voice agent from the current form, when valid. */
+function submitVoiceAgent({
+  projectId,
+  isValid,
+  agentId,
+  form,
+  createMutation,
+  updateMutation,
+}: {
+  projectId: string;
+  isValid: boolean;
+  agentId: string | undefined;
+  form: { name: string; transport: VoiceTransport; voiceAgentId: string };
+  createMutation: ReturnType<typeof api.agents.create.useMutation>;
+  updateMutation: ReturnType<typeof api.agents.update.useMutation>;
+}): void {
+  if (!projectId || !isValid) return;
+  const config = {
+    transport: form.transport,
+    agentId: form.voiceAgentId.trim(),
+  };
+  if (agentId) {
+    updateMutation.mutate({
+      id: agentId,
+      projectId,
+      name: form.name.trim(),
+      config,
+    });
+  } else {
+    createMutation.mutate({
+      projectId,
+      name: form.name.trim(),
+      type: "voice",
+      config,
+    });
+  }
+}
+
+/**
+ * All the voice-editor state and callbacks the drawer and its views render from.
+ *
+ * Mirrors {@link AgentHttpEditorDrawer}: same onSave resolution, the same
+ * create/update mutations, and the same flow-callback forwarding so the run
+ * dialog and the scenario editor can open it and be told about the saved agent.
+ */
+function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
+  const { project } = useOrganizationTeamProject();
+  const { closeDrawer, canGoBack, goBack } = useDrawer();
+  const projectId = project?.id ?? "";
+  const { onClose, onSave, agentId, isOpen, isCreating } = resolveEditorInputs({
+    props,
+    closeDrawer,
+    complexProps: getComplexProps(),
+    drawerParams: useDrawerParams(),
+    flowCallbacksForSave: getFlowCallbacks("agentVoiceEditor"),
+  });
+
+  const [talkOpen, setTalkOpen] = useState(false);
+  const [createdAgentRowId, setCreatedAgentRowId] = useState<string>();
+
+  const { agentQuery, hasElevenLabsKey } = useVoiceAgentData({
+    agentId,
+    projectId,
+    isOpen,
+  });
+
+  const form = useVoiceFormState({
+    agentData: agentQuery.data,
+    agentId,
+    isCreating,
+    isOpen,
+    projectId,
+  });
+  const { createMutation, updateMutation, utils } = useVoiceAgentMutations({
+    projectId,
+    onSave,
+    onClose,
+  });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isValid = name.trim().length > 0 && voiceAgentId.trim().length > 0;
+  const isValid = isVoiceFormValid(form);
 
-  const handleSave = useCallback(() => {
-    if (!projectId || !isValid) return;
-    const config = { transport, agentId: voiceAgentId.trim() };
-    if (agentId) {
-      updateMutation.mutate({
-        id: agentId,
+  const handleSave = useCallback(
+    () =>
+      submitVoiceAgent({
         projectId,
-        name: name.trim(),
-        config,
-      });
-    } else {
-      createMutation.mutate({
-        projectId,
-        name: name.trim(),
-        type: "voice",
-        config,
-      });
-    }
-  }, [
-    projectId,
-    isValid,
-    transport,
-    voiceAgentId,
-    agentId,
-    name,
-    createMutation,
-    updateMutation,
-  ]);
+        isValid,
+        agentId,
+        form,
+        createMutation,
+        updateMutation,
+      }),
+    [projectId, isValid, agentId, form, createMutation, updateMutation],
+  );
 
   const handleClose = useCallback(() => {
     if (projectId) clearDraft(projectId);
     onClose();
   }, [projectId, onClose]);
 
-  // The Add-key detour carries the current URL back so the provider page can
-  // return here with the draft still in place.
-  const addKeyHref = (() => {
-    if (typeof window === "undefined") return MODEL_PROVIDERS_ROUTE;
-    const returnTo = encodeURIComponent(window.location.href);
-    return `${MODEL_PROVIDERS_ROUTE}?returnTo=${returnTo}`;
-  })();
+  return {
+    project,
+    canGoBack,
+    goBack,
+    agentId,
+    isOpen,
+    projectId,
+    form,
+    hasElevenLabsKey,
+    isSaving,
+    isValid,
+    isLoading: agentQuery.isLoading,
+    talkOpen,
+    setTalkOpen,
+    createdAgentRowId,
+    setCreatedAgentRowId,
+    handleSave,
+    handleClose,
+    utils,
+  };
+}
 
-  // Talk to it is enabled as soon as the transport's agent id is filled and the
-  // project has a key — no save-first. The tooltip names whichever is missing.
-  const canTalk = voiceAgentId.trim().length > 0 && hasElevenLabsKey;
-  const talkTooltip =
-    voiceAgentId.trim().length === 0
-      ? "Enter the agent id first"
-      : !hasElevenLabsKey
-        ? "Add an ElevenLabs key first"
-        : undefined;
+// ============================================================================
+// Main Component
+// ============================================================================
 
-  const talkAgentRowId = agentId ?? createdAgentRowId;
-
-  const transportOptionsDisabled = VOICE_TRANSPORTS.length <= 1;
+/**
+ * Drawer for creating/editing a voice agent. The credential comes from the
+ * project's ElevenLabs provider row — the agent stores no secret — so the drawer
+ * only says whether that key is present.
+ */
+export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
+  const editor = useVoiceAgentEditor(props);
+  const { form } = editor;
 
   return (
     <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && handleClose()}
+      open={editor.isOpen}
+      onOpenChange={({ open }) => !open && editor.handleClose()}
       size="lg"
       closeOnInteractOutside={false}
       modal={false}
@@ -310,176 +507,303 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
     >
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <LuArrowLeft size={20} />
-              </Button>
-            )}
-            <Heading>
-              {agentId ? "Edit Voice Agent" : "New Voice Agent"}
-            </Heading>
-          </HStack>
-        </Drawer.Header>
+        <VoiceAgentHeader
+          canGoBack={editor.canGoBack}
+          goBack={editor.goBack}
+          agentId={editor.agentId}
+        />
         <Drawer.Body
           display="flex"
           flexDirection="column"
           overflow="hidden"
           padding={0}
         >
-          {talkOpen ? (
-            <VStack
-              gap={4}
-              align="stretch"
-              flex={1}
-              overflowY="auto"
-              paddingX={6}
-              paddingY={4}
-            >
-              <Button
-                variant="ghost"
-                size="sm"
-                alignSelf="flex-start"
-                onClick={() => setTalkOpen(false)}
-                data-testid="voice-agent-talk-back"
-              >
-                <LuArrowLeft size={16} /> Back
-              </Button>
-              <TalkToItPanel
-                projectId={projectId}
-                projectSlug={project?.slug ?? ""}
-                transport={transport}
-                agentId={voiceAgentId.trim()}
-                agentRowId={talkAgentRowId}
-                name={name.trim() || undefined}
-                onAgentCreated={(rowId) => {
-                  setCreatedAgentRowId(rowId);
-                  void utils.agents.getAll.invalidate({ projectId });
-                }}
-              />
-            </VStack>
-          ) : agentId && agentQuery.isLoading ? (
+          {editor.talkOpen ? (
+            <VoiceAgentTalkView
+              project={editor.project}
+              projectId={editor.projectId}
+              transport={form.transport}
+              voiceAgentId={form.voiceAgentId}
+              name={form.name}
+              agentId={editor.agentId}
+              createdAgentRowId={editor.createdAgentRowId}
+              setCreatedAgentRowId={editor.setCreatedAgentRowId}
+              utils={editor.utils}
+              onBack={() => editor.setTalkOpen(false)}
+            />
+          ) : editor.agentId && editor.isLoading ? (
             <HStack justify="center" paddingY={8}>
               <Spinner size="md" />
             </HStack>
           ) : (
-            <VStack
-              gap={4}
-              align="stretch"
-              flex={1}
-              overflowY="auto"
-              paddingX={6}
-              paddingY={4}
-            >
-              <Field.Root required>
-                <Field.Label>Name</Field.Label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter agent name"
-                  data-testid="voice-agent-name-input"
-                />
-              </Field.Root>
-
-              <Field.Root>
-                <Field.Label>Reached via</Field.Label>
-                <NativeSelect.Root disabled={transportOptionsDisabled}>
-                  <NativeSelect.Field
-                    value={transport}
-                    onChange={(e) =>
-                      setTransport(e.target.value as VoiceTransport)
-                    }
-                    data-testid="voice-agent-transport-select"
-                  >
-                    {VOICE_TRANSPORTS.map((t) => (
-                      <option key={t} value={t}>
-                        {VOICE_TRANSPORT_LABELS[t]}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              </Field.Root>
-
-              <Field.Root required>
-                <Field.Label>Agent id</Field.Label>
-                <Input
-                  value={voiceAgentId}
-                  onChange={(e) => setVoiceAgentId(e.target.value)}
-                  placeholder="agent_..."
-                  data-testid="voice-agent-id-input"
-                />
-                <Field.HelperText>
-                  From the ElevenLabs dashboard: Agents, your agent, Agent ID
-                </Field.HelperText>
-              </Field.Root>
-
-              {/* Credentials line — the key lives on the ElevenLabs provider
-                  row, never on the agent. */}
-              {hasElevenLabsKey ? (
-                <Text fontSize="sm" color="fg.muted">
-                  Using the ElevenLabs provider key
-                </Text>
-              ) : (
-                <HStack gap={2} fontSize="sm" color="fg.muted">
-                  <Text>No ElevenLabs key in this project</Text>
-                  <Link
-                    href={addKeyHref}
-                    color="blue.fg"
-                    data-testid="voice-agent-add-key"
-                  >
-                    Add key
-                  </Link>
-                </HStack>
-              )}
-            </VStack>
+            <VoiceAgentForm
+              name={form.name}
+              setName={form.setName}
+              transport={form.transport}
+              setTransport={form.setTransport}
+              voiceAgentId={form.voiceAgentId}
+              setVoiceAgentId={form.setVoiceAgentId}
+              hasElevenLabsKey={editor.hasElevenLabsKey}
+            />
           )}
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          <HStack gap={3}>
-            <Button variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
-            {/* No `disabled` prop here: Tooltip already no-ops on empty
-                content, and toggling `disabled` would swap it between
-                returning `children` bare and wrapping them in
-                ChakraTooltip.Root, remounting the Button underneath. */}
-            <Tooltip
-              content={talkTooltip ?? ""}
-              positioning={{ placement: "top" }}
-            >
-              <Box>
-                <Button
-                  variant="outline"
-                  disabled={!canTalk}
-                  title={talkTooltip}
-                  onClick={() => setTalkOpen(true)}
-                  data-testid="voice-agent-talk"
-                >
-                  Talk to it
-                </Button>
-              </Box>
-            </Tooltip>
-            <Button
-              colorPalette="blue"
-              onClick={handleSave}
-              disabled={!isValid || isSaving}
-              loading={isSaving}
-              data-testid="save-agent-button"
-            >
-              {agentId ? "Save Changes" : "Create Agent"}
-            </Button>
-          </HStack>
-        </Drawer.Footer>
+        <VoiceAgentFooter
+          agentId={editor.agentId}
+          voiceAgentId={form.voiceAgentId}
+          hasElevenLabsKey={editor.hasElevenLabsKey}
+          isValid={editor.isValid}
+          isSaving={editor.isSaving}
+          onCancel={editor.handleClose}
+          onTalk={() => editor.setTalkOpen(true)}
+          onSave={editor.handleSave}
+        />
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+// ============================================================================
+// Presentational sub-components
+// ============================================================================
+
+function VoiceAgentHeader({
+  canGoBack,
+  goBack,
+  agentId,
+}: {
+  canGoBack: boolean;
+  goBack: () => void;
+  agentId: string | undefined;
+}) {
+  return (
+    <Drawer.Header>
+      <HStack gap={2}>
+        {canGoBack && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={goBack}
+            padding={1}
+            minWidth="auto"
+            data-testid="back-button"
+          >
+            <LuArrowLeft size={20} />
+          </Button>
+        )}
+        <Heading>{agentId ? "Edit Voice Agent" : "New Voice Agent"}</Heading>
+      </HStack>
+    </Drawer.Header>
+  );
+}
+
+function VoiceAgentTalkView({
+  project,
+  projectId,
+  transport,
+  voiceAgentId,
+  name,
+  agentId,
+  createdAgentRowId,
+  setCreatedAgentRowId,
+  utils,
+  onBack,
+}: {
+  project: { slug?: string } | null | undefined;
+  projectId: string;
+  transport: VoiceTransport;
+  voiceAgentId: string;
+  name: string;
+  agentId: string | undefined;
+  createdAgentRowId: string | undefined;
+  setCreatedAgentRowId: (rowId: string) => void;
+  utils: ApiUtils;
+  onBack: () => void;
+}) {
+  return (
+    <VStack
+      gap={4}
+      align="stretch"
+      flex={1}
+      overflowY="auto"
+      paddingX={6}
+      paddingY={4}
+    >
+      <Button
+        variant="ghost"
+        size="sm"
+        alignSelf="flex-start"
+        onClick={onBack}
+        data-testid="voice-agent-talk-back"
+      >
+        <LuArrowLeft size={16} /> Back
+      </Button>
+      <TalkToItPanel
+        projectId={projectId}
+        projectSlug={project?.slug ?? ""}
+        transport={transport}
+        agentId={voiceAgentId.trim()}
+        agentRowId={agentId ?? createdAgentRowId}
+        name={name.trim() || undefined}
+        onAgentCreated={(rowId) => {
+          setCreatedAgentRowId(rowId);
+          void utils.agents.getAll.invalidate({ projectId });
+        }}
+      />
+    </VStack>
+  );
+}
+
+function VoiceAgentForm({
+  name,
+  setName,
+  transport,
+  setTransport,
+  voiceAgentId,
+  setVoiceAgentId,
+  hasElevenLabsKey,
+}: {
+  name: string;
+  setName: (value: string) => void;
+  transport: VoiceTransport;
+  setTransport: (value: VoiceTransport) => void;
+  voiceAgentId: string;
+  setVoiceAgentId: (value: string) => void;
+  hasElevenLabsKey: boolean;
+}) {
+  const transportOptionsDisabled = VOICE_TRANSPORTS.length <= 1;
+  return (
+    <VStack
+      gap={4}
+      align="stretch"
+      flex={1}
+      overflowY="auto"
+      paddingX={6}
+      paddingY={4}
+    >
+      <Field.Root required>
+        <Field.Label>Name</Field.Label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Enter agent name"
+          data-testid="voice-agent-name-input"
+        />
+      </Field.Root>
+
+      <Field.Root>
+        <Field.Label>Reached via</Field.Label>
+        <NativeSelect.Root disabled={transportOptionsDisabled}>
+          <NativeSelect.Field
+            value={transport}
+            onChange={(e) => setTransport(e.target.value as VoiceTransport)}
+            data-testid="voice-agent-transport-select"
+          >
+            {VOICE_TRANSPORTS.map((t) => (
+              <option key={t} value={t}>
+                {VOICE_TRANSPORT_LABELS[t]}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Field.Root>
+
+      <Field.Root required>
+        <Field.Label>Agent id</Field.Label>
+        <Input
+          value={voiceAgentId}
+          onChange={(e) => setVoiceAgentId(e.target.value)}
+          placeholder="agent_..."
+          data-testid="voice-agent-id-input"
+        />
+        <Field.HelperText>
+          From the ElevenLabs dashboard: Agents, your agent, Agent ID
+        </Field.HelperText>
+      </Field.Root>
+
+      <CredentialsLine hasElevenLabsKey={hasElevenLabsKey} />
+    </VStack>
+  );
+}
+
+/** The credentials line — the key lives on the ElevenLabs provider row. */
+function CredentialsLine({ hasElevenLabsKey }: { hasElevenLabsKey: boolean }) {
+  if (hasElevenLabsKey) {
+    return (
+      <Text fontSize="sm" color="fg.muted">
+        Using the ElevenLabs provider key
+      </Text>
+    );
+  }
+  return (
+    <HStack gap={2} fontSize="sm" color="fg.muted">
+      <Text>No ElevenLabs key in this project</Text>
+      <Link
+        href={addKeyHref()}
+        color="blue.fg"
+        data-testid="voice-agent-add-key"
+      >
+        Add key
+      </Link>
+    </HStack>
+  );
+}
+
+function VoiceAgentFooter({
+  agentId,
+  voiceAgentId,
+  hasElevenLabsKey,
+  isValid,
+  isSaving,
+  onCancel,
+  onTalk,
+  onSave,
+}: {
+  agentId: string | undefined;
+  voiceAgentId: string;
+  hasElevenLabsKey: boolean;
+  isValid: boolean;
+  isSaving: boolean;
+  onCancel: () => void;
+  onTalk: () => void;
+  onSave: () => void;
+}) {
+  // Talk to it is enabled as soon as the transport's agent id is filled and the
+  // project has a key — no save-first. The tooltip names whichever is missing.
+  const canTalk = voiceAgentId.trim().length > 0 && hasElevenLabsKey;
+  const talkTooltip = talkTooltipFor({ voiceAgentId, hasElevenLabsKey });
+  return (
+    <Drawer.Footer borderTopWidth="1px" borderColor="border">
+      <HStack gap={3}>
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        {/* No `disabled` prop here: Tooltip already no-ops on empty content, and
+            toggling `disabled` would swap it between returning `children` bare and
+            wrapping them in ChakraTooltip.Root, remounting the Button underneath. */}
+        <Tooltip content={talkTooltip ?? ""} positioning={{ placement: "top" }}>
+          <Box>
+            <Button
+              variant="outline"
+              disabled={!canTalk}
+              title={talkTooltip}
+              onClick={onTalk}
+              data-testid="voice-agent-talk"
+            >
+              Talk to it
+            </Button>
+          </Box>
+        </Tooltip>
+        <Button
+          colorPalette="blue"
+          onClick={onSave}
+          disabled={!isValid || isSaving}
+          loading={isSaving}
+          data-testid="save-agent-button"
+        >
+          {agentId ? "Save Changes" : "Create Agent"}
+        </Button>
+      </HStack>
+    </Drawer.Footer>
   );
 }

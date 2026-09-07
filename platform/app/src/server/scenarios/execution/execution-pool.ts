@@ -282,22 +282,30 @@ export class ScenarioExecutionPool {
     }
   }
 
+  /**
+   * Remove and settle the first cancelled job in the pending queue, wherever it
+   * sits. Returns true when one was found (so the caller re-checks capacity),
+   * false when no cancelled job remains.
+   */
+  private skipNextCancelledPending(): boolean {
+    const cancelledIdx = this._pending.findIndex((job) =>
+      this._cancelled.has(job.scenarioRunId),
+    );
+    if (cancelledIdx === -1) return false;
+    const cancelled = this._pending.splice(cancelledIdx, 1)[0];
+    if (cancelled) {
+      logger.info(
+        { scenarioRunId: cancelled.scenarioRunId },
+        "Skipping cancelled pending job, dispatching finished(CANCELLED)",
+      );
+      this._onSkipCancelled?.(cancelled);
+    }
+    return true;
+  }
+
   private dequeueNext(): void {
     while (this._pending.length > 0 && this._running.size < this._concurrency) {
-      // A cancelled pending job is skipped wherever it sits in the queue.
-      const cancelledIdx = this._pending.findIndex((job) =>
-        this._cancelled.has(job.scenarioRunId),
-      );
-      if (cancelledIdx !== -1) {
-        const cancelled = this._pending.splice(cancelledIdx, 1)[0];
-        if (!cancelled) continue;
-        logger.info(
-          { scenarioRunId: cancelled.scenarioRunId },
-          "Skipping cancelled pending job, dispatching finished(CANCELLED)",
-        );
-        this._onSkipCancelled?.(cancelled);
-        continue;
-      }
+      if (this.skipNextCancelledPending()) continue;
 
       // Start the first job that may start now. A voice job blocked by its
       // project's cap is left in place so a runnable job behind it is not

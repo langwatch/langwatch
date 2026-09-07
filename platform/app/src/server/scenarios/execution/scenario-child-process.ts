@@ -124,16 +124,107 @@ function readTelemetryEnv(): {
   return { langwatchEndpoint, langwatchApiKey };
 }
 
+type VoiceAdapterData = Extract<
+  ChildProcessJobData["adapterData"],
+  { type: "voice" }
+>;
+
+/** The single JSON line the child writes to stdout for the parent to parse. */
+type ChildOutputResult = {
+  success: boolean;
+  reasoning?: string;
+  error?: string;
+  agentInstance?: { hostname: string; label: string | null };
+  cutAtLimit?: boolean;
+};
+
+/**
+ * Voice-only run setup: the caller metadata recorded on the run (AC20, AC24)
+ * and the whole-call limit timer that ends the call so the judge still runs on
+ * what was said (AC28). A non-voice run gets empty metadata and no timer.
+ */
+function buildVoiceRunSetup({
+  jobData,
+  adapter,
+}: {
+  jobData: ChildProcessJobData;
+  adapter: ScenarioRunner.AgentAdapter;
+}): {
+  voiceMetadata: Record<string, unknown>;
+  callLimitTimer: ReturnType<typeof createCallLimitTimer> | null;
+} {
+  const { target, adapterData } = jobData;
+  if (target.type !== "voice" || adapterData.type !== "voice") {
+    return { voiceMetadata: {}, callLimitTimer: null };
+  }
+  const callerVoice: CallerVoiceConfig =
+    jobData.callerVoice ?? DEFAULT_CALLER_VOICE;
+  const effectiveCaller = buildCallerVoiceSimulatorConfig(callerVoice);
+  const voiceMetadata = {
+    callerKind: "simulated" as const,
+    caller: {
+      voice: effectiveCaller.voice,
+      interruptProbability: callerVoice.interruptProbability,
+      effects: callerVoice.effects,
+    },
+  };
+  const callLimitTimer = createCallLimitTimer({
+    maxCallSeconds: adapterData.maxCallSeconds,
+    onLimit: () => endVoiceCallAtLimit({ adapterData, adapter }),
+  });
+  return { voiceMetadata, callLimitTimer };
+}
+
+function endVoiceCallAtLimit({
+  adapterData,
+  adapter,
+}: {
+  adapterData: VoiceAdapterData;
+  adapter: ScenarioRunner.AgentAdapter;
+}): void {
+  logger.warn("voice call reached the max duration; ending the call");
+  // End the transport gracefully so the drained transcript is judged. "Hang up
+  // now" is on the runner contract, not cast out of the adapter here.
+  void voiceTransportRegistry[adapterData.voiceTarget.transport]
+    .endCall(adapter)
+    .catch(() => {
+      // Cleanup failure must not mask the run result.
+    });
+}
+
+/** Assemble the child's stdout result from the run outcome and voice timer. */
+function buildOutputResult({
+  result,
+  callLimitTimer,
+  adapter,
+}: {
+  result: { success: boolean; reasoning?: string };
+  callLimitTimer: ReturnType<typeof createCallLimitTimer> | null;
+  adapter: ScenarioRunner.AgentAdapter;
+}): ChildOutputResult {
+  const outputResult: ChildOutputResult = { success: result.success };
+  if (result.reasoning) {
+    outputResult.reasoning = result.reasoning;
+  }
+  // The run was ended by LangWatch at the max call duration (AC28); the parent
+  // records the marker so the run header can show "Cut at the call limit".
+  if (callLimitTimer?.wasCut()) {
+    outputResult.cutAtLimit = true;
+  }
+  // The connected agent instance that answered the run's turns, for the
+  // parent's record of which process served the run.
+  if (
+    adapter instanceof SerializedConnectedAgentAdapter &&
+    adapter.servedInstance
+  ) {
+    outputResult.agentInstance = adapter.servedInstance;
+  }
+  return outputResult;
+}
+
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
-  const {
-    context,
-    scenario,
-    parameters,
-    adapterData,
-    modelParams,
-    nlpServiceUrl,
-    target,
-  } = jobData;
+  const { context, scenario, parameters, modelParams, nlpServiceUrl, target } =
+    jobData;
 
   const { langwatchEndpoint, langwatchApiKey } = readTelemetryEnv();
 
@@ -143,7 +234,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   // no need to duplicate it onto the job payload. The workflow/code
   // factories consume it as workflow.api_key; prompt and http ignore it.
   const adapter = createAdapter({
-    adapterData,
+    adapterData: jobData.adapterData,
     modelParams,
     nlpServiceUrl,
     projectApiKey: langwatchApiKey,
@@ -157,38 +248,10 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   // For a voice target, record the effective caller config on the run (AC20,
   // AC24) and arm the whole-call timer that ends the call at the limit so the
   // judge still runs on what was said (AC28).
-  const isVoiceRun = target.type === "voice" && adapterData.type === "voice";
-  const callerVoice: CallerVoiceConfig =
-    jobData.callerVoice ?? DEFAULT_CALLER_VOICE;
-  const effectiveCaller = buildCallerVoiceSimulatorConfig(callerVoice);
-  const voiceMetadata = isVoiceRun
-    ? {
-        callerKind: "simulated" as const,
-        caller: {
-          voice: effectiveCaller.voice,
-          interruptProbability: callerVoice.interruptProbability,
-          effects: callerVoice.effects,
-        },
-      }
-    : {};
-
-  const callLimitTimer =
-    isVoiceRun && adapterData.type === "voice"
-      ? createCallLimitTimer({
-          maxCallSeconds: adapterData.maxCallSeconds,
-          onLimit: () => {
-            logger.warn("voice call reached the max duration; ending the call");
-            // End the transport gracefully so the drained transcript is judged.
-            // "Hang up now" is on the runner contract, not cast out of the
-            // adapter here.
-            void voiceTransportRegistry[adapterData.voiceTarget.transport]
-              .endCall(adapter)
-              .catch(() => {
-                // Cleanup failure must not mask the run result.
-              });
-          },
-        })
-      : null;
+  const { voiceMetadata, callLimitTimer } = buildVoiceRunSetup({
+    jobData,
+    adapter,
+  });
 
   const result = await ScenarioRunner.run(
     {
@@ -248,31 +311,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 
   // Output JSON result to stdout for parent process to parse
   // Only stdout contains the JSON result; all other output goes to stderr
-  const outputResult: {
-    success: boolean;
-    reasoning?: string;
-    error?: string;
-    agentInstance?: { hostname: string; label: string | null };
-    cutAtLimit?: boolean;
-  } = {
-    success: result.success,
-  };
-  if (result.reasoning) {
-    outputResult.reasoning = result.reasoning;
-  }
-  // The run was ended by LangWatch at the max call duration (AC28); the parent
-  // records the marker so the run header can show "Cut at the call limit".
-  if (callLimitTimer?.wasCut()) {
-    outputResult.cutAtLimit = true;
-  }
-  // The connected agent instance that answered the run's turns, for the
-  // parent's record of which process served the run.
-  if (
-    adapter instanceof SerializedConnectedAgentAdapter &&
-    adapter.servedInstance
-  ) {
-    outputResult.agentInstance = adapter.servedInstance;
-  }
+  const outputResult = buildOutputResult({ result, callLimitTimer, adapter });
   // The result line is the last thing the child says. Exit once it is
   // written rather than wait for the event loop to drain: the run's adapters
   // and the SDK can leave handles open after the run, and a child that stays
