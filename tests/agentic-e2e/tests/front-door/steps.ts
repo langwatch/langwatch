@@ -19,7 +19,15 @@
  * (50 attempts / 15 minutes on `/sign-in/email` — see
  * `platform/app/src/server/better-auth/config/rate-limit.ts`).
  */
-import { expect, type Page, test } from "@playwright/test";
+import {
+  type APIRequestContext,
+  type APIResponse,
+  expect,
+  type Page,
+  type Response as PlaywrightResponse,
+  test,
+} from "@playwright/test";
+import { z } from "zod";
 import { findSignUpVerificationToken } from "./db";
 
 export const FRONT_DOOR_PASSWORD = "FrontDoorTest123!";
@@ -82,7 +90,9 @@ export async function whenIChooseAPasswordToFinishSigningUp(
     page.getByLabel("Confirm password", { exact: true }),
   ).toBeVisible();
   await page.getByLabel("Confirm password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Create account", exact: true })
+    .click();
   await expect(page.getByTestId("verification-sent")).toBeVisible({
     timeout: 15000,
   });
@@ -119,6 +129,88 @@ export async function findSignUpTokenFor(email: string): Promise<string> {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
+}
+
+/**
+ * Asks production to issue a link, then reads the token CI cannot receive by
+ * email. A missing mail provider makes the HTTP call fail after persistence;
+ * observing the row distinguishes that expected delivery failure from a
+ * failure to issue the link.
+ */
+export async function requestSignUpVerificationToken(
+  request: APIRequestContext,
+  email: string,
+): Promise<string> {
+  const response = await request.post(
+    "/api/trpc/auth.requestSignUpVerification?batch=1",
+    { data: { "0": { json: { email } } } },
+  );
+  return await signUpVerificationTokenAfterResponse(response, email);
+}
+
+const emailDeliveryIsUnconfigured = (): boolean =>
+  !process.env.EMAIL_PROVIDER &&
+  !(process.env.USE_AWS_SES === "true" && process.env.AWS_REGION) &&
+  !process.env.SENDGRID_API_KEY &&
+  !process.env.SMTP_URL &&
+  !process.env.SMTP_HOST &&
+  !process.env.RESEND_API_KEY;
+
+/** Validates the request before returning the token it persisted. */
+export async function signUpVerificationTokenAfterResponse(
+  response: APIResponse | PlaywrightResponse,
+  email: string,
+): Promise<string> {
+  const responseBody = response.ok() ? "" : await response.text();
+  const expectedDeliveryFailure =
+    response.status() === 500 && emailDeliveryIsUnconfigured();
+  if (!response.ok() && !expectedDeliveryFailure) {
+    throw new Error(
+      `requestSignUpVerification failed for ${email}: ${response.status()} ${responseBody.slice(0, 300)}`,
+    );
+  }
+
+  return await findSignUpTokenFor(email);
+}
+
+const confirmedAddressSchema = z.object({
+  addressProof: z.string().min(1),
+  email: z.string().email(),
+});
+
+/**
+ * Proves a fresh address through the same public endpoints as the sign-up UI.
+ * CI has no inbox, so the token is read through `findSignUpTokenFor`; the
+ * token is still minted, spent and exchanged for its single-use address proof
+ * by production code.
+ */
+export async function requestSignUpAddressProof(
+  request: APIRequestContext,
+  email: string,
+): Promise<string> {
+  const token = await requestSignUpVerificationToken(request, email);
+  const confirmationResponse = await request.post(
+    "/api/auth/sign-up/confirm-address",
+    {
+      data: { token },
+      headers: betterAuthRequestHeaders(),
+    },
+  );
+  const confirmationBody: unknown = await confirmationResponse
+    .json()
+    .catch(() => null);
+  const confirmation = confirmedAddressSchema.safeParse(confirmationBody);
+  if (
+    !confirmationResponse.ok() ||
+    !confirmation.success ||
+    confirmation.data.email !== email
+  ) {
+    throw new Error(
+      `confirm-address failed for ${email}: ${confirmationResponse.status()} ${JSON.stringify(confirmationBody).slice(0, 300)}`,
+    );
+  }
+
+  return confirmation.data.addressProof;
 }
 
 /**
@@ -197,7 +289,11 @@ export async function givenMyAccountHasAWorkspace(page: Page): Promise<void> {
       encodeURIComponent(JSON.stringify({ "0": { json: {} } })),
   );
   const data = (await getAll.json().catch(() => null)) as {
-    "0"?: { result?: { data?: { json?: Array<{ teams?: Array<{ projects?: unknown[] }> }> } } };
+    "0"?: {
+      result?: {
+        data?: { json?: Array<{ teams?: Array<{ projects?: unknown[] }> }> };
+      };
+    };
   } | null;
   const orgs = data?.["0"]?.result?.data?.json ?? [];
   const hasProject = orgs.some((o) =>
@@ -221,7 +317,10 @@ export async function givenMyAccountHasAWorkspace(page: Page): Promise<void> {
     },
   );
   const result = await response.json().catch(() => null);
-  if (!response.ok() || (result as { "0"?: { error?: unknown } })?.["0"]?.error) {
+  if (
+    !response.ok() ||
+    (result as { "0"?: { error?: unknown } })?.["0"]?.error
+  ) {
     throw new Error(
       `initializeOrganization failed: ${response.status()} ${JSON.stringify(result).slice(0, 300)}`,
     );
@@ -247,9 +346,7 @@ export async function thenIAmCalledByMyEmailNeverNull(
   // account — and a modal's backdrop swallows the click on the user menu
   // behind it. Answer them the way a person in a hurry does, then carry on.
   await whenIDeclineWhatTheShellOffersFirst(page);
-  await page
-    .getByRole("button", { name: /Open user menu/ })
-    .click();
+  await page.getByRole("button", { name: /Open user menu/ }).click();
   const group = page.getByText(new RegExp(`\\(${escapeRegExp(email)}\\)`));
   await expect(group).toBeVisible({ timeout: 10000 });
   await expect(group).not.toContainText("null");
@@ -319,7 +416,8 @@ function escapeRegExp(value: string): string {
 // =============================================================================
 
 /**
- * Registers a fresh account directly (no UI), the way `auth.setup.ts` does.
+ * Registers a fresh account directly (no UI), after proving its address
+ * through the same confirmation endpoint as the sign-up screen.
  * No `name` is sent — `user.register`'s schema treats it as optional rather
  * than nullable (`z.string().min(1).optional()`, so an empty string would be
  * REFUSED, not accepted), and omitting it is exactly the shape a passkey or
@@ -327,11 +425,15 @@ function escapeRegExp(value: string): string {
  */
 export async function givenARegisteredAccount(
   page: Page,
-  { email, password = FRONT_DOOR_PASSWORD }: { email: string; password?: string },
+  {
+    email,
+    password = FRONT_DOOR_PASSWORD,
+  }: { email: string; password?: string },
 ): Promise<void> {
+  const addressProof = await requestSignUpAddressProof(page.request, email);
   const response = await page.request.post("/api/trpc/user.register?batch=1", {
     data: {
-      "0": { json: { email, password } },
+      "0": { json: { addressProof, email, password } },
     },
   });
   if (!response.ok()) {
@@ -374,7 +476,10 @@ export async function whenIEnterMyPasswordToSignIn(
 /** The whole address -> password -> in journey, in one call. */
 export async function whenISignInWithPassword(
   page: Page,
-  { email, password = FRONT_DOOR_PASSWORD }: { email: string; password?: string },
+  {
+    email,
+    password = FRONT_DOOR_PASSWORD,
+  }: { email: string; password?: string },
 ): Promise<void> {
   await givenIAmOnTheSignInScreen(page);
   await whenIEnterMyAddressToSignIn(page, email);
@@ -421,7 +526,11 @@ export async function thenNoErrorFlashAppears(page: Page): Promise<void> {
  */
 export async function whenISignInAndOutSeveralTimes(
   page: Page,
-  { email, password, times }: { email: string; password: string; times: number },
+  {
+    email,
+    password,
+    times,
+  }: { email: string; password: string; times: number },
 ): Promise<void> {
   for (let i = 0; i < times; i++) {
     await whenISignInWithPassword(page, { email, password });
