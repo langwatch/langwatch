@@ -29,7 +29,7 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   //
   // `inviteLanding` is the only one that returns anything tenant-shaped (an
   // organization name and the inviter's name). The invite code IS the
-  // authorization, exactly as in `organization.acceptInvite`, and a revoked
+  // authorization, exactly as in `invite.acceptInvite`, and a revoked
   // invitation is answered identically to a missing one.
   "auth.inviteLanding",
   "auth.requestFreshInvite",
@@ -47,6 +47,7 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
 describe("tRPC public surface", () => {
   describe("when enumerating procedures that skip authentication", () => {
     /** @scenario Adding a new public endpoint is a deliberate, reviewed act */
+    /** @scenario Invitation RPCs have one dedicated namespace */
     it("matches the reviewed allowlist exactly", () => {
       const procedures = (
         appRouter as unknown as {
@@ -60,6 +61,31 @@ describe("tRPC public surface", () => {
         .sort();
 
       expect(publicPaths).toEqual([...PUBLIC_PROCEDURE_ALLOWLIST].sort());
+
+      const paths = Object.keys(procedures);
+      expect(paths).toEqual(
+        expect.arrayContaining([
+          "invite.createInvites",
+          "invite.deleteInvite",
+          "invite.resendInvite",
+          "invite.getOrganizationPendingInvites",
+          "invite.acceptInvite",
+        ]),
+      );
+      const retiredPaths = [
+        "organization.createInvites",
+        "organization.deleteInvite",
+        "organization.resendInvite",
+        "organization.getOrganizationPendingInvites",
+        "organization.acceptInvite",
+        "organization.createInviteRequest",
+        "organization.approveInvite",
+        "invite.createInviteRequest",
+        "invite.approveInvite",
+      ];
+      for (const path of retiredPaths) {
+        expect(paths).not.toContain(path);
+      }
     });
 
     /** @scenario Knowing a shared trace's id is not enough to read it */

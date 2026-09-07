@@ -308,7 +308,7 @@ export const authRouter = createTRPCRouter({
    * role, no membership.
    *
    * A revoked invitation reads exactly like a missing one, the same way
-   * `organization.acceptInvite` answers it: the journey ends quietly.
+   * `invite.acceptInvite` answers it: the journey ends quietly.
    * Expired is different, because it is recoverable in one click by the
    * inviter (D11).
    */

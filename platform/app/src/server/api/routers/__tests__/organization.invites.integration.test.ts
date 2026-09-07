@@ -342,7 +342,7 @@ describe("Organization Invites Integration", () => {
           },
         ]);
 
-        const result = await caller.organization.acceptInvite({
+        const result = await caller.invite.acceptInvite({
           inviteCode: invite.inviteCode,
         });
 
@@ -380,7 +380,7 @@ describe("Organization Invites Integration", () => {
           },
         ]);
 
-        await caller.organization.acceptInvite({
+        await caller.invite.acceptInvite({
           inviteCode: invite.inviteCode,
         });
 
@@ -415,7 +415,7 @@ describe("Organization Invites Integration", () => {
           },
         ]);
 
-        const result = await caller.organization.acceptInvite({
+        const result = await caller.invite.acceptInvite({
           inviteCode: invite.inviteCode,
         });
 
@@ -436,7 +436,7 @@ describe("Organization Invites Integration", () => {
         const invite = await createPendingInvite(email);
         const { user, caller } = await createInvitee(email);
 
-        await caller.organization.acceptInvite({
+        await caller.invite.acceptInvite({
           inviteCode: invite.inviteCode,
         });
 
@@ -473,7 +473,7 @@ describe("Organization Invites Integration", () => {
         const { caller } = await createInvitee(email);
 
         await expect(
-          caller.organization.acceptInvite({ inviteCode: invite.inviteCode }),
+          caller.invite.acceptInvite({ inviteCode: invite.inviteCode }),
         ).rejects.toMatchObject({ code: "NOT_FOUND" });
         const untouched = await prisma.organizationInvite.findUnique({
           where: { id: invite.id },
@@ -510,7 +510,7 @@ describe("Organization Invites Integration", () => {
         );
         mockSendInviteEmail.mockResolvedValue(undefined);
 
-        const result = await adminCaller.organization.resendInvite({
+        const result = await adminCaller.invite.resendInvite({
           inviteId: invite.id,
           organizationId,
         });
@@ -534,7 +534,7 @@ describe("Organization Invites Integration", () => {
           `invitee-${testNamespace}-stale@acme.com`,
         );
         mockSendInviteEmail.mockResolvedValue(undefined);
-        await adminCaller.organization.resendInvite({
+        await adminCaller.invite.resendInvite({
           inviteId: invite.id,
           organizationId,
         });
@@ -552,7 +552,7 @@ describe("Organization Invites Integration", () => {
         await expect(
           appRouter
             .createCaller(ctx)
-            .organization.acceptInvite({ inviteCode: invite.inviteCode }),
+            .invite.acceptInvite({ inviteCode: invite.inviteCode }),
         ).rejects.toMatchObject({ code: "NOT_FOUND" });
       });
     });
@@ -564,7 +564,7 @@ describe("Organization Invites Integration", () => {
         const invite = await createExpiredInvite(email);
         mockSendInviteEmail.mockResolvedValue(undefined);
 
-        const resent = await adminCaller.organization.resendInvite({
+        const resent = await adminCaller.invite.resendInvite({
           inviteId: invite.id,
           organizationId,
         });
@@ -581,7 +581,7 @@ describe("Organization Invites Integration", () => {
         });
         const result = await appRouter
           .createCaller(ctx)
-          .organization.acceptInvite({
+          .invite.acceptInvite({
             inviteCode: resent.invite.inviteCode,
           });
 
@@ -604,7 +604,7 @@ describe("Organization Invites Integration", () => {
           new Error("Email service unavailable"),
         );
 
-        const result = await adminCaller.organization.resendInvite({
+        const result = await adminCaller.invite.resendInvite({
           inviteId: invite.id,
           organizationId,
         });
@@ -634,7 +634,7 @@ describe("Organization Invites Integration", () => {
           },
         });
 
-        await adminCaller.organization.deleteInvite({
+        await adminCaller.invite.deleteInvite({
           inviteId: invite.id,
           organizationId,
         });
@@ -657,7 +657,7 @@ describe("Organization Invites Integration", () => {
         await expect(
           appRouter
             .createCaller(ctx)
-            .organization.acceptInvite({ inviteCode: invite.inviteCode }),
+            .invite.acceptInvite({ inviteCode: invite.inviteCode }),
         ).rejects.toMatchObject({ code: "NOT_FOUND" });
       });
     });
@@ -707,7 +707,7 @@ describe("Organization Invites Integration", () => {
         });
 
         const invites =
-          await adminCaller.organization.getOrganizationPendingInvites({
+          await adminCaller.invite.getOrganizationPendingInvites({
             organizationId,
           });
 
@@ -739,7 +739,7 @@ describe("Organization Invites Integration", () => {
           callOrder.push("email-sent");
         });
 
-        const results = await adminCaller.organization.createInvites({
+        const results = await adminCaller.invite.createInvites({
           organizationId,
           invites: [
             { email: "batch-a@example.com", role: "MEMBER", teamIds: teamId },
@@ -767,7 +767,7 @@ describe("Organization Invites Integration", () => {
           .mockResolvedValueOnce(undefined) // first email succeeds
           .mockRejectedValueOnce(new Error("SMTP failure")); // second email fails
 
-        const results = await adminCaller.organization.createInvites({
+        const results = await adminCaller.invite.createInvites({
           organizationId,
           invites: [
             { email: "ok-email@example.com", role: "MEMBER", teamIds: teamId },

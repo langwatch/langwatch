@@ -73,6 +73,8 @@ vi.mock("~/utils/api", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+      },
+      invite: {
         getOrganizationPendingInvites: {
           useQuery: () => ({
             ...setup.mockGetPendingInvites(),
