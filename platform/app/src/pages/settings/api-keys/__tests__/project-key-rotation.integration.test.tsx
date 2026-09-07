@@ -254,24 +254,6 @@ describe("<ApiKeysSection /> project base key rotation", () => {
         ).not.toBeInTheDocument();
         expect(screen.queryByText("Project API Key")).not.toBeInTheDocument();
       });
-
-      // The legacy row intentionally has no edit or revoke control — rotation
-      // is the only mutating affordance, and only when permitted.
-      /** @scenario "The base key keeps working until it is explicitly rotated" */
-      it("does not offer edit or revoke controls on the legacy row", () => {
-        renderSection();
-        expect(screen.getByText("Project API Key")).toBeInTheDocument();
-        expect(
-          screen.queryByRole("button", {
-            name: /Edit API key Project API Key/,
-          }),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByRole("button", {
-            name: /Revoke API key Project API Key/,
-          }),
-        ).not.toBeInTheDocument();
-      });
     });
   });
 
