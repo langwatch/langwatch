@@ -1662,67 +1662,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/langy/web/src/behavior/langy-chip-context.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/behavior/langy-context-target.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/behavior/langy-local-control.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/langy/web/src/behavior/langy.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/behavior/use-global-langy-shortcut.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/behavior/use-langy-context-target.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/behavior/use-langy-orb-proximity.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/derived-cards/use-choices-ref-rows.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/logic/langy-chat-transport.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/logic/langy-time-travel.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/stores/langy-dev-log.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/use-langy-conversation-update-listener.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/use-langy-stick-to-bottom.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/use-langy-turn-recovery.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/model/logic/langy-tool-failure.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/model/logic/langy-tool-label.ts",
       "measured": "2026-09-06"
     },
     {
@@ -1774,43 +1714,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/sections/langy-tool-error-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/sections/message-content.tsx",
       "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/sections/recent-chats-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-answer-segments.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-capability-registry.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-choices-timeline.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-cli-follow-ups.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-plan.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-question-tool.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-trace-explorer-link.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4010,30 +3918,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/features/langy/web/src/behavior/langy-chip-context.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/langy/web/src/features/langy/behavior/data/use-langy-messages.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/langy/web/src/features/langy/behavior/logic/langy-error-explainer.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/langy/web/src/features/langy/behavior/logic/langy-time-travel.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/langy/web/src/features/langy/behavior/use-capability-data.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/langy/web/src/features/langy/model/logic/langy-tool-failure.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-dataset-card.tsx",
       "measured": "2026-09-06"
     },
@@ -4043,10 +3927,6 @@
     },
     {
       "key": "complexity|packages/features/langy/web/src/features/langy/ui/sections/message-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/langy/web/src/model/langy-local-waits.ts",
       "measured": "2026-09-06"
     },
     {

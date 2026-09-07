@@ -5,22 +5,27 @@ import { useEffect } from "react";
  * traces-v2. preventDefault claims it for the page when keyboard focus is inside the
  * document.
  */
+/** `⌘I` / `Ctrl+I`, with no modifier riders. */
+function isShortcutKey(event: KeyboardEvent): boolean {
+  const isAccel = event.metaKey || event.ctrlKey;
+  return isAccel && (event.key === "i" || event.key === "I") && !event.altKey && !event.shiftKey;
+}
+
+/** A text field with an active selection is claiming the key for itself. */
+function hasActiveTextSelection(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const isTextInput =
+    target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+  if (!isTextInput) return false;
+  const sel = window.getSelection?.();
+  return Boolean(sel && sel.toString().length > 0);
+}
+
 export function useGlobalLangyShortcut(onTrigger: () => void): void {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      const isAccel = event.metaKey || event.ctrlKey;
-      if (!isAccel) return;
-      if (event.key !== "i" && event.key !== "I") return;
-      if (event.altKey || event.shiftKey) return;
-      const target = event.target;
-      if (target instanceof HTMLElement) {
-        const isTextInput =
-          target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
-        if (isTextInput) {
-          const sel = window.getSelection?.();
-          if (sel && sel.toString().length > 0) return;
-        }
-      }
+      if (!isShortcutKey(event)) return;
+      if (hasActiveTextSelection(event.target)) return;
       event.preventDefault();
       onTrigger();
     };

@@ -30,6 +30,52 @@ function pushQuestionToolCards(part: unknown, timeline: LangyChoicesTimelineEntr
   return pushedAny;
 }
 
+/** Every choices card (block or `question`-tool) an assistant message carries, in order. */
+function pushAssistantChoicesCards(
+  parts: readonly unknown[],
+  timeline: LangyChoicesTimelineEntry[],
+): boolean {
+  let sawQuestion = false;
+  for (const part of parts) {
+    const card = parseLangyCardPart(part);
+    if (card && card.card.kind === "choices") {
+      timeline.push({ kind: "question", blockId: card.blockId });
+      sawQuestion = true;
+      continue;
+    }
+    // The agent's `question` TOOL asks the same way a choices block does (see
+    // langyQuestionTool.ts) — its cards must appear on the timeline or the
+    // lock derivation would call them "never recorded" and render every one
+    // permanently closed.
+    const pushedQuestionToolCards =
+      isQuestionToolPart(part) && pushQuestionToolCards(part, timeline);
+    if (pushedQuestionToolCards) {
+      sawQuestion = true;
+    }
+  }
+  return sawQuestion;
+}
+
+/** Every choice-selection reply a user message carries, in order. */
+function pushUserSelections(
+  parts: readonly unknown[],
+  timeline: LangyChoicesTimelineEntry[],
+): boolean {
+  let sawSelection = false;
+  for (const part of parts) {
+    const selection = parseLangyChoiceSelectionPart(part);
+    if (!selection) continue;
+    timeline.push({
+      kind: "selection",
+      blockId: selection.blockId,
+      optionIds: selection.optionIds,
+      ...(selection.otherText !== void 0 ? { otherText: selection.otherText } : {}),
+    });
+    sawSelection = true;
+  }
+  return sawSelection;
+}
+
 export function langyChoicesTimeline(
   messages: readonly MessageLike[],
 ): LangyChoicesTimelineEntry[] {
@@ -39,41 +85,12 @@ export function langyChoicesTimeline(
     const parts = message.parts ?? [];
 
     if (message.role === "assistant") {
-      let sawQuestion = false;
-      for (const part of parts) {
-        const card = parseLangyCardPart(part);
-        if (card && card.card.kind === "choices") {
-          timeline.push({ kind: "question", blockId: card.blockId });
-          sawQuestion = true;
-          continue;
-        }
-        // The agent's `question` TOOL asks the same way a choices block does
-        // (see langyQuestionTool.ts) — its cards must appear on the timeline
-        // or the lock derivation would call them "never recorded" and render
-        // every one permanently closed.
-        const pushedCards = isQuestionToolPart(part) && pushQuestionToolCards(part, timeline);
-        if (pushedCards) {
-          sawQuestion = true;
-        }
-      }
-      if (!sawQuestion) timeline.push({ kind: "message" });
+      if (!pushAssistantChoicesCards(parts, timeline)) timeline.push({ kind: "message" });
       continue;
     }
 
     if (message.role === "user") {
-      let sawSelection = false;
-      for (const part of parts) {
-        const selection = parseLangyChoiceSelectionPart(part);
-        if (!selection) continue;
-        timeline.push({
-          kind: "selection",
-          blockId: selection.blockId,
-          optionIds: selection.optionIds,
-          ...(selection.otherText !== void 0 ? { otherText: selection.otherText } : {}),
-        });
-        sawSelection = true;
-      }
-      if (!sawSelection) timeline.push({ kind: "message" });
+      if (!pushUserSelections(parts, timeline)) timeline.push({ kind: "message" });
       continue;
     }
 

@@ -92,6 +92,67 @@ function parseQuestions(input: unknown) {
   });
 }
 
+type RawQuestion = z.infer<typeof rawQuestionSchema>;
+
+/** The options a raw question carries, filtered to the ones with a usable label. */
+function questionCardOptions(raw: RawQuestion): LangyDerivedChoicesCard["options"] {
+  const parsedOptions = z.array(rawQuestionOptionSchema).safeParse(raw.options);
+  return (parsedOptions.success ? parsedOptions.data : [])
+    .flatMap((option) => {
+      if (typeof option.label !== "string" || option.label.trim() === "") return [];
+      return [{ label: option.label, description: option.description }];
+    })
+    .map((option, optionIndex) => ({
+      id: `opt-${optionIndex + 1}`,
+      label: option.label,
+      ...(typeof option.description === "string" && option.description.trim() !== ""
+        ? { description: option.description }
+        : {}),
+    }));
+}
+
+/** One question, index-scoped, turned into its stamped choices card part (or null when
+ *  it has no question text or no usable options). */
+function buildQuestionCardPart({
+  raw,
+  index,
+  toolCallId,
+}: {
+  raw: RawQuestion;
+  index: number;
+  toolCallId: string | undefined;
+}): LangyCardPart | null {
+  // `question` is the full text; `header` is the tool's short label. The card
+  // has one line, so the full text wins and the header only stands in when
+  // the model sent nothing else.
+  const question = firstNonEmpty([raw.question, raw.header]);
+  if (!question) return null;
+
+  const options = questionCardOptions(raw);
+  if (options.length === 0) return null;
+
+  // Stable across renders and rehydration: the recorded selection binds by
+  // this id, so it must derive from the part's own durable identity.
+  const blockId = `question:${toolCallId ?? question}:${index}`;
+  const card: LangyDerivedChoicesCard = {
+    kind: "choices",
+    blockId,
+    question,
+    options,
+    ...(raw.multiple === true ? { multiSelect: true } : {}),
+    // The tool's TUI always accepts a typed answer; only an explicit
+    // `custom: false` closes that door here.
+    ...(raw.custom !== false ? { allowOther: true } : {}),
+  };
+  return parseLangyCardPart({
+    type: "langy-card",
+    blockId,
+    kind: "choices",
+    provenance: "derived",
+    card,
+  });
+}
+
 /**
  * The stamped card parts a `question` tool call renders as — one choices card per
  * question it carries.
@@ -104,55 +165,10 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
   if (!COMPLETE_INPUT_STATES.has(toolPart.state ?? "")) return [];
 
   const rawQuestions = parseQuestions(toolPart.input);
-
-  const cards: LangyCardPart[] = [];
-  rawQuestions.forEach((raw, index) => {
-    // `question` is the full text; `header` is the tool's short label. The
-    // card has one line, so the full text wins and the header only stands in
-    // when the model sent nothing else.
-    const question = firstNonEmpty([raw.question, raw.header]);
-    if (!question) return;
-
-    const parsedOptions = z.array(rawQuestionOptionSchema).safeParse(raw.options);
-    const options = (parsedOptions.success ? parsedOptions.data : [])
-      .flatMap((option) => {
-        if (typeof option.label !== "string" || option.label.trim() === "") {
-          return [];
-        }
-        return [{ label: option.label, description: option.description }];
-      })
-      .map((option, optionIndex) => ({
-        id: `opt-${optionIndex + 1}`,
-        label: option.label,
-        ...(typeof option.description === "string" && option.description.trim() !== ""
-          ? { description: option.description }
-          : {}),
-      }));
-    if (options.length === 0) return;
-
-    // Stable across renders and rehydration: the recorded selection binds by
-    // this id, so it must derive from the part's own durable identity.
-    const blockId = `question:${toolPart.toolCallId ?? question}:${index}`;
-    const card: LangyDerivedChoicesCard = {
-      kind: "choices",
-      blockId,
-      question,
-      options,
-      ...(raw.multiple === true ? { multiSelect: true } : {}),
-      // The tool's TUI always accepts a typed answer; only an explicit
-      // `custom: false` closes that door here.
-      ...(raw.custom !== false ? { allowOther: true } : {}),
-    };
-    const parsed = parseLangyCardPart({
-      type: "langy-card",
-      blockId,
-      kind: "choices",
-      provenance: "derived",
-      card,
-    });
-    if (parsed) cards.push(parsed);
+  return rawQuestions.flatMap((raw, index) => {
+    const cardPart = buildQuestionCardPart({ raw, index, toolCallId: toolPart.toolCallId });
+    return cardPart ? [cardPart] : [];
   });
-  return cards;
 }
 
 /**

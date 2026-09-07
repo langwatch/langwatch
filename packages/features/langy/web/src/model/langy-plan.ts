@@ -193,6 +193,69 @@ function normaliseItem(item: { content: string; status: string }): LangyPlanItem
   return { content: cleanPlanContent(item.content), status: normalisePlanStatus(item.status) };
 }
 
+/** The latest valid todo snapshot from the tool parts, or null when none parsed. */
+function latestTodoSnapshot(parts: readonly unknown[]): LangyPlanItem[] | null {
+  let derived: LangyPlanItem[] | null = null;
+  for (const part of parts) {
+    if (!isPlanToolPart(part)) continue;
+    const parsed = parseTodoList(tryReadPartInput(part));
+    if (parsed && parsed.length > 0) derived = parsed;
+  }
+  return derived;
+}
+
+/**
+ * Walks the stream, tracking which LATEST-list item is currently in-progress, and
+ * attributes every non-plan tool call to that item (or to the preamble before any
+ * item became active).
+ */
+function attributePartsToItems(
+  parts: readonly unknown[],
+  items: LangyPlanItem[],
+): { itemParts: unknown[][]; preamble: unknown[] } {
+  const itemParts: unknown[][] = items.map(() => []);
+  const preamble: unknown[] = [];
+  let currentItemIndex = -1;
+
+  for (const part of parts) {
+    if (isPlanToolPart(part)) {
+      currentItemIndex = nextCurrentItemIndex({ part, items, currentItemIndex });
+      continue;
+    }
+    if (tryReadToolName(part) === void 0) continue; // not a tool call
+
+    const item = itemParts[currentItemIndex];
+    if (currentItemIndex >= 0 && item) {
+      item.push(part);
+    } else {
+      preamble.push(part);
+    }
+  }
+  return { itemParts, preamble };
+}
+
+/** Re-derives the current item index from one plan-tool part's snapshot, or keeps it. */
+function nextCurrentItemIndex({
+  part,
+  items,
+  currentItemIndex,
+}: {
+  part: unknown;
+  items: LangyPlanItem[];
+  currentItemIndex: number;
+}): number {
+  const snapshot = parseTodoList(tryReadPartInput(part));
+  if (!snapshot) return currentItemIndex;
+  const ip = inProgressIndex(snapshot);
+  if (ip === -1) return currentItemIndex;
+  // Map the snapshot's in-progress item onto the latest list by content: a call
+  // made while step 2 ran belongs to step 2 even now that it reads "completed".
+  // An item whose text has since changed falls to preamble.
+  const currentItem = snapshot[ip];
+  if (!currentItem) return currentItemIndex;
+  return items.findIndex((item) => item.content === currentItem.content);
+}
+
 /**
  * Fold a message's tool parts into the plan it was following, or null when the agent
  * never maintained a todo list (⇒ no checklist, today's rendering).
@@ -212,12 +275,7 @@ export function langyPlan(
 
   // The latest valid snapshot from the tool parts (used for attribution, and as
   // the plan itself when there is no typed override).
-  let derived: LangyPlanItem[] | null = null;
-  for (const part of parts) {
-    if (!isPlanToolPart(part)) continue;
-    const parsed = parseTodoList(tryReadPartInput(part));
-    if (parsed && parsed.length > 0) derived = parsed;
-  }
+  const derived = latestTodoSnapshot(parts);
 
   const override =
     opts?.overrideItems && opts.overrideItems.length > 0
@@ -227,36 +285,7 @@ export function langyPlan(
   const items = fresherSnapshot({ override, derived });
   if (!items || items.length === 0) return null;
 
-  const itemParts: unknown[][] = items.map(() => []);
-  const preamble: unknown[] = [];
-
-  // Walk the stream, tracking which LATEST-list item is currently in-progress.
-  let currentItemIndex = -1;
-  for (const part of parts) {
-    if (isPlanToolPart(part)) {
-      const snapshot = parseTodoList(tryReadPartInput(part));
-      if (!snapshot) continue;
-      const ip = inProgressIndex(snapshot);
-      if (ip !== -1) {
-        // Map the snapshot's in-progress item onto the latest list by content:
-        // a call made while step 2 ran belongs to step 2 even now that it reads
-        // "completed". An item whose text has since changed falls to preamble.
-        const currentItem = snapshot[ip];
-        if (currentItem) {
-          currentItemIndex = items.findIndex((item) => item.content === currentItem.content);
-        }
-      }
-      continue;
-    }
-    if (tryReadToolName(part) === void 0) continue; // not a tool call
-
-    const item = itemParts[currentItemIndex];
-    if (currentItemIndex >= 0 && item) {
-      item.push(part);
-    } else {
-      preamble.push(part);
-    }
-  }
+  const { itemParts, preamble } = attributePartsToItems(parts, items);
 
   const completedCount = items.filter((it) => it.status === "completed").length;
   const totalCount = items.filter((it) => it.status !== "cancelled").length;

@@ -10,6 +10,8 @@ import { api } from "../../../behavior/langy-api.ts";
 import {
   CAPABILITY_HYDRATORS,
   type CapabilityHydratedRow,
+  type CapabilityHydration,
+  type CapabilityHydrator,
 } from "./capabilities/capability-hydrators.ts";
 import type { CapabilityCommand } from "../../../model/langy-capability-digest.ts";
 
@@ -57,18 +59,14 @@ function hydrationMode({
   return canHydrateByQuery ? ("query" as const) : null;
 }
 
-export function useCapabilityData({
+/** Everything the fetch needs to decide: what resource, how to fetch it, and with what
+ *  ids/query — resolved once from the command + digest so the hook body is a straight
+ *  read of the result. */
+function resolveHydrationInputs({
   command,
   digest,
-  maxRows = DEFAULT_MAX_ROWS,
-}: CapabilityDataInput): CapabilityData {
-  const utils = api.useUtils();
-  // The viewer's CURRENT project, from the one authoritative context — never a
-  // prop, so a card can't be handed some other project's id and quietly break
-  // isolation. (The procedures re-check permissions server-side regardless.)
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? null;
-
+  maxRows,
+}: Pick<CapabilityDataInput, "command" | "digest"> & { maxRows: number }) {
   const resource = digest?.resource ?? command?.resource ?? null;
   const hydrator = resource ? CAPABILITY_HYDRATORS[resource] : undefined;
 
@@ -91,21 +89,90 @@ export function useCapabilityData({
   const canHydrateByQuery = Boolean(query && hydrator?.byQuery);
   const mode = hydrationMode({ canHydrateByIds, canHydrateByQuery });
 
+  return { resource, hydrator, ids, query, mode };
+}
+
+/** The actual fetch, once `mode` has already picked which strategy applies. */
+async function fetchCapabilityRows({
+  mode,
+  hydrator,
+  utils,
+  projectId,
+  ids,
+  query,
+  maxRows,
+}: {
+  mode: "ids" | "query";
+  hydrator: CapabilityHydrator | undefined;
+  utils: Parameters<NonNullable<CapabilityHydrator["byIds"]>>[0]["utils"];
+  projectId: string;
+  ids: string[] | null;
+  query: Record<string, unknown> | null;
+  maxRows: number;
+}): Promise<CapabilityHydration> {
+  if (mode === "ids") {
+    return hydrator!.byIds!({ utils, projectId, ids: ids! });
+  }
+  return hydrator!.byQuery!({ utils, projectId, query: query!, limit: maxRows });
+}
+
+/** The card's data, read off the query's settled/loading/error state. */
+function buildCapabilityData(
+  result: { data: CapabilityHydration | undefined; isError: boolean; isFetching: boolean },
+  digest: CliResultDigest | null | undefined,
+): CapabilityData {
+  const hydration = result.data;
+  const totalCount = digest?.counts?.total ?? hydration?.total ?? null;
+
+  if (result.isError) {
+    return { status: "unavailable", rows: [], loadedCount: 0, totalCount, isHydrating: false };
+  }
+  if (!hydration) {
+    return { status: "hydrating", rows: [], loadedCount: 0, totalCount, isHydrating: true };
+  }
+  return {
+    status: "hydrated",
+    rows: hydration.rows,
+    loadedCount: hydration.rows.length,
+    totalCount,
+    // Still true while a superseded fetch's rows are shown and the refined
+    // fetch (new key, keepPreviousData) is in flight.
+    isHydrating: result.isFetching,
+  };
+}
+
+export function useCapabilityData({
+  command,
+  digest,
+  maxRows = DEFAULT_MAX_ROWS,
+}: CapabilityDataInput): CapabilityData {
+  const utils = api.useUtils();
+  // The viewer's CURRENT project, from the one authoritative context — never a
+  // prop, so a card can't be handed some other project's id and quietly break
+  // isolation. (The procedures re-check permissions server-side regardless.)
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? null;
+
+  const { resource, hydrator, ids, query, mode } = resolveHydrationInputs({
+    command,
+    digest,
+    maxRows,
+  });
+
   const enabled = projectId !== null && mode !== null;
 
   const result = useQuery({
     queryKey: ["langy-capability-data", projectId, resource, mode, mode === "ids" ? ids : query],
-    queryFn: async () => {
-      if (mode === "ids") {
-        return hydrator!.byIds!({ utils, projectId: projectId!, ids: ids! });
-      }
-      return hydrator!.byQuery!({
+    queryFn: () =>
+      fetchCapabilityRows({
+        mode: mode!,
+        hydrator,
         utils,
         projectId: projectId!,
-        query: query!,
-        limit: maxRows,
-      });
-    },
+        ids,
+        query,
+        maxRows,
+      }),
     enabled,
     staleTime: 30_000,
     retry: 1,
@@ -117,34 +184,5 @@ export function useCapabilityData({
 
   if (!enabled) return IDLE;
 
-  const hydration = result.data;
-  const totalCount = digest?.counts?.total ?? hydration?.total ?? null;
-
-  if (result.isError) {
-    return {
-      status: "unavailable",
-      rows: [],
-      loadedCount: 0,
-      totalCount,
-      isHydrating: false,
-    };
-  }
-  if (!hydration) {
-    return {
-      status: "hydrating",
-      rows: [],
-      loadedCount: 0,
-      totalCount,
-      isHydrating: true,
-    };
-  }
-  return {
-    status: "hydrated",
-    rows: hydration.rows,
-    loadedCount: hydration.rows.length,
-    totalCount,
-    // Still true while a superseded fetch's rows are shown and the refined
-    // fetch (new key, keepPreviousData) is in flight.
-    isHydrating: result.isFetching,
-  };
+  return buildCapabilityData(result, digest);
 }

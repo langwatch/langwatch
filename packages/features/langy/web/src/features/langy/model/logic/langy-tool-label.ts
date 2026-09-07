@@ -169,6 +169,90 @@ export function skillCardDetail(summary: string): string | undefined {
   return first;
 }
 
+/** A call that runs on the developer's own machine, not in the sandbox. */
+function describeLocalTool(lower: string, input: unknown): LangyToolLabel | null {
+  const local = LOCAL_TOOLS[lower];
+  if (!local) return null;
+  const path = readString(input, ["path", "file_path", "filePath"]);
+  const command = readString(input, COMMAND_KEYS);
+  const query = readString(input, ["pattern", "query"]);
+  const detail = command ?? (path ? basename(path) : undefined) ?? query;
+  return {
+    title: `${local} on your machine`,
+    detail: detail ? truncate(detail) : undefined,
+    key: "local",
+  };
+}
+
+/** The skill tool. THE point of the card is which skill, and what it does. */
+function describeSkillTool(lower: string, input: unknown): LangyToolLabel | null {
+  if (lower !== "skill" && lower !== "use_skill") return null;
+  const skillId = readString(input, SKILL_KEYS);
+  const skill = skillId ? findSkill(skillId) : undefined;
+  if (!skill) {
+    return {
+      title: skillId ? `Using the ${skillId} skill` : "Using a skill",
+      key: `skill:${skillId ?? "unknown"}`,
+    };
+  }
+  // A recipe is a walkthrough, not a standing capability, and saying "the
+  // Generate RAG dataset skill" reads like we don't know our own product.
+  const kind = skill.source === "recipe" ? "recipe" : "skill";
+  return {
+    title: `Using the ${skill.label} ${kind}`,
+    // The summary comes from the derived catalogue — the skill's OWN SKILL.md
+    // description, which is the copy on the public skill directory. The card
+    // therefore cannot over-promise: it can only quote the skill. But it
+    // quotes only the FIRST LINE of it: see skillCardDetail.
+    detail: skillCardDetail(skill.summary),
+    key: `skill:${skill.id}`,
+  };
+}
+
+/**
+ * A LangWatch capability (either typed by the envelope, or a shell call normalised into
+ * one). Worded by the SAME registry that words its card, so the running line and the
+ * settled card cannot disagree.
+ */
+function describeCapabilityTool(name: string, input: unknown): LangyToolLabel | null {
+  const progress = resolveCapabilityProgress(effectiveToolName(name, input));
+  if (!progress) return null;
+  const command = commandOf(input);
+  return {
+    title: progress.headline,
+    detail: command ? truncate(command) : undefined,
+    key: `capability:${progress.surface}`,
+  };
+}
+
+/** A shell call that is NOT a LangWatch command. */
+function describeShellTool(name: string, input: unknown): LangyToolLabel | null {
+  const command = shellCommandOf(name, input);
+  if (!command) return null;
+  const step = githubStepOf(command);
+  if (step) {
+    return {
+      title: GITHUB_STAGE_TITLE[step.end] ?? "Working with GitHub",
+      detail: step.detail ?? truncate(command),
+      key: "github",
+    };
+  }
+  const intent = describeShellIntent(command);
+  if (intent) return { ...intent, key: "shell" };
+  // Honest and specific: we do not know what this command is for, so we show
+  // the command. "Coding" was a guess, and it was usually wrong.
+  return { title: "Running a command", detail: truncate(command), key: "shell" };
+}
+
+/** Everything else, by what it does rather than what it is called. */
+function describeGenericTool(lower: string, input: unknown): LangyToolLabel | null {
+  const generic = GENERIC_TOOLS[lower];
+  if (!generic) return null;
+  const path = readString(input, ["file_path", "filePath", "path"]);
+  const query = readString(input, ["pattern", "query", "url"]);
+  return { title: generic.title, detail: genericDetail({ path, query }), key: generic.key };
+}
+
 /**
  * Describe one tool call. The single mapping every activity card goes through —
  * there is no per-tool branch anywhere else in the UI.
@@ -181,91 +265,11 @@ export function describeToolCall({
   input: unknown;
 }): LangyToolLabel {
   const lower = name.toLowerCase();
-
-  // ── A call that runs on the developer's own machine, not in the sandbox.
-  const local = LOCAL_TOOLS[lower];
-  if (local) {
-    const path = readString(input, ["path", "file_path", "filePath"]);
-    const command = readString(input, COMMAND_KEYS);
-    const query = readString(input, ["pattern", "query"]);
-    const detail = command ?? (path ? basename(path) : undefined) ?? query;
-    return {
-      title: `${local} on your machine`,
-      detail: detail ? truncate(detail) : undefined,
-      key: "local",
-    };
-  }
-
-  // ── The skill tool. THE point of the card is which skill, and what it does.
-  if (lower === "skill" || lower === "use_skill") {
-    const skillId = readString(input, SKILL_KEYS);
-    const skill = skillId ? findSkill(skillId) : undefined;
-    if (skill) {
-      // A recipe is a walkthrough, not a standing capability, and saying "the
-      // Generate RAG dataset skill" reads like we don't know our own product.
-      const kind = skill.source === "recipe" ? "recipe" : "skill";
-      return {
-        title: `Using the ${skill.label} ${kind}`,
-        // The summary comes from the derived catalogue — the skill's OWN
-        // SKILL.md description, which is the copy on the public skill directory.
-        // The card therefore cannot over-promise: it can only quote the skill.
-        // But it quotes only the FIRST LINE of it: see skillCardDetail.
-        detail: skillCardDetail(skill.summary),
-        key: `skill:${skill.id}`,
-      };
-    }
-    return {
-      title: skillId ? `Using the ${skillId} skill` : "Using a skill",
-      key: `skill:${skillId ?? "unknown"}`,
-    };
-  }
-
-  // ── A LangWatch capability (either typed by the envelope, or a shell call we
-  //    normalised into one). Worded by the SAME registry that words its card, so
-  //    the running line and the settled card cannot disagree.
-  const progress = resolveCapabilityProgress(effectiveToolName(name, input));
-  if (progress) {
-    const command = commandOf(input);
-    return {
-      title: progress.headline,
-      detail: command ? truncate(command) : undefined,
-      key: `capability:${progress.surface}`,
-    };
-  }
-
-  // ── A shell call that is NOT a LangWatch command.
-  const command = shellCommandOf(name, input);
-  if (command) {
-    const step = githubStepOf(command);
-    if (step) {
-      return {
-        title: GITHUB_STAGE_TITLE[step.end] ?? "Working with GitHub",
-        detail: step.detail ?? truncate(command),
-        key: "github",
-      };
-    }
-    const intent = describeShellIntent(command);
-    if (intent) return { ...intent, key: "shell" };
-    // Honest and specific: we do not know what this command is for, so we show
-    // the command. "Coding" was a guess, and it was usually wrong.
-    return {
-      title: "Running a command",
-      detail: truncate(command),
-      key: "shell",
-    };
-  }
-
-  // ── Everything else, by what it does rather than what it is called.
-  const generic = GENERIC_TOOLS[lower];
-  if (generic) {
-    const path = readString(input, ["file_path", "filePath", "path"]);
-    const query = readString(input, ["pattern", "query", "url"]);
-    return {
-      title: generic.title,
-      detail: genericDetail({ path, query }),
-      key: generic.key,
-    };
-  }
-
-  return { title: humanize(name), key: `tool:${lower}` };
+  return (
+    describeLocalTool(lower, input) ??
+    describeSkillTool(lower, input) ??
+    describeCapabilityTool(name, input) ??
+    describeShellTool(name, input) ??
+    describeGenericTool(lower, input) ?? { title: humanize(name), key: `tool:${lower}` }
+  );
 }

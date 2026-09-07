@@ -14,89 +14,33 @@ export interface LangyChipExplanation {
 /** Trace ids shown in full before the rest collapse into a count. */
 const IDS_SHOWN = 3;
 
+/**
+ * One plain-sentence action per chip kind, for every kind whose payload is
+ * simply `chip.ref` (or nothing, for "project"). "selection" is handled
+ * separately below because its payload shape depends on what was selected.
+ */
+const CHIP_ACTIONS: Record<Exclude<LangyContextChip["kind"], "selection">, string> = {
+  filter: "Langy gets the search itself, so it can run it, narrow it, or count what it matches.",
+  trace: "Langy will read this trace, start to finish.",
+  evaluation: "Langy will read this evaluation and its recent results.",
+  experiment: "Langy will read this experiment and its runs.",
+  dataset: "Langy will read this dataset and its records.",
+  prompt: "Langy will read this prompt and its versions.",
+  scenario: "Langy will read this simulation run.",
+  dashboard: "Langy will read this dashboard.",
+  workflow: "Langy will read this workflow and how it is wired up.",
+  agent: "Langy will read this agent's configuration.",
+  automation: "Langy will read this automation, what fires it and what it does.",
+  annotation: "Langy will read this annotation and what it is attached to.",
+  project: "Langy always works in the project you have open.",
+};
+
 export function describeChipContext(chip: LangyContextChip): LangyChipExplanation {
-  switch (chip.kind) {
-    case "filter":
-      return {
-        action:
-          "Langy gets the search itself, so it can run it, narrow it, or count what it matches.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "selection":
-      return describeSelection(chip);
-
-    case "trace":
-      return {
-        action: "Langy will read this trace, start to finish.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "evaluation":
-      return {
-        action: "Langy will read this evaluation and its recent results.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "experiment":
-      return {
-        action: "Langy will read this experiment and its runs.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "dataset":
-      return {
-        action: "Langy will read this dataset and its records.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "prompt":
-      return {
-        action: "Langy will read this prompt and its versions.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "scenario":
-      return {
-        action: "Langy will read this simulation run.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "dashboard":
-      return {
-        action: "Langy will read this dashboard.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "workflow":
-      return {
-        action: "Langy will read this workflow and how it is wired up.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "agent":
-      return {
-        action: "Langy will read this agent's configuration.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "automation":
-      return {
-        action: "Langy will read this automation, what fires it and what it does.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "annotation":
-      return {
-        action: "Langy will read this annotation and what it is attached to.",
-        ...(chip.ref ? { payload: chip.ref } : {}),
-      };
-
-    case "project":
-      return {
-        action: "Langy always works in the project you have open.",
-      };
-  }
+  if (chip.kind === "selection") return describeSelection(chip);
+  return {
+    action: CHIP_ACTIONS[chip.kind],
+    ...(chip.ref ? { payload: chip.ref } : {}),
+  };
 }
 
 /**

@@ -66,6 +66,49 @@ export function langyMessagesPollInterval(
   return data?.isTurnInFlight ? TURN_IN_FLIGHT_POLL_MS : false;
 }
 
+/** The raw query result's `data` shape, loosely — only the fields this hook reads. */
+type LangyMessagesData = Partial<
+  Omit<
+    LangyMessagesResult,
+    "isLoading" | "isFetching" | "isError" | "refetch" | "error" | "messages"
+  >
+> & { messages?: unknown };
+
+/** Assembles the hook's result from the query state, with every field's fallback in
+ *  one place instead of inline in the return statement. */
+function buildLangyMessagesResult({
+  data,
+  conversationId,
+  query,
+}: {
+  data: LangyMessagesData | undefined;
+  conversationId: string | null;
+  query: {
+    isLoading: boolean;
+    isFetching: boolean;
+    isError: boolean;
+    error: unknown;
+    refetch: () => unknown;
+  };
+}): LangyMessagesResult {
+  const hasConversation = !!conversationId;
+  return {
+    messages: (data?.messages ?? []) as LangyMessageDto[],
+    lastError: data?.lastError ?? null,
+    isTurnInFlight: data?.isTurnInFlight ?? false,
+    inFlightTurnId: data?.inFlightTurnId ?? null,
+    shouldAskFeedback: data?.shouldAskFeedback ?? false,
+    eventCursor: data?.eventCursor ?? null,
+    currentTurnId: data?.currentTurnId ?? null,
+    lastModel: data?.lastModel ?? null,
+    isLoading: hasConversation && query.isLoading,
+    isFetching: hasConversation && query.isFetching,
+    isError: hasConversation && query.isError,
+    error: hasConversation ? query.error : null,
+    refetch: () => void query.refetch(),
+  };
+}
+
 /**
  * HEAVY, on-demand message history for one conversation (`langy.messages`).
  */
@@ -99,19 +142,5 @@ export function useLangyMessages(conversationId: string | null): LangyMessagesRe
   // between two conversations, but after New chat it would keep handing back the one just left.
   const data = conversationId ? query.data : undefined;
 
-  return {
-    messages: (data?.messages ?? []) as LangyMessageDto[],
-    lastError: data?.lastError ?? null,
-    isTurnInFlight: data?.isTurnInFlight ?? false,
-    inFlightTurnId: data?.inFlightTurnId ?? null,
-    shouldAskFeedback: data?.shouldAskFeedback ?? false,
-    eventCursor: data?.eventCursor ?? null,
-    currentTurnId: data?.currentTurnId ?? null,
-    lastModel: data?.lastModel ?? null,
-    isLoading: !!conversationId && query.isLoading,
-    isFetching: !!conversationId && query.isFetching,
-    isError: !!conversationId && query.isError,
-    error: conversationId ? query.error : null,
-    refetch: () => void query.refetch(),
-  };
+  return buildLangyMessagesResult({ data, conversationId, query });
 }

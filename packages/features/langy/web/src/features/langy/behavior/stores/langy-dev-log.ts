@@ -321,26 +321,43 @@ export function toolCallsFrom(records: LangyDevLogRecord[]): DevToolCall[] {
 }
 
 /** One scannable line per record, for the unified Log view. */
+function streamRecordSummary(entry: LangyStreamEntry): string {
+  if (entry.type === "delta") {
+    return entry.text.length > 60 ? `${entry.text.slice(0, 60)}…` : entry.text;
+  }
+  if (entry.type === "tool") return `${entry.phase ?? ""} ${entry.name}`;
+  if (entry.type === "status") return entry.status || "(cleared)";
+  if (entry.type === "error") return entry.error;
+  return "";
+}
+
+function durableRecordSummary(record: Extract<LangyDevLogRecord, { lane: "durable" }>): string {
+  if (record.source === "snapshot") {
+    const cursor = record.cursor
+      ? `${record.cursor.acceptedAt}/${record.cursor.eventId.slice(0, 8)}`
+      : "null";
+    return `snapshot seed · cursor=${cursor} · turn=${record.currentTurnId ?? "—"}`;
+  }
+  return `${record.event.type.replace("lw.langy_conversation.", "")} · ${record.event.id.slice(0, 8)}`;
+}
+
+function signalRecordSummary(record: Extract<LangyDevLogRecord, { lane: "signal" }>): string {
+  const cursor = record.cursor
+    ? `${record.cursor.acceptedAt}/${record.cursor.eventId.slice(0, 8)}`
+    : "none";
+  return `conv=${record.conversationId.slice(-8)} · cursor=${cursor}`;
+}
+
 export function recordSummary(record: LangyDevLogRecord): string {
   switch (record.lane) {
-    case "stream": {
-      const entry = record.entry;
-      if (entry.type === "delta") {
-        return entry.text.length > 60 ? `${entry.text.slice(0, 60)}…` : entry.text;
-      }
-      if (entry.type === "tool") return `${entry.phase ?? ""} ${entry.name}`;
-      if (entry.type === "status") return entry.status || "(cleared)";
-      if (entry.type === "error") return entry.error;
-      return "";
-    }
+    case "stream":
+      return streamRecordSummary(record.entry);
     case "outbound":
       return record.label;
     case "durable":
-      return record.source === "snapshot"
-        ? `snapshot seed · cursor=${record.cursor ? `${record.cursor.acceptedAt}/${record.cursor.eventId.slice(0, 8)}` : "null"} · turn=${record.currentTurnId ?? "—"}`
-        : `${record.event.type.replace("lw.langy_conversation.", "")} · ${record.event.id.slice(0, 8)}`;
+      return durableRecordSummary(record);
     case "signal":
-      return `conv=${record.conversationId.slice(-8)} · cursor=${record.cursor ? `${record.cursor.acceptedAt}/${record.cursor.eventId.slice(0, 8)}` : "none"}`;
+      return signalRecordSummary(record);
   }
 }
 

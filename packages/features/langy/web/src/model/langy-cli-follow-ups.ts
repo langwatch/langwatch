@@ -53,6 +53,44 @@ export const SUGGESTION_LABEL: Record<string, string> = {
  */
 const UNOFFERABLE_KINDS: ReadonlySet<string> = new Set(["evaluators", "prompts"]);
 
+/** Every feature that consumes `kind`, minus the feature that produced it and any
+ *  already offered — the per-kind half of {@link followUpsForResult}. */
+function suggestionsForProducedKind({
+  kind,
+  sourceId,
+  resultName,
+  featureMap,
+  seen,
+}: {
+  kind: string;
+  sourceId: string;
+  resultName: string;
+  featureMap: Pick<LangyFeatureMap, "featuresConsuming"> | undefined;
+  seen: Set<string>;
+}): FollowUpSuggestion[] {
+  const suggestions: FollowUpSuggestion[] = [];
+  for (const consumer of featureMap?.featuresConsuming(kind) ?? []) {
+    if (consumer.id === sourceId) continue;
+
+    const label = SUGGESTION_LABEL[consumer.id];
+    if (!label) continue;
+
+    const id = `${kind}:${consumer.id}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+
+    suggestions.push({
+      id,
+      featureId: consumer.id,
+      featureName: consumer.name,
+      label,
+      kind,
+      sourceToolName: resultName,
+    });
+  }
+  return suggestions;
+}
+
 /**
  * The offers one settled tool result justifies: every feature that consumes a resource
  * kind this result produced, minus the feature that produced it (a trace search does
@@ -68,30 +106,19 @@ export function followUpsForResult(
   if (!source || source.produces.length === 0) return [];
   if (countResults(result.output) === 0) return [];
 
-  const suggestions: FollowUpSuggestion[] = [];
   const seen = new Set<string>();
-
+  const suggestions: FollowUpSuggestion[] = [];
   for (const kind of source.produces) {
     if (UNOFFERABLE_KINDS.has(kind)) continue;
-    for (const consumer of featureMap?.featuresConsuming(kind) ?? []) {
-      if (consumer.id === source.id) continue;
-
-      const label = SUGGESTION_LABEL[consumer.id];
-      if (!label) continue;
-
-      const id = `${kind}:${consumer.id}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-
-      suggestions.push({
-        id,
-        featureId: consumer.id,
-        featureName: consumer.name,
-        label,
+    suggestions.push(
+      ...suggestionsForProducedKind({
         kind,
-        sourceToolName: result.name,
-      });
-    }
+        sourceId: source.id,
+        resultName: result.name,
+        featureMap,
+        seen,
+      }),
+    );
   }
   return suggestions;
 }

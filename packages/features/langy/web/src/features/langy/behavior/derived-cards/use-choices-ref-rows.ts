@@ -9,7 +9,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../../behavior/langy-api.ts";
 import { CAPABILITY_HYDRATORS } from "../capabilities/capability-hydrators.ts";
-import type { CapabilityHydrator, CapabilityTrpcUtils } from "../capabilities/capability-hydrators.ts";
+import type {
+  CapabilityHydrator,
+  CapabilityTrpcUtils,
+} from "../capabilities/capability-hydrators.ts";
 
 export type ChoicesRefRow =
   | { state: "pending" }
@@ -58,6 +61,57 @@ async function hydrateRefType(
   }
 }
 
+/** Groups hydratable refs by type so each type resolves in one byIds call. */
+function groupHydratableRefs(
+  options: LangyDerivedChoicesCard["options"],
+): Map<string, { optionId: string; refId: string }[]> {
+  const byType = new Map<string, { optionId: string; refId: string }[]>();
+  for (const option of options) {
+    if (!option.ref) continue;
+    if (!CAPABILITY_HYDRATORS[option.ref.type]?.byIds) continue;
+    const list = byType.get(option.ref.type) ?? [];
+    list.push({ optionId: option.id, refId: option.ref.id });
+    byType.set(option.ref.type, list);
+  }
+  return byType;
+}
+
+async function hydrateAllRefTypes(
+  hydratable: Map<string, { optionId: string; refId: string }[]>,
+  utils: CapabilityTrpcUtils,
+  projectId: string,
+): Promise<Map<string, ChoicesRefRow>> {
+  const next = new Map<string, ChoicesRefRow>();
+  await Promise.all(
+    [...hydratable.entries()].map(async ([type, entries]) => {
+      const hydrator = CAPABILITY_HYDRATORS[type]?.byIds;
+      if (!hydrator) return;
+      await hydrateRefType(entries, hydrator, utils, projectId, next);
+    }),
+  );
+  return next;
+}
+
+/** One row per option: resolved state where hydrated, `plain`/`pending` otherwise. */
+function buildRefRows(
+  options: LangyDerivedChoicesCard["options"],
+  resolved: Map<string, ChoicesRefRow>,
+  projectId: string | null,
+): Map<string, ChoicesRefRow> {
+  const rows = new Map<string, ChoicesRefRow>();
+  for (const option of options) {
+    if (!option.ref || !CAPABILITY_HYDRATORS[option.ref.type]?.byIds) {
+      rows.set(option.id, { state: "plain" });
+      continue;
+    }
+    rows.set(
+      option.id,
+      resolved.get(option.id) ?? (projectId ? { state: "pending" } : { state: "plain" }),
+    );
+  }
+  return rows;
+}
+
 export function useChoicesRefRows(
   options: LangyDerivedChoicesCard["options"],
 ): ReadonlyMap<string, ChoicesRefRow> {
@@ -65,18 +119,7 @@ export function useChoicesRefRows(
   const utils = api.useUtils();
   const projectId = project?.id ?? null;
 
-  // Group hydratable refs by type so each type resolves in one byIds call.
-  const hydratable = useMemo(() => {
-    const byType = new Map<string, { optionId: string; refId: string }[]>();
-    for (const option of options) {
-      if (!option.ref) continue;
-      if (!CAPABILITY_HYDRATORS[option.ref.type]?.byIds) continue;
-      const list = byType.get(option.ref.type) ?? [];
-      list.push({ optionId: option.id, refId: option.ref.id });
-      byType.set(option.ref.type, list);
-    }
-    return byType;
-  }, [options]);
+  const hydratable = useMemo(() => groupHydratableRefs(options), [options]);
 
   const [resolved, setResolved] = useState<Map<string, ChoicesRefRow>>(() => new Map());
 
@@ -84,35 +127,14 @@ export function useChoicesRefRows(
     if (!projectId || hydratable.size === 0) return;
     let cancelled = false;
 
-    void (async () => {
-      const next = new Map<string, ChoicesRefRow>();
-      await Promise.all(
-        [...hydratable.entries()].map(async ([type, entries]) => {
-          const hydrator = CAPABILITY_HYDRATORS[type]?.byIds;
-          if (!hydrator) return;
-          await hydrateRefType(entries, hydrator, utils, projectId, next);
-        }),
-      );
+    void hydrateAllRefTypes(hydratable, utils, projectId).then((next) => {
       if (!cancelled) setResolved(next);
-    })();
+    });
 
     return () => {
       cancelled = true;
     };
   }, [projectId, hydratable, utils]);
 
-  return useMemo(() => {
-    const rows = new Map<string, ChoicesRefRow>();
-    for (const option of options) {
-      if (!option.ref || !CAPABILITY_HYDRATORS[option.ref.type]?.byIds) {
-        rows.set(option.id, { state: "plain" });
-        continue;
-      }
-      rows.set(
-        option.id,
-        resolved.get(option.id) ?? (projectId ? { state: "pending" } : { state: "plain" }),
-      );
-    }
-    return rows;
-  }, [options, resolved, projectId]);
+  return useMemo(() => buildRefRows(options, resolved, projectId), [options, resolved, projectId]);
 }

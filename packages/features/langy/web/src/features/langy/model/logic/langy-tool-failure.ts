@@ -292,45 +292,32 @@ function githubAppNotInstalled({
 }
 
 /**
- * Turn a failed tool frame into safe, structured card copy.
- *
- * @see the three levels in this module's header.
+ * Level 3. No document, so no code — but there is usually TEXT, and the text is the
+ * only thing left that knows anything. Showing it beats "This step couldn't be
+ * completed", which tells the reader nothing and tells support less.
  */
-export function presentLangyToolError({
-  title,
-  errorText,
-  toolName,
-}: {
-  title: string;
-  errorText: unknown;
-  /**
-   * The tool that failed. Only used to tell the sandbox's `gh` apart from the
-   * developer's own — see {@link githubAppNotInstalled}.
-   */
-  toolName?: string;
-}): LangyToolErrorPresentation {
-  const raw = rawFailureText(errorText);
-  const domain = readStructuredError(errorText);
+function buildNoDomainPresentation(
+  title: string,
+  raw: string | undefined,
+): LangyToolErrorPresentation {
+  // ...unless the text is a traceback. A traceback is the engine talking to itself: a
+  // file path, a line number and an exception class from inside a process, none of it
+  // written for a reader (dev/docs/best_practices/error-handling.md).
+  const detail = raw && !isEngineTraceback(raw) ? firstLine(raw) : undefined;
+  return {
+    title: `${title} failed`,
+    message: "This step couldn't be completed.",
+    ...(detail ? { detail } : {}),
+    ...(raw ? { raw } : {}),
+  };
+}
 
-  const notInstalled = githubAppNotInstalled({ toolName, raw });
-  if (notInstalled) return notInstalled;
-
-  // Level 3. No document, so no code — but there is usually TEXT, and the text is the
-  // only thing left that knows anything. Showing it beats "This step couldn't be
-  // completed", which tells the reader nothing and tells support less.
-  if (!domain) {
-    // ...unless the text is a traceback. A traceback is the engine talking to itself: a
-    // file path, a line number and an exception class from inside a process, none of it
-    // written for a reader (dev/docs/best_practices/error-handling.md).
-    const detail = raw && !isEngineTraceback(raw) ? firstLine(raw) : undefined;
-    return {
-      title: `${title} failed`,
-      message: "This step couldn't be completed.",
-      ...(detail ? { detail } : {}),
-      ...(raw ? { raw } : {}),
-    };
-  }
-
+/** Levels 1 and 2: a domain error document, structured into card copy. */
+function buildDomainPresentation(
+  title: string,
+  domain: CliHandledError,
+  raw: string | undefined,
+): LangyToolErrorPresentation {
   // New-CLI documents carry the trace links top-level on the error; documents
   // written by an older CLI keep them nested under `meta.trace` (the shared
   // REST handler's wire shape). Prefer the top-level fields, fall back to the
@@ -362,6 +349,35 @@ export function presentLangyToolError({
     ...(logsUrl ? { logsUrl } : {}),
     ...(raw ? { raw } : {}),
   };
+}
+
+/**
+ * Turn a failed tool frame into safe, structured card copy.
+ *
+ * @see the three levels in this module's header.
+ */
+export function presentLangyToolError({
+  title,
+  errorText,
+  toolName,
+}: {
+  title: string;
+  errorText: unknown;
+  /**
+   * The tool that failed. Only used to tell the sandbox's `gh` apart from the
+   * developer's own — see {@link githubAppNotInstalled}.
+   */
+  toolName?: string;
+}): LangyToolErrorPresentation {
+  const raw = rawFailureText(errorText);
+  const domain = readStructuredError(errorText);
+
+  const notInstalled = githubAppNotInstalled({ toolName, raw });
+  if (notInstalled) return notInstalled;
+
+  return domain
+    ? buildDomainPresentation(title, domain, raw)
+    : buildNoDomainPresentation(title, raw);
 }
 
 /**

@@ -58,6 +58,40 @@ export function readTraceSearchQuery(input: unknown): TraceSearchQuery {
   };
 }
 
+/** Applies one `--flag value` pair to `search`, mutating it in place. Unknown flags are ignored. */
+function applyTraceSearchFlag(search: TraceSearchQuery, flag: string, value: string): void {
+  switch (flag) {
+    case "-q":
+    case "--query": {
+      const text = readText(value);
+      if (text !== undefined) search.query = text;
+      return;
+    }
+    case "--origin": {
+      const origins = readOrigins(value);
+      if (origins !== undefined) search.origins = origins;
+      return;
+    }
+    case "--start-date": {
+      const at = readEpochMs(value);
+      if (at !== undefined) search.startDate = at;
+      return;
+    }
+    case "--end-date": {
+      const at = readEpochMs(value);
+      if (at !== undefined) search.endDate = at;
+      return;
+    }
+    case "--limit": {
+      const n = readInt(value);
+      if (n !== undefined) search.limit = n;
+      return;
+    }
+    default:
+      return;
+  }
+}
+
 /** Pull `trace search`'s flags out of the shell command the agent ran. */
 export function parseTraceSearchCommand(command: string): TraceSearchQuery {
   const tokens = tokenize(command);
@@ -69,37 +103,7 @@ export function parseTraceSearchCommand(command: string): TraceSearchQuery {
     // `--flag=value` carries its own value; `--flag value` takes the next token.
     const value = inlineValue ?? tokens[i + 1];
     if (value === undefined) continue;
-
-    switch (flag) {
-      case "-q":
-      case "--query": {
-        const text = readText(value);
-        if (text !== undefined) search.query = text;
-        break;
-      }
-      case "--origin": {
-        const origins = readOrigins(value);
-        if (origins !== undefined) search.origins = origins;
-        break;
-      }
-      case "--start-date": {
-        const at = readEpochMs(value);
-        if (at !== undefined) search.startDate = at;
-        break;
-      }
-      case "--end-date": {
-        const at = readEpochMs(value);
-        if (at !== undefined) search.endDate = at;
-        break;
-      }
-      case "--limit": {
-        const n = readInt(value);
-        if (n !== undefined) search.limit = n;
-        break;
-      }
-      default:
-        break;
-    }
+    applyTraceSearchFlag(search, flag, value);
   }
 
   return search;
@@ -238,68 +242,101 @@ function splitFlag(token: string): [string, string | undefined] {
   return [token.slice(0, equals), token.slice(equals + 1)];
 }
 
+interface TokenizeState {
+  tokens: string[];
+  current: string;
+  quote: '"' | "'" | null;
+  hasContent: boolean;
+}
+
+// Single quotes are literal through and through — a backslash inside them is
+// data, so this branch deliberately never looks at the next character.
+function consumeSingleQuoted(state: TokenizeState, char: string): void {
+  if (char === "'") state.quote = null;
+  else state.current += char;
+}
+
+function consumeDoubleQuoted(state: TokenizeState, char: string): void {
+  if (char === '"') state.quote = null;
+  else state.current += char;
+}
+
+/** Consumes a backslash (and, when it is an escape, the character after it too);
+ *  returns how many source characters were consumed. */
+function consumeBackslash(state: TokenizeState, command: string, i: number): number {
+  const next = command[i + 1];
+  if (next === undefined) {
+    state.current += "\\";
+    return 1;
+  }
+  // Inside double quotes a backslash only escapes the four characters the
+  // shell lets it; before anything else it stands for itself.
+  if (state.quote === '"' && !['"', "\\", "$", "`"].includes(next)) {
+    state.current += "\\";
+    return 1;
+  }
+  state.current += next;
+  state.hasContent = true;
+  return 2;
+}
+
+function openQuote(state: TokenizeState, char: '"' | "'"): void {
+  state.quote = char;
+  state.hasContent = true;
+}
+
+function consumeWhitespace(state: TokenizeState): void {
+  if (state.current || state.hasContent) state.tokens.push(state.current);
+  state.current = "";
+  state.hasContent = false;
+}
+
+function flushToken(state: TokenizeState): void {
+  if (state.current || state.hasContent) state.tokens.push(state.current);
+}
+
 /**
  * Split a shell command into tokens, honouring single and double quotes — the agent
  * writes `--query 'checkout failed'`, and splitting on whitespace would turn that into
  * two flags and a stray word.
  */
 function tokenize(command: string): string[] {
-  const tokens: string[] = [];
-  let current = "";
-  let quote: '"' | "'" | null = null;
-  let hasContent = false;
+  const state: TokenizeState = { tokens: [], current: "", quote: null, hasContent: false };
 
-  for (let i = 0; i < command.length; i++) {
+  let i = 0;
+  while (i < command.length) {
     const char = command[i]!;
 
-    if (quote === "'") {
-      // Single quotes are literal through and through — a backslash inside them
-      // is data, so this branch deliberately never looks at the next character.
-      if (char === "'") quote = null;
-      else current += char;
+    if (state.quote === "'") {
+      consumeSingleQuoted(state, char);
+      i += 1;
       continue;
     }
-
     if (char === "\\") {
-      const next = command[i + 1];
-      if (next === undefined) {
-        current += char;
-        continue;
-      }
-      // Inside double quotes a backslash only escapes the four characters the
-      // shell lets it; before anything else it stands for itself.
-      if (quote === '"' && !['"', "\\", "$", "`"].includes(next)) {
-        current += char;
-        continue;
-      }
-      current += next;
-      hasContent = true;
-      i++;
+      i += consumeBackslash(state, command, i);
       continue;
     }
-
-    if (quote === '"') {
-      if (char === '"') quote = null;
-      else current += char;
+    if (state.quote === '"') {
+      consumeDoubleQuoted(state, char);
+      i += 1;
       continue;
     }
-
     if (char === '"' || char === "'") {
-      quote = char;
-      hasContent = true;
+      openQuote(state, char);
+      i += 1;
       continue;
     }
     if (/\s/.test(char)) {
-      if (current || hasContent) tokens.push(current);
-      current = "";
-      hasContent = false;
+      consumeWhitespace(state);
+      i += 1;
       continue;
     }
-    current += char;
+    state.current += char;
+    i += 1;
   }
-  if (current || hasContent) tokens.push(current);
+  flushToken(state);
 
-  return tokens;
+  return state.tokens;
 }
 
 /** Epoch ms from the CLI's "ISO string or epoch ms". */

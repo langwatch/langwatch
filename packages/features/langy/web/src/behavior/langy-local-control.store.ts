@@ -60,6 +60,82 @@ interface LangyLocalControlState {
   reset: (conversationId: string | null) => void;
 }
 
+/** True when `conversationId` names a conversation other than the one live. */
+function isStaleConversation(
+  state: LangyLocalControlState,
+  conversationId: string | null,
+): boolean {
+  // An entry for a conversation nobody is reading is not worth keeping,
+  // and folding it into the open one would show the wrong card.
+  return Boolean(conversationId) && state.conversationId !== conversationId;
+}
+
+function recordWaitEntry(
+  state: LangyLocalControlState,
+  { conversationId, wait }: { conversationId: string | null; wait: LangyLiveWait },
+): Partial<LangyLocalControlState> | null {
+  if (isStaleConversation(state, conversationId)) return null;
+  // The live stream is replayed from its start on every attach, so the
+  // `pending` entry that raised a card arrives again after the card was
+  // answered. A card only ever moves forward.
+  const known = state.waits[wait.waitId];
+  const status = mergeLangyWaitStatus({ durable: known?.status, live: wait.status });
+  return { waits: { ...state.waits, [wait.waitId]: { ...wait, status } } };
+}
+
+function recordWorkspaceEntry(
+  state: LangyLocalControlState,
+  { conversationId, workspace }: { conversationId: string | null; workspace: LangyLiveWorkspace },
+): Partial<LangyLocalControlState> | null {
+  if (isStaleConversation(state, conversationId)) return null;
+  return { workspace, workspaceRevision: state.workspaceRevision + 1 };
+}
+
+function recordWorkspaceStateEntry(
+  state: LangyLocalControlState,
+  { conversationId, connected }: { conversationId: string | null; connected: boolean },
+): Partial<LangyLocalControlState> | null {
+  if (isStaleConversation(state, conversationId)) return null;
+  if (state.workspaceConnected === connected) return null;
+  // The first read is not a change, it is the starting point: the queries
+  // watching the revision are fetching their own first answer anyway.
+  const first = state.workspaceConnected === null;
+  return {
+    workspaceConnected: connected,
+    workspaceRevision: first ? state.workspaceRevision : state.workspaceRevision + 1,
+  };
+}
+
+function settleWaitEntry(
+  state: LangyLocalControlState,
+  {
+    waitId,
+    kind = "permission",
+    status,
+    decision,
+    source,
+  }: {
+    waitId: string;
+    kind?: LangyLiveWait["kind"];
+    status: LangyLiveWait["status"];
+    decision?: string;
+    source?: string;
+  },
+): Partial<LangyLocalControlState> {
+  const wait = state.waits[waitId] ?? { waitId, kind, status: "pending" };
+  return {
+    waits: {
+      ...state.waits,
+      [waitId]: {
+        ...wait,
+        status,
+        ...(decision === undefined ? {} : { decision }),
+        ...(source === undefined ? {} : { source }),
+      },
+    },
+  };
+}
+
 export const useLangyLocalControlStore = create<LangyLocalControlState>((set, get) => ({
   conversationId: null,
   waits: {},
@@ -67,59 +143,22 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>((set, ge
   workspaceConnected: null,
   workspaceRevision: 0,
 
-  recordWait: ({ conversationId, wait }) => {
-    const state = get();
-    // An entry for a conversation nobody is reading is not worth keeping,
-    // and folding it into the open one would show the wrong card.
-    if (conversationId && state.conversationId !== conversationId) return;
-    // The live stream is replayed from its start on every attach, so the
-    // `pending` entry that raised a card arrives again after the card was
-    // answered. A card only ever moves forward.
-    const known = state.waits[wait.waitId];
-    const status = mergeLangyWaitStatus({
-      durable: known?.status,
-      live: wait.status,
-    });
-    set({ waits: { ...state.waits, [wait.waitId]: { ...wait, status } } });
+  recordWait: (a) => {
+    const patch = recordWaitEntry(get(), a);
+    if (patch) set(patch);
   },
 
-  recordWorkspace: ({ conversationId, workspace }) => {
-    const state = get();
-    if (conversationId && state.conversationId !== conversationId) return;
-    set({
-      workspace,
-      workspaceRevision: state.workspaceRevision + 1,
-    });
+  recordWorkspace: (a) => {
+    const patch = recordWorkspaceEntry(get(), a);
+    if (patch) set(patch);
   },
 
-  recordWorkspaceState: ({ conversationId, connected }) => {
-    const state = get();
-    if (conversationId && state.conversationId !== conversationId) return;
-    if (state.workspaceConnected === connected) return;
-    // The first read is not a change, it is the starting point: the queries
-    // watching the revision are fetching their own first answer anyway.
-    const first = state.workspaceConnected === null;
-    set({
-      workspaceConnected: connected,
-      workspaceRevision: first ? state.workspaceRevision : state.workspaceRevision + 1,
-    });
+  recordWorkspaceState: (a) => {
+    const patch = recordWorkspaceStateEntry(get(), a);
+    if (patch) set(patch);
   },
 
-  settleWait: ({ waitId, kind = "permission", status, decision, source }) => {
-    const state = get();
-    const wait = state.waits[waitId] ?? { waitId, kind, status: "pending" };
-    set({
-      waits: {
-        ...state.waits,
-        [waitId]: {
-          ...wait,
-          status,
-          ...(decision === undefined ? {} : { decision }),
-          ...(source === undefined ? {} : { source }),
-        },
-      },
-    });
-  },
+  settleWait: (a) => set(settleWaitEntry(get(), a)),
 
   reset: (conversationId) =>
     set({

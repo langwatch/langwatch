@@ -56,6 +56,52 @@ const SHIMMER_PERIOD_MS = 11000;
 
 const NO_PROPS: LangyContextTargetProps = Object.freeze({});
 
+type IdentifiedTarget = {
+  id: string | undefined;
+  kind: LangyContextTarget["kind"] | undefined;
+  label: string | undefined;
+  chipRef?: string;
+};
+
+function isRegistrableTarget({
+  isActive,
+  id,
+  kind,
+  label,
+}: {
+  isActive: boolean;
+  id: string | undefined;
+  kind: LangyContextTarget["kind"] | undefined;
+  label: string | undefined;
+}): boolean {
+  return Boolean(isActive && id && kind && label);
+}
+
+function toggleContextTarget({ id, kind, label, chipRef }: IdentifiedTarget): void {
+  if (!id || !kind || !label) return;
+  const targets = useLangyContextTargetStore.getState();
+  if (targets.activeChipIds.has(id)) {
+    releaseContextTarget(id);
+  } else {
+    absorbContextTarget({ id, kind, label, ref: chipRef });
+  }
+}
+
+function startTargetDrag(
+  event: DragEvent<HTMLElement>,
+  { id, kind, label, chipRef }: IdentifiedTarget,
+): void {
+  if (!id || !kind || !label) return;
+  event.dataTransfer.setData(
+    LANGY_CONTEXT_DRAG_MIME,
+    JSON.stringify({ id, kind, label, ref: chipRef }),
+  );
+  // A plain-text fallback so dropping into the composer's textarea — which
+  // people will try — leaves the label behind rather than nothing at all.
+  event.dataTransfer.setData("text/plain", label);
+  event.dataTransfer.effectAllowed = "copy";
+}
+
 export function useLangyContextTarget(
   target: (LangyContextTarget & { enabled?: boolean }) | null | undefined,
 ): LangyContextTargetHandle {
@@ -91,34 +137,17 @@ export function useLangyContextTarget(
   );
 
   useEffect(() => {
-    const registrable = isActive && id && kind && label;
-    if (!registrable) return;
-    register({ id, kind, label, ref: chipRef });
-    return () => unregister(id);
+    if (!isRegistrableTarget({ isActive, id, kind, label })) return;
+    register({ id: id!, kind: kind!, label: label!, ref: chipRef });
+    return () => unregister(id!);
   }, [isActive, id, kind, label, chipRef, register, unregister]);
 
   const toggle = useCallback(() => {
-    if (!id || !kind || !label) return;
-    const targets = useLangyContextTargetStore.getState();
-    if (targets.activeChipIds.has(id)) {
-      releaseContextTarget(id);
-    } else {
-      absorbContextTarget({ id, kind, label, ref: chipRef });
-    }
+    toggleContextTarget({ id, kind, label, chipRef });
   }, [id, kind, label, chipRef]);
 
   const onDragStart = useCallback(
-    (event: DragEvent<HTMLElement>) => {
-      if (!id || !kind || !label) return;
-      event.dataTransfer.setData(
-        LANGY_CONTEXT_DRAG_MIME,
-        JSON.stringify({ id, kind, label, ref: chipRef }),
-      );
-      // A plain-text fallback so dropping into the composer's textarea — which
-      // people will try — leaves the label behind rather than nothing at all.
-      event.dataTransfer.setData("text/plain", label);
-      event.dataTransfer.effectAllowed = "copy";
-    },
+    (event: DragEvent<HTMLElement>) => startTargetDrag(event, { id, kind, label, chipRef }),
     [id, kind, label, chipRef],
   );
 
@@ -136,32 +165,58 @@ export function useLangyContextTarget(
   // — a keystroke, or a timer.
   const isOffered = isArmed || isRevealed;
 
-  const targetProps = useMemo<LangyContextTargetProps>(() => {
-    if (!isActive || !id) return NO_PROPS;
-    // Not offered, the page is the page: no ring, no drag, no intercepted
-    // click. Only the locating id, which nothing paints and nothing listens to
-    // — see the ZERO COST note above for why it cannot wait for arming.
-    if (!isOffered) return { "data-langy-target": id };
-    return {
-      className: "langy-target",
-      style: shimmerStyleFor(id),
-      "data-langy-target": id,
-      // Offered, EVERY target lights up — the point of the mode is to answer
-      // "what can I even give it?" at a glance. That is the christmas tree the
-      // earlier always-on design was right to refuse; what makes it fine here
-      // is that it is modal, brief, and asked for.
-      "data-langy-target-state": visualState({
+  const targetProps = useMemo<LangyContextTargetProps>(
+    () =>
+      computeTargetProps({
+        isActive,
+        id,
+        isOffered,
         isAdded,
         isHovered,
-        isNear: true,
+        onDragStart,
+        onClickCapture,
       }),
-      draggable: true,
-      onDragStart,
-      onClickCapture,
-    };
-  }, [isActive, id, isOffered, isAdded, isHovered, onDragStart, onClickCapture]);
+    [isActive, id, isOffered, isAdded, isHovered, onDragStart, onClickCapture],
+  );
 
   return { targetProps, isActive, isAdded, toggle };
+}
+
+function computeTargetProps({
+  isActive,
+  id,
+  isOffered,
+  isAdded,
+  isHovered,
+  onDragStart,
+  onClickCapture,
+}: {
+  isActive: boolean;
+  id: string | undefined;
+  isOffered: boolean;
+  isAdded: boolean;
+  isHovered: boolean;
+  onDragStart: (event: DragEvent<HTMLElement>) => void;
+  onClickCapture: (event: MouseEvent<HTMLElement>) => void;
+}): LangyContextTargetProps {
+  if (!isActive || !id) return NO_PROPS;
+  // Not offered, the page is the page: no ring, no drag, no intercepted
+  // click. Only the locating id, which nothing paints and nothing listens to
+  // — see the ZERO COST note above for why it cannot wait for arming.
+  if (!isOffered) return { "data-langy-target": id };
+  return {
+    className: "langy-target",
+    style: shimmerStyleFor(id),
+    "data-langy-target": id,
+    // Offered, EVERY target lights up — the point of the mode is to answer
+    // "what can I even give it?" at a glance. That is the christmas tree the
+    // earlier always-on design was right to refuse; what makes it fine here
+    // is that it is modal, brief, and asked for.
+    "data-langy-target-state": visualState({ isAdded, isHovered, isNear: true }),
+    draggable: true,
+    onDragStart,
+    onClickCapture,
+  };
 }
 
 /**

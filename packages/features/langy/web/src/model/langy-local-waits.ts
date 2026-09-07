@@ -240,6 +240,20 @@ function mergePatterns({
   return patternsOf({ patterns: entry.patterns, pattern: entry.pattern });
 }
 
+/** The durable side wins any detail it holds; a nullable field falls back to null. */
+function mergeNullable<T>(durable: T | null | undefined, live: T | null | undefined): T | null {
+  return durable ?? live ?? null;
+}
+
+/** Same rule, for the one boolean-valued field (defaults false rather than null). */
+function mergeSkipOffered(durable: boolean | undefined, live: boolean | undefined): boolean {
+  return durable ?? live ?? false;
+}
+
+function mergeCommand(durable: string | undefined, entry: LangyLiveWait): string {
+  return durable || (entry.summary ?? "");
+}
+
 /**
  * The same card once the live stream has spoken — the durable side wins every detail it holds,
  * and the live side contributes the state plus whatever the durable side hasn't carried yet.
@@ -256,14 +270,14 @@ function withLive(
     }),
     decision: durable?.decision ?? readDecision(entry.decision),
     source: durable?.source ?? readSource(entry.source),
-    command: durable?.command || (entry.summary ?? ""),
-    pattern: durable?.pattern ?? entry.pattern ?? null,
+    command: mergeCommand(durable?.command, entry),
+    pattern: mergeNullable(durable?.pattern, entry.pattern),
     patterns: mergePatterns({ durable, entry }),
-    reason: durable?.reason ?? entry.reason ?? null,
-    timeoutSeconds: durable?.timeoutSeconds ?? entry.timeoutSeconds ?? null,
-    skipOffered: durable?.skipOffered ?? entry.skipOffered ?? false,
-    workspaceName: durable?.workspaceName ?? entry.workspaceName ?? null,
-    hostname: durable?.hostname ?? entry.hostname ?? null,
+    reason: mergeNullable(durable?.reason, entry.reason),
+    timeoutSeconds: mergeNullable(durable?.timeoutSeconds, entry.timeoutSeconds),
+    skipOffered: mergeSkipOffered(durable?.skipOffered, entry.skipOffered),
+    workspaceName: mergeNullable(durable?.workspaceName, entry.workspaceName),
+    hostname: mergeNullable(durable?.hostname, entry.hostname),
   };
 }
 

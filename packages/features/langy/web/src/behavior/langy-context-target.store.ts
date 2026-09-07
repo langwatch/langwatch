@@ -168,6 +168,158 @@ function isSameTarget(a: LangyContextTarget, b: LangyContextTarget): boolean {
   return a.kind === b.kind && a.label === b.label && a.ref === b.ref;
 }
 
+type StoreState = LangyContextTargetState;
+type StatePatch = Partial<StoreState>;
+
+function clearRevealTimer(): void {
+  if (revealTimer) {
+    clearTimeout(revealTimer);
+    revealTimer = null;
+  }
+}
+
+function resetState(): StatePatch {
+  return {
+    targets: {},
+    picked: [],
+    activeChipIds: new Set<string>(),
+    revealedIds: new Set<string>(),
+    pendingReveal: null,
+    nearIds: new Set<string>(),
+    hoveredId: null,
+    spotlightId: null,
+    armSource: null,
+  };
+}
+
+function computeClearPicked(state: StoreState): StoreState | StatePatch {
+  return state.picked.length === 0 ? state : { picked: [] };
+}
+
+/** Only extends a reveal that is actually running — never starts one. */
+function holdRevealIfRunning(): void {
+  if (revealTimer) armRevealTimer();
+}
+
+function computeSetSpotlight(state: StoreState, id: string | null): StoreState | StatePatch {
+  return state.spotlightId === id ? state : { spotlightId: id };
+}
+
+function computeClearAbsorbFlash(state: StoreState, nonce: number): StoreState | StatePatch {
+  return state.absorbFlash?.nonce === nonce ? { absorbFlash: null } : state;
+}
+
+function computeArm(state: StoreState, source: LangyArmSource): StoreState | StatePatch {
+  return state.armSource === source ? state : { armSource: source };
+}
+
+function computeDisarm(
+  state: StoreState,
+  source: LangyArmSource | undefined,
+): StoreState | StatePatch {
+  if (state.armSource === null) return state;
+  // A disarm for a source that is not the one holding the latch is not a
+  // release — it is a different gesture ending.
+  if (source && state.armSource !== source) return state;
+  return { armSource: null, nearIds: new Set<string>(), hoveredId: null };
+}
+
+function computeToggleArm(state: StoreState): StatePatch {
+  return state.armSource === null
+    ? { armSource: "key" as const }
+    : { armSource: null, nearIds: new Set<string>(), hoveredId: null };
+}
+
+/**
+ * A pending reveal is waiting for exactly this: targets of its kind mounting
+ * on the page it navigated to. Light each one up as it arrives (capped), and
+ * let the shared timer close the burst.
+ */
+function absorbPendingReveal(
+  state: StoreState,
+  targets: StoreState["targets"],
+  target: LangyContextTarget,
+): StatePatch {
+  const pending = state.pendingReveal;
+  if (!pending) return { targets };
+  if (nowInstant().epochMilliseconds - pending.requestedAt > PENDING_REVEAL_TTL_MS) {
+    return { targets, pendingReveal: null };
+  }
+  if (pending.kind === target.kind && state.revealedIds.size < REVEAL_MAX_TARGETS) {
+    armRevealTimer();
+    const revealedIds = new Set(state.revealedIds);
+    revealedIds.add(target.id);
+    return { targets, revealedIds };
+  }
+  return { targets };
+}
+
+function computeRegister(state: StoreState, target: LangyContextTarget): StoreState | StatePatch {
+  const existing = state.targets[target.id];
+  // Returning the same state object short-circuits zustand's notify, so a
+  // re-render that re-registers an unchanged row wakes nobody up.
+  if (existing && isSameTarget(existing, target)) return state;
+  const targets = { ...state.targets, [target.id]: target };
+  return absorbPendingReveal(state, targets, target);
+}
+
+function computeUnregister(state: StoreState, id: string): StoreState | StatePatch {
+  if (!(id in state.targets)) return state;
+  const next = { ...state.targets };
+  delete next[id];
+  return { targets: next };
+}
+
+function computePick(state: StoreState, target: LangyContextTarget): StoreState | StatePatch {
+  if (state.picked.some((t) => t.id === target.id)) return state;
+  return { picked: [...state.picked, target] };
+}
+
+function computeUnpick(state: StoreState, id: string): StoreState | StatePatch {
+  if (!state.picked.some((t) => t.id === id)) return state;
+  return { picked: state.picked.filter((t) => t.id !== id) };
+}
+
+function computeRequestReveal(state: StoreState, kind: LangyRevealableKind): StatePatch {
+  const matching = Object.values(state.targets)
+    .filter((target) => target.kind === kind)
+    .slice(0, REVEAL_MAX_TARGETS)
+    .map((target) => target.id);
+  if (matching.length > 0) {
+    armRevealTimer();
+    return { revealedIds: new Set(matching), pendingReveal: null };
+  }
+  // Nothing of that kind here — hold the ask for the page being navigated
+  // to, where `register` will answer it.
+  return { pendingReveal: { kind, requestedAt: nowInstant().epochMilliseconds } };
+}
+
+function computeClearReveal(state: StoreState): StoreState | StatePatch {
+  if (state.revealedIds.size === 0 && state.pendingReveal === null) return state;
+  return { revealedIds: new Set<string>(), pendingReveal: null };
+}
+
+function computeSetActiveChipIds(state: StoreState, ids: string[]): StoreState | StatePatch {
+  const unchanged =
+    ids.length === state.activeChipIds.size && ids.every((id) => state.activeChipIds.has(id));
+  if (unchanged) return state;
+  return { activeChipIds: new Set(ids) };
+}
+
+function computeSetProximity(
+  state: StoreState,
+  nearIds: string[],
+  hoveredId: string | null,
+): StoreState | StatePatch {
+  // Called on every animation frame the pointer moves. Bail on an unchanged
+  // result so a mouse drifting across one row doesn't wake a hundred
+  // subscribers sixty times a second.
+  const sameNear =
+    nearIds.length === state.nearIds.size && nearIds.every((id) => state.nearIds.has(id));
+  if (sameNear && hoveredId === state.hoveredId) return state;
+  return { nearIds: new Set(nearIds), hoveredId };
+}
+
 export const useLangyContextTargetStore = create<LangyContextTargetState>()((set) => ({
   targets: {},
   picked: [],
@@ -180,147 +332,45 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()((set
   absorbFlash: null,
   armSource: null,
 
-  setSpotlight: (id) => set((state) => (state.spotlightId === id ? state : { spotlightId: id })),
+  setSpotlight: (id) => set((state) => computeSetSpotlight(state, id)),
 
   flashAbsorb: (id) =>
     set((state) => ({
       absorbFlash: { id, nonce: (state.absorbFlash?.nonce ?? 0) + 1 },
     })),
 
-  clearAbsorbFlash: (nonce) =>
-    set((state) => (state.absorbFlash?.nonce === nonce ? { absorbFlash: null } : state)),
+  clearAbsorbFlash: (nonce) => set((state) => computeClearAbsorbFlash(state, nonce)),
 
-  arm: (source) => set((state) => (state.armSource === source ? state : { armSource: source })),
+  arm: (source) => set((state) => computeArm(state, source)),
 
-  disarm: (source) =>
-    set((state) => {
-      if (state.armSource === null) return state;
-      // A disarm for a source that is not the one holding the latch is not a
-      // release — it is a different gesture ending.
-      if (source && state.armSource !== source) return state;
-      return {
-        armSource: null,
-        nearIds: new Set<string>(),
-        hoveredId: null,
-      };
-    }),
+  disarm: (source) => set((state) => computeDisarm(state, source)),
 
-  toggleArm: () =>
-    set((state) =>
-      state.armSource === null
-        ? { armSource: "key" as const }
-        : { armSource: null, nearIds: new Set<string>(), hoveredId: null },
-    ),
+  toggleArm: () => set((state) => computeToggleArm(state)),
 
-  register: (target) =>
-    set((state) => {
-      const existing = state.targets[target.id];
-      // Returning the same state object short-circuits zustand's notify, so a
-      // re-render that re-registers an unchanged row wakes nobody up.
-      if (existing && isSameTarget(existing, target)) return state;
-      const targets = { ...state.targets, [target.id]: target };
+  register: (target) => set((state) => computeRegister(state, target)),
 
-      // A pending reveal is waiting for exactly this: targets of its kind
-      // mounting on the page it navigated to. Light each one up as it
-      // arrives (capped), and let the shared timer close the burst.
-      const pending = state.pendingReveal;
-      if (pending && nowInstant().epochMilliseconds - pending.requestedAt > PENDING_REVEAL_TTL_MS) {
-        return { targets, pendingReveal: null };
-      }
-      if (pending && pending.kind === target.kind && state.revealedIds.size < REVEAL_MAX_TARGETS) {
-        armRevealTimer();
-        const revealedIds = new Set(state.revealedIds);
-        revealedIds.add(target.id);
-        return { targets, revealedIds };
-      }
-      return { targets };
-    }),
+  unregister: (id) => set((state) => computeUnregister(state, id)),
 
-  unregister: (id) =>
-    set((state) => {
-      if (!(id in state.targets)) return state;
-      const next = { ...state.targets };
-      delete next[id];
-      return { targets: next };
-    }),
+  pick: (target) => set((state) => computePick(state, target)),
 
-  pick: (target) =>
-    set((state) => {
-      if (state.picked.some((t) => t.id === target.id)) return state;
-      return { picked: [...state.picked, target] };
-    }),
+  unpick: (id) => set((state) => computeUnpick(state, id)),
 
-  unpick: (id) =>
-    set((state) => {
-      if (!state.picked.some((t) => t.id === id)) return state;
-      return { picked: state.picked.filter((t) => t.id !== id) };
-    }),
+  clearPicked: () => set((state) => computeClearPicked(state)),
 
-  clearPicked: () => set((state) => (state.picked.length === 0 ? state : { picked: [] })),
+  requestReveal: ({ kind }) => set((state) => computeRequestReveal(state, kind)),
 
-  requestReveal: ({ kind }) =>
-    set((state) => {
-      const matching = Object.values(state.targets)
-        .filter((target) => target.kind === kind)
-        .slice(0, REVEAL_MAX_TARGETS)
-        .map((target) => target.id);
-      if (matching.length > 0) {
-        armRevealTimer();
-        return { revealedIds: new Set(matching), pendingReveal: null };
-      }
-      // Nothing of that kind here — hold the ask for the page being
-      // navigated to, where `register` will answer it.
-      return { pendingReveal: { kind, requestedAt: nowInstant().epochMilliseconds } };
-    }),
+  holdReveal: () => holdRevealIfRunning(),
 
-  holdReveal: () => {
-    // Only extends a reveal that is actually running — never starts one.
-    if (revealTimer) armRevealTimer();
-  },
+  clearReveal: () => set((state) => computeClearReveal(state)),
 
-  clearReveal: () =>
-    set((state) => {
-      if (state.revealedIds.size === 0 && state.pendingReveal === null) {
-        return state;
-      }
-      return { revealedIds: new Set<string>(), pendingReveal: null };
-    }),
-
-  setActiveChipIds: (ids) =>
-    set((state) => {
-      const unchanged =
-        ids.length === state.activeChipIds.size && ids.every((id) => state.activeChipIds.has(id));
-      if (unchanged) return state;
-      return { activeChipIds: new Set(ids) };
-    }),
+  setActiveChipIds: (ids) => set((state) => computeSetActiveChipIds(state, ids)),
 
   setProximity: ({ nearIds, hoveredId }) =>
-    set((state) => {
-      // Called on every animation frame the pointer moves. Bail on an
-      // unchanged result so a mouse drifting across one row doesn't wake a
-      // hundred subscribers sixty times a second.
-      const sameNear =
-        nearIds.length === state.nearIds.size && nearIds.every((id) => state.nearIds.has(id));
-      if (sameNear && hoveredId === state.hoveredId) return state;
-      return { nearIds: new Set(nearIds), hoveredId };
-    }),
+    set((state) => computeSetProximity(state, nearIds, hoveredId)),
 
   reset: () => {
-    if (revealTimer) {
-      clearTimeout(revealTimer);
-      revealTimer = null;
-    }
-    set({
-      targets: {},
-      picked: [],
-      activeChipIds: new Set<string>(),
-      revealedIds: new Set<string>(),
-      pendingReveal: null,
-      nearIds: new Set<string>(),
-      hoveredId: null,
-      spotlightId: null,
-      armSource: null,
-    });
+    clearRevealTimer();
+    set(resetState());
   },
 }));
 

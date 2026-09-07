@@ -39,62 +39,69 @@ export function hasLangyBlockParts(parts: readonly unknown[]): boolean {
   });
 }
 
+/** The in-progress build of the ordered segment list. */
+interface SegmentAccumulator {
+  segments: LangyAnswerSegment[];
+  textBuffer: string[];
+}
+
+/** Consecutive text parts merge into one prose run with a paragraph break at each part
+ *  boundary — distinct parts are distinct blocks, and a bare join glued the last word
+ *  of one part onto the first word of the next. */
+function flushTextBuffer(acc: SegmentAccumulator): void {
+  if (acc.textBuffer.length === 0) return;
+  const text = acc.textBuffer.join("\n\n");
+  acc.textBuffer = [];
+  if (text.trim().length === 0) return;
+  acc.segments.push({ type: "text", text });
+}
+
+function appendCardPart(acc: SegmentAccumulator, rawPart: unknown): void {
+  flushTextBuffer(acc);
+  const parsed = parseLangyCardPart(rawPart);
+  if (parsed) {
+    acc.segments.push({ type: "card", part: parsed });
+    return;
+  }
+  // A malformed stamp still surfaces — as the disclosure, with the part
+  // itself as the raw evidence.
+  acc.segments.push({
+    type: "failed",
+    part: { type: "langy-card-failed", blockId: "malformed-part", raw: safeStringify(rawPart) },
+  });
+}
+
+function appendCardFailedPart(acc: SegmentAccumulator, rawPart: unknown): void {
+  flushTextBuffer(acc);
+  const parsed = parseLangyCardFailedPart(rawPart);
+  if (parsed) acc.segments.push({ type: "failed", part: parsed });
+}
+
+function appendAnswerPart(acc: SegmentAccumulator, rawPart: unknown): void {
+  const parsedPart = answerPartSchema.safeParse(rawPart);
+  if (!parsedPart.success) return;
+
+  const part = parsedPart.data;
+  if (part.type === "text") {
+    if ((part.text ?? "").length > 0) acc.textBuffer.push(part.text ?? "");
+    return;
+  }
+  if (part.type === LANGY_CARD_PART_TYPE) return appendCardPart(acc, rawPart);
+  if (part.type === LANGY_CARD_FAILED_PART_TYPE) return appendCardFailedPart(acc, rawPart);
+  // Tool parts and anything else render through their own surfaces
+  // (LangyToolActivity et al) — not part of the prose flow.
+}
+
 /**
  * The ordered segments. Consecutive text parts merge into one prose run with a
  * paragraph break at each part boundary — distinct parts are distinct blocks, and a
  * bare join glued the last word of one part onto the first word of the next.
  */
 export function langyAnswerSegments(parts: readonly unknown[]): LangyAnswerSegment[] {
-  const segments: LangyAnswerSegment[] = [];
-  let textBuffer: string[] = [];
-
-  const flushText = (): void => {
-    if (textBuffer.length === 0) return;
-    const text = textBuffer.join("\n\n");
-    textBuffer = [];
-    if (text.trim().length === 0) return;
-    segments.push({ type: "text", text });
-  };
-
-  for (const rawPart of parts) {
-    const parsedPart = answerPartSchema.safeParse(rawPart);
-    if (!parsedPart.success) continue;
-
-    const part = parsedPart.data;
-    if (part.type === "text") {
-      if ((part.text ?? "").length > 0) textBuffer.push(part.text ?? "");
-      continue;
-    }
-    if (part.type === LANGY_CARD_PART_TYPE) {
-      flushText();
-      const parsed = parseLangyCardPart(rawPart);
-      if (parsed) {
-        segments.push({ type: "card", part: parsed });
-      } else {
-        // A malformed stamp still surfaces — as the disclosure, with the
-        // part itself as the raw evidence.
-        segments.push({
-          type: "failed",
-          part: {
-            type: "langy-card-failed",
-            blockId: "malformed-part",
-            raw: safeStringify(rawPart),
-          },
-        });
-      }
-      continue;
-    }
-    if (part.type === LANGY_CARD_FAILED_PART_TYPE) {
-      flushText();
-      const parsed = parseLangyCardFailedPart(rawPart);
-      if (parsed) segments.push({ type: "failed", part: parsed });
-      continue;
-    }
-    // Tool parts and anything else render through their own surfaces
-    // (LangyToolActivity et al) — not part of the prose flow.
-  }
-  flushText();
-  return segments;
+  const acc: SegmentAccumulator = { segments: [], textBuffer: [] };
+  for (const rawPart of parts) appendAnswerPart(acc, rawPart);
+  flushTextBuffer(acc);
+  return acc.segments;
 }
 
 /**

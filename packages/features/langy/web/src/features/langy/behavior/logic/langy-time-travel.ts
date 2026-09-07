@@ -32,28 +32,20 @@ export interface LangyTimeTravelView {
   cursor: LangyEventCursor | null;
 }
 
-export function buildTimeTravelView({
-  records,
-  scrubSeq,
-  historyMessages,
-}: {
-  records: LangyDevLogRecord[];
-  scrubSeq: number | null;
-  historyMessages: LangyMessageDto[];
-}): LangyTimeTravelView | null {
-  if (scrubSeq === null) return null;
-  const visible = tapeUpTo(records, scrubSeq);
-  const atMs = visible.at(-1)?.atMs ?? 0;
-  const fold = replayTurnProjection(visible);
-
-  // Settled messages carry a SERVER-TIME sort key, and the two sources share one clock
-  // by construction: a history row's createdAtMs IS the event's occurredAt (the message
-  // map stamps CreatedAt from it).
+/**
+ * Merges history rows the durable projection had by `atMs` with settled answers from the
+ * recorded EVENT LOG itself, deduplicated by messageId (both share one server clock, so
+ * clock skew can never double-render an answer).
+ */
+function computeSettledMessages(
+  visible: LangyDevLogRecord[],
+  historyMessages: LangyMessageDto[],
+  atMs: number,
+): TimeTravelMessage[] {
   const settled: { key: number; message: TimeTravelMessage }[] = [];
-
-  // History rows the durable projection had by the moment. Rows with no
-  // timestamp (older builds default 0) are always in.
   const seenIds = new Set<string>();
+
+  // History rows with no timestamp (older builds default 0) are always in.
   for (const message of historyMessages) {
     if (message.role !== "user" && message.role !== "assistant") continue;
     if ((message.createdAtMs ?? 0) > atMs) continue;
@@ -64,9 +56,6 @@ export function buildTimeTravelView({
     });
   }
 
-  // Settled answers from the recorded EVENT LOG itself — parts exactly as the
-  // terminal event carried them, deduplicated against history by messageId so
-  // client/server clock skew can never double-render an answer.
   for (const record of visible) {
     if (record.lane !== "durable" || record.source !== "tail") continue;
     const event = record.event;
@@ -75,33 +64,44 @@ export function buildTimeTravelView({
     seenIds.add(event.data.messageId);
     settled.push({
       key: event.occurredAt,
-      message: {
-        id: event.data.messageId,
-        role: "assistant",
-        parts: event.data.parts,
-      },
+      message: { id: event.data.messageId, role: "assistant", parts: event.data.parts },
     });
   }
 
   // Stable sort on the shared server clock; legacy zero-keyed rows keep their
   // arrival order at the front.
   settled.sort((a, b) => a.key - b.key);
-  const messages = settled.map((entry) => entry.message);
+  return settled.map((entry) => entry.message);
+}
 
-  const terminal =
-    fold.turn?.Status === "completed" ||
-    fold.turn?.Status === "failed" ||
-    fold.turn?.Status === "stopped";
-
-  // The moment's live edge: a send whose message_recorded had not landed in
-  // the history rows yet — show the user's text from the outbound lane.
+/**
+ * The moment's live edge: a send whose message_recorded had not landed in the history
+ * rows yet — show the user's text from the outbound lane, once, and never after it
+ * (or an equivalent history row) has settled.
+ */
+function computePendingSend({
+  visible,
+  historyMessages,
+  atMs,
+  terminal,
+  messages,
+}: {
+  visible: LangyDevLogRecord[];
+  historyMessages: LangyMessageDto[];
+  atMs: number;
+  terminal: boolean;
+  messages: TimeTravelMessage[];
+}): {
+  pendingSend: boolean;
+  lastSend: Extract<LangyDevLogRecord, { lane: "outbound" }> | undefined;
+  sendText: string | null;
+} {
   const lastSend = [...visible]
     .reverse()
     .find(
       (record): record is Extract<LangyDevLogRecord, { lane: "outbound" }> =>
         record.lane === "outbound" && record.kind === "send",
     );
-  const running = fold.turn?.Status === "running";
   const newestBaselineUserAt = Math.max(
     0,
     ...historyMessages
@@ -121,7 +121,78 @@ export function buildTimeTravelView({
     JSON.stringify(lastSettledUser.parts).includes(JSON.stringify(sendText));
   const pendingSend =
     !!lastSend && !terminal && !sendAlreadySettled && lastSend.atMs > newestBaselineUserAt;
+  return { pendingSend, lastSend, sendText };
+}
 
+/** Mid-turn: the partial answer, exactly as far as it had streamed, plus its live signals. */
+function computeStreamedState(
+  visible: LangyDevLogRecord[],
+  fold: ReturnType<typeof replayTurnProjection>,
+  terminal: boolean,
+): { streamedText: string; reasoning: string; status: string | null; progress: number | null } {
+  let streamedText = "";
+  let reasoning = "";
+  let status: string | null = null;
+  let progress: number | null = null;
+  if (terminal) return { streamedText, reasoning, status, progress };
+  for (const record of streamRecords(visible)) {
+    // Deltas for the CURRENT turn only — a scrub position inside an earlier
+    // turn folds that turn instead, and its deltas match by turnId too.
+    if (fold.turnId !== null && record.turnId !== fold.turnId) continue;
+    const entry = record.entry;
+    if (entry.type === "delta") streamedText += entry.text;
+    else if (entry.type === "reasoning") reasoning += entry.text;
+    else if (entry.type === "status") status = entry.status || null;
+    else if (entry.type === "progress") {
+      progress = entry.progress ?? progress;
+      if (entry.message) status = entry.message;
+    }
+  }
+  return { streamedText, reasoning, status, progress };
+}
+
+/** THE SETTLE GAP: the answer's history row lands on the SERVER clock, but the fold only
+ *  turns terminal once the closing event reaches the tape — a catch-up round-trip later. */
+function hasAnswerLanded(messages: TimeTravelMessage[], streamedText: string): boolean {
+  const lastSettledAssistant = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant");
+  return (
+    !!streamedText &&
+    !!lastSettledAssistant &&
+    settledPartsText(lastSettledAssistant.parts).startsWith(streamedText.trimEnd())
+  );
+}
+
+export function buildTimeTravelView({
+  records,
+  scrubSeq,
+  historyMessages,
+}: {
+  records: LangyDevLogRecord[];
+  scrubSeq: number | null;
+  historyMessages: LangyMessageDto[];
+}): LangyTimeTravelView | null {
+  if (scrubSeq === null) return null;
+  const visible = tapeUpTo(records, scrubSeq);
+  const atMs = visible.at(-1)?.atMs ?? 0;
+  const fold = replayTurnProjection(visible);
+
+  const messages = computeSettledMessages(visible, historyMessages, atMs);
+
+  const terminal =
+    fold.turn?.Status === "completed" ||
+    fold.turn?.Status === "failed" ||
+    fold.turn?.Status === "stopped";
+  const running = fold.turn?.Status === "running";
+
+  const { pendingSend, lastSend, sendText } = computePendingSend({
+    visible,
+    historyMessages,
+    atMs,
+    terminal,
+    messages,
+  });
   if (pendingSend && lastSend) {
     messages.push({
       id: `tt-send-${lastSend.seq}`,
@@ -130,38 +201,12 @@ export function buildTimeTravelView({
     });
   }
 
-  // Mid-turn: the partial answer, exactly as far as it had streamed.
-  let streamedText = "";
-  let reasoning = "";
-  let status: string | null = null;
-  let progress: number | null = null;
-  if (!terminal) {
-    for (const record of streamRecords(visible)) {
-      // Deltas for the CURRENT turn only — a scrub position inside an earlier
-      // turn folds that turn instead, and its deltas match by turnId too.
-      if (fold.turnId !== null && record.turnId !== fold.turnId) continue;
-      const entry = record.entry;
-      if (entry.type === "delta") streamedText += entry.text;
-      else if (entry.type === "reasoning") reasoning += entry.text;
-      else if (entry.type === "status") status = entry.status || null;
-      else if (entry.type === "progress") {
-        progress = entry.progress ?? progress;
-        if (entry.message) status = entry.message;
-      }
-    }
-  }
-
-  // THE SETTLE GAP. The answer's history row lands on the SERVER clock, but the fold
-  // only turns terminal once the closing event reaches the tape — a catch-up round-trip
-  // later.
-  const lastSettledAssistant = [...messages]
-    .reverse()
-    .find((message) => message.role === "assistant");
-  const answerLanded =
-    !!streamedText &&
-    !!lastSettledAssistant &&
-    settledPartsText(lastSettledAssistant.parts).startsWith(streamedText.trimEnd());
-
+  const { streamedText, reasoning, status, progress } = computeStreamedState(
+    visible,
+    fold,
+    terminal,
+  );
+  const answerLanded = hasAnswerLanded(messages, streamedText);
   if (streamedText && !answerLanded) {
     messages.push({
       id: `tt-partial-${fold.turnId ?? "pending"}`,
