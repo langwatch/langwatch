@@ -83,6 +83,11 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
       parameters,
     });
   },
+  // Slice 1 registers the type so a voice run classifies rather than falling
+  // through; the real adapter that dials ElevenLabs lands in a later slice.
+  voice: () => {
+    throw new Error("Voice agent runs are not available yet");
+  },
   // The relay route authenticates the child with the project key, the same
   // credential the code and workflow adapters carry to the engine.
   connected: ({ data, projectApiKey, parameters }) => {

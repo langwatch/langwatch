@@ -27,7 +27,7 @@ export interface ExecutionJobData {
   setId: string;
   scenarioName?: string;
   target: {
-    type: "prompt" | "http" | "code" | "workflow" | "connected";
+    type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
     referenceId: string;
   };
   /**

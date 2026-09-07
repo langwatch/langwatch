@@ -245,6 +245,37 @@ export const ConnectedAgentDataSchema = z.object({
 });
 export type ConnectedAgentData = z.infer<typeof ConnectedAgentDataSchema>;
 
+/**
+ * What a voice run carries to the child: the transport, the agent id on that
+ * transport, and the project's ElevenLabs credential resolved from the
+ * provider row (never stored on the agent). The credential is `null` when the
+ * project has no key, so the child fails the run with a named reason rather
+ * than reaching the vendor with an empty credential — the same way the http
+ * data carries its secrets to the child.
+ *
+ * Slice 1 only prepares this; the "voice" adapter factory that consumes it
+ * lands in a later slice.
+ */
+export const VoiceTargetSchema = z.object({
+  transport: z.literal("elevenlabs_convai"),
+  agentId: z.string(),
+  credential: z
+    .object({
+      apiKey: z.string(),
+      baseUrl: z.string(),
+    })
+    .nullable(),
+});
+export type VoiceTarget = z.infer<typeof VoiceTargetSchema>;
+
+/** Pre-fetched voice agent configuration for serialized execution. */
+export const VoiceAgentDataSchema = z.object({
+  type: z.literal("voice"),
+  agentId: z.string(),
+  voiceTarget: VoiceTargetSchema,
+});
+export type VoiceAgentData = z.infer<typeof VoiceAgentDataSchema>;
+
 /** Union type for all supported target adapter data */
 export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
@@ -252,6 +283,7 @@ export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   CodeAgentDataSchema,
   WorkflowAgentDataSchema,
   ConnectedAgentDataSchema,
+  VoiceAgentDataSchema,
 ]);
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
@@ -313,7 +345,7 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 export const TargetConfigSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
   referenceId: z.string(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;

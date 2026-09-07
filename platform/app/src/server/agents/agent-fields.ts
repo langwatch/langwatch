@@ -115,13 +115,14 @@ export const resolveAgentFields = ({
   dsl?: Workflow | null;
 }): AgentFields => {
   if (type === "workflow") return workflowAgentFields(dsl);
-  // A connected agent's contract is fixed by the relay: it reads the
-  // conversation and answers with one output.
-  if (type === "connected") return CONNECTED_AGENT_FIELDS;
+  // A connected agent's contract is fixed by the relay, and a voice agent's is
+  // fixed by the call: both read the conversation and answer with one output,
+  // and neither stores inputs/outputs on its config.
+  if (type === "connected" || type === "voice") return CONNECTED_AGENT_FIELDS;
 
   return {
-    inputFields: config.inputs ?? [],
-    outputFields: config.outputs ?? [],
+    inputFields: "inputs" in config ? (config.inputs ?? []) : [],
+    outputFields: "outputs" in config ? (config.outputs ?? []) : [],
     fieldsResolved: true,
   };
 };

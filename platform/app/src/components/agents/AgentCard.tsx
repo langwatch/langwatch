@@ -16,6 +16,7 @@ import {
   Globe,
   type LucideIcon,
   MessageSquare,
+  Mic,
   MoreVertical,
   Play,
   RefreshCw,
@@ -41,6 +42,7 @@ const agentTypeIcons: Record<AgentType, LucideIcon> = {
   http: Globe,
   workflow: Workflow,
   connected: Bot,
+  voice: Mic,
 };
 
 const agentTypeLabels: Record<AgentType, string> = {
@@ -49,6 +51,7 @@ const agentTypeLabels: Record<AgentType, string> = {
   http: "HTTP",
   workflow: "Workflow",
   connected: "Connected",
+  voice: "Voice agent",
 };
 
 /** The class that keeps a click inside the card menu out of the card click. */

@@ -20,6 +20,14 @@ describe("getAgentEditorDrawer", () => {
     });
   });
 
+  describe("given a voice agent", () => {
+    describe("when its editor drawer is looked up", () => {
+      it("returns agentVoiceEditor", () => {
+        expect(getAgentEditorDrawer("voice")).toBe("agentVoiceEditor");
+      });
+    });
+  });
+
   describe("given a workflow agent", () => {
     describe("when its editor drawer is looked up", () => {
       it("returns agentWorkflowEditor (not workflowSelector, which is create-only)", () => {

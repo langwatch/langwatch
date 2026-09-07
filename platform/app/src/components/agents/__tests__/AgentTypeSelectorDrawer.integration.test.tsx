@@ -83,6 +83,14 @@ describe("AgentTypeSelectorDrawer", () => {
       expect(screen.queryByText("Prompt Agent")).not.toBeInTheDocument();
     });
 
+    it("shows the Voice Agent option", async () => {
+      renderDrawer();
+      await waitFor(() => {
+        expect(screen.getByText("Voice Agent")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("agent-type-voice")).toBeInTheDocument();
+    });
+
     it("shows descriptions for each type", async () => {
       renderDrawer();
       await waitFor(() => {
@@ -158,6 +166,20 @@ describe("AgentTypeSelectorDrawer", () => {
 
       expect(mockOnSelect).toHaveBeenCalledWith("workflow");
       expect(mockOpenDrawer).toHaveBeenCalledWith("workflowSelector");
+    });
+
+    it("calls onSelect with 'voice' and opens the voice editor when clicking Voice Agent", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("agent-type-voice")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("agent-type-voice"));
+
+      expect(mockOnSelect).toHaveBeenCalledWith("voice");
+      expect(mockOpenDrawer).toHaveBeenCalledWith("agentVoiceEditor");
     });
   });
 });

@@ -1,5 +1,5 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { Cable, Code, Globe, Workflow } from "lucide-react";
+import { Cable, Code, Globe, Mic, Workflow } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -10,7 +10,7 @@ import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
  * Note: "signature" (prompt) agents have been removed.
  * Use the Prompts feature directly for LLM-based prompts.
  */
-export type AgentType = "code" | "workflow" | "http";
+export type AgentType = "code" | "workflow" | "http" | "voice";
 
 export type AgentTypeSelectorDrawerProps = {
   open?: boolean;
@@ -29,6 +29,13 @@ const agentTypes: Array<{
     icon: Globe,
     title: "HTTP Agent",
     description: "Connect to an external API endpoint to process requests",
+  },
+  {
+    type: "voice",
+    icon: Mic,
+    title: "Voice Agent",
+    description:
+      "Test a voice agent hosted on ElevenLabs: talk to it or send a simulated caller",
   },
   {
     type: "code",
@@ -72,6 +79,9 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
         break;
       case "http":
         openDrawer("agentHttpEditor");
+        break;
+      case "voice":
+        openDrawer("agentVoiceEditor");
         break;
       default: {
         const _exhaustive: never = type;

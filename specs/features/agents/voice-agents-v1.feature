@@ -84,14 +84,14 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   # ---------------------------------------------------------------------------
 
   # AC7
-  @integration @unimplemented
+  @integration
   Scenario: Talk to it is disabled before the agent is saved
     Given an unsaved voice agent drawer
     When the drawer is drawn
     Then "Talk to it" is disabled with the tooltip "Save the agent first"
 
   # AC7
-  @integration @unimplemented
+  @integration
   Scenario: Talk to it is disabled when the project has no ElevenLabs key
     Given the saved voice agent "Support line" and a project with no ElevenLabs key
     When the drawer is drawn
@@ -231,21 +231,21 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   # ---------------------------------------------------------------------------
 
   # AC2
-  @unit @unimplemented
+  @unit
   Scenario: A voice agent config with a trimmed agent id is valid
     Given a voice agent config with transport "elevenlabs_convai" and a 1-128 character agent id
     When the config is validated
     Then it is accepted
 
   # AC2
-  @unit @unimplemented
+  @unit
   Scenario: A voice agent config with an empty agent id is rejected
     Given a voice agent config whose agent id is empty after trimming
     When the config is validated
     Then it is rejected
 
   # AC2
-  @unit @unimplemented
+  @unit
   Scenario: A voice agent config with an unrecognised transport is rejected
     Given a voice agent config whose transport is not a known member of the transport union
     When the config is validated

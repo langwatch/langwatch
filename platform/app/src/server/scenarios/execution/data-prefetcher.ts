@@ -52,11 +52,16 @@ import {
   AgentRepository,
   type TypedAgent,
 } from "../../agents/agent.repository";
+import { parseVoiceAgentConfig } from "../../agents/voice/voice-agent.config";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
 import { prisma } from "../../db";
+import {
+  findElevenLabsProviderForProject,
+  getElevenLabsApiCredential,
+} from "../../gateway/elevenLabsCredential.service";
 import {
   PromptService,
   type VersionedPrompt,
@@ -76,6 +81,7 @@ import {
   type ScenarioConfig,
   type TargetAdapterData,
   type TargetConfig,
+  type VoiceAgentData,
   type WorkflowAgentData,
 } from "./types";
 
@@ -344,6 +350,7 @@ const MISSING_TARGET_LABELS: Record<TargetConfig["type"], string> = {
   workflow: "Workflow agent",
   connected: "Connected agent",
   http: "HTTP agent",
+  voice: "Voice agent",
 };
 
 /**
@@ -874,6 +881,13 @@ async function fetchAgentData(
       projectSecretsFetcher: deps.projectSecretsFetcher,
     });
   }
+  if (target.type === "voice") {
+    return fetchVoiceAgentData({
+      projectId,
+      agentId: target.referenceId,
+      fetcher: deps.agentFetcher,
+    });
+  }
   return fetchHttpAgentData({
     projectId,
     agentId: target.referenceId,
@@ -991,6 +1005,46 @@ async function fetchConnectedAgentData({
       config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
       MAX_CALL_TIMEOUT_MS,
     ),
+  };
+}
+
+/**
+ * The child reaches an ElevenLabs voice agent with the project's provider key,
+ * so the job carries the transport, the agent id on it, and the credential
+ * resolved from the provider row. The agent stores no secret; the key comes
+ * from the ElevenLabs model provider, and is `null` when the project has none,
+ * which the child surfaces as a named failure.
+ *
+ * Slice 1 only prepares this — the "voice" adapter factory that consumes it
+ * lands in a later slice.
+ */
+async function fetchVoiceAgentData({
+  projectId,
+  agentId,
+  fetcher,
+}: {
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
+}): Promise<VoiceAgentData | null> {
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "voice") return null;
+
+  const config = parseVoiceAgentConfig(agent.config);
+
+  const provider = await findElevenLabsProviderForProject(projectId);
+  const credential = provider
+    ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
+    : null;
+
+  return {
+    type: "voice",
+    agentId: agent.id,
+    voiceTarget: {
+      transport: config.transport,
+      agentId: config.agentId,
+      credential,
+    },
   };
 }
 

@@ -76,6 +76,13 @@ export async function prefetchAgentTestData({
     };
   }
 
+  if (target.type === "voice") {
+    return {
+      success: false,
+      error: "Voice agents run as scenarios, not as single test turns",
+    };
+  }
+
   const [project, adapterResult, agentName] = await Promise.all([
     reads.project(),
     reads.adapter(),
