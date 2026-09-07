@@ -24,9 +24,10 @@ vi.mock("../../../../env.mjs", () => ({
   env: { NEXTAUTH_PROVIDER: "auth0", BASE_HOST: "http://localhost:5560" },
 }));
 
-vi.mock("~/server/rateLimit", () => ({
-  rateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+const { rateLimitMock } = vi.hoisted(() => ({
+  rateLimitMock: vi.fn().mockResolvedValue({ allowed: true }),
 }));
+vi.mock("~/server/rateLimit", () => ({ rateLimit: rateLimitMock }));
 
 // The tRPC error-audit middleware writes through the real prisma singleton, so
 // a mutation that throws here reaches a live client and fails with a Prisma
@@ -37,8 +38,8 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("~/utils/getClientIp", () => ({
-  getDirectPeerIp: vi.fn(() => "127.0.0.1"),
+vi.mock("~/server/auth/rate-limit-client-ip", () => ({
+  getAuthRateLimitClientIp: vi.fn(() => "198.51.100.11"),
 }));
 
 const { resolveAuthProviderMock } = vi.hoisted(() => ({
@@ -109,6 +110,11 @@ describe("userRouter.register()", () => {
         name: "Alice",
         email: "a@x.com",
         password: "supersecret",
+      });
+      expect(rateLimitMock).toHaveBeenCalledWith({
+        key: "user.register:198.51.100.11",
+        windowSeconds: 60 * 60,
+        max: 20,
       });
     });
   });
