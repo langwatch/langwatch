@@ -9,7 +9,7 @@
  */
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { GuidedOnboardingStateView } from "~/server/api/routers/onboarding/guided";
+import type { GuidedOnboardingStateView } from "~/server/onboarding/guided-onboarding.instance";
 import { api } from "~/utils/api";
 
 export const GUIDED_ONBOARDING_FLAG = "experiment_onboarding_langy_guided";

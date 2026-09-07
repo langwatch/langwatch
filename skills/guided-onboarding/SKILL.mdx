@@ -223,7 +223,9 @@ The output carries `reveal_id` and `preview`, never the secret. When the key alr
 
 You never see the secret, and you never print it: never write a value that starts with `vk-lw-` in a message, and never write the snippet yourself. The `secret_snippet` card shows it to the user, once, and masks it afterwards.
 
-The gateway address is the value after `Gateway:` in the brief, exactly as it stands there, never a host you remember: an instance serves its own. When the brief says none is configured, use `<your gateway URL>` in its place and say in one line that the gateway is not set up on this instance yet.
+The gateway address is the value after `Gateway:` in the brief, exactly as it stands there, never a host you remember: an instance serves its own.
+
+Never write a placeholder in a snippet: no angle brackets, no "your key here", nothing that stands in for a value. A snippet is either complete, with the key shown through the card, or it is described in words, as below.
 
 Say, verbatim:
 
@@ -232,11 +234,28 @@ Your key production-app is live. Point your app at the gateway with it and every
 Then, in the same step and right after the line, call `secret_snippet` with the reveal id, the preview, and this template, the gateway address filled in and `{{secret}}` left exactly as it is:
 
 ```
-export OPENAI_BASE_URL="<the address after Gateway: in the brief>"
+export OPENAI_BASE_URL=the address after Gateway: in the brief, in double quotes
 export OPENAI_API_KEY="{{secret}}"
 ```
 
-When a `production-app` key exists but the brief carries no reveal id for it, its secret is not readable any more: skip the card and print the two lines above in a `bash` fence with `<your production-app key>` where the secret goes.
+When the brief says no gateway is configured, skip the snippet and say in one line that the gateway is not set up on this instance yet, then close with the last line below.
+
+### When the key exists but the brief carries no reveal id
+
+Its secret was shown once, at creation, and cannot be shown again. Do not open with the live line. Say, verbatim, then ask with the `question` tool:
+
+Your production-app key was created earlier and its secret was shown once, at creation. Do you still have it?
+
+Options, in this order:
+
+1. "Create a new key"
+2. "I saved it"
+
+On "Create a new key": mint one with `--reveal-once` as above, using the next free name (`production-app-2`, then `-3`), say the live line with that name, and show the snippet through the `secret_snippet` card with the reveal id the create printed.
+
+On "I saved it": there is no card to show, so describe the two lines instead of writing a snippet. Say that the app needs two environment variables: `OPENAI_BASE_URL` set to the gateway address (write the address itself, from the brief), and `OPENAI_API_KEY` set to the production-app key they saved. Write the address in full and the key line in words; never put a value in angle brackets or a stand-in where the key goes.
+
+Then, either way:
 
 Say, verbatim, as the last line:
 

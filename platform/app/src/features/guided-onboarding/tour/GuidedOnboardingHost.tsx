@@ -18,7 +18,7 @@ import { useSidebarSectionOverrides } from "~/components/sidebar/sidebarSectionO
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import type { GuidedOnboardingStateView } from "~/server/api/routers/onboarding/guided";
+import type { GuidedOnboardingStateView } from "~/server/onboarding/guided-onboarding.instance";
 import type { GuidedOnboardingState } from "~/server/schemas/sign-up-data.schema";
 import { api } from "~/utils/api";
 import { usePathname } from "~/utils/compat/next-navigation";

@@ -11,8 +11,10 @@ import {
   GUIDED_ONBOARDING_KICKOFF_PART_TYPE,
   type GuidedKickoffInput,
   guidedKickoffPartOf,
+  guidedKickoffStateFactsOf,
   guidedTourCardRows,
   planGuidedKickoffSend,
+  settleGuidedKickoffParts,
 } from "../kickoff";
 
 const KICKOFF: GuidedKickoffInput = {
@@ -183,6 +185,134 @@ describe("the guided onboarding kickoff", () => {
         "Setting up for",
         "you",
       ]);
+    });
+  });
+});
+
+describe("settleGuidedKickoffParts", () => {
+  const snapshot = buildGuidedKickoffParts({
+    input: {
+      path: "gateway",
+      paths: ["gateway"],
+      orgName: "ACME",
+      firstName: "Ada",
+      tourStatus: "completed",
+      gatewayUrl: "https://gateway.acme.example/v1",
+    },
+  });
+
+  describe("given a kickoff the panel composed before the tour's key was recorded", () => {
+    const recordedLater = guidedKickoffStateFactsOf({
+      paths: ["gateway", "llmops"],
+      gatewayUrl: "https://gateway.acme.example/v1",
+      virtualKeyName: "production-app",
+      virtualKeyPreview: "vk-lw-01M1X40",
+      virtualKeyRevealId: "rvl_late",
+    });
+
+    /** @scenario "The brief's state lines are settled on the server from the stored guided state" */
+    it("rebuilds the typed part and the brief from the stored state, and keeps what the panel alone knows", () => {
+      expect(snapshot[1].text).toContain(
+        "Virtual key: none minted by the tour",
+      );
+
+      const settled = settleGuidedKickoffParts({
+        parts: snapshot,
+        facts: recordedLater,
+      });
+
+      expect(settled).not.toBeNull();
+      const [typed, brief] = settled as [
+        Record<string, unknown>,
+        { type: string; text: string },
+      ];
+      expect(typed).toMatchObject({
+        type: "guided-onboarding-kickoff",
+        path: "gateway",
+        paths: ["gateway", "llmops"],
+        orgName: "ACME",
+        firstName: "Ada",
+        tourStatus: "completed",
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-01M1X40",
+        virtualKeyRevealId: "rvl_late",
+      });
+      expect(brief.type).toBe("text");
+      expect(brief.text).toContain(
+        "Virtual key: production-app, preview vk-lw-01M1X40, reveal rvl_late",
+      );
+      expect(brief.text).toContain(
+        "Everything picked, in the order it was picked: gateway (Gateway), llmops (Evals & LLM Ops)",
+      );
+      expect(brief.text).toContain("Organization: ACME");
+      expect(brief.text).toContain("First name: Ada");
+      expect(brief.text).toContain("Tour: completed");
+      expect(brief.text).not.toContain("none minted by the tour");
+    });
+
+    it("keeps the continuation line of a kickoff that continues a conversation", () => {
+      const continuing = buildGuidedKickoffParts({
+        input: {
+          path: "gateway",
+          paths: ["llmops", "gateway"],
+          tourStatus: "completed",
+        },
+        continuing: true,
+      });
+      const settled = settleGuidedKickoffParts({
+        parts: continuing,
+        facts: recordedLater,
+      }) as [unknown, { text: string }];
+      expect(settled[1].text.startsWith("Let's set up Gateway then.\n")).toBe(
+        true,
+      );
+      expect(settled[1].text).toContain("reveal rvl_late");
+    });
+
+    it("leaves every other part where it was", () => {
+      const extra = { type: "file", url: "https://acme.example/a.png" };
+      const settled = settleGuidedKickoffParts({
+        parts: [extra, ...snapshot],
+        facts: recordedLater,
+      });
+      expect(settled?.[0]).toBe(extra);
+      expect(settled).toHaveLength(3);
+    });
+  });
+
+  describe("given a message that is not a kickoff", () => {
+    it("answers null", () => {
+      expect(
+        settleGuidedKickoffParts({
+          parts: [{ type: "text", text: "hello" }],
+          facts: guidedKickoffStateFactsOf({}),
+        }),
+      ).toBeNull();
+    });
+  });
+});
+
+describe("guidedKickoffStateFactsOf", () => {
+  it("reads the settled fields off a state view and nothing else", () => {
+    expect(
+      guidedKickoffStateFactsOf({
+        paths: ["gateway"],
+        provider: "OpenAI",
+        providerModel: "gpt-5",
+        gatewayUrl: "https://gateway.acme.example/v1",
+        virtualKeyName: "production-app",
+        virtualKeyPreview: "vk-lw-01M1X40",
+        virtualKeyRevealId: "rvl_abc",
+        ...({ currentPath: "gateway", conversationId: "conv-1" } as object),
+      }),
+    ).toEqual({
+      paths: ["gateway"],
+      provider: "OpenAI",
+      providerModel: "gpt-5",
+      gatewayUrl: "https://gateway.acme.example/v1",
+      virtualKeyName: "production-app",
+      virtualKeyPreview: "vk-lw-01M1X40",
+      virtualKeyRevealId: "rvl_abc",
     });
   });
 });

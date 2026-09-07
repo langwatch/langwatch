@@ -60,6 +60,41 @@ export type GuidedKickoff = GuidedKickoffInput & {
   conversationId?: string | null;
 };
 
+/**
+ * The fields of the input the durable guided state settles: what the takeover
+ * and the tour recorded, plus the instance's gateway. The panel fills them
+ * from the state it holds, and the server fills them again, from the state
+ * as stored, when the kickoff's turn starts (`settleGuidedKickoffParts`).
+ */
+export const GUIDED_KICKOFF_STATE_FIELDS = [
+  "paths",
+  "provider",
+  "providerModel",
+  "gatewayUrl",
+  "virtualKeyName",
+  "virtualKeyPreview",
+  "virtualKeyRevealId",
+] as const;
+export type GuidedKickoffStateFacts = Pick<
+  GuidedKickoffInput,
+  (typeof GUIDED_KICKOFF_STATE_FIELDS)[number]
+>;
+
+/** The settled fields, read off a guided state view. */
+export function guidedKickoffStateFactsOf(
+  state: Partial<GuidedKickoffStateFacts>,
+): GuidedKickoffStateFacts {
+  return {
+    paths: state.paths ?? [],
+    provider: state.provider,
+    providerModel: state.providerModel,
+    gatewayUrl: state.gatewayUrl,
+    virtualKeyName: state.virtualKeyName,
+    virtualKeyPreview: state.virtualKeyPreview,
+    virtualKeyRevealId: state.virtualKeyRevealId,
+  };
+}
+
 export const guidedKickoffPartSchema = z
   .object({ type: z.literal(GUIDED_ONBOARDING_KICKOFF_PART_TYPE) })
   .and(guidedKickoffInputSchema);
@@ -164,6 +199,47 @@ export function buildGuidedKickoffParts({
     { type: GUIDED_ONBOARDING_KICKOFF_PART_TYPE, ...input },
     { type: "text", text: buildGuidedKickoffBrief({ input, continuing }) },
   ];
+}
+
+/**
+ * The kickoff parts with their state lines settled from `facts`: the typed
+ * part carries the settled fields and the brief is rebuilt from them, so the
+ * card and the model agree. The brief keeps its continuation line when it
+ * had one. Null when the parts carry no kickoff.
+ *
+ * The panel composes the kickoff from a snapshot of the guided state, and
+ * the tour's last write (the key it minted, recorded by the drawer) can land
+ * after that snapshot was taken. Settling on the server, from the state as
+ * stored when the turn starts, is what makes the brief carry it either way.
+ */
+export function settleGuidedKickoffParts({
+  parts,
+  facts,
+}: {
+  parts: readonly unknown[];
+  facts: GuidedKickoffStateFacts;
+}): unknown[] | null {
+  const kickoff = guidedKickoffPartOf(parts);
+  if (!kickoff) return null;
+  const { type: _type, ...sent } = kickoff;
+  const continuation = guidedPathContinuationLine(kickoff.path);
+  const continuing = parts.some(
+    (part) =>
+      typeof (part as { text?: unknown })?.text === "string" &&
+      (part as { text: string }).text.startsWith(continuation),
+  );
+  const [typed, brief] = buildGuidedKickoffParts({
+    input: { ...sent, ...facts },
+    continuing,
+  });
+  return parts.map((part) => {
+    if (parseGuidedKickoffPart(part)) return typed;
+    const text = (part as { text?: unknown })?.text;
+    return typeof text === "string" &&
+      text.includes(GUIDED_KICKOFF_BRIEF_OPENER)
+      ? brief
+      : part;
+  });
 }
 
 /**

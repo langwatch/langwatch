@@ -98,6 +98,21 @@ Feature: Langy guides the first setup after sign-up
       Then the gateway path opens on the live line as if the key were just made
       And the reveal id, the name and the preview come from the brief's Virtual key line
 
+    # A snippet with a placeholder where the key goes is one the person cannot
+    # paste, and a value in angle brackets reads as the key itself to someone
+    # skimming. When the key exists but its secret cannot be shown again, the
+    # person decides: a new key through the card, or the lines with the key
+    # described in words.
+    @unit
+    Scenario: A key that exists with no reveal gets a question, never a placeholder
+      Given a production-app key exists and the brief carries no reveal id for it
+      When the compiled guided-onboarding skill is read
+      Then Langy says the key was created earlier and its secret was shown once, at creation
+      And asks with a question card whether to create a new key, with "Create a new key" and "I saved it"
+      And on "Create a new key" it mints with --reveal-once and shows the snippet through the secret snippet card
+      And on "I saved it" it prints the two export lines with the address filled in and the key line described in words
+      And the skill never writes a value in angle brackets where the key or the gateway address goes
+
     # The secret was pasted into a chat code block, and from there it was in
     # the conversation store, the projection and every viewer's history. The
     # key is minted with --reveal-once, so the CLI output carries a reveal id
@@ -117,6 +132,22 @@ Feature: Langy guides the first setup after sign-up
       Then the brief carries the key's name, its preview and its reveal id on one line
       And the brief never carries the secret
       And a brief for a tour that minted no key says so
+
+    # The panel composes the kickoff from the guided state it holds, and the
+    # drawer records the key the tour minted seconds before the tour ends: a
+    # kickoff composed from a snapshot taken before that write said no key
+    # was minted, and Langy wrote the snippet with a placeholder. The lines
+    # the state settles (the picks, the provider, the gateway, the key) are
+    # rebuilt on the server from the state as stored when the turn starts,
+    # so the snapshot the panel held no longer matters.
+    @unit
+    Scenario: The brief's state lines are settled on the server from the stored guided state
+      Given the panel composed the kickoff before the tour's key was recorded on the guided state
+      When the kickoff turn starts
+      Then the recorded kickoff carries the key's name, its preview and its reveal id
+      And the model reads the settled brief, not the panel's snapshot
+      And the picks, the provider and the gateway come from the stored state as well
+      And what only the panel knows, the name, the first name and how the tour ended, stays as sent
 
     @unit
     Scenario: The panel sends the kickoff exactly once

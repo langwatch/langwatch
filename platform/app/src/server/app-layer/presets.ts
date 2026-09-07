@@ -12,6 +12,7 @@ import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.cl
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
+import { guidedKickoffStateFactsOf } from "~/features/guided-onboarding/kickoff";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import {
@@ -66,6 +67,8 @@ import {
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
+import { withInstanceFacts } from "~/server/onboarding/guided-onboarding.instance";
+import { GuidedOnboardingService } from "~/server/onboarding/guided-onboarding.service";
 import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
@@ -1425,6 +1428,14 @@ export function initializeDefaultApp(options?: {
   const langyTurns = LangyTurnService.create({
     conversations: langyConversations,
     credentials: LangyCredentialService.create(prisma),
+    guidedKickoffFacts: async ({ organizationId }) =>
+      guidedKickoffStateFactsOf(
+        withInstanceFacts(
+          await GuidedOnboardingService.create(prisma).getState({
+            organizationId,
+          }),
+        ),
+      ),
     // ADR-050 versioned prompts. Only consulted when LANGY_PROMPT_PROJECT_ID
     // names the project holding the rows; unset (the default) skips the
     // registry entirely and the in-repo text is used verbatim.

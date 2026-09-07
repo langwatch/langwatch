@@ -251,6 +251,14 @@ Feature: Guided onboarding tour
     And the secret is still handed to the dialog, once
 
   @unit
+  Scenario: the tour's action settles once the key is recorded
+    Given the gateway tour is running on the virtual keys page
+    When the tour submits the key through the drawer's registered action
+    Then the action settles only after the guided state has recorded the key
+    And the guided state the page holds is refreshed
+    And a record that fails still hands the secret to the dialog
+
+  @unit
   Scenario: the secret step reveals the secret
     Given the create request was sent by the previous step
     Then the secret step waits for the create to answer, then up to fifteen seconds for the secret

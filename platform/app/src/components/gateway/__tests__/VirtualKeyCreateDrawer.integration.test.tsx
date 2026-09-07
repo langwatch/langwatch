@@ -46,12 +46,14 @@ const {
   createMutateAsync,
   createMutationOptions,
   listInvalidate,
+  guidedStateInvalidate,
   applicableBudgetsData,
   capturedApplicableInputs,
   recordVirtualKeyReveal,
 } = vi.hoisted(() => ({
   createMutateAsync: vi.fn(),
-  recordVirtualKeyReveal: vi.fn(),
+  recordVirtualKeyReveal: vi.fn(async () => undefined),
+  guidedStateInvalidate: vi.fn(async () => undefined),
   createMutationOptions: {
     current: null as { onSuccess?: (result: unknown) => unknown } | null,
   },
@@ -95,11 +97,14 @@ vi.mock("~/utils/api", () => ({
         },
         applicableBudgets: { invalidate: async () => undefined },
       },
+      onboarding: {
+        getGuidedState: { invalidate: guidedStateInvalidate },
+      },
     }),
     onboarding: {
       recordVirtualKeyReveal: {
         useMutation: () => ({
-          mutate: recordVirtualKeyReveal,
+          mutateAsync: recordVirtualKeyReveal,
           isPending: false,
         }),
       },
@@ -226,6 +231,8 @@ describe("given the new-virtual-key drawer", () => {
     listInvalidate.mockResolvedValue(undefined);
     createMutationOptions.current = null;
     recordVirtualKeyReveal.mockReset();
+    recordVirtualKeyReveal.mockResolvedValue(undefined);
+    guidedStateInvalidate.mockClear();
   });
 
   afterEach(() => cleanup());
@@ -316,6 +323,62 @@ describe("given the new-virtual-key drawer", () => {
       expect(onCreated).toHaveBeenCalledWith(
         expect.objectContaining({ secret: "vk-lw-secret" }),
       );
+    });
+
+    /** @scenario the tour's action settles once the key is recorded */
+    it("settles the tour action only after the record landed, then refreshes the guided state", async () => {
+      createMutateAsync.mockResolvedValue({
+        virtualKey: { id: "vk-new", name: "production-app" },
+        secret: "vk-lw-secret",
+        revealId: "rvl_abc",
+        preview: "vk-lw-01HZX9N",
+      });
+      let recorded: () => void = () => undefined;
+      recordVirtualKeyReveal.mockReturnValue(
+        new Promise<undefined>((resolve) => {
+          recorded = () => resolve(undefined);
+        }),
+      );
+      renderDrawer(vi.fn());
+      let settled = false;
+      const request = Promise.resolve(submitThroughTheTour()).then(() => {
+        settled = true;
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(recordVirtualKeyReveal).toHaveBeenCalledTimes(1);
+      expect(settled).toBe(false);
+      expect(guidedStateInvalidate).not.toHaveBeenCalled();
+
+      recorded();
+      await act(async () => {
+        await request;
+      });
+      expect(settled).toBe(true);
+      expect(guidedStateInvalidate).toHaveBeenCalledWith({
+        organizationId: ORG_ID,
+      });
+    });
+
+    it("still hands the secret to the dialog when the record fails", async () => {
+      createMutateAsync.mockResolvedValue({
+        virtualKey: { id: "vk-new", name: "production-app" },
+        secret: "vk-lw-secret",
+        revealId: "rvl_abc",
+        preview: "vk-lw-01HZX9N",
+      });
+      recordVirtualKeyReveal.mockRejectedValue(new Error("offline"));
+      const onCreated = vi.fn();
+      renderDrawer(onCreated);
+      const request = submitThroughTheTour();
+      await act(async () => {
+        await request;
+      });
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ secret: "vk-lw-secret" }),
+      );
+      expect(guidedStateInvalidate).not.toHaveBeenCalled();
     });
 
     /** @scenario the secret shows as soon as the create answers */

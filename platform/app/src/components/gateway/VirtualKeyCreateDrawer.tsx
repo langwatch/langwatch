@@ -297,15 +297,22 @@ export function VirtualKeyCreateDrawer({
       });
       // The tour's key is shown once more by Langy, through the secret
       // snippet card, so the guided state keeps the reveal id the brief
-      // carries. A failure to record it costs the brief that line, never
-      // the key.
+      // carries. The record is awaited and the state refreshed before the
+      // action settles, so the tour ends on a state that has it. A failure
+      // to record it costs the brief that line, never the key.
       if (revealOnce && result.revealId && result.preview) {
-        recordReveal.mutate({
-          organizationId,
-          name: result.virtualKey.name,
-          preview: result.preview,
-          revealId: result.revealId,
-        });
+        await recordReveal
+          .mutateAsync({
+            organizationId,
+            name: result.virtualKey.name,
+            preview: result.preview,
+            revealId: result.revealId,
+          })
+          .then(
+            () =>
+              utils.onboarding.getGuidedState.invalidate({ organizationId }),
+            () => undefined,
+          );
       }
       onCreated({
         id: result.virtualKey.id,

@@ -39,7 +39,8 @@ const VERBATIM_LINES = {
     "Then I can show you around once your first traces are flying through.",
   "the gateway opener":
     "Your key production-app is live. Point your app at the gateway with it and every call gets budgets, routing and tracing for free:",
-  "the gateway base url": 'OPENAI_BASE_URL="<the address after Gateway: in the brief>"',
+  "the gateway base url":
+    "OPENAI_BASE_URL=the address after Gateway: in the brief, in double quotes",
   "the gateway closer":
     "That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.",
   "the governance opener":
@@ -146,6 +147,28 @@ describe("the guided-onboarding skill", () => {
       const card = rendered.indexOf("call `secret_snippet`");
       expect(line).toBeGreaterThan(-1);
       expect(card).toBeGreaterThan(line);
+    });
+
+    /** @scenario "A key that exists with no reveal gets a question, never a placeholder" */
+    it("asks before it does anything when the key exists with no reveal id, and never writes a placeholder", () => {
+      expect(rendered).toContain(
+        "Your production-app key was created earlier and its secret was shown once, at creation. Do you still have it?",
+      );
+      expect(rendered).toContain('1. "Create a new key"');
+      expect(rendered).toContain('2. "I saved it"');
+      expect(rendered).toContain(
+        "On \"Create a new key\": mint one with `--reveal-once` as above",
+      );
+      expect(rendered).toContain(
+        "On \"I saved it\": there is no card to show, so describe the two lines instead of writing a snippet.",
+      );
+      expect(rendered).toContain(
+        "Never write a placeholder in a snippet: no angle brackets",
+      );
+      expect(rendered).not.toContain("<your production-app key>");
+      expect(rendered).not.toContain("<your gateway URL>");
+      expect(rendered).not.toMatch(/OPENAI_API_KEY="<[^>]*>"/);
+      expect(rendered).not.toMatch(/OPENAI_BASE_URL="<[^>]*>"/);
     });
 
     it("checks for the production-app key before minting one", () => {

@@ -7,31 +7,11 @@
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
 import { z } from "zod";
-import { env } from "~/env.mjs";
 import { protectedProcedure } from "~/server/api/trpc";
-import { ensureGatewayV1BaseUrl } from "~/server/app-layer/langy/LangyCredentialService";
+import { withInstanceFacts } from "~/server/onboarding/guided-onboarding.instance";
 import { GuidedOnboardingService } from "~/server/onboarding/guided-onboarding.service";
-import type { GuidedOnboardingState } from "~/server/schemas/sign-up-data.schema";
 
 const organizationInput = z.object({ organizationId: z.string() });
-
-/** The guided state with what the kickoff brief needs from the instance. */
-export type GuidedOnboardingStateView = GuidedOnboardingState & {
-  /** The gateway URL an app on this instance points at, with its /v1. */
-  gatewayUrl?: string;
-};
-
-/**
- * The gateway URL is the instance's, not the organization's, so it rides on
- * every answer instead of being stored: the kickoff brief names it and the
- * skill prints it in the snippet, never a hardcoded host.
- */
-export function withInstanceFacts(
-  state: GuidedOnboardingState,
-): GuidedOnboardingStateView {
-  const base = env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL;
-  return base ? { ...state, gatewayUrl: ensureGatewayV1BaseUrl(base) } : state;
-}
 
 export const guidedOnboardingProcedures = {
   getGuidedState: protectedProcedure

@@ -50,7 +50,10 @@ vi.mock("~/utils/api", () => ({
   api: {
     onboarding: {
       recordVirtualKeyReveal: {
-        useMutation: () => ({ mutate: () => undefined, isPending: false }),
+        useMutation: () => ({
+          mutateAsync: async () => undefined,
+          isPending: false,
+        }),
       },
     },
     useUtils: () => ({

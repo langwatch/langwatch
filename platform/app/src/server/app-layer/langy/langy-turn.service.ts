@@ -71,6 +71,10 @@ import {
 } from "./errors";
 import type { LangyConversationService } from "./langy-conversation.service";
 import { buildFinalAssistantParts } from "./langy-final-parts";
+import {
+  type GuidedKickoffFactsPort,
+  settleGuidedKickoffMessage,
+} from "./langy-guided-kickoff";
 import { extractTextFromParts } from "./langy-message.service";
 import { LangyTurnAttempt } from "./langy-turn-attempt";
 import { resolveLangyTurnBaseDependencies } from "./langy-turn-base-dependencies";
@@ -343,6 +347,14 @@ export interface StartConversationTurnInput {
 export interface LangyTurnServiceDeps {
   conversations: LangyConversationService;
   credentials: LangyCredentialService;
+  /**
+   * Reads the guided onboarding facts the kickoff brief carries, from the
+   * organization's state as stored. A kickoff message is settled with them
+   * before it is recorded, so the brief never depends on the snapshot the
+   * panel composed it from. Optional: absent (tests) records the message as
+   * sent.
+   */
+  guidedKickoffFacts?: GuidedKickoffFactsPort;
   /**
    * Reads Langy's versioned prompts (ADR-050). Optional: absent (tests, and any
    * composition that has not wired it) means the in-repo fallback text, which
@@ -907,7 +919,12 @@ export class LangyTurnService {
     );
 
     try {
-      const questionParts = lastUserMessage?.parts ?? [];
+      const userMessage = await settleGuidedKickoffMessage({
+        message: lastUserMessage,
+        organizationId: credentials.organizationId,
+        facts: this.deps.guidedKickoffFacts,
+      });
+      const questionParts = userMessage?.parts ?? [];
       // The FIRST USER message names the conversation, never messages[0]
       // verbatim: a client can send assistant parts it still held (a new chat
       // started while the previous reply streamed), and those must not become
@@ -1284,13 +1301,13 @@ export class LangyTurnService {
                 },
               }
             : {}),
-          ...(!isRetry && lastUserMessage?.role === "user"
+          ...(!isRetry && userMessage?.role === "user"
             ? {
                 userMessage: {
                   userId,
                   messageId: identity.messageId,
-                  role: lastUserMessage.role,
-                  parts: lastUserMessage.parts,
+                  role: userMessage.role,
+                  parts: userMessage.parts,
                   title,
                 },
               }
