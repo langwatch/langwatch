@@ -129,6 +129,7 @@ export interface IdentityStorageAdapterDeps {
    * byte-for-byte what the stock adapter did.
    */
   legacyEngine: (options: BetterAuthOptions) => DBAdapter;
+  passkeyRemoval: PasskeyRemovalPort;
   accounts: IdentityAccountsPort;
   resolution: IdentityResolutionPort;
   ceremonies: IdentityAccountCeremonies;
@@ -152,6 +153,18 @@ export interface IdentityStorageAdapterDeps {
    * deploy of the entrance from changing anything on its own.
    */
   birth: IdentityBirthPort;
+}
+
+export type PasskeyRemovalOutcome =
+  | "deleted"
+  | "not_found"
+  | "would_strand_user";
+
+/** The atomic persistence boundary behind better-auth's one-passkey delete. */
+export interface PasskeyRemovalPort {
+  deleteIfAnotherWayInRemains(args: {
+    passkeyId: string;
+  }): Promise<PasskeyRemovalOutcome>;
 }
 
 /**
@@ -231,6 +244,7 @@ type Row = Record<string, unknown>;
 
 function identityCustomAdapter({
   legacy,
+  passkeyRemoval,
   accounts,
   resolution,
   ceremonies,
@@ -348,6 +362,29 @@ function identityCustomAdapter({
             candidate.connector.toUpperCase() === "AND"),
       );
       return typeof clause?.value === "string" ? clause.value : null;
+    };
+
+    /** The exact one-row shape emitted by the passkey plugin's delete route. */
+    const exactRecordId = (
+      model: string,
+      where: readonly CleanedWhere[] | undefined,
+    ): string | null => {
+      const canonical = canonicalWhere(model, where);
+      if (canonical.length !== 1) {
+        return null;
+      }
+      const clause = canonical[0];
+      if (
+        clause === undefined ||
+        clause.field !== "id" ||
+        (clause.operator !== undefined &&
+          clause.operator.toLowerCase() !== "eq") ||
+        (clause.connector !== undefined &&
+          clause.connector.toUpperCase() !== "AND")
+      ) {
+        return null;
+      }
+      return typeof clause.value === "string" ? clause.value : null;
     };
 
     const secretsOf = (row: Row): IdentityAccountSecrets =>
@@ -1088,6 +1125,26 @@ function identityCustomAdapter({
       },
 
       delete: async ({ model, where }) => {
+        if (modelOf(model) === "passkey") {
+          const passkeyId = exactRecordId(model, where);
+          if (passkeyId === null) {
+            throw refused(
+              new IdentityUnsupportedStorageQueryError(
+                "identity storage adapter: better-auth issued a passkey delete that was not one exact id equality. Passkey deletion is guarded atomically and cannot fall through to an unguarded storage delete.",
+              ),
+            );
+          }
+          const outcome =
+            await passkeyRemoval.deleteIfAnotherWayInRemains({ passkeyId });
+          if (outcome === "would_strand_user") {
+            throw APIError.from("BAD_REQUEST", {
+              code: "LAST_WAY_IN",
+              message:
+                "This is the only way you can sign in. Add another sign-in method first, then remove this one.",
+            });
+          }
+          return;
+        }
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,

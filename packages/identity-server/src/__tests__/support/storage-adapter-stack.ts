@@ -18,7 +18,10 @@ import {
   bridgeAccountCeremonies,
   IdentityCeremonies,
 } from "../../better-auth/identity-ceremonies";
-import { createIdentityStorageAdapter } from "../../better-auth/identity-storage-adapter";
+import {
+  createIdentityStorageAdapter,
+  type PasskeyRemovalPort,
+} from "../../better-auth/identity-storage-adapter";
 import type {
   IdentityAccountsPort,
   IdentityResolutionPort,
@@ -52,6 +55,7 @@ const emptyDb = (): MemoryDB => ({
   session: [],
   account: [],
   verification: [],
+  passkey: [],
 });
 
 /**
@@ -218,12 +222,14 @@ export function identityStack({
   inert = false,
   withDatabaseHooks = false,
   schemaBoundLegacy = false,
+  passkeyRemoval,
 }: {
   inert?: boolean;
   withDatabaseHooks?: boolean;
   /** The legacy engine refuses account columns the Prisma schema does not
    *  hold, instead of absorbing them the way bare memory storage does. */
   schemaBoundLegacy?: boolean;
+  passkeyRemoval?: PasskeyRemovalPort;
 } = {}): IdentityStack {
   const db = emptyDb();
   const heads = new InMemoryHeads();
@@ -362,6 +368,17 @@ export function identityStack({
       legacyEngine: schemaBoundLegacy
         ? schemaBoundLegacyEngine(db)
         : memoryAdapter(db),
+      passkeyRemoval: passkeyRemoval ?? {
+        deleteIfAnotherWayInRemains: async ({ passkeyId }) => {
+          const passkeys = db.passkey ?? [];
+          const index = passkeys.findIndex((row) => row.id === passkeyId);
+          if (index < 0) {
+            return "not_found";
+          }
+          passkeys.splice(index, 1);
+          return "deleted";
+        },
+      },
       accounts,
       resolution,
       ceremonies,

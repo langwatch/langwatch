@@ -129,6 +129,7 @@ import { LegacySsoDomainRoutingRepository } from "./repositories/legacy-sso-doma
 import { PrismaLegacySsoOrganizationRepository } from "./repositories/legacy-sso-organization.prisma.repository";
 import { PrismaMfaEnrollmentRepository } from "./repositories/mfa-enrollment.prisma.repository";
 import { PrismaMfaEnrollmentProjectionRepository } from "./repositories/mfa-enrollment-projection.prisma.repository";
+import { PrismaPasskeyRemovalRepository } from "./repositories/passkey-removal.prisma.repository";
 import { PrismaSignUpHealthRepository } from "./repositories/sign-up-health.prisma.repository";
 import {
   PrismaSignUpAccountDirectory,
@@ -781,6 +782,10 @@ export function identityNewbornReconciliation(): IdentityNewbornReconciliationSe
  */
 const identityStorage = createIdentityStorageAdapter({
   legacyEngine: prismaAdapter(prisma, { provider: "postgresql" }),
+  passkeyRemoval: PrismaPasskeyRemovalRepository.create({
+    prisma,
+    routesToIdentity: routesToIdentityBranch,
+  }),
   accounts: identityAccounts,
   resolution: identityResolution,
   ceremonies: identityCeremonies(),
