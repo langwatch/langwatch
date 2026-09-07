@@ -1,4 +1,5 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { Castle } from "lucide-react";
 import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -8,18 +9,7 @@ import {
 } from "~/components/governance/platform/InsightsSetupDialog";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import {
-  LangyMark,
-  LangyMarkGradientDefs,
-} from "~/features/langy/components/LangyMark";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
-
-/**
- * Own paint server. The Langy sidecar mounts the shared one, but a viewer
- * without Langy never has it, and a mark filled from a missing gradient
- * paints nothing.
- */
-const INSIGHTS_MARK_GRADIENT_ID = "governance-insights-mark-grad";
 
 /**
  * The Insights inbox before there is anything in it.
@@ -60,8 +50,12 @@ function InsightsPage() {
           borderColor="border.muted"
           borderRadius="xl"
         >
+          {/* The glyph the brief's mocks use: a plain outline on the tile,
+              not the gradient logo — that one is Langy's launcher, and it
+              needs a paint server this page would otherwise have to carry. */}
           <Box
             background="fg"
+            color="bg"
             borderRadius="xl"
             width="72px"
             height="72px"
@@ -69,8 +63,7 @@ function InsightsPage() {
             alignItems="center"
             justifyContent="center"
           >
-            <LangyMarkGradientDefs id={INSIGHTS_MARK_GRADIENT_ID} />
-            <LangyMark size={36} gradientId={INSIGHTS_MARK_GRADIENT_ID} />
+            <Castle size={32} strokeWidth={1.75} aria-hidden />
           </Box>
           <Heading size="lg" textAlign="center">
             Langy writes your brief here

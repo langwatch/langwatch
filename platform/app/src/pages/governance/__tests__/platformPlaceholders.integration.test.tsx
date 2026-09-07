@@ -142,20 +142,6 @@ describe("given the Insights screen", () => {
     ).toBeInTheDocument();
   });
 
-  /** @scenario "Insights opens on an empty brief with one sentence of promise" */
-  it("paints the Langy mark without the Langy panel mounted", () => {
-    // The mark fills from an SVG gradient by id. The Langy sidecar mounts
-    // one, but a viewer without Langy never has it, so the page must carry
-    // its own or the tile holds an invisible mark.
-    const { container } = renderPage(InsightsPage);
-    const mark = container.querySelector(".langy-mark path");
-    const gradientId = mark?.getAttribute("fill")?.match(/^url\(#(.+)\)$/)?.[1];
-    expect(gradientId).toBeTruthy();
-    expect(
-      container.querySelector(`linearGradient#${gradientId}`),
-    ).not.toBeNull();
-  });
-
   /** @scenario "Open Langy opens the Langy panel" */
   it("opens the Langy panel from Open Langy", () => {
     renderPage(InsightsPage);
