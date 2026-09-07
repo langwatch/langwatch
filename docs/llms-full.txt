@@ -65421,6 +65421,37 @@ openapi: "PATCH /api/gateway/v1/cache-rules/{id}"
 
 ---
 
+# FILE: ./api-reference/gateway-routing-policies/get-routing-policy.mdx
+
+---
+title: "Get routing policy"
+openapi: "GET /api/gateway/v1/routing-policies/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-routing-policies/list-routing-policies.mdx
+
+---
+title: "List routing policies"
+openapi: "GET /api/gateway/v1/routing-policies"
+---
+
+---
+
+# FILE: ./api-reference/gateway-routing-policies/overview.mdx
+
+---
+title: "Overview"
+description: "Manage routing policies for the AI Gateway. Define strategies and scopes to control how requests are routed."
+---
+
+## Intro
+
+Manage routing policies for the AI Gateway. Define strategies and scopes to control how requests are routed.
+
+---
+
 # FILE: ./api-reference/gateway-spend/list-spend-events.mdx
 
 ---
