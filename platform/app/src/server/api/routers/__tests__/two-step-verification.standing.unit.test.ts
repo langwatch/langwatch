@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationMfaService } from "~/server/app-layer/identity/organization-mfa.service";
 import { createInnerTRPCContext } from "../../trpc";
+import { apiKeyRouter } from "../apiKey";
 import { twoStepVerificationRouter } from "../twoStepVerification";
 
 const { organizationMfaMock } = vi.hoisted(() => ({
@@ -15,11 +16,13 @@ const { organizationMfaMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import("~/server/app-layer/identity/runtime")
-  >()),
+  ...(await importOriginal<typeof import("~/server/app-layer/identity/runtime")>()),
   organizationMfa: () => organizationMfaMock(),
   twoStepVerification: () => ({}),
+}));
+
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(async () => void 0),
 }));
 
 const members = {
@@ -41,17 +44,17 @@ const service = new OrganizationMfaService({
       name: "Acme",
       slug: "acme",
     })),
-    write: vi.fn(async () => undefined),
+    write: vi.fn(async () => void 0),
   },
   sessions: { amrFor: vi.fn(async () => null) },
   members,
   connections: { assertedFactorsFor: vi.fn(async () => null) },
-  notifier: { requirementTurnedOn: vi.fn(async () => undefined) },
+  notifier: { requirementTurnedOn: vi.fn(async () => void 0) },
   offered: () => true,
   entitled: vi.fn(async () => true),
 });
 
-const callerFor = (userId: string | null) => {
+const contextFor = (userId: string | null) => {
   const session = userId
     ? {
         user: { id: userId, email: `${userId}@example.com` },
@@ -59,15 +62,16 @@ const callerFor = (userId: string | null) => {
         expires: "2099-01-01",
       }
     : null;
-  return twoStepVerificationRouter.createCaller(
-    createInnerTRPCContext({
-      session,
-      // If the recovery exemption regresses, this real unsatisfied standing
-      // is evaluated in the middleware first and the call is refused.
-      mfaGate: { offered: () => true, organizationMfa: () => service },
-    }),
-  );
+  return createInnerTRPCContext({
+    session,
+    // If the recovery exemption regresses, this real unsatisfied standing
+    // is evaluated in the middleware first and the call is refused.
+    mfaGate: { offered: () => true, organizationMfa: () => service },
+  });
 };
+
+const callerFor = (userId: string | null) =>
+  twoStepVerificationRouter.createCaller(contextFor(userId));
 
 describe("twoStepVerification.standing", () => {
   beforeEach(() => {
@@ -90,6 +94,36 @@ describe("twoStepVerification.standing", () => {
         userId: "sam",
         organizationId: "org-acme",
       });
+    });
+
+    it("cannot carry the recovery exemption into an API-key mutation", async () => {
+      const context = contextFor("sam");
+      const apiKeyCreate = vi.spyOn(context.prisma.apiKey, "create");
+      const membershipRead = vi.spyOn(context.prisma.organizationUser, "findFirst");
+
+      await expect(
+        twoStepVerificationRouter.createCaller(context).standing({ organizationId: "org-acme" }),
+      ).resolves.toMatchObject({
+        required: true,
+        satisfaction: { satisfied: false },
+      });
+
+      await expect(
+        apiKeyRouter.createCaller(context).create({
+          organizationId: "org-acme",
+          name: "attempted bypass",
+          permissionMode: "all",
+          keyType: "personal",
+          bindings: [],
+        }),
+      ).rejects.toMatchObject({
+        cause: expect.objectContaining({
+          code: "identity_mfa_enrollment_required",
+        }),
+      });
+
+      expect(membershipRead).not.toHaveBeenCalled();
+      expect(apiKeyCreate).not.toHaveBeenCalled();
     });
   });
 
