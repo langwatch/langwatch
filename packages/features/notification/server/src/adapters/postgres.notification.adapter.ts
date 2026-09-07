@@ -1,9 +1,8 @@
-import type { NotificationService as NotificationServiceContract } from "@langwatch/notification-contract";
 import {
   PrismaNotificationRepository,
   type NotificationDatabase,
 } from "../repositories/prisma/prisma.notification.repository.ts";
-import { NotificationService } from "../services/notification.service.ts";
+import { DefaultNotificationService } from "../services/notification.service.ts";
 
 /** Process composition for the PostgreSQL-backed Notification capability. */
 export class PostgresNotificationAdapter {
@@ -13,8 +12,8 @@ export class PostgresNotificationAdapter {
     return new PostgresNotificationAdapter(options.database);
   }
 
-  build(): NotificationServiceContract {
-    return NotificationService.create({
+  build(): DefaultNotificationService {
+    return DefaultNotificationService.create({
       repository: PrismaNotificationRepository.create(this.database),
     });
   }

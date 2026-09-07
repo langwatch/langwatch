@@ -15,9 +15,10 @@ feature depend on infrastructure and on unrelated usage/organization rules.
 ## Decision
 
 Notification owns the durable record: its portable schema, repository
-capability, and one abstract `NotificationService`. The server implementation
-uses a private Prisma repository and validates mapped rows with the contract
-schema. The application composes one concrete instance.
+capability, and one callable `NotificationApi` interface and token.
+`NotificationApp` implements that API and privately constructs the PostgreSQL
+adapter and service. The repository validates mapped rows with the contract
+schema. Construction follows [ADR-133](../../../../dev/docs/adr/133-composition-spec.md).
 
 Billing and other product features decide when to create a notification and
 may collaborate with the canonical service through its contract. Mail, Slack,
@@ -27,16 +28,16 @@ preference lifecycle exists.
 
 ## Public surfaces and transports
 
-The contract publishes the notification record schemas and one abstract
-`NotificationService` with two operations: create a record, and list an
-organization's recent records. The server package publishes only its composition
-adapter. Notification mounts no route and has no browser package, so every
-surface it has is a service call from a composing feature.
+The durable-record contract publishes two `NotificationApi` operations: create
+a record and list an organization's recent records. `NotificationService` remains
+a type alias during caller migration; it is no longer a runtime constructor.
+The server exports `notificationServer`, whose sole App factory builds the
+private service from a typed database. This durable-record API mounts no route.
 
 ## Dependencies
 
-The contract depends only on Zod. The server depends on that contract and on the
-generated Prisma client. Notification depends on no other feature, and no
+The contract uses Zod and the portable runtime-composition token helper. The
+server uses that contract, runtime composition and the generated Prisma client. Notification depends on no other feature, and no
 delivery provider is a dependency: mail, Slack and HubSpot stay with whoever
 decides to send.
 
@@ -48,12 +49,12 @@ validates every row it maps.
 
 ## Runtime and registration
 
-The composing feature builds the instance; there is no global registration and
-no place on the shared application context. Enterprise Billing builds one inside
-its own persistence adapter and uses it for usage-limit records, and a future
-consumer builds its own the same way. The feature owns no worker job, subscriber or
-event pipeline. The application context property named `notifications` is a
-separate, application-owned delivery capability and is not this service.
+`notificationServer` declares the App without constructing it. Its factory owns
+record-service construction and declares no peer APIs or background work.
+Existing billing/API composition still calls the PostgreSQL adapter directly;
+those callers must converge on one installed API before the composition
+migration is complete. The application context property named `notifications`
+is a separate delivery capability, not the durable-record API.
 
 ## Environment and configuration
 

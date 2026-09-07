@@ -1,5 +1,4 @@
 import {
-  NotificationService as NotificationServiceContract,
   createNotificationCommandSchema,
   notificationRecentQuerySchema,
   type CreateNotificationCommand,
@@ -9,13 +8,11 @@ import {
 import { NotificationRepository } from "../repositories/notification.repository.ts";
 
 /** Canonical Notification service; delivery policy remains outside this class. */
-export class NotificationService extends NotificationServiceContract {
-  private constructor(private readonly repository: NotificationRepository) {
-    super();
-  }
+export class DefaultNotificationService {
+  private constructor(private readonly repository: NotificationRepository) {}
 
-  static create(options: { repository: NotificationRepository }): NotificationService {
-    return new NotificationService(options.repository);
+  static create(options: { repository: NotificationRepository }): DefaultNotificationService {
+    return new DefaultNotificationService(options.repository);
   }
 
   listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {

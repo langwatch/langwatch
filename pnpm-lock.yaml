@@ -7066,6 +7066,9 @@ importers:
 
   packages/features/notification/contract:
     dependencies:
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -7079,6 +7082,9 @@ importers:
 
   packages/features/notification/server:
     dependencies:
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       '@aws-sdk/client-ses':
         specifier: ^3.1080.0
         version: 3.1108.0

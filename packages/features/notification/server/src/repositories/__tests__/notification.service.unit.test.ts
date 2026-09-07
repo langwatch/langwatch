@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CreateNotificationCommand, Notification } from "@langwatch/notification-contract";
 import { NotificationRepository } from "../notification.repository.ts";
-import { NotificationService } from "../../services/notification.service.ts";
+import { DefaultNotificationService } from "../../services/notification.service.ts";
 
 class InMemoryNotificationRepository extends NotificationRepository {
   private readonly records: Notification[] = [];
@@ -30,11 +30,11 @@ class InMemoryNotificationRepository extends NotificationRepository {
   });
 }
 
-describe("NotificationService", () => {
+describe("DefaultNotificationService", () => {
   /** @scenario "Create a notification record" */
   it("creates and queries durable records through one repository", async () => {
     const repository = new InMemoryNotificationRepository();
-    const service = NotificationService.create({ repository });
+    const service = DefaultNotificationService.create({ repository });
     const sentAt = new Date("2026-08-25T00:00:00.000Z");
 
     const notification = await service.create({

@@ -7,9 +7,9 @@ import type {
   ResourceLimitNotifierInput,
   UsageLimitData,
 } from "@langwatch/enterprise-billing-contract";
-import {
-  NotificationService as NotificationRecordService,
-  type Notification,
+import type {
+  NotificationApi as NotificationRecordService,
+  Notification,
 } from "@langwatch/notification-contract";
 import { NotificationService } from "./billing-usage-notice.service.ts";
 import { UsageWarningService } from "./usage-warning.service.ts";

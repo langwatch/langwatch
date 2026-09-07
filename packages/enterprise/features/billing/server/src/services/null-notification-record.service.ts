@@ -2,14 +2,16 @@
  * A notification record store that keeps nothing.
  */
 
-import {
-  NotificationService as NotificationRecordService,
-  type CreateNotificationCommand,
-  type Notification,
-  type NotificationRecentQuery,
+import type {
+  NotificationApi,
+  CreateNotificationCommand,
+  Notification,
+  NotificationRecentQuery,
 } from "@langwatch/notification-contract";
 
-export class NullNotificationRecordService extends NotificationRecordService {
+export class NullNotificationRecordService implements NotificationApi {
+  private constructor() {}
+
   static create(): NullNotificationRecordService {
     return new NullNotificationRecordService();
   }
