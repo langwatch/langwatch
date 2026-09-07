@@ -10,7 +10,7 @@ Status: research document, second pass. On 2026-09-07, 17 scenario issues verifi
 
 - **90 open voice/audio issues** across the org after this pass, down from 107. Scenario SDK 63, platform 19, langwatch-saas 6, two elsewhere. None carry a `voice` or `audio` label, in any repo.
 - **17 closed as verified delivered, 31 "looked done" ones are not.** Of 48 issues that referenced a merged PR, only 17 survived a code check. The cross-reference signal is mostly dependency bumps. Details in 2.3.
-- **The product story is LangWatch phoning the agent under test with a simulated caller, from the app.** A QA lead types the number, describes the caller, writes the criteria, presses Call, and gets the call back as a run with recording, transcript and verdict. It reuses the server-side scenario runner and per-turn audio console that already exist, and waits on one SDK fix, the A-leg media stream in scenario 762, which has no plan yet and is the long pole. A second button, Call it myself through the browser mic, is the wow slice, is platform-only, and ships alongside. Section 4.
+- **V1 is testing a voice agent from the app, with an ElevenLabs hosted agent as the baseline target.** A team pastes an agent id, talks to it from the browser, and has a simulated caller phone it in batches. Every call lands as a normal run with transcript, per-turn audio and verdict. Config is one API key in Settings and one agent id. The SDK adapter, the gateway signed-URL mint, the credential store, the agent model and the scenario model all exist. New work is one agent type, one drawer, one mic panel, one post-call fetch and pool wiring. Phone-number targets wait on scenario 762 and move to V2 on the same screens. Section 4.
 - **Two urgent items.** An ElevenLabs key leaks through the Gemini passthrough lane (security, PR open), and a reproducible voice test failure is blocking all JavaScript CI in the scenario repo.
 - **Feature completeness is strong at the edges, thin in the middle.** Scenario SDK voice testing and the trace/simulation audio players are mature. The gateway can mint realtime sessions but cannot relay or govern a call mid-flight. No audio evaluators, no SDK audio helpers, no voice in Langy.
 - **Biggest product gap for "voice through the app".** The SDK computes per-run recordings, timelines, and latency metrics for every voice scenario, and none of it reaches the platform. The UI only ever sees per-message audio parts.
@@ -177,130 +177,132 @@ Correction to a researcher claim: Python still JSON-stringifies structured conte
 
 ---
 
-## 4. User stories: call the agent under test from the platform
+## 4. V1: test a voice agent from the app, with an ElevenLabs agent as the baseline
 
-### 4.1 The story in one paragraph
+### 4.1 V1 in one paragraph
 
-A QA lead has a voice agent live on a phone number. They open LangWatch, type the number, describe the caller in a few sentences, write what a good call looks like, and press Call. LangWatch phones the agent, the simulated caller talks to it, and the finished call is in the app as a run: recording, transcript, verdict. No SDK, no local code, no Twilio account, no tunnel. That is the product, because it is the only way to test the endpoint without a person on the line, and it is what runs in batches after every deploy.
+V1 lets a team point LangWatch at a voice agent they already run on ElevenLabs Conversational AI, talk to it from the browser, and have a simulated caller phone it in batches, with every call landing as a normal run: transcript, per-turn audio, verdict and criteria. Total configuration is an ElevenLabs API key in Settings once and an agent id per agent. No Twilio, no phone number, no tunnel, no SDK install, no key on the agent. Phone-number targets, which need the A-leg media stream in scenario 762, move to V2 and reuse every screen below.
 
-The same page has a second button: Call it myself. The tester talks to the agent through the browser mic and gets the same run back. It is the demo moment, it is cheap, and it shares the number field, target type, run record, transcript and judge with the simulated path. Both are v1. The simulated caller is the core; the live call is the wow slice.
+### 4.2 Why this is the right V1
 
-### 4.2 Three paths, kept apart
+- **It works today, end to end, at the SDK level.** The ElevenLabs adapter talks to a hosted agent by agent id over the ElevenLabs websocket (`python/scenario/voice/adapters/elevenlabs.py:240-252`). The whole agent pipeline runs on ElevenLabs. It is black box.
+- **The gateway already does the hard part.** It mints the ElevenLabs signed URL (`GET /v1/convai/conversation/get-signed-url`, `services/aigateway/adapters/httpapi/router.go:193`), records the conversation id at mint time, receives the post-call webhook (`router.go:171`) and reconciles unclosed sessions by polling the conversation (`platform/app/src/server/gateway/realtimeSessionPoller.ts`). Spend is already tracked. Only the transcript and recording fetch are missing.
+- **The credential store exists.** The ElevenLabs provider row in Settings already holds the API key, base URL and webhook secret (`platform/app/src/server/modelProviders/registry.ts:530-545`).
+- **The agent model fits.** An agent is one row with a type string and a JSON config (`platform/app/prisma/schema.prisma:2800`). A Voice agent is a new type value and a config variant, not a new table.
+- **The scenario model fits.** In the SDK a voice scenario is the same run as a text scenario with a `voice` argument on the user simulator (`python/scenario/user_simulator_agent.py:225`). Only three caller-side knobs are voice-only: voice, interrupt probability, audio effects. All have defaults.
+- **Phone is not needed to prove the product.** For an ElevenLabs agent that also has a Twilio number, the websocket path covers everything that changes when someone edits the prompt, the tools or the voice. The telephony leg is a V2 concern.
 
-The word "voice test" hides three different pipelines. Two are v1, and they share the number field, the run record, the transcript, the judge and the review screen.
+What V1 does not cover: agents on Vapi, Retell, LiveKit, Pipecat, in-house stacks, or reachable only by phone number. Those wait on 762 or on the SDK adapters that are stubs today (3.2).
 
-| Path | Who talks to the agent | What the platform needs | Blocked on |
-|---|---|---|---|
-| **Simulated** (v1, the core) | A synthetic caller: persona text spoken by a realtime model or TTS plus STT | A `phone` target type, the scenario SDK Twilio adapter run in the existing server-side pool, a public websocket ingress for Twilio media streams, a call session that lives as long as the call | https://github.com/langwatch/scenario/issues/762 (A-leg media stream on the originated call). Not blocked by Twilio. Blocked by SDK work that has no plan yet. |
-| **Live** (v1, the wow slice) | The tester, through the browser mic | A LangWatch-owned Twilio number, a browser softphone token, a TwiML bridge that dials the target number with recording on, a recording webhook, STT on the recording, a run record | Nothing outside the platform. Twilio browser calling and call recording are standard Twilio features. |
-| **Upload** (later) | Nobody, the call already happened | Attach a recording, transcribe, judge | https://github.com/langwatch/langwatch/issues/6283 (file attach in authoring) |
+Re-verified on scenario main `ae0c921c` on 2026-09-07: `place_call` still sends `<Say><Pause length="120">` on the originated leg (`python/scenario/voice/adapters/twilio.py:470-484`) and attaches media by rewriting the callee's webhook. No open PR or branch touches it. The 762 issue body names three guardrails the A-leg plan must cover: authenticate the media-stream websocket, restore a max call duration once `<Pause>` is gone, and allowlist outbound destinations. Those belong in the V2 phone story, not in a separate safety story.
 
-Why Live can land first even though it is not the core: bridging a browser call to a phone number is a Twilio `<Dial>` with `record` set. Audio never passes through LangWatch during the call. Twilio posts the recording URL when the call ends. The gateway already exposes `POST /v1/audio/transcriptions`, and the run UI already renders audio parts, transcript, verdict and criteria. The missing pieces are a Twilio number owned by LangWatch, a token endpoint, one TwiML handler, one webhook, and a page.
+### 4.3 Design decisions
 
-Re-verified on scenario main `ae0c921c` on 2026-09-07: `place_call` still sends `<Say><Pause length="120">` on the originated leg (`python/scenario/voice/adapters/twilio.py:470-484`) and attaches media by rewriting the callee's webhook. No open PR or branch touches it. The TypeScript adapter branch `issue372/ts-voice-twilio` copies the same shape. The only black-box voice adapters that reach a deployed agent today are ElevenLabs hosted ConvAI by agent id and Twilio against a number in your own account. The 762 issue body names three guardrails the A-leg plan must cover: authenticate the media-stream websocket, restore a max call duration once `<Pause>` is gone, and allowlist outbound destinations. Those belong in S1, not in a separate safety story.
-
-Why Simulated is buildable now and not v2: the platform owns the Twilio account, so it can originate the call and put `<Connect><Stream>` on that originated leg pointing at its own websocket ingress. That is exactly the topology scenario 762 asks for. The SDK adapter today does the opposite, rewriting the callee's webhook, which only works for numbers you own. Once the adapter can stream on the originated leg, the rest is hosting: the scenario runner already exists in the platform and already streams per-turn audio into the run view. Cloud has public URLs, so no tunnel. Least config for the user is still a phone number plus the persona and criteria text they already write for text scenarios.
-
-### 4.3 What exists today
-
-| Building block | Status | Evidence |
+| Question | Decision | Why |
 |---|---|---|
-| Twilio anything in the platform | Absent | No Twilio, SIP or telephony code in `platform/`, `services/`, `specs/`. |
-| Credential store for a platform-owned Twilio account | Exists | Encrypted `ModelProvider.customKeys` already hosts ElevenLabs credentials. For v1 the account is LangWatch's, set by env, not per project. |
-| Transcription | Exists | Gateway `POST /v1/audio/transcriptions` (`services/aigateway/adapters/providers/bifrost_audio.go`, `elevenlabs.go`). |
-| Audio storage | Exists | Stored objects service, S3 and self-hosted backends. Self-hosted gaps in langwatch-saas 494, 796, 799 are not v1. |
-| Run record and review UI | Exists | Simulation runs render audio parts (`MediaPart.tsx`), transcript, verdict (`RunCriteriaChip.tsx`, `CriteriaDetails.tsx`). Whole-call player with seek is not there (langwatch 4627, 5582). |
-| Judge on a transcript | Exists | The scenario judge runs on messages. A recorded call becomes a two-role transcript after STT with diarization or two-channel recording. |
-| Browser softphone | Absent | No WebRTC client code in the app. Twilio's browser SDK needs a short-lived access token minted server-side. |
-| Target type `phone` | Absent | `platform/app/src/server/scenarios/simulation-target.ts:11-14` has `prompt`, `http`, `code`, `workflow`, `connected`. |
-| Server-side scenario runner for the simulated caller | Exists | `platform/app/src/server/scenarios/execution/execution-pool.ts`, child processes, concurrency 3 per pod. Built for short batch runs, not held call sessions. |
-| SDK Twilio adapter dialing an external number | Absent | `python/scenario/voice/adapters/twilio.py:66-90` rewrites the callee's webhook, so the callee must be in the same Twilio account. Fix is scenario 762. |
-| Public websocket ingress for Twilio media | Absent | The SDK uses a cloudflared tunnel. The platform has none. Cloud has public URLs, so this is a route, not a tunnel. |
-| Per-turn audio streamed into the run console | Exists | SDK voice runs already send `input_audio` parts per message and the console renders them. |
+| One agent type per transport, or one Voice agent? | **One Voice agent type** with a Reached via select inside the form. V1 has one option, ElevenLabs agent. Phone number joins in V2. | Everything downstream is identical. Separate types fork the picker, cards, icons and docs for a connection detail. |
+| Where does the API key go? | **Settings, Model providers, ElevenLabs.** The agent form shows a read-only line naming the provider row and links to Settings if none is configured. | Provider is a credential concern and already has a home. Phone in V2 needs no provider at all. |
+| Does the agent form have a model picker? | **No.** An ElevenLabs agent has no model to pick. The provider is implied by the transport. | A picker would offer a choice that does not exist. |
+| Where does the model picker go? | **On the scenario, for the simulated caller's voice**, filtered to realtime and audio modes. The registry already tags those (`llmModels.json` mode `audio`; picker accepts only chat and embedding today, `ModelSelector.tsx:46`). | The caller is ours. Its voice is a model choice. The agent is theirs. |
+| Separate voice scenario type? | **No.** A collapsed Caller voice section on the existing editor: voice with a project default, Interrupts off by default, Effects none by default. | Three knobs with defaults. The same scenario must run against the text agent and the voice agent for comparison. |
+| Sweeping voices or accents? | **Existing scenario parameters.** Voice and interrupt probability as parameters. | A batch sweeps without copying the scenario. |
+| Voice-specific criteria? | **Free text in V1.** | The judge takes strings. Structured latency and talk-over thresholds come with run-level timeline data (X2). |
 
-### 4.4 Stories
+### 4.4 User flow
 
-Persona: **Maya, QA lead**. She does not write code. Secondary: **Dev, the agent's engineer**.
+1. **Settings, once per project.** Settings, Model providers, ElevenLabs. Paste the API key. Exists today. One line of copy is added: voice agents sign their sessions with this key.
+2. **Agents, New Agent.** The type selector gains one card, Voice agent, next to HTTP agent and Code agent.
+3. **Voice agent drawer.** Name. Reached via, a select with one V1 option, ElevenLabs agent. Agent id, from the ElevenLabs dashboard. A read-only Credentials line naming the provider row, or a callout with a link to Settings when no key exists. A Talk to it button. Save.
+4. **Talk to it.** A side panel opens: Connecting, then a live timer, a live two-speaker transcript, and Hang up. The browser opens the ElevenLabs session with the signed URL the gateway minted. Audio flows browser to ElevenLabs directly, the same shape the SDK adapter uses. On hang up the panel shows the transcript, a Play button, and a link to the run it created. This is the demo moment and the connection test in one.
+5. **Scenario editor.** Situation, persona and criteria unchanged. One new collapsed group, Caller voice: model picker filtered to voice models with a project default, Interrupts slider off, Effects none. Nothing here mentions ElevenLabs.
+6. **Run dialog.** The target picker lists the voice agent with a mic icon. Two buttons for a voice target. Run starts the simulated caller in the server-side pool, and per-turn audio streams into the run console as SDK voice runs do today. Call it myself opens the same mic panel as step 4, tagged with the scenario, so the judge scores your call against its criteria when you hang up.
+7. **Results.** The existing run view. Per-turn audio, transcript, verdict, criteria chips. A Caller column reads Simulated or You. A Play recording button when the ElevenLabs recording fetch succeeded.
 
-**V1, the Live path, the wow slice. Config: a phone number.**
+Four of the seven screens are unchanged. New surface is one card, one drawer, one panel, one collapsed group and one button.
 
-**L1. Call my agent from the app and talk to it.**
-As Maya, I want to enter the agent's phone number, press Call, and talk to it through my browser mic, so that I can check a deployed agent by hand in under a minute.
-Accept: one page: number field in E.164, Call button, mic permission prompt, live status (dialing, ringing, connected, ended), Hang up button. Timer visible. Call ends automatically at a max duration. Works on LangWatch cloud with no setup beyond a project.
-Requires: LangWatch-owned Twilio number, token endpoint for the browser client, TwiML handler that dials the target with two-channel recording.
+### 4.5 Stories
 
-**L2. See the call as a run when I hang up.**
-As Maya, I want the finished call to appear in the simulations list as a run with the recording and a transcript split by speaker, so that I can review and share it.
-Accept: run appears within a minute of hang-up. Player for the whole recording. Transcript with two speakers labeled Tester and Agent. Duration, target number, who called. Playable in the same conversation view as SDK runs.
-Requires: recording webhook, STT through the gateway with two-channel input, run record with a new `phone` target type.
+Each story states who, what they do, what they see, what it needs and where it sits.
 
-**L3. Judge the call against criteria I wrote.**
-As Maya, I want to write pass criteria before calling and get a verdict on the transcript after, so that manual calls produce the same evidence as automated scenarios.
-Accept: optional criteria textarea on the call page. Verdict and per-criterion chips as in SDK runs. No criteria, no verdict.
-Requires: run the existing judge on the STT transcript.
+**E1. Register an ElevenLabs agent**
+- **Who:** an AI engineer who owns a voice agent on ElevenLabs.
+- **Does:** New Agent, Voice agent, pastes the agent id, saves.
+- **Sees:** the agent in the list with a mic icon. If no ElevenLabs key is configured, a callout with a link to Settings, and Save still works.
+- **Needs:** `voice` value for `Agent.type`; config `{ transport: "elevenlabs_convai", agentId }`; Voice agent card in the type selector; `AgentVoiceEditorDrawer` mirroring `AgentHttpEditorDrawer.tsx`; a `voice` value in `SimulationTarget.type` (`simulation-target.ts:11-14`); icon and label in `AgentCard.tsx:38-46`.
+- **Sits:** V1, first.
 
-**L4. Tell me why the call did not connect.**
-As Maya, I want a plain reason when nothing happened: no answer, busy, invalid number, mic blocked, Twilio error, so that I fix it instead of guessing.
-Accept: distinct statuses on the run with the Twilio error code where present.
-Requires: mapping Twilio call status callbacks to run status.
+**E2. Talk to it from the agent drawer**
+- **Who:** the same engineer, or anyone doing a demo.
+- **Does:** presses Talk to it, allows the mic, talks, hangs up.
+- **Sees:** live timer and two-speaker transcript while talking. After hang up, the transcript, Play, and a link to the run. Max duration enforced client-side and shown as a countdown in the last minute.
+- **Needs:** a tRPC route that calls the gateway signed-URL mint with the project's ElevenLabs credential and returns signed URL plus conversation id; the ElevenLabs browser SDK loaded in the panel; a post-call job that fetches the conversation transcript and recording by id with the same key and writes a run with per-turn parts; a consent notice on the panel; `X-LangWatch-Guardrails-Not-Applied` behaviour documented, since the conversation never passes through the gateway.
+- **Sits:** V1, the wow slice.
 
-**V1, the Simulated path, the core. Config: the number, plus the persona and criteria text.**
+**E3. Have a simulated caller test it**
+- **Who:** a QA lead.
+- **Does:** picks a scenario, picks the voice agent, presses Run.
+- **Sees:** the run console fill turn by turn with caller and agent audio, then verdict and criteria. In a batch, the results table like any text run.
+- **Needs:** the execution pool (`execution-pool.ts`) resolving a `voice` target into the SDK's `ElevenLabsAgentAdapter` with the project credential, and the user simulator with the scenario's Caller voice settings; a per-project concurrency cap for voice runs; a max call duration; the existing per-turn audio path (`MediaPart.tsx`, `useSequentialAudioPlayback.ts`).
+- **Sits:** V1, the core.
 
-**S1. Have a simulated caller phone my agent.**
-As Maya, I want to describe the caller in a few sentences, pick a voice, and press Call, so that the same scenario can be run against the deployed agent without me on the line.
-Accept: on the same call page, a switch between Me and Simulated caller. Persona and criteria use the existing scenario authoring fields. Live status and per-turn transcript stream into the run console as the call happens, as SDK voice runs do today. Max duration and Hang up as in L1.
-Requires: `phone` entry in `SimulationTarget`, the scenario SDK Twilio adapter running in the existing execution pool, a public websocket ingress for Twilio media streams, a call session that stays up for the whole call, and the A-leg stream fix in scenario 762. Voice style from scenario 533 and 862.
+**E4. Choose the caller's voice**
+- **Who:** the QA lead.
+- **Does:** expands Caller voice on the scenario, picks a voice, sets Interrupts to 20 percent.
+- **Sees:** the picker lists only realtime and audio models the project has credentials for, with the project default preselected.
+- **Needs:** `ModelSelector.tsx` accepting `audio` and `realtime` modes; three fields on the scenario config with defaults; the pool passing them to the user simulator (`voice`, `interrupt_probability`, `audio_effects`).
+- **Sits:** V1.
 
-**S2. Save the number as a target and run any scenario against it.**
-As Maya, I want the number saved as a project target so that every voice scenario and scenario set in the project can be pointed at it.
-Requires: S1. Reuses target selection as for http and prompt targets.
+**E5. Call it myself from a scenario**
+- **Who:** the QA lead, checking a criterion by hand.
+- **Does:** picks the scenario and the voice agent, presses Call it myself, talks, hangs up.
+- **Sees:** the same panel as E2, then a run scored against the scenario's criteria with Caller: You.
+- **Needs:** E2 plus the run tagged with the scenario id and routed through the judge.
+- **Sits:** V1.
 
-**V2.**
+**E6. Sweep voices in a batch**
+- **Who:** the QA lead.
+- **Does:** sets voice and interrupt probability as scenario parameters, runs the batch.
+- **Sees:** one row per parameter set in the results table.
+- **Needs:** the Caller voice fields accepting parameter references, which the parameter system already supports for text fields.
+- **Sits:** V1 if free, else early V2.
 
-**S3. Run a batch of callers on a schedule and trend it.**
-As Maya, I want a set of caller personas run after each agent deploy with pass rate and latency per persona.
-Requires: S2 plus run-level timeline and latency carried to the platform (today computed in the SDK and never sent, `scenario_executor.py:2088-2115`).
+**P1. Phone number as a target (V2)**
+- **Who:** a QA lead whose agent is reachable only by phone, or built on a stack that is not ElevenLabs.
+- **Does:** New Agent, Voice agent, Reached via: Phone number, types the number. Then E3 and E5 work unchanged.
+- **Needs:** scenario 762 with its three guardrails (websocket auth, max duration after `<Pause>` goes, outbound allowlist); a LangWatch-owned Twilio number; a public media-stream ingress and long-lived session in the pool; a Twilio browser softphone for Call it myself with two-channel recording and gateway transcription (`POST /v1/audio/transcriptions`).
+- **Sits:** V2. Plan for 762 this week so it is ready when V1 ships.
 
-**S4. Get through an IVR menu first.**
-As Maya, I want the simulated caller to press keys to reach the agent behind a phone tree.
-Requires: S1, plus the SDK DTMF work in scenario 464.
+**X1. Run-level recording, timeline and latency (cross-cutting)**
+- The SDK computes them (`python/scenario/voice/recording.py`) and never sends them (`scenario_executor.py:2088-2115`). Needed for whole-call playback (langwatch 4627), latency in `MetricsSummary.tsx`, and honest docs. Independent of transport. Start it in parallel with E3.
 
-**Cross-cutting, either path.**
+**X2. Compare text and voice agents on one scenario (cross-cutting)**
+- Run the same scenario against the HTTP agent and the Voice agent and see both in one results table. Falls out of keeping one scenario type. Needs only a modality column.
 
-**X1. Link the call to the agent's trace.**
-As Dev, I want the run to link to the trace my agent emitted for that call, matched by Twilio call SID or by caller number and time window.
-Requires: SDK audio and realtime helpers (langwatch 3968, 3969, scenario 674).
+### 4.6 Build order
 
-**X2. Play the whole call with turn markers and latency.**
-As Maya, I want one player with seek and per-turn response latency, so that I can tell wording problems from slowness.
-Requires: langwatch 4627 (parked), 5582 (seek), and for the Live path a per-turn split derived from the two-channel recording.
+1. **E1 and E3.** Agent type, drawer without Talk to it, pool wiring to the existing adapter. This is a working simulated caller in the app and proves the pool can hold a voice session.
+2. **E2.** Signed-URL route, mic panel, post-call transcript and recording fetch. First demo.
+3. **E4 and E5.** Caller voice group, picker modes, Call it myself on the run dialog. V1 complete.
+4. **X1 in parallel from step 1.** It unblocks the whole-call player and honest latency.
+5. **E6, X2.** Cheap once the above land.
+6. **P1.** Write the 762 plan now, build after V1.
 
-### 4.5 Build order
+### 4.7 Open questions for the product owner
 
-Two tracks run in parallel from day one. Track A is the core and has the long pole, scenario 762, so it starts first. Track B is the wow slice, platform-only, and will finish first because it is small. Nothing in Track B is throwaway: the target type, run record, STT step and judge step are the same code the core uses.
+- Transcript retention must be on for the agent in ElevenLabs or the post-call fetch returns nothing. Do we detect and explain that, or document it?
+- The browser session goes browser to ElevenLabs, so no gateway guardrail runs on it. Is a visible "guardrails not applied" note on the panel enough for V1?
+- Which ElevenLabs plan tiers return the conversation audio by API? Confirm before promising Play recording.
+- Consent notice per country on the Talk to it panel. Confirm the copy.
+- For V2 phone: which number does the agent see as caller ID, and does the Twilio plan support two-channel recording?
 
-1. **Track A, scenario 762.** Written plan this week, then the A-leg `<Connect><Stream>` change in the SDK Twilio adapter, tested against our own numbers first and an external number second.
-2. **Track A, S1.** `phone` target type, media-stream ingress and long-lived call session in the platform, adapter run in the execution pool, call page with persona, criteria, Call, live turn console. Per-project concurrency cap and max duration. This is the product.
-3. **Track B, L1, L2.** Softphone page, token endpoint, TwiML bridge with two-channel recording, recording webhook, STT via the gateway, run record and playback. Reuses the target type and run record from S1, or lands them first if it gets there sooner.
-4. **Track B, L3, L4.** Judge on transcript, connect-failure statuses. Call it myself is complete.
-5. **S2.** Saved target so scenario sets can point at the number. Small once S1 exists. v1 complete.
-6. **X2, S3, S4, X1.** Whole-call player, batches on a schedule, IVR, trace link.
-
-Dropped from the earlier draft: the standalone safety policy story (allowlists, cost caps, hours) is out of scope. A max duration and a per-project concurrency cap on simulated calls are folded into L1 and S1. The self-hosted bring-your-own-Twilio story is folded away: v1 runs on a LangWatch-owned number on cloud only.
-
-### 4.6 Open questions for the product owner
-
-- Which number does the agent see as caller ID? A LangWatch number means agents that whitelist callers will reject the test.
-- Two-channel recording gives clean speaker separation. Confirm the Twilio plan supports it.
-- Recording consent varies by country. v1 shows a consent notice on the call page. Confirm that is enough for the target markets.
-
-### 4.7 Secondary stories, kept for the backlog
+### 4.8 Secondary stories, kept for the backlog
 
 - Developer: one-line SDK helper to trace a live realtime call with audio stored out of band (langwatch 3968, 3969, scenario 674, 599).
 - Platform admin: cut a gateway realtime session off when budget runs out (ADR-097 relay, four gates unmet).
 - AI engineer: audio evaluators for transcription accuracy and silence gaps (langevals, absent).
 - TS developer: LiveKit, Vapi and WebRTC adapters and TS docs tabs (scenario 563, 566).
 - Lead: voice cost broken out per project (spend rater has the data).
+- Any user: upload a recording and have it judged (langwatch 6283). Later.
 - Any user: talk to Langy. No groundwork, later.
 
 ## 5. Next actions
@@ -310,7 +312,8 @@ Dropped from the earlier draft: the standalone safety policy story (allowlists, 
 - Reviewer queue, in order: 7830, 872 (undraft), 907, 950, 973, 863, 851 (rebase). Section 2.5.
 - Human call on scenario 453 (Notion board) and langwatch 4157 (record the decision on the issue).
 - Add a `voice` label in `langwatch/langwatch` and `langwatch/scenario` so this survey does not need 23 search terms next time.
-- Answer the three questions in 4.6, then spec L1 and L2. Provision a LangWatch-owned Twilio number for cloud.
-- Write the plan for scenario 762 (Twilio A-leg to external numbers) this week. It is the long pole of v1.
+- Spec E1 and E3 (Voice agent type, pool wiring to the ElevenLabs adapter) and start them. Then E2, the mic panel.
+- Answer the questions in 4.7, especially ElevenLabs transcript retention and audio-by-API tiers, before promising Play recording.
+- Write the plan for scenario 762 (Twilio A-leg to external numbers) this week, with its three guardrails. It is the long pole of V2, not V1.
 - Spec run-level audio, timeline and latency to the platform. Worth doing even if the phone runner slips, and it fixes the docs over-promise.
 - Fix the docs claim in `docs/agent-testing/voice-agents.mdx` that the app shows per-turn TTFB and p50/p95. It does not.
