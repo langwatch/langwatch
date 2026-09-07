@@ -478,8 +478,27 @@ Feature: Langy guides the first setup after sign-up
       When the compiled guided-onboarding skill is read
       Then the tracing edit and the connect adapter are committed on the langy/ branch as soon as the agent is online
       And the commit stages the changed files by name, never the env file, with the message "Add LangWatch tracing and the connect endpoint" and no trailer
-      And Langy says in one line that the changes are on that branch for review
-      And the push and the pull request come at the end of the path
+      And Langy keeps that branch checked out for the agent it started, and says so in one line
+
+    # The pull request used to come at the very end of the path, after the
+    # suite, so the person waited the whole path to see the change they could
+    # already merge. It opens right after the commit now, and the address is
+    # said in one sentence before the proposal; the card comes at the end.
+    @unit
+    Scenario: The pull request is opened before the proposal
+      When the compiled guided-onboarding skill is read
+      Then right after the tracing commit Langy pushes the branch and opens the pull request with the title "Add LangWatch tracing and the connect endpoint"
+      And Langy says "I opened a pull request with the tracing change: {link}. You can merge it already." with the address the command printed in the braces
+      And a missing remote or gh login is the one-line branch note instead
+      And the proposal comes right after, in the same turn
+
+    # A film said "All ready!" between the first run and the suite. The line
+    # closes the path, so it waits for the suite run and its open run.
+    @unit
+    Scenario: The closing line waits for the suite run
+      When the compiled guided-onboarding skill is read
+      Then the closing line is said only once the suite ran and its run is open, and never before
+      And a later file change is committed and pushed onto the same pull request
 
     @unit
     Scenario: The credentials are written after the tracing edit
@@ -520,7 +539,7 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: The path is a checklist Langy keeps
       When the compiled guided-onboarding skill is read
-      Then on the create option the fixed order goes into the plan tool as eleven pending items, before any command
+      Then on the create option the fixed order goes into the plan tool as ten pending items, before any command
       And each item is marked done as it finishes
       And a turn never ends with an open item unless a command answered an error
 
@@ -530,7 +549,7 @@ Feature: Langy guides the first setup after sign-up
     Scenario: A folder with no remote still completes the path
       When the compiled guided-onboarding skill is read
       Then a missing remote or gh login is one line saying the branch holds the commit and no pull request was opened
-      And the pull request item is done with that line and the closing line and complete-path follow
+      And the step is done with that line, the proposal follows, and the closing line and complete-path close the path
 
     # A film said the chat line and added a sentence about the tracing edit in
     # the same turn, so the person's cursor never got the composer.
@@ -573,8 +592,9 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: The path ends in a fixed order
       When the compiled guided-onboarding skill is read
-      Then the scenario is created and opened, the why-a-scenario line is said, the run happens
-      And the two-things line, the suite, its run, the open run, the push and pull request follow
+      Then the commit, the push, the pull request and its sentence come before the proposal
+      And the scenario is created and opened, the why-a-scenario line is said, the run happens
+      And the two-things line, the suite, its run and the open run follow
       And the closing line comes before complete-path, which is last
 
     # The line is true whatever the verdict: the agent answered and the traces
@@ -797,6 +817,36 @@ Feature: Langy guides the first setup after sign-up
   # ===========================================================================
   # The done marker: what complete-path shows in the panel
   # ===========================================================================
+
+  Rule: The transcript tells the pull request once as words and once as a card
+
+    # The step-by-step progress receipt (Clone, Branch, Commit, Push, PR) said
+    # the same thing as the sentence with the link and as the card at the end,
+    # three times on one screen.
+    @integration
+    Scenario: A guided conversation shows no progress card
+      Given a guided conversation whose reply committed the tracing change
+      When the reply renders
+      Then no pull request progress receipt is drawn
+
+    # The card is derived from the conversation's own tool calls: the branch
+    # from the checkout, the title from the gh pr create flags, the address
+    # from that command's stdout. With no remote it names the branch alone.
+    @integration
+    Scenario: The pull request card closes the path
+      Given a guided conversation whose reply ran complete-path
+      When the reply renders
+      Then one pull request card sits after the closing line, with the title, the branch, the address and a button to open it
+      And a reply that did not close the path draws no such card
+      And with no pull request the card names the branch that holds the commit
+
+    # "How did Langy do?" showed up between steps of the path, under a reply
+    # that was not an answer yet.
+    @unit
+    Scenario: No feedback ask while the guided path runs
+      Given a conversation that carries the kickoff
+      Then the feedback ask is held while no reply since the kickoff ran complete-path
+      And it may show once the path is closed, after the pull request card
 
   Rule: The complete-path result renders as one line, the panel's done marker
 

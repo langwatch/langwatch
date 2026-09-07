@@ -57,6 +57,11 @@ import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { readHandledError, showErrorToast } from "~/features/errors";
+import {
+  guidedPathInProgress,
+  guidedPullRequestFromMessages,
+  isGuidedConversation,
+} from "~/features/guided-onboarding/guidedConversation";
 import { planGuidedKickoffSend } from "~/features/guided-onboarding/kickoff";
 import { useGuidedTourStore } from "~/features/guided-onboarding/tour/guidedTourStore";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
@@ -2901,6 +2906,26 @@ function LangyPanel({
       ? [...(localCards ?? []), ...(openQuestionCards ?? [])]
       : null;
 
+  // A guided conversation tells its pull request as a sentence before the
+  // proposal and as one card after the closing line, so the step-by-step
+  // progress receipt stays out, and the feedback ask waits for the path to
+  // close.
+  const guidedConversation = useMemo(
+    () => isGuidedConversation(displayMessages),
+    [displayMessages],
+  );
+  const guidedPullRequest = useMemo(
+    () =>
+      guidedConversation
+        ? guidedPullRequestFromMessages(displayMessages)
+        : null,
+    [guidedConversation, displayMessages],
+  );
+  const guidedInProgress = useMemo(
+    () => guidedConversation && guidedPathInProgress(displayMessages),
+    [guidedConversation, displayMessages],
+  );
+
   // Where those cards sit in the column.
   //
   // While the turn runs they belong at the live edge, beside the working line:
@@ -3688,6 +3713,8 @@ function LangyPanel({
                                   onApply={applyProposal}
                                   onDiscard={discardProposalInStore}
                                   conversationId={activeConversationId}
+                                  hideGithubProgress={guidedConversation}
+                                  guidedPullRequest={guidedPullRequest}
                                   isStreaming={
                                     displayBusy &&
                                     index === displayMessages.length - 1 &&
@@ -3720,6 +3747,10 @@ function LangyPanel({
                                     !turnActive &&
                                     !turnError &&
                                     !recovery.isRecovering &&
+                                    // Never during a guided path: the ask
+                                    // comes once, after the card that
+                                    // closes it.
+                                    !guidedInProgress &&
                                     message.role === "assistant" &&
                                     index === displayMessages.length - 1
                                   }

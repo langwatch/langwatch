@@ -88,6 +88,7 @@ describe("the question tool", () => {
       };
       expect(Object.keys(questions.items.properties).sort()).toEqual([
         "allowOther",
+        "bare",
         "header",
         "multiple",
         "options",

@@ -24,6 +24,8 @@ const VERBATIM_LINES = {
     "Perfect. To write a scenario for that and run it against your real agent, and wire tracing in while I'm at it, I still need to reach the code. How should I connect?",
   "the proposal":
     "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is {title}, because {reason}.",
+  "the pull request line":
+    "I opened a pull request with the tracing change: {link}. You can merge it already.",
   "the chat-about-this line":
     "Of course. Tell me what the scenario should cover and I'll write it with you.",
   "the why-a-scenario line":
@@ -307,9 +309,42 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain("never the env file and never `git add -A`");
       expect(rendered).toContain("with this message and no trailer");
       expect(rendered).toContain(
-        "say in one line of your own words that the tracing and the connect call are on branch `langy/<slug>` for them to review",
+        "keep that branch checked out: the agent you started runs on it, and say so in one line",
       );
-      expect(rendered).toContain("the commit exists since step 2, so commit again only when a file changed since");
+    });
+
+    /** @scenario "The pull request is opened before the proposal" */
+    it("pushes and opens the pull request right after the tracing commit, says the address in one sentence, then proposes", () => {
+      const commit = rendered.indexOf(
+        'git add <the files you changed> && git commit -m "Add LangWatch tracing and the connect endpoint"',
+      );
+      const push = rendered.indexOf(
+        "7. Push the branch and open the pull request, as steps 5 and 6 of `code-changes` say, with the title `Add LangWatch tracing and the connect endpoint`.",
+      );
+      const sentence = rendered.indexOf(VERBATIM_LINES["the pull request line"]);
+      const noRemote = rendered.indexOf(
+        "No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and the step is done.",
+      );
+      const proposal = rendered.indexOf("### 3. Propose the first scenario, and stop");
+      expect(commit).toBeGreaterThan(-1);
+      expect(push).toBeGreaterThan(commit);
+      expect(sentence).toBeGreaterThan(push);
+      expect(noRemote).toBeGreaterThan(sentence);
+      expect(proposal).toBeGreaterThan(noRemote);
+      expect(rendered).toContain("The proposal of step 3 comes right after, in the same turn.");
+    });
+
+    /** @scenario "The closing line waits for the suite run" */
+    it("says the closing line only once the suite ran and its run is open", () => {
+      expect(rendered).toContain(
+        "Item 10, only once item 8 is done, so the suite ran and its run is open, and never before. Say, verbatim, as the last line:",
+      );
+      const suiteRun = rendered.indexOf("langwatch test-suite run <suite_id>");
+      const closing = rendered.indexOf(VERBATIM_LINES["the closing line"]);
+      expect(closing).toBeGreaterThan(suiteRun);
+      expect(rendered).toContain(
+        "Item 9: the commit and the pull request exist since step 2, so commit and push again only when a file changed since; the change lands on the same pull request",
+      );
     });
 
     /** @scenario "The first scenario is the golden path" */
@@ -375,9 +410,8 @@ describe("the guided-onboarding skill", () => {
         "6. The suite",
         "7. Run the suite",
         "8. Open the suite run",
-        "9. Commit, when a file changed",
-        "10. Push and pull request, or the no-remote line",
-        "11. The closing line and complete-path",
+        "9. Commit and push, when a file changed since the pull request",
+        "10. The closing line and complete-path",
       ];
       const positions = items.map((item) => rendered.indexOf(item));
       for (const [index, position] of positions.entries()) {
@@ -391,10 +425,10 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "A folder with no remote still completes the path" */
     it("treats a missing remote or gh login as the pull request item done, not as a failed step", () => {
       expect(rendered).toContain(
-        "A missing remote, a missing `gh` login and a failed verdict are not errors: the item is done with its line, and the next one starts.",
+        "A missing remote, a missing `gh` login and a failed verdict are not errors: the step is done with its line, and the next one starts.",
       );
       expect(rendered).toContain(
-        "No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and item 10 is done.",
+        "No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and the step is done.",
       );
       const noRemote = rendered.indexOf("No remote, or no `gh` login:");
       const closing = rendered.indexOf(VERBATIM_LINES["the closing line"]);
@@ -456,6 +490,10 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The path ends in a fixed order" */
     it("states the end of the path as one fixed order", () => {
       const order = [
+        'git commit -m "Add LangWatch tracing and the connect endpoint"',
+        "Push the branch and open the pull request",
+        VERBATIM_LINES["the pull request line"],
+        VERBATIM_LINES["the proposal"],
         'langwatch scenario create "<title>"',
         "langwatch navigate open <scenario_id>",
         VERBATIM_LINES["the why-a-scenario line"],
@@ -464,7 +502,6 @@ describe("the guided-onboarding skill", () => {
         'langwatch test-suite create "Full regression"',
         "langwatch test-suite run <suite_id>",
         "langwatch navigate open <the scenariorun_ id the suite run printed>",
-        "push the branch and open the pull request",
         VERBATIM_LINES["the closing line"],
         "langwatch onboarding complete-path llmops",
       ];

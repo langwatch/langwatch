@@ -61,6 +61,8 @@ export const GUIDED_LINES = {
     "Perfect. To write a scenario for that and run it against your real agent, and wire tracing in while I'm at it, I still need to reach the code. How should I connect?",
   proposalStart:
     "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is",
+  pullRequestOpened: "I opened a pull request with the tracing change:",
+  pullRequestMerge: "You can merge it already.",
   chatAboutThis:
     "Of course. Tell me what the scenario should cover and I'll write it with you.",
   whyScenario:

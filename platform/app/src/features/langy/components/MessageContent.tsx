@@ -12,6 +12,10 @@ import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 import { isInternalHref, Markdown } from "~/components/Markdown";
+import {
+  type GuidedPullRequest,
+  guidedPathCompletedIn,
+} from "~/features/guided-onboarding/guidedConversation";
 import { guidedKickoffPartOf } from "~/features/guided-onboarding/kickoff";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { githubProgressFromToolParts } from "~/server/app-layer/langy/execution/githubCommand";
@@ -59,6 +63,7 @@ import { LangySecretSnippetCard } from "./derived-cards/LangySecretSnippetCard";
 import { StreamingAnswerWithCards } from "./derived-cards/StreamingAnswerWithCards";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { LangyGuidedPrCard } from "./github/LangyGuidedPrCard";
 import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyFeedback } from "./LangyFeedback";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
@@ -106,6 +111,7 @@ function MessageContentImpl({
   liveCodeAccessCallId,
   questionWaits,
   hideGithubProgress = false,
+  guidedPullRequest = null,
 }: {
   message: UIMessage;
   organizationId?: string | null;
@@ -116,6 +122,11 @@ function MessageContentImpl({
    * time.
    */
   hideGithubProgress?: boolean;
+  /**
+   * The pull request a guided path opened (or the branch alone), drawn once
+   * after the closing line of the reply that completed the path.
+   */
+  guidedPullRequest?: GuidedPullRequest | null;
   appliedOutcomes: Record<
     string,
     { href?: string; label?: string; onOpen?: () => void }
@@ -645,6 +656,15 @@ function MessageContentImpl({
             />
           ),
         )}
+        {/* The card that closes a guided path, after the closing line: the
+            pull request with the tracing change, or the branch holding it. */}
+        {guidedPullRequest &&
+        !isPlainText &&
+        guidedPathCompletedIn(message.parts) ? (
+          <LangyCardBoundary scope="the pull request card">
+            <LangyGuidedPrCard {...guidedPullRequest} />
+          </LangyCardBoundary>
+        ) : null}
         {/* WHEN to ask is the backend's call (langy.messages `shouldAskFeedback` —
             conversation depth + a per-user quiet period), or the agent's own
             [langy:feedback] directive at a high-signal moment, or the user

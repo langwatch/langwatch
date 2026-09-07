@@ -89,7 +89,11 @@ Work on a branch of your own, never on the branch the user has checked out: `git
 git add <the files you changed> && git commit -m "Add LangWatch tracing and the connect endpoint"
 ```
 
-Then say in one line of your own words that the tracing and the connect call are on branch `langy/<slug>` for them to review. Keep that branch checked out while the agent you started runs; the push and the pull request come in step 5.
+7. Push the branch and open the pull request, as steps 5 and 6 of `code-changes` say, with the title `Add LangWatch tracing and the connect endpoint`. Then say, verbatim, with the braces filled with the address `gh pr create` printed:
+
+I opened a pull request with the tracing change: {link}. You can merge it already.
+
+No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and the step is done. Either way, keep that branch checked out: the agent you started runs on it, and say so in one line. The proposal of step 3 comes right after, in the same turn.
 
 ### 3. Propose the first scenario, and stop
 
@@ -124,11 +128,10 @@ On the create option, or on the scenario agreed after "Chat about this", before 
 6. The suite
 7. Run the suite
 8. Open the suite run
-9. Commit, when a file changed
-10. Push and pull request, or the no-remote line
-11. The closing line and complete-path
+9. Commit and push, when a file changed since the pull request
+10. The closing line and complete-path
 
-Mark each item done as you finish it, and read the list before you end a turn: **a turn never ends with an open item**, unless a command answered an error (see "When a step fails"). A missing remote, a missing `gh` login and a failed verdict are not errors: the item is done with its line, and the next one starts.
+Mark each item done as you finish it, and read the list before you end a turn: **a turn never ends with an open item**, unless a command answered an error (see "When a step fails"). A missing remote, a missing `gh` login and a failed verdict are not errors: the step is done with its line, and the next one starts.
 
 Item 1:
 
@@ -171,9 +174,9 @@ langwatch test-suite run <suite_id> --target connected:<agent name> --wait --for
 langwatch navigate open <the scenariorun_ id the suite run printed>
 ```
 
-Items 9 and 10: the commit exists since step 2, so commit again only when a file changed since. Then push the branch and open the pull request as steps 5 and 6 of `code-changes` say, and report the address. No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and item 10 is done. Leave the branch checked out: the agent you started runs on it, and say so in one line.
+Item 9: the commit and the pull request exist since step 2, so commit and push again only when a file changed since; the change lands on the same pull request, and with no remote it stays on the branch. Leave the branch checked out: the agent you started runs on it.
 
-Item 11. Say, verbatim, as the last line:
+Item 10, only once item 8 is done, so the suite ran and its run is open, and never before. Say, verbatim, as the last line:
 
 All ready! Let me know if there is anything I can help with.
 

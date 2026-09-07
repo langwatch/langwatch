@@ -226,6 +226,64 @@ describe("given a turn that raised a card with a call and then wrote on", () => 
     ).toBe(true);
   });
 
+  /** @scenario "The pull request card closes the path" */
+  it("draws the guided pull request card after the closing line once the path is done", () => {
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <MessageContent
+          message={assistantMessage([
+            toolPart("langwatch test-suite run suite_1 --wait", "c1"),
+            { type: "text", text: CLOSING },
+            toolPart("langwatch onboarding complete-path llmops", "c2"),
+          ])}
+          appliedOutcomes={{}}
+          discardedProposals={new Set()}
+          applyingProposals={new Set()}
+          onApply={async () => {}}
+          onDiscard={() => {}}
+          hideGithubProgress
+          guidedPullRequest={{
+            url: "https://github.com/acme/checkout/pull/12",
+            title: "Add LangWatch tracing and the connect endpoint",
+            branch: "langy/tracing",
+          }}
+        />
+      </ChakraProvider>,
+    );
+
+    const card = screen.getByLabelText("Guided path pull request");
+    expect(orderOf(screen.getByText(CLOSING), card)).toBe(true);
+    expect(card.textContent).toContain(
+      "Add LangWatch tracing and the connect endpoint",
+    );
+    expect(card.textContent).toContain("langy/tracing");
+    expect(
+      screen.getByText("Open pull request").closest("a")?.getAttribute("href"),
+    ).toBe("https://github.com/acme/checkout/pull/12");
+  });
+
+  it("keeps the guided pull request card off a reply that did not close the path", () => {
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <MessageContent
+          message={assistantMessage([
+            toolPart("langwatch scenario run s_1 --wait", "c1"),
+            { type: "text", text: SECOND },
+          ])}
+          appliedOutcomes={{}}
+          discardedProposals={new Set()}
+          applyingProposals={new Set()}
+          onApply={async () => {}}
+          onDiscard={() => {}}
+          guidedPullRequest={{ branch: "langy/tracing" }}
+        />
+      </ChakraProvider>,
+    );
+
+    expect(screen.queryByLabelText("Guided path branch")).toBeNull();
+  });
+
+  /** @scenario "A guided conversation shows no progress card" */
   it("leaves the progress card out when the caller hides it", () => {
     render(
       <ChakraProvider value={defaultSystem}>
