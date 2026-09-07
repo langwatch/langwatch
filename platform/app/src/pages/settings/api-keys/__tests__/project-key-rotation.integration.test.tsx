@@ -247,11 +247,12 @@ describe("<ApiKeysSection /> project base key rotation", () => {
 
     describe("when viewing the legacy project key row", () => {
       /** @scenario Rotation requires permission to manage the project */
-      it("does not offer a control to rotate the project base API key", () => {
+      it("does not render the secret-bearing legacy key row", () => {
         renderSection();
         expect(
           screen.queryByRole("button", { name: ROTATE_LABEL }),
         ).not.toBeInTheDocument();
+        expect(screen.queryByText("Project API Key")).not.toBeInTheDocument();
       });
 
       // The legacy row intentionally has no edit or revoke control — rotation

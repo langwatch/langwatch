@@ -224,7 +224,7 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
       terminal) or to use `--api-key <key>` instead
 
   @bdd @cli @login @project @slug @integration
-  Scenario: the project-key endpoint refuses a project the caller cannot write to
+  Scenario: the project-key endpoint refuses a project the caller cannot manage
     Given a device-session bearer token
     When POST /api/auth/cli/project-key names a project the user cannot write to
     Then the server responds 403 and no key is returned

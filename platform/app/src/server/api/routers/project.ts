@@ -192,13 +192,12 @@ export const projectRouter = createTRPCRouter({
       return { success: true, projectSlug: project.slug };
     }),
   /**
-   * The base key is a project-level write credential, so reading it is gated
-   * with `project:update` to match the access it grants. Rotation stays at
-   * `project:manage`.
+   * The base key grants full access to one project. Revealing it is therefore
+   * an administrator action, just like rotating it.
    */
   getProjectAPIKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:update")
+    .permission("project:manage")
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
