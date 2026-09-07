@@ -178,14 +178,20 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Given a turn is in flight by either the live stream or the durable state
     Then the feedback ask is not shown under the latest reply
 
-  @integration @unimplemented
+  @integration
   Scenario: A turn in flight resumes after a page refresh
-    # Depends on the PR3 Redis token-buffer transport; the UI reads turn state
-    # and replays the buffered tail.
     Given Langy is streaming a response
     When I refresh the page
-    Then Langy shows "Catching up…" while it reattaches to the in-flight turn
-    And it replays the buffered token tail and continues streaming
+    Then the durable record names the turn in flight and the panel adopts it
+    And the panel reattaches to that turn's stream once, which replays what the turn already wrote
+    And a turn this tab sent itself is never reattached, its stream came with the send
+
+  @integration
+  Scenario: A turn started by the shared folder connecting reaches the open tab
+    Given the guided path is waiting for my folder to connect
+    When the folder connects and the server starts the next turn
+    Then the panel adopts the turn from the durable record and reattaches to its stream
+    And a navigate instruction from that turn opens the page it names in place
 
   # ---------------------------------------------------------------------------
   # Domain-error rendering (ADR-045)

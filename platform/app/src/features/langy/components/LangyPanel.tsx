@@ -96,6 +96,7 @@ import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
 import { useLangyWarmWorker } from "../hooks/useLangyWarmWorker";
 import { useLingeringDodge } from "../hooks/useLingeringDodge";
 import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
+import { shouldResumeAdoptedTurn } from "../logic/adoptedTurnResume";
 import { syncLangyAfterDefaultModelWrite } from "../logic/codingDefaultSync";
 import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
@@ -894,6 +895,12 @@ function LangyPanel({
   // "a double-fire must not repeat the effect" shape.
   const navigatedInstructionsRef = useRef<Set<string>>(new Set());
 
+  // The turn this tab's own send started, and the adopted turn this tab
+  // already reattached to. A turn the durable record names that is neither
+  // has no stream open here, and the resume effect below opens one.
+  const dispatchedTurnIdRef = useRef<string | null>(null);
+  const resumedTurnIdRef = useRef<string | null>(null);
+
   // UI actions already claimed or dropped on this client, keyed by
   // turnId+actionId (`uiActionDedupKey`) — the same replay problem, and the
   // same per-turn reset, as the navigate dedup above.
@@ -950,6 +957,7 @@ function LangyPanel({
           // The turn was dispatched: adopt the conversation + turn and enter the
           // `active` phase (which also clears the previous turn's live signals).
           useLangyStore.getState().beginTurn({ conversationId, turnId });
+          dispatchedTurnIdRef.current = turnId;
           // The words are a bubble on screen now, so they are no longer a
           // draft to hand back. Without this, a failure LATER in the turn put
           // the question the reader had already asked back in the composer,
@@ -966,6 +974,17 @@ function LangyPanel({
               conversationId,
             });
           }
+        },
+        getResumeTarget: () => {
+          const projectId = turnContextRef.current?.projectId;
+          const store = useLangyStore.getState();
+          if (!projectId || !store.activeConversationId || !store.activeTurnId)
+            return null;
+          return {
+            projectId,
+            conversationId: store.activeConversationId,
+            turnId: store.activeTurnId,
+          };
         },
         onNavigate: (entry) => {
           // Internal-target guard, mirroring MessageContent's isInternalHref:
@@ -1232,6 +1251,7 @@ function LangyPanel({
     status,
     error,
     regenerate,
+    resumeStream,
     applyHistoryToEngine,
     resetEngine,
     clearError,
@@ -1615,6 +1635,39 @@ function LangyPanel({
     historyMessages,
     messages.length,
     applyHistoryToEngine,
+  ]);
+
+  // Reattach to a turn this tab did not dispatch. The durable fold adopts it
+  // (the store's `activeTurnId`) and the rehydration above puts its user
+  // message in the engine, but the text as it is written and the live-only
+  // instructions (navigate, ui) only reach a tab through the turn stream, so
+  // the engine resumes: the transport's `getResumeTarget` names the turn and
+  // the subscription replays what the turn already wrote. The turn a send from
+  // this tab started already has its stream, and never resumes.
+  const lastEngineRole = messages.at(-1)?.role ?? null;
+  useEffect(() => {
+    if (
+      !shouldResumeAdoptedTurn({
+        turnActive,
+        activeTurnId: localTurnId,
+        dispatchedTurnId: dispatchedTurnIdRef.current,
+        resumedTurnId: resumedTurnIdRef.current,
+        isStreaming: isBusy,
+        isHistoryLoadPending: historyLoadConversationId !== null,
+        lastEngineRole,
+      })
+    ) {
+      return;
+    }
+    resumedTurnIdRef.current = localTurnId;
+    void resumeStream();
+  }, [
+    turnActive,
+    localTurnId,
+    isBusy,
+    historyLoadConversationId,
+    lastEngineRole,
+    resumeStream,
   ]);
 
   // A failed recents list surfaces INSIDE the panel as a dismissable Langy

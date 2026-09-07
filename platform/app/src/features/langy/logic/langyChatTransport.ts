@@ -94,6 +94,19 @@ export interface LangyChatTransportDeps {
   /** Fired when a turn stream terminates — the reconcile trigger. */
   onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   /**
+   * The turn a resume should reattach to: the one the durable record named
+   * and this tab adopted without dispatching it (a turn started server-side
+   * when the shared folder connected, another tab's send, or a page refresh
+   * mid-turn). `null` means nothing to reattach to, and `reconnectToStream`
+   * tells useChat so. Read at resume time, never captured, for the same
+   * reason `getContext` is a getter.
+   */
+  getResumeTarget?: () => {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  } | null;
+  /**
    * Every wire entry, unfiltered and before any interpretation — the tap the
    * developer drawer's tape records from. Deliberately a plain observer: it
    * cannot alter dispatch, and it runs on entries this transport otherwise
@@ -179,25 +192,40 @@ export function createLangyChatTransport(
         projectId: ctx.projectId,
         conversationId,
         turnId,
-        onSignal: deps.onSignal,
-        ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
-        ...(deps.onUiAction ? { onUiAction: deps.onUiAction } : {}),
-        ...(deps.onLocalWait ? { onLocalWait: deps.onLocalWait } : {}),
-        ...(deps.onLocalWorkspace
-          ? { onLocalWorkspace: deps.onLocalWorkspace }
-          : {}),
-        onSettled: deps.onTurnSettled,
-        ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
+        ...streamCallbacks(deps),
         abortSignal: options.abortSignal,
       });
     },
 
-    // Resume is a re-subscribe + a fold-query reconcile, driven by the panel on
-    // remount — not a transport-level reconnect. Returning null tells useChat
-    // there is nothing to auto-reconnect to.
+    // A turn this tab did not dispatch has no stream here until something
+    // subscribes to it. The durable fold hands the tab the turn's tool calls
+    // and waits, but the live-only entries (navigate, ui, the text as it is
+    // written) reach a tab only through `onTurnStream`. The subscription
+    // replays the buffered prefix first, so a resume sees the whole turn, and
+    // the panel's dedup keeps a replayed navigate from firing twice.
     async reconnectToStream() {
-      return null;
+      const target = deps.getResumeTarget?.();
+      if (!target) return null;
+      return subscribeTurnStream({
+        ...target,
+        ...streamCallbacks(deps),
+      });
     },
+  };
+}
+
+/** The entry handlers both a dispatched and a resumed stream route through. */
+function streamCallbacks(deps: LangyChatTransportDeps) {
+  return {
+    onSignal: deps.onSignal,
+    ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
+    ...(deps.onUiAction ? { onUiAction: deps.onUiAction } : {}),
+    ...(deps.onLocalWait ? { onLocalWait: deps.onLocalWait } : {}),
+    ...(deps.onLocalWorkspace
+      ? { onLocalWorkspace: deps.onLocalWorkspace }
+      : {}),
+    onSettled: deps.onTurnSettled,
+    ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
   };
 }
 
