@@ -28,7 +28,7 @@ import {
 import { evaluationServerConfigDefinition } from "@langwatch/evaluation-contract";
 import { gatewayServerConfigDefinition } from "@langwatch/gateway-contract";
 import { githubServerConfigDefinition } from "@langwatch/github-contract";
-import { assertLangyServerConfig, langyServerConfigDefinition } from "@langwatch/langy-contract";
+import { langyServerConfigDefinition } from "@langwatch/langy-contract";
 import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
 import { logServerConfigDefinition } from "@langwatch/log-contract";
 import { metricServerConfigDefinition } from "@langwatch/metric-contract";
@@ -174,7 +174,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * refuses them: a URL alone dispatches unauthenticated, a secret alone
    * dispatches nowhere. Both absent is a valid "no agent manager" deployment.
    */
-  langy: { ...langyServerConfigDefinition },
+  langy: langyServerConfigDefinition,
   /**
    * Carried raw (not a number): `settlementGraceMs` in
    * `@langwatch/gateway-server` owns the parse, bound and warning — the
@@ -615,7 +615,6 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
   // first use: each one names a deployment that boots and then fails on a
   // job, which reads as an outage rather than as the mistake it is.
   assertAuthServerConfig(value.browserSession);
-  assertLangyServerConfig(value.langy);
   assertBillingServerConfig(value.stripe);
   const mail = resolveWorkerMailConfig(value.mail, value.browserSession.sessionSecret);
   const langy = resolveWorkerLangyConfig(value.langy);
@@ -780,10 +779,8 @@ function resolveWorkerLangyConfig(
 ): WorkerLangyConfig | undefined {
   const agentUrl = langy.agentUrl?.trim();
   const internalSecret = langy.internalSecret?.trim();
-  if (!agentUrl && !internalSecret) return undefined;
-  if (!agentUrl || !internalSecret) {
-    throw new Error("LANGY_AGENT_URL and LANGY_INTERNAL_SECRET must be configured together");
-  }
+  // An address without a secret never gets here: the schema refuses it.
+  if (!agentUrl || !internalSecret) return undefined;
 
   return { agentUrl, internalSecret };
 }

@@ -58,6 +58,8 @@ export type RuntimeConfigIssue = {
   /** The configuration leaf, spelled the way the service consumes it. */
   path: string;
   code: string;
+  /** Present for a group rule, which is the one issue Zod's code does not explain. */
+  message?: string;
   /**
    * Absent when a runtime hands `RuntimeConfig` a bare Zod schema — inventing
    * one would name a variable the deployment may not have.
@@ -83,12 +85,18 @@ export class InvalidRuntimeConfigError extends Error {
     const issues = input.error.issues.map((issue) => {
       const path = issue.path.join(".");
       const env = input.bindings?.get(path);
-      return { path, code: issue.code, ...(env === undefined ? {} : { env }) };
+      return {
+        path,
+        code: issue.code,
+        ...(env === undefined ? {} : { env }),
+        ...(issue.code === "custom" ? { message: issue.message } : {}),
+      };
     });
     const locations = issues
       .map(
         (issue) =>
-          `${issue.path || "<root>"} (${issue.env === undefined ? "" : `${issue.env}, `}${issue.code})`,
+          `${issue.path || "<root>"} (${issue.env === undefined ? "" : `${issue.env}, `}${issue.code})` +
+          (issue.message === undefined ? "" : `: ${issue.message}`),
       )
       .join(", ");
     super(`Invalid ${input.runtime} configuration: ${locations}.`);
@@ -100,7 +108,7 @@ export class InvalidRuntimeConfigError extends Error {
 export type RuntimeConfigOptions<Value extends Record<string, unknown>> = {
   name: string;
   schema?: z.ZodType<Value>;
-  definition?: RuntimeConfigDefinition;
+  definition?: ConfigDefinitionRoot;
   source: Readonly<Record<string, unknown>>;
 };
 
@@ -120,24 +128,55 @@ export interface RuntimeConfigDefinition {
   readonly [key: string]: ConfigDefinitionNode;
 }
 
+/** What a group rule reports: the leaf that is wrong and why, in words an operator acts on. */
+export type ConfigRuleViolation = {
+  readonly path: string;
+  readonly message: string;
+};
+
+/** A rule spanning more than one leaf, run on the parsed group value. */
+export type ConfigRule<Value> = (value: Value) => ConfigRuleViolation | undefined;
+
+/**
+ * Leaves that are only right together. The rules run inside the schema, so a
+ * half-configured group is refused by the same parse that refuses a bad leaf,
+ * before anything boots on it.
+ */
+export type ConfigGroup<Definition extends RuntimeConfigDefinition> = {
+  readonly _configGroup: true;
+  readonly definition: Definition;
+  readonly rules: readonly ConfigRule<ConfigValue<Definition>>[];
+};
+
+type ConfigGroupNode = {
+  readonly _configGroup: true;
+  readonly definition: RuntimeConfigDefinition;
+  readonly rules: readonly ConfigRule<never>[];
+};
+
 type ConfigDefinitionNode =
   | ConfigLeaf<unknown>
+  | ConfigGroupNode
   | RuntimeConfigDefinition
   | boolean
   | number
   | string;
 
+export type ConfigDefinitionRoot = RuntimeConfigDefinition | ConfigGroupNode;
+
 /** Resolves a semantic configuration definition to its value shape. */
 export type ConfigValue<Definition> =
   Definition extends ConfigLeaf<infer Value>
     ? Value
-    : Definition extends readonly unknown[]
+    : Definition extends { readonly _configGroup: true; readonly definition: infer Inner }
+      ? ConfigValue<Inner>
+      : Definition extends readonly unknown[]
       ? Definition
       : Definition extends Record<string, unknown>
         ? { [Key in keyof Definition]: ConfigValue<Definition[Key]> }
         : WidenPrimitive<Definition>;
 
-type DefinitionRuntimeConfigOptions<Definition extends RuntimeConfigDefinition> = {
+type DefinitionRuntimeConfigOptions<Definition extends ConfigDefinitionRoot> = {
   name: string;
   definition: Definition;
   source: Readonly<Record<string, unknown>>;
@@ -147,13 +186,13 @@ export class RuntimeConfig<Value extends Record<string, unknown>> {
   static create<Value extends Record<string, unknown>>(
     options: SchemaRuntimeConfigOptions<Value>,
   ): RuntimeConfig<Value>;
-  static create<const Definition extends RuntimeConfigDefinition>(
+  static create<const Definition extends ConfigDefinitionRoot>(
     options: DefinitionRuntimeConfigOptions<Definition>,
   ): RuntimeConfig<ConfigValue<Definition>>;
   static create(
     options:
       | RuntimeConfigOptions<Record<string, unknown>>
-      | DefinitionRuntimeConfigOptions<RuntimeConfigDefinition>,
+      | DefinitionRuntimeConfigOptions<ConfigDefinitionRoot>,
   ): RuntimeConfig<Record<string, unknown>> {
     const definition = options.definition;
     const schema =
@@ -179,7 +218,7 @@ export class RuntimeConfig<Value extends Record<string, unknown>> {
    * Exists for the `const` inference: without it a caller would write
    * `as const` on every definition to keep its literal types.
    */
-  static define<const Definition extends RuntimeConfigDefinition>(
+  static define<const Definition extends ConfigDefinitionRoot>(
     definition: Definition,
   ): Definition {
     return definition;
@@ -217,6 +256,14 @@ function isConfigLeaf(value: unknown): value is ConfigLeaf<unknown> {
   );
 }
 
+function isConfigGroup(value: unknown): value is ConfigGroupNode {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as ConfigGroupNode)._configGroup === true
+  );
+}
+
 function envName(path: readonly string[]): string {
   return path
     .flatMap((part) => part.replace(/([a-z\d])([A-Z])/g, "$1_$2").split("."))
@@ -224,7 +271,7 @@ function envName(path: readonly string[]): string {
     .toUpperCase();
 }
 
-function compileDefinition(definition: RuntimeConfigDefinition): z.ZodTypeAny {
+function compileDefinition(definition: ConfigDefinitionRoot): z.ZodTypeAny {
   const claimed = new Map<string, string>();
 
   const claim = (binding: string, path: string[]): void => {
@@ -237,7 +284,8 @@ function compileDefinition(definition: RuntimeConfigDefinition): z.ZodTypeAny {
     claimed.set(binding, path.join("."));
   };
 
-  const compile = (node: RuntimeConfigDefinition, path: string[]): z.ZodTypeAny => {
+  const compile = (node: ConfigDefinitionRoot, path: string[]): z.ZodTypeAny => {
+    if (isConfigGroup(node)) return withRules(compile(node.definition, path), node.rules);
     const shape: Record<string, z.ZodTypeAny> = {};
 
     for (const [key, value] of Object.entries(node)) {
@@ -260,7 +308,19 @@ function compileDefinition(definition: RuntimeConfigDefinition): z.ZodTypeAny {
   return compile(definition, []);
 }
 
-export function compileRuntimeConfig<const Definition extends RuntimeConfigDefinition>(
+function withRules(schema: z.ZodTypeAny, rules: readonly ConfigRule<never>[]): z.ZodTypeAny {
+  if (rules.length === 0) return schema;
+  return schema.superRefine((value, ctx) => {
+    for (const rule of rules) {
+      const violation = rule(value as never);
+      if (violation) {
+        ctx.addIssue({ code: "custom", path: [violation.path], message: violation.message });
+      }
+    }
+  });
+}
+
+export function compileRuntimeConfig<const Definition extends ConfigDefinitionRoot>(
   definition: Definition,
 ): z.ZodType<ConfigValue<Definition>> {
   return compileDefinition(definition) as z.ZodType<ConfigValue<Definition>>;
@@ -286,12 +346,13 @@ type ResolvedDefinition = {
 };
 
 function resolveDefinition(
-  definition: RuntimeConfigDefinition,
+  definition: ConfigDefinitionRoot,
   source: Readonly<Record<string, unknown>>,
 ): ResolvedDefinition {
   const bindings = new Map<string, string>();
 
-  const resolve = (node: RuntimeConfigDefinition, path: string[]): Record<string, unknown> => {
+  const resolve = (node: ConfigDefinitionRoot, path: string[]): Record<string, unknown> => {
+    if (isConfigGroup(node)) return resolve(node.definition, path);
     const result: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(node)) {
@@ -373,8 +434,16 @@ function configEnum<const Values extends readonly [string, ...string[]]>(
   };
 }
 
+function configGroup<const Definition extends RuntimeConfigDefinition>(
+  definition: Definition,
+  rules: readonly ConfigRule<ConfigValue<Definition>>[],
+): ConfigGroup<Definition> {
+  return { _configGroup: true, definition, rules };
+}
+
 export const Config = {
   value: configValue,
+  group: configGroup,
   url: configUrl,
   optionalUrl: configOptionalUrl,
   secret: configSecret,

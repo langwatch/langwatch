@@ -37,7 +37,7 @@ import {
   gatewayServerConfigDefinition,
 } from "@langwatch/gateway-contract";
 import { githubServerConfigDefinition } from "@langwatch/github-contract";
-import { assertLangyServerConfig, langyServerConfigDefinition } from "@langwatch/langy-contract";
+import { langyServerConfigDefinition } from "@langwatch/langy-contract";
 import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
 import { modelProviderServerConfigDefinition } from "@langwatch/model-provider-contract";
 import { notificationServerConfigDefinition } from "@langwatch/notification-contract";
@@ -197,13 +197,8 @@ export const apiConfigDefinition = RuntimeConfig.define({
    * endpoint served.
    */
   metricsApiKey: opsServerConfigDefinition.metricsApiKey,
-  /**
-   * The Langy agent's callback bearer. Blank answers 503 `Not configured`
-   * rather than falling open — a deployment with no Langy agent needs none.
-   */
-  langyInternalSecret: langyServerConfigDefinition.internalSecret,
-  /** The Langy agent manager's address, refused unless its secret rides with it. */
-  langyAgentUrl: langyServerConfigDefinition.agentUrl,
+  /** The agent manager's address and callback bearer; the schema refuses an address alone. */
+  langy: langyServerConfigDefinition,
   /**
    * `auth0WebhookSecret` blank answers 404, not 401 — an unconfigured
    * install looks unrouted. `provenOffboarding` (`SCIM_V2_GRANTS`) is a
@@ -567,7 +562,7 @@ export type ApiConfig = Readonly<
     | "browserSession"
     | "dataRetention"
     | "infrastructure"
-    | "langyAgentUrl"
+    | "langy"
     | "mail"
     | "shutdown"
     | "validateTrpcOutput"
@@ -589,6 +584,11 @@ export type ApiConfig = Readonly<
     validateTrpcOutput: boolean;
     /** The deployment's one browser-session identity, or nothing. */
     browserSession: ApiBrowserSessionConfig | undefined;
+    /**
+     * The Langy agent's callback bearer. Blank answers 503 `Not configured`
+     * rather than falling open — a deployment with no Langy agent needs none.
+     */
+    langyInternalSecret: string | undefined;
     /** Absent when the deployment named no `BASE_HOST`; see `resolveApiMailConfig`. */
     mail?: ApiMailConfig;
     /**
@@ -644,10 +644,6 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
   // request, which reads as an outage rather than as the mistake it is.
   assertGatewaySecretsAllOrNone(source);
   assertAuthServerConfig(value.browserSession);
-  assertLangyServerConfig({
-    agentUrl: value.langyAgentUrl,
-    internalSecret: value.langyInternalSecret,
-  });
   assertBillingServerConfig(value.billing);
   assertAnalyticsServerConfig({ langwatchQl: value.infrastructure.clickhouse.langwatchQl });
   // Destructured out of the spread rather than overwritten: the projection's
@@ -655,9 +651,10 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
   // unresolved gateway on a deployment that named no `BASE_HOST`.
   const { mail: mailSource, ...rest } = value;
   const mail = resolveApiMailConfig(mailSource, value.infrastructure.execution.publicBaseUrl);
-  const { billing: billingSource, ...withoutBilling } = rest;
+  const { billing: billingSource, langy, ...withoutBilling } = rest;
   return {
     ...withoutBilling,
+    langyInternalSecret: langy.internalSecret,
     ...(mail ? { mail } : {}),
     billing: resolveApiBillingConfig(billingSource),
     featureFlags: resolveFeatureFlagConfig(source),
