@@ -1,8 +1,6 @@
-import type {
-  IdentityUsersRepository,
-  LegacySignInAccount,
-} from "@langwatch/identity-server";
+import type { IdentityUsersRepository } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { LegacySignInAccount } from "../signin-account-lookup";
 
 /** One `User` row, as the sign-in and account-linking decisions read it. */
 export interface IdentityUserRow {
