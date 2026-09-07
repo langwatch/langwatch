@@ -299,7 +299,6 @@ describe("given the sign-up screen", () => {
       expect(routeMock).not.toHaveBeenCalled();
     });
 
-    /** @scenario A claimed proof whose enrollment failed recovers by email */
     it("offers the way in when the link was reopened and opened no session", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token");
       completeVerificationMock.mockResolvedValue({
