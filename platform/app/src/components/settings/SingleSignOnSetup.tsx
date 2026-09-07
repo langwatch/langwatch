@@ -331,7 +331,10 @@ function LegacyMigrationStart({
   const [configuring, setConfiguring] = useState(false);
   return (
     <VStack align="stretch" gap={6} width="full">
-      <SettingsCard title="Auth0 single sign-on" badge={<IdentityChip label="Active" tone="good" />}>
+      <SettingsCard
+        title="Auth0 single sign-on"
+        badge={<IdentityChip label="Active" tone="good" />}
+      >
         <Text fontSize="sm">
           Your existing Auth0 sign-in remains active until you explicitly switch
           normal traffic to its replacement.
@@ -384,34 +387,44 @@ function MigrationProgress({
       <SettingList>
         <SettingRow label="Normal sign-in">
           <Text fontSize="sm">
-            {migration.selectedRoute === "legacy" ? "Auth0 (legacy)" : migration.replacement.providerId}
+            {migration.selectedRoute === "legacy"
+              ? "Auth0 (legacy)"
+              : migration.replacement.providerId}
           </Text>
         </SettingRow>
         <SettingRow label="Members linked">
-          <Text fontSize="sm">{migration.members.linkedCount} of {migration.members.activeCount}</Text>
+          <Text fontSize="sm">
+            {migration.members.linkedCount} of {migration.members.activeCount}
+          </Text>
         </SettingRow>
         <SettingRow label="Directory provisioning">
-          <Text fontSize="sm">{migration.scim.status.replaceAll("-", " ")}</Text>
+          <Text fontSize="sm">
+            {migration.scim.status.replaceAll("-", " ")}
+          </Text>
         </SettingRow>
       </SettingList>
       {migration.inheritedDomains.length > 0 && (
         <Text fontSize="xs" color="fg.muted">
-          {migration.inheritedDomains.map((entry) => {
-            const proof =
-              entry.method === "operator-attested"
-                ? "operator attestation"
-                : entry.method === "dns-txt" || entry.method === "https-file"
-                  ? "published domain proof"
-                  : entry.method === "license-token"
-                    ? "installation licence"
-                    : "existing legacy configuration";
-            return `${entry.domain} (${proof})`;
-          }).join(", ")}
+          {migration.inheritedDomains
+            .map((entry) => {
+              const proof =
+                entry.method === "operator-attested"
+                  ? "operator attestation"
+                  : entry.method === "dns-txt" || entry.method === "https-file"
+                    ? "published domain proof"
+                    : entry.method === "license-token"
+                      ? "installation licence"
+                      : "existing legacy configuration";
+              return `${entry.domain} (${proof})`;
+            })
+            .join(", ")}
         </Text>
       )}
       {migration.members.stragglers.length > 0 && (
         <VStack align="stretch" gap={1}>
-          <Text fontSize="sm" fontWeight="semibold">Still using Auth0</Text>
+          <Text fontSize="sm" fontWeight="semibold">
+            Still using Auth0
+          </Text>
           {migration.members.stragglers.map((person) => (
             <Text key={person.userId} fontSize="xs" color="fg.muted">
               {person.name ?? person.email ?? person.userId}
@@ -420,7 +433,9 @@ function MigrationProgress({
         </VStack>
       )}
       {migration.blockers.map((blocker) => (
-        <Text key={blocker.code} fontSize="xs" color="fg.muted">{blocker.message}</Text>
+        <Text key={blocker.code} fontSize="xs" color="fg.muted">
+          {blocker.message}
+        </Text>
       ))}
       {canManage && migration.phase !== "FINALIZED" && (
         <HStack gap={2} flexWrap="wrap">
@@ -429,7 +444,16 @@ function MigrationProgress({
               size="sm"
               loading={route.isPending}
               disabled={!migration.testSignIn.done}
-              onClick={() => route.mutate({ organizationId, connectionId: migration.replacement.connectionId, route: "direct" }, settle)}
+              onClick={() =>
+                route.mutate(
+                  {
+                    organizationId,
+                    connectionId: migration.replacement.connectionId,
+                    route: "direct",
+                  },
+                  settle,
+                )
+              }
             >
               Switch to new SSO
             </Button>
@@ -438,7 +462,16 @@ function MigrationProgress({
               size="sm"
               variant="outline"
               loading={route.isPending}
-              onClick={() => route.mutate({ organizationId, connectionId: migration.replacement.connectionId, route: "legacy" }, settle)}
+              onClick={() =>
+                route.mutate(
+                  {
+                    organizationId,
+                    connectionId: migration.replacement.connectionId,
+                    route: "legacy",
+                  },
+                  settle,
+                )
+              }
             >
               Roll back to Auth0
             </Button>
@@ -448,9 +481,19 @@ function MigrationProgress({
             variant="outline"
             loading={finalize.isPending}
             disabled={!migration.canFinalize}
-            onClick={() => finalize.mutate({ organizationId, connectionId: migration.replacement.connectionId }, settle)}
+            onClick={() =>
+              finalize.mutate(
+                {
+                  organizationId,
+                  connectionId: migration.replacement.connectionId,
+                },
+                settle,
+              )
+            }
           >
-            {migration.phase === "FINALIZING" ? "Retry finalization" : "Finalize migration"}
+            {migration.phase === "FINALIZING"
+              ? "Retry finalization"
+              : "Finalize migration"}
           </Button>
         </HStack>
       )}

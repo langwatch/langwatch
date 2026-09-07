@@ -28,13 +28,16 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   return {
     ...actual,
-    hasOrganizationPermission: (...args: unknown[]) => hasOrganizationPermission(...args),
+    hasOrganizationPermission: (...args: unknown[]) =>
+      hasOrganizationPermission(...args),
     organizationDenialReason: async () => undefined,
   };
 });
 
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
   return appPermissionsMock();
 });
 
@@ -75,9 +78,13 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   }),
 }));
 
-const { isAuditLogExempt, isSelfAudited } = await import("~/server/api/auditLogExemptions");
+const { isAuditLogExempt, isSelfAudited } = await import(
+  "~/server/api/auditLogExemptions"
+);
 const { createInnerTRPCContext } = await import("~/server/api/trpc");
-const { JOIN_SETTING_AUDIT_ACTION, joinRequestsRouter } = await import("../joinRequests");
+const { JOIN_SETTING_AUDIT_ACTION, joinRequestsRouter } = await import(
+  "../joinRequests"
+);
 
 const caller = () =>
   joinRequestsRouter.createCaller(

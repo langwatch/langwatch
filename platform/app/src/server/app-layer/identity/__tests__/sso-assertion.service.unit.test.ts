@@ -66,7 +66,11 @@ const serviceOver = ({
 }: {
   row: SignInConnection | null;
   members?: { userId: string; address: string }[];
-  boundIdentities?: { connectionId: string; accountId: string; address: string }[];
+  boundIdentities?: {
+    connectionId: string;
+    accountId: string;
+    address: string;
+  }[];
 }) => {
   const findConnectionForSignIn = vi.fn().mockResolvedValue(row);
   const findRegistrantAtAddress = vi.fn(
@@ -140,7 +144,9 @@ describe("given a live connection", () => {
       });
 
       for (const email of ["ana@acme.com", "bea@beta.example"]) {
-        await expect(service.decide({ providerId: CONNECTION_ID, email })).resolves.toEqual({
+        await expect(
+          service.decide({ providerId: CONNECTION_ID, email }),
+        ).resolves.toEqual({
           action: "continue",
         });
       }

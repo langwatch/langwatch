@@ -113,7 +113,9 @@ export function RegisterConnection({
             metadataXml: form.metadataXml || null,
             certificate: form.certificate || null,
           } as const);
-    const settle = { onSuccess: () => void utils.ssoSetup.getSetup.invalidate() };
+    const settle = {
+      onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
+    };
     if (replacesConnectionId) {
       migrate.mutate(
         {
@@ -126,7 +128,10 @@ export function RegisterConnection({
       );
       return;
     }
-    register.mutate({ organizationId, providerId: form.providerId, idp }, settle);
+    register.mutate(
+      { organizationId, providerId: form.providerId, idp },
+      settle,
+    );
   };
 
   return (

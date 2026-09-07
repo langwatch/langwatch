@@ -20,7 +20,11 @@ import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCar
 import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
 import { BasicInfoConditionalFields } from "../components/sections/BasicInfoConditionalFields";
 import { IntentSelectionScreen } from "../components/sections/IntentSelectionScreen";
-import { desireItems, roleItems, usageStyleItems } from "../constants/onboarding-data";
+import {
+  desireItems,
+  roleItems,
+  usageStyleItems,
+} from "../constants/onboarding-data";
 import { useOnboardingFormContext } from "../contexts/form-context";
 import {
   type DesireType,
@@ -99,7 +103,12 @@ const OrganizationScreen: React.FC = () => {
           </Checkbox.Control>
           <Checkbox.Label fontWeight="normal" fontSize="13px" color="fg.muted">
             {"I agree to the LangWatch "}
-            <Link href={LEGAL_LINKS.terms.href} isExternal fontWeight="medium" variant="underline">
+            <Link
+              href={LEGAL_LINKS.terms.href}
+              isExternal
+              fontWeight="medium"
+              variant="underline"
+            >
               {LEGAL_LINKS.terms.label}
               <Icon size="xs">
                 <ExternalLink />
@@ -207,7 +216,9 @@ interface IntroScreensProps {
   flow: OnboardingFlowConfig;
 }
 
-export const useCreateWelcomeScreens = ({ flow }: IntroScreensProps): OnboardingScreen[] => {
+export const useCreateWelcomeScreens = ({
+  flow,
+}: IntroScreensProps): OnboardingScreen[] => {
   const screensBase: Record<OnboardingScreenIndex, OnboardingScreen> = useMemo(
     () => ({
       [OnboardingScreenIndex.ORGANIZATION]: {
@@ -221,7 +232,8 @@ export const useCreateWelcomeScreens = ({ flow }: IntroScreensProps): Onboarding
         id: "intent",
         required: true,
         heading: "What do you want to do?",
-        subHeading: "Pick your starting point. You can explore the rest anytime",
+        subHeading:
+          "Pick your starting point. You can explore the rest anytime",
         component: IntentSelectionScreen,
       },
       [OnboardingScreenIndex.BASIC_INFO]: {

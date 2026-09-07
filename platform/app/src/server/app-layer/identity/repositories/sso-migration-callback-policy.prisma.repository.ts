@@ -97,7 +97,9 @@ export function migrationAuthenticationDecision({
 }
 
 /** Better Auth's migration callback policy, backed only by persisted facts. */
-export class PrismaSsoMigrationCallbackPolicy implements DatabaseHookSsoMigrationPort {
+export class PrismaSsoMigrationCallbackPolicy
+  implements DatabaseHookSsoMigrationPort
+{
   constructor(
     private readonly prisma: PrismaClient,
     private readonly newActivityId: () => string,

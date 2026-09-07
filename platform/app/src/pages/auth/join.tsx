@@ -91,7 +91,11 @@ export default function Join() {
                 if (mine.isError) void mine.refetch();
               }}
             />
-            <Button variant="ghost" size="sm" onClick={continueToWorkspaceCreation}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={continueToWorkspaceCreation}
+            >
               Create a new organization instead
             </Button>
           </VStack>

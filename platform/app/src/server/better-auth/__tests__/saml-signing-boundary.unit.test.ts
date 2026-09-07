@@ -231,31 +231,31 @@ describe("the mounted SAML signing boundary", () => {
   });
 
   /** @scenario "A different or tampered signing certificate authenticates nothing" */
-  it.each(["unrelated", "tampered"])(
-    "rejects an %s assertion without identity writes",
-    async (kind) => {
-      const { auth, db } = authFor(metadataWith(oldIdentity));
-      const signed = await responseFrom(
-        kind === "unrelated" ? unrelatedIdentity : oldIdentity,
-      );
-      const response =
-        kind === "tampered"
-          ? Buffer.from(
-              Buffer.from(signed.context, "base64")
-                .toString()
-                .replace("ana@acme.com", "eve@acme.com"),
-            ).toString("base64")
-          : signed.context;
+  it.each([
+    "unrelated",
+    "tampered",
+  ])("rejects an %s assertion without identity writes", async (kind) => {
+    const { auth, db } = authFor(metadataWith(oldIdentity));
+    const signed = await responseFrom(
+      kind === "unrelated" ? unrelatedIdentity : oldIdentity,
+    );
+    const response =
+      kind === "tampered"
+        ? Buffer.from(
+            Buffer.from(signed.context, "base64")
+              .toString()
+              .replace("ana@acme.com", "eve@acme.com"),
+          ).toString("base64")
+        : signed.context;
 
-      const result = await post(auth, response);
+    const result = await post(auth, response);
 
-      expect(result.status).toBe(302);
-      expect(result.headers.get("location")).toContain("error=");
-      expect(db.user).toEqual([]);
-      expect(db.account).toEqual([]);
-      expect(db.session).toEqual([]);
-    },
-  );
+    expect(result.status).toBe(302);
+    expect(result.headers.get("location")).toContain("error=");
+    expect(db.user).toEqual([]);
+    expect(db.account).toEqual([]);
+    expect(db.session).toEqual([]);
+  });
 
   /** @scenario "Overlapping signing certificates in metadata both authenticate during rotation" */
   it("accepts either certificate in one metadata document", async () => {

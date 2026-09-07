@@ -33,7 +33,10 @@ export function isAllowedAuthOrigin(opts: {
   baseUrl: string;
 }): boolean {
   const { method, pathname = "", origin, referer, baseUrl } = opts;
-  if (method === "POST" && /^\/api\/auth\/sso\/saml2\/sp\/acs\/[^/?#]+$/.test(pathname)) {
+  if (
+    method === "POST" &&
+    /^\/api\/auth\/sso\/saml2\/sp\/acs\/[^/?#]+$/.test(pathname)
+  ) {
     return true;
   }
   if (!method || !STATE_CHANGING_METHODS.has(method)) return true;
