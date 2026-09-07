@@ -99,6 +99,22 @@ describe("given the REST surface the API process mounts", () => {
       );
     });
 
+    /** @scenario "Each parameter is declared once per operation" */
+    it("declares each parameter once per operation", () => {
+      const repeated: string[] = [];
+      for (const [path, operations] of Object.entries(generated.document.paths ?? {})) {
+        for (const [method, operation] of Object.entries(operations ?? {})) {
+          const parameters = (operation as { parameters?: { name: string; in: string }[] })
+            .parameters;
+          if (!parameters) continue;
+          const keys = parameters.map((parameter) => `${parameter.in}:${parameter.name}`);
+          if (new Set(keys).size !== keys.length) repeated.push(`${method.toUpperCase()} ${path}`);
+        }
+      }
+
+      expect(repeated).toEqual([]);
+    });
+
     it("describes the whole surface in one pass, so a family cannot be counted twice", () => {
       const described = Object.keys(generated.document.paths ?? {});
 

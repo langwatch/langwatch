@@ -12,7 +12,6 @@ import {
   type AppRestSecurity,
   canonicalBaseResponses,
   canonicalConflictResponses,
-  idempotencyKeyParameter,
   idempotentReplayHeaders,
   requestTraceIds,
   type RestErrorHandler,
@@ -823,7 +822,6 @@ export function createGatewayPlatformRestApp(options: {
           })
           .withDocs({
             summary: "Create virtual key",
-            parameters: [idempotencyKeyParameter],
             description:
               "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
             tags: ["Virtual Keys"],
@@ -1596,7 +1594,6 @@ export function createGatewayPlatformRestApp(options: {
           })
           .withDocs({
             summary: "Create budget",
-            parameters: [idempotencyKeyParameter],
             description:
               "Creates an organization-owned budget. The scope discriminates which resource the budget covers, across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-end-user templates; both require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group` budget that none of the organization's active keys can produce traffic for is refused with `gateway_budget_scope_unreachable`, since it would never spend and never block; send `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never refused. Send `Idempotency-Key` to make a retry safe.",
             tags: ["Budgets"],
@@ -2013,7 +2010,6 @@ export function createGatewayPlatformRestApp(options: {
           })
           .withDocs({
             summary: "Create a cache rule",
-            parameters: [idempotencyKeyParameter],
             description:
               "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll. Send `Idempotency-Key` to make a retry safe.",
             tags: ["Cache Rules"],

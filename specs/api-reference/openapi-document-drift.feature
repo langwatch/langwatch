@@ -48,6 +48,13 @@ Feature: The published OpenAPI document tracks the surface the API process serve
       Then each family that publishes route descriptions appears in the document
 
     @unit
+    Scenario: Each parameter is declared once per operation
+      Given a family documents the replay key by hand on a route the pipeline already marks idempotent
+      When the description is generated
+      Then the operation lists the Idempotency-Key header once
+      And no operation in the document repeats a parameter
+
+    @unit
     Scenario: An operation no security scheme can express is left out and named
       Given a route reachable only by a browser session
       And the route carries a route description
