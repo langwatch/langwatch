@@ -11,7 +11,13 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-function processes(command: string, pid = process.pid + 1): void {
+function processes({
+	command,
+	pid = process.pid + 1,
+}: {
+	command: string;
+	pid?: number;
+}): void {
 	vi.mocked(execFileSync).mockReturnValue(
 		process.platform === "win32"
 			? JSON.stringify([{ ProcessId: pid, CommandLine: command }])
@@ -23,9 +29,10 @@ describe("runningCodeRestartNotice()", () => {
 	describe("when Windows reports running processes", () => {
 		it("detects an npm launcher from CIM output", () => {
 			Object.defineProperty(process, "platform", { value: "win32" });
-			processes(
-				'"C:\\nodejs\\node.exe" "C:\\npm\\langwatch\\dist\\cli\\index.js" code',
-			);
+			processes({
+				command:
+					'"C:\\nodejs\\node.exe" "C:\\npm\\langwatch\\dist\\cli\\index.js" code',
+			});
 			expect(runningCodeRestartNotice()).toContain("Restart `langwatch code`");
 		});
 
@@ -50,12 +57,13 @@ describe("runningCodeRestartNotice()", () => {
 			"/usr/local/bin/lw code .",
 			'"C:\\Program Files\\nodejs\\node.exe" "C:\\npm\\node_modules\\langwatch\\dist\\cli\\index.js" code .',
 		])("suggests a restart for %s", (command) => {
-			processes(command);
+			processes({ command });
 			expect(runningCodeRestartNotice()).toContain("Restart `langwatch code`");
 		});
 	});
 
 	describe("when no other LangWatch code launcher is running", () => {
+		/** @scenario "Other applications do not trigger the notice" */
 		it.each([
 			"claude",
 			"code .",
@@ -73,17 +81,18 @@ describe("runningCodeRestartNotice()", () => {
 			"node /another/script.js /usr/local/bin/langwatch code",
 			"node /another/script /usr/local/bin/langwatch code",
 		])("ignores %s", (command) => {
-			processes(command);
+			processes({ command });
 			expect(runningCodeRestartNotice()).toBeUndefined();
 		});
 
 		it("excludes the current command", () => {
-			processes("langwatch code", process.pid);
+			processes({ command: "langwatch code", pid: process.pid });
 			expect(runningCodeRestartNotice()).toBeUndefined();
 		});
 	});
 
 	describe("when process inspection fails", () => {
+		/** @scenario "Process inspection failure does not fail configuration" */
 		it("does not fail configuration or claim a running launcher", () => {
 			vi.mocked(execFileSync).mockImplementation(() => {
 				throw new Error("process inspection timed out");

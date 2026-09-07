@@ -72,17 +72,21 @@ function isLangwatchCode(command: string): boolean {
 	const args = (command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map((arg) =>
 		arg.replace(/^(?:"(.*)"|'(.*)')$/, "$1$2").replace(/\\/g, "/"),
 	);
-	const executable = readCommandPath(
+	const executable = readCommandPath({
 		args,
-		0,
-		(value) => isRuntime(value) || isLauncher(value),
-	);
+		index: 0,
+		recognizes: (value) => isRuntime(value) || isLauncher(value),
+	});
 	if (!isRuntime(executable.value)) {
 		return isLauncher(executable.value) && args[executable.next] === "code";
 	}
-	const entryIndex = skipRuntimeOptions(args, executable.next);
+	const entryIndex = skipRuntimeOptions({ args, start: executable.next });
 	if (entryIndex === undefined) return false;
-	const entry = readCommandPath(args, entryIndex, isEntrypoint);
+	const entry = readCommandPath({
+		args,
+		index: entryIndex,
+		recognizes: isEntrypoint,
+	});
 	return isEntrypoint(entry.value) && args[entry.next] === "code";
 }
 
@@ -101,11 +105,15 @@ const isEntrypoint = (value: string): boolean =>
  * first file so an unrelated script's arguments cannot become our entrypoint.
  * Keep the ordinary/quoted-path case independent of filesystem permissions.
  */
-function readCommandPath(
-	args: string[],
-	index: number,
-	recognizes: (value: string) => boolean,
-): { value: string; next: number } {
+function readCommandPath({
+	args,
+	index,
+	recognizes,
+}: {
+	args: string[];
+	index: number;
+	recognizes: (value: string) => boolean;
+}): { value: string; next: number } {
 	const first = args[index] ?? "";
 	if (recognizes(first) || !/^(?:\/|[A-Za-z]:\/)/.test(first)) {
 		return { value: first, next: index + 1 };
@@ -142,14 +150,31 @@ const RUNTIME_VALUE_OPTIONS = new Set([
 	"--unhandled-rejections",
 ]);
 
-function skipRuntimeOptions(args: string[], start: number): number | undefined {
+function skipRuntimeOptions({
+	args,
+	start,
+}: {
+	args: string[];
+	start: number;
+}): number | undefined {
 	let index = start;
 	while (args[index]?.startsWith("-")) {
 		const option = args[index]!;
 		if (option === "--") return index + 1;
 		const name = option.split("=")[0]!;
 		if (!process.allowedNodeEnvironmentFlags.has(name)) return undefined;
-		index += RUNTIME_VALUE_OPTIONS.has(name) && !option.includes("=") ? 2 : 1;
+		if (!RUNTIME_VALUE_OPTIONS.has(name) || option.includes("=")) {
+			index += 1;
+			continue;
+		}
+		// The value is a path in its own right, so ps may have split it across
+		// tokens too. Recognizing nothing keeps this to the join-until-a-real-file
+		// recovery, which falls back to a single token exactly as before.
+		index = readCommandPath({
+			args,
+			index: index + 1,
+			recognizes: () => false,
+		}).next;
 	}
 	return index;
 }
