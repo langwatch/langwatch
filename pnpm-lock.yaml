@@ -1661,6 +1661,15 @@ importers:
       '@playwright/test':
         specifier: ^1.57.0
         version: 1.61.1
+      '@types/pg':
+        specifier: ^8.20.3
+        version: 8.20.4
+      ioredis:
+        specifier: 5.10.1
+        version: 5.10.1
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
 
 packages:
 
