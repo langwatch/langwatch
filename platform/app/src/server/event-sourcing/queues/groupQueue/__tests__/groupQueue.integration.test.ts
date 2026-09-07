@@ -277,6 +277,186 @@ describe.skipIf(!hasTestcontainers)(
       );
     });
 
+    it("drains pre-registered downstream groups produced by an old unscoped worker", async () => {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const allowList = `${name}:gq:test-allow-list`;
+      const processed: string[] = [];
+      let worker: GroupQueueProcessor<TestPayload>;
+      const definition = createQueueDefinition({
+        name,
+        process: async (payload) => {
+          processed.push(payload.groupId);
+          if (payload.groupId === "root") {
+            await worker.send({ id: "child", groupId: "child", value: "x" });
+          }
+        },
+      });
+      const preflight = new GroupQueueProcessor(definition, redis, {
+        consumerEnabled: false,
+        dispatchGroupAllowListKey: allowList,
+      });
+      worker = new GroupQueueProcessor(definition, redis);
+      queues.push(preflight, worker);
+
+      await preflight.registerPreflightGroups(() => ["root", "child"]);
+      await worker.send({ id: "root", groupId: "root", value: "x" });
+      await preflight.waitUntilPreflightIdle();
+
+      expect(processed).toEqual(["root", "child"]);
+      expect(new Set(await redis.smembers(allowList))).toEqual(
+        new Set(["root", "child"]),
+      );
+      expect(
+        new Set(await redis.zrange(`${allowList}:candidates`, 0, -1)),
+      ).toEqual(new Set(["root", "child"]));
+    });
+
+    it("keeps concurrent preflight barriers complete when their root job deduplicates", async () => {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const allowA = `${name}:gq:preflight:a`;
+      const allowB = `${name}:gq:preflight:b`;
+      const processed: string[] = [];
+      let worker: GroupQueueProcessor<TestPayload>;
+      const definition = createQueueDefinition({
+        name,
+        deduplication: {
+          makeId: (payload) => payload.id,
+          ttlMs: 60_000,
+          replace: false,
+        },
+        process: async (payload) => {
+          processed.push(payload.groupId);
+          if (payload.groupId === "root") {
+            await worker.send({ id: "child", groupId: "child", value: "x" });
+          }
+        },
+      });
+      const first = new GroupQueueProcessor(definition, redis, {
+        consumerEnabled: false,
+        dispatchGroupAllowListKey: allowA,
+      });
+      const second = new GroupQueueProcessor(definition, redis, {
+        consumerEnabled: false,
+        dispatchGroupAllowListKey: allowB,
+      });
+      queues.push(first, second);
+      await Promise.all([
+        first.registerPreflightGroups(() => ["root", "child"]),
+        second.registerPreflightGroups(() => ["root", "child"]),
+      ]);
+      await first.send({ id: "same-root", groupId: "root", value: "a" });
+      await second.send({ id: "same-root", groupId: "root", value: "b" });
+      expect(await redis.zcard(`${name}:gq:group:root:jobs`)).toBe(1);
+
+      worker = new GroupQueueProcessor(definition, redis);
+      queues.push(worker);
+      await Promise.all([
+        first.waitUntilPreflightIdle(),
+        second.waitUntilPreflightIdle(),
+      ]);
+
+      expect(processed).toEqual(["root", "child"]);
+      expect(new Set(await redis.smembers(allowA))).toEqual(
+        new Set(["root", "child"]),
+      );
+      expect(new Set(await redis.smembers(allowB))).toEqual(
+        new Set(["root", "child"]),
+      );
+    });
+
+    it("propagates the job scope instead of the consuming preflight scope", async () => {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const allowA = `${name}:gq:preflight:a`;
+      const allowB = `${name}:gq:preflight:b`;
+      const processed: string[] = [];
+      let consumingPreflight: GroupQueueProcessor<TestPayload>;
+      const definition = createQueueDefinition({
+        name,
+        process: async (payload) => {
+          processed.push(payload.groupId);
+          if (payload.groupId === "root") {
+            await consumingPreflight.send({
+              id: "child",
+              groupId: "child",
+              value: "x",
+            });
+          }
+        },
+      });
+      const originatingPreflight = new GroupQueueProcessor(definition, redis, {
+        consumerEnabled: false,
+        dispatchGroupAllowListKey: allowA,
+      });
+      consumingPreflight = new GroupQueueProcessor(definition, redis, {
+        dispatchGroupAllowListKey: allowB,
+      });
+      queues.push(originatingPreflight, consumingPreflight);
+      await consumingPreflight.registerPreflightGroups(() => ["root"]);
+      await originatingPreflight.send({
+        id: "root",
+        groupId: "root",
+        value: "x",
+      });
+      await vi.waitFor(
+        async () => {
+          expect(await redis.zcard(`${name}:gq:group:child:jobs`)).toBe(1);
+        },
+        { timeout: 5000, interval: 25 },
+      );
+
+      const ordinaryWorker = new GroupQueueProcessor(definition, redis);
+      queues.push(ordinaryWorker);
+      await originatingPreflight.waitUntilPreflightIdle();
+
+      expect(processed).toEqual(["root", "child"]);
+      expect(await redis.sismember(allowA, "child")).toBe(1);
+      expect(await redis.sismember(allowB, "child")).toBe(0);
+    });
+
+    it("does not coalesce a scoped sibling behind an unscoped first job", async () => {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const allowList = `${name}:gq:preflight:coalesce`;
+      const processed: string[] = [];
+      const batches: string[][] = [];
+      const definition = createQueueDefinition({
+        name,
+        score: (payload) => orderedScore(payload.id === "unscoped" ? 1 : 2),
+        coalesceMaxBatch: () => 10,
+        processBatch: async (payloads) => {
+          batches.push(payloads.map((payload) => payload.id));
+        },
+        process: async (payload) => {
+          processed.push(payload.id);
+        },
+      });
+      const ordinaryProducer = new GroupQueueProcessor(definition, redis, {
+        consumerEnabled: false,
+      });
+      const preflight = new GroupQueueProcessor(definition, redis, {
+        consumerEnabled: false,
+        dispatchGroupAllowListKey: allowList,
+      });
+      queues.push(ordinaryProducer, preflight);
+      await preflight.registerPreflightGroups(() => ["shared"]);
+      await ordinaryProducer.send({
+        id: "unscoped",
+        groupId: "shared",
+        value: "x",
+      });
+      await preflight.send({
+        id: "scoped",
+        groupId: "shared",
+        value: "x",
+      });
+
+      const worker = new GroupQueueProcessor(definition, redis);
+      queues.push(worker);
+      await preflight.waitUntilPreflightIdle();
+
+      expect(processed).toEqual(["unscoped", "scoped"]);
+      expect(batches).toEqual([]);
+    });
+
     /**
      * Stages a whole group through a producer-only processor, then starts the
      * consumer that dispatches it. Every payload is therefore staged AND past

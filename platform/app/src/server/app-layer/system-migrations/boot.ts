@@ -35,6 +35,7 @@ export async function runSystemMigrationsToQuiescence(args?: {
   awaitPassEffects?: () => Promise<void>;
 }): Promise<MigrationPassSummary> {
   const signal = args?.signal ?? new AbortController().signal;
+  let finiteHoldProofPending = false;
 
   for (let pass = 1; pass <= MAX_PASSES; pass++) {
     signal.throwIfAborted();
@@ -58,7 +59,17 @@ export async function runSystemMigrationsToQuiescence(args?: {
     signal.throwIfAborted();
 
     await settlePassEffects({ pass, settle: args?.awaitPassEffects });
-    assertPassCanConverge({ summary, pass });
+    assertPassCanConverge({ summary, pass, finiteHoldProofPending });
+
+    if (finiteHoldStalled(summary)) {
+      finiteHoldProofPending = true;
+      logger.info(
+        { summary, pass },
+        "finite migrations remained held before effect drain; a proof pass follows",
+      );
+      continue;
+    }
+    finiteHoldProofPending = false;
 
     if (converged(summary)) {
       logger.info(
@@ -100,21 +111,28 @@ async function settlePassEffects({
 function assertPassCanConverge({
   summary,
   pass,
+  finiteHoldProofPending,
 }: {
   summary: MigrationPassSummary;
   pass: number;
+  finiteHoldProofPending: boolean;
 }): void {
   if (summary.parked > 0) {
     throw new SystemMigrationPreflightError(
       `System migration preflight parked ${summary.parked} tenant migrations on pass ${pass}`,
     );
   }
-  const finiteHeld = summary.finiteHeld ?? summary.held;
-  if (finiteHeld > 0 && summary.advanced === 0) {
+  if (finiteHoldStalled(summary) && finiteHoldProofPending) {
+    const finiteHeld = summary.finiteHeld ?? summary.held;
     throw new SystemMigrationPreflightError(
       `System migration preflight left ${finiteHeld} finite migrations held on pass ${pass}`,
     );
   }
+}
+
+function finiteHoldStalled(summary: MigrationPassSummary): boolean {
+  const finiteHeld = summary.finiteHeld ?? summary.held;
+  return finiteHeld > 0 && summary.advanced === 0;
 }
 
 function continuingBecause(summary: MigrationPassSummary): string {

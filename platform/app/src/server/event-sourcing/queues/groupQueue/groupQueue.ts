@@ -688,8 +688,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const contextMetadata = {
       ...getJobContextMetadata(),
       queueDispatchScopeKey:
-        this.dispatchGroupAllowListKey ??
-        getCurrentContext()?.queueDispatchScopeKey,
+        getCurrentContext()?.queueDispatchScopeKey ??
+        this.dispatchGroupAllowListKey,
     };
     const payloadWithContext = {
       ...(payload as Record<string, unknown>),
@@ -794,8 +794,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const contextMetadata = {
       ...getJobContextMetadata(),
       queueDispatchScopeKey:
-        this.dispatchGroupAllowListKey ??
-        getCurrentContext()?.queueDispatchScopeKey,
+        getCurrentContext()?.queueDispatchScopeKey ??
+        this.dispatchGroupAllowListKey,
     };
     const now = Date.now();
 
@@ -1207,12 +1207,25 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               this.parseDrainedPayload({ sibling, groupId }),
             ),
           );
-          const liveSiblings = drainedSiblings.filter(
-            (_, index) => parsedSiblings[index] !== null,
-          );
-          const siblingPayloads = parsedSiblings.filter(
-            (parsed) => parsed !== null,
-          ) as Payload[];
+          const liveSiblings: DrainedJob[] = [];
+          const siblingPayloads: Payload[] = [];
+          const differentlyScoped: DrainedJob[] = [];
+          for (const [index, parsed] of parsedSiblings.entries()) {
+            if (!parsed) continue;
+            const sibling = drainedSiblings[index]!;
+            if (
+              parsed.queueDispatchScopeKey !==
+              contextMetadata?.queueDispatchScopeKey
+            ) {
+              differentlyScoped.push(sibling);
+              continue;
+            }
+            liveSiblings.push(sibling);
+            siblingPayloads.push(parsed.payload);
+          }
+          if (differentlyScoped.length > 0) {
+            await this.restageDrainedSiblings(groupId, differentlyScoped);
+          }
           drainedSiblings = liveSiblings;
           if (siblingPayloads.length > 0) {
             batchPayloads = [payload, ...siblingPayloads];
@@ -1841,13 +1854,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }: {
     sibling: DrainedJob;
     groupId: string;
-  }): Promise<Payload | null> {
+  }): Promise<{
+    payload: Payload;
+    queueDispatchScopeKey?: string;
+  } | null> {
     try {
       const jobData = await this.blobLifecycle.decode({
         value: sibling.jobDataJson,
         groupId,
       });
-      return this.stripInternalFields(jobData);
+      const contextMetadata = jobData.__context as
+        | JobContextMetadata
+        | undefined;
+      return {
+        payload: this.stripInternalFields(jobData),
+        queueDispatchScopeKey: contextMetadata?.queueDispatchScopeKey,
+      };
     } catch (err) {
       // A transient blob-store error on a sibling MUST NOT drop it to replay —
       // the dispatched job's decode routes transient errors through
@@ -2789,29 +2811,56 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
   private async registerPreflightGroup(groupId: string): Promise<void> {
     const key =
-      this.dispatchGroupAllowListKey ??
-      getCurrentContext()?.queueDispatchScopeKey;
+      getCurrentContext()?.queueDispatchScopeKey ??
+      this.dispatchGroupAllowListKey;
     if (!key) return;
-    if (groupId === "__unknown__" || groupId === "__legacy_outbox__") {
+    await this.registerPreflightGroups(() => [groupId]);
+  }
+
+  async registerPreflightGroups(
+    resolveGroupIds: () => readonly (string | undefined)[],
+  ): Promise<void> {
+    const key =
+      getCurrentContext()?.queueDispatchScopeKey ??
+      this.dispatchGroupAllowListKey;
+    if (!key) return;
+    const groupIds = resolveGroupIds();
+    const unresolved = groupIds.find(
+      (groupId) => groupId === "__unknown__" || groupId === "__legacy_outbox__",
+    );
+    if (unresolved) {
       throw new QueueError(
         this.queueName,
-        "registerPreflightGroup",
-        `Migration preflight refused unresolved group ${groupId}`,
+        "registerPreflightGroups",
+        `Migration preflight refused unresolved group ${unresolved}`,
       );
     }
-    await this.redisConnection.sadd(key, groupId);
-    await this.redisConnection.expire(key, 3600);
+    if (groupIds.some((groupId) => !groupId)) {
+      throw new QueueError(
+        this.queueName,
+        "registerPreflightGroups",
+        "Migration preflight refused a pipeline with custom group routing",
+      );
+    }
+    if (!key.startsWith(`${this.queueName}:gq:`)) {
+      throw new QueueError(
+        this.queueName,
+        "registerPreflightGroups",
+        "Migration preflight refused a dispatch scope outside the canonical queue slot",
+      );
+    }
+    await this.scripts.registerPreflightTargets({
+      targetKey: key,
+      groupIds: groupIds as readonly string[],
+    });
   }
 
   private async activatePreflightGroup(groupId: string): Promise<void> {
     const key =
-      this.dispatchGroupAllowListKey ??
-      getCurrentContext()?.queueDispatchScopeKey;
+      getCurrentContext()?.queueDispatchScopeKey ??
+      this.dispatchGroupAllowListKey;
     if (!key) return;
-    const candidatesKey = `${key}:candidates`;
-    await this.redisConnection.zadd(candidatesKey, Date.now(), groupId);
-    await this.redisConnection.expire(candidatesKey, 3600);
-    await this.redisConnection.lpush(this.scripts.getSignalKey(), "1");
+    await this.registerPreflightGroups(() => [groupId]);
   }
 
   async waitUntilPreflightIdle(): Promise<void> {
