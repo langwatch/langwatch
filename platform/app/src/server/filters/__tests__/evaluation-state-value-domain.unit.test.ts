@@ -37,6 +37,7 @@ describe("triggerFiltersSchema", () => {
 
     describe("when the value is one of the canonical execution states", () => {
       for (const status of CANONICAL_STATUS_VALUES) {
+        /** @scenario "Every state an evaluation can report is still accepted" */
         it(`accepts "${status}"`, () => {
           const result = triggerFiltersSchema.safeParse({
             "evaluations.state": { "eval-abc": [status] },

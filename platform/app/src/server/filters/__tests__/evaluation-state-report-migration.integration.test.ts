@@ -347,6 +347,7 @@ describe("evaluation-state report-only migration (TriggerFilterFinding)", () => 
 
   describe("given a trigger whose evaluations.state holds a non-canonical value", () => {
     describe("when the filters column is object-shaped", () => {
+      /** @scenario "An unrecognised state value is left alone and surfaced" */
       it("reports exactly one finding for the offending evaluator and value", async () => {
         const findings = await queryFindings({
           db: rawDb,
@@ -430,6 +431,7 @@ describe("evaluation-state report-only migration (TriggerFilterFinding)", () => 
     });
 
     describe("when the key is the evaluations.label sibling field", () => {
+      /** @scenario "Only the evaluation-state condition is touched" */
       it("produces no findings", async () => {
         // The naive implementation this guards against is a prefix match
         // on "evaluations." -- evaluations.label is not evaluations.state.
@@ -445,6 +447,7 @@ describe("evaluation-state report-only migration (TriggerFilterFinding)", () => 
 
   describe("given a trigger outside the scan's scope", () => {
     describe("when the trigger is soft-deleted", () => {
+      /** @scenario "Automations outside the repair's scope are not written at all" */
       it("produces no findings even though its filters hold a phantom value", async () => {
         const findings = await queryFindings({
           db: rawDb,
@@ -469,6 +472,7 @@ describe("evaluation-state report-only migration (TriggerFilterFinding)", () => 
 
   describe("given a trigger whose filters cannot be normalized to an object", () => {
     describe("when the jsonb string's inner text does not parse", () => {
+      /** @scenario "One unreadable automation does not stop the others" */
       it("is reported as malformed instead of aborting the run", async () => {
         const findings = await queryFindings({
           db: rawDb,
@@ -487,6 +491,7 @@ describe("evaluation-state report-only migration (TriggerFilterFinding)", () => 
   });
 
   describe("the report-only guarantee", () => {
+    /** @scenario "A repair mapping is only applied once it is evidenced" */
     it("leaves every seeded Trigger row's xmin unchanged across the run", async () => {
       const xminAfterScan = await snapshotXmins({
         db: rawDb,
@@ -496,6 +501,7 @@ describe("evaluation-state report-only migration (TriggerFilterFinding)", () => 
       expect(xminAfterScan).toEqual(xminBeforeScan);
     });
 
+    /** @scenario "Running the repair twice changes nothing the second time" */
     it("adds zero findings when the scan runs a second time", async () => {
       const before = await countFindings({
         db: rawDb,

@@ -45,6 +45,7 @@ describe("PrismaTriggerRepository", () => {
   describe("update", () => {
     describe("given a row whose stored filters already hold a non-canonical evaluations.state value", () => {
       describe("when the payload carries that same value through unchanged, with only the name changed", () => {
+        /** @scenario "An unrepaired automation can still be renamed, retargeted and disabled" */
         it("succeeds and preserves the stale value byte-for-byte in the write", async () => {
           const { repo, update, findUnique } = makeRepo({
             storedFilters: STALE_STATE_FILTERS,
@@ -92,6 +93,7 @@ describe("PrismaTriggerRepository", () => {
       });
 
       describe("when the payload adds a second, different non-canonical value", () => {
+        /** @scenario "Introducing a new dead value into that automation is still refused" */
         it("rejects the update, naming only the newly-introduced value", async () => {
           const { repo, update } = makeRepo({
             storedFilters: STALE_STATE_FILTERS,
@@ -122,6 +124,7 @@ describe("PrismaTriggerRepository", () => {
       });
 
       describe("when the payload replaces the stale value with a canonical value", () => {
+        /** @scenario "An unrepaired automation can be corrected by its owner" */
         it("succeeds without re-reading the row", async () => {
           const { repo, update, findUnique } = makeRepo({
             storedFilters: STALE_STATE_FILTERS,
@@ -206,6 +209,7 @@ describe("PrismaTriggerRepository", () => {
   describe("create", () => {
     describe("given a payload with a non-canonical evaluations.state value", () => {
       describe("when creating a brand-new trigger", () => {
+        /** @scenario "Every authoring surface refuses a newly-entered dead value" */
         it("rejects unconditionally, matching create's unchanged behaviour", async () => {
           const { repo, create } = makeRepo();
 

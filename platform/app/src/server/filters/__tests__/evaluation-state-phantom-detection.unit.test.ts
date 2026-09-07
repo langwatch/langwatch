@@ -60,6 +60,7 @@ describe("findNonCanonicalStateValues", () => {
     });
 
     describe("when the value is a legacy pass/fail label", () => {
+      /** @scenario "The two known ambiguous values get a stated outcome" */
       it('reports "succeeded" as a finding, not a canonical value', () => {
         const findings = findNonCanonicalStateValues({
           "evaluations.state": { e1: ["succeeded"] },

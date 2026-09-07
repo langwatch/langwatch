@@ -42,7 +42,7 @@ Feature: Repairing automations whose evaluation-state condition can never match
       Then both are repaired
       And neither automation's stored form is changed by the repair
 
-    @integration @unimplemented
+    @integration
     Scenario: Only the evaluation-state condition is touched
       Given an automation whose dead value appears in a different condition entirely
       And an automation whose dead value appears in an adjacent evaluation condition
@@ -58,14 +58,14 @@ Feature: Repairing automations whose evaluation-state condition can never match
 
   Rule: A value that cannot be confidently repaired is reported, never guessed
 
-    @integration @unimplemented
+    @integration
     Scenario: An unrecognised state value is left alone and surfaced
       Given an automation whose state value is not recognised
       When the repair runs
       Then its condition is unchanged
       And the run reports that automation, its project, and the offending value
 
-    @integration @unimplemented
+    @unit
     Scenario: The two known ambiguous values get a stated outcome
       Given automations using each of the two legacy pass/fail state values
       When the repair runs
@@ -79,7 +79,7 @@ Feature: Repairing automations whose evaluation-state condition can never match
       Then the full set of intended changes is reported
       And no automation is modified
 
-    @integration @unimplemented
+    @integration
     Scenario: A repair mapping is only applied once it is evidenced
       Given the real distribution of dead values has not been established
       When the work ships
@@ -87,14 +87,14 @@ Feature: Repairing automations whose evaluation-state condition can never match
 
   Rule: The repair is safe to run, and to run again
 
-    @integration @unimplemented
+    @integration
     Scenario: Running the repair twice changes nothing the second time
       Given the repair has already run
       When it runs again
       Then no automation is changed
       And the run reports that nothing needed repair
 
-    @integration @unimplemented
+    @integration
     Scenario: One unreadable automation does not stop the others
       Given an automation whose stored conditions are unreadable
       And a repairable automation alongside it
@@ -103,7 +103,7 @@ Feature: Repairing automations whose evaluation-state condition can never match
       And the unreadable one is reported
       And the run completes
 
-    @integration @unimplemented
+    @integration
     Scenario: Automations outside the repair's scope are not written at all
       Given a deleted automation and an automation with no evaluation-state condition
       When the repair runs
@@ -117,7 +117,7 @@ Feature: Repairing automations whose evaluation-state condition can never match
 
   Rule: A dead state value can no longer be saved
 
-    @integration @unimplemented
+    @unit
     Scenario Outline: Every authoring surface refuses a newly-entered dead value
       Given an operator composing an automation on <surface>
       When they save a state condition naming a value no evaluation reports
@@ -137,7 +137,7 @@ Feature: Repairing automations whose evaluation-state condition can never match
       And the value that was rejected
       And the state values they can use instead
 
-    @unit @unimplemented
+    @unit
     Scenario: Every state an evaluation can report is still accepted
       When an operator saves a condition for each state evaluations report
       Then every one of them saves
@@ -150,19 +150,19 @@ Feature: Repairing automations whose evaluation-state condition can never match
 
   Rule: An automation that could not be repaired stays under its owner's control
 
-    @integration @unimplemented
+    @unit
     Scenario: An unrepaired automation can still be renamed, retargeted and disabled
       Given an automation whose state value was reported as unrepairable
       When its owner renames it, changes where it notifies, or disables it
       Then each of those changes is saved
 
-    @integration @unimplemented
+    @unit
     Scenario: An unrepaired automation can be corrected by its owner
       Given an automation whose state value was reported as unrepairable
       When its owner changes that value to one evaluations report
       Then the change is saved
 
-    @integration @unimplemented
+    @unit
     Scenario: Introducing a new dead value into that automation is still refused
       Given an automation whose state value was reported as unrepairable
       When its owner adds a further condition naming another dead value
