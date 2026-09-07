@@ -50,8 +50,9 @@ not a publishing concern — it drives the old programmatic API directly, across
 offers none of those. It is also the wrong shape for the parse seam below: the
 seam is a round trip per parse, and this is a synchronous CLI that walks 8,700
 modules on every `pnpm lint`. It parses in process against 6 instead, with a
-cache keyed on path + mtime + size so no file is parsed twice, which is how it
-honours the batching this ADR asks for. It moves when the unstable API grows a
+cache of extracted import/JSX facts, validated against file metadata. Cached
+facts replace previous revisions and do not retain syntax trees; cross-file
+setup inspection releases its AST cache after each lint invocation. It moves when the unstable API grows a
 program, a printer and a scanner, or when every rule is restructured to parse
 the tree in one exchange.
 
@@ -83,6 +84,48 @@ tsconfig above it, landing in an inferred project of its own. And the session
 caches source files by path, so each parse takes a name no earlier parse used;
 without that, a scan pinning a rule across several snippets judged all of them
 by the first.
+
+### Incremental declaration boundaries
+
+The application typecheck scripts build the project-reference solution in
+`dev/tsconfig.declarations.json` before checking consumers. That solution is
+the adoption list; each standalone package emits checked declarations with
+`composite` and `noEmitOnError`, and keeps its own build-info file. The 14
+cyclic web packages are one exception required by the compiler's acyclic
+project-reference rule: a direct composite group checks their sources together,
+stages declarations and maps under `dev/.cache`, then distributes them into
+each package's local `dist/`. Consumers reference that composite group directly;
+they do not use non-composite declaration stubs. Application checks stop if a
+standalone package or the group fails. Other workspace packages continue to
+resolve to source until their own declaration and consumer checks pass.
+
+The adopted packages expose declarations through a plain `types` export pointing
+to flat `dist/*.d.ts` paths. Runtime loaders and tools continue to use the
+source `default` export. The cyclic web group adds the top-level
+`langwatch-declaration-source` condition while compiling its members; that
+condition is group-only and keeps member compilation on current source.
+Typechecks prepare dependency outputs before checking source.
+
+Package checks use their normal `tsconfig.json` with the producer's main
+references and references to test dependencies. Their typecheck script prepares
+the producer (or composite web group) and then runs `tsc --noEmit`, so the
+current producer source is checked and tests can consume the fresh declaration
+output. Producers use `rootDir: "src"` and flat `dist/*.d.ts` output; runtime
+export defaults remain source. A web group member references its composite group
+and prepares it before checking tests, so redirected declarations describe the
+current checked source. A raw `tsc` invocation does
+not prepare artifacts; the package command is authoritative for freshness.
+
+Declaration output, maps, and build info live in ignored, worktree-local paths
+outside potentially shared dependency directories. Standalone outputs live in
+package `dist/`; the cyclic group keeps its build-info and complete staging
+tree under `dev/.cache` before distributing local outputs. Worktrees never
+write one another's incremental state. Ordinary builds refresh changed source;
+the declaration command removes its outputs when invoked with `--clean`. A
+[shared immutable cache](../best_practices/declaration-cache.md) reuses checked
+outputs across worktrees with matching inputs, restoring standalone outputs or
+the complete group staging tree before distribution. Incremental state is
+never restored from another worktree.
 
 ## Rationale / Trade-offs
 
