@@ -17,7 +17,10 @@ describe("start.sh system migration ordering", () => {
   });
 
   it("gates every supported app and worker entrypoint", () => {
-    const source = readFileSync(new URL("../start.sh", import.meta.url), "utf8");
+    const source = readFileSync(
+      new URL("../start.sh", import.meta.url),
+      "utf8",
+    );
     const wrapper = readFileSync(
       new URL("../start-runtime.sh", import.meta.url),
       "utf8",

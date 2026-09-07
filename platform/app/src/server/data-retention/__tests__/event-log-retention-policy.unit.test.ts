@@ -60,7 +60,11 @@ describe("event log retention policy", () => {
     ["pulled_usage", "lw.obs.pulled_usage.observed", "traces"],
     ["ingestion_pull", "lw.obs.ingestion_pull.run_completed", "traces"],
     ["trigger", "lw.automation.trigger.match_recorded", "traces"],
-    ["coding_agent_session", "lw.obs.coding_agent_session.span_facts_contributed", "traces"],
+    [
+      "coding_agent_session",
+      "lw.obs.coding_agent_session.span_facts_contributed",
+      "traces",
+    ],
     ["governance_subject", "lw.governance.budget_crossing", "traces"],
     ["billing_report", "lw.billing_report.historical_event", "traces"],
     ["global", "lw.maintenance.historical_event", "traces"],
@@ -79,17 +83,19 @@ describe("event log retention policy", () => {
     });
   });
 
-  it.each(["unknown_historical_aggregate", "constructor", "toString", "__proto__"])(
-    "treats the unknown aggregate key %s as traces",
-    (AggregateType) => {
-      expect(
-        classifyEventLogRowRetention({
-          AggregateType,
-          EventType: "legacy.event",
-        }),
-      ).toBe("traces");
-    },
-  );
+  it.each([
+    "unknown_historical_aggregate",
+    "constructor",
+    "toString",
+    "__proto__",
+  ])("treats the unknown aggregate key %s as traces", (AggregateType) => {
+    expect(
+      classifyEventLogRowRetention({
+        AggregateType,
+        EventType: "legacy.event",
+      }),
+    ).toBe("traces");
+  });
 
   it("derives the indefinite ClickHouse predicate from the same policy", () => {
     expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toBe(
@@ -126,7 +132,9 @@ describe("event log retention policy", () => {
     const experiments = eventLogRetentionCategorySqlPredicate("experiments");
 
     for (const predicate of [traces, scenarios, experiments]) {
-      expect(predicate).toContain(`NOT ${EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE}`);
+      expect(predicate).toContain(
+        `NOT ${EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE}`,
+      );
     }
     expect(traces).toContain(
       "AggregateType NOT IN ('experiment_run', 'simulation_run', 'simulation_set', 'suite_run')",
@@ -137,16 +145,21 @@ describe("event log retention policy", () => {
     expect(experiments).toContain("AggregateType IN ('experiment_run')");
   });
 
-  it.each(["traces", "scenarios", "experiments"] as const)(
-    "round-trips the %s mutation marker from a stored ClickHouse command",
-    (category) => {
-      const markerSql = eventLogRetentionCategoryMutationMarkerSql(category);
-      const command = `UPDATE _retention_days = 49 WHERE ${markerSql}`;
+  it.each([
+    "traces",
+    "scenarios",
+    "experiments",
+  ] as const)("round-trips the %s mutation marker from a stored ClickHouse command", (category) => {
+    const markerSql = eventLogRetentionCategoryMutationMarkerSql(category);
+    const command = `UPDATE _retention_days = 49 WHERE ${markerSql}`;
 
-      expect(markerSql).toContain(`'langwatch:event-log-retention-category:${category}'`);
-      expect(eventLogRetentionCategoryFromMutationCommand(command)).toBe(category);
-    },
-  );
+    expect(markerSql).toContain(
+      `'langwatch:event-log-retention-category:${category}'`,
+    );
+    expect(eventLogRetentionCategoryFromMutationCommand(command)).toBe(
+      category,
+    );
+  });
 
   it("rejects absent or ambiguous mutation markers", () => {
     const ambiguousCommand = [
@@ -155,7 +168,11 @@ describe("event log retention policy", () => {
     ].join(" AND ");
 
     expect(eventLogRetentionCategoryFromMutationCommand(undefined)).toBeNull();
-    expect(eventLogRetentionCategoryFromMutationCommand("UPDATE without marker")).toBeNull();
-    expect(eventLogRetentionCategoryFromMutationCommand(ambiguousCommand)).toBeNull();
+    expect(
+      eventLogRetentionCategoryFromMutationCommand("UPDATE without marker"),
+    ).toBeNull();
+    expect(
+      eventLogRetentionCategoryFromMutationCommand(ambiguousCommand),
+    ).toBeNull();
   });
 });

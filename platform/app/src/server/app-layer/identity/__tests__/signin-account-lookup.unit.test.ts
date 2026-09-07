@@ -5,7 +5,10 @@ import {
   routingIdentifierOf,
   type SignInMethod,
 } from "@langwatch/identity";
-import type { IdentityHeadsRepository, IdentityUserGate } from "@langwatch/identity-server";
+import type {
+  IdentityHeadsRepository,
+  IdentityUserGate,
+} from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
 import {
   type LegacySignInAccount,
@@ -127,7 +130,9 @@ async function routeAccount({
   lookup: ProjectionSignInAccountLookup;
   methods: readonly SignInMethod[];
 }) {
-  const methodsForAccount = await lookup.findAccountMethods({ normalizedValue: EMAIL });
+  const methodsForAccount = await lookup.findAccountMethods({
+    normalizedValue: EMAIL,
+  });
 
   return routeSignIn({
     identifier: routingIdentifierOf(EMAIL),
@@ -257,7 +262,9 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
       latched: true,
     });
 
-    await expect(lookup.findAccountMethods({ normalizedValue: EMAIL })).resolves.toBeNull();
+    await expect(
+      lookup.findAccountMethods({ normalizedValue: EMAIL }),
+    ).resolves.toBeNull();
   });
 
   it("uses legacy methods when an unlatched account has partial identifier heads", async () => {
@@ -287,7 +294,9 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
       identifiers: { [partialCredential.identifierId]: partialCredential },
     });
 
-    await expect(lookup.findAccountMethods({ normalizedValue: EMAIL })).resolves.toEqual({
+    await expect(
+      lookup.findAccountMethods({ normalizedValue: EMAIL }),
+    ).resolves.toEqual({
       hasPassword: false,
       hasPasskey: true,
       providerIds: [],

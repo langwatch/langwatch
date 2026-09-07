@@ -90,9 +90,6 @@ vi.mock(
     // here, so they are the functions themselves, not factories returning one.
     deploymentIsFederationCapable: () => false,
     resolveSignInMethodPolicy: async () => ({}),
-    // Re-stated by the runtime because it is better-auth's one identity door.
-    // Nothing in this suite asks it; the Record above is exhaustive.
-    looksLikeSsoConnectionId: () => false,
     signInDomainRoutingPort: () => ({}),
     signInRouter: () => ({}),
     signUpIdentifier: () => ({}),

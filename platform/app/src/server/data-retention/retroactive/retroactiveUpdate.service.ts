@@ -41,7 +41,9 @@ interface MutationRow {
 export class RetroactiveMutationInProgressError extends Error {
   readonly name = "RetroactiveMutationInProgressError" as const;
   constructor(public readonly blocked: MutationProgress[]) {
-    const summary = blocked.map((m) => `${m.table} (${m.mutationId})`).join(", ");
+    const summary = blocked
+      .map((m) => `${m.table} (${m.mutationId})`)
+      .join(", ");
     super(
       `Retroactive update already in progress for: ${summary}. ` +
         `Wait for completion or kill the listed mutation(s) before starting another.`,
@@ -78,7 +80,9 @@ function tenantFilterParams(projectId: string): Record<string, string> {
 }
 
 export class RetroactiveUpdateService {
-  constructor(private readonly resolveClickHouseClient: ClickHouseClientResolver | null) {}
+  constructor(
+    private readonly resolveClickHouseClient: ClickHouseClientResolver | null,
+  ) {}
 
   async triggerUpdate({
     projectId,
@@ -132,7 +136,11 @@ export class RetroactiveUpdateService {
     return { tables };
   }
 
-  async getMutationProgress({ projectId }: { projectId: string }): Promise<MutationProgress[]> {
+  async getMutationProgress({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<MutationProgress[]> {
     if (!this.resolveClickHouseClient) return [];
 
     const client = await this.resolveClickHouseClient(projectId);
@@ -171,7 +179,9 @@ export class RetroactiveUpdateService {
 
     const client = await this.resolveClickHouseClient(projectId);
     await client.command({
-      query: `KILL MUTATION WHERE mutation_id = {mutationId:String} ` + `AND ${TENANT_FILTER_SQL}`,
+      query:
+        `KILL MUTATION WHERE mutation_id = {mutationId:String} ` +
+        `AND ${TENANT_FILTER_SQL}`,
       query_params: { mutationId, ...tenantFilterParams(projectId) },
     });
   }
@@ -212,7 +222,9 @@ export class RetroactiveUpdateService {
       .filter((row) => {
         if (row.table !== "event_log") return true;
 
-        const markedCategory = eventLogRetentionCategoryFromMutationCommand(row.command);
+        const markedCategory = eventLogRetentionCategoryFromMutationCommand(
+          row.command,
+        );
         return markedCategory === null || markedCategory === category;
       })
       .map(this.toMutationProgress);
@@ -225,7 +237,9 @@ export class RetroactiveUpdateService {
     partsToDo: r.partsToDo,
     createTime: r.createTime,
     category:
-      (r.table === "event_log" ? eventLogRetentionCategoryFromMutationCommand(r.command) : null) ??
+      (r.table === "event_log"
+        ? eventLogRetentionCategoryFromMutationCommand(r.command)
+        : null) ??
       RETENTION_TABLE_CATEGORY_MAP[r.table as RetentionManagedTable] ??
       null,
   });

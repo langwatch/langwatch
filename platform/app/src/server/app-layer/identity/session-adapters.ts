@@ -3,7 +3,11 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { tryGetApp } from "~/server/app-layer/app";
-import type { ProviderAssertionPort, SessionIdentifierPort } from "./session-claims.service";
+import { signInProviderForPath } from "./session-claims";
+import type {
+  ProviderAssertionPort,
+  SessionIdentifierPort,
+} from "./session-claims.service";
 import type {
   SessionCachePort,
   SessionRecord,
@@ -15,7 +19,6 @@ import type {
   SessionRevocationCachePort,
   SessionRevocationRecordsPort,
 } from "./session-revocation.service";
-import { signInProviderForPath } from "./session-claims";
 
 const logger = createLogger("langwatch:identity:session-claims");
 
@@ -82,7 +85,9 @@ export class PrismaSessionIdentifiers implements SessionIdentifierPort {
  * input or a persisted Account row: either would let unverified or stale
  * evidence satisfy a current sign-in.
  */
-export class VerifiedCallbackProviderAssertions implements ProviderAssertionPort {
+export class VerifiedCallbackProviderAssertions
+  implements ProviderAssertionPort
+{
   private readonly scope = new AsyncLocalStorage<{
     pendingToken: {
       providerId: string;
@@ -130,7 +135,8 @@ export class VerifiedCallbackProviderAssertions implements ProviderAssertionPort
     const parsedClaims = verifiedCallbackClaimsSchema.safeParse(claims);
     if (!parsedClaims.success) return;
 
-    const { sub: providerAccountId, amr: assertedFactors = [] } = parsedClaims.data;
+    const { sub: providerAccountId, amr: assertedFactors = [] } =
+      parsedClaims.data;
 
     current.pendingToken = {
       providerId,
@@ -162,13 +168,17 @@ export class VerifiedCallbackProviderAssertions implements ProviderAssertionPort
       providerId,
       providerAccountId,
       assertedFactors: verifiedTokenClaims
-        ? current.pendingToken?.assertedFactors ?? []
+        ? (current.pendingToken?.assertedFactors ?? [])
         : [],
       verifiedTokenClaims,
     };
   }
 
-  async authenticatedAccountFor({ providerId }: { providerId: string }): Promise<{
+  async authenticatedAccountFor({
+    providerId,
+  }: {
+    providerId: string;
+  }): Promise<{
     providerAccountId: string;
     assertedFactors: readonly string[];
     verifiedTokenClaims: boolean;
@@ -187,7 +197,11 @@ export class VerifiedCallbackProviderAssertions implements ProviderAssertionPort
 export class PrismaSessionRecords implements SessionRecordsPort {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async listForUser({ userId }: { userId: string }): Promise<readonly SessionRecord[]> {
+  async listForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<readonly SessionRecord[]> {
     return this.prisma.session.findMany({
       where: { userId, expires: { gt: new Date() } },
       orderBy: { createdAt: "desc" },
@@ -241,7 +255,8 @@ const SESSION_RECORD_SELECT = {
  * keys it writes for a session are the session itself, under its token, and
  * the per-user index of the tokens that are live.
  */
-const cachedSessionKey = ({ token }: { token: string }) => `better-auth:${token}`;
+const cachedSessionKey = ({ token }: { token: string }) =>
+  `better-auth:${token}`;
 const activeSessionIndexKey = ({ userId }: { userId: string }) =>
   `better-auth:active-sessions-${userId}`;
 
@@ -299,7 +314,11 @@ export class RedisSessionCache implements SessionCachePort {
  * an answer here rather than a failure.
  */
 export class RedisSessionRevocationCache implements SessionRevocationCachePort {
-  async readIndex({ userId }: { userId: string }): Promise<readonly CachedSession[] | null> {
+  async readIndex({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<readonly CachedSession[] | null> {
     const redis = sessionCacheConnection();
     if (!redis) return null;
     const stored = await redis.get(activeSessionIndexKey({ userId }));
@@ -333,7 +352,10 @@ export class RedisSessionRevocationCache implements SessionRevocationCachePort {
   }): Promise<void> {
     const redis = sessionCacheConnection();
     if (!redis) return;
-    await redis.set(activeSessionIndexKey({ userId }), JSON.stringify(sessions));
+    await redis.set(
+      activeSessionIndexKey({ userId }),
+      JSON.stringify(sessions),
+    );
   }
 
   async dropIndex({ userId }: { userId: string }): Promise<void> {
@@ -360,10 +382,16 @@ export class RedisSessionRevocationCache implements SessionRevocationCachePort {
  * window, so a token skipped for being expired is a token better-auth would
  * keep answering from.
  */
-export class PrismaSessionRevocationRecords implements SessionRevocationRecordsPort {
+export class PrismaSessionRevocationRecords
+  implements SessionRevocationRecordsPort
+{
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findTokensForUser({ userId }: { userId: string }): Promise<readonly string[]> {
+  async findTokensForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<readonly string[]> {
     const sessions = await this.prisma.session.findMany({
       where: { userId },
       select: { sessionToken: true },
@@ -385,7 +413,11 @@ export class PrismaSessionRevocationRecords implements SessionRevocationRecordsP
     return sessions.map((session) => session.sessionToken);
   }
 
-  async findTokenForSession({ sessionId }: { sessionId: string }): Promise<string | null> {
+  async findTokenForSession({
+    sessionId,
+  }: {
+    sessionId: string;
+  }): Promise<string | null> {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
       select: { sessionToken: true },

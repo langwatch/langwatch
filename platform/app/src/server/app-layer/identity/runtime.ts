@@ -454,7 +454,7 @@ export function ssoConnections(): SsoConnectionService {
       connections: new PrismaSsoConnectionReadRepository(prisma),
       breakGlass: new LocalDoorBreakGlassBinding(),
       stranding: new PrismaSsoConnectionStrandingRepository(prisma),
-      platformOperators: new AdminEmailPlatformOperators(prisma),
+      platformOperators: new AdminEmailPlatformOperators(identityUsers),
     }),
     new SsoConnectionLedgerWriter({
       projectionStore: new PrismaSsoConnectionProjectionRepository(prisma),

@@ -1,16 +1,19 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { classifyEventLogRowRetention } from "../../data-retention/event-log-retention-policy";
 import {
   INDEFINITE_RETENTION_DAYS,
   PLATFORM_DEFAULT_RETENTION_DAYS,
 } from "../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
-import { classifyEventLogRowRetention } from "../../data-retention/event-log-retention-policy";
 import type { Event } from "../domain/types";
 import { AbstractEventStore } from "./abstractEventStore";
 import type { EventStoreReadContext } from "./eventStore.types";
-import type { EventRecord, EventRepository } from "./repositories/eventRepository.types";
+import type {
+  EventRecord,
+  EventRepository,
+} from "./repositories/eventRepository.types";
 
 /**
  * ClickHouse-backed EventStore with OpenTelemetry instrumentation and structured logging.
@@ -23,8 +26,12 @@ import type { EventRecord, EventRepository } from "./repositories/eventRepositor
 export class EventStoreClickHouse<
   EventType extends Event = Event,
 > extends AbstractEventStore<EventType> {
-  private readonly tracer = getLangWatchTracer("langwatch.trace-processing.event-store.clickhouse");
-  private readonly logger = createLogger("langwatch:trace-processing:event-store:clickhouse");
+  private readonly tracer = getLangWatchTracer(
+    "langwatch.trace-processing.event-store.clickhouse",
+  );
+  private readonly logger = createLogger(
+    "langwatch:trace-processing:event-store:clickhouse",
+  );
 
   constructor(
     repository: EventRepository,
@@ -105,13 +112,16 @@ export class EventStoreClickHouse<
       );
     }
 
-    const policy = await this.retentionPolicyResolver.resolve(String(context.tenantId));
+    const policy = await this.retentionPolicyResolver.resolve(
+      String(context.tenantId),
+    );
     return classifiedRecords.map(({ record, retentionClass }) =>
       retentionClass === "indefinite"
         ? { ...record, _retention_days: INDEFINITE_RETENTION_DAYS }
         : {
             ...record,
-            _retention_days: policy?.[retentionClass] ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+            _retention_days:
+              policy?.[retentionClass] ?? PLATFORM_DEFAULT_RETENTION_DAYS,
           },
     );
   }

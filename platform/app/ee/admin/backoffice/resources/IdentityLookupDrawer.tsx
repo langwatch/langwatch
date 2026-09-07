@@ -556,7 +556,6 @@ function WaitingPanel({
             )}
           </HStack>
         ))}
-
       </VStack>
     </Box>
   );

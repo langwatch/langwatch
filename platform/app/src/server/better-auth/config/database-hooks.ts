@@ -4,7 +4,10 @@ import { sessionClaimsData } from "../session-claims-hook";
 
 export interface LegacyDatabaseHooksPort {
   beforeUserCreate(args: {
-    user: { email: string; deactivatedAt?: Date | null } & Record<string, unknown>;
+    user: { email: string; deactivatedAt?: Date | null } & Record<
+      string,
+      unknown
+    >;
   }): Promise<boolean | void>;
   afterUserCreate(args: {
     user: { id: string; email: string; name: string };
