@@ -12,6 +12,7 @@ import { apiKeyPermission, requires } from "@langwatch/api";
 import {
   type AppRestSecurity,
   baseResponses,
+  credentialPrincipalOf,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -62,21 +63,23 @@ export function createModelDefaultsRestApp(options: {
   type ModelDefaultsContext = ProjectScopedContext<EndpointVariables>;
 
   const projectId = (c: ModelDefaultsContext): string => projectOf(c).id;
-  const actorId = (c: ModelDefaultsContext): string | undefined => c.get("apiKeyUserId");
 
   /**
    * The API key this request arrived on, or none for a credential that is not
    * one (a legacy project key names no key row).
    */
   const apiKeyPrincipal = (c: ModelDefaultsContext): ModelDefaultApiKeyPrincipal | undefined => {
-    const resolved = c.get("resolvedToken");
-    if (resolved?.type !== "apiKey") return undefined;
+    const principal = credentialPrincipalOf(c);
+    if (principal.kind !== "apiKey") return undefined;
     return {
-      apiKeyId: resolved.apiKeyId,
-      userId: resolved.userId ?? null,
-      organizationId: resolved.organizationId,
+      apiKeyId: principal.apiKeyId,
+      userId: principal.userId,
+      organizationId: principal.organizationId,
     };
   };
+
+  const actorId = (c: ModelDefaultsContext): string | undefined =>
+    apiKeyPrincipal(c)?.userId ?? void 0;
 
   /**
    * The scopes a write NAMES, authorized against the credential rather than

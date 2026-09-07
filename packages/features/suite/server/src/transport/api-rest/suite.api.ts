@@ -3,6 +3,7 @@ import {
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
+  credentialPrincipalOf,
   deprecatedAlias,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
@@ -334,6 +335,12 @@ function toTestSuiteResponse(testSuite: ScenarioTestSuite) {
 const idParamsSchema = z.object({ id: z.string().min(1) });
 const archivedSuiteSchema = z.object({ id: z.string(), archived: z.boolean() });
 
+/** The person the credential belongs to; nothing for a project or service key. */
+function callerUserIdOf(c: ProjectScopedContext<EndpointVariables>): string | null {
+  const principal = credentialPrincipalOf(c);
+  return principal.kind === "apiKey" ? principal.userId : null;
+}
+
 /**
  * REST for suites — the run plans a project assembles by hand, and the test suites
  * scenarios are filed into.
@@ -481,7 +488,7 @@ export function createSuiteRestApp(options: {
       // A project key belongs to no person, so it records no actor. A
       // user-bound key records the person it belongs to, through the
       // surface the request declared.
-      userId: c.get("apiKeyUserId"),
+      userId: callerUserIdOf(c),
       surfaceHeader: c.req.header("X-LangWatch-Surface"),
     });
     const idempotencyKey =

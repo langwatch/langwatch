@@ -11,6 +11,7 @@ import {
   badRequestSchema,
   baseResponses,
   conflictResponses,
+  credentialPrincipalOf,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -394,17 +395,18 @@ export function registerPromptRoutes(
   const { service, policy } = family;
 
   /**
-   * The credential this request arrived on. Absent `resolvedToken` means a door
-   * that resolved no key row, which is treated as a key pinned to its project.
+   * The credential this request arrived on. A legacy project key resolves no
+   * key row, so it is a credential pinned to its project rather than a key
+   * whose owner could widen what the caller reaches.
    */
   const credentialOf = (c: PromptContext): PromptRestCredential => {
-    const resolved = c.get("resolvedToken");
-    if (resolved?.type === "apiKey") {
+    const principal = credentialPrincipalOf(c);
+    if (principal.kind === "apiKey") {
       return {
         type: "apiKey",
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId ?? null,
-        organizationId: resolved.organizationId,
+        apiKeyId: principal.apiKeyId,
+        userId: principal.userId,
+        organizationId: principal.organizationId,
       };
     }
     return { type: "legacyProjectKey", projectId: projectOf(c).id };

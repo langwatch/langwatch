@@ -21,7 +21,11 @@ const renderUnexpected: ErrorHandler = (error, c) =>
 function testSecurity(): AppRestSecurity {
   const pass: MiddlewareHandler = async (_c, next) => next();
   const asProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", { id: PROJECT_ID, slug: "caller" });
+    const project = { id: PROJECT_ID, slug: "caller" };
+    c.set("project", project);
+    // The whole resolved credential, as the process's own authentication
+    // installs it: the family reads its caller off this, never off loose keys.
+    c.set("resolvedToken", { type: "legacyProjectKey", project });
     await next();
   };
   const unreachable = () => {

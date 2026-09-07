@@ -16,6 +16,7 @@ import { requires } from "@langwatch/api";
 import {
   type AppRestSecurity,
   createFamilyErrorHandler,
+  credentialPrincipalOf,
   type EndpointVariables,
   managementActor,
   MANAGEMENT_API_VERSION,
@@ -207,7 +208,8 @@ async function presenceOf({
  * somebody else is listed either way, marked as not selectable.
  */
 function viewerUserIdOf(c: AgentsV1Context): string | null {
-  return (c.get("apiKeyUserId") as string | null) ?? null;
+  const principal = credentialPrincipalOf(c);
+  return principal.kind === "apiKey" ? principal.userId : null;
 }
 
 /** The rows as every read answers them: presence, owner and link added. */

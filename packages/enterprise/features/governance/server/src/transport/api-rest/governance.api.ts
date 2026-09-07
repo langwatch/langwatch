@@ -33,6 +33,7 @@ import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
+  credentialPrincipalOf,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
   resolver,
@@ -52,7 +53,8 @@ const logger = createLogger("langwatch:api:governance");
 const requireUserBoundCaller: MiddlewareHandler<{
   Variables: Variables;
 }> = async (c, next) => {
-  if (!c.get("apiKeyUserId")) {
+  const principal = credentialPrincipalOf(c);
+  if (principal.kind !== "apiKey" || !principal.userId) {
     return c.json(
       {
         error: {
@@ -233,6 +235,12 @@ function resolveSurfaceFromRequest(c: {
   return declared === "cli" ? "cli" : "hono";
 }
 
+/** The member the credential acts as; nothing for a legacy project or service key. */
+function callerUserIdOf(c: Context<{ Variables: Variables }>): string | null {
+  const principal = credentialPrincipalOf(c);
+  return principal.kind === "apiKey" ? principal.userId : null;
+}
+
 /**
  * Who this request is attributed to, read off the Hono context.
  *
@@ -243,7 +251,7 @@ function resolveSurfaceFromRequest(c: {
 function callerOf(c: Context<{ Variables: Variables }>): GovernanceProjectCaller {
   return {
     projectId: c.get("project").id,
-    userId: c.get("apiKeyUserId") ?? null,
+    userId: callerUserIdOf(c),
     surface: resolveSurfaceFromRequest(c),
   };
 }

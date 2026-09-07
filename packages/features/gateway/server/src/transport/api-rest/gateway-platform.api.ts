@@ -5,13 +5,13 @@
  */
 
 import { apiKeyPermission } from "@langwatch/api";
-import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import {
   apiErrorBody,
   apiErrorSchema,
   type AppRestSecurity,
   canonicalBaseResponses,
   canonicalConflictResponses,
+  credentialPrincipalOf,
   idempotentReplayHeaders,
   requestTraceIds,
   type RestErrorHandler,
@@ -25,6 +25,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
+import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import {
@@ -519,9 +520,7 @@ type GatewayContext = ProjectScopedContext<EndpointVariables>;
 type GatewayErrorContext = Parameters<RestErrorHandler>[1];
 
 /** Which principal a credential stands for is the process's call; this only holds the facts. */
-type ActorRequestReader = Parameters<typeof projectOf>[0] & {
-  get(key: "resolvedToken"): ResolvedApiKeyToken | undefined;
-};
+type ActorRequestReader = Parameters<typeof projectOf>[0] & Context;
 
 function actorForRequest(
   c: ActorRequestReader,
@@ -529,7 +528,7 @@ function actorForRequest(
 ): { actor: GatewayActor; actorUserId: string } {
   return app.actorForCredential({
     projectId: projectOf(c).id,
-    resolvedToken: c.get("resolvedToken"),
+    credential: credentialPrincipalOf(c),
   });
 }
 

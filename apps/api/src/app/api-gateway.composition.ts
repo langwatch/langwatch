@@ -320,16 +320,16 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
     // A scoped API key acts as its owning user; a legacy project key carries
     // none, so it acts as a stable machine principal for its project, which
     // keeps an audit row traceable back to the credential that wrote it.
-    actorForCredential: ({ projectId, resolvedToken }) =>
-      resolvedToken?.type === "apiKey"
+    actorForCredential: ({ projectId, credential }) =>
+      credential.kind === "apiKey"
         ? {
             actor: {
               kind: "apiKey",
-              apiKeyId: resolvedToken.apiKeyId,
-              userId: resolvedToken.userId,
-              organizationId: resolvedToken.organizationId,
+              apiKeyId: credential.apiKeyId,
+              userId: credential.userId,
+              organizationId: credential.organizationId,
             } satisfies VirtualKeyActor,
-            actorUserId: resolvedToken.userId ?? `svc_${projectId}`,
+            actorUserId: credential.userId ?? `svc_${projectId}`,
           }
         : {
             actor: { kind: "legacyProjectKey", projectId } satisfies VirtualKeyActor,
@@ -366,14 +366,10 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
       );
     },
     requireVisibleVirtualKeyForProjectCredential: ({ project, id, organizationId }) =>
-      virtualKeyAuthorization.getVisibleVk(
-        virtualKeys,
-        membershipForProjectCredential(project),
-        {
-          id,
-          organizationId,
-        },
-      ),
+      virtualKeyAuthorization.getVisibleVk(virtualKeys, membershipForProjectCredential(project), {
+        id,
+        organizationId,
+      }),
     requireExistingVirtualKey: ({ organizationId, id }) =>
       virtualKeyAuthorization.getExistingVk(virtualKeys, id, organizationId),
 

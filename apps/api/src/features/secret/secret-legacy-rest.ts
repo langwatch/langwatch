@@ -21,6 +21,7 @@ import {
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
+  credentialPrincipalOf,
   type SecuredApp,
   validator,
 } from "@langwatch/api/rest";
@@ -34,9 +35,9 @@ const legacyRestVersionSelector = RestVersionSelector.create({
 });
 
 function legacySecretActorId(context: Context): string {
-  const apiKeyUserId: unknown = context.get("apiKeyUserId");
-  if (typeof apiKeyUserId === "string" && apiKeyUserId.length > 0) {
-    return apiKeyUserId;
+  const principal = credentialPrincipalOf(context);
+  if (principal.kind === "apiKey" && principal.userId) {
+    return principal.userId;
   }
   throw new AuthenticatedActorRequiredError();
 }

@@ -7,6 +7,7 @@ import {
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
+  credentialPrincipalOf,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -99,6 +100,12 @@ async function readPlan(params: {
   return found.suite;
 }
 
+/** The person the credential belongs to; nothing for a project or service key. */
+function callerUserIdOf(c: ProjectScopedContext<EndpointVariables>): string | null {
+  const principal = credentialPrincipalOf(c);
+  return principal.kind === "apiKey" ? principal.userId : null;
+}
+
 /** Builds the `/api/v1/run-plans` collection and item endpoints. */
 export function createRunPlansV1RestApp(options: {
   security: AppRestSecurity;
@@ -118,7 +125,7 @@ export function createRunPlansV1RestApp(options: {
 
   const actorOf = (c: RunPlanContext) =>
     runActorFromRequest({
-      userId: c.get("apiKeyUserId"),
+      userId: callerUserIdOf(c),
       surfaceHeader: c.req.header("X-LangWatch-Surface"),
     });
 
@@ -131,10 +138,7 @@ export function createRunPlansV1RestApp(options: {
     return rows.map((suite) => planWire({ platformUrl, projectSlug: project.slug, suite }));
   };
 
-  const runHandler = async (
-    c: RunPlanContext,
-    input: z.infer<typeof runPlanRunInputSchema>,
-  ) => {
+  const runHandler = async (c: RunPlanContext, input: z.infer<typeof runPlanRunInputSchema>) => {
     const project = projectOf(c);
     const actor = actorOf(c);
     const result = await suites().runPlan({
@@ -213,105 +217,103 @@ export function createRunPlansV1RestApp(options: {
     },
   };
 
-  return (
-    service
-      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
-        policy(requires("scenarios:view"))(b)
-          .withQuery(listQuerySchema)
-          .withOutput(z.array(runPlanWireSchema))
-          .withDocs({
-            operationId: "listRunPlans",
-            tags: ["Run Plans"],
-            description:
-              "List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites are not run plans and are listed by the test suites family.",
-            responses: {
-              ...baseResponses,
-              200: {
-                description: "Success",
-                content: {
-                  "application/json": { schema: resolver(z.array(runPlanWireSchema)) },
-                },
+  return service
+    .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+      policy(requires("scenarios:view"))(b)
+        .withQuery(listQuerySchema)
+        .withOutput(z.array(runPlanWireSchema))
+        .withDocs({
+          operationId: "listRunPlans",
+          tags: ["Run Plans"],
+          description:
+            "List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites are not run plans and are listed by the test suites family.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: {
+                "application/json": { schema: resolver(z.array(runPlanWireSchema)) },
               },
             },
-          }),
-      )
-      .registerRoute("post", "/run", MANAGEMENT_API_VERSION, runHandler, (b) =>
-        policy(requires("scenarios:create"))(b)
-          .withInput(runPlanRunInputSchema)
-          .withOutput(runPlanRunResultSchema)
-          .withDocs({
-            operationId: "runRunPlan",
-            tags: ["Run Plans"],
-            description:
-              "Run a configuration under a name. The name identifies the run plan: send a name already in use and that plan's configuration is replaced with this one, send a new name and the plan is created, send no name and one is derived from what the run covers and what it runs against.",
-            responses: {
-              ...baseResponses,
-              200: {
-                description: "Success",
-                content: { "application/json": { schema: resolver(runPlanRunResultSchema) } },
-              },
+          },
+        }),
+    )
+    .registerRoute("post", "/run", MANAGEMENT_API_VERSION, runHandler, (b) =>
+      policy(requires("scenarios:create"))(b)
+        .withInput(runPlanRunInputSchema)
+        .withOutput(runPlanRunResultSchema)
+        .withDocs({
+          operationId: "runRunPlan",
+          tags: ["Run Plans"],
+          description:
+            "Run a configuration under a name. The name identifies the run plan: send a name already in use and that plan's configuration is replaced with this one, send a new name and the plan is created, send no name and one is derived from what the run covers and what it runs against.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: { "application/json": { schema: resolver(runPlanRunResultSchema) } },
             },
-          }),
-      )
-      .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
-        policy(requires("scenarios:view"))(b)
-          .withParams(idParamsSchema)
-          .withOutput(runPlanWireSchema)
-          .withDocs({
-            operationId: "getRunPlan",
-            tags: ["Run Plans"],
-            description:
-              "Read one run plan. An id the project does not hold, and a test suite id, both answer 404 suite_not_found.",
-            responses: {
-              ...baseResponses,
-              200: {
-                description: "Success",
-                content: { "application/json": { schema: resolver(runPlanWireSchema) } },
-              },
-              ...notFoundResponse,
+          },
+        }),
+    )
+    .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+      policy(requires("scenarios:view"))(b)
+        .withParams(idParamsSchema)
+        .withOutput(runPlanWireSchema)
+        .withDocs({
+          operationId: "getRunPlan",
+          tags: ["Run Plans"],
+          description:
+            "Read one run plan. An id the project does not hold, and a test suite id, both answer 404 suite_not_found.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: { "application/json": { schema: resolver(runPlanWireSchema) } },
             },
-          }),
-      )
-      .registerRoute("post", "/:id/run", MANAGEMENT_API_VERSION, rerunHandler, (b) =>
-        policy(requires("scenarios:create"))(b)
-          .withParams(idParamsSchema)
-          .withInput(rerunInputSchema)
-          .withOutput(runPlanRunResultSchema)
-          .withDocs({
-            operationId: "rerunRunPlan",
-            tags: ["Run Plans"],
-            summary: "Run a plan again",
-            description:
-              "Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.",
-            responses: {
-              ...baseResponses,
-              200: {
-                description: "Success",
-                content: { "application/json": { schema: resolver(runPlanRunResultSchema) } },
-              },
-              ...notFoundResponse,
+            ...notFoundResponse,
+          },
+        }),
+    )
+    .registerRoute("post", "/:id/run", MANAGEMENT_API_VERSION, rerunHandler, (b) =>
+      policy(requires("scenarios:create"))(b)
+        .withParams(idParamsSchema)
+        .withInput(rerunInputSchema)
+        .withOutput(runPlanRunResultSchema)
+        .withDocs({
+          operationId: "rerunRunPlan",
+          tags: ["Run Plans"],
+          summary: "Run a plan again",
+          description:
+            "Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: { "application/json": { schema: resolver(runPlanRunResultSchema) } },
             },
-          }),
-      )
-      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
-        policy(requires("scenarios:manage"))(b)
-          .withParams(idParamsSchema)
-          .withOutput(archiveResultSchema)
-          .withDocs({
-            operationId: "archiveRunPlan",
-            tags: ["Run Plans"],
-            description:
-              "Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are.",
-            responses: {
-              ...baseResponses,
-              200: {
-                description: "Success",
-                content: { "application/json": { schema: resolver(archiveResultSchema) } },
-              },
-              ...notFoundResponse,
+            ...notFoundResponse,
+          },
+        }),
+    )
+    .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
+      policy(requires("scenarios:manage"))(b)
+        .withParams(idParamsSchema)
+        .withOutput(archiveResultSchema)
+        .withDocs({
+          operationId: "archiveRunPlan",
+          tags: ["Run Plans"],
+          description:
+            "Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: { "application/json": { schema: resolver(archiveResultSchema) } },
             },
-          }),
-      )
-      .build()
-  );
+            ...notFoundResponse,
+          },
+        }),
+    )
+    .build();
 }

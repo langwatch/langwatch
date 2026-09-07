@@ -22,6 +22,7 @@ import {
 import { requires } from "@langwatch/api";
 import {
   bodyLimit,
+  credentialPrincipalOf,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   projectOf,
@@ -206,7 +207,11 @@ export function registerCallEndpoint({
     const project = projectOf(c);
 
     const agent = await connectedAgentOf({ deps, projectId: project.id, id });
-    await deps.assertRunnable({ agent, apiKeyUserId: c.get("apiKeyUserId") });
+    const principal = credentialPrincipalOf(c);
+    await deps.assertRunnable({
+      agent,
+      apiKeyUserId: (principal.kind === "apiKey" ? principal.userId : null) ?? void 0,
+    });
 
     const call = dispatchCallOf({
       body,

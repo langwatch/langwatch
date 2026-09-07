@@ -7,6 +7,7 @@ import {
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
+  credentialPrincipalOf,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -105,6 +106,12 @@ async function resolvedPlanUrl(params: {
   });
 }
 
+/** The person the credential belongs to; nothing for a project or service key. */
+function callerUserIdOf(c: ProjectScopedContext<EndpointVariables>): string | null {
+  const principal = credentialPrincipalOf(c);
+  return principal.kind === "apiKey" ? principal.userId : null;
+}
+
 /** Builds the `/api/v1/test-suites` collection, item and run endpoints. */
 export function createTestSuitesV1RestApp(options: {
   security: AppRestSecurity;
@@ -178,7 +185,7 @@ export function createTestSuitesV1RestApp(options: {
     const app = suites();
     await readTestSuite({ suites: app, id, projectId: project.id });
     const actor = runActorFromRequest({
-      userId: c.get("apiKeyUserId"),
+      userId: callerUserIdOf(c),
       surfaceHeader: c.req.header("X-LangWatch-Surface"),
     });
 
@@ -227,129 +234,127 @@ export function createTestSuitesV1RestApp(options: {
     },
   };
 
-  return (
-    service
-      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
-        policy(requires("scenarios:view"))(b)
-          .withQuery(listQuerySchema)
-          .withOutput(z.array(testSuiteWireSchema))
-          .withDocs({
-            operationId: "listTestSuites",
-            tags: ["Test Suites"],
-            description:
-              "List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family.",
-            responses: {
-              ...baseResponses,
-              200: {
-                description: "Success",
-                content: {
-                  "application/json": { schema: resolver(z.array(testSuiteWireSchema)) },
-                },
+  return service
+    .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+      policy(requires("scenarios:view"))(b)
+        .withQuery(listQuerySchema)
+        .withOutput(z.array(testSuiteWireSchema))
+        .withDocs({
+          operationId: "listTestSuites",
+          tags: ["Test Suites"],
+          description:
+            "List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: {
+                "application/json": { schema: resolver(z.array(testSuiteWireSchema)) },
               },
             },
-          }),
-      )
-      .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
-        policy(requires("scenarios:create"))(b)
-          .withInput(nameInputSchema)
-          .withOutput(testSuiteWireSchema)
-          .withStatus(201)
-          .withDocs({
-            operationId: "createTestSuite",
-            tags: ["Test Suites"],
-            description:
-              "Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run.",
-            responses: {
-              ...baseResponses,
-              201: {
-                description: "Test suite created",
-                content: { "application/json": { schema: resolver(testSuiteWireSchema) } },
+          },
+        }),
+    )
+    .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
+      policy(requires("scenarios:create"))(b)
+        .withInput(nameInputSchema)
+        .withOutput(testSuiteWireSchema)
+        .withStatus(201)
+        .withDocs({
+          operationId: "createTestSuite",
+          tags: ["Test Suites"],
+          description:
+            "Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run.",
+          responses: {
+            ...baseResponses,
+            201: {
+              description: "Test suite created",
+              content: { "application/json": { schema: resolver(testSuiteWireSchema) } },
+            },
+          },
+        }),
+    )
+    .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+      policy(requires("scenarios:view"))(b)
+        .withParams(idParamsSchema)
+        .withOutput(testSuiteDetailWireSchema)
+        .withDocs({
+          operationId: "getTestSuite",
+          tags: ["Test Suites"],
+          summary: "Read one test suite",
+          description:
+            "Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: {
+                "application/json": { schema: resolver(testSuiteDetailWireSchema) },
               },
             },
-          }),
-      )
-      .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
-        policy(requires("scenarios:view"))(b)
-          .withParams(idParamsSchema)
-          .withOutput(testSuiteDetailWireSchema)
-          .withDocs({
-            operationId: "getTestSuite",
-            tags: ["Test Suites"],
-            summary: "Read one test suite",
-            description:
-              "Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.",
-            responses: {
-              ...baseResponses,
-              200: {
-                description: "Success",
-                content: {
-                  "application/json": { schema: resolver(testSuiteDetailWireSchema) },
-                },
-              },
-              ...notFoundResponse,
+            ...notFoundResponse,
+          },
+        }),
+    )
+    .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, renameHandler, (b) =>
+      policy(requires("scenarios:update"))(b)
+        .withParams(idParamsSchema)
+        .withInput(nameInputSchema)
+        .withOutput(testSuiteWireSchema)
+        .withDocs({
+          operationId: "renameTestSuite",
+          tags: ["Test Suites"],
+          description:
+            "Rename a test suite. The slug is kept, so links and run history stay where they are.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: { "application/json": { schema: resolver(testSuiteWireSchema) } },
             },
-          }),
-      )
-      .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, renameHandler, (b) =>
-        policy(requires("scenarios:update"))(b)
-          .withParams(idParamsSchema)
-          .withInput(nameInputSchema)
-          .withOutput(testSuiteWireSchema)
-          .withDocs({
-            operationId: "renameTestSuite",
-            tags: ["Test Suites"],
-            description:
-              "Rename a test suite. The slug is kept, so links and run history stay where they are.",
-            responses: {
-              ...baseResponses,
-              200: {
-                description: "Success",
-                content: { "application/json": { schema: resolver(testSuiteWireSchema) } },
-              },
-              ...notFoundResponse,
+            ...notFoundResponse,
+          },
+        }),
+    )
+    .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
+      policy(requires("scenarios:manage"))(b)
+        .withParams(idParamsSchema)
+        .withOutput(archiveResultSchema)
+        .withDocs({
+          operationId: "archiveTestSuite",
+          tags: ["Test Suites"],
+          description:
+            "Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: { "application/json": { schema: resolver(archiveResultSchema) } },
             },
-          }),
-      )
-      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
-        policy(requires("scenarios:manage"))(b)
-          .withParams(idParamsSchema)
-          .withOutput(archiveResultSchema)
-          .withDocs({
-            operationId: "archiveTestSuite",
-            tags: ["Test Suites"],
-            description:
-              "Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live.",
-            responses: {
-              ...baseResponses,
-              200: {
-                description: "Success",
-                content: { "application/json": { schema: resolver(archiveResultSchema) } },
-              },
-              ...notFoundResponse,
+            ...notFoundResponse,
+          },
+        }),
+    )
+    .registerRoute("post", "/:id/run", MANAGEMENT_API_VERSION, runHandler, (b) =>
+      policy(requires("scenarios:create"))(b)
+        .withParams(idParamsSchema)
+        .withInput(testSuiteRunInputSchema)
+        .withOutput(runPlanRunResultSchema)
+        .withDocs({
+          operationId: "runTestSuite",
+          tags: ["Test Suites"],
+          summary: "Run a test suite",
+          description:
+            "Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: { "application/json": { schema: resolver(runPlanRunResultSchema) } },
             },
-          }),
-      )
-      .registerRoute("post", "/:id/run", MANAGEMENT_API_VERSION, runHandler, (b) =>
-        policy(requires("scenarios:create"))(b)
-          .withParams(idParamsSchema)
-          .withInput(testSuiteRunInputSchema)
-          .withOutput(runPlanRunResultSchema)
-          .withDocs({
-            operationId: "runTestSuite",
-            tags: ["Test Suites"],
-            summary: "Run a test suite",
-            description:
-              "Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.",
-            responses: {
-              ...baseResponses,
-              200: {
-                description: "Success",
-                content: { "application/json": { schema: resolver(runPlanRunResultSchema) } },
-              },
-              ...notFoundResponse,
-            },
-          }),
-      )
-      .build()
-  );
+            ...notFoundResponse,
+          },
+        }),
+    )
+    .build();
 }
