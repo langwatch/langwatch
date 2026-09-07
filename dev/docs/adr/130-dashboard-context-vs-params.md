@@ -1,4 +1,4 @@
-# ADR-129: Dashboard Context vs. Params
+# ADR-130: Dashboard Context vs. Params
 
 **Date:** 2026-09-03
 

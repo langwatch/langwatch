@@ -4,7 +4,7 @@
 --
 -- Rename dashboard-widget reserved parameters to their namespaced form.
 --
--- See dev/docs/adr/129-dashboard-context-vs-params.md: widget author code
+-- See dev/docs/adr/130-dashboard-context-vs-params.md: widget author code
 -- (srcdocHtml / TSX) and the SQL strings inside a "dashboard_srcdoc" widget's
 -- "graph" jsonb used the reserved names `period_start`, `period_end`,
 -- `period_granularity_seconds`, `LW.params.timeWindow`,
