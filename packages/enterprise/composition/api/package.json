@@ -124,6 +124,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/enterprise": "workspace:*",
+    "@langwatch/enterprise-audit-log-server": "workspace:*",
     "@langwatch/enterprise-billing-server": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-governance-server": "workspace:*",

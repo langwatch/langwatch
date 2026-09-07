@@ -426,6 +426,10 @@ import {
   LoggedApiScimAbsence,
   type ApiScimRestPorts,
 } from "./api-scim.composition.ts";
+import {
+  composeApiEnterpriseAudit,
+  LoggedApiEnterpriseAuditAbsence,
+} from "./api-enterprise-audit.composition.ts";
 import type { AuthCliDeviceFlowRestPorts, AuthRestPorts } from "@langwatch/auth-server";
 import type {
   GovernanceCliRestPorts,
@@ -624,6 +628,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     return new ApiProductionComposition(options);
   }
 
+  /**
+   * The audit trail this process records on, composed once and held.
+   */
+  private composedAudit: ApiAuditPort | undefined;
   private composedFeaturePorts: ApiOwnedRestFeaturePorts | undefined;
   private composedDatabase: ApiDatabaseInfrastructure | undefined;
   private composedEventing: ApiEventingInfrastructure | undefined;
@@ -906,7 +914,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.requestPolicy = ApiRequestPolicy.create({
       authentication: AuthSessionApiAuthenticationAdapter.create(auth.compose()),
       authorization: AuthzApiAuthorizationAdapter.create(authz),
-      audit: this.options.audit,
+      audit: this.resolveAudit(),
     });
     const agents = this.resolveAgents(options);
     this.resolveConnectedAgents(options, authz, tenancy, agents);
@@ -949,7 +957,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           // installation bills through Stripe, read from the one leaf that
           // already carries it rather than from a second of its own.
           saasBilling: options.config.infrastructure.modelProvider.isSaas,
-          audit: this.options.audit,
+          audit: this.resolveAudit(),
         }
       : undefined;
     // The execution features: the studio's own lifecycle, the optimization
@@ -1570,7 +1578,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       apiKeys: tenancy.apiKeys,
       authz,
       organizations: tenancy.organizations,
-      ...(this.options.audit ? { audit: this.options.audit } : {}),
+      audit: this.resolveAudit(),
     };
     const restSecurity: AppRestSecurity = ApiRestSecurity.create({
       ...credentials,
@@ -1793,7 +1801,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               targetId: string;
               args: Record<string, unknown>;
             }) => {
-              await this.options.audit?.record({
+              await this.resolveAudit().record({
                 actorId: entry.userId,
                 path: entry.action,
                 input: { projectId: entry.projectId, ...entry.args },
@@ -2140,7 +2148,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       modelProviders,
       // The SAME ceiling the framework chain installs on a declared policy.
       requireApiKeyPermission: (permission) => projectRestPolicy.permissionMiddleware(permission),
-      audit: this.options.audit,
+      audit: this.resolveAudit(),
       managementAudit: this.composeManagementAudit(),
       isSaas: this.composedIsSaas,
       instanceAdminKey: this.composedFeaturePorts?.instanceAdminKey ?? (() => undefined),
@@ -2839,7 +2847,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             null
         : undefined,
       authz,
-      audit: this.options.audit,
+      audit: this.resolveAudit(),
       // The SAME coding-agent application the `codingAgents.*` namespace reads,
       // so the install follow-up maps the branches this organization's own
       // sessions already named.
@@ -2850,15 +2858,34 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
+   * The audit trail every completed mutation on this process is recorded on.
+   *
+   * An injected trail wins, so a host that already holds one keeps it; otherwise this process
+   * composes its own over the connection it already opened. Composed ONCE and held, because
+   * every door here reads it and two trails would file the same action twice.
+   *
+   * The connection is read through a thunk rather than captured: this resolves while the
+   * request policy is being built, which is before the composition sequence reaches the
+   * database, and a trail that captured `undefined` then would record nothing for the life of
+   * the process.
+   */
+  private resolveAudit(): ApiAuditPort {
+    this.composedAudit ??=
+      this.options.audit ??
+      composeApiEnterpriseAudit({
+        prisma: () => this.composedDatabase?.connection.client,
+        report: LoggedApiEnterpriseAuditAbsence.create(createLogger("langwatch:api:audit")),
+      });
+    return this.composedAudit;
+  }
+
+  /**
    * Bridges the packaged families' management-audit port onto this process's
    * audit sink. The port names the action, not the URL, so the action is what
    * lands in `path` — it is the stable identifier of what was done.
    */
   private composeManagementAudit(): AppRestManagementAuditPort {
-    const audit = this.options.audit;
-    if (!audit) {
-      return () => {};
-    }
+    const audit = this.resolveAudit();
     const logger = createLogger("langwatch:api:management-audit");
     return (entry) => {
       void audit
@@ -3029,7 +3056,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
 
     this.composedApiKey = composeApiKeyFeature({
-      audit: this.options.audit,
+      audit: this.resolveAudit(),
       peers: { apiKeys: tenancy.apiKeys },
     });
   }
@@ -3543,7 +3570,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       }),
     );
     this.composedEnterprise = composeEnterpriseFeature({
-      audit: this.options.audit,
+      audit: this.resolveAudit(),
       ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
       // The seat allowances `/settings/members` asks about on every open. Answered whether or
       // not this deployment composed an Enterprise application, over the SAME plan provider and

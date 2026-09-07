@@ -112,3 +112,14 @@ export {
   type WebhookEndpointView,
   type WebhookEventsService,
 } from "@langwatch/enterprise-webhook-server";
+
+/**
+ * The audit trail every completed mutation is recorded on. Reached through this composition
+ * for the same reason the governance family is: an API-role process may depend on the
+ * Enterprise API composition and on no Enterprise feature server below it.
+ */
+export {
+  AuditLogAdapter,
+  type AuditLogRequestLike,
+  type LegacyAuditLogInput,
+} from "@langwatch/enterprise-audit-log-server";

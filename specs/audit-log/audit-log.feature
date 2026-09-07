@@ -72,6 +72,30 @@ Feature: Unified Audit Log
     Then an AuditLog row is written with action "gateway.cache_rule.created" and targetKind "cache_rule"
 
   # ──────────────────────────────────────────────────────────────────────────
+  # Write path — the process that records
+  # ──────────────────────────────────────────────────────────────────────────
+  #
+  # The interactive API process holds one audit trail and every door records
+  # through it. A deployment that composed none writes nothing at all, which is
+  # indistinguishable from a deployment where nobody did anything.
+
+  @unit
+  Scenario: A recorded mutation lands on the audit trail with the scopes it named
+    Given the API process opened its database
+    When a completed mutation is recorded
+    Then one row carries the actor, the action and the arguments
+    And the organization and project the row is filed under are taken from those
+      arguments, so a per-tenant reader finds the row at all
+
+  @unit
+  Scenario: The trail resolves its connection when a row is written, not when it is composed
+    Given the trail was composed before the process opened its database
+    When a mutation is recorded after the connection is open
+    Then the row is written through that connection
+    And a process that opened no database names the missing collaborator instead
+      of failing the call it was recording
+
+  # ──────────────────────────────────────────────────────────────────────────
   # Read path — /settings/audit-log shows merged stream
   # ──────────────────────────────────────────────────────────────────────────
   #
