@@ -27,16 +27,24 @@ from .helpers import Program, tracked_optimizer, valset_of
 
 
 class Posts:
-    """The step posts made so far, answered with `statuses` in order, then 200."""
+    """The step posts made so far, answered with `statuses` in order, then 200.
+
+    A status may also be an exception instance, which is raised instead of
+    answered — that is how a transport failure (timeout, refused connection)
+    looks to the caller, as opposed to an HTTP status.
+    """
 
     def __init__(self):
-        self.statuses: list[int] = []
+        self.statuses: list[int | Exception] = []
         self.bodies: list[list[dict]] = []
 
     def post(self, url, **kwargs):
         self.bodies.append(json.loads(kwargs["data"]))
+        answer = self.statuses.pop(0) if self.statuses else 200
+        if isinstance(answer, Exception):
+            raise answer
         return httpx.Response(
-            self.statuses.pop(0) if self.statuses else 200,
+            answer,
             request=httpx.Request("POST", url),
         )
 
@@ -75,6 +83,31 @@ class TestWhenTheStepPostFails:
             log_a_step("0")
 
         assert len(posts.bodies) == 3, "a 502 is retried before giving up"
+        assert [step.index for step in langwatch_dspy.steps_buffer] == ["0"]
+        assert "Could not log optimizer step 0" in caplog.text
+
+        log_a_step("1")
+
+        assert [step["index"] for step in posts.bodies[-1]] == ["0", "1"]
+        assert langwatch_dspy.steps_buffer == []
+
+    # @scenario "A network failure is retried and buffered like a server error"
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            httpx.ConnectError("connection refused"),
+            httpx.ReadTimeout("read operation timed out"),
+        ],
+        ids=["connect-error", "timeout"],
+    )
+    def test_retries_a_network_failure(self, posts, caplog, failure):
+        posts.statuses.extend([failure, failure, failure])
+
+        with caplog.at_level(logging.WARNING, logger="langwatch.dspy"):
+            log_a_step("0")
+
+        assert len(posts.bodies) == 3, "a transport failure is retried"
         assert [step.index for step in langwatch_dspy.steps_buffer] == ["0"]
         assert "Could not log optimizer step 0" in caplog.text
 

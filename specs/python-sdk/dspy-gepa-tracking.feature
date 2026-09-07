@@ -79,6 +79,13 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
     And the next log_step that gets through posts both steps
 
   @unit
+  Scenario: A network failure is retried and buffered like a server error
+    Given the connection to the platform times out or is refused
+    When log_step is called and the post fails after its retries
+    Then the evaluation the step reports is not failed by it
+    And the step stays in the buffer
+
+  @unit
   Scenario: A client error is a real answer, not a blip
     Given the platform answers 422 to the step post
     When log_step is called
