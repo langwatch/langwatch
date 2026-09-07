@@ -38,6 +38,7 @@
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "lucide-react": "^1.22.0"

@@ -56,12 +56,12 @@ export const PLAN_DISPUTES: readonly PlanDispute[] = Object.freeze([
       "Two Free plans exist and both are reachable: which answers depends on which source resolves first.",
     chosen: {
       states: "2 members, 0 lite, 50,000 messages per month, publishing allowed",
-      source: "packages/enterprise/features/billing/contract/src/plan-limits.ts:78",
+      source: "packages/plans/src/catalogue-data.ts:115",
     },
     alternatives: [
       {
         states: "1 member, 0 lite, 1,000 messages per month, publishing refused",
-        source: "packages/enterprise/features/licensing/contract/src/license-constants.ts:44",
+        source: "packages/plans/src/licensing.ts:237",
       },
     ],
   },
@@ -73,16 +73,16 @@ export const PLAN_DISPUTES: readonly PlanDispute[] = Object.freeze([
       "Pro is quoted below Free on volume, so the ladder, which sorts rungs by volume, can never place Pro above anything and never offers Free to Pro.",
     chosen: {
       states: "10,000 messages per month, 5 members",
-      source: "packages/enterprise/features/billing/contract/src/plan-limits.ts:93",
+      source: "packages/plans/src/catalogue-data.ts:178",
     },
     alternatives: [
       {
         states: "100,000 messages per month, 10 members",
-        source: "packages/enterprise/features/licensing/contract/src/license-plan-templates.ts:35",
+        source: "packages/plans/src/licensing.ts:136",
       },
       {
         states: "Free is 50,000 messages per month, above Pro",
-        source: "packages/enterprise/features/billing/contract/src/plan-limits.ts:79",
+        source: "packages/plans/src/catalogue-data.ts:125",
       },
     ],
   },
@@ -94,7 +94,7 @@ export const PLAN_DISPUTES: readonly PlanDispute[] = Object.freeze([
       "The pricing page quotes twice the volume the plan enforces, and nothing compares them.",
     chosen: {
       states: "100,000 messages per month",
-      source: "packages/enterprise/features/billing/contract/src/plan-limits.ts:126",
+      source: "packages/plans/src/catalogue-data.ts:203",
     },
     alternatives: [
       {
@@ -112,7 +112,7 @@ export const PLAN_DISPUTES: readonly PlanDispute[] = Object.freeze([
     chosen: {
       states:
         "per plan: Free 50, Pro 500, Launch 150, Accelerate 300, Growth 500, Enterprise 5,000",
-      source: "packages/enterprise/features/billing/contract/src/plan-limits.ts:83",
+      source: "packages/plans/src/catalogue-data.ts:115",
     },
     alternatives: [
       {

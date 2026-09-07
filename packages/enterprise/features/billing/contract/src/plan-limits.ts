@@ -1,175 +1,51 @@
-import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import { GROWTH_SEAT_PLAN_TYPES, type PlanTypes as PlanType, PlanTypes } from "./plan-types.ts";
+import {
+  planCatalogue,
+  quotedLimitsOfPlan,
+  UNLIMITED_MESSAGES as NO_MESSAGE_CAP,
+} from "@langwatch/plans";
+import { type PlanTypes as PlanType, PlanTypes } from "./plan-types.ts";
 
 /**
  * Sentinel value representing no message cap.
  * When a limit is set to this value, it means there is no limit.
  */
-export const UNLIMITED_MESSAGES = 999_999_999;
+export const UNLIMITED_MESSAGES = NO_MESSAGE_CAP;
 
-const PAID_FEATURES = {
-  maxMembersLite: 9999,
-  canPublish: true,
-} as const;
+/**
+ * One catalogue plan, in the field names a resolved plan is quoted under.
+ * Nothing is decided here: every number, name and price is the catalogue's,
+ * and a plan a person sells is still billed as a subscription.
+ */
+function presetOf(type: PlanType): PlanInfo {
+  const plan = planCatalogue.plan(type);
 
-type PlanOverrides = Pick<
-  PlanInfo,
-  "type" | "name" | "maxMembers" | "maxMessagesPerMonth" | "prices"
-> &
-  Partial<Omit<PlanInfo, "free">>;
-
-const definePaidPlan = (overrides: PlanOverrides): PlanInfo => ({
-  planSource: "subscription",
-  free: false,
-  ...PAID_FEATURES,
-  ...overrides,
-});
-
-const withAnnualVariant = ({
-  basePlan,
-  type,
-  name,
-  prices,
-}: {
-  basePlan: PlanInfo;
-  type: PlanType;
-  name: string;
-  prices: PlanInfo["prices"];
-}): PlanInfo => ({
-  ...basePlan,
-  type,
-  name,
-  prices,
-});
-
-const LAUNCH_PLAN = definePaidPlan({
-  type: PlanTypes.LAUNCH,
-  name: "Launch",
-  maxMembers: 3,
-  maxMessagesPerMonth: 20_000,
-  automationDailyDispatchCeiling: 150,
-  prices: {
-    USD: 59,
-    EUR: 59,
-  },
-});
-
-const ACCELERATE_PLAN = definePaidPlan({
-  type: PlanTypes.ACCELERATE,
-  name: "Accelerate",
-  maxMembers: 5,
-  maxMessagesPerMonth: 20_000,
-  automationDailyDispatchCeiling: 300,
-  prices: {
-    USD: 199,
-    EUR: 199,
-  },
-});
+  return {
+    planSource: plan.free ? "free" : "subscription",
+    type: plan.type,
+    name: plan.name,
+    free: plan.free,
+    ...quotedLimitsOfPlan(plan),
+  };
+}
 
 export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
-  [PlanTypes.FREE]: {
-    planSource: "free",
-    type: PlanTypes.FREE,
-    name: "Free",
-    free: true,
-    // SaaS Free gets the 14-day content visibility window.
-    visibilityDays: FREE_VISIBILITY_DAYS,
-    maxMembers: 2,
-    maxMessagesPerMonth: 50_000,
-    maxMembersLite: 0,
-    canPublish: true,
-    // Matches the persist-cap service's own free-tier default.
-    automationDailyDispatchCeiling: 50,
-    prices: {
-      USD: 0,
-      EUR: 0,
-    },
-  },
-  [PlanTypes.PRO]: definePaidPlan({
-    type: PlanTypes.PRO,
-    name: "Pro",
-    maxMembers: 5,
-    maxMessagesPerMonth: 10_000,
-    // Legacy grandfathered tier, not on the self-serve ladder: kept at the
-    // paid-bucket value it already resolved to.
-    automationDailyDispatchCeiling: 500,
-    prices: {
-      USD: 99,
-      EUR: 99,
-    },
-  }),
-  [PlanTypes.LAUNCH]: LAUNCH_PLAN,
-  [PlanTypes.LAUNCH_ANNUAL]: withAnnualVariant({
-    basePlan: LAUNCH_PLAN,
-    type: PlanTypes.LAUNCH_ANNUAL,
-    name: "Launch Annual",
-    prices: {
-      USD: 649,
-      EUR: 649,
-    },
-  }),
-  [PlanTypes.ACCELERATE]: ACCELERATE_PLAN,
-  [PlanTypes.ACCELERATE_ANNUAL]: withAnnualVariant({
-    basePlan: ACCELERATE_PLAN,
-    type: PlanTypes.ACCELERATE_ANNUAL,
-    name: "Accelerate Annual",
-    prices: {
-      USD: 2199,
-      EUR: 2199,
-    },
-  }),
-  [PlanTypes.GROWTH]: definePaidPlan({
-    type: PlanTypes.GROWTH,
-    name: "Growth",
-    maxMembers: 10,
-    maxMessagesPerMonth: 100_000,
-    // The top self-serve rung: kept at the paid-bucket value the cap service
-    // already gave every non-free, non-enterprise plan.
-    automationDailyDispatchCeiling: 500,
-    prices: {
-      USD: 399,
-      EUR: 399,
-    },
-  }),
-  ...(Object.fromEntries(
-    GROWTH_SEAT_PLAN_TYPES.map((type) => [
-      type,
-      definePaidPlan({
-        type,
-        name: "Growth",
-        maxMembers: 20,
-        maxMessagesPerMonth: UNLIMITED_MESSAGES,
-        automationDailyDispatchCeiling: 500,
-        userPrice: { EUR: 29, USD: 32 },
-        prices: { USD: 0, EUR: 0 },
-      }),
-    ]),
-  ) as Record<(typeof GROWTH_SEAT_PLAN_TYPES)[number], PlanInfo>),
-  [PlanTypes.ENTERPRISE]: definePaidPlan({
-    type: PlanTypes.ENTERPRISE,
-    name: "Enterprise",
-    maxMembers: 1000,
-    maxMessagesPerMonth: 1_000_000,
-    // Stated here as well as in the licensing contract's tier map,
-    // and deliberately not in PAID_FEATURES, which every paid plan shares.
-    // The preset is what this plan sells; the tier map is the net that catches
-    // a contract resolved some other way, such as a license signed before the
-    // feature existed.
-    webhookEndpointsEnabled: true,
-    // Matches the persist-cap service's own enterprise-tier default.
-    automationDailyDispatchCeiling: 5_000,
-    prices: {
-      USD: 999,
-      EUR: 999,
-    },
-  }),
+  [PlanTypes.FREE]: presetOf(PlanTypes.FREE),
+  [PlanTypes.PRO]: presetOf(PlanTypes.PRO),
+  [PlanTypes.LAUNCH]: presetOf(PlanTypes.LAUNCH),
+  [PlanTypes.LAUNCH_ANNUAL]: presetOf(PlanTypes.LAUNCH_ANNUAL),
+  [PlanTypes.ACCELERATE]: presetOf(PlanTypes.ACCELERATE),
+  [PlanTypes.ACCELERATE_ANNUAL]: presetOf(PlanTypes.ACCELERATE_ANNUAL),
+  [PlanTypes.GROWTH]: presetOf(PlanTypes.GROWTH),
+  [PlanTypes.GROWTH_SEAT_EUR_MONTHLY]: presetOf(PlanTypes.GROWTH_SEAT_EUR_MONTHLY),
+  [PlanTypes.GROWTH_SEAT_EUR_ANNUAL]: presetOf(PlanTypes.GROWTH_SEAT_EUR_ANNUAL),
+  [PlanTypes.GROWTH_SEAT_USD_MONTHLY]: presetOf(PlanTypes.GROWTH_SEAT_USD_MONTHLY),
+  [PlanTypes.GROWTH_SEAT_USD_ANNUAL]: presetOf(PlanTypes.GROWTH_SEAT_USD_ANNUAL),
+  [PlanTypes.ENTERPRISE]: presetOf(PlanTypes.ENTERPRISE),
 };
 
 /**
- * Returns the FREE plan limits for any organization.
- *
- * All free-tier organizations get 50,000 messages/month regardless of pricing
- * model.
+ * The FREE plan limits for any organization. Every free-tier organization gets
+ * the same monthly volume regardless of pricing model.
  */
 export const getFreePlanLimits = (): PlanInfo => PLAN_LIMITS[PlanTypes.FREE];

@@ -1,11 +1,11 @@
 import {
   LicenseGenerationCapability,
   buildMintedPlan,
-  getPlanTemplate,
   type GenerateLicenseInput,
   type GenerateLicenseOutput,
   type LicenseData,
 } from "@langwatch/enterprise-licensing-contract";
+import { getPlanTemplate, quotedPlanLimits } from "@langwatch/plans";
 import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
 
 /**
@@ -60,10 +60,12 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
       plan: buildMintedPlan({
         type: template.type,
         name: template.name,
-        maxMembers: seats,
-        maxMembersLite: maxMembersLite ?? template.maxMembersLite,
-        maxMessagesPerMonth: maxMessagesPerMonth ?? template.maxMessagesPerMonth,
-        canPublish: template.canPublish,
+        ...quotedPlanLimits({
+          members: seats,
+          membersLite: maxMembersLite ?? template.maxMembersLite,
+          messagesPerMonth: maxMessagesPerMonth ?? template.maxMessagesPerMonth,
+          publish: template.canPublish,
+        }),
         webhookEndpointsEnabled: template.webhookEndpointsEnabled,
         usageUnit: template.usageUnit,
       }),

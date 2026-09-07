@@ -4,6 +4,7 @@
  * the payment-success sync that reconciles quantities, retention and the seat policy.
  */
 import { createLogger } from "@langwatch/observability";
+import { planQuantities, planQuantitiesOf } from "@langwatch/plans";
 import type Stripe from "stripe";
 import {
   isGrowthEventsPrice,
@@ -188,8 +189,7 @@ export class BillingSubscriptionLifecycleService {
     const { usersQuantity, tracesQuantity } = this.quantitiesOf({ subscription, existing });
     const updatedSubscription = await this.subscriptionRepository.tryUpdateQuantities({
       id: existing.id,
-      maxMembers: usersQuantity,
-      maxMessagesPerMonth: tracesQuantity,
+      ...planQuantities({ members: usersQuantity, messagesPerMonth: tracesQuantity }),
     });
     if (!updatedSubscription) {
       return;
@@ -211,8 +211,7 @@ export class BillingSubscriptionLifecycleService {
           plan: updatedSubscription.plan,
           subscriptionId: updatedSubscription.id,
           startDate: updatedSubscription.startDate,
-          maxMembers: updatedSubscription.maxMembers,
-          maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+          ...planQuantitiesOf(updatedSubscription),
         }),
     });
   }
@@ -324,8 +323,7 @@ export class BillingSubscriptionLifecycleService {
             plan: updatedSubscription.plan,
             subscriptionId: updatedSubscription.id,
             startDate: updatedSubscription.startDate,
-            maxMembers: updatedSubscription.maxMembers,
-            maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+            ...planQuantitiesOf(updatedSubscription),
           }),
       });
 

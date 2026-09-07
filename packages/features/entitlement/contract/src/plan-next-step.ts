@@ -1,3 +1,4 @@
+import { planNextStepCeilingsShape } from "@langwatch/plans";
 import { z } from "zod";
 
 /**
@@ -26,10 +27,7 @@ export const planNextStepSchema = z.discriminatedUnion("kind", [
     monthlyPrice: z.number().nonnegative(),
     currency: z.enum(["USD", "EUR"]),
     pricedPerSeat: z.boolean(),
-    maxMessagesPerMonth: z.number().int().positive(),
-    maxMembers: z.number().int().positive(),
-    /** Confirmed matches a day one automation may act on, on this rung. */
-    automationDailyDispatchCeiling: z.number().int().positive(),
+    ...planNextStepCeilingsShape,
   }),
   z.object({ kind: z.literal("account_team") }),
   z.object({ kind: z.literal("none") }),

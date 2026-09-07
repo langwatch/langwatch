@@ -17,6 +17,26 @@ export {
   type PlanGates,
 } from "./gates.ts";
 export {
+  CLOUD_FREE_LICENSING_PLAN,
+  ENTERPRISE_TEMPLATE,
+  generatableLimitsShape,
+  getPlanTemplate,
+  GROWTH_TEMPLATE,
+  licenseResourceCounts,
+  licenseResourceLimitsShape,
+  licenseSeats,
+  licenseSeatsShape,
+  mintablePlanLimitsSchema,
+  OPEN_SOURCE_LICENSING_PLAN,
+  planPublishing,
+  planPublishingShape,
+  PRO_TEMPLATE,
+  templateFormDefaults,
+  type LicensePlanTemplate,
+  type LicenseResourceCounts,
+  type LicensingQuotedPlan,
+} from "./licensing.ts";
+export {
   LIMIT_NAMES,
   LIMIT_UNITS,
   limitUnitSchema,
@@ -54,3 +74,19 @@ export {
   type PlanType,
   type PricingModel,
 } from "./plan-type.ts";
+export {
+  planDispatchCeilingsShape,
+  planNextStepCeilingsOf,
+  planNextStepCeilingsShape,
+  planPricesShape,
+  planQuantities,
+  planQuantitiesOf,
+  planSeatsAndVolume,
+  planSeatsAndVolumeShape,
+  quotedLimitsOfPlan,
+  quotedPlanLimits,
+  quotedPlanLimitsOf,
+  type PlanNextStepCeilings,
+  type PlanSeatsAndVolume,
+  type QuotedPlanLimits,
+} from "./quoted-plan.ts";

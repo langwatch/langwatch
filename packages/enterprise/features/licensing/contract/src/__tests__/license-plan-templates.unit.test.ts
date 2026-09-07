@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LIMIT } from "../index.ts";
-import { ENTERPRISE_TEMPLATE, GROWTH_TEMPLATE, getPlanTemplate, PRO_TEMPLATE } from "../index.ts";
+import {
+  ENTERPRISE_TEMPLATE,
+  getPlanTemplate,
+  GROWTH_TEMPLATE,
+  PRO_TEMPLATE,
+} from "@langwatch/plans";
 
 describe("PRO_TEMPLATE", () => {
   it("has type PRO", () => {

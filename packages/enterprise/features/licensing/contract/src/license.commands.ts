@@ -1,3 +1,4 @@
+import { generatableLimitsShape } from "@langwatch/plans";
 import { z } from "zod";
 import { licenseDataSchema } from "./license.ts";
 
@@ -18,9 +19,7 @@ export const generateLicenseInputSchema = z.object({
   organizationName: z.string(),
   email: z.email(),
   planType: z.string().min(1),
-  maxMembers: z.number(),
-  maxMembersLite: z.number().optional(),
-  maxMessagesPerMonth: z.number().optional(),
+  ...generatableLimitsShape,
   expiresAt: z.date().optional(),
   privateKey: z.string().min(1),
   now: z.date().optional(),

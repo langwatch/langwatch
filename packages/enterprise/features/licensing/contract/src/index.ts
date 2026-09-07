@@ -8,7 +8,6 @@ export * from "./license-plan-defaults.ts";
 export * from "./license-plan-entitlements.ts";
 export * from "./license-plan-floor.ts";
 export * from "./license-plan-mapping.ts";
-export * from "./license-plan-templates.ts";
 export * from "./license.commands.ts";
 export * from "./license.errors.ts";
 export * from "./license.queries.ts";

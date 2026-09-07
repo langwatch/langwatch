@@ -4,6 +4,7 @@ import {
   type PlanNextStep,
   type PricingModel,
 } from "@langwatch/entitlement-contract";
+import { planNextStepCeilingsOf } from "@langwatch/plans";
 import type { PlanCataloguePort } from "../ports/plan-catalogue.port.ts";
 
 /**
@@ -65,9 +66,7 @@ export class PlanNextStepService {
       monthlyPrice: above.monthlyPrice[currency],
       currency,
       pricedPerSeat: above.pricedPerSeat,
-      maxMessagesPerMonth: above.maxMessagesPerMonth,
-      maxMembers: above.maxMembers,
-      automationDailyDispatchCeiling: above.automationDailyDispatchCeiling,
+      ...planNextStepCeilingsOf(above),
     };
   }
 }

@@ -1,3 +1,4 @@
+import { quotedPlanLimitsOf } from "@langwatch/plans";
 import type { LicenseData } from "./license.ts";
 import { resolvePlanDefaults } from "./license-plan-defaults.ts";
 import type { PlanInfo } from "./license-plan.ts";
@@ -11,10 +12,7 @@ export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
     name: resolved.name,
     free: false, // Paid license = not a free tier
     overrideAddingLimitations: false, // Enforce limits, don't bypass
-    maxMembers: resolved.maxMembers,
-    maxMembersLite: resolved.maxMembersLite,
-    maxMessagesPerMonth: resolved.maxMessagesPerMonth,
-    canPublish: resolved.canPublish,
+    ...quotedPlanLimitsOf(resolved),
     webhookEndpointsEnabled: resolved.webhookEndpointsEnabled,
     usageUnit: resolved.usageUnit,
     prices: {

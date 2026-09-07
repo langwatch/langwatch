@@ -11,6 +11,7 @@ import {
   type RemoveLicenseResult,
   type StoreLicenseResult,
 } from "@langwatch/enterprise-licensing-contract";
+import { licenseResourceCounts } from "@langwatch/plans";
 import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
 import type { LicenseLoggerPort } from "../ports/license-logger.port.ts";
 import type { LicenseRetentionPort } from "../ports/license-retention.port.ts";
@@ -235,14 +236,11 @@ export class LicenseService extends LicensingServiceContract {
       messagesPromise,
     ]);
 
-    return {
-      currentMembers,
-      maxMembers: resolved.maxMembers,
-      currentMembersLite,
-      maxMembersLite: resolved.maxMembersLite,
-      currentMessagesPerMonth,
-      maxMessagesPerMonth: resolved.maxMessagesPerMonth,
-    };
+    return licenseResourceCounts({
+      members: { current: currentMembers, max: resolved.maxMembers },
+      membersLite: { current: currentMembersLite, max: resolved.maxMembersLite },
+      messagesPerMonth: { current: currentMessagesPerMonth, max: resolved.maxMessagesPerMonth },
+    });
   }
 
   private inspectPlatformLicense(

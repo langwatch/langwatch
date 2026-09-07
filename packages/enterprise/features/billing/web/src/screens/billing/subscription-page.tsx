@@ -29,6 +29,7 @@ import { OrganizationUserRole, PricingModel, TeamUserRole } from "../../model/pr
 import { LabeledSwitch } from "../../ui/elements/labeled-switch.tsx";
 import { Link } from "../../ui/elements/link.tsx";
 import { CONTACT_SALES_URL, type MemberType } from "@langwatch/enterprise-licensing-contract";
+import { planSeatsAndVolume } from "@langwatch/plans";
 import { useBillingPricing } from "../../behavior/use-billing-pricing.ts";
 import {
   type BillingInterval,
@@ -321,11 +322,13 @@ export function SubscriptionPage() {
   const currentPlanFeatures = isEnterprisePlan
     ? buildEnterprisePlanFeatures(plan)
     : isLicenseOverride || isTieredLegacyPaidPlan
-      ? buildPlanCapabilities({
-          maxMembers: plan?.maxMembers ?? 0,
-          maxMessagesPerMonth: plan?.maxMessagesPerMonth ?? 0,
-          maxMembersLite: plan?.maxMembersLite ?? 0,
-        })
+      ? buildPlanCapabilities(
+          planSeatsAndVolume({
+            members: plan?.maxMembers ?? 0,
+            membersLite: plan?.maxMembersLite ?? 0,
+            messagesPerMonth: plan?.maxMessagesPerMonth ?? 0,
+          }),
+        )
       : isDeveloperPlan
         ? DEVELOPER_FEATURES
         : getGrowthFeatures(effectiveCurrency);

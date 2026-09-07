@@ -1,3 +1,4 @@
+import { CLOUD_FREE_LICENSING_PLAN, OPEN_SOURCE_LICENSING_PLAN, UNLIMITED } from "@langwatch/plans";
 import type { PlanInfo } from "./license-plan.ts";
 
 export const LICENSING_FEATURE_ID = "licensing" as const;
@@ -11,7 +12,7 @@ export const DEFAULT_LICENSE_PURCHASE_URL = "https://buy.stripe.com/dRm3cwaIDgXs
  * Infinity for JSON serialization safety. Note: Infinity cannot be serialized to JSON (becomes
  * null), so we use Number.MAX_SAFE_INTEGER which is serializable and effectively unlimited.
  */
-export const DEFAULT_LIMIT = Number.MAX_SAFE_INTEGER;
+export const DEFAULT_LIMIT = UNLIMITED;
 
 /**
  * Default value for maxMembersLite when not specified in license.
@@ -38,61 +39,20 @@ export const LICENSE_ERRORS = {
 
 export type LicenseError = (typeof LICENSE_ERRORS)[keyof typeof LICENSE_ERRORS];
 
-/** Cloud free tier resource limits - designed for individual evaluation/POC use */
-const FREE_TIER_LIMITS = {
-  /** Single operator model */
-  MEMBERS: 1,
-  /** Members Lite requires paid plan */
-  MEMBERS_LITE: 0,
-  /** ~33 messages per day */
-  MESSAGES_PER_MONTH: 1_000,
-} as const;
-
 /**
  * UNLIMITED_PLAN: the plan a self-hosted deployment runs on without a license. A license sells
  * the Enterprise surface (SSO, SCIM, audit logs) and support, not permission to run the
  * software, so nothing the deployment stores on its own infrastructure is capped here.
  */
-export const UNLIMITED_PLAN: PlanInfo = {
-  planSource: "free",
-  type: "OPEN_SOURCE",
-  name: "Open Source",
-  free: true,
-  overrideAddingLimitations: true,
-  maxMembers: Number.MAX_SAFE_INTEGER,
-  maxMembersLite: Number.MAX_SAFE_INTEGER,
-  maxMessagesPerMonth: Number.MAX_SAFE_INTEGER,
-  canPublish: true,
-  usageUnit: "traces",
-  prices: {
-    USD: 0,
-    EUR: 0,
-  },
-};
+export const UNLIMITED_PLAN: PlanInfo = OPEN_SOURCE_LICENSING_PLAN;
 
 /**
  * FREE_PLAN: the Cloud free tier. Self-hosted deployments never land here. With no license, or
  * an expired or unreadable one, they resolve to UNLIMITED_PLAN.
  */
 export const FREE_PLAN: PlanInfo = {
-  planSource: "free",
-  type: "FREE",
-  name: "Free",
-  free: true,
+  ...CLOUD_FREE_LICENSING_PLAN,
   visibilityDays: FREE_VISIBILITY_DAYS,
-  overrideAddingLimitations: false,
-
-  maxMessagesPerMonth: FREE_TIER_LIMITS.MESSAGES_PER_MONTH,
-
-  maxMembers: FREE_TIER_LIMITS.MEMBERS,
-  maxMembersLite: FREE_TIER_LIMITS.MEMBERS_LITE,
-
-  canPublish: false,
-  usageUnit: "traces",
-  prices: {
-    USD: 0,
-    EUR: 0,
-  },
 };
 
 /**

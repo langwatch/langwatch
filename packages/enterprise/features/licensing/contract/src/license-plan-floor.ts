@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { planPublishing } from "@langwatch/plans";
 import { UNLIMITED_PLAN } from "./license-constants.ts";
 import type { PlanInfo } from "./license-plan.ts";
 
@@ -37,6 +38,6 @@ export function floorAtOssBaseline(plan: PlanInfo): PlanInfo {
   return {
     ...plan,
     maxMessagesPerMonth: Math.max(plan.maxMessagesPerMonth, UNLIMITED_PLAN.maxMessagesPerMonth),
-    canPublish: plan.canPublish || UNLIMITED_PLAN.canPublish,
+    ...planPublishing({ publish: plan.canPublish || UNLIMITED_PLAN.canPublish }),
   };
 }

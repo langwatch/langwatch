@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { licenseSeats, planPublishing } from "@langwatch/plans";
 import { DEFAULT_LIMIT } from "./license-constants.ts";
 import type { LicensePlanLimits } from "./license.ts";
 
@@ -54,12 +55,11 @@ export function buildMintedPlan({
   return {
     type,
     name,
-    maxMembers,
-    maxMembersLite,
+    ...licenseSeats({ members: maxMembers, membersLite: maxMembersLite }),
     maxProjects: DEFAULT_LIMIT,
     maxMessagesPerMonth,
     maxWorkflows: DEFAULT_LIMIT,
-    canPublish,
+    ...planPublishing({ publish: canPublish }),
     webhookEndpointsEnabled,
     usageUnit,
   };

@@ -37,6 +37,7 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
+import { mintablePlanLimitsSchema } from "@langwatch/plans";
 import { z } from "zod";
 import type { LicensingApp } from "#app/licensing.app";
 
@@ -80,27 +81,13 @@ type LicenseTrpcProcedures<
   unscopedPolicy: TrpcPolicyDecorator;
 }>;
 
-/**
- * Plan limits a minted license encodes: the enforced levers (member seats,
- * messages volume) plus identity. Projects, teams and experimentation
- * resources are OSS/uncapped and are not part of a license.
- */
-const planLimitsSchema = z.object({
-  maxMembers: z.number().int().positive("Plan limits must be positive numbers"),
-  maxMembersLite: z.number().int().positive("Plan limits must be positive numbers"),
-  maxMessagesPerMonth: z.number().int().positive("Plan limits must be positive numbers"),
-  canPublish: z.boolean(),
-  webhookEndpointsEnabled: z.boolean().optional(),
-  usageUnit: z.enum(["traces", "events"]),
-});
-
 const generateLicenseSchema = z.object({
   privateKey: z.string().min(1, "Private key is required"),
   organizationName: z.string().min(1, "Organization name is required"),
   email: z.string().email("Invalid email format"),
   expiresAt: z.date(),
   planType: z.enum(["PRO", "ENTERPRISE", "CUSTOM"]),
-  plan: planLimitsSchema,
+  plan: mintablePlanLimitsSchema,
 });
 
 const organizationScopeSchema = z.object({

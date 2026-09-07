@@ -1,6 +1,11 @@
 import { z } from "zod";
 import type { LicenseError } from "./license-constants.ts";
 import { planSchema } from "@langwatch/entitlement-contract";
+import {
+  licenseResourceLimitsShape,
+  licenseSeatsShape,
+  planPublishingShape,
+} from "@langwatch/plans";
 import type { PlanInfo } from "./license-plan.ts";
 
 /**
@@ -9,8 +14,7 @@ import type { PlanInfo } from "./license-plan.ts";
 export const licensePlanLimitsSchema = z.object({
   type: z.string(),
   name: z.string(),
-  maxMembers: z.number(),
-  maxMembersLite: z.number().optional(),
+  ...licenseSeatsShape,
   maxTeams: z.number().optional(),
   maxProjects: z.number().optional(),
   maxMessagesPerMonth: z.number(),
@@ -30,7 +34,7 @@ export const licensePlanLimitsSchema = z.object({
   maxDashboards: z.number().optional(),
   maxCustomGraphs: z.number().optional(),
   maxAutomations: z.number().optional(),
-  canPublish: z.boolean(),
+  ...planPublishingShape,
   // Webhook endpoints platform: optional so licenses signed before the
   // feature existed keep validating; absent means false.
   webhookEndpointsEnabled: z.boolean().optional(),
@@ -180,15 +184,6 @@ export type RemoveLicenseResult = {
   /** Always true on success. Throws OrganizationNotFoundError if org doesn't exist. */
   removed: true;
 };
-
-const licenseResourceLimitsShape = {
-  currentMembers: z.number(),
-  maxMembers: z.number(),
-  currentMembersLite: z.number(),
-  maxMembersLite: z.number(),
-  currentMessagesPerMonth: z.number(),
-  maxMessagesPerMonth: z.number(),
-} as const;
 
 const licenseMetadataShape = {
   plan: z.string(),

@@ -4,13 +4,13 @@
  */
 import {
   buildMintedPlan,
-  getPlanTemplate,
   licenseValidationError,
   limitTypes,
   type LicenseData,
   type LimitCheckResult,
   type LimitType,
 } from "@langwatch/enterprise-licensing-contract";
+import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
 import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
 import type { LicenseService } from "../services/license.service.ts";
 
@@ -141,10 +141,7 @@ export class LicensingApp {
       plan: buildMintedPlan({
         type: template?.type ?? input.planType,
         name: template?.name ?? input.planType,
-        maxMembers: input.plan.maxMembers,
-        maxMembersLite: input.plan.maxMembersLite,
-        maxMessagesPerMonth: input.plan.maxMessagesPerMonth,
-        canPublish: input.plan.canPublish,
+        ...quotedPlanLimitsOf(input.plan),
         webhookEndpointsEnabled: input.plan.webhookEndpointsEnabled,
         usageUnit: input.plan.usageUnit,
       }),

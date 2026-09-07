@@ -1,3 +1,4 @@
+import { planSeatsAndVolume } from "@langwatch/plans";
 import { DEFAULT_MEMBERS_LITE } from "./license-constants.ts";
 import type { LicensePlanLimits } from "./license.ts";
 
@@ -48,10 +49,12 @@ export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits
   return {
     type: plan.type,
     name: plan.name,
-    maxMembers: plan.maxMembers,
-    maxMessagesPerMonth: plan.maxMessagesPerMonth,
+    ...planSeatsAndVolume({
+      members: plan.maxMembers,
+      membersLite: plan.maxMembersLite ?? DEFAULT_MEMBERS_LITE,
+      messagesPerMonth: plan.maxMessagesPerMonth,
+    }),
     canPublish: plan.canPublish,
-    maxMembersLite: plan.maxMembersLite ?? DEFAULT_MEMBERS_LITE,
     webhookEndpointsEnabled: plan.webhookEndpointsEnabled,
     usageUnit: KNOWN_USAGE_UNITS.includes(plan.usageUnit as (typeof KNOWN_USAGE_UNITS)[number])
       ? (plan.usageUnit ?? "traces")

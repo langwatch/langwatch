@@ -1,4 +1,4 @@
-import { ENTERPRISE_TEMPLATE, PRO_TEMPLATE } from "@langwatch/enterprise-licensing-contract";
+import { ENTERPRISE_TEMPLATE, PRO_TEMPLATE, templateFormDefaults } from "@langwatch/plans";
 
 export type PlanType = "PRO" | "ENTERPRISE" | "CUSTOM";
 
@@ -28,19 +28,11 @@ export interface PlanFormDefaults {
  */
 export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
   PRO: {
-    maxMembers: PRO_TEMPLATE.maxMembers,
-    maxMembersLite: PRO_TEMPLATE.maxMembersLite,
-    maxMessagesPerMonth: PRO_TEMPLATE.maxMessagesPerMonth,
-    canPublish: PRO_TEMPLATE.canPublish,
-    webhookEndpointsEnabled: PRO_TEMPLATE.webhookEndpointsEnabled,
+    ...templateFormDefaults(PRO_TEMPLATE),
     usageUnit: PRO_TEMPLATE.usageUnit as "traces" | "events",
   },
   ENTERPRISE: {
-    maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
-    maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite,
-    maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-    canPublish: ENTERPRISE_TEMPLATE.canPublish,
-    webhookEndpointsEnabled: ENTERPRISE_TEMPLATE.webhookEndpointsEnabled,
+    ...templateFormDefaults(ENTERPRISE_TEMPLATE),
     usageUnit: ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events",
   },
   CUSTOM: {},

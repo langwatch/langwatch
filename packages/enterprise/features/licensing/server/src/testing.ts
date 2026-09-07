@@ -4,10 +4,13 @@
  * License generation logic stays in lw-saas only.
  */
 import type { LicenseData } from "@langwatch/enterprise-licensing-contract";
+import { planQuantities } from "@langwatch/plans";
 
 /**
- * Base license data template - PRO plan.
- * Used for reference in tests to know expected values.
+ * Base license data template - PRO plan. Used for reference in tests to know
+ * expected values. The numbers are pinned to `VALID_LICENSE_KEY` below, which
+ * was signed over them, so they are not the catalogue's PRO plan and cannot
+ * be read from it.
  */
 export const BASE_LICENSE: LicenseData = {
   licenseId: "lic-001",
@@ -19,9 +22,8 @@ export const BASE_LICENSE: LicenseData = {
   plan: {
     type: "PRO",
     name: "Pro",
-    maxMembers: 5,
+    ...planQuantities({ members: 5, messagesPerMonth: 50000 }),
     maxProjects: 10,
-    maxMessagesPerMonth: 50000,
     evaluationsCredit: 100,
     maxWorkflows: 25,
     maxPrompts: 25,
@@ -44,9 +46,8 @@ export const ENTERPRISE_LICENSE: LicenseData = {
   plan: {
     type: "ENTERPRISE",
     name: "Enterprise",
-    maxMembers: 100,
+    ...planQuantities({ members: 100, messagesPerMonth: 10000000 }),
     maxProjects: 500,
-    maxMessagesPerMonth: 10000000,
     evaluationsCredit: 10000,
     maxWorkflows: 1000,
     maxPrompts: 1000,

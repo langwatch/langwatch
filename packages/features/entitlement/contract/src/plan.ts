@@ -1,3 +1,8 @@
+import {
+  planDispatchCeilingsShape,
+  planPricesShape,
+  planSeatsAndVolumeShape,
+} from "@langwatch/plans";
 import { z } from "zod";
 
 export const planSourceSchema = z.enum(["license", "subscription", "free"]);
@@ -16,17 +21,11 @@ export const planSchema = z.object({
   trialDays: z.number().optional(),
   daysSinceCreation: z.number().optional(),
   overrideAddingLimitations: z.boolean().optional(),
-  maxMembers: z.number(),
-  maxMembersLite: z.number(),
-  maxMessagesPerMonth: z.number(),
-  canPublish: z.boolean(),
+  ...planSeatsAndVolumeShape,
   webhookEndpointsEnabled: z.boolean().optional(),
-  maxTriggerPersistDispatchesPerDay: z.number().optional(),
-  automationDailyDispatchCeiling: z.number().optional(),
+  ...planDispatchCeilingsShape,
   usageUnit: z.string().optional(),
-  userPrice: moneyByCurrencySchema.optional(),
-  tracesPrice: moneyByCurrencySchema.optional(),
-  prices: moneyByCurrencySchema,
+  ...planPricesShape,
 });
 
 export type PlanSource = z.infer<typeof planSourceSchema>;

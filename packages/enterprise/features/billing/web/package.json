@@ -33,6 +33,7 @@
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-web": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",

@@ -16,7 +16,7 @@ import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Select } from "@langwatch/design-system/select";
 import { licensingApi } from "../../behavior/licensing-api.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
-import { ENTERPRISE_TEMPLATE } from "@langwatch/enterprise-licensing-contract";
+import { ENTERPRISE_TEMPLATE, quotedPlanLimitsOf, templateFormDefaults } from "@langwatch/plans";
 // A package that self-references through its own `exports` resolves at runtime
 // and not under `moduleResolution: "bundler"`, so the names this file already
 // shared with the package entry are reached by relative path.
@@ -83,11 +83,7 @@ const defaultFormData: FormData = {
   email: "",
   expiresAt: getDefaultExpirationDate(),
   planType: "ENTERPRISE",
-  maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
-  maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite ?? 50,
-  maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-  canPublish: ENTERPRISE_TEMPLATE.canPublish,
-  webhookEndpointsEnabled: ENTERPRISE_TEMPLATE.webhookEndpointsEnabled,
+  ...templateFormDefaults(ENTERPRISE_TEMPLATE),
   usageUnit: (ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events") ?? "events",
 };
 
@@ -236,10 +232,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         expiresAt: new Date(formData.expiresAt),
         planType: formData.planType,
         plan: {
-          maxMembers: formData.maxMembers,
-          maxMembersLite: formData.maxMembersLite,
-          maxMessagesPerMonth: formData.maxMessagesPerMonth,
-          canPublish: formData.canPublish,
+          ...quotedPlanLimitsOf(formData),
           webhookEndpointsEnabled: !!formData.webhookEndpointsEnabled,
           usageUnit: formData.usageUnit,
         },
