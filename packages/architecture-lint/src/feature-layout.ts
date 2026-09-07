@@ -2,6 +2,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files.ts";
+import { readFeatureCatalogue } from "./feature-catalogue.ts";
 import { lintFeatureAppContracts } from "./feature-app-contract.ts";
 import {
   CONTRACT_ARTIFACT,
@@ -658,7 +659,9 @@ export function lintFeatureLayouts(
 
     return resolver;
   };
-  violations.push(...lintFeatureAppContracts(packages, getResolver()));
+  violations.push(
+    ...lintFeatureAppContracts(root, readFeatureCatalogue(root, []), packages, getResolver()),
+  );
 
   for (const pkg of packages) {
     if (pkg.layoutVersion !== 0) continue;
