@@ -35,6 +35,10 @@ import { describe, expect, it } from "vitest";
 import { projectRoutes } from "~/utils/routes";
 
 const MAIN_MENU_PATH = path.join(__dirname, "../components/MainMenu.tsx");
+const SETTINGS_MENU_PATH = path.join(
+  __dirname,
+  "../features/navigation/useSettingsMenu.ts",
+);
 const ROUTES_PATH = path.join(__dirname, "../routes.tsx");
 
 /** The pattern the router falls back to when nothing else claims a path. */
@@ -46,10 +50,16 @@ const CATCH_ALL = "*";
  */
 const SAMPLE_SEGMENT = "sample";
 
-/** Absolute-path `href="..."` literals in the menu, in source order. */
+/** Absolute-path `href` literals in the sidebar and settings menus, in source order. */
 function menuHrefLiterals(): string[] {
-  const source = readFileSync(MAIN_MENU_PATH, "utf-8");
-  return [...source.matchAll(/href="(\/[^"]*)"/g)].map((m) => m[1]!);
+  const sources = [
+    readFileSync(MAIN_MENU_PATH, "utf-8"),
+    readFileSync(SETTINGS_MENU_PATH, "utf-8"),
+  ];
+  return sources.flatMap((source) => [
+    ...[...source.matchAll(/href="(\/[^"]*)"/g)].map((m) => m[1]!),
+    ...[...source.matchAll(/href:\s*"(\/[^"]*)"/g)].map((m) => m[1]!),
+  ]);
 }
 
 /**

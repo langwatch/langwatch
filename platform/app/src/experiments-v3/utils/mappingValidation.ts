@@ -247,6 +247,19 @@ export const getTargetMissingMappings = (
     "agentType" in target &&
     target.agentType === "http";
 
+  // A connected agent declares the turn it reads plus the parameters of its
+  // own function. Every parameter carries the function's default, so only the
+  // turn has to be mapped for the column to run.
+  const isConnectedAgent =
+    target.type === "agent" &&
+    "agentType" in target &&
+    target.agentType === "connected";
+  const optionalInputIds = new Set(
+    inputs
+      .filter((input) => "optional" in input && input.optional)
+      .map((input) => input.identifier),
+  );
+
   // Evaluator targets use requiredFields/optionalFields from AVAILABLE_EVALUATORS
   const isEvaluatorTarget = target.type === "evaluator";
 
@@ -370,6 +383,10 @@ export const getTargetMissingMappings = (
   for (const fieldId of usedFields) {
     // Skip if not in inputs list - user hasn't defined this variable
     if (!inputIds.has(fieldId)) continue;
+
+    // An unmapped parameter of a connected agent is not a gap: the function
+    // applies its own default for it.
+    if (isConnectedAgent && optionalInputIds.has(fieldId)) continue;
 
     const hasMapping = datasetMappings[fieldId] !== undefined;
 

@@ -1,9 +1,10 @@
 /**
- * The three actions of the run dialog: leave it, write the target down, or
- * queue the run.
+ * The two actions of the run dialog: leave it, or queue the run.
  *
  * Only the run is solid: it is the one thing the dialog is open for, and it
- * names how many test cases it starts.
+ * names how many scenarios it starts. A run plan is a name and a
+ * configuration, and running is what writes both down, so there is nothing to
+ * save on its own.
  *
  * @see specs/features/agent-testing/run-dialog.feature
  */
@@ -11,30 +12,69 @@
 import { Box, chakra } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { Dialog } from "~/components/ui/dialog";
+import { Tooltip } from "~/components/ui/tooltip";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { RunDialogController } from "./useRunDialogSubmit";
 
-/** What the run control reads, given how many cases the subject covers. */
-export function runButtonLabel(caseCount: number | null): string {
+/**
+ * What the run control reads, given how many scenarios the subject covers
+ * and, in a comparison, how many targets it goes against.
+ */
+export function runButtonLabel({
+  caseCount,
+  targetCount,
+}: {
+  caseCount: number | null;
+  targetCount: number;
+}): string {
   if (caseCount === null) return "Run";
-  return caseCount === 1 ? "Run 1 case" : `Run ${caseCount} cases`;
+  const scenarios =
+    caseCount === 1 ? "Run 1 scenario" : `Run ${caseCount} scenarios`;
+  return targetCount > 1 ? `${scenarios} × ${targetCount} targets` : scenarios;
 }
 
 export function RunDialogFooter({
   controller,
-  hasTarget,
   isRunBlocked,
   caseCount,
+  targetCount,
+  blockedReason,
+  warning,
+  onRun,
   onClose,
 }: {
   controller: RunDialogController;
-  hasTarget: boolean;
   isRunBlocked: boolean;
-  /** How many test cases the run covers, or nothing when it is not known. */
+  /** How many scenarios the run covers, or nothing when it is not known. */
   caseCount: number | null;
+  /** How many targets the run goes against. */
+  targetCount: number;
+  /** Why the run cannot start, when it cannot. Shown as the button tooltip. */
+  blockedReason: string | null;
+  /**
+   * What Run does first instead of running, when something holds it: the
+   * button stays enabled and says so over the pointer.
+   */
+  warning?: string | null;
+  /** What Run does. Defaults to queueing the run. */
+  onRun?: () => void;
   onClose: () => void;
 }) {
+  const runButton = (
+    <SmallButton
+      variant="solid"
+      colorPalette="blue"
+      disabled={isRunBlocked}
+      loading={controller.isBusy}
+      onClick={onRun ?? (() => void controller.run())}
+      data-testid="run-dialog-run"
+      data-warning={warning ?? undefined}
+    >
+      <Play size={13} />
+      {runButtonLabel({ caseCount, targetCount })}
+    </SmallButton>
+  );
   return (
     <Dialog.Footer
       borderTopWidth="1px"
@@ -61,26 +101,24 @@ export function RunDialogFooter({
       >
         Cancel
       </chakra.button>
-      <SmallButton
-        disabled={!hasTarget || controller.isBusy}
-        loading={controller.isSaving}
-        onClick={() => void controller.save()}
-      >
-        Save
-      </SmallButton>
-      <SmallButton
-        variant="solid"
-        colorPalette="blue"
-        background={undefined}
-        borderColor="transparent"
-        disabled={isRunBlocked}
-        loading={controller.isRunning}
-        onClick={() => void controller.run()}
-        data-testid="run-dialog-run"
-      >
-        <Play size={13} />
-        {runButtonLabel(caseCount)}
-      </SmallButton>
+      {isRunBlocked && blockedReason ? (
+        <Tooltip content={blockedReason}>
+          {/* A disabled button never dispatches pointer events, which would
+              keep the tooltip from firing; wrap it in a span so the hover
+              still lands on something. */}
+          <Box as="span" display="inline-flex">
+            {runButton}
+          </Box>
+        </Tooltip>
+      ) : !isRunBlocked && warning ? (
+        <Tooltip content={warning}>
+          <Box as="span" display="inline-flex">
+            {runButton}
+          </Box>
+        </Tooltip>
+      ) : (
+        runButton
+      )}
     </Dialog.Footer>
   );
 }

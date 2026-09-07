@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -78,8 +79,52 @@ const (
 	// model_provider_not_bound, which is a provider the caller DID name.
 	ErrModelNotRecognized = herr.Code("model_not_recognized")
 	ErrProviderError      = herr.Code("provider_error")
-	ErrPayloadTooLarge    = herr.Code("payload_too_large")
-	ErrBadRequest         = herr.Code("bad_request")
+	// ErrProviderCredentialInvalid means the credentials configured for a
+	// model provider cannot produce an authenticated call at all — a Vertex
+	// service account that yields no OAuth token source, AWS credentials the
+	// signer cannot retrieve. The request never reaches the provider, so
+	// there is no upstream verdict to forward and no retry that can help:
+	// every credential in the chain fails the same way. Terminal and the
+	// customer's to fix, so it must not carry provider_timeout's retryable 504.
+	ErrProviderCredentialInvalid = herr.Code("provider_credential_invalid")
+	// ErrProviderCredentialRejected means the credential reached the provider
+	// and the provider refused it (401/403). Distinct from
+	// provider_credential_invalid, which never got that far: this one proves
+	// the credential is well-formed and says the account behind it is the
+	// problem — expired, revoked, or lacking permission for the operation.
+	//
+	// Reserved: no path emits it today. A provider that refuses a credential
+	// answers with a status, and errFromBifrost forwards every answered error
+	// verbatim before classification runs, so the 401/403 arrives as itself.
+	// Registered anyway (status, fault, remediation, presentation copy) so a
+	// path that does not forward — a pre-dispatch credential refresh, a plugin
+	// rejection — has a code to use without minting a new slug.
+	ErrProviderCredentialRejected = herr.Code("provider_credential_rejected")
+	// ErrProviderConfigInvalid means the provider slot is configured in a way
+	// that cannot serve THIS request: no key declares the requested model, a
+	// deployment map is missing, or the provider does not implement the
+	// operation. Terminal, and the remediation is in the customer's model
+	// provider settings rather than in the request.
+	ErrProviderConfigInvalid = herr.Code("provider_config_invalid")
+	// ErrProviderConnectionFailed means the request never got to the provider:
+	// DNS failure, connection refused, transport error. Retryable and the
+	// provider's (or the network's) fault, unlike the config and credential
+	// codes above, which repeat identically on every attempt.
+	//
+	// Deliberately not "provider_unreachable": that slug is already an app
+	// code, thrown when a credential CHECK finds nothing answering
+	// (providerValidation.ts), and its customer copy says the key was never
+	// checked. One slug cannot carry both meanings, and the copy for either
+	// would be wrong on the other's path.
+	ErrProviderConnectionFailed = herr.Code("provider_connection_failed")
+	// ErrRequestAbandoned means the caller disconnected or its deadline
+	// expired before the provider answered. It is a verdict about the caller,
+	// not about the credential: it must neither advance the fallback chain
+	// nor move the circuit breaker, or one client hanging up repeatedly would
+	// open the breaker on a healthy provider.
+	ErrRequestAbandoned = herr.Code("request_abandoned")
+	ErrPayloadTooLarge  = herr.Code("payload_too_large")
+	ErrBadRequest       = herr.Code("bad_request")
 	// ErrMissingModel is a request-shape error with its own stable identity so
 	// clients and rejection metrics do not have to infer it from prose.
 	ErrMissingModel    = herr.Code("missing_model")
@@ -134,3 +179,29 @@ const (
 // cache's own check are the same answer to the same person, and two copies of
 // it drift.
 const KeyExpiredMessage = "This key has expired. Extend its expiration date, or create a new key."
+
+// noFallbackError marks a dispatch error the engine has already declared
+// terminal for the whole credential chain, carrying that verdict to the
+// dispatcher without changing the error the client sees.
+type noFallbackError struct{ error }
+
+func (e noFallbackError) Unwrap() error { return e.error }
+
+// WithNoFallback marks err as one that must not advance the fallback chain.
+// Bifrost documents AllowFallbacks as nil-means-true, so a provider or plugin
+// setting it false is stating that no other credential will do better;
+// ignoring it spent the whole chain re-proving a failure already known to be
+// terminal. Returns err unchanged when err is nil.
+func WithNoFallback(err error) error {
+	if err == nil {
+		return nil
+	}
+	return noFallbackError{err}
+}
+
+// IsNoFallback reports whether err carries an explicit refusal to fail over to
+// another credential.
+func IsNoFallback(err error) bool {
+	var nf noFallbackError
+	return errors.As(err, &nf)
+}

@@ -36,7 +36,13 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
         updated_at (float):
         duration_in_ms (float):
         platform_url (str):
+        messages_truncated (bool | Unset): True when `messages` holds only the first few messages of a longer
+            conversation. Pass `include=messages` to read them all.
         total_cost (float | Unset):
+        note (None | str | Unset): One short line saying why the run was started, as given when it was queued. Null on a
+            run started without one. Absent on servers that predate run notes.
+        scenario_version (int | None | Unset): The version of the scenario at the moment the run was queued. Null on
+            runs recorded before versions existed. Absent on servers that predate scenario versions.
     """
 
     scenario_id: str
@@ -51,7 +57,10 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
     updated_at: float
     duration_in_ms: float
     platform_url: str
+    messages_truncated: bool | Unset = UNSET
     total_cost: float | Unset = UNSET
+    note: None | str | Unset = UNSET
+    scenario_version: int | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -92,7 +101,21 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
 
         platform_url = self.platform_url
 
+        messages_truncated = self.messages_truncated
+
         total_cost = self.total_cost
+
+        note: None | str | Unset
+        if isinstance(self.note, Unset):
+            note = UNSET
+        else:
+            note = self.note
+
+        scenario_version: int | None | Unset
+        if isinstance(self.scenario_version, Unset):
+            scenario_version = UNSET
+        else:
+            scenario_version = self.scenario_version
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -112,8 +135,14 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
                 "platformUrl": platform_url,
             }
         )
+        if messages_truncated is not UNSET:
+            field_dict["messagesTruncated"] = messages_truncated
         if total_cost is not UNSET:
             field_dict["totalCost"] = total_cost
+        if note is not UNSET:
+            field_dict["note"] = note
+        if scenario_version is not UNSET:
+            field_dict["scenarioVersion"] = scenario_version
 
         return field_dict
 
@@ -179,7 +208,27 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
 
         platform_url = d.pop("platformUrl")
 
+        messages_truncated = d.pop("messagesTruncated", UNSET)
+
         total_cost = d.pop("totalCost", UNSET)
+
+        def _parse_note(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        note = _parse_note(d.pop("note", UNSET))
+
+        def _parse_scenario_version(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        scenario_version = _parse_scenario_version(d.pop("scenarioVersion", UNSET))
 
         get_api_simulation_runs_by_scenario_run_id_response_200 = cls(
             scenario_id=scenario_id,
@@ -194,7 +243,10 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
             updated_at=updated_at,
             duration_in_ms=duration_in_ms,
             platform_url=platform_url,
+            messages_truncated=messages_truncated,
             total_cost=total_cost,
+            note=note,
+            scenario_version=scenario_version,
         )
 
         get_api_simulation_runs_by_scenario_run_id_response_200.additional_properties = d

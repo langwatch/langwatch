@@ -82,25 +82,48 @@ export interface PromptSummary {
   version?: number;
 }
 
-export interface PromptVersion {
-  version?: number;
-  commitMessage?: string;
-  model?: string;
-  messages?: Array<{ role: string; content: string }>;
+export interface PromptTag {
+  name: string;
+  versionId: string;
 }
 
-export interface PromptDetailResponse extends PromptSummary {
-  versions?: PromptVersion[];
+export type PromptFieldList = Array<{ identifier: string; type: string }>;
+
+/**
+ * A single versioned prompt payload. `GET /api/prompts/:id` returns the
+ * requested version's data flattened to the top level (merged with the base
+ * prompt data), and `GET /api/prompts/:id/versions` returns an array of
+ * entries in this same shape — there is no nested `versions` array on the
+ * detail response.
+ */
+export interface PromptVersion {
+  versionId?: string;
+  version?: number;
+  commitMessage?: string | null;
   model?: string;
+  /** Legacy single-text prompt body. */
+  prompt?: string;
   messages?: Array<{ role: string; content: string }>;
-  prompt?: Array<{ role: string; content: string }>;
+  temperature?: number;
+  maxTokens?: number;
+  responseFormat?: Record<string, unknown> | null;
+  /** Runtime parameters: an object map of name -> JSON value, not an array. */
+  parameters?: Record<string, unknown>;
+  inputs?: PromptFieldList;
+  outputs?: PromptFieldList;
+  /** All tags on the prompt; each names the version it currently points to. */
+  tags?: PromptTag[];
 }
+
+export interface PromptDetailResponse extends PromptSummary, PromptVersion {}
 
 export interface PromptMutationResponse {
   id?: string;
   handle?: string;
   name?: string;
   latestVersionNumber?: number;
+  versionId?: string;
+  tags?: string[];
 }
 
 // --- HTTP client ---
@@ -153,8 +176,10 @@ interface ParsedErrorBody {
 const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "provider"];
 
 /**
- * Parses an error response body as a handled-error envelope. Accepts both the
- * REST shape (`{ error: "<code>", message, tips?, docsUrl?, fault? }`) and the
+ * Parses an error response body as a handled-error envelope. Accepts three
+ * shapes: the canonical v1 envelope
+ * (`{ error: { type, code, message, meta?, trace_id } }`), the legacy REST
+ * shape (`{ error: "<code>", message, tips?, docsUrl?, fault? }`) and the
  * serialized tRPC shape (`{ code, message?, tips?, docsUrl?, fault?, ... }`).
  * Returns an empty object when the body is not a recognizable error envelope.
  */
@@ -164,7 +189,16 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       return {};
     }
-    const body = parsed as Record<string, unknown>;
+    const envelope = parsed as Record<string, unknown>;
+    // The canonical v1 envelope nests everything under `error`. Read the
+    // nested object as the body so one parser serves both generations.
+    const nested =
+      typeof envelope.error === "object" &&
+      envelope.error !== null &&
+      !Array.isArray(envelope.error)
+        ? (envelope.error as Record<string, unknown>)
+        : null;
+    const body = nested ?? envelope;
     // Prefer `code` (the domain discriminant) over `error` — the
     // packages/api unversioned envelope uses `error` for the HTTP status
     // text ("Not Found") while `code` holds the real code.
@@ -369,6 +403,16 @@ export async function getPrompt(
     "GET",
     `/api/prompts/${encodeURIComponent(idOrHandle)}${query}`
   ) as Promise<PromptDetailResponse>;
+}
+
+/** Lists all versions of a prompt (versioned data only). */
+export async function getPromptVersions(
+  idOrHandle: string
+): Promise<PromptVersion[]> {
+  return makeRequest(
+    "GET",
+    `/api/prompts/${encodeURIComponent(idOrHandle)}/versions`
+  ) as Promise<PromptVersion[]>;
 }
 
 /** Creates a new prompt. */

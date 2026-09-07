@@ -89,7 +89,7 @@ def _build_response(
 def sync_detailed(
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     Any
     | DeleteApiPromptsTagsByTagResponse400
@@ -124,7 +124,7 @@ def sync_detailed(
 def sync(
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     Any
     | DeleteApiPromptsTagsByTagResponse400
@@ -155,7 +155,7 @@ def sync(
 async def asyncio_detailed(
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     Any
     | DeleteApiPromptsTagsByTagResponse400
@@ -188,7 +188,7 @@ async def asyncio_detailed(
 async def asyncio(
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     Any
     | DeleteApiPromptsTagsByTagResponse400

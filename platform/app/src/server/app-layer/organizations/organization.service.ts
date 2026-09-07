@@ -41,11 +41,11 @@ import {
 } from "./errors";
 import type {
   AuditLogFilters,
+  BillingOrganizationLookup,
   CreateAndAssignResult,
   EnrichedAuditLog,
   FullyLoadedOrganization,
   MemberTeamBinding,
-  OrganizationForBilling,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
@@ -309,7 +309,7 @@ export class OrganizationService {
 
   async getOrganizationForBilling(
     organizationId: string,
-  ): Promise<OrganizationForBilling | null> {
+  ): Promise<BillingOrganizationLookup> {
     return this.repo.getOrganizationForBilling(organizationId);
   }
 

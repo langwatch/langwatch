@@ -1,13 +1,15 @@
 import chalk from "chalk";
+import type { SuiteFieldDefinition } from "@/client-sdk/services/test-suites";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags";
 import { createCliScenariosService } from "./cli-scenarios-service";
 import {
-  FolderReferenceError,
-  resolveFolderReference,
-} from "../suites/folders/resolveFolder";
+  resolveSuiteReference,
+  SuiteReferenceError,
+} from "../test-suites/resolveSuite";
 
 export const createScenarioCommand = async (
   name: string,
@@ -15,28 +17,40 @@ export const createScenarioCommand = async (
     situation: string;
     criteria?: string;
     labels?: string;
-    folder?: string;
+    testSuite?: string;
+    /** `--field identifier=value`, one per occurrence. */
+    field?: string[];
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  // The folder is resolved before anything is created, so a folder that names
-  // nothing leaves no half-filed scenario behind.
-  let folderId: string | undefined;
-  let folderName: string | undefined;
-  if (options.folder !== undefined) {
+  // The test suite is resolved before anything is created, so a reference that
+  // names nothing leaves no half-filed scenario behind. Its field definitions
+  // settle how each `--field` value is read.
+  let testSuiteId: string | undefined;
+  let testSuiteName: string | undefined;
+  let fieldDefinitions: SuiteFieldDefinition[] | undefined;
+  if (options.testSuite !== undefined) {
     try {
-      const folder = await resolveFolderReference({ reference: options.folder });
-      folderId = folder.id;
-      folderName = folder.name;
+      const testSuite = await resolveSuiteReference({
+        reference: options.testSuite,
+      });
+      testSuiteId = testSuite.id;
+      testSuiteName = testSuite.name;
+      fieldDefinitions = testSuite.fields ?? [];
     } catch (error) {
-      if (error instanceof FolderReferenceError) {
+      if (error instanceof SuiteReferenceError) {
         console.error(chalk.red(`Error: ${error.message}`));
         process.exit(1);
       }
       throw error;
     }
   }
+
+  const fields = parseScenarioFieldFlags({
+    pairs: options.field,
+    definitions: fieldDefinitions,
+  });
 
   const service = createCliScenariosService();
   const spinner = createSpinner(`Creating scenario "${name}"...`).start();
@@ -54,12 +68,13 @@ export const createScenarioCommand = async (
       situation: options.situation,
       criteria,
       labels,
-      ...(folderId !== undefined && { folderId }),
+      ...(testSuiteId !== undefined && { testSuiteId }),
+      ...(fields !== undefined && { fields }),
     });
 
     spinner.succeed(
-      folderName
-        ? `Created scenario "${chalk.cyan(scenario.name)}" in folder "${chalk.cyan(folderName)}" ${chalk.gray(`(id: ${scenario.id})`)}`
+      testSuiteName
+        ? `Created scenario "${chalk.cyan(scenario.name)}" in test suite "${chalk.cyan(testSuiteName)}" ${chalk.gray(`(id: ${scenario.id})`)}`
         : `Created scenario "${chalk.cyan(scenario.name)}" ${chalk.gray(`(id: ${scenario.id})`)}`,
     );
 

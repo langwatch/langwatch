@@ -25,7 +25,7 @@
  * much of it is handed back — and never about relaxing what the database will
  * do.
  *
- * @see ./provisioning.ts — the identity, the profile, and the key map
+ * @see ./provisioning/accessModel.ts — the identity, the profile, and the key map
  * @see ./capability.ts — the value sent as the tenant setting
  * @see specs/analytics/lwql-api.feature
  */
@@ -35,12 +35,20 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   isClickHouseObjectUnavailableError,
+  isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
+  unknownIdentifierFromError,
 } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { toError } from "~/utils/posthogErrorCapture";
-
-import { LangWatchQLUnavailableError } from "./errors";
-import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
+import {
+  type LangWatchQLConnection,
+  lwqlDerivedConnectionFromEnv,
+} from "./connection";
+import {
+  LangWatchQLUnavailableError,
+  LangWatchQLUnknownIdentifierError,
+} from "./errors";
+import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./limits";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
 
@@ -129,19 +137,6 @@ export interface LangWatchQLExecutor {
   close?(): Promise<void>;
 }
 
-/** How to reach the LangWatchQL schema as the restricted identity. */
-export interface LangWatchQLConnection {
-  /** ClickHouse HTTP endpoint. */
-  readonly url: string;
-  /** The restricted identity — never an administrative account. */
-  readonly username: string;
-  readonly password: string;
-  /** Database an unqualified table name resolves to, i.e. the LangWatchQL one. */
-  readonly database: string;
-  /** Custom setting carrying the tenant capability, per the settings profile. */
-  readonly tenantSetting: string;
-}
-
 /**
  * Applies the row ceiling, then the byte ceiling, reporting whether either bit.
  *
@@ -208,6 +203,51 @@ const LWQL_REQUEST_TIMEOUT_MS =
 const LWQL_MAX_OPEN_CONNECTIONS = 10;
 
 /**
+ * What a failed governed run is reported as.
+ *
+ * Three answers, and which one applies is decided by what the server refused
+ * rather than by anything the caller sent:
+ *
+ *  - **The deployment is incomplete.** An unknown table or database, or an
+ *    access refusal, cannot be the caller's SQL: the validator only lets
+ *    catalog-approved names reach here. So it is the same "not provisioned
+ *    here" condition as having no executor at all, and gets the same answer.
+ *  - **The caller named a column that is not there.** This one IS their SQL,
+ *    and is the only refusal on this path they fix themselves. The validator
+ *    approves table names, not columns, and column existence is not knowable
+ *    when a chart is saved, so run time is the only place it can be named.
+ *  - **Anything else** goes through the read path's own translation, so the
+ *    resource ceilings a caller can act on arrive as the platform's existing
+ *    codes rather than as a second vocabulary for the same failures. What that
+ *    does not recognise stays unhandled and degrades to "unknown", which is
+ *    correct: a driver diagnostic is not something a caller can act on, and is
+ *    exactly the kind of text this API must not relay.
+ *
+ * In every case the raw error rides in `reasons` for the operator's logs and
+ * never in the response. Lifted out of the `execute` body rather than inlined
+ * so the decision has a name, and so `execute` stays within the complexity
+ * budget the house rules enforce on changed lines.
+ */
+function refusalFor({
+  error,
+  durationMs,
+}: {
+  error: unknown;
+  durationMs: number;
+}): unknown {
+  if (isClickHouseObjectUnavailableError(error)) {
+    return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+  }
+  if (isClickHouseUnknownIdentifierError(error)) {
+    return new LangWatchQLUnknownIdentifierError({
+      identifier: unknownIdentifierFromError(error),
+      reasons: [toError(error)],
+    });
+  }
+  return translateClickHouseQueryError(error, durationMs);
+}
+
+/**
  * An executor that runs LangWatchQL as the restricted identity.
  *
  * The client is built here rather than taken as an argument so that the two
@@ -256,22 +296,7 @@ export function createLangWatchQLExecutor(
           },
         };
       } catch (error) {
-        // An unknown table/database or an access refusal cannot be the
-        // caller's SQL: the validator only lets catalog-approved names reach
-        // this point. It is a deployment whose LangWatchQL objects or grants
-        // are missing — the same "not provisioned here" condition as a null
-        // executor, and it gets the same answer. The raw error rides in
-        // `reasons` for the operator's logs and never in the response.
-        if (isClickHouseObjectUnavailableError(error)) {
-          throw new LangWatchQLUnavailableError({ reasons: [toError(error)] });
-        }
-        // Reuses the read path's translation, so the two resource ceilings a
-        // caller can act on arrive as the platform's existing codes rather than
-        // as a second vocabulary for the same two failures. Anything it does
-        // not recognise stays unhandled and degrades to "unknown" — correct,
-        // because a driver diagnostic is not something a caller can act on and
-        // is exactly the kind of text this API must not relay.
-        throw translateClickHouseQueryError(error, Date.now() - startedAt);
+        throw refusalFor({ error, durationMs: Date.now() - startedAt });
       }
     },
 
@@ -298,6 +323,18 @@ export function createLangWatchQLExecutor(
  * required would refuse to boot every deployment that does not run this API.
  */
 export function lwqlConnectionFromEnv(): LangWatchQLConnection | null {
+  // Self-provisioning (issue #6635) owns the target: `provisionLwql` creates
+  // the access model on the connection derived from the admin `CLICKHOUSE_URL`,
+  // so resolving a *different* connection here would query a server where none
+  // of it exists. Checked before `absent` rather than after: a deployment that
+  // sets all five explicitly *and* `LWQL_SELF_PROVISION` would otherwise fall
+  // through to the explicit values and split provisioning from querying.
+  // `lwqlDerivedConnectionFromEnv` treats the per-field `LWQL_*` as overrides
+  // and refuses outright on one that cannot be honoured.
+  if (process.env.LWQL_SELF_PROVISION === "true") {
+    return lwqlDerivedConnectionFromEnv();
+  }
+
   const url = process.env.LWQL_CLICKHOUSE_URL;
   const username = process.env.LWQL_CLICKHOUSE_USER;
   const password = process.env.LWQL_CLICKHOUSE_PASSWORD;

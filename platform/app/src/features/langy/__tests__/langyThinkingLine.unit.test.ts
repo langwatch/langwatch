@@ -16,7 +16,9 @@
 import { describe, expect, it } from "vitest";
 import { LANGY_THINKING_VERBS } from "../components/langyThinkingVerbs";
 import {
+  LANGY_AWAITING_ANSWER_LINE,
   langyThinkingLine,
+  langyTurnActivityKey,
   THINKING_SLOW_MS,
   THINKING_STILL_STARTING_MS,
   THINKING_STUCK_MS,
@@ -29,6 +31,65 @@ const assistant = (parts: unknown[]) => ({
 const user = { role: "user", parts: [{ type: "text", text: "hi" }] };
 
 describe("langyThinkingLine", () => {
+  describe("given a card holding the turn for the reader's answer", () => {
+    /** @scenario "A turn held by a card says it is waiting for me" */
+    it("says it is waiting for that answer, however long the card is open", () => {
+      const messages = [user, assistant([])];
+
+      for (const elapsedMs of [1_000, THINKING_SLOW_MS, THINKING_STUCK_MS]) {
+        const line = langyThinkingLine({
+          messages,
+          elapsedMs,
+          awaitingAnswer: true,
+        });
+        expect(line?.text).toBe(LANGY_AWAITING_ANSWER_LINE);
+        expect(line?.tone).toBe("waiting");
+        expect(line?.text).not.toContain("taking longer");
+        expect(line?.text).not.toContain("stuck");
+      }
+    });
+
+    it("outranks the tool the card is holding", () => {
+      const line = langyThinkingLine({
+        messages: [
+          user,
+          assistant([
+            { type: "tool-local_bash", state: "input-available", input: {} },
+          ]),
+        ],
+        elapsedMs: 1_000,
+        awaitingAnswer: true,
+      });
+      expect(line?.text).toBe(LANGY_AWAITING_ANSWER_LINE);
+    });
+  });
+
+  describe("given a card holding the turn and a folder shared from a terminal", () => {
+    /** @scenario "The panel names the terminal while the ask is open there too" */
+    it("names the terminal as well, because the same ask is open there", () => {
+      const line = langyThinkingLine({
+        messages: [user, assistant([])],
+        elapsedMs: 1_000,
+        awaitingAnswer: true,
+        terminalConnected: true,
+      });
+
+      expect(line?.text).toBe("Answer on the card above or in the terminal.");
+      expect(line?.tone).toBe("waiting");
+    });
+
+    it("names only the card when no folder is shared", () => {
+      const line = langyThinkingLine({
+        messages: [user, assistant([])],
+        elapsedMs: 1_000,
+        awaitingAnswer: true,
+      });
+
+      expect(line?.text).toBe(LANGY_AWAITING_ANSWER_LINE);
+      expect(line?.text).not.toContain("terminal");
+    });
+  });
+
   describe("given a turn where NOTHING has happened", () => {
     /** The 97-second lie, in one test. */
     it("never invents work — it says the workspace is being prepared", () => {
@@ -79,7 +140,7 @@ describe("langyThinkingLine", () => {
         elapsedMs: THINKING_STUCK_MS,
         workerReady: true,
       });
-      expect(line?.text).toBe("Langy still hasn't answered — it may be stuck.");
+      expect(line?.text).toBe("Langy still has not answered. It may be stuck.");
       expect(line?.tone).toBe("stuck");
     });
 
@@ -296,6 +357,140 @@ describe("langyThinkingLine", () => {
         hasLiveReasoning: true,
       });
       expect(line?.text.toLowerCase()).toContain("trace");
+    });
+  });
+
+  /**
+   * The escalation used to run off the time since the line MOUNTED, so it
+   * measured turn length. A turn that had answered a permission card and was
+   * running a local command, with output arriving in the terminal, was told
+   * "Langy still has not answered. It may be stuck." while nothing was wrong.
+   *
+   * The caller restarts its clock whenever this key changes, so what the
+   * ladder measures is silence. These pin what counts as the turn making
+   * progress.
+   */
+  describe("given the turn's own account of what it has produced", () => {
+    const RUNNING_CALL = [{ toolCallId: "call-1", status: "running" }];
+
+    /** @scenario "Work that never reaches the message still counts as progress" */
+    it("changes when a tool call in the record starts or finishes", () => {
+      const messages = [user, assistant([])];
+      const before = langyTurnActivityKey({ messages });
+      const running = langyTurnActivityKey({
+        messages,
+        toolCalls: RUNNING_CALL,
+      });
+      const finished = langyTurnActivityKey({
+        messages,
+        toolCalls: [{ toolCallId: "call-1", status: "succeeded" }],
+      });
+      expect(running).not.toBe(before);
+      expect(finished).not.toBe(running);
+    });
+
+    it("changes when the developer answers a card", () => {
+      const messages = [user, assistant([])];
+      const pending = langyTurnActivityKey({
+        messages,
+        waits: [{ waitId: "wait-1", status: "pending" }],
+      });
+      const answered = langyTurnActivityKey({
+        messages,
+        waits: [{ waitId: "wait-1", status: "answered" }],
+      });
+      expect(answered).not.toBe(pending);
+    });
+
+    it("changes when a plan step moves on", () => {
+      const messages = [user, assistant([])];
+      const before = langyTurnActivityKey({
+        messages,
+        planItems: [
+          { content: "One", status: "in_progress" },
+          { content: "Two", status: "pending" },
+        ],
+      });
+      const after = langyTurnActivityKey({
+        messages,
+        planItems: [
+          { content: "One", status: "completed" },
+          { content: "Two", status: "in_progress" },
+        ],
+      });
+      expect(after).not.toBe(before);
+    });
+
+    it("changes as reasoning and prose arrive", () => {
+      const messages = [user, assistant([])];
+      const quiet = langyTurnActivityKey({ messages });
+      expect(langyTurnActivityKey({ messages, reasoning: "so far" })).not.toBe(
+        quiet,
+      );
+      expect(
+        langyTurnActivityKey({
+          messages: [user, assistant([{ type: "text", text: "Here" }])],
+        }),
+      ).not.toBe(quiet);
+      expect(
+        langyTurnActivityKey({
+          messages: [user, assistant([{ type: "text", text: "Here are 4" }])],
+        }),
+      ).not.toBe(
+        langyTurnActivityKey({
+          messages: [user, assistant([{ type: "text", text: "Here" }])],
+        }),
+      );
+    });
+
+    it("holds still while nothing happens, so real silence still escalates", () => {
+      const messages = [user, assistant([])];
+      const activity = {
+        messages,
+        toolCalls: RUNNING_CALL,
+        planItems: [{ content: "One", status: "in_progress" }],
+        reasoning: "a thought",
+      };
+      expect(langyTurnActivityKey(activity)).toBe(
+        langyTurnActivityKey(activity),
+      );
+    });
+
+    /** @scenario "The escalation measures silence, not how long the turn has run" */
+    it("keeps a long-running turn off the stuck line once its clock restarts", () => {
+      // What the caller does with the key: the elapsed time it passes is the
+      // silence since the key last changed, so a turn twenty minutes old that
+      // did something a moment ago reads as working, not as stuck.
+      const messages = [
+        user,
+        assistant([{ type: "text", text: "Sure." }]),
+        user,
+      ];
+      const silentTooLong = langyThinkingLine({
+        messages,
+        elapsedMs: THINKING_STUCK_MS,
+      });
+      expect(silentTooLong?.tone).toBe("stuck");
+
+      const justDidSomething = langyThinkingLine({ messages, elapsedMs: 500 });
+      expect(justDidSomething?.tone).not.toBe("stuck");
+      expect(justDidSomething?.text).not.toContain("longer than usual");
+    });
+
+    /** @scenario "A turn that really is silent still ends up looking stuck" */
+    it("still escalates a turn that has produced nothing at all", () => {
+      const messages = [user, assistant([])];
+      // Nothing to fingerprint, so the clock never restarts and the silence is
+      // the whole turn.
+      expect(langyTurnActivityKey({ messages })).toBe(
+        langyTurnActivityKey({ messages }),
+      );
+      const line = langyThinkingLine({
+        messages,
+        elapsedMs: THINKING_STUCK_MS,
+      });
+      expect(line?.tone).toBe("stuck");
+      expect(line?.text).toContain("stuck");
     });
   });
 

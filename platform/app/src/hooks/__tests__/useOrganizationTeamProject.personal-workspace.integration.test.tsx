@@ -37,7 +37,6 @@ const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } =
       selectedOrganizationId: "",
       selectedTeamId: "",
       selectedProjectSlug: "",
-      lastVisitedHomeKind: "",
     } as Record<string, string>,
   }));
 

@@ -1,4 +1,6 @@
 {{- include "langwatch.validateSecrets" . }}
+{{- include "langwatch.lwql.provisioningGuard" . }}
+{{- $lwqlBridgeDisabled := eq (include "langwatch.lwql.postgresBridgeDisabled" .) "true" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -10,9 +12,14 @@ metadata:
     {{- if .Values.app.deployment.labels }}
     {{- toYaml .Values.app.deployment.labels | nindent 4 }}
     {{- end }}
-  {{- with .Values.app.deployment.annotations }}
+  {{- if or .Values.app.deployment.annotations $lwqlBridgeDisabled }}
   annotations:
+    {{- with .Values.app.deployment.annotations }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if $lwqlBridgeDisabled }}
+    langwatch.io/lwql-postgres-bridge: "disabled"
+    {{- end }}
   {{- end }}
 spec:
   replicas: {{ .Values.app.replicaCount }}
@@ -235,10 +242,10 @@ spec:
             {{- end }}
 
             {{- if (index .Values "langyagent").chartManaged }}
-            # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
+            # Langy agent pod. The app POSTs chats to LANGY_AGENT_URL with
             # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
             # against the same Secret. Subchart values key read via index (aliased subchart).
-            - name: OPENCODE_AGENT_URL
+            - name: LANGY_AGENT_URL
               value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:
@@ -332,6 +339,7 @@ spec:
             {{- end }}
 
             {{- with .Values.app.extraEnvs}}
+            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "app.extraEnvs") }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
 

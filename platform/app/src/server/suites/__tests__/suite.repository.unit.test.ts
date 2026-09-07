@@ -20,7 +20,7 @@ function makeSuiteRow(
     projectId: "proj_1",
     name: "Critical Path",
     slug: "critical-path",
-    kind: "custom",
+    kind: "run_plan",
     scope: null,
     description: null,
     scenarioIds: ["scen_1", "scen_2"],
@@ -29,6 +29,8 @@ function makeSuiteRow(
     labels: [],
     simulatorModel: null,
     judgeModel: null,
+    fields: null,
+    evaluators: null,
     archivedAt: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
@@ -157,16 +159,35 @@ describe("SuiteRepository", () => {
 
         const result = await repository.findAll({
           projectId: "proj_1",
-          kinds: ["custom"],
+          kinds: ["run_plan"],
         });
 
         expect(result).toEqual(suites);
         expect(prisma.simulationSuite.findMany).toHaveBeenCalledWith({
           where: {
             projectId: "proj_1",
-            kind: { in: ["custom"] },
+            kind: { in: ["run_plan"] },
             archivedAt: null,
           },
+          orderBy: { updatedAt: "desc" },
+        });
+      });
+    });
+
+    describe("when the caller asks for archived rows too", () => {
+      it("drops the archivedAt filter", async () => {
+        (
+          prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue([]);
+
+        await repository.findAll({
+          projectId: "proj_1",
+          kinds: ["run_plan"],
+          includeArchived: true,
+        });
+
+        expect(prisma.simulationSuite.findMany).toHaveBeenCalledWith({
+          where: { projectId: "proj_1", kind: { in: ["run_plan"] } },
           orderBy: { updatedAt: "desc" },
         });
       });
@@ -180,7 +201,7 @@ describe("SuiteRepository", () => {
 
         const result = await repository.findAll({
           projectId: "proj_1",
-          kinds: ["custom"],
+          kinds: ["run_plan"],
         });
 
         expect(result).toEqual([]);

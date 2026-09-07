@@ -27,7 +27,6 @@ import {
   mintLangySessionApiKey,
   revokeLangySessionApiKey,
 } from "~/server/app-layer/langy/langyApiKey";
-import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
@@ -71,6 +70,7 @@ import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { createRunModelsResolver } from "~/server/scenarios/run-models.resolver";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
@@ -322,6 +322,10 @@ import { PrismaShareRepository } from "./share/repositories/share.prisma.reposit
 import { ShareService } from "./share/share.service";
 import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
 import { createSharedTracePayloadCache } from "./share/shared-trace-cache.service";
+import { ResultAtomsClickHouseRepository } from "./simulations/result-atoms/result-atoms.clickhouse.repository";
+import { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
+import { RunConfigurationsClickHouseRepository } from "./simulations/run-configurations/run-configurations.clickhouse.repository";
+import { RunConfigurationsService } from "./simulations/run-configurations/run-configurations.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
@@ -622,6 +626,14 @@ export function initializeDefaultApp(options?: {
   const scenarioRunExport = ScenarioRunExportService.create(
     simulationReads.repository,
   );
+  const resultAtoms = new ResultAtomsService(
+    new ResultAtomsClickHouseRepository(resolveClickHouseClient),
+    globalPrisma,
+  );
+  const runConfigurations = new RunConfigurationsService(
+    new RunConfigurationsClickHouseRepository(resolveClickHouseClient),
+    globalPrisma,
+  );
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
   const evaluations = {
@@ -817,7 +829,7 @@ export function initializeDefaultApp(options?: {
     prisma,
   );
   const langyMessageRepository = new PrismaLangyMessageRepository(prisma);
-  const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
+  const langyAgentUrl = process.env.LANGY_AGENT_URL;
   const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
   const langyWorker = createLangyWorkerPort({
     agentUrl: langyAgentUrl ?? "",
@@ -1433,9 +1445,6 @@ export function initializeDefaultApp(options?: {
     // Check-only cap view for the panel-open warm: signature parity with the
     // turn's token strip, without spending a PR permit on a panel open.
     checkPermit: getLangyGithubPrUsage,
-    // The harness flag (`release_langy_pi_harness`), evaluated once per turn
-    // and riding `credentials.harness` into probe, stash and dispatch.
-    resolveHarness: resolveLangyHarness,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
@@ -1456,6 +1465,7 @@ export function initializeDefaultApp(options?: {
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
     startSuiteRun: commands.suiteRuns.startSuiteRun,
     queueSimulationRun: commands.simulations.queueRun,
+    resolveRunModels: createRunModelsResolver(prisma),
   });
 
   const traceCollection = traced(
@@ -1804,7 +1814,12 @@ export function initializeDefaultApp(options?: {
     emailSuppressions,
     dspySteps: { steps: dspySteps },
     analytics: { service: analyticsService },
-    simulations: { runs: simulationReads, export: scenarioRunExport },
+    simulations: {
+      runs: simulationReads,
+      results: resultAtoms,
+      runConfigurations,
+      export: scenarioRunExport,
+    },
     suiteRuns: { runs: suiteRunService },
     topicClustering: {
       status: new TopicClusteringStatusService(
@@ -1922,7 +1937,19 @@ export function initializeDefaultApp(options?: {
 }
 
 /** Tests — noop commands, null-backed services. */
-export function createTestApp(overrides?: Partial<AppDependencies>): App {
+/**
+ * Overrides a test app takes.
+ *
+ * `simulations` merges into the preset's group rather than replacing it, so a
+ * test that names the one service it cares about keeps the rest. Replacing the
+ * whole group made every test that named two of three services fail to compile
+ * the moment a third was added.
+ */
+export type TestAppOverrides = Omit<Partial<AppDependencies>, "simulations"> & {
+  simulations?: Partial<AppDependencies["simulations"]>;
+};
+
+export function createTestApp(overrides?: TestAppOverrides): App {
   const testPrisma = globalPrisma;
   const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
   const testRetentionPolicyCache = new RetentionPolicyCache(
@@ -1938,6 +1965,31 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   // Hoisted so the export shares the null repository with `runs`, matching how
   // the production preset wires the pair.
   const testSimulationReads = SimulationRunService.create(null);
+
+  // The caller's overrides merge into this group rather than replacing it, so
+  // a test that names the one service it cares about keeps the rest. Replacing
+  // the whole group made every test naming two of three services stop
+  // compiling the moment a fourth service was added.
+  const testSimulations = {
+    runs: testSimulationReads,
+    // The results read has no null repository. It fails on use rather than
+    // answering an empty page, so a test that reaches it says so instead of
+    // reading as a project with no runs.
+    results: new ResultAtomsService(
+      new ResultAtomsClickHouseRepository(() => {
+        throw new Error("ClickHouse not available in test app");
+      }),
+      testPrisma,
+    ),
+    runConfigurations: new RunConfigurationsService(
+      new RunConfigurationsClickHouseRepository(() => {
+        throw new Error("ClickHouse not available in test app");
+      }),
+      testPrisma,
+    ),
+    export: ScenarioRunExportService.create(testSimulationReads.repository),
+    ...overrides?.simulations,
+  };
   const noop = async () => {
     /* noop */
   };
@@ -2132,10 +2184,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           testFireTrigger(testDeps, input),
       };
     })(),
-    simulations: {
-      runs: testSimulationReads,
-      export: ScenarioRunExportService.create(testSimulationReads.repository),
-    },
     suiteRuns: {
       runs: SuiteRunService.create({
         resolveClickHouseClient: null,
@@ -2235,6 +2283,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           recordTurnHandoff: noop,
           consumeTurnHandoff: noop,
           generateConversationTitle: noop,
+          requestLocalControl: noop,
+          connectLocalWorkspace: noop,
+          disconnectLocalWorkspace: noop,
+          changeLocalPolicy: noop,
+          startUserWait: noop,
+          endUserWait: noop,
         },
         new NullLangyConversationRepository(),
       ),
@@ -2348,6 +2402,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         textMessageStart: noop,
         textMessageEnd: noop,
         finishRun: noop,
+        recordEvaluations: noop,
+        recordAgentInstance: noop,
         cancelRun: noop,
         deleteRun: noop,
         computeRunMetrics: noop,
@@ -2356,6 +2412,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         startSuiteRun: noop,
         recordSuiteRunItemStarted: noop,
         completeSuiteRunItem: noop,
+        regradeSuiteRunItem: noop,
       } as AppCommands["suiteRuns"],
       langy: {
         createConversation: noop,
@@ -2374,6 +2431,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordTurnHandoff: noop,
         consumeTurnHandoff: noop,
         generateConversationTitle: noop,
+        requestLocalControl: noop,
+        connectLocalWorkspace: noop,
+        disconnectLocalWorkspace: noop,
+        changeLocalPolicy: noop,
+        startUserWait: noop,
+        endUserWait: noop,
       } as AppCommands["langy"],
       topicClustering: {
         requestClustering: noop,
@@ -2446,5 +2509,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     // is cached, which is the stricter behaviour of both.
     sharedTraceCache: createSharedTracePayloadCache(null),
     ...overrides,
+    // After the spread, which would otherwise replace the whole group with
+    // whatever subset the caller named.
+    simulations: testSimulations,
   });
 }

@@ -3,7 +3,7 @@
  *
  * Unit tests for validateWorkflowAgentMappings.
  *
- * Covers the four cases: multi-input without mappings (error), single-input
+ * Covers the four scenarios: multi-input without mappings (error), single-input
  * without mappings (passes), multi-input with mappings (passes), and zero
  * inputs without mappings (passes).
  */

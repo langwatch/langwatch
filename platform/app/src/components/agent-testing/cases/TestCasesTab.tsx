@@ -1,5 +1,5 @@
 /**
- * The Test cases tab: the suites rail beside the table of cases.
+ * The Scenarios tab: the suites rail beside the table of scenarios.
  *
  * The reads and the writes of the tab live in useTestCasesTab. The rail, the
  * panel and the dialogs are views over the model it returns.

@@ -22,7 +22,7 @@ Saved evaluators are pre-configured evaluation setups that you create on the Lan
 
 ### Via the Platform UI
 
-1. Go to **Evaluations** in your LangWatch project
+1. Go to **Evaluators** in your LangWatch project
 2. Click **New Evaluator**
 3. Select the evaluator type (e.g., LLM Boolean, PII Detection)
 4. Configure the settings (model, prompt, thresholds, etc.)
@@ -31,6 +31,10 @@ Saved evaluators are pre-configured evaluation setups that you create on the Lan
 {/* TODO: Add screenshot of saved evaluator creation UI */}
 
 ### Via the Evaluators Page
+
+<Frame>
+<img src="/images/evaluations/evaluators-list.png" alt="The Evaluators page with three saved evaluators and the New Evaluator button" />
+</Frame>
 
 You can also manage saved evaluators from the dedicated Evaluators page at `/{project}/evaluators`.
 
@@ -50,7 +54,7 @@ Saved evaluators are referenced using the `evaluators/{slug}` format, where `{sl
 ```python Python
 import langwatch
 
-df = langwatch.datasets.get_dataset("my-dataset").to_pandas()
+df = langwatch.dataset.get_dataset("my-dataset").to_pandas()
 
 experiment = langwatch.experiment.init("my-experiment")
 

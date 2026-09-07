@@ -102,6 +102,12 @@ export interface EndpointDocs {
   /** Security requirements for the operation. */
   security?: DescribeRouteOptions["security"];
   /**
+   * The documented request body of an endpoint that reads its body by hand
+   * instead of declaring `input`. An endpoint that declares `input` documents
+   * its body from the schema and does not need this.
+   */
+  requestBody?: DescribeRouteOptions["requestBody"];
+  /**
    * Additional documented responses, merged over the generated success
    * response (same-status keys win).
    */

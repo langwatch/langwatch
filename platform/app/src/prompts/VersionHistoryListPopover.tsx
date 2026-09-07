@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Box,
   type BoxProps,
   Button,
@@ -15,6 +14,7 @@ import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
 import { HistoryIcon } from "~/components/icons/History";
+import { Avatar } from "~/components/ui/avatar";
 import { Popover } from "~/components/ui/popover";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";

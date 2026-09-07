@@ -328,12 +328,6 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/me/budget/request")),
       },
 
-      // CLI device-flow approval (RFC 8628 user-facing screen)
-      {
-        path: "/cli/auth",
-        ...page(() => import("./pages/cli/auth")),
-      },
-
       // AI Gateway: org-scoped admin pages live under /gateway/** at the top
       // level, like /governance. Every gateway resource (VirtualKey /
       // GatewayBudget / ModelProvider) is org-keyed by the schema, so the
@@ -387,6 +381,14 @@ const routes: RouteObject[] = [
       },
       ...legacyRedirectRoutes,
     ],
+  },
+
+  // CLI device-flow approval (RFC 8628 user-facing screen). Top level, like
+  // /onboarding: it is a confirm-a-code screen, not a page of the app, and
+  // the Langy panel must not mount on it.
+  {
+    path: "/cli/auth",
+    ...page(() => import("./pages/cli/auth")),
   },
 
   // Project routes — wrapped in a layout route that mounts Langy ONCE per

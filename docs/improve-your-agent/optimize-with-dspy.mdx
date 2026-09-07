@@ -1,0 +1,271 @@
+---
+title: Optimize with DSPy Using Scenarios as the Metric
+sidebarTitle: Optimize with DSPy
+keywords: langwatch, dspy, gepa, miprov2, prompt optimization, tool optimization, agent optimization, scenarios, metric, optimizer
+description: Scores every candidate on full multi-turn conversations with your agent, running the agent improvement loop automatically with DSPy algorithms.
+---
+
+Writing a metric for an agent is hard, because a reply has no single expected output to compare against.
+
+Your scenario suite is already that metric: it runs the whole conversation with a simulated user and judges it on the criteria you wrote, so the optimizer runs the [improvement loop](/improve-your-agent/overview) one candidate after another, against the same suite you use as the quality gate.
+
+To run a DSPy optimizer you give it a program and a metric. The program is a `dspy.ReAct` module, whose instructions contain every tool description, so rewriting the instructions rewrites the tool descriptions too.
+
+The metric runs one scenario against the candidate and scores the verdict, and GEPA also reads the judge's reasoning as feedback for the next candidate.
+
+The runnable example is in the SDK repository: [`sdks/python/examples/agent-optimization`](https://github.com/langwatch/langwatch/tree/main/sdks/python/examples/agent-optimization).
+
+## What you need
+
+- Python 3.10 or later. In the example folder, `uv sync` installs everything. In your own project, `pip install "langwatch[dspy]" "dspy[optuna]" langwatch-scenario` (MIPROv2 needs the `optuna` extra), and import `scenario` before `dspy` in every module, because in the other order dspy 3.3 fails while loading numpy.
+- `OPENAI_API_KEY` for the agent, the simulated user and the judge, and `LANGWATCH_API_KEY` so the optimization run and the simulations appear in LangWatch.
+- Five to ten scenarios. One optimization run executes each of them several times: the MIPROv2 run of the example below took 64 scenario runs, 42 minutes and $0.93, with `gpt-5-mini` as the agent, the simulated user and the judge, and `gpt-5` writing the instruction candidates.
+
+## Step 1: Wrap the agent as a DSPy module
+
+Build the agent as a `dspy.ReAct` over the tools, and write a scenario adapter that passes the conversation to it as `dspy.History` plus the last user message and returns the answer:
+
+```python
+import scenario
+import dspy
+
+class SupportSignature(dspy.Signature):
+    """You are the support agent of ACME, an online shop. Help the customer with orders and returns."""
+
+    history: dspy.History = dspy.InputField()
+    question: str = dspy.InputField()
+    answer: str = dspy.OutputField()
+
+def build_agent() -> dspy.ReAct:
+    return dspy.ReAct(
+        SupportSignature,
+        tools=[lookup_order, check_return_eligibility, create_return, escalate],
+        max_iters=8,
+    )
+
+class ReActAdapter(scenario.AgentAdapter):
+    def __init__(self, program: dspy.ReAct):
+        self.program = program
+
+    async def call(self, input: scenario.AgentInput) -> scenario.AgentReturnTypes:
+        history = history_from(input.messages[:-1])  # the question and answer pairs so far
+        prediction = await self.program.acall(
+            history=history, question=input.last_new_user_message_str()
+        )
+        return trajectory_to_messages(prediction)
+```
+
+`trajectory_to_messages` turns the ReAct trajectory into `tool_calls` and `tool` messages followed by the answer, so the judge sees the tool calls and the rejected arguments as well as the reply; both helpers are in the example's `agent.py`. The tool descriptions come from the docstrings: `dspy.ReAct` writes them into the instructions of its `react` predictor, and that predictor is what the optimizer rewrites.
+
+## Step 2: One example per scenario
+
+Write one `dspy.Example` per scenario, with the situation, the criteria and a step budget, where a rejected tool call that the agent retries counts as an extra step.
+
+```python
+SCENARIOS = [
+    dict(
+        name="damaged item refund",
+        description="The customer received a damaged blender, order 1001, and wants a refund to the original payment method.",
+        criteria=[
+            "The agent creates the return",
+            "The agent confirms the refund method",
+            "The agent does not call check_return_eligibility more than once for the same order",
+        ],
+        budget_steps=5,
+    ),
+    ...
+]
+
+trainset = [
+    dspy.Example(**s).with_inputs("name", "description", "criteria", "budget_steps")
+    for s in SCENARIOS
+]
+```
+
+## Step 3: Run the scenario inside the program
+
+The optimizer calls the program on every example and then the metric on what the program returned. So wrap the whole scenario in the program: it runs the conversation with the candidate agent inside it and returns the verdict, the steps and the judge's reasoning, and the metric turns those into a score:
+
+```python
+class ScenarioProgram(dspy.Module):
+    def __init__(self, agent: dspy.Module):
+        super().__init__()
+        self.agent = agent  # named predictors: agent.react, agent.extract
+
+    def forward(self, name, description, criteria, budget_steps):
+        result = asyncio.run(scenario.run(
+            name=name,
+            description=description,
+            max_turns=12,
+            set_id="dspy-optimization",
+            agents=[
+                ReActAdapter(self.agent),
+                scenario.UserSimulatorAgent(),
+                scenario.JudgeAgent(criteria=criteria, model="openai/gpt-5-mini"),
+            ],
+        ))
+        # a step is one reply or one tool call; each one is a model call
+        steps = count_agent_steps(result.messages)
+        return dspy.Prediction(
+            success=result.success,
+            passed=result.passed_criteria,
+            failed=result.failed_criteria,
+            reasoning=result.reasoning,
+            steps=steps,
+        )
+
+
+def scenario_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
+    over = max(0, pred.steps - gold.budget_steps) / gold.budget_steps
+    score = 0.0 if not pred.success else max(0.0, min(1.0, 1 - 0.5 * over))
+    if pred_name is None and trace is None:
+        return score  # MIPROv2 and Evaluate take a number
+    feedback = (
+        f"Judge verdict: {'PASS' if pred.success else 'FAIL'}. {pred.reasoning}\n"
+        f"Unmet criteria: {pred.failed or 'none'}\n"
+        f"Agent steps: {pred.steps}, budget {gold.budget_steps}."
+    )
+    return dspy.Prediction(score=score, feedback=feedback)  # GEPA reads the text
+```
+
+The metric scores a failed scenario zero and a passed scenario one minus half a point per budget of extra steps, so the pass gate comes first and the step budget is the objective under it. When a tool rejects its arguments during the conversation, the example adds one line to the feedback that says so, which is what GEPA needs to rewrite that tool's description.
+
+`scenario.run` executes the conversation on its own thread, and GEPA reads the trace of the thread that called the program, so the example's `forward` copies the DSPy trace of the scenario thread back into the calling thread.
+
+## Step 4: Run the optimizer
+
+<Tabs>
+  <Tab title="GEPA">
+```python
+import langwatch
+import langwatch.dspy
+
+dspy.configure(lm=dspy.LM("openai/gpt-5-mini", cache=False))
+program = ScenarioProgram(build_agent())
+
+optimizer = dspy.GEPA(
+    metric=scenario_metric,
+    max_metric_calls=48,
+    reflection_minibatch_size=3,
+    num_threads=3,
+    reflection_lm=dspy.LM("openai/gpt-5", temperature=1.0, max_tokens=16000),
+    track_stats=True,
+)
+langwatch.dspy.init(experiment="returns-agent-scenarios", optimizer=optimizer)
+
+optimized = optimizer.compile(program, trainset=trainset, valset=trainset)
+optimized.save("optimized_agent.json")
+print(optimized.agent.react.signature.instructions)
+```
+
+`max_metric_calls=48` gave four iterations on the example: the first full pass costs six calls, and each accepted candidate costs a minibatch of three for the parent, three for the candidate and a full pass of six. GEPA's `auto="light"` budget plans hundreds of metric calls, which is too many when every call is a full simulation.
+
+`langwatch.dspy.init` records the seed program and every candidate that reaches a full validation pass as one step each, with the candidate's instructions per predictor and the score of every scenario in that pass. GEPA drops a candidate that loses on its minibatch before the validation set, so that candidate has no step.
+  </Tab>
+  <Tab title="MIPROv2">
+```python
+import langwatch
+import langwatch.dspy
+
+dspy.configure(lm=dspy.LM("openai/gpt-5-mini", cache=False))
+program = ScenarioProgram(build_agent())
+
+optimizer = dspy.MIPROv2(
+    metric=scenario_metric,
+    auto=None,
+    num_candidates=4,
+    num_threads=3,
+    max_bootstrapped_demos=0,
+    max_labeled_demos=0,
+    prompt_model=dspy.LM("openai/gpt-5"),
+)
+langwatch.dspy.init(experiment="returns-agent-scenarios", optimizer=optimizer)
+
+optimized = optimizer.compile(
+    program, trainset=trainset, valset=trainset, num_trials=6, minibatch=False
+)
+optimized.save("optimized_agent_mipro.json")
+```
+
+Zero demos keeps the change to the instructions: MIPROv2 proposes instruction candidates and searches over their combinations, though it still runs about ten scenarios to bootstrap traces for the proposer. `minibatch=False` evaluates the whole suite on every trial, because the default minibatch is larger than six scenarios, and `langwatch.dspy.init` records every trial.
+  </Tab>
+</Tabs>
+
+Run the suite once before and once after with `dspy.Evaluate(devset=trainset, metric=scenario_metric, num_threads=3)`, so the before and after pass rates and steps come from the same scenarios; the example's `evaluate_suite` prints that table. To run the example:
+
+```bash
+cd sdks/python/examples/agent-optimization
+uv sync
+uv run optimize_gepa.py
+uv run optimize_mipro.py
+```
+
+## Step 5: Read the result in LangWatch
+
+- **Experiments** shows the optimization run as a score chart, one point per trial, with the instructions of each predictor at that step. Both scripts register the run through `langwatch.dspy.init`: MIPROv2 logs one step per trial, and GEPA logs one step for the seed program and one for every candidate it evaluates on the validation set. See [DSPy visualization](/dspy-visualization/quickstart).
+- **Agent Testing** shows every simulation the optimizer ran, as runs of the `dspy-optimization` set. The example puts the baseline pass and the final pass in their own batches, named `<run id>-baseline` and `<run id>-best`, so they appear as two runs of six next to the larger runs from inside the optimizer, and the scripts print both names.
+
+<Frame caption="The MIPROv2 run in Experiments: one point per trial, the best trial marked, and the instructions of the selected step below the chart.">
+<img className="block" src="/images/improve-your-agent/dspy-experiment-run.png" alt="The Experiments page for returns-agent-scenarios: the MIPROv2 score chart with seven points and the Best marker on step 5, and the predictors table of the selected step below it" />
+</Frame>
+
+<Frame caption="The dspy-optimization set in Agent Testing: the baseline and best passes of both runs as runs of six, next to the runs from inside the optimizers.">
+<img className="block" src="/images/improve-your-agent/dspy-agent-testing-batches.png" alt="The Results tab of the dspy-optimization set, with eight runs in the sidebar and the six scenarios of the MIPROv2 best pass with their verdicts, time and cost" />
+</Frame>
+
+Compare the instructions before and after: both scripts print every instruction the optimizer changed, and the tool descriptions are part of them.
+
+## What the example runs showed
+
+One run of each script on the six scenarios, with the agent, the simulated user and the judge on `gpt-5-mini` and `gpt-5` as the proposer or the reflection model:
+
+| | MIPROv2 | GEPA |
+|---|---|---|
+| Settings | `num_candidates=4`, `num_trials=6`, zero demos | `max_metric_calls=48`, `reflection_minibatch_size=3` |
+| Scenario runs | 64: the baseline pass, 10 to bootstrap traces for the proposer, 42 over seven trials, the final pass | 63: the baseline pass, 51 inside the optimizer, the final pass |
+| Wall clock | 42 minutes | 31 minutes |
+| Cost | $0.93, of which $0.41 for 18 proposer calls | $0.64, of which $0.18 for 4 reflection calls |
+| Best score inside the optimizer | 83% on trial 5, from 65% for the default program | 100% on iteration 1, from 67% for the default program |
+| Pass rate before and after, re-evaluated | 4 of 6, then 4 of 6 | 4 of 6, then 5 of 6 |
+| Steps over the suite before and after | 24, then 18 | 21, then 20 |
+
+Neither optimizer saw the tool code, but both saw the rejected calls in the traces, and both wrote the accepted values into the `react` instructions. MIPROv2, from the proposer's candidates:
+
+```text
+- Normalize the customer's freeform reason to one of the allowed codes before checking eligibility:
+  - damaged/broken/doesn't work → defective
+  - wrong item/received different item → incorrect_item
+  - not as described/doesn't fit/changed preference → not_as_expected
+  - changed my mind/no longer want it → remorse
+- Call check_return_eligibility(order_id, reason) at most once per order.
+```
+
+GEPA, from the judge's reasoning and the tool errors in the feedback, on its first iteration:
+
+```text
+2) check_return_eligibility
+   - args: {"order_id": "string", "reason": "string"}
+   - reason MUST be one of exactly:
+     - "defective"
+     - "incorrect_item"
+     - "not_as_expected"
+     - "remorse"
+   - Map customer wording to these values BEFORE calling:
+     - "damaged", "broken", "doesn't work" -> "defective"
+     - "wrong item", "received the wrong product" -> "incorrect_item"
+```
+
+That is the same tool description fix as in [Fix tool calls](/improve-your-agent/fix-tool-calls), found by search. On both optimizer runs the damaged blender return went from failed to passed and from 5 steps to 4; the hand-written fix on that page, which also validates the arguments and rewrites the error message, got the same return down to 3.
+
+The scenario where the customer asks for a recipe failed on every pass, and the cause was in the example rather than in the agent: its criterion said the agent calls no tool, and the judge counts ReAct's internal `finish` step as a tool call. The criterion now lists the three tools it means instead.
+
+On the MIPROv2 run the angry customer passed before and failed after, and the 83% of the best trial did not repeat on the final pass, which is the non-determinism described in the Limits below.
+
+## Limits
+
+- The optimizer changes text, meaning the instructions and the tool descriptions. Changing a tool's schema, adding a missing tool or capping the harness is still a code change: see [Fix tool calls](/improve-your-agent/fix-tool-calls).
+- Scenarios are not deterministic: the simulated user words the situation differently on every run, so a candidate can pass once and fail once. Evaluate the baseline and the final program twice before you compare them, and use `--repeat` on the platform for the same reason.
+- The score counts the agent's steps, so the cost of the simulated user and the judge is not in it.
+- DSPy is Python. For a TypeScript agent, use the guided loop instead: see [Reduce turns](/improve-your-agent/reduce-turns).
+
+<Info>**Also check:** [Optimization algorithms](/improve-your-agent/algorithms) (which optimizer to pick), [Scenarios in code](/agent-testing/scenarios-in-code), [DSPy visualization](/dspy-visualization/quickstart) (how a run appears in Experiments).</Info>

@@ -40,10 +40,10 @@ import type {
   ExternalSetSummary,
   SuiteRunSummary,
 } from "~/server/scenarios/scenario-event.types";
+import { firstGrapheme } from "~/utils/firstGrapheme";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { SearchInput } from "../ui/SearchInput";
 import { ALL_RUNS_ID, toExternalSetSelection } from "./useSuiteRouting";
-import { VoiceAgentsCallout } from "./VoiceAgentsCallout";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
@@ -258,7 +258,7 @@ export function SuiteSidebar({
                     fontSize="xs"
                     fontWeight="bold"
                   >
-                    {suite.name.charAt(0).toUpperCase()}
+                    {firstGrapheme(suite.name).toUpperCase()}
                   </Center>
                 </IconButton>
               </Tooltip>
@@ -333,7 +333,7 @@ export function SuiteSidebar({
                       fontSize="xs"
                       fontWeight="bold"
                     >
-                      {extSet.scenarioSetId.charAt(0).toUpperCase()}
+                      {firstGrapheme(extSet.scenarioSetId).toUpperCase()}
                     </Center>
                   </IconButton>
                 </Tooltip>
@@ -355,14 +355,6 @@ export function SuiteSidebar({
           </>
         )}
       </VStack>
-
-      {/*
-       * Voice agents announcement card — pinned just above the collapse
-       * toggle so it sits at the bottom of the sets/runs sidebar without
-       * stealing space from the list itself. Hidden when the sidebar is
-       * collapsed (no room for the copy at icon-rail width).
-       */}
-      {!isCollapsed && <VoiceAgentsCallout />}
 
       {/* Toggle button — always the same DOM node */}
       <ShadowDivider />

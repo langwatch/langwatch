@@ -10,7 +10,7 @@ export function bigint(value: string | null | undefined): bigint {
   }
 }
 
-export function numberValue(point: CanonicalMetricDataPoint): number | null {
+export function numberValue(point: MetricRollupSourcePoint): number | null {
   if (point.valueType === "double") return point.valueDouble;
   if (point.valueType === "int" && point.valueInt !== null) {
     const value = Number(point.valueInt);
@@ -42,6 +42,45 @@ export type MetricSequencePoint = Pick<
   | "aggregationTemporality"
 >;
 
+/**
+ * The fields the rollup fold actually reads, on top of the ordering fields a
+ * seek needs. Naming them is what lets the authoritative read stop asking for
+ * the rest: attributes, schema urls, scope identity, flags, quantiles and the
+ * accounting timestamps are stored on every point and read by none of the
+ * builders below, yet `FINAL` materialised all of them for every row a seek
+ * scanned — the megabytes-per-granule that pushed the reads over the server's
+ * memory cap (`while reading column PointAttributesJson`).
+ *
+ * `MetricRollupSourcePoint` stays assignable to this, so a caller holding a
+ * whole point still folds; the type only bounds what a caller *must* supply,
+ * and so what a read has to fetch.
+ */
+export type MetricRollupSourcePoint = MetricSequencePoint &
+  Pick<
+    CanonicalMetricDataPoint,
+    | "tenantId"
+    | "metricName"
+    | "metricUnit"
+    | "isMonotonic"
+    | "startTimeUnixNano"
+    | "valueType"
+    | "valueInt"
+    | "valueDouble"
+    | "count"
+    | "sum"
+    | "min"
+    | "max"
+    | "explicitBounds"
+    | "bucketCounts"
+    | "exponentialScale"
+    | "exponentialZeroThreshold"
+    | "zeroCount"
+    | "positiveOffset"
+    | "positiveBucketCounts"
+    | "negativeOffset"
+    | "negativeBucketCounts"
+  >;
+
 /** Mirrors the ClickHouse ORDER BY, which collates PointId by bytes. */
 export function comparePoints(
   left: MetricSequencePoint,
@@ -55,8 +94,8 @@ export function comparePoints(
 }
 
 export function isGap(
-  previous: CanonicalMetricDataPoint | undefined,
-  current: CanonicalMetricDataPoint,
+  previous: MetricRollupSourcePoint | undefined,
+  current: MetricRollupSourcePoint,
 ): boolean {
   return (
     !!previous &&
@@ -65,8 +104,8 @@ export function isGap(
 }
 
 export function startsNewSequence(
-  previous: CanonicalMetricDataPoint | undefined,
-  current: CanonicalMetricDataPoint,
+  previous: MetricRollupSourcePoint | undefined,
+  current: MetricRollupSourcePoint,
 ): boolean {
   return (
     !previous ||
@@ -90,8 +129,8 @@ export function usesPredecessor(point: MetricSequencePoint): boolean {
 }
 
 export function previousPoint(
-  all: CanonicalMetricDataPoint[],
+  all: MetricRollupSourcePoint[],
   index: number,
-): CanonicalMetricDataPoint | undefined {
+): MetricRollupSourcePoint | undefined {
   return index > 0 ? all[index - 1] : undefined;
 }

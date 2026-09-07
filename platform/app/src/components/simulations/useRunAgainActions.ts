@@ -1,5 +1,5 @@
 /**
- * Running the same test case again from the run detail drawer: straight
+ * Running the same scenario again from the run detail drawer: straight
  * against the remembered target, or through the modal when there is none.
  */
 

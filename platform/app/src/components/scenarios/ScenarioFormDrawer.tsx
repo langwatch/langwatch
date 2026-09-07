@@ -53,10 +53,10 @@ import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import {
-  type ScenarioFolderOption,
   ScenarioForm,
   type ScenarioFormData,
   type ScenarioInitialData,
+  type ScenarioTestSuiteOption,
 } from "./ScenarioForm";
 import { ScenarioParametersDialog } from "./ScenarioParametersDialog";
 import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
@@ -73,8 +73,8 @@ export type ScenarioFormDrawerProps = {
    * the page after a run starts. Absent keeps the editor as v1 draws it.
    */
   variant?: ScenarioEditorVariant;
-  /** The suite a new case starts in, so a case made inside a suite lands in it. */
-  folderId?: string | null;
+  /** The suite a new scenario starts in, so a scenario made inside a suite lands in it. */
+  testSuiteId?: string | null;
   /**
    * Called instead of leaving for the v1 simulations page once a run starts.
    * Agent Testing stays where it is and opens the run in a drawer.
@@ -84,13 +84,13 @@ export type ScenarioFormDrawerProps = {
 
 export type ScenarioEditorVariant = "agent-testing";
 
-/** What the Agent Testing editor says a test case is for. */
+/** What the Agent Testing editor says a scenario is for. */
 export const AGENT_TESTING_EDITOR_DESCRIPTION =
   "Test your agent on a critical path or edge case";
 
-/** Why Run is off on a test case that has never run. */
+/** Why Run is off on a scenario that has never run. */
 export const NO_REMEMBERED_TARGET_HINT =
-  "Run this test case from the table first, to choose the agent it runs against.";
+  "Run this scenario from the table first, to choose the agent it runs against.";
 
 /**
  * Model overrides chosen in the run dialog. Omitted on a plain save so the
@@ -102,20 +102,8 @@ type ModelOverrides = {
   judgeModel: string | null;
 };
 
-/**
- * What a save without a run confirms. Agent Testing calls the record a test
- * case; every other surface calls it a scenario.
- */
-function savedToastTitle({
-  isAgentTesting,
-  isUpdate,
-}: {
-  isAgentTesting: boolean;
-  isUpdate: boolean;
-}): string {
-  if (isAgentTesting) {
-    return isUpdate ? "Test case updated" : "Test case created";
-  }
+/** What a save without a run confirms. Every surface calls the record a scenario. */
+function savedToastTitle({ isUpdate }: { isUpdate: boolean }): string {
   return isUpdate ? "Scenario updated" : "Scenario created";
 }
 
@@ -137,7 +125,7 @@ export function ScenarioFormDrawerFromUrl(
       {...props}
       open={open}
       scenarioId={params.scenarioId}
-      folderId={props.folderId ?? params.folderId}
+      testSuiteId={props.testSuiteId ?? params.testSuiteId}
       variant={props.variant ?? (params.variant as ScenarioEditorVariant)}
     />
   );
@@ -608,7 +596,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         const saved = await handleSave({ data, skipTransition: true });
         if (saved) {
           toaster.create({
-            title: savedToastTitle({ isAgentTesting, isUpdate: !!scenario }),
+            title: savedToastTitle({ isUpdate: !!scenario }),
             type: "success",
           });
           onClose();
@@ -647,12 +635,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         parameters: parseScenarioParameterDefinitions(scenario.parameters),
       };
     }
-    // A new case made from inside a test suite starts filed in it.
-    if (props.folderId !== undefined && props.folderId !== null) {
-      return { ...(initialFormData ?? {}), folderId: props.folderId };
+    // A new scenario made from inside a test suite starts filed in it.
+    if (props.testSuiteId !== undefined && props.testSuiteId !== null) {
+      return { ...(initialFormData ?? {}), testSuiteId: props.testSuiteId };
     }
     return initialFormData ?? undefined;
-  }, [scenario, initialFormData, props.folderId]);
+  }, [scenario, initialFormData, props.testSuiteId]);
 
   return (
     <Drawer.Root
@@ -670,7 +658,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             {isAgentTesting ? (
               <HStack gap={2}>
                 <Heading size="md">
-                  {scenarioId || scenario ? "Edit test case" : "New test case"}
+                  {scenarioId || scenario ? "Edit scenario" : "New scenario"}
                 </Heading>
                 <CaseVersionChip version={scenario?.version} />
               </HStack>
@@ -777,7 +765,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 is an error state, not a form. `handleSave` refuses either way,
                 so this is what says so rather than what enforces it. */}
             {/* Agent Testing reads three plain buttons: Cancel, Save, Run.
-                The Run button uses the agent this test case last ran against,
+                The Run button uses the agent this scenario last ran against,
                 which the run dialog on the table remembers. */}
             {!hasReadFailed && isAgentTesting && (
               <>
@@ -872,7 +860,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 /**
  * The form with the test suite field filled from the project.
  *
- * Only the Agent Testing editor reads the folder list, and it reads it here
+ * Only the Agent Testing editor reads the test suite list, and it reads it here
  * rather than in the drawer, so every other surface never asks for it.
  */
 function ScenarioFormWithSuites({
@@ -883,27 +871,30 @@ function ScenarioFormWithSuites({
   formRef: (form: UseFormReturn<ScenarioFormData> | null) => void;
 }) {
   const { project } = useOrganizationTeamProject();
-  const { data: folders } = api.suites.folders.getAll.useQuery(
+  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
-  const folderOptions: ScenarioFolderOption[] = useMemo(
+  const testSuiteOptions: ScenarioTestSuiteOption[] = useMemo(
     () =>
-      (folders ?? []).map((folder) => ({ id: folder.id, name: folder.name })),
-    [folders],
+      (testSuites ?? []).map((testSuite) => ({
+        id: testSuite.id,
+        name: testSuite.name,
+      })),
+    [testSuites],
   );
 
   return (
     <ScenarioForm
       defaultValues={defaultValues}
       formRef={formRef}
-      folderOptions={folderOptions}
+      testSuiteOptions={testSuiteOptions}
     />
   );
 }
 
 /**
- * Says the case changed since it was loaded, and offers the reload.
+ * Says the scenario changed since it was loaded, and offers the reload.
  *
  * The refused save wrote nothing, so nothing is lost by leaving the form as
  * it is. Reloading is the destructive choice: it replaces the form with the
@@ -931,7 +922,7 @@ function StaleVersionNotice({
       data-testid="scenario-stale-version"
     >
       <Text fontSize="sm" fontWeight="medium">
-        This test case changed since it was opened
+        This scenario changed since it was opened
       </Text>
       <Text fontSize="xs" color="fg.muted">
         Somebody else saved{" "}

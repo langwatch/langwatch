@@ -3,7 +3,7 @@
  * field, the field styling itself, and the message under a field the server or
  * the schema refused.
  *
- * One copy, so the test case dialog, the run plan dialog and the run dialog
+ * One copy, so the scenario dialog, the run plan dialog and the run dialog
  * all read the same.
  */
 

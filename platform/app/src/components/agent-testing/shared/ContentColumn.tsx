@@ -12,8 +12,17 @@
 
 import { Box, type BoxProps, VStack } from "@chakra-ui/react";
 
-/** How wide the column is allowed to grow. */
+/** How wide the column is allowed to grow beside a rail. */
 export const CONTENT_COLUMN_MAX_WIDTH = "1100px";
+
+/**
+ * How wide the column is allowed to grow with no rail beside it.
+ *
+ * The run plan list is the widest thing the page draws: seven columns, one of
+ * them a name and two of them free text. It reads on its own, so it takes the
+ * width the rail would have used instead of leaving it empty.
+ */
+export const CONTENT_COLUMN_WIDE_MAX_WIDTH = "1280px";
 
 /** The width from which the rail is paid back on the right. */
 export const CONTENT_COLUMN_CENTERING_WIDTH = 1600;
@@ -25,6 +34,8 @@ export const CONTENT_COLUMN_CENTERING_WIDTH = 1600;
 export const CONTENT_COLUMN_GUTTER = 32;
 
 export type ContentColumnProps = BoxProps & {
+  /** How wide the column may grow. Defaults to the width used beside a rail. */
+  columnMaxWidth?: string;
   /**
    * The width of the rail on the left of this column, in pixels. The column
    * pays it back on the right on a wide window. Zero for a surface with no
@@ -35,6 +46,7 @@ export type ContentColumnProps = BoxProps & {
 
 export function ContentColumn({
   railWidth = 0,
+  columnMaxWidth = CONTENT_COLUMN_MAX_WIDTH,
   children,
   ...boxProps
 }: ContentColumnProps) {
@@ -62,7 +74,7 @@ export function ContentColumn({
         align="stretch"
         gap={3}
         width="full"
-        maxWidth={CONTENT_COLUMN_MAX_WIDTH}
+        maxWidth={columnMaxWidth}
         marginX="auto"
       >
         {children}
