@@ -514,7 +514,16 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
     const params = body.params as
       | { id?: unknown; data?: Record<string, unknown> }
       | undefined;
-    assertLegacySsoStringWriteAllowed({ data: params?.data });
+    const organizationId =
+      body.method === "update" && typeof params?.id === "string"
+        ? params.id
+        : null;
+    await assertLegacySsoStringWriteAllowed({
+      organizationId,
+      data: params?.data,
+      hasConnection: async ({ organizationId }) =>
+        (await prisma.ssoConnection.count({ where: { organizationId } })) > 0,
+    });
     const ssoDomain = params?.data?.ssoDomain;
     if (typeof ssoDomain === "string" && ssoDomain.trim() !== "") {
       params!.data!.ssoDomain = ssoDomain.trim().toLowerCase();

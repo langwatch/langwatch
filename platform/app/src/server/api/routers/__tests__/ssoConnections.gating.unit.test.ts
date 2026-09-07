@@ -15,8 +15,6 @@ const { mockService, mockAuditLog, mockSsoConnections } = vi.hoisted(() => ({
   mockService: {
     list: vi.fn(),
     getById: vi.fn(),
-    registerConnection: vi.fn(),
-    claimDomain: vi.fn(),
     approveDomainClaim: vi.fn(),
     rejectDomainClaim: vi.fn(),
     attestDomain: vi.fn(),
@@ -46,8 +44,6 @@ vi.mock(
       SsoConnectionBackofficeService: class {
         list = mockService.list;
         getById = mockService.getById;
-        registerConnection = mockService.registerConnection;
-        claimDomain = mockService.claimDomain;
         approveDomainClaim = mockService.approveDomainClaim;
         rejectDomainClaim = mockService.rejectDomainClaim;
         attestDomain = mockService.attestDomain;
@@ -64,6 +60,8 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   ssoConnections: mockSsoConnections,
   BACKUP_CODE_COUNT: 10,
   betterAuthInstance: () => ({ provide: () => undefined }),
+  clearSignUpConfirmationPending: async () => undefined,
+  databaseHooks: () => ({}),
   deploymentIsFederationCapable: () => false,
   identityBridgeCeremonies: () => ({}),
   identityCeremonies: () => ({}),
@@ -91,6 +89,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   sessionCallbackEvidence: () => ({}),
   sessionClaims: () => ({}),
   sessionRevocation: () => ({ revokeAll: async () => undefined }),
+  ssoAssertion: () => ({}),
   signUpConfirmationEndpoint: () => ({
     confirmSignUpAddress: async () => undefined,
   }),
@@ -159,7 +158,12 @@ describe("the back-office single sign-on surface", () => {
       // a call that stopped being denied fails here instead of handing the
       // assertions below an `undefined` to read properties off.
       const denial = await caller
-        .attestDomain({ ...TARGET, domain: "acme.com" })
+        .attestDomain({
+          ...TARGET,
+          domain: "acme.com",
+          evidenceRef: "ticket:SEC-123",
+          note: "verified by the support operator",
+        })
         .then(
           () => {
             throw new Error(
@@ -185,9 +189,14 @@ describe("the back-office single sign-on surface", () => {
     it("refuses every mutation on the surface, not only the read", async () => {
       const caller = buildCaller("ana@acme.com");
       const attempts = [
-        () => caller.claimDomain({ ...TARGET, domain: "acme.com" }),
         () => caller.approveDomainClaim({ ...TARGET, domain: "acme.com" }),
-        () => caller.attestDomain({ ...TARGET, domain: "acme.com" }),
+        () =>
+          caller.attestDomain({
+            ...TARGET,
+            domain: "acme.com",
+            evidenceRef: "ticket:SEC-123",
+            note: "verified by the support operator",
+          }),
         () => caller.suspend({ ...TARGET, reason: null }),
         () => caller.resume(TARGET),
         () => caller.requestTeardown({ ...TARGET, reason: null }),
@@ -195,7 +204,6 @@ describe("the back-office single sign-on surface", () => {
       for (const attempt of attempts) {
         await expect(attempt()).rejects.toMatchObject({ code: "NOT_FOUND" });
       }
-      expect(mockService.claimDomain).not.toHaveBeenCalled();
       expect(mockService.requestTeardown).not.toHaveBeenCalled();
     });
   });
@@ -205,9 +213,13 @@ describe("the back-office single sign-on surface", () => {
     it("turns every change into a guarded command carrying the operator", async () => {
       const caller = buildCaller("olive@langwatch.ai");
 
-      await caller.claimDomain({ ...TARGET, domain: "acme.com" });
       await caller.approveDomainClaim({ ...TARGET, domain: "acme.com" });
-      await caller.attestDomain({ ...TARGET, domain: "acme.com" });
+      await caller.attestDomain({
+        ...TARGET,
+        domain: "acme.com",
+        evidenceRef: "ticket:SEC-123",
+        note: "verified by the support operator",
+      });
       await caller.activate({ ...TARGET, testLoginAccountId: "acc_test" });
       await caller.suspend({ ...TARGET, reason: null });
       await caller.resume(TARGET);
@@ -215,7 +227,6 @@ describe("the back-office single sign-on surface", () => {
       // Every one reached a lifecycle verb, and every one carried the
       // operator as the actor. The surface mints that; no input supplies it.
       const commanded = [
-        mockService.claimDomain,
         mockService.approveDomainClaim,
         mockService.attestDomain,
         mockService.activateConnection,
@@ -235,10 +246,8 @@ describe("the back-office single sign-on surface", () => {
         "activate",
         "approveDomainClaim",
         "attestDomain",
-        "claimDomain",
         "getAll",
         "getById",
-        "register",
         "rejectDomainClaim",
         "requestTeardown",
         "resume",
@@ -246,40 +255,14 @@ describe("the back-office single sign-on surface", () => {
       ]);
     });
 
-    /** @scenario "Setting up a SAML connection is not something anybody does themselves yet" */
-    it("refuses a SAML registration by name, saying to talk to LangWatch", async () => {
-      const caller = buildCaller("olive@langwatch.ai");
-      // The real service decides this, so the mock steps aside for one call.
-      const { SsoSamlNotSelfServeError } = await import("@langwatch/identity");
-      mockService.registerConnection.mockRejectedValueOnce(
-        new SsoSamlNotSelfServeError("connection type saml"),
-      );
-
-      const refusal = await caller
-        .register({
-          organizationId: "org_acme",
-          type: "saml",
-          providerId: "okta",
-          issuer: null,
-          allowsJit: false,
-        })
-        .then(
-          () => {
-            throw new Error(
-              "register resolved: SAML was accepted as self-serve",
-            );
-          },
-          (error: unknown) => error as { message: string },
-        );
-
-      // The wire message for a handled error IS the code; the words the
-      // reader sees come from the registry keyed by it.
-      expect(refusal.message).toBe("sso_saml_not_self_serve");
-    });
-
     it("records every attempt in the audit log before the command runs", async () => {
       const caller = buildCaller("olive@langwatch.ai");
-      await caller.attestDomain({ ...TARGET, domain: "acme.com" });
+      await caller.attestDomain({
+        ...TARGET,
+        domain: "acme.com",
+        evidenceRef: "ticket:SEC-123",
+        note: "verified by the support operator",
+      });
 
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
