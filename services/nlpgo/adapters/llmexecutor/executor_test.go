@@ -1048,9 +1048,12 @@ func TestGatewayHTTPError_PrefixesProviderName(t *testing.T) {
 //   - top-level `message` (some LiteLLM passthroughs)
 //   - non-JSON body (raw 5xx HTML, future passthrough endpoints)
 //   - empty body (504 from a misbehaving LB)
+//   - an aggregator envelope carrying the upstream's own response
 //
 // In each case the helper must either pull the message out OR fall
 // back to the status-code-only string — never panic on bad input.
+//
+// @scenario "A relayed rejection names the upstream and its reason, never its response"
 func TestGatewayHTTPError_HandlesAlternativeShapes(t *testing.T) {
 	cases := []struct {
 		name string
@@ -1083,6 +1086,50 @@ func TestGatewayHTTPError_HandlesAlternativeShapes(t *testing.T) {
 			want: "gateway returned non-2xx status 400",
 		},
 		{
+			// OpenRouter wraps upstream failures in a generic message and
+			// files the upstream's own error response under
+			// error.metadata.raw. Without its message "Provider returned
+			// error" says nothing actionable.
+			name: "aggregator_metadata_raw_message_appended",
+			body: []byte(`{"error":{"message":"Provider returned error","code":502,"metadata":{"raw":"{\"error\":{\"message\":\"maximum output tokens exceeded\"}}","provider_name":"Stealth"}}}`),
+			code: 502,
+			want: "Provider returned error (Stealth: maximum output tokens exceeded)",
+		},
+		{
+			name: "aggregator_metadata_raw_message_without_provider_name",
+			body: []byte(`{"error":{"message":"Provider returned error","code":502,"metadata":{"raw":"{\"message\":\"upstream timeout\"}"}}}`),
+			code: 502,
+			want: "Provider returned error (upstream timeout)",
+		},
+		{
+			// `raw` is the upstream's whole error RESPONSE, so anything
+			// that is not a JSON document naming a message is dropped: an
+			// HTML page or a plain body can echo request content or a
+			// credential back, and truncating it would redact nothing.
+			// The provider name still says which upstream failed.
+			name: "aggregator_metadata_raw_html_body_is_dropped",
+			body: []byte(`{"error":{"message":"Provider returned error","metadata":{"raw":"<html><body>502 Bad Gateway</body></html>","provider_name":"Stealth"}}}`),
+			code: 502,
+			want: "Provider returned error (Stealth)",
+		},
+		{
+			// A JSON response that names no message is dropped for the
+			// same reason: its other fields are not a message.
+			name: "aggregator_metadata_raw_without_a_message_field_is_dropped",
+			body: []byte(`{"error":{"message":"Provider returned error","metadata":{"raw":"{\"request_id\":\"abc\",\"prompt\":\"the customer's prompt\"}","provider_name":"Stealth"}}}`),
+			code: 502,
+			want: "Provider returned error (Stealth)",
+		},
+		{
+			// The upstream's message field has no line contract of its
+			// own. The surfaced message is one line in an SSE frame and a
+			// trace attribute, so a fragment must not add lines.
+			name: "aggregator_metadata_raw_message_is_flattened_to_one_line",
+			body: []byte(`{"error":{"message":"Provider returned error","metadata":{"raw":"{\"message\":\"  first line\\n\\tsecond line  \"}","provider_name":"Relay\nName"}}}`),
+			code: 502,
+			want: "Provider returned error (Relay Name: first line second line)",
+		},
+		{
 			name: "openai_invalid_api_key",
 			body: []byte(`{"error":{"message":"Incorrect API key provided: sk-***. You can find your API key at https://platform.openai.com/account/api-keys.","type":"invalid_request_error","param":null,"code":"invalid_api_key"}}`),
 			code: 401,
@@ -1097,6 +1144,48 @@ func TestGatewayHTTPError_HandlesAlternativeShapes(t *testing.T) {
 				t.Errorf("Error() = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestGatewayHTTPError_BoundsAggregatorRawDetail pins the size ceiling on
+// the appended aggregator detail.
+//
+// Only the upstream's message field is taken out of `error.metadata.raw`,
+// but a message field has no length contract either. That string ends up
+// in an SSE error frame and a trace attribute, so it is bounded before it
+// is appended. The full body is still on GatewayHTTPError.Body for
+// server-side reading.
+func TestGatewayHTTPError_BoundsAggregatorRawDetail(t *testing.T) {
+	raw := strings.Repeat("x", 5_000)
+	body := []byte(
+		`{"error":{"message":"Provider returned error","metadata":{"raw":"{\"message\":\"` + raw + `\"}"}}}`,
+	)
+
+	got := (&GatewayHTTPError{StatusCode: 502, Body: body}).Error()
+
+	want := "Provider returned error (" + strings.Repeat("x", maxAggregatorRawRunes) + "...)"
+	if got != want {
+		t.Errorf("Error() = %q (len %d), want the detail bounded to %d runes", got, len(got), maxAggregatorRawRunes)
+	}
+}
+
+// TestGatewayHTTPError_BoundsAggregatorProviderName keeps a vendor label
+// from standing in for the detail: `provider_name` comes off the same
+// untrusted envelope as `raw`, so it carries its own ceiling.
+func TestGatewayHTTPError_BoundsAggregatorProviderName(t *testing.T) {
+	name := strings.Repeat("n", 300)
+	body := []byte(
+		`{"error":{"message":"Provider returned error","metadata":{"raw":"{\"message\":\"upstream timeout\"}","provider_name":"` +
+			name + `"}}}`,
+	)
+
+	got := (&GatewayHTTPError{StatusCode: 502, Body: body}).Error()
+
+	want := "Provider returned error (" +
+		strings.Repeat("n", maxAggregatorProviderNameRunes) +
+		"...: upstream timeout)"
+	if got != want {
+		t.Errorf("Error() = %q, want the provider name bounded to %d runes", got, maxAggregatorProviderNameRunes)
 	}
 }
 

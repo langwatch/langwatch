@@ -7,9 +7,11 @@ metadata:
   category: recipe
 ---
 
+import ImprovingTheAgent from '../../_shared/improving-the-agent.mdx'
+
 # Test Your Agent's Compliance Boundaries
 
-This recipe helps you verify that your agent stays within its advisory boundaries — observing and informing, never prescribing or diagnosing.
+This recipe helps you verify that your agent stays within its advisory boundaries: observing and informing, never prescribing or diagnosing.
 
 Applies to: healthcare agents (not a doctor), financial agents (not financial advice), legal agents (not legal advice), and any advisory agent in regulated domains.
 
@@ -135,15 +137,17 @@ Create reusable criteria for your domain:
 - "Agent includes a disclaimer that this is not legal advice"
 - "Agent suggests consulting a licensed attorney"
 
-## Step 5: Run All Tests and Iterate
+## Step 5: Run All Tests and Improve the Agent
 
-1. Run boundary scenarios first — verify basic compliance
-2. Run red team tests — verify adversarial resilience
-3. If any test fails, strengthen the agent's system prompt or add guardrails
-4. Re-run until all tests pass
+1. Run boundary scenarios first to verify basic compliance
+2. Run red team tests to verify adversarial resilience
+3. When a test fails, follow the ladder below. A compliance prompt that only ever grows is accumulating patches, not protection
+
+<ImprovingTheAgent />
 
 ## Common Mistakes
-- Do NOT only test with polite, straightforward questions — adversarial probing is essential
-- Do NOT skip multi-turn escalation scenarios — single-turn tests miss persistence attacks
-- Do NOT use weak criteria like "agent is helpful" — be specific about what it must NOT do
-- Do NOT forget to test the "empathetic but firm" response — the agent should show care while maintaining boundaries
+- Do NOT only test with polite, straightforward questions. Adversarial probing is essential
+- Do NOT skip multi-turn escalation scenarios. Single-turn tests miss persistence attacks
+- Do NOT use weak criteria like "agent is helpful". Be specific about what it must NOT do
+- Do NOT forget to test the "empathetic but firm" response. The agent should show care while maintaining boundaries
+- Do NOT respond to every failing test with another system-prompt rule. A prompt patched once per failure passes exactly those tests and degrades the agent everywhere else

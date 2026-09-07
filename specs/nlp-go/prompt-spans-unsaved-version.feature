@@ -22,7 +22,7 @@ Feature: Prompt spans — unsaved/applied prompt version (draft) carries the bas
   #
   # Bindings:
   #   - Emission scenarios (1, 2, 3, 5, 6, 7): services/nlpgo/tests/integration/prompt_spans_unsaved_version_test.go
-  #   - Drawer "unsaved edits" label (4): langwatch/src/features/traces-v2/.../PromptAccordion.integration.test.ts
+  #   - Drawer "unsaved edits" label (4): platform/app/src/features/traces-v2/.../PromptAccordion.integration.test.ts
 
   Background:
     Given the nlpgo service is running and the project is on the Go-NLP execution path
@@ -76,7 +76,10 @@ Feature: Prompt spans — unsaved/applied prompt version (draft) carries the bas
   # Trace-UI consumption — draft flag drives "Open with unsaved edits" label
   # ============================================================================
 
-  @integration @v1
+    # @unimplemented: the integration test that bound this was skipped from the
+    # day it landed and was removed with the other 22 permanently-skipped suites.
+    # Marked honestly rather than left bound to a test that never ran.
+  @integration @v1 @unimplemented
   Scenario: trace drawer surfaces the draft state on the "Open in Prompts" affordance
     Given a draft execution has produced a Prompt.compile span with "langwatch.prompt.draft" = true
     When I open the trace details drawer for the resulting LLM span

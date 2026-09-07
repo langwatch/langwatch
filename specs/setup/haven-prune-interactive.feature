@@ -1,7 +1,7 @@
 Feature: Interactive prune — pick which stale worktrees to delete
   A machine that juggles dozens of worktrees silts up: old feature branches
   keep their whole tree on disk (node_modules dominates) plus a ClickHouse and
-  Postgres database each. `haven prune` used to only reclaim regenerable build
+  Postgres database each. `haven clean` (formerly `haven prune`) used to only reclaim regenerable build
   artefacts. The interactive prune goes further: it scans every worktree at once,
   shows how big each is, which databases it owns, and how long it has sat idle,
   then lets me tick the ones to delete outright — pre-ticking everything that has
@@ -28,7 +28,7 @@ Feature: Interactive prune — pick which stale worktrees to delete
 
   @unit
   Scenario: Every worktree is scanned concurrently for its footprint
-    When I run "haven prune" in a terminal
+    When I run "haven clean" in a terminal
     Then each worktree's disk size, databases, and idle time are detected in parallel
     And each row fills in its footprint as its scan lands, behind a loading state
 
@@ -97,12 +97,12 @@ Feature: Interactive prune — pick which stale worktrees to delete
 
   @integration @unimplemented
   Scenario: Agents get a read-only report instead of the picker
-    When an agent runs "haven prune"
+    When an agent runs "haven clean"
     Then the same concurrent scan runs and prints a plain table with a "*" on the stale-enough rows
     And nothing is deleted without a terminal
 
   @integration @unimplemented
-  Scenario: The old artefact-only reclaim stays available
-    When I run "haven prune --artifacts"
-    Then only regenerable build artefacts are reclaimed and no worktree is deleted
-    And "--yes" is still required to act rather than dry-run
+  Scenario: The unattended reclaim is artefacts and orphan processes only
+    When I run "haven clean --yes"
+    Then only regenerable build artefacts and orphaned dev processes are reclaimed
+    And no worktree is deleted and no database is dropped

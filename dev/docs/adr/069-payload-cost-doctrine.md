@@ -6,6 +6,8 @@
 
 **Shipping with this ADR (phase 1):** enqueue-time filtering on the event-subscriber contract, adopted by the coding-agent span-facts subscriber — the deferred ADR-066 scope-table item ("move the coding-agent-name gate before enqueue"), shipped. The enqueue-time *projection* that would also lift the derived slice at the seam is deliberately deferred to phase 2 (see Sequencing for why the seam is the wrong place for it). Phases 2–4 are sequenced follow-ups (below), not built here.
 
+**Also shipped, out of phase order:** the seam grew a second hook, `stage`, and the coding-agent span-facts subscriber now travels as a claim-check rather than carrying the matched span whole — the claim-check half of phase 2, landed early. It arrived stacked onto this ADR's PR rather than after it, so the Sequencing section below does not read in shipping order on its own. **Read the 2026-07 amendment at the end before treating anything in phase 2 as unbuilt**; it states precisely which half shipped and which did not.
+
 **Builds on:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the same economics, one plane over. ADR-066 took `event_log` off the per-item hot path; this ADR takes bulk payloads off the per-item *scheduling* plane. Its scope table already named this ADR's phase 1 and deferred it.
 
 **Sibling doctrine:** [ADR-068](./068-windowed-clickhouse-reads.md) — 068's discipline is *measure before you limit*: a fallback cannot be rate-limited while it is invisible. This ADR is the memory-plane statement of the same discipline: a scheduler cannot budget a cost that is not declared. Both replace "hope, then get killed" with "see, then bound".
@@ -241,7 +243,11 @@ in-flight and retry stages (invariant 2), and the grant pool behind it (phase 3)
 statement of what is left. A future phase-2 implementer should read this as "the
 reference mechanism exists and has one adopter", not as "phase 2 is underway".
 
-Two consequences worth naming rather than discovering:
+Three consequences worth naming rather than discovering:
+
+- **A build that predates the type drops the reference silently.** `span_referenced` is a new event type, so a pre-#6117 worker draining a job staged by a new one fails its `span_received` type check, returns, and **completes the job**. No throw, no drop counter, no log — the span facts for that event are simply gone. The version gate does not help: it protects a build that already knows the type against a *future* version, not a build that has never heard of it. #6117 was written to be deployed consumer-first for exactly this reason, and then merged stacked onto #6111, so both halves shipped in one commit and the protection was lost. **Any future adopter of `stage` must ship the consumer half at least one release ahead of the producer half** — the one-release consumer-first deploy is the mechanism, and it only works if the two halves ship apart.
+
+  **Decided (2026-07-28): this adopter is NOT retrofitted with a producer flag.** For the hosted fleet the window has already passed — #6111/#6117 are merged and deployed. The exposure that remains is a **self-hosted upgrade crossing the #6117 boundary in one step**, where coding-agent span facts landing on a not-yet-restarted worker are lost silently. Accepted, and recorded here so it is not rediscovered.
 
 - **Span-facts delivery is now store-dependent.** The subscriber was previously
   self-contained: everything it needed was in the job. It now depends on the
@@ -262,6 +268,62 @@ Two consequences worth naming rather than discovering:
   queue contract with its own blast radius, not a line in this PR. If this class
   of blocked group is observed in practice, that knob is the follow-up — with
   the retry metrics to size it, per ADR-068's measure-before-you-limit rule.
+
+## Amendment: a bounded derivation is a third staged shape, and the claim-check adopter moves to it (2026-08)
+
+The blocked-group class the previous amendment named as hypothetical was
+observed in production on 2026-08-05: 22 groups parked in `:blocked`, every one
+of them a `codingAgentSpanFactsDispatch` claim-check that had exhausted all 25
+attempts against `Referenced span is not readable yet`, the oldest sitting 7
+hours. The retry budget was not the problem — the jobs used all of it. The
+dependency was.
+
+**The doctrine gains a third option for what staged work may carry.** Until now
+it was a pointer or the whole payload. Add: a **bounded derivation** — the
+subscriber's finished result, carried on the job, when that result is drawn from
+a fixed, closed vocabulary and holds no content.
+
+The boundedness test is what keeps this from being "queue the payload again",
+and it is deliberately structural rather than a byte count:
+
+1. the vocabulary is a **closed list** enumerated in code, not "whatever keys
+   this event happens to carry", so the staged size is bounded by the list's
+   length and not by the payload's;
+2. the values are **scalars only** — lengths, ids, names, counters — so content
+   (prompts, replies, tool output) cannot ride even when a listed key exists;
+3. the canonical row remains the only place content is readable from.
+
+`CODING_AGENT_CONTRIBUTION_KEYS` and `contributionFactsSchema` already satisfy
+all three, and the *log* contribution path has always staged exactly this shape.
+The span path taking a pointer instead was the inconsistency, not the rule.
+
+**What this buys.** The subscriber becomes self-contained again — the property
+the previous amendment recorded losing. No sibling-write race, no store
+dependency, no retry against a projection this subscriber does not own, and the
+class of blocked group above stops being reachable. Payload cost is unchanged in
+kind: a derivation off a closed list is cheap for the same reason a pointer is.
+
+**What it does not buy.** Invariant 1 is still unmet — a carried derivation
+declares no byte size either, so phase 2's byte-bounded stages and phase 3's
+grant pool remain untouched. This narrows one adopter's failure surface; it is
+not progress through the sequencing above.
+
+**Deploy order, and this time enforced.** The previous amendment recorded the
+consumer-first rule and then lost it by merging both halves in one commit. The
+move to a carried derivation is a new staged type and carries the identical
+hazard, so it ships as two releases: **R1 teaches the handler the new shape and
+produces nothing new; R2 flips the producer.** R1 also closes the hole that made
+the hazard silent — the handler's fall-through now distinguishes "an event kind
+I know and decline" (completes quietly, the legitimate case) from "a shape I
+cannot read at all" (throws into the retry). A pre-R1 worker still swallows an
+R2 job silently, which is exactly why R2 must not ship until R1 is everywhere;
+but from R1 onward the failure mode is a retry rather than a loss.
+
+The claim-check mechanism itself stays — `span_referenced` remains the right
+shape for a subscriber whose result is *not* a bounded derivation, and the
+handler keeps resolving it after R2 so the references staged before the flip
+drain. What changes is that a claim-check is no longer the default answer for a
+subscriber that only ever wanted a handful of scalars.
 
 ## References
 

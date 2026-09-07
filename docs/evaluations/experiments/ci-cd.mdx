@@ -37,6 +37,10 @@ Configure your experiment once in the LangWatch Experiments via UI, then trigger
    ```
    Or open the **Run Options** menu in the experiment toolbar and choose **Run in CI/CD** for ready-to-copy snippets.
 
+<Frame>
+<img src="/images/evaluations/workbench-run-via-api.png" alt="The Run via API dialog with the Python, TypeScript and Shell tabs, the data source tabs and the Python snippet" />
+</Frame>
+
 3. **Run from CI/CD:**
 
 <Tabs>
@@ -59,7 +63,7 @@ result.printSummary();
   </Tab>
 </Tabs>
 
-That's it! The experiment runs with the configuration saved in LangWatch.
+The experiment runs with the configuration saved in LangWatch.
 
 ### GitHub Actions Example
 
@@ -133,10 +137,10 @@ console.log(runUrl);        // open the run in LangWatch
 
 By default the run uses the dataset attached to the experiment. You can override the data from CI without changing the platform configuration:
 
-- `parameters` — constant inputs merged into every row (and the single row when there is no dataset), handy for a feature flag or a model name
-- `data` — inline rows to evaluate
-- `dataset_id` — a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
-- `row_indices` — a subset of dataset row indices to evaluate, instead of the whole dataset
+- `parameters`: constant inputs merged into every row (and the single row when there is no dataset), for example a feature flag or a model name
+- `data`: inline rows to evaluate
+- `dataset_id`: a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
+- `row_indices`: a subset of dataset row indices to evaluate, instead of the whole dataset
 
 <Tabs>
   <Tab title="Python">
@@ -160,6 +164,8 @@ await langwatch.experiments.runWithResults("my-experiment", { parameters: { mode
 ```
   </Tab>
 </Tabs>
+
+Test suite runs also accept a `parameters` field. There the values apply to every scenario in the run. See [Scenario run parameters](/agent-testing/run-parameters).
 
 ---
 
@@ -189,6 +195,7 @@ for idx, row in experiment.loop(dataset.iterrows()):
     experiment.evaluate(
         "ragas/faithfulness",
         index=idx,
+        settings={},
         data={
             "input": row["input"],
             "output": response,
@@ -273,7 +280,7 @@ Where `scripts/run_evaluation.py` contains your full experiment code.
 
 ### Comparing Multiple Configurations
 
-SDK experiments shine when comparing different configurations:
+SDK experiments can compare different configurations in the same run:
 
 ```python
 import langwatch
@@ -283,21 +290,21 @@ experiment = langwatch.experiment.init("model-comparison-ci")
 
 for idx, row in experiment.loop(dataset.iterrows()):
     def compare(idx, row):
-        # Test GPT-4
-        with experiment.target("gpt-4o", {"model": "gpt-4o", "temperature": 0.7}):
-            response = call_openai("gpt-4o", row["input"])
+        # Test the OpenAI model
+        with experiment.target("gpt-5-mini", {"model": "gpt-5-mini"}):
+            response = call_openai("gpt-5-mini", row["input"])
             experiment.log_response(response)
-            experiment.evaluate("ragas/faithfulness", index=idx, data={
+            experiment.evaluate("ragas/faithfulness", index=idx, settings={}, data={
                 "input": row["input"],
                 "output": response,
                 "contexts": row["contexts"],
             })
 
-        # Test Claude
-        with experiment.target("claude-3.5", {"model": "claude-3-5-sonnet"}):
-            response = call_anthropic(row["input"])
+        # Test the Anthropic model
+        with experiment.target("claude-sonnet-5", {"model": "claude-sonnet-5"}):
+            response = call_anthropic("claude-sonnet-5", row["input"])
             experiment.log_response(response)
-            experiment.evaluate("ragas/faithfulness", index=idx, data={
+            experiment.evaluate("ragas/faithfulness", index=idx, settings={}, data={
                 "input": row["input"],
                 "output": response,
                 "contexts": row["contexts"],
@@ -328,10 +335,10 @@ Both approaches output a CI-friendly summary:
   Pass Rate:  93.3%
 ────────────────────────────────────────────────────────────
   TARGETS:
-    gpt-4o: 20 passed, 2 failed
+    gpt-5-mini: 20 passed, 2 failed
       Avg latency: 1250ms
       Total cost: $0.0125
-    claude-3.5: 22 passed, 1 failed
+    claude-sonnet-5: 22 passed, 1 failed
       Avg latency: 980ms
       Total cost: $0.0098
 ────────────────────────────────────────────────────────────
@@ -460,7 +467,7 @@ except EvaluationRunFailedError as e:
   <Tab title="TypeScript">
 ```typescript
 import {
-  EvaluationNotFoundError,
+  ExperimentNotFoundError,
   EvaluationTimeoutError,
   EvaluationRunFailedError,
 } from "langwatch";
@@ -469,7 +476,7 @@ try {
   const result = await langwatch.experiments.run("my-experiment", { timeout: 300000 });
   result.printSummary();
 } catch (error) {
-  if (error instanceof EvaluationNotFoundError) {
+  if (error instanceof ExperimentNotFoundError) {
     console.error("Experiment not found - check the slug");
   } else if (error instanceof EvaluationTimeoutError) {
     console.error(`Timeout: only ${error.progress}/${error.total} completed`);
@@ -486,12 +493,12 @@ try {
 
 ## REST API (Platform Experiments)
 
-For custom integrations, you can use the REST API directly:
+For custom integrations, you can use the REST API directly. The paths below are also served under `/api/evaluations/v3/`, the prefix earlier SDK versions call.
 
 ### Start a Run
 
 ```bash
-curl -X POST "https://app.langwatch.ai/api/evaluations/v3/{slug}/run" \
+curl -X POST "https://app.langwatch.ai/api/experiments/{slug}/run" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -508,7 +515,7 @@ Response:
 ### Poll for Status
 
 ```bash
-curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}" \
+curl "https://app.langwatch.ai/api/experiments/runs/{runId}" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -531,11 +538,11 @@ Response (completed):
 ### Fetch Results
 
 ```bash
-curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}/results?experimentSlug={slug}" \
+curl "https://app.langwatch.ai/api/experiments/runs/{runId}/results?experimentSlug={slug}" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
-Returns the per-row dataset entries (input, output, trace id, duration) and evaluation scores for the run.
+Returns the per-row dataset entries (input, output, trace id, duration) and evaluation scores for the run. `experimentSlug` is optional for the first 24 hours after the run and required after that.
 
 ---
 

@@ -30,6 +30,59 @@ Feature: Event-sourced analytics materialization
       Then the slim row is rebuilt from the trace's full event history
       And it carries the topic AND the trace's original cost and tokens
 
+  # The anchor rule below is ADR-071 (dev/docs/adr/071-coding-agent-session-immutable-storage-anchor.md):
+  # the time a slim row is stored and expired under is a storage decision, held
+  # separately from any time the trace itself reports.
+  Rule: A slim row is anchored on a real time it was observed at, and stays there
+
+    @unit
+    Scenario: A trace whose only signal is a log record is anchored in real time
+      Given a trace that emits log records and never emits a span
+      When its slim row is written
+      Then the row is anchored at the time its first signal was observed
+      And it is not filed under a time so old that retention would already have discarded it
+
+    @unit
+    Scenario: A trace with spans is anchored at its first span's start
+      Given a trace whose spans arrive in the order they started
+      When its slim row is written
+      Then the row is anchored at the first span's start
+
+    @unit
+    Scenario: A trace recorded before the upgrade keeps its place in the timeline
+      Given a trace that was recorded before storage time was held separately
+      When it is read back after the upgrade
+      Then it still appears at the same point in analytics as it did before
+      And its duration is still measured from the earliest span it reported
+
+    @unit
+    Scenario: A trace that reports a start time years ahead is not filed under it
+      Given a trace whose reported start time is years in the future
+      When it is recorded
+      Then it does not appear years ahead in analytics
+      And it is discarded on the normal retention schedule rather than outliving it
+
+    @unit
+    Scenario: A late earlier-starting span moves the trace's timing, not its anchor
+      Given a trace already anchored by its first span
+      When a span that started earlier arrives late
+      Then the trace's measured start moves back to the earlier span
+      But the row stays anchored where it was first stored
+
+    @unit
+    Scenario: A trace's duration is measured from its spans, never from a log record
+      Given a trace whose log record is accepted after its span has finished
+      When both signals have been folded
+      Then the trace's duration is the span's own, not the wait until the log arrived
+      And it is the same duration whichever of the two arrived first
+
+    @unit
+    Scenario: A log-led trace resumed from its committed row keeps its anchor and its timing
+      Given a log-led trace whose committed state is recovered after its cache expired
+      When its remaining signals are folded onto the recovered state
+      Then it is anchored exactly where the uninterrupted fold anchors it
+      And its measured start and duration match the uninterrupted fold's
+
   Rule: The rollup sums additive metrics correctly from per-span increments
 
     Scenario: Total cost is the sum of the trace's span costs

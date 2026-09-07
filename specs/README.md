@@ -62,13 +62,21 @@ Annotations live in the normal test files (`*.unit.test.ts`, `*.integration.test
 One `it` block may carry multiple `@scenario` annotations if it covers several scenarios;
 one scenario may be bound by multiple tests.
 
-The `langwatch/scripts/check-feature-parity.ts` script parses watched feature files
+The `platform/app/scripts/check-feature-parity.ts` script parses every feature file
 and fails CI if any tagged (`@unit` / `@integration` / `@e2e` / `@regression`) scenario
-has no binding. Opt a feature file into enforcement by adding it to the `WATCHED`
-list inside the script.
+has no binding. Enforcement is on by default and fails closed — a new feature file
+needs no registration anywhere. The script carries two ratcheted deny-lists instead:
+`LEGACY_UNBOUND` for files whose enforced scenarios are not yet bound, and
+`LEGACY_INERT` for files that yield no enforced scenario at all (usually because
+nothing in them is tagged). Both only shrink; taking a file off either list is the
+ratchet clicking, and a file that stops needing its entry must lose it.
+
+Note what that means for an untagged file: it enforces nothing, so it reports
+`0/0 scenarios bound` and reads as green while binding nothing at all. Tag the
+scenarios, or the spec is decorative.
 
 Run locally:
 
 ```bash
-cd langwatch && pnpm check:feature-parity
+cd platform/app && pnpm check:feature-parity
 ```

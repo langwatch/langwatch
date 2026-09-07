@@ -105,6 +105,14 @@ func (l *listenSvc) Start(ctx context.Context) error {
 	return nil
 }
 
+// Stop drains the listener: no new connections are accepted, and in-flight
+// requests run until they finish or ctx expires.
+//
+// http.Server.Shutdown covers ordinary requests only. A hijacked connection
+// (websockets, raw upgrades) is neither closed nor waited for, so it gets
+// none of the graceful budget and dies with the process. Anything that
+// hijacks must register its own shutdown notification through
+// srv.RegisterOnShutdown and be waited on separately.
 func (l *listenSvc) Stop(ctx context.Context) error {
 	return l.srv.Shutdown(ctx)
 }

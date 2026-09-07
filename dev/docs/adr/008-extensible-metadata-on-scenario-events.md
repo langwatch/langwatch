@@ -6,6 +6,8 @@
 
 > **Amendment (2026-07, PR #4547):** Scenario events are no longer stored in Elasticsearch. They are ingested through the event-sourcing pipeline and stored in ClickHouse; the read projections are served from the ClickHouse scenario-run read model. The metadata extensibility decision below still stands — the outer `metadata` remains pass-through and the `langwatch` namespace remains strictly typed — but the "ES mappings" section describes the removed backend and is kept only as history.
 
+> **Amendment (2026-08, Agent Testing v2):** `metadata.note` is a named convention on the user side of metadata: a short free text note for one batch run, set by the platform, the CLI or an SDK/CI caller. It is a convention only, so no schema, event version or storage change. See the amendment section at the end of this file.
+
 ## Context
 
 Scenario run events (`SCENARIO_RUN_STARTED`, `SCENARIO_RUN_FINISHED`, `SCENARIO_MESSAGE_SNAPSHOT`) follow the AG-UI event design and are emitted by the `@langwatch/scenario` SDK. The server receives them as-is and stores them in Elasticsearch -- there is no server-side enrichment.
@@ -72,6 +74,7 @@ await scenario.run({
 | `targetReferenceId` | `string` | yes | ID of the agent/prompt target this run was executed against |
 | `targetType` | `"prompt" \| "http" \| "code"` | yes | Target kind, matches `scenarioJobSchema.target.type` |
 | `simulationSuiteId` | `string` | no | `SimulationSuite.id` — which suite dispatched this run |
+| `scenarioVersion` | `number` | no | `Scenario.version` at the moment the run was queued; absent on runs recorded before scenario versioning existed |
 
 The entire `langwatch` object is optional on metadata (SDK users never send it).
 
@@ -97,6 +100,64 @@ The entire `langwatch` object is optional on metadata (SDK users never send it).
 **Neutral:**
 - The server remains a dumb pipe
 - The `@langwatch/scenario` SDK needs a release for both JS and Python packages
+
+## Amendment (2026-08, Agent Testing v2): the `note` convention
+
+A run note is a short free text line that belongs to one batch run. It works
+like a commit message or a hypothesis: "switched judge to the stricter criterion",
+"nightly regression after the retry fix". LangWatch shows it in the runs
+sidebar and in the run header, so a person can tell later what a run was for.
+
+**The carrier is the top-level `note` key of `metadata`.** It sits on the user
+side of metadata, not inside the reserved `langwatch` namespace. That namespace
+requires `targetReferenceId` and `targetType`, which are platform foreign keys
+an SDK or CI caller cannot supply, so a note placed there would work for
+platform runs only. `metadata.note` is one convention that every source uses in
+the same way.
+
+```json
+{
+  "type": "SCENARIO_RUN_STARTED",
+  "metadata": {
+    "name": "Login Test",
+    "note": "nightly regression after the retry fix"
+  }
+}
+```
+
+Each source sets it like this:
+
+| Source | How |
+|---|---|
+| Platform run dialog | The note field of the run dialog. |
+| Command line | `--note` on `langwatch suite run` and `langwatch scenario run`. |
+| SDK or CI | `scenario.run({ metadata: { note: process.env.GITHUB_SHA } })`. |
+
+**Write path.** For runs the platform starts, the note is stamped at queue time
+onto every run in the batch, so a run carries its note from its first moment.
+The note is trimmed, and an empty note is dropped rather than stored as an
+empty string. A run without a note therefore records metadata identical to what
+it recorded before notes existed.
+
+The 200-character limit belongs to the input paths that start a run: the run
+dialog and the `--note` option of the CLI. Both refuse a longer note before any
+run is queued, so nothing is lost. A note that arrives on a `SCENARIO_RUN_STARTED`
+event from an SDK or a CI job is trimmed and dropped when blank, matching a
+platform note, but its length is not checked: the event reports a run that
+already happened, and refusing it over the note would lose the run itself.
+
+**Read path.** Batch history reads the note back from the run rows it already
+loads for the page. There is no second query and no join. A batch produced only
+by SDK runs, with no run plan record behind it, reports its note in the same
+way.
+
+**Scope.** The `note` key is a convention, not a schema change. `metadata` is
+already pass-through, so no ingestion schema, no event version and no ClickHouse
+migration changes. The SDKs need no release. The key is added to the typed read
+models only, so the interface can read `run.metadata.note` in TypeScript.
+
+Specs: `specs/suites/run-notes.feature`,
+`specs/suites/run-note-metadata-convention.feature`.
 
 ## References
 

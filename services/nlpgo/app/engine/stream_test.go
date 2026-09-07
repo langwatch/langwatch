@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
@@ -70,6 +71,45 @@ func TestExecuteStream_HeartbeatExitDoesNotRaceWithClose(t *testing.T) {
 //	                  executionState.timestamps?.finished_at;
 //
 // Both must be present or the line goes silent.
+// stateEvent hand-projects NodeState field by field, so a field added to the
+// struct reaches nobody until it is added here too. The agent editor's test
+// button shows the endpoint's status, headers and the rendered request body,
+// and it can only show what this projection carries.
+func TestStateEvent_CarriesHTTPDiagnostics(t *testing.T) {
+	ns := &NodeState{
+		ID:     "http",
+		Status: "success",
+		HTTP: &NodeHTTP{
+			StatusCode:      200,
+			StatusText:      "OK",
+			ResponseHeaders: map[string]string{"Content-Type": "application/json"},
+			RenderedBody:    `{"q":"hello"}`,
+		},
+	}
+
+	ev := stateEvent("trace-x", "http", ns)
+
+	payload, ok := ev.Payload["execution_state"].(map[string]any)
+	if !ok {
+		t.Fatalf("execution_state missing or wrong type")
+	}
+	got, ok := payload["http"].(*NodeHTTP)
+	if !ok {
+		t.Fatalf("http diagnostics missing from execution_state; got %v", payload["http"])
+	}
+	if got.StatusCode != http.StatusOK || got.RenderedBody != `{"q":"hello"}` {
+		t.Fatalf("http diagnostics not carried through: %+v", got)
+	}
+}
+
+func TestStateEvent_OmitsHTTPDiagnosticsForOtherNodes(t *testing.T) {
+	ev := stateEvent("trace-x", "code", &NodeState{ID: "code", Status: "success"})
+	payload := ev.Payload["execution_state"].(map[string]any)
+	if _, present := payload["http"]; present {
+		t.Fatalf("a non-HTTP node must not carry an http key")
+	}
+}
+
 func TestStateEvent_TimestampsHaveBothStartedAndFinished(t *testing.T) {
 	ns := &NodeState{
 		ID:         "code",

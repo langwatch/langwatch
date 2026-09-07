@@ -1,156 +1,150 @@
 ---
 title: Virtual Keys
-description: Mint, rotate, revoke, and scope virtual API keys for the LangWatch AI Gateway.
+description: Create, scope, rotate, disable and revoke the keys your applications use to call the LangWatch AI Gateway.
 sidebarTitle: Virtual Keys
 ---
 
-A **virtual key** (VK) is a LangWatch-issued credential that a downstream client (SDK, coding CLI, production app) presents to the gateway in place of a provider-native API key. The gateway resolves the VK to an owning organisation, a set of scope rows (`VirtualKeyScope[]` at any combination of ORGANIZATION, TEAM, PROJECT), a set of provider credentials, a routing policy, a cache policy, guardrails, blocked patterns, and budgets, everything the VK is allowed to do and how it is observed.
+## What a virtual key is
 
-VKs replace raw provider keys in your applications. The provider keys themselves stay inside LangWatch (configured under **Settings → Model Providers**, the same surface you already use for evaluators and playground) and are never shared with downstream clients.
+A virtual key is the credential your application presents to the gateway in place of a provider API key. A virtual key is like a virtual credit card that you can attach a budget to: it belongs to a project, a team, an organization or one person, it reaches only the providers you allow, and you can rotate, disable or revoke it without touching the provider account.
 
-<CardGroup cols={2}>
-  <Card title="Quickstart, first request in 5 min" icon="rocket" href="/ai-gateway/quickstart">
-    Create a VK, call `/v1/chat/completions`, read correlation headers.
-  </Card>
-  <Card title="Use your VK from Python, TypeScript" icon="code" href="/ai-gateway/sdks/python">
-    OpenAI, Anthropic SDK drop-in, just swap `base_url` and `api_key`.
-  </Card>
-  <Card title="Plug your VK into Claude Code, Codex, Cursor" icon="terminal" href="/ai-gateway/cli/overview">
-    Route coding-assistant traffic through the gateway for budget + audit.
-  </Card>
-  <Card title="Manage VKs from the terminal" icon="keyboard" href="/integration/cli#virtual-keys">
-    `langwatch virtual-keys create | list | rotate | revoke`, scriptable.
-  </Card>
-</CardGroup>
+The provider keys stay in LangWatch, under **Settings > Model Providers**. Your application never sees them.
 
-## Format
+## Create a virtual key
 
-`vk-lw-{live|test}_<26-char-ULID>`, 40 characters total.
+Open **AI Gateway > Virtual Keys** and click **New virtual key**. The drawer has these fields:
 
-- `vk-lw-`, fixed prefix, grep-friendly, scans well in DLP, GitGuardian.
-- `live` or `test`, environment prefix. Prevents accidentally using a test key against production or vice versa.
-- 26-char Crockford-base32 ULID, time-prefixed, monotonic, renders sensibly in the dashboard and in your logs.
-
-The secret is shown **exactly once** at creation. After you dismiss the creation dialog it can never be retrieved again, only the first 12 characters (`vk-lw-01HZX9`) are visible in the list.
-
-Server-side, the secret is stored as `hex(hmac_sha256(server_pepper, secret))`. Peppered HMAC-SHA256 is the right primitive for API keys (as opposed to passwords), the VK body already carries 130 bits of entropy as a ULID, so argon2id-style stretching would just add 50–100 ms of pointless latency on every cold resolve-key call. A short prefix is stored alongside for grep/lookup.
-
-## Creating a VK
-
-Under **AI Gateway → Virtual Keys** click **New virtual key** and fill:
-
-| Field | Meaning |
+| Field | What it sets |
 |---|---|
-| Name | Human label. Used in the UI and in `langwatch.vk.name` trace attribute. |
-| Environment | `live` (default) or `test`. Reflected in the key prefix. |
-| Scopes | One or more rows selecting where the VK is valid (ORGANIZATION / TEAM / PROJECT). The picker shows every scope the caller holds `virtualKeys:manage` on. Cross-scope VKs (e.g. TEAM "platform" AND TEAM "data-sci") require manage on every named scope. |
-| Routing policy | Optional. If unset, the VK falls back to the org's default policy, ordered by `fallbackPriorityGlobal` then `createdAt` across every ModelProvider visible in the VK's scope cascade. Pin a specific policy to override the default fallback order. |
-| Models allowed | Optional allowlist. Blank = "any model the eligible ModelProviders support." |
-| Model aliases | Map of client-friendly names → `provider/model`. E.g. `gpt-4o: azure/my-deployment`. |
-| Cache policy | `respect` (default), `force`, or `disable`. |
-| Guardrails | Attach existing LangWatch evaluators as `pre`, `post`, `stream_chunk` hooks, the drawer has a dedicated picker section listing every project evaluator with `executionMode = AS_GUARDRAIL`. Fail-open toggles on pre and post directions surface the concrete `403`, 50 ms, terminal-SSE enforcement shape so operators know what the toggle actually does. See [Guardrails → Attaching guardrails to a VK](/ai-gateway/guardrails#attaching-guardrails-to-a-vk). |
-| Blocked patterns | Regex allow/deny for tool names, MCP servers, URLs. |
-| Initial budget | Optionally attach a budget on creation. Budgets can always be added later. |
-| Personal (principal) | Optional. Mark the VK as personal by setting `principalUserId`. Personal VKs cascade budgets through the principal first. The CLI device-flow self-mints a personal VK at ORG scope without requiring an explicit `virtualKeys:manage` grant. |
+| **Name** | The name shown in the list, up to 128 characters. |
+| **Description**, **Tags** | Optional. Tags are `key=value` pairs shown on the list row. |
+| **Ownership** | **Project**, **Personal**, **Team** or **Organization**. See [Ownership and scopes](#ownership-and-scopes). |
+| **Budget** | An amount in USD per day, week or month. Leave it empty for no cap on the key itself. Below the field, **Inherited budgets** lists every budget that already applies to the key. |
+| **Provider access** | **All providers**, or a selection. Expand a provider to restrict the key to specific models. |
+| **Routing** | **Default: no fallback**, **Fall back to all eligible providers**, or one of your routing policies. |
+| **Expires** | **Never**, **1 day**, **7 days**, **30 days**, **6 months**, **1 year**, or a custom date. A date in the past is refused. |
 
-Click **Create**. The full secret is revealed inline with a **Copy** button and a **I've saved it, close** confirmation that must be checked before dismissing. After dismiss, the secret is gone for good.
+<Frame caption="The create drawer. Inherited budgets lists the organization budget that already applies to a project key.">
+  <img src="/images/ai-gateway/vk-create-drawer.png" alt="The New virtual key drawer with ownership, budget, inherited budgets, provider access and routing" />
+</Frame>
 
-## VK detail page
+Click **Create**. The secret is shown once, with a **Copy** button. LangWatch stores only a hash of it. The list shows the prefix, for example `vk-lw-01HZX9N`.
 
-Clicking a row in the list opens the detail page (`/gateway/virtual-keys/<vk_id>`). Four sections, top-to-bottom:
+**All providers** means the key reaches every provider its scopes can see, including providers you add later. An explicit selection stays as picked until you edit the key.
 
-1. **Header**: name + action bar: **Audit history** (deep-links into `/settings/audit-log?targetKind=virtual_key&targetId=<vk_id>` with a pre-filled filter chip showing only this VK's events alongside any related platform actions), **Edit**, **Rotate**, **Revoke**. The Audit history deep-link is the fastest way to reconstruct "who changed this VK, when" during an incident.
-2. **Identity, Activity**: id, prefix, environment, status, description, and humanised **Last used** + **Created** (hover for exact timestamp). Revision number shown when non-zero, increments on every `gateway.virtual_key.updated` audit row.
-3. **Provider fallback chain**: ordered rows, each showing provider icon + readable name + ModelProvider id + position badge (`primary`, `fallback-1`, `fallback-2`, …). The list is computed from the bound routing policy (or the default policy if none is pinned). Clarifies at-a-glance which provider is in the driver's seat and what falls back when it errors.
-4. **Configuration summary**: compact read-only view (no drawer needed) of the runtime config that's actually in effect:
-   - **Tags**: colored subtle badges, the same strings shown on the list row.
-   - **Cache mode**: badge (`respect`, `force`, `disable`) + TTL on force.
-   - **Rate limits**: `rpm` + `rpd` outline badges (or em-dash if unset).
-   - **Model aliases**: expanded as `alias → target` pairs, up to 5 visible with "+N more" overflow.
-   - **Blocked patterns**: grouped by dimension (`tools`, `mcp`, `urls`, `models`) with red-tinted regex chips; click-through opens the edit drawer at that section.
-   - **Guardrails**: count + direction breakdown (`N pre / M post / K stream_chunk`), each clickable to the guardrail config.
-5. **Usage (last 30 days)**: stat tiles (Total spend, Requests, Avg $/request), a 30-day filled area sparkline, Spend-by-model row, and the top 10 recent debits table (When relative, Model, Tokens in→out, Amount smart-decimals, Latency ms). Guarded on `virtualKeys:view` + `gatewayUsage:view`.
+<Frame caption="The Virtual Keys list: name, prefix, status, scopes, routing, spend this month and last use. A red bar under the spend marks a key past a budget.">
+  <img src="/images/ai-gateway/vk-list-spend.png" alt="The Virtual Keys list with active and expired keys and the Spent this month column" />
+</Frame>
 
-Everything on this page is read-only except the four header actions, edits happen in the drawer (`Edit`) or dedicated flows (`Rotate`, `Revoke`).
+## Ownership and scopes
 
-## Rotation
+Ownership decides who can see and manage the key, which providers it reaches and where its traces and costs land.
 
-Rotate a VK when you believe the secret may have leaked or as part of routine hygiene.
+| Ownership | Scope | Traces and costs land in |
+|---|---|---|
+| **Project** | The project | That project |
+| **Personal** | Your personal workspace project, with you as the principal | Your personal workspace |
+| **Team** | The team | A project you pick in the drawer |
+| **Organization** | The organization | A project you pick in the drawer |
 
-1. Open the VK in the list.
-2. Click **Rotate secret**.
-3. LangWatch mints a new secret and displays it exactly once.
-4. The old secret remains valid for a 24-hour **grace window** to let in-flight deploys update.
-5. After the grace window ends, only the new secret works.
+A key reaches the provider credentials configured on its scope and above it: a project key sees the project's, the team's and the organization's credentials.
 
-Rotation keeps the same `vk_id`, same ownership, same configuration, only the secret changes. Observability traces remain continuous across rotation.
+A personal key carries a principal, the person behind it. Personal and group budgets apply to keys with a principal. You always see your own personal keys; seeing other people's personal keys needs `virtualKeys:viewOtherPersonal`.
 
-## Revocation
+## The key format and how to send it
 
-Revocation immediately invalidates the secret. There is **no grace period** on revoke.
+A key is `vk-lw-` followed by a 26-character Crockford base32 ULID, 32 characters in total. The prefix makes keys easy to find with secret scanners. LangWatch stores an HMAC-SHA256 hash of the secret and the first 13 characters for display.
 
-Gateway caches are invalidated within 60 seconds via the `/internal/gateway/changes` long-poll. If you need instant invalidation everywhere (e.g. incident response), restart the gateway pods, the next request that hits them will pull fresh state before serving.
+Send the key in one of these headers:
 
-Revoked VKs remain in the database (soft-delete) for audit. Their traces still appear in analytics.
-
-## Scoping
-
-A VK belongs to exactly one **organisation** and carries one or more **scope rows** (`VirtualKeyScope`). Each row pins the VK to an ORGANIZATION, TEAM, or PROJECT. The scope set drives:
-
-- **Eligible provider set**: union of every ModelProvider visible from any of the VK's scopes (upward cascade). A VK scoped to PROJECT `demo` sees `demo`'s ModelProviders, the parent team's, and the org's.
-- **Budget cascade**: every applicable budget at any of the VK's scopes is checked. Hard-block at any scope blocks.
-- **Trace attribution**: the gateway tags spans with the most-specific scope match (PROJECT > TEAM > ORG).
-
-For the full semantics — including how multi-scope intersection works and which scope provides `langwatch.project_id` on a span — see [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) and [vk-config-bundle.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-config-bundle.feature).
-
-Trace attribution on every request:
-
-- `langwatch.virtual_key_id`
-- `langwatch.organization_id` (always present)
-- `langwatch.project_id` — resolution order: (a) the VK's unique PROJECT-scope row, if it has exactly one; otherwise (b) the org's `internal_governance` project, where TEAM- and ORG-scoped VK spans land so all governance traffic surfaces in one filter view. If neither exists (older self-hosted deployments without governance), the attribute is omitted rather than 500ing the bundle.
-- `langwatch.team_id` (present when the VK has a TEAM scope, or a unique team containing the resolved project)
-- `langwatch.principal_id` (present when `principalUserId` is set on the VK)
-
-## Personal vs shared
-
-Two flavours, distinguished by whether `principalUserId` is set:
-
-- **Personal VK** (`principalUserId` set): the VK is treated as that user's personal credential. Budget cascade includes the user's PRINCIPAL-scope budget first. Visibility is per-user by default; `virtualKeys:viewOtherPersonal` is required to inspect another user's personal VK. The CLI device-flow self-mints one of these at ORG scope on first login.
-- **Shared VK** (`principalUserId` null): service-account-style credential. Budget cascade runs only through scope-driven budgets. Visibility follows the standard `virtualKeys:view` perm at the VK's scopes.
-
-Both use the same `vk-lw-…` format and the same multi-scope semantics; the principal column is orthogonal to scope.
-
-## Permissions
-
-Acting on VKs requires the following permissions (2-segment `resource:action`):
-
-| Action | Permission |
+| Header | Used by |
 |---|---|
-| View list (own + scope-visible) | `virtualKeys:view` |
-| View another user's personal VK | `virtualKeys:viewOtherPersonal` |
-| Create | `virtualKeys:create` (must hold `:manage` at every named scope when creating multi-scope) |
-| Update config | `virtualKeys:update` |
-| Rotate | `virtualKeys:rotate` |
-| Delete, revoke | `virtualKeys:delete` |
-| All of the above | `virtualKeys:manage` |
+| `Authorization: Bearer vk-lw-...` | OpenAI SDKs, curl, most tools |
+| `X-Api-Key: vk-lw-...` | Anthropic SDKs and Claude Code |
+| `X-Goog-Api-Key: vk-lw-...` | Gemini SDKs and Gemini CLI |
+| `Xi-Api-Key: vk-lw-...` | ElevenLabs SDKs |
 
-See [RBAC](/ai-gateway/rbac) for default role mappings.
+## Edit a key
 
-## How the gateway resolves your VK
+Open the key from the list and click **Edit**. Ownership is read-only after creation. The edit drawer has the create fields plus two sections:
 
-The first time the gateway sees a presented VK:
+| Section | What it sets |
+|---|---|
+| **Rate limits** | Requests per minute and requests per day. See [Rate limits](/ai-gateway/rate-limits). |
+| **Realtime voice** | The maximum number of open realtime sessions. See [Realtime](/ai-gateway/api/realtime). |
 
-1. Calls `/internal/gateway/resolve-key` on the LangWatch control-plane → receives a signed JWT (15-minute TTL) with identity claims (`vk_id`, `project_id`, `principal_id`, etc.) plus a `revision` number.
-2. Calls `/internal/gateway/config/:vk_id` (with `If-None-Match: <revision>` on subsequent fetches) → receives the fat config (providers, fallback, guardrails, budgets).
-3. Caches both in-memory (L1 LRU) and optionally in Redis (L2, shared across gateway pods).
-4. Subscribes to `/internal/gateway/changes?since=<revision>` long-poll, on any mutation to any VK, the gateway invalidates and re-fetches.
+The drawer also shows a **Cache control** section. The gateway does not read it: caching is set by [cache rules](/ai-gateway/cache-control), which match on model, key or tag.
 
-Subsequent requests with the same VK are served entirely from cache. JWT verification is local (HS256 shared secret); no control-plane round-trip on the hot path.
+The same settings are the `config` object on the API (`PATCH /api/gateway/v1/virtual-keys/:id`) and in `vk update <id> --config-json`: `modelsAllowed`, `providersAllowed`, `rateLimits`, `fallback`, `realtime` and `guardrailAttachments`. Model aliases are set on the routing policy, not on the key. See [Model aliases](/ai-gateway/model-aliases).
 
-This means:
+Guardrails and cache rules attach to keys from their own pages. See [Guardrails](/ai-gateway/guardrails) and [Cache control](/ai-gateway/cache-control).
 
-- **First request** on a cold cache: 2-4 ms of control-plane overhead.
-- **Warm request** after first: tens of microseconds of overhead.
-- **Control-plane offline**: gateway continues serving from warm cache until JWT TTL expires (15 min default); with bootstrap mode on, it can serve indefinitely.
+The key detail page shows the spend of the last 30 days, the provider chain in the order it is tried, and the configuration in effect.
 
-See [Self-Hosting → Config](/ai-gateway/self-hosting/config) for tuning the cache.
+## Rotate, disable, expire and revoke
+
+| Action | Effect | Error the caller gets |
+|---|---|---|
+| **Rotate** | A new secret is shown once. The old secret keeps working for 24 hours. The key id, scopes and budgets stay the same. | None during the grace period |
+| **Disable** | Requests are rejected until you click **Enable**. Budgets, configuration and a running rotation grace stay intact. | 403 `virtual_key_disabled` |
+| **Expires** | The key stops serving at the date. Extend the date to put it back in service with the same secret. | 403 `virtual_key_expired` |
+| **Revoke** | The secret stops working now. There is no grace period and no way back. The key's own budgets are archived with their ledger. | 403 `virtual_key_revoked` |
+
+A secret the gateway does not know, for example a mistyped one, gets 401 `invalid_api_key`. The 24-hour rotation grace is fixed. A revoked key cannot be rotated.
+
+Each transition emits a webhook event: `gateway.virtual_key.created`, `gateway.virtual_key.rotated`, `gateway.virtual_key.disabled`, `gateway.virtual_key.enabled` and `gateway.virtual_key.revoked`. See [Webhooks](/features/webhooks).
+
+## Manage keys from the CLI
+
+The `langwatch` CLI has a `virtual-keys` command group, alias `vk`. It uses the `LANGWATCH_API_KEY` environment variable.
+
+```bash
+# Create a project key with a monthly budget
+langwatch vk create \
+  --name acme-support-agent \
+  --scope project:<project_id> \
+  --budget-limit 50 --budget-window month --budget-breach block
+
+# List, inspect and read spend
+langwatch vk list
+langwatch vk get <vk_id>
+langwatch vk spend <vk_id> --from 2026-09-01T00:00:00Z
+
+# Lifecycle
+langwatch vk rotate <vk_id>
+langwatch vk disable <vk_id> --reason "payment overdue"
+langwatch vk enable <vk_id>
+langwatch vk revoke <vk_id>
+```
+
+`vk create` also takes `--scope org:<id>`, `--scope team:<id>`, `--trace-project <id>`, `--routing-policy <id>`, `--routing-mode none|fallback_all|policy`, `--principal-user <user_id>` and `--providers-allowed <ids>`. `vk update <id>` changes the name, description, scopes, trace project, routing and budget, with `--clear-description`, `--clear-trace-project`, `--clear-routing-policy` and `--clear-budget` to unset them, and `--config-json <json>` or `--config-file <path>` to set the key's configuration.
+
+## Manage keys over REST
+
+The management API lives under `/api/gateway/v1` and takes a LangWatch API key in the `X-Auth-Token` header.
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/virtual-keys \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "acme-support-agent",
+    "budget": { "limit_usd": "50", "window": "month", "on_breach": "block" },
+    "expires_at": "2026-12-31T23:59:59Z"
+  }'
+```
+
+The response is `{ "virtual_key": { "id": "vk_..." }, "secret": "vk-lw-..." }`. Send an `Idempotency-Key` header to make the create safe to retry: a replay returns the original response, including the secret. To do that, LangWatch keeps the first response for 24 hours, encrypted with AES-256-GCM under the deployment's `CREDENTIALS_SECRET`, and deletes it when it expires. A replay carries the `X-Idempotent-Replay` header. Send a different key for every distinct create, and treat the key itself as a secret.
+
+| Method and path | Permission |
+|---|---|
+| `GET /api/gateway/v1/virtual-keys` | `virtualKeys:view` |
+| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create`, plus `virtualKeys:manage` at every scope the key names |
+| `GET /api/gateway/v1/virtual-keys/:id` | `virtualKeys:view` |
+| `GET /api/gateway/v1/virtual-keys/:id/spend` | `gatewayUsage:view` |
+| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update`, plus `virtualKeys:manage` at every scope the patch names |
+| `POST /api/gateway/v1/virtual-keys/:id/rotate` | `virtualKeys:rotate` |
+| `POST /api/gateway/v1/virtual-keys/:id/disable`, `.../enable` | `virtualKeys:update` |
+| `POST /api/gateway/v1/virtual-keys/:id/revoke` | `virtualKeys:delete` |
+
+Field by field: [Virtual keys API reference](/api-reference/gateway-virtual-keys/overview). Roles and permissions: [RBAC](/ai-gateway/rbac).

@@ -88,6 +88,30 @@ func TestApplyGovernanceMessage_RewritesAccountError(t *testing.T) {
 	}
 }
 
+// Translated lanes carry the provider's discriminants on the error itself
+// (no captured body); the parsed type/code must trigger the same rewrite or
+// the provider's billing message reaches governed users on those lanes.
+func TestApplyGovernanceMessage_RewritesOnParsedQuotaCode(t *testing.T) {
+	ue := &domain.UpstreamError{
+		StatusCode: 429,
+		Message:    "You exceeded your current quota, please check your plan and billing details.",
+		ErrorType:  "insufficient_quota",
+		ErrorCode:  "insufficient_quota",
+	}
+	_, gotErr := applyGovernanceMessage(nil, ue)
+	var got *domain.UpstreamError
+	errors.As(gotErr, &got)
+	if got.Message != accountExhaustionMessage {
+		t.Fatalf("bodyless quota error must be re-messaged, got %q", got.Message)
+	}
+	if got.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("status must be preserved: %d", got.StatusCode)
+	}
+	if got.ErrorType != "insufficient_quota" || got.ErrorCode != "insufficient_quota" {
+		t.Fatalf("error identity must be preserved: type=%q code=%q", got.ErrorType, got.ErrorCode)
+	}
+}
+
 // A retryable rate-limit must NOT be re-messaged — it stays verbatim and
 // retryable (the bug-33 complement: only terminal account exhaustion is
 // re-messaged).

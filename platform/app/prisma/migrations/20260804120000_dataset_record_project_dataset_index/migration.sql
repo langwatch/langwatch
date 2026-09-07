@@ -1,0 +1,27 @@
+-- Composite index for the per-project dataset entry counts.
+--
+-- The dataset lists count entries with
+-- `WHERE "projectId" = $1 AND "datasetId" IN (...) GROUP BY "datasetId"`.
+-- With only the two single-column indexes available, the planner has to
+-- combine them with a BitmapAnd, and its row estimate collapses whenever a
+-- single project owns most of the table (projectId and datasetId are almost
+-- perfectly correlated there) — so it gives up and sequentially scans the
+-- whole table. Measured on production data, that mis-plan costs 13s for the
+-- largest project.
+--
+-- The composite serves the same predicate as one index-only scan, never
+-- touching the heap: 3.5ms for a typical project, 165ms for the largest,
+-- on a faithful 2.58M-row reproduction of the production distribution.
+-- It also serves the project-scoped record reads on the dataset editor page.
+--
+-- LOCKING NOTE: plain `CREATE INDEX` takes a SHARE lock on "DatasetRecord" —
+-- concurrent reads keep working, writes (uploads, appends, row edits) block
+-- until the build finishes. The build reads the heap once: ~2.8s on a 2.58M-row
+-- reproduction, so expect single-digit seconds against production. Dataset
+-- writes are low-frequency and this runs during deploy, so the brief write
+-- pause is acceptable. `CREATE INDEX CONCURRENTLY` would avoid it entirely but
+-- cannot run inside a transaction, which the Prisma migration setup requires.
+CREATE INDEX "DatasetRecord_projectId_datasetId_idx" ON "DatasetRecord"("projectId", "datasetId");
+
+-- Down (manual rollback):
+-- DROP INDEX "DatasetRecord_projectId_datasetId_idx";

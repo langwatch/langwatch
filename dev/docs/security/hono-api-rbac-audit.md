@@ -19,8 +19,8 @@ forgettable middleware.
 ## Scope
 
 258 routes across 47 route families were audited (every `app.ts` /
-`app.v1.ts` under `langwatch/src/app/api/**` plus every file under
-`langwatch/src/server/routes/**` and the EE admin routes). Each route was
+`app.v1.ts` under `platform/app/src/app/api/**` plus every file under
+`platform/app/src/server/routes/**` and the EE admin routes). Each route was
 classified by auth mechanism, declared vs. expected permission, and
 tenant-scoping posture; high/critical and cross-tenant findings were then
 adversarially re-verified against the actual code path.

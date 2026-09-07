@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -24,8 +25,11 @@ func goServiceShell(repoRoot, svc string, shouldWatch bool) string {
 // service its SERVER_ADDR.
 func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, langyDockerHost string) []Child {
 	base := st.OverlayEnv()
+	logPath := func(name string) string {
+		return filepath.Join(o.cfg.Home, "logs", st.Slug, name+".log")
+	}
 	// Bun and Node use their own bundled CA roots, NOT the macOS system store, so
-	// the app process and the langy worker's opencode (Bun) subprocess otherwise
+	// the app process and the langy worker (Bun) subprocess otherwise
 	// reject the portless HTTPS certs on every gateway/control-plane call ("self
 	// signed certificate in certificate chain"). Point them at the portless Local
 	// CA so those runtimes trust the same hostnames curl/Go/the browser already do.
@@ -53,7 +57,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true")
 	}
 	out = append(out, Child{
-		Name: "app", Dir: lwDir, Color: palette[1],
+		Name: "app", Dir: lwDir, Color: palette[1], LogPath: logPath("app"),
 		Shell: "pnpm -s run dev:vite",
 		Env:   nodeEnv(),
 		// Hold the web (vite) until the API answers /api/health. The app proxies
@@ -63,42 +67,69 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 		// until the stack can actually handle a request.
 		ReadyProbeURL: fmt.Sprintf("http://127.0.0.1:%d/api/health", st.APIPort),
 	})
-	// In-process worker mode: the app process (start:app -> start.ts) hosts the
-	// worker stack itself when WORKERS_IN_PROCESS=1, so there is no separate
+	// In-process worker mode (the default): the app process (start:app ->
+	// start.ts) hosts the worker stack itself, so there is no separate
 	// `workers` lane below — one Node process instead of two, saving its RAM.
+	// `haven up +workers` selects the standalone lane instead.
 	apiEnv := nodeEnv()
-	if opts.ShouldRunWorkersInProcess {
+	if !opts.Selection.Workers {
 		apiEnv = append(apiEnv, "WORKERS_IN_PROCESS=1")
 	}
 	out = append(out, Child{
-		Name: "api", Dir: lwDir, Color: palette[3],
+		Name: "api", Dir: lwDir, Color: palette[3], LogPath: logPath("api"),
 		Shell: "pnpm -s run start:app",
 		Env:   apiEnv,
 	})
-	if !opts.ShouldSkipGateway {
+	if opts.Selection.Gateway {
 		out = append(out, Child{
-			Name: "gateway", Dir: opts.RepoRoot, Color: palette[2],
+			Name: "gateway", Dir: opts.RepoRoot, Color: palette[2], LogPath: logPath("gateway"),
 			Shell: goServiceShell(opts.RepoRoot, "aigateway", opts.ShouldGoWatch),
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("gateway"))),
 		})
 	}
-	if !opts.ShouldSkipNLP {
+	if opts.Selection.NLP {
 		out = append(out, Child{
-			Name: "nlp", Dir: opts.RepoRoot, Color: palette[4],
+			Name: "nlp", Dir: opts.RepoRoot, Color: palette[4], LogPath: logPath("nlp"),
 			Shell: goServiceShell(opts.RepoRoot, "nlpgo", opts.ShouldGoWatch),
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("nlp"))),
 		})
 	}
-	if !opts.ShouldSkipLangyAgent {
-		out = append(out, o.langyChild(st, opts, base, port("langyagent"), langyDockerHost))
+	if opts.Selection.IDP {
+		idpEnv := append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("idp")))
+		// The issuer/metadata URLs the simulator publishes must be the routed
+		// hostname, not loopback — the browser follows them during a login.
+		for _, svc := range st.Services {
+			if svc.Name == "idp" {
+				if svc.URL != "" {
+					idpEnv = append(idpEnv, "IDPSIM_BASE_URL="+svc.URL)
+				}
+				// Bound to loopback rather than the wildcard the simulator
+				// defaults to: this nameserver answers whatever it is asked
+				// about, so it should be reachable from this machine and
+				// nowhere else.
+				if svc.DNSPort != 0 {
+					idpEnv = append(idpEnv, fmt.Sprintf("IDPSIM_DNS_ADDR=127.0.0.1:%d", svc.DNSPort))
+				}
+			}
+		}
+		out = append(out, Child{
+			Name: "idp", Dir: opts.RepoRoot, Color: palette[6], LogPath: logPath("idp"),
+			Shell: goServiceShell(opts.RepoRoot, "idpsim", opts.ShouldGoWatch),
+			Env:   idpEnv,
+		})
 	}
-	if opts.ShouldStartWorkers && !opts.ShouldRunWorkersInProcess {
+	if opts.Selection.Langy {
+		langy := o.langyChild(st, opts, base, port("langyagent"), langyDockerHost)
+		langy.LogPath = logPath("langyagent")
+		out = append(out, langy)
+	}
+	if opts.Selection.Workers {
 		out = append(out, Child{
 			// green, not red: workers are a healthy background lane, and a red
 			// prefix reads as an error even on ordinary info logs. Red (palette[5])
 			// is reserved for genuine failures, so no lane label uses it —
 			// TestNoLaneIsRed pins that.
-			Name: "workers", Dir: lwDir, Color: palette[0],
+			Name: "workers", Dir: lwDir, Color: palette[0], LogPath: logPath("workers"),
 			Shell: "pnpm -s run start:workers",
 			Env:   append(nodeEnv(), "START_WORKERS=true"),
 		})

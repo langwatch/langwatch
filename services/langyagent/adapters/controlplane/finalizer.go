@@ -25,7 +25,7 @@ import (
 // event log even when the /chat NDJSON relay dropped. So it retries — bounded —
 // which is safe precisely because the ingest is idempotent on turnId: re-posting
 // the same final is a no-op at the event store. The self-retrying liveness
-// reactor is the final backstop when even the retries cannot land.
+// subscriber is the final backstop when even the retries cannot land.
 type Finalizer struct {
 	client         *http.Client
 	internalSecret string
@@ -57,7 +57,7 @@ const (
 // Finalize posts result for turnID to the control plane at endpoint, retrying a
 // few times on transient (5xx / network / timeout) failures with a short
 // backoff. A missing secret, endpoint, or required id makes it a no-op rather
-// than an error — the liveness reactor is the backstop when a durable write
+// than an error — the liveness subscriber is the backstop when a durable write
 // genuinely cannot land, and a hard error here must never break a finished turn.
 func (f *Finalizer) Finalize(ctx context.Context, endpoint, turnID string, result app.TurnResult) error {
 	if f == nil || f.internalSecret == "" {

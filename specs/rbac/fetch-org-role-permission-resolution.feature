@@ -6,7 +6,7 @@ Feature: Organization role awareness across the platform
 
   # The role-recognition + permission-grant scenarios below are
   # bound to the corresponding cases in
-  # `langwatch/src/server/api/__tests__/rbac.test.ts` (Org Role
+  # `platform/app/src/server/api/__tests__/rbac.test.ts` (Org Role
   # Permissions, Team Role Permissions, Custom Role Scenarios).
   #
   # The "non-member denied", "demo project access", "frontend knows
@@ -41,10 +41,14 @@ Feature: Organization role awareness across the platform
     When the user tries to access project "chatbot"
     Then access is denied
 
+  # Superseded by ADR-092: demo access has always required a session, so
+  # "any user" overstates it. See "The demo project opens for signed-in
+  # callers only" in specs/rbac/unified-authorization-engine.feature, which
+  # is the bound version of this behaviour.
   @unimplemented
   Scenario: Demo projects are accessible without organization membership
     Given project "chatbot" is a demo project
-    When any user accesses the project
+    When any signed-in user accesses the project
     Then access is granted
     And no organization role is associated
 

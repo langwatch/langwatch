@@ -21,23 +21,19 @@ updates while the exception is active.
 
 ### pnpm
 
-For pnpm workspaces, add `minimumReleaseAgeExclude` beside
-`minimumReleaseAge` in the relevant `pnpm-workspace.yaml`:
+The repo is a single pnpm workspace (ADR-076), so there is exactly one place
+an exemption goes: `minimumReleaseAgeExclude` beside `minimumReleaseAge` in
+`pnpm-workspace.yaml` **at the repo root**. Nowhere else is read — pnpm
+ignores a `pnpm-workspace.yaml` or `.npmrc` inside a member, so an exemption
+written there looks applied and does nothing, and the resolution keeps
+failing. (Exactly that happened to `skills/.npmrc`'s standing exemption when
+the six install roots merged.)
 
 ```yaml
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - litellm
   - '@scope/package'
-```
-
-For standalone pnpm roots that use `.npmrc`, add the package-specific exclude
-there:
-
-```ini
-minimum-release-age=10080
-minimum-release-age-exclude[]=litellm
-minimum-release-age-exclude[]=@scope/package
 ```
 
 pnpm also supports version-scoped exceptions when the fix should be pinned to a
@@ -49,7 +45,8 @@ minimumReleaseAgeExclude:
   - litellm@1.2.3
 ```
 
-Then update only the affected package in the lock root that owns the dependency:
+Then update only the affected package — there is one lockfile, at the repo
+root, so this always runs from there:
 
 ```bash
 pnpm update litellm --latest

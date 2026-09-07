@@ -1,0 +1,97 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import { z } from "zod";
+
+import { EventSchema } from "~/server/event-sourcing/domain/types";
+import {
+  PULLED_USAGE_COST_BASIS,
+  PULLED_USAGE_COST_STATUS,
+  PULLED_USAGE_EVENT_TYPES,
+  PULLED_USAGE_EVENT_VERSIONS,
+} from "./constants";
+
+/**
+ * `PulledUsageObserved` — one priced usage item pulled from a provider's own
+ * record of what the customer already spent (ADR-088, Schema).
+ *
+ * Time carries two fields and they are not interchangeable. `occurredAtMs` is
+ * the provider's business bucket — the day or hour the spend belongs to, which
+ * a restatement of that same period keeps unchanged. `observedAtMs` is the
+ * monotonic instant we pulled it, and it is the ONLY field a restatement can be
+ * ordered by; ordering versions by the bucket time would compare a period
+ * against itself. Both are epoch milliseconds and neither is named
+ * `occurredAt`, because that is a command-envelope field `stripEnvelope` would
+ * delete from the event data before it was ever stored.
+ */
+export const pulledUsageObservedEventDataSchema = z.object({
+  /**
+   * The provider's stable natural key for this item: the bucket coordinates
+   * for an admin API that reports periods, or the message id for a provider
+   * that reports messages. Human-readable; carried for support and debugging.
+   */
+  itemKey: z.string().min(1),
+  /**
+   * The dimension-only identity a restatement matches on. Cost and quantities
+   * are EXCLUDED by construction: hashing the cost in would make a corrected
+   * figure mint a fresh key and be added on top of the figure it corrects.
+   */
+  restatementKey: z.string().min(1),
+  /** Which provider record this came from, e.g. `anthropic_admin`. */
+  source: z.string().min(1),
+  /** The ingestion source's id — the row that owns the attribution below. */
+  ingestionSourceId: z.string().min(1),
+
+  /** Attribution, read off the IngestionSource, never inferred. */
+  organizationId: z.string().min(1),
+  /** Null when the source names no team: unattributed, said out loud. */
+  teamId: z.string().nullable(),
+  /**
+   * Null until `IngestionSource` can carry a project (ADR-088 Decision 4).
+   * Null means unattributed. It must never be filled with the hidden
+   * governance project, which is invisible to the customer.
+   */
+  projectId: z.string().nullable(),
+
+  model: z.string(),
+  tokensInput: z.number().int().nonnegative(),
+  tokensOutput: z.number().int().nonnegative(),
+  tokensCacheRead: z.number().int().nonnegative(),
+  tokensCacheWrite: z.number().int().nonnegative(),
+
+  /** The money, priced exactly once at the ingest seam, as an integer. */
+  costNanoUsd: z.number().int().nonnegative(),
+  /**
+   * Which price table produced a `computed` cost. Null for
+   * `provider_reported`: there was no price table, the provider said the
+   * number, and stamping a rate version on it would claim we derived it.
+   */
+  rateVersion: z.string().nullable(),
+  costBasis: z.enum([
+    PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
+    PULLED_USAGE_COST_BASIS.COMPUTED,
+  ]),
+  costStatus: z.enum([
+    PULLED_USAGE_COST_STATUS.EXACT,
+    PULLED_USAGE_COST_STATUS.ESTIMATE,
+  ]),
+
+  /** The provider's business bucket time, epoch ms. Stable under restatement. */
+  occurredAtMs: z.number().int().positive(),
+  /** Monotonic pull time, epoch ms. The restatement ordering field. */
+  observedAtMs: z.number().int().positive(),
+});
+
+export type PulledUsageObservedEventData = z.infer<
+  typeof pulledUsageObservedEventDataSchema
+>;
+
+export const PulledUsageObservedEventSchema = EventSchema.extend({
+  type: z.literal(PULLED_USAGE_EVENT_TYPES.OBSERVED),
+  version: z.literal(PULLED_USAGE_EVENT_VERSIONS.OBSERVED),
+  data: pulledUsageObservedEventDataSchema,
+});
+
+export type PulledUsageObservedEvent = z.infer<
+  typeof PulledUsageObservedEventSchema
+>;
+export type PulledUsageProcessingEvent = PulledUsageObservedEvent;

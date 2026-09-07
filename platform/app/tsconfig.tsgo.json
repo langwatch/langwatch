@@ -1,0 +1,69 @@
+{
+	"compilerOptions": {
+		"target": "es2020",
+		"lib": ["dom", "dom.iterable", "esnext"],
+		"allowJs": true,
+		"checkJs": true,
+		"skipLibCheck": true,
+		"strict": true,
+		"forceConsistentCasingInFileNames": true,
+		"noEmit": true,
+		"esModuleInterop": true,
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"moduleDetection": "force",
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"jsx": "preserve",
+		"incremental": true,
+		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-app.tsbuildinfo",
+		"noUncheckedIndexedAccess": true,
+		"verbatimModuleSyntax": true,
+		"paths": {
+			"~/*": ["./src/*"],
+			"@ee/*": ["./ee/*"],
+			"@app/*": ["./src/server/app-layer/*"],
+			"zod/lib/helpers/errorUtil": ["./node_modules/zod/lib/helpers/errorUtil"]
+		},
+		"plugins": [
+			{
+				"name": "next"
+			}
+		]
+	},
+	"include": [
+		"./src/**/*",
+		".eslintrc.cjs",
+		"next-env.d.ts",
+		"**/*.ts",
+		"**/*.tsx",
+		"**/*.cjs",
+		"**/*.mjs",
+		".next/types/**/*.ts",
+		".next-saas/types/**/*.ts"
+	],
+	"exclude": [
+		"node_modules",
+		"dist",
+		"../../mcp/typescript",
+		".next",
+		".next-saas",
+		"**/*.snippet.*",
+		"src/**/codegen/snippets/**/*",
+		"packages/insanity-check/**/*",
+		// 7.7 MB of generated Ajv output on 19 lines, swept in as a root file by
+		// `allowJs` + `./src/**/*` — a seventh of everything the compiler parses,
+		// for nothing. It carries `@ts-nocheck`, so none of it was ever checked,
+		// and `vegaLiteSchemaValidator.generated.d.ts` beside it is what the
+		// import in vegaLiteSchema.ts resolves to either way.
+		"src/features/analytics-query/visualization/vegaLiteSchemaValidator.generated.js",
+		"**/*.test.ts",
+		"**/*.test.tsx",
+		"**/*.spec.ts",
+		"**/*.spec.tsx",
+		"**/__tests__/**",
+		"**/__mocks__/**",
+		"e2e/**"
+	]
+}

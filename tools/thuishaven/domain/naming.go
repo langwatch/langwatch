@@ -23,6 +23,11 @@ type Naming struct {
 // legacy alias.
 const HubService = "hub"
 
+// IdPService is the IdP simulator's routed name. Per-worktree stacks carry the
+// slug (idp.<slug>.langwatch.localhost); the standalone `haven idp` runner
+// routes it slugless, as the machine-wide idp.langwatch.localhost.
+const IdPService = "idp"
+
 // DefaultNaming is the standard scheme: <service>.<slug>.langwatch.localhost.
 func DefaultNaming(tld string) Naming {
 	if tld == "" {

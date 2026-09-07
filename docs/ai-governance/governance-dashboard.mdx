@@ -1,16 +1,16 @@
 ---
 title: /governance dashboard
-description: The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /settings/governance/*. Available only after the org's setup-state OR-of-flags trips.
+description: The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /governance/*. Available only after the org's setup-state OR-of-flags trips.
 sidebarTitle: /governance dashboard
 ---
 
 The `/governance` route is the **org governance daily home**: the read-mostly oversight dashboard an admin opens to answer *"is the gateway healthy, are we within budget, did anything anomalous happen overnight, are users actually using this?"*. It's the counterpart of `/me` for the admin persona.
 
-It is intentionally distinct from the **admin-authoring** surface at `/settings/governance/*`, see [Control plane → Daily-use vs admin-authoring](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for why the split exists.
+It is intentionally distinct from the **admin-authoring** surface at `/governance/*`, see [Control plane → Daily-use vs admin-authoring](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for why the split exists.
 
 <Info>**Pairs with:** [Control plane & integration tiers](/ai-governance/control-plane) for the surface map, [Anomaly rules](/ai-governance/anomaly-rules) for what populates the anomalies strip, and [Departments](/ai-governance/departments) for how the **Spend by department** card attributes spend across the org.</Info>
 
-<Note>**Visibility**: the `/governance` entry only appears in the main sidebar once the org's setup-state OR-of-flags trips (see [When the entry shows up](#when-the-entry-shows-up) below). A brand-new org sees the **Settings → AI Governance** admin pages instead until they have data flowing.</Note>
+<Note>**Visibility**: the `/governance` entry only appears in the main sidebar once the org's setup-state OR-of-flags trips (see [When the entry shows up](#when-the-entry-shows-up) below). A brand-new org sees the **Governance** admin pages instead until they have data flowing.</Note>
 
 ## What you see
 
@@ -85,7 +85,7 @@ The same signal drives:
 
 - The **Govern (Preview)** entry visibility in the main sidebar.
 - The CLI `langwatch governance status` output (mirrors the same booleans).
-- The post-onboarding redirect, when an admin lands on `/`, the persona-2 home picker sends them to `/governance` if active, else to `/settings/governance` to keep configuring.
+- The post-onboarding redirect, when an admin lands on `/`, the persona-2 home picker sends them to `/governance` if active, else to `/governance` to keep configuring.
 
 ## Permissions
 
@@ -107,7 +107,7 @@ The dashboard is read-mostly, but every section deep-links into the admin-author
 - Ingestion-source health row → click into the per-source detail page.
 - Anomalies row → click the rule name → opens the [anomaly-rule editor](/ai-governance/anomaly-rules) at that rule.
 
-If the dashboard surfaces something you want to *act* on (rotate a key, edit a rule threshold, archive a source), follow the deep link into the corresponding admin-authoring page under `/settings/governance/*`.
+If the dashboard surfaces something you want to *act* on (rotate a key, edit a rule threshold, archive a source), follow the deep link into the corresponding admin-authoring page under `/governance/*`.
 
 ## Where to next
 

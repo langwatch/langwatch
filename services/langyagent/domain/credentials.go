@@ -38,9 +38,9 @@ type Credentials struct {
 	// it was given, and the worst a compromised manager can do with this handle is
 	// destroy its own access.
 	LangwatchAPIKeyID string `json:"langwatchApiKeyId,omitempty"`
-	LLMVirtualKey     string `json:"llmVirtualKey" validate:"required"`
-	GatewayBaseURL    string `json:"gatewayBaseUrl" validate:"required"`
-	LangwatchEndpoint string `json:"langwatchEndpoint" validate:"required"`
+	LLMVirtualKey     string `json:"llmVirtualKey"               validate:"required"`
+	GatewayBaseURL    string `json:"gatewayBaseUrl"              validate:"required"`
+	LangwatchEndpoint string `json:"langwatchEndpoint"           validate:"required"`
 	Model             string `json:"model,omitempty"`
 	GithubToken       string `json:"githubToken,omitempty"`
 	GithubLogin       string `json:"githubLogin,omitempty"`
@@ -50,7 +50,7 @@ type Credentials struct {
 	// reusing a token scoped to different repositories.
 	GithubRepoScope string `json:"githubRepoScopeKey,omitempty"`
 	// EgressAllowlist is the project's per-project Langy egress allow-list
-	// (ADR-043 rung 2), resolved by the control plane's
+	// (ADR-076 rung 2), resolved by the control plane's
 	// LangyCredentialService.getEgressAllowlist and threaded through this
 	// envelope. The *presence* of the list is the mode: nil/empty ⇒ the egress
 	// adapter watches but blocks nothing; non-empty ⇒ the adapter restricts
@@ -74,7 +74,7 @@ type Credentials struct {
 
 // MirrorTier is the fidelity of the ADR-061 mirror copy, resolved per
 // organization by the control plane and threaded through the credentials
-// envelope. A closed vocabulary; anything unrecognised normalises to skip.
+// envelope. A closed vocabulary; anything unrecognized normalises to skip.
 type MirrorTier string
 
 const (
@@ -88,7 +88,7 @@ const (
 )
 
 // NormalizeMirrorTier maps an envelope value to a known tier. An empty or
-// unrecognised value normalises to skip — fail-safe: a version skew (a manager
+// unrecognized value normalises to skip, fail-safe: a version skew (a manager
 // with a mirror configured but a control plane not yet sending the tier) never
 // leaks a turn LangWatch was not told it could see.
 func NormalizeMirrorTier(v string) MirrorTier {
@@ -139,7 +139,7 @@ type CredentialSignature struct {
 	// comparable with ==. The keys encode presence, never the secret.
 	Capabilities string
 	// EgressAllowlist is a canonical fingerprint (sorted + newline-joined) of
-	// the project's egress allow-list (ADR-043). Folding it in means a policy
+	// the project's egress allow-list (ADR-076). Folding it in means a policy
 	// change (the customer edits the list) recycles the worker on its next turn
 	// — the egress adapter is rebuilt with the new list, so a live worker is
 	// never left running under the old policy. A string (not the []string
@@ -196,7 +196,7 @@ var hostPatternPattern = regexp.MustCompile(`^(\*\.)?([a-z0-9-]+\.)*[a-z0-9-]+$`
 // case-insensitive fingerprint so semantically-equal lists (reordered, mixed
 // case, trailing dots) do not spuriously recycle the worker, while any real
 // membership change does. Entries that are not clean host patterns are DROPPED
-// (defence in depth): the control plane already Zod-validates on write, so this
+// (defense in depth): the control plane already Zod-validates on write, so this
 // only fires on a drifted or hostile envelope — but the manager still refuses to
 // fold a URL, an authority with a port/userinfo, or a path-traversal like
 // "../../etc" into an allow rule. Kept in step with the Go matcher's

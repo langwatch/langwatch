@@ -7,9 +7,14 @@ Feature: Provider fallback chain
   # tests in services/aigateway/.
 
   When a primary provider fails for a reason that indicates "try again
-  elsewhere" (5xx, timeout, 429, network), the gateway walks the VK's
-  fallback chain. Client-fault errors (400/401/403/404) are returned as-is
-  so the customer sees the real problem.
+  elsewhere" (5xx, timeout, 429, network, and 404 because in a multi-provider
+  chain it usually means this provider does not serve that model), the gateway
+  walks the VK's fallback chain, as far as the key's attempt budget allows: a
+  key with no chain gets one attempt and the error reaches the caller.
+  Terminal errors (400/401/403) are returned as-is so the real problem is
+  visible. Terminal is not the same as the caller's fault: a 401 or 403 is
+  usually the operator's provider credential, and switching credentials would
+  hide the thing they have to fix.
 
   See contract.md §7.
 
@@ -17,9 +22,7 @@ Feature: Provider fallback chain
     Given a VK with fallback config:
       """
       {
-        "on": ["5xx", "timeout", "rate_limit_exceeded", "network_error"],
         "chain": ["pc_openai_primary", "pc_anthropic_secondary", "pc_gemini_tertiary"],
-        "timeout_ms": 10000,
         "max_attempts": 3
       }
       """
@@ -38,11 +41,12 @@ Feature: Provider fallback chain
 
     @integration @unimplemented
     Scenario: primary timeout triggers fallback
-      Given "pc_openai_primary" exceeds timeout_ms
+      Given "pc_openai_primary" never answers and its attempt times out
+      And the caller is still connected, so there is budget for another attempt
       And "pc_anthropic_secondary" returns 200
       When I POST /v1/chat/completions
       Then the client receives 200 from anthropic
-      And the timeout_ms limit is enforced per attempt, not across attempts
+      And a caller who has already given up gets no further attempt
 
     @integration @unimplemented
     Scenario: 429 from primary triggers fallback
@@ -50,7 +54,7 @@ Feature: Provider fallback chain
       When I POST /v1/chat/completions
       Then the gateway falls back to secondary immediately (no honor of Retry-After before fallback)
 
-  Rule: Fallback does NOT trigger on client-fault errors
+  Rule: Fallback does NOT trigger on a terminal upstream error
 
     @integration @unimplemented
     Scenario: primary 400 returns as-is without fallback
@@ -70,10 +74,30 @@ Feature: Provider fallback chain
       And "pc_anthropic_secondary" is NOT called
 
     @integration @unimplemented
-    Scenario: primary 404 (model unknown at provider) returns as-is
-      When the request uses a model that does not exist at the primary provider
+    Scenario: primary 403 (provider refuses the account) returns as-is
+      Given "pc_openai_primary" returns 403 from OpenAI
+      When I POST /v1/chat/completions
       Then fallback does NOT trigger
-      And the error propagates so the user corrects their request
+      And the error propagates so the customer fixes the account it names
+
+  Rule: Which failures walk the chain is not per-key configuration
+
+    The chain is walked on the real upstream outcome, decided in one place
+    from the response itself. There is no per-key trigger list: a list could
+    only ever narrow the set, and every narrowing turns a failure the gateway
+    could have recovered from into one the customer sees.
+
+    A deploy rolls one side at a time, so for a while the two sides disagree
+    about what the fallback block contains. Neither may refuse the other, in
+    either direction, or a routine deploy takes traffic down.
+
+    @unit
+    Scenario: A key keeps serving while a deploy is half done
+      Given the control plane and the gateway are mid-deploy on different versions
+      When a request arrives for a key whose policy allows three attempts
+      Then the request is served
+      And the key gets the three attempts its operator configured
+      And this holds whichever of the two sides is the newer one
 
   Rule: All attempts exhausted returns the last error
 
@@ -131,3 +155,41 @@ Feature: Provider fallback chain
       When the gateway detects the drop
       Then the gateway does NOT attempt the same request against primary
       And it may attempt fallback (new upstream) if fallback is armed
+
+  Rule: Failing over is a choice the key makes, not a default it inherits
+
+    Fallback sends a request, and its payload, to a different vendor than the
+    one the caller asked for. That is a decision worth stating: a key now
+    carries its routing behaviour explicitly, and a new key does not fail
+    over unless somebody says it should. Keys created before the choice
+    existed are pinned to the old behaviour, so nothing changes underneath a
+    customer who never made the choice.
+
+    @integration
+    Scenario: A key with no fallback attempts one provider and stops
+      Given a key whose routing behaviour is "no fallback"
+      When its configuration reaches the gateway
+      Then the gateway is allowed a single dispatch attempt
+
+    @integration
+    Scenario: A key with no fallback surfaces the provider's failure
+      Given a key whose routing behaviour is "no fallback"
+      And the provider serving the requested model is down
+      When a request arrives
+      Then the caller gets the provider's failure, promptly and in full
+      And no other provider is contacted
+      # Promptly matters: the failure mode this file exists to prevent is a
+      # request that hangs instead of failing.
+
+    @integration
+    Scenario: A key set to fall back still walks every eligible provider
+      Given a key whose routing behaviour is "fall back to every provider"
+      And the first provider in the chain is down
+      When a request arrives
+      Then the next eligible provider serves it
+
+    @integration
+    Scenario: Keys that predate the choice keep falling back
+      Given a key created before routing behaviour was explicit
+      When its configuration is read
+      Then it falls back across every provider it can reach

@@ -7,7 +7,7 @@ Feature: Variable insertion menu
   # All scenarios describe the VariableInsertMenu component (open
   # via {{ trigger, source-grouped fields, type icons, search, key
   # navigation, insertion). Tests exist at
-  # `langwatch/src/components/variables/__tests__/VariableInsertMenu
+  # `platform/app/src/components/variables/__tests__/VariableInsertMenu
   # .test.tsx` and the trigger logic in
   # `prompt-textarea/__tests__/PromptTextAreaWithVariables.test.tsx`.
   #

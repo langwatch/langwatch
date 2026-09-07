@@ -241,6 +241,72 @@ describe("parseHandledError, given dialect 3 (the new framework envelope)", () =
 });
 
 /**
+ * Dialect 4, the canonical envelope every `SecuredApp` publishing it answers
+ * with (`app/api/shared/schemas.ts`). It nests the failure under `error` and
+ * spells the trace ids in snake_case, and the reader knew neither: an agent got
+ * `network_error` for a refusal the platform had named, and a customer's card
+ * printed the whole envelope verbatim because it could not find a sentence in
+ * it.
+ */
+describe("parseHandledError, given dialect 4 (the canonical envelope)", () => {
+  const body = {
+    error: {
+      type: "bad_request",
+      code: "langy_ui_payload_invalid",
+      message: 'The payload for "workbench.setTargetPrompt" is not valid.',
+      meta: { kind: "workbench.setTargetPrompt" },
+      trace_id: TRACE_ID,
+      span_id: "00f067aa0ba902b7",
+    },
+  };
+
+  it("reads the nested code, sentence, meta and trace id", () => {
+    const parsed = parseHandledError({ status: 400, body });
+
+    expect(parsed).toMatchObject({
+      code: "langy_ui_payload_invalid",
+      message: 'The payload for "workbench.setTargetPrompt" is not valid.',
+      meta: { kind: "workbench.setTargetPrompt" },
+      traceId: TRACE_ID,
+      isHandled: true,
+    });
+  });
+
+  it("prefers the nested code over the status class in `type`", () => {
+    expect(parseHandledError({ status: 400, body }).code).not.toBe(
+      "bad_request",
+    );
+  });
+
+  it("still reads an envelope that carries only the status class", () => {
+    const parsed = parseHandledError({
+      status: 404,
+      body: { error: { type: "not_found", message: "No such experiment" } },
+    });
+
+    expect(parsed).toMatchObject({
+      code: "not_found",
+      message: "No such experiment",
+      isHandled: true,
+    });
+  });
+
+  it("leaves dialect 1's string `error` alone", () => {
+    // Dialect 1 puts the CODE in `error` as a string. Reading dialect 4 first
+    // is only safe because it requires an object there.
+    const parsed = parseHandledError({
+      status: 404,
+      body: { error: "dataset_not_found", message: "Dataset not found" },
+    });
+
+    expect(parsed).toMatchObject({
+      code: "dataset_not_found",
+      message: "Dataset not found",
+    });
+  });
+});
+
+/**
  * The remediation channel (ADR-045). The platform spells it `tips`/`docsUrl`;
  * the CLI had only ever read `suggestions`/`docUrl`, names the platform never
  * emits, so every one of the centrally-authored tips in
@@ -249,6 +315,64 @@ describe("parseHandledError, given dialect 3 (the new framework envelope)", () =
  * `specs/features/domain-error-contract.feature` names the CLI as a consumer
  * that must be able to self-diagnose from these.
  */
+describe("parseHandledError, given dialect 4 (the canonical nested envelope)", () => {
+  it("reads code, sentence, trace and meta from under the `error` object", () => {
+    const parsed = parseHandledError({
+      status: 404,
+      body: {
+        error: {
+          type: "not_found",
+          code: "saved_workbench_chart_not_found",
+          message: "Saved chart not found.",
+          meta: { chart_id: "chart-1" },
+          trace_id: TRACE_ID,
+        },
+      },
+    });
+
+    expect(parsed).toMatchObject({
+      code: "saved_workbench_chart_not_found",
+      message: "Saved chart not found.",
+      httpStatus: 404,
+      meta: { chart_id: "chart-1" },
+      traceId: TRACE_ID,
+      isHandled: true,
+    });
+  });
+
+  it("lifts the reason chain out of `meta.reasons`", () => {
+    const parsed = parseHandledError({
+      status: 400,
+      body: {
+        error: {
+          type: "bad_request",
+          code: "validation_error",
+          message: "The request didn't match the expected shape.",
+          meta: {
+            fields: ["granularitySeconds"],
+            reasons: [{ code: "schema_failure" }],
+          },
+        },
+      },
+    });
+
+    expect(parsed.meta).toEqual({ fields: ["granularitySeconds"] });
+    expect(parsed.reasons).toEqual([{ kind: "schema_failure" }]);
+  });
+
+  it("does not read a nested transport failure as the platform speaking", () => {
+    const parsed = parseHandledError({
+      status: 0,
+      body: {
+        error: { code: "ECONNREFUSED", errno: -61, syscall: "connect" },
+      },
+    });
+
+    expect(parsed.isHandled).toBe(false);
+    expect(parsed.code).toBe("network_error");
+  });
+});
+
 describe("parseHandledError, given the platform's remediation channel", () => {
   it("reads `tips` and `docsUrl`, the names the platform actually emits", () => {
     const parsed = parseHandledError({

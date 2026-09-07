@@ -1,0 +1,3041 @@
+// @ts-ignore
+import type {
+  ESpanKind,
+  EStatusCode,
+  IEvent,
+  IExportTraceServiceRequest,
+} from "@opentelemetry/otlp-transformer";
+import Long from "long";
+import { assert, describe, expect, it } from "vitest";
+import { type ZodError, z } from "zod";
+import { fromZodError } from "zod-validation-error";
+import type { DeepPartial } from "../../utils/types";
+import { openTelemetryTraceRequestToTracesForCollection } from "./otel.traces";
+import { spanSchema } from "./types";
+
+const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "python",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.25.0",
+            },
+          },
+          {
+            key: "service.name",
+            value: {
+              stringValue: "unknown_service",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "openinference.instrumentation.openai",
+            version: "0.1.12",
+          },
+          spans: [
+            {
+              traceId: "A8suuE3VKsm8FJapnHM4gA==",
+              spanId: "m6IZGoTJqJE=",
+              name: "ChatCompletion",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+              startTimeUnixNano: "1722809513563529000",
+              endTimeUnixNano: "1722809514125001000",
+              attributes: [
+                {
+                  key: "openinference.span.kind",
+                  value: {
+                    stringValue: "LLM",
+                  },
+                },
+                {
+                  key: "input.value",
+                  value: {
+                    stringValue:
+                      '{"messages": [{"role": "system", "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis."}, {"role": "user", "content": "hi"}], "model": "gpt-5", "stream": true}',
+                  },
+                },
+                {
+                  key: "input.mime_type",
+                  value: {
+                    stringValue: "application/json",
+                  },
+                },
+                {
+                  key: "output.value",
+                  value: {
+                    stringValue:
+                      '{"choices": [{"message": {"content": "Hey there! 😊👋 What\'s up? 🌟", "role": "assistant"}, "index": 0, "finish_reason": "stop"}], "id": "chatcmpl-9sdk9jAOO21SHl5mgTZSXVdCVJhDq", "created": 1722809513, "model": "gpt-5", "object": "chat.completion.chunk", "system_fingerprint": "fp_611b667b19"}',
+                  },
+                },
+                {
+                  key: "output.mime_type",
+                  value: {
+                    stringValue: "application/json",
+                  },
+                },
+                {
+                  key: "llm.invocation_parameters",
+                  value: {
+                    stringValue: '{"model": "gpt-5", "stream": true}',
+                  },
+                },
+                {
+                  key: "session.id",
+                  value: {
+                    stringValue: "my-test-session",
+                  },
+                },
+                {
+                  key: "user.id",
+                  value: {
+                    stringValue: "my-test-user",
+                  },
+                },
+                {
+                  key: "metadata",
+                  value: {
+                    stringValue: '{"foo": "bar"}',
+                  },
+                },
+                {
+                  key: "tag.tags",
+                  value: {
+                    arrayValue: {
+                      values: [
+                        {
+                          stringValue: "tag-1",
+                        },
+                        {
+                          stringValue: "tag-2",
+                        },
+                      ],
+                    },
+                  },
+                },
+                {
+                  key: "llm.input_messages.0.message.role",
+                  value: {
+                    stringValue: "system",
+                  },
+                },
+                {
+                  key: "llm.input_messages.0.message.content",
+                  value: {
+                    stringValue:
+                      "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+                  },
+                },
+                {
+                  key: "llm.input_messages.1.message.role",
+                  value: {
+                    stringValue: "user",
+                  },
+                },
+                {
+                  key: "llm.input_messages.1.message.content",
+                  value: {
+                    stringValue: "hi",
+                  },
+                },
+                {
+                  key: "llm.model_name",
+                  value: {
+                    stringValue: "gpt-5",
+                  },
+                },
+                {
+                  key: "llm.output_messages.0.message.role",
+                  value: {
+                    stringValue: "assistant",
+                  },
+                },
+                {
+                  key: "llm.output_messages.0.message.content",
+                  value: {
+                    stringValue: "Hey there! 😊👋 What's up? 🌟",
+                  },
+                },
+              ],
+              events: [
+                {
+                  timeUnixNano: "1722809514030552000",
+                  name: "First Token Stream Event",
+                },
+              ] as IEvent[],
+              status: {
+                code: "STATUS_CODE_OK" as unknown as EStatusCode,
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const openllmetryOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "python",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.26.0",
+            },
+          },
+          {
+            key: "service.name",
+            value: {
+              stringValue: "unknown_service",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.openai.v1",
+            version: "0.26.4",
+          },
+          spans: [
+            {
+              traceId: "hhUJjCxy5yMw6ADvOrHYuA==",
+              spanId: "D2n+rs/O1Jg=",
+              name: "openai.chat",
+              kind: "SPAN_KIND_CLIENT" as unknown as ESpanKind,
+              startTimeUnixNano: "1722866602559872000",
+              endTimeUnixNano: "1722866604545023000",
+              attributes: [
+                {
+                  key: "llm.request.type",
+                  value: {
+                    stringValue: "chat",
+                  },
+                },
+                {
+                  key: "gen_ai.system",
+                  value: {
+                    stringValue: "OpenAI",
+                  },
+                },
+                {
+                  key: "gen_ai.request.model",
+                  value: {
+                    stringValue: "gpt-5",
+                  },
+                },
+                {
+                  key: "llm.headers",
+                  value: {
+                    stringValue: "None",
+                  },
+                },
+                {
+                  key: "llm.is_streaming",
+                  value: {
+                    boolValue: true,
+                  },
+                },
+                {
+                  key: "gen_ai.openai.api_base",
+                  value: {
+                    stringValue: "https://api.openai.com/v1/",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.0.role",
+                  value: {
+                    stringValue: "system",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.0.content",
+                  value: {
+                    stringValue:
+                      "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.1.role",
+                  value: {
+                    stringValue: "user",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.1.content",
+                  value: {
+                    stringValue: "yous",
+                  },
+                },
+                {
+                  key: "gen_ai.response.model",
+                  value: {
+                    stringValue: "gpt-5",
+                  },
+                },
+                {
+                  key: "gen_ai.completion.0.role",
+                  value: {
+                    stringValue: "assistant",
+                  },
+                },
+                {
+                  key: "gen_ai.completion.0.content",
+                  value: {
+                    stringValue: "Hey there! 😊 What's on your mind? 💬✨",
+                  },
+                },
+              ],
+              events: [
+                {
+                  timeUnixNano: "1722866604464076000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604487318000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604493170000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604496259000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604498817000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604501262000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604503900000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604506069000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604513677000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604519198000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604524125000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604527675000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604530569000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604540024000",
+                  name: "llm.content.completion.chunk",
+                },
+              ] as IEvent[],
+              status: {
+                code: "STATUS_CODE_OK" as unknown as EStatusCode,
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const fastApiOpenTelemetryRequest: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "python",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.26.0",
+            },
+          },
+          {
+            key: "service.name",
+            value: {
+              stringValue: "unknown_service",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.fastapi",
+            version: "0.47b0",
+          },
+          spans: [
+            {
+              traceId: "mLt2CryyC2bSMDv62DoncQ==",
+              spanId: "hZJ04MHH3MI=",
+              parentSpanId: "ABb1CmFM02M=",
+              name: "POST / http send",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+              startTimeUnixNano: "1722946507515216000",
+              endTimeUnixNano: "1722946509073605000",
+              attributes: [
+                {
+                  key: "asgi.event.type",
+                  value: {
+                    stringValue: "http.response.body",
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+    {
+      resource: {
+        attributes: [
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "python",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.26.0",
+            },
+          },
+          {
+            key: "service.name",
+            value: {
+              stringValue: "unknown_service",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.fastapi",
+            version: "0.47b0",
+          },
+          spans: [
+            {
+              traceId: "mLt2CryyC2bSMDv62DoncQ==",
+              spanId: "ABb1CmFM02M=",
+              name: "POST /",
+              kind: "SPAN_KIND_SERVER" as unknown as ESpanKind,
+              startTimeUnixNano: "1722942373770026000",
+              endTimeUnixNano: "1722942375147931000",
+              attributes: [
+                {
+                  key: "http.scheme",
+                  value: {
+                    stringValue: "http",
+                  },
+                },
+                {
+                  key: "http.host",
+                  value: {
+                    stringValue: "127.0.0.1:8000",
+                  },
+                },
+                {
+                  key: "net.host.port",
+                  value: {
+                    intValue: "8000" as unknown as number,
+                  },
+                },
+                {
+                  key: "http.flavor",
+                  value: {
+                    stringValue: "1.1",
+                  },
+                },
+                {
+                  key: "http.target",
+                  value: {
+                    stringValue: "/",
+                  },
+                },
+                {
+                  key: "http.url",
+                  value: {
+                    stringValue: "http://127.0.0.1:8000/",
+                  },
+                },
+                {
+                  key: "http.method",
+                  value: {
+                    stringValue: "POST",
+                  },
+                },
+                {
+                  key: "http.server_name",
+                  value: {
+                    stringValue: "0.0.0.0:8000",
+                  },
+                },
+                {
+                  key: "http.user_agent",
+                  value: {
+                    stringValue:
+                      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+                  },
+                },
+                {
+                  key: "net.peer.ip",
+                  value: {
+                    stringValue: "127.0.0.1",
+                  },
+                },
+                {
+                  key: "net.peer.port",
+                  value: {
+                    intValue: "63047" as unknown as number,
+                  },
+                },
+                {
+                  key: "http.route",
+                  value: {
+                    stringValue: "/",
+                  },
+                },
+                {
+                  key: "http.status_code",
+                  value: {
+                    intValue: 404,
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const traceWithException: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "service.name",
+            value: {
+              stringValue: "fastapi_sample_endpoint",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.fastapi",
+            version: "0.47b0",
+          },
+          spans: [
+            {
+              traceId: "1SNx9GTvt0O0YyRUSGOwew==",
+              spanId: "7ok1RgTVkrg=",
+              name: "POST /",
+              kind: "SPAN_KIND_SERVER" as unknown as ESpanKind,
+              startTimeUnixNano: "1722958611402254000",
+              endTimeUnixNano: "1722958616308867000",
+              attributes: [
+                {
+                  key: "http.scheme",
+                  value: {
+                    stringValue: "http",
+                  },
+                },
+                {
+                  key: "http.host",
+                  value: {
+                    stringValue: "127.0.0.1:8000",
+                  },
+                },
+                {
+                  key: "net.host.port",
+                  value: {
+                    intValue: 8000,
+                  },
+                },
+                {
+                  key: "http.flavor",
+                  value: {
+                    stringValue: "1.1",
+                  },
+                },
+                {
+                  key: "http.target",
+                  value: {
+                    stringValue: "/",
+                  },
+                },
+                {
+                  key: "http.url",
+                  value: {
+                    stringValue: "http://127.0.0.1:8000/",
+                  },
+                },
+                {
+                  key: "http.method",
+                  value: {
+                    stringValue: "POST",
+                  },
+                },
+                {
+                  key: "http.server_name",
+                  value: {
+                    stringValue: "0.0.0.0:8000",
+                  },
+                },
+                {
+                  key: "http.user_agent",
+                  value: {
+                    stringValue:
+                      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+                  },
+                },
+                {
+                  key: "net.peer.ip",
+                  value: {
+                    stringValue: "127.0.0.1",
+                  },
+                },
+                {
+                  key: "net.peer.port",
+                  value: {
+                    intValue: 55903,
+                  },
+                },
+                {
+                  key: "http.route",
+                  value: {
+                    stringValue: "/",
+                  },
+                },
+              ],
+              events: [
+                {
+                  timeUnixNano: "1722958616308696000",
+                  name: "exception",
+                  attributes: [
+                    {
+                      key: "exception.type",
+                      value: {
+                        stringValue: "Exception",
+                      },
+                    },
+                    {
+                      key: "exception.message",
+                      value: {
+                        stringValue: "BROKEN",
+                      },
+                    },
+                    {
+                      key: "exception.stacktrace",
+                      value: {
+                        stringValue:
+                          'Traceback (most recent call last):\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/opentelemetry/trace/__init__.py", line 583, in use_span\n    yield span\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/opentelemetry/instrumentation/asgi/__init__.py", line 731, in __call__\n    await self.app(scope, otel_receive, otel_send)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 79, in __call__\n    raise exc\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 68, in __call__\n    await self.app(scope, receive, sender)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 20, in __call__\n    raise e\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 17, in __call__\n    await self.app(scope, receive, send)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 718, in __call__\n    await route.handle(scope, receive, send)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 276, in handle\n    await self.app(scope, receive, send)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 66, in app\n    response = await func(request)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/routing.py", line 273, in app\n    raw_response = await run_endpoint_function(\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/routing.py", line 192, in run_endpoint_function\n    return await run_in_threadpool(dependant.call, **values)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/concurrency.py", line 41, in run_in_threadpool\n    return await anyio.to_thread.run_sync(func, *args)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/to_thread.py", line 33, in run_sync\n    return await get_asynclib().run_sync_in_worker_thread(\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/_backends/_asyncio.py", line 877, in run_sync_in_worker_thread\n    return await future\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/_backends/_asyncio.py", line 807, in run\n    result = context.run(func, *args)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/examples/opentelemetry/traditional_instrumentation_fastapi_app.py", line 50, in fastapi_sample_endpoint\n    raise Exception("BROKEN")\nException: BROKEN\n',
+                      },
+                    },
+                    {
+                      key: "exception.escaped",
+                      value: {
+                        stringValue: "False",
+                      },
+                    },
+                  ],
+                },
+              ],
+              status: {
+                message: "Exception: BROKEN",
+                code: "STATUS_CODE_ERROR" as unknown as EStatusCode,
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const openllmetryLangChainRequest: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "python",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.26.0",
+            },
+          },
+          {
+            key: "service.name",
+            value: {
+              stringValue: "unknown_service",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.langchain",
+            version: "0.26.5",
+          },
+          spans: [
+            {
+              traceId: "4cmJuE+nwC7cmxIAX8430w==",
+              spanId: "S2v3VMCZCUo=",
+              name: "RunnableSequence.workflow",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+              startTimeUnixNano: "1723006472661658000",
+              endTimeUnixNano: "1723006473946042000",
+              attributes: [
+                {
+                  key: "traceloop.span.kind",
+                  value: {
+                    stringValue: "workflow",
+                  },
+                },
+                {
+                  key: "traceloop.entity.name",
+                  value: {
+                    stringValue: "RunnableSequence.workflow",
+                  },
+                },
+                {
+                  key: "traceloop.entity.input",
+                  value: {
+                    stringValue:
+                      '{"inputs": {"input": ""}, "tags": [], "metadata": {}, "kwargs": {"run_type": null, "name": "RunnableSequence"}}',
+                  },
+                },
+                {
+                  key: "traceloop.entity.output",
+                  value: {
+                    stringValue:
+                      '{"outputs": "\\ud83d\\udc4b Hi there! How can I help you today?", "kwargs": {"tags": [], "inputs": {"question": "hello"}}}',
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const strandsTrace: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: { attributes: [] },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.strands",
+          },
+          spans: [
+            {
+              traceId: "4cmJuE+nwC7cmxIAX8430w==",
+              spanId: "S2v3VMCZCUo=",
+              name: "Model invoke",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+              startTimeUnixNano: "1723006472661658000",
+              endTimeUnixNano: "1723006473946042000",
+              attributes: [
+                {
+                  key: "event_loop.cycle_id",
+                  value: {
+                    stringValue: "29f8679a-3afb-498e-8dc2-643c25434292",
+                  },
+                },
+                {
+                  key: "gen_ai.request.model",
+                  value: {
+                    stringValue: "openai/gpt-4.1-nano",
+                  },
+                },
+                {
+                  key: "gen_ai.event.start_time",
+                  value: {
+                    stringValue: "2025-05-25T10:37:11.068343+00:00",
+                  },
+                },
+                {
+                  key: "gen_ai.event.end_time",
+                  value: {
+                    stringValue: "2025-05-25T10:37:12.014098+00:00",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.0.role",
+                  value: {
+                    stringValue: "user",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.0.content.0.text",
+                  value: {
+                    stringValue: "yo",
+                  },
+                },
+                {
+                  key: "gen_ai.agent.name",
+                  value: {
+                    stringValue: "Strands Agent",
+                  },
+                },
+                {
+                  key: "gen_ai.completion.0.text",
+                  value: {
+                    stringValue:
+                      "Hello! What would you like to look at or explore today?",
+                  },
+                },
+                {
+                  key: "agent.name",
+                  value: {
+                    stringValue: "Strands Agent",
+                  },
+                },
+                {
+                  key: "gen_ai.usage.prompt_tokens",
+                  value: {
+                    intValue: 24,
+                  },
+                },
+                {
+                  key: "gen_ai.usage.completion_tokens",
+                  value: {
+                    intValue: 10,
+                  },
+                },
+                {
+                  key: "gen_ai.usage.total_tokens",
+                  value: {
+                    intValue: 34,
+                  },
+                },
+                {
+                  key: "scope.name",
+                  value: {
+                    stringValue: "strands-bot",
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const springAITrace: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "service.name",
+            value: {
+              stringValue: "spring-ai-sample-service",
+            },
+          },
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "java",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.30.0",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "org.springframework.boot",
+            version: "3.4.0",
+          },
+          spans: [
+            {
+              traceId: "755b1db22272958b92cb003f30058e74",
+              spanId: "0dedf6826df097a9",
+              parentSpanId: "8127960fb3f7c04d",
+              name: "chat gpt-5",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+              startTimeUnixNano: "1748353030869334708",
+              endTimeUnixNano: "1748353033397302125",
+              attributes: [
+                {
+                  key: "gen_ai.request.model",
+                  value: {
+                    stringValue: "gpt-5",
+                  },
+                },
+                {
+                  key: "gen_ai.response.model",
+                  value: {
+                    stringValue: "gpt-5",
+                  },
+                },
+                {
+                  key: "gen_ai.usage.total_tokens",
+                  value: {
+                    stringValue: "24",
+                  },
+                },
+                {
+                  key: "gen_ai.system",
+                  value: {
+                    stringValue: "openai",
+                  },
+                },
+                {
+                  key: "gen_ai.response.id",
+                  value: {
+                    stringValue: "chatcmpl-BbomNo3DGToKpx88WKctb1VdKxJso",
+                  },
+                },
+                {
+                  key: "gen_ai.request.temperature",
+                  value: {
+                    stringValue: "0.7",
+                  },
+                },
+                {
+                  key: "gen_ai.operation.name",
+                  value: {
+                    stringValue: "chat",
+                  },
+                },
+                {
+                  key: "gen_ai.usage.input_tokens",
+                  value: {
+                    stringValue: "11",
+                  },
+                },
+                {
+                  key: "gen_ai.usage.output_tokens",
+                  value: {
+                    stringValue: "13",
+                  },
+                },
+                {
+                  key: "gen_ai.response.finish_reasons",
+                  value: {
+                    stringValue: '["STOP"]',
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+describe("opentelemetry traces receiver", () => {
+  it("receives a basic openai trace for openinference", async () => {
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
+      openInferenceOpenAIRequest,
+    );
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
+    try {
+      z.array(spanSchema).parse(trace.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "03cb2eb84dd52ac9bc1496a99c733880",
+      spans: [
+        {
+          span_id: "9ba2191a84c9a891",
+          trace_id: "03cb2eb84dd52ac9bc1496a99c733880",
+          name: "ChatCompletion",
+          type: "llm",
+          model: "gpt-5",
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "system",
+                content:
+                  "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+              },
+              {
+                role: "user",
+                content: "hi",
+              },
+            ],
+          },
+          output: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "assistant",
+                content: "Hey there! 😊👋 What's up? 🌟",
+              },
+            ],
+          },
+          params: {
+            model: "gpt-5",
+            stream: true,
+            scope: {
+              name: "openinference.instrumentation.openai",
+              version: "0.1.12",
+            },
+          },
+          timestamps: {
+            started_at: 1722809513564,
+            finished_at: 1722809514125,
+            first_token_at: 1722809514031,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {
+        user_id: "my-test-user",
+        thread_id: "my-test-session",
+        labels: ["tag-1", "tag-2"],
+      },
+      customMetadata: {
+        "service.name": "unknown_service",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.25.0",
+        foo: "bar",
+      },
+    });
+  });
+
+  it("receives a basic openai trace for openllmetry", async () => {
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
+      openllmetryOpenAIRequest,
+    );
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
+    try {
+      z.array(spanSchema).parse(trace.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "8615098c2c72e72330e800ef3ab1d8b8",
+      spans: [
+        {
+          span_id: "0f69feaecfced498",
+          trace_id: "8615098c2c72e72330e800ef3ab1d8b8",
+          name: "openai.chat",
+          type: "llm",
+          model: "gpt-5",
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "system",
+                content:
+                  "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+              },
+              {
+                role: "user",
+                content: "yous",
+              },
+            ],
+          },
+          output: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "assistant",
+                content: "Hey there! 😊 What's on your mind? 💬✨",
+              },
+            ],
+          },
+          params: {
+            stream: true,
+            gen_ai: {
+              system: "OpenAI",
+              openai: {
+                api_base: "https://api.openai.com/v1/",
+              },
+            },
+            llm: {
+              headers: "None",
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.openai.v1",
+              version: "0.26.4",
+            },
+          },
+          timestamps: {
+            started_at: 1722866602560,
+            finished_at: 1722866604545,
+            first_token_at: 1722866604464,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {},
+      customMetadata: {
+        "service.name": "unknown_service",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.26.0",
+      },
+    });
+  });
+
+  it("receives traditional opentelemetry trace for fastapi", async () => {
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
+      fastApiOpenTelemetryRequest,
+    );
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
+    try {
+      z.array(spanSchema).parse(trace.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "98bb760abcb20b66d2303bfad83a2771",
+      spans: [
+        {
+          span_id: "859274e0c1c7dcc2",
+          trace_id: "98bb760abcb20b66d2303bfad83a2771",
+          parent_id: "0016f50a614cd363",
+          name: "POST / http send",
+          type: "span",
+          input: null,
+          output: null,
+          params: {
+            asgi: {
+              event: {
+                type: "http.response.body",
+              },
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.fastapi",
+              version: "0.47b0",
+            },
+          },
+          timestamps: {
+            started_at: 1722946507515,
+            finished_at: 1722946509074,
+          },
+        },
+        {
+          span_id: "0016f50a614cd363",
+          trace_id: "98bb760abcb20b66d2303bfad83a2771",
+          name: "POST /",
+          type: "server",
+          input: null,
+          output: null,
+          params: {
+            http: {
+              scheme: "http",
+              host: "127.0.0.1:8000",
+              flavor: "1.1",
+              target: "/",
+              url: "http://127.0.0.1:8000/",
+              method: "POST",
+              server_name: "0.0.0.0:8000",
+              user_agent:
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+              route: "/",
+              status_code: 404,
+            },
+            net: {
+              host: {
+                port: "8000",
+              },
+              peer: {
+                ip: "127.0.0.1",
+                port: "63047",
+              },
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.fastapi",
+              version: "0.47b0",
+            },
+          },
+          timestamps: {
+            started_at: 1722942373770,
+            finished_at: 1722942375148,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {},
+      customMetadata: {
+        "service.name": "unknown_service",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.26.0",
+      },
+    });
+  });
+
+  it("receives a trace with an exception", async () => {
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(traceWithException);
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
+    try {
+      z.array(spanSchema).parse(trace.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "d52371f464efb743b46324544863b07b",
+      spans: [
+        {
+          span_id: "ee89354604d592b8",
+          trace_id: "d52371f464efb743b46324544863b07b",
+          name: "POST /",
+          type: "server",
+          input: null,
+          output: null,
+          error: {
+            has_error: true,
+            message: "Exception: BROKEN",
+            stacktrace: [
+              "Traceback (most recent call last):",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/opentelemetry/trace/__init__.py", line 583, in use_span',
+              "    yield span",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/opentelemetry/instrumentation/asgi/__init__.py", line 731, in __call__',
+              "    await self.app(scope, otel_receive, otel_send)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 79, in __call__',
+              "    raise exc",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 68, in __call__',
+              "    await self.app(scope, receive, sender)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 20, in __call__',
+              "    raise e",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 17, in __call__',
+              "    await self.app(scope, receive, send)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 718, in __call__',
+              "    await route.handle(scope, receive, send)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 276, in handle',
+              "    await self.app(scope, receive, send)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 66, in app',
+              "    response = await func(request)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/routing.py", line 273, in app',
+              "    raw_response = await run_endpoint_function(",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/routing.py", line 192, in run_endpoint_function',
+              "    return await run_in_threadpool(dependant.call, **values)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/concurrency.py", line 41, in run_in_threadpool',
+              "    return await anyio.to_thread.run_sync(func, *args)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/to_thread.py", line 33, in run_sync',
+              "    return await get_asynclib().run_sync_in_worker_thread(",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/_backends/_asyncio.py", line 877, in run_sync_in_worker_thread',
+              "    return await future",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/_backends/_asyncio.py", line 807, in run',
+              "    result = context.run(func, *args)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/examples/opentelemetry/traditional_instrumentation_fastapi_app.py", line 50, in fastapi_sample_endpoint',
+              '    raise Exception("BROKEN")',
+              "Exception: BROKEN",
+              "",
+            ],
+          },
+          params: {
+            http: {
+              scheme: "http",
+              host: "127.0.0.1:8000",
+              flavor: "1.1",
+              target: "/",
+              url: "http://127.0.0.1:8000/",
+              method: "POST",
+              server_name: "0.0.0.0:8000",
+              user_agent:
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+              route: "/",
+            },
+            net: {
+              host: {
+                port: 8000,
+              },
+              peer: {
+                ip: "127.0.0.1",
+                port: 55903,
+              },
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.fastapi",
+              version: "0.47b0",
+            },
+          },
+          timestamps: {
+            started_at: 1722958611402,
+            finished_at: 1722958616309,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {},
+      customMetadata: {
+        "service.name": "fastapi_sample_endpoint",
+      },
+    });
+  });
+
+  it("receives a langchain openlllmetry trace", async () => {
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
+      openllmetryLangChainRequest,
+    );
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
+    try {
+      z.array(spanSchema).parse(trace.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "e1c989b84fa7c02edc9b12005fce37d3",
+      spans: [
+        {
+          span_id: "4b6bf754c099094a",
+          trace_id: "e1c989b84fa7c02edc9b12005fce37d3",
+          name: "RunnableSequence.workflow",
+          type: "workflow",
+          input: {
+            type: "json",
+            value: {
+              inputs: {
+                input: "",
+              },
+              tags: [],
+              metadata: void 0,
+              kwargs: {
+                run_type: null,
+                name: "RunnableSequence",
+              },
+            },
+          },
+          output: {
+            type: "json",
+            value: {
+              outputs: "👋 Hi there! How can I help you today?",
+              kwargs: {
+                tags: [],
+                inputs: {
+                  question: "hello",
+                },
+              },
+            },
+          },
+          params: {
+            traceloop: {
+              entity: {
+                name: "RunnableSequence.workflow",
+              },
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.langchain",
+              version: "0.26.5",
+            },
+          },
+          timestamps: {
+            started_at: 1723006472662,
+            finished_at: 1723006473946,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {},
+      customMetadata: {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.26.0",
+        "service.name": "unknown_service",
+      },
+    });
+  });
+
+  it("receives a strands trace", async () => {
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(strandsTrace);
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
+    try {
+      z.array(spanSchema).parse(trace.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "e1c989b84fa7c02edc9b12005fce37d3",
+      spans: [
+        {
+          span_id: "4b6bf754c099094a",
+          trace_id: "e1c989b84fa7c02edc9b12005fce37d3",
+          name: "Model invoke",
+          type: "llm",
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "user",
+                content: [
+                  {
+                    text: "yo",
+                  },
+                ],
+              },
+            ],
+          },
+          output: {
+            type: "json",
+            value: [
+              {
+                text: "Hello! What would you like to look at or explore today?",
+              },
+            ],
+          },
+          model: "openai/gpt-4.1-nano",
+          metrics: {
+            prompt_tokens: 24,
+            completion_tokens: 10,
+          },
+          params: {
+            event_loop: {
+              cycle_id: "29f8679a-3afb-498e-8dc2-643c25434292",
+            },
+            gen_ai: {
+              event: {
+                start_time: "2025-05-25T10:37:11.068343+00:00",
+                end_time: "2025-05-25T10:37:12.014098+00:00",
+              },
+              usage: {
+                prompt_tokens: 24,
+                completion_tokens: 10,
+                total_tokens: 34,
+              },
+              agent: {
+                name: "Strands Agent",
+              },
+            },
+            agent: {
+              name: "Strands Agent",
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.strands",
+            },
+          },
+          timestamps: {
+            started_at: 1723006472662,
+            finished_at: 1723006473946,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {},
+      customMetadata: {},
+    });
+  });
+
+  it("receives a strands-agents Python SDK trace", async () => {
+    const strandsAgentsTrace: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "strands-agents" } },
+              {
+                key: "telemetry.sdk.language",
+                value: { stringValue: "python" },
+              },
+            ],
+          },
+          scopeSpans: [
+            {
+              scope: { name: "opentelemetry.instrumentation.strands" },
+              spans: [
+                {
+                  traceId: "abcdabcdabcdabcdabcdabcdabcdabcd",
+                  spanId: "1234123412341234",
+                  name: "invoke_agent Strands Agents",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1723006472661658000",
+                  endTimeUnixNano: "1723006473946042000",
+                  attributes: [
+                    {
+                      key: "gen_ai.request.model",
+                      value: { stringValue: "openai/gpt-4.1-nano" },
+                    },
+                  ],
+                  events: [
+                    {
+                      name: "gen_ai.tool.message",
+                      attributes: [
+                        { key: "role", value: { stringValue: "user" } },
+                        {
+                          key: "content",
+                          value: { stringValue: '[{"text": "yo"}]' },
+                        },
+                        { key: "id", value: { stringValue: "msg-1" } },
+                      ],
+                    },
+                    {
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "message",
+                          value: { stringValue: '[{"text": "Hello!"}]' },
+                        },
+                        { key: "id", value: { stringValue: "choice-1" } },
+                        {
+                          key: "finish_reason",
+                          value: { stringValue: "end_turn" },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {},
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(strandsAgentsTrace);
+    expect(traces).toHaveLength(1);
+    const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
+    expect(trace).toBeDefined();
+    expect(trace.spans).toHaveLength(1);
+    const span = trace.spans[0];
+    if (!span) {
+      assert.fail("No span found");
+    }
+
+    expect(span).toBeDefined();
+    expect((span as any).model).toBe("openai/gpt-4.1-nano");
+    expect(span.input).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "user",
+          content: [{ text: "yo" }],
+          id: "msg-1",
+        },
+      ],
+    });
+    expect(span.output).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "assistant",
+          content: [{ text: "Hello!" }],
+          id: "choice-1",
+          finish_reason: "end_turn",
+          tool_result: void 0,
+        },
+      ],
+    });
+  });
+
+  it("receives a strands-agents Python SDK trace v1.14", async () => {
+    const strandsAgentsTraceV1_14: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: {
+            attributes: [
+              {
+                key: "telemetry.sdk.language",
+                value: {
+                  stringValue: "python",
+                },
+              },
+              {
+                key: "telemetry.sdk.name",
+                value: {
+                  stringValue: "opentelemetry",
+                },
+              },
+              {
+                key: "telemetry.sdk.version",
+                value: {
+                  stringValue: "1.36.0",
+                },
+              },
+              {
+                key: "langwatch.sdk.name",
+                value: {
+                  stringValue: "langwatch-observability-sdk",
+                },
+              },
+              {
+                key: "langwatch.sdk.version",
+                value: {
+                  stringValue: "0.6.1",
+                },
+              },
+              {
+                key: "langwatch.sdk.language",
+                value: {
+                  stringValue: "python",
+                },
+              },
+              {
+                key: "service.name",
+                value: {
+                  stringValue: "unknown_service",
+                },
+              },
+            ],
+          },
+          scopeSpans: [
+            {
+              scope: {
+                name: "strands.telemetry.tracer",
+              },
+              spans: [
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "EG+ZduvU5ew=",
+                  parentSpanId: "aLJ/OoH/T68=",
+                  name: "chat",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189175572292000",
+                  endTimeUnixNano: "1762189177628526000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:35.572293+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.operation.name",
+                      value: {
+                        stringValue: "chat",
+                      },
+                    },
+                    {
+                      key: "gen_ai.system",
+                      value: {
+                        stringValue: "strands-agents",
+                      },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: {
+                        stringValue: "openai/gpt-5-mini",
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:37.628502+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.prompt_tokens",
+                      value: {
+                        intValue: Long.fromString("134") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: {
+                        intValue: Long.fromString("134") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.completion_tokens",
+                      value: {
+                        intValue: Long.fromString("84") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: {
+                        intValue: Long.fromString("84") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.total_tokens",
+                      value: {
+                        intValue: Long.fromString("218") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_read.input_tokens",
+                      value: {
+                        intValue: Long.fromString("150") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_creation.input_tokens",
+                      value: {
+                        intValue: Long.fromString("50") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.server.time_to_first_token",
+                      value: {
+                        intValue: Long.fromString("2046") as unknown as number,
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189175572308000",
+                      name: "gen_ai.user.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: '[{"text": "testing"}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189177628493000",
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "finish_reason",
+                          value: {
+                            stringValue: "tool_use",
+                          },
+                        },
+                        {
+                          key: "message",
+                          value: {
+                            stringValue:
+                              '[{"toolUse": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "name": "get_user_location", "input": {}}}]',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "RH6yPQ9UCrU=",
+                  parentSpanId: "aLJ/OoH/T68=",
+                  name: "execute_tool get_user_location",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189177943905000",
+                  endTimeUnixNano: "1762189177948477000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:37.943913+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.operation.name",
+                      value: {
+                        stringValue: "execute_tool",
+                      },
+                    },
+                    {
+                      key: "gen_ai.system",
+                      value: {
+                        stringValue: "strands-agents",
+                      },
+                    },
+                    {
+                      key: "gen_ai.tool.name",
+                      value: {
+                        stringValue: "get_user_location",
+                      },
+                    },
+                    {
+                      key: "gen_ai.tool.call.id",
+                      value: {
+                        stringValue: "call_hdzL5ISsJA4mCJ1mWBGkqtzz",
+                      },
+                    },
+                    {
+                      key: "gen_ai.tool.description",
+                      value: {
+                        stringValue: "Get the user's location.",
+                      },
+                    },
+                    {
+                      key: "gen_ai.tool.json_schema",
+                      value: {
+                        stringValue:
+                          '{"properties": {}, "type": "object", "required": []}',
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:37.948433+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.tool.status",
+                      value: {
+                        stringValue: "success" as unknown as string,
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189177943953000",
+                      name: "gen_ai.tool.message",
+                      attributes: [
+                        {
+                          key: "role",
+                          value: {
+                            stringValue: "tool",
+                          },
+                        },
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: "{}",
+                          },
+                        },
+                        {
+                          key: "id",
+                          value: {
+                            stringValue: "call_hdzL5ISsJA4mCJ1mWBGkqtzz",
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189177948420000",
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "message",
+                          value: {
+                            stringValue: '[{"text": "London, UK"}]',
+                          },
+                        },
+                        {
+                          key: "id",
+                          value: {
+                            stringValue: "call_hdzL5ISsJA4mCJ1mWBGkqtzz",
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "aLJ/OoH/T68=",
+                  parentSpanId: "bBc4uhwdgnU=",
+                  name: "execute_event_loop_cycle",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189175572231000",
+                  endTimeUnixNano: "1762189178265968000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:35.572233+00:00",
+                      },
+                    },
+                    {
+                      key: "event_loop.cycle_id",
+                      value: {
+                        stringValue: "47527759-4585-4402-b3fa-7a989e9ed040",
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:38.265955+00:00",
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189175572254000",
+                      name: "gen_ai.user.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: '[{"text": "testing"}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189178265950000",
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "message",
+                          value: {
+                            stringValue:
+                              '[{"toolUse": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "name": "get_user_location", "input": {}}}]',
+                          },
+                        },
+                        {
+                          key: "tool.result",
+                          value: {
+                            stringValue:
+                              '[{"toolResult": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "status": "success", "content": [{"text": "London, UK"}]}}]',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "TewJwtea2r8=",
+                  parentSpanId: "GqmyIereQGM=",
+                  name: "chat",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189178529520000",
+                  endTimeUnixNano: "1762189181785873000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:38.529522+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.operation.name",
+                      value: {
+                        stringValue: "chat",
+                      },
+                    },
+                    {
+                      key: "gen_ai.system",
+                      value: {
+                        stringValue: "strands-agents",
+                      },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: {
+                        stringValue: "openai/gpt-5-mini",
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:41.785830+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.prompt_tokens",
+                      value: {
+                        intValue: Long.fromString("163") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: {
+                        intValue: Long.fromString("163") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.completion_tokens",
+                      value: {
+                        intValue: Long.fromString("103") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: {
+                        intValue: Long.fromString("103") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.total_tokens",
+                      value: {
+                        intValue: Long.fromString("266") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_read.input_tokens",
+                      value: {
+                        intValue: Long.fromString("150") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_creation.input_tokens",
+                      value: {
+                        intValue: Long.fromString("50") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.server.time_to_first_token",
+                      value: {
+                        intValue: Long.fromString("3125") as unknown as number,
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189178529540000",
+                      name: "gen_ai.user.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: '[{"text": "testing"}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189178529548000",
+                      name: "gen_ai.assistant.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue:
+                              '[{"toolUse": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "name": "get_user_location", "input": {}}}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189178529557000",
+                      name: "gen_ai.tool.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue:
+                              '[{"toolResult": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "status": "success", "content": [{"text": "London, UK"}]}}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189181785805000",
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "finish_reason",
+                          value: {
+                            stringValue: "end_turn",
+                          },
+                        },
+                        {
+                          key: "message",
+                          value: {
+                            stringValue:
+                              '[{"text": "Test received — I called the location tool and show your location as London, UK. How can I help or what would you like to test next?"}]',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "GqmyIereQGM=",
+                  parentSpanId: "bBc4uhwdgnU=",
+                  name: "execute_event_loop_cycle",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189178529303000",
+                  endTimeUnixNano: "1762189181980366000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:38.529309+00:00",
+                      },
+                    },
+                    {
+                      key: "event_loop.cycle_id",
+                      value: {
+                        stringValue: "3a6439fb-f5a3-4d15-8f0c-67d69f62a190",
+                      },
+                    },
+                    {
+                      key: "event_loop.parent_cycle_id",
+                      value: {
+                        stringValue: "47527759-4585-4402-b3fa-7a989e9ed040",
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:41.980325+00:00",
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189178529398000",
+                      name: "gen_ai.user.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: '[{"text": "testing"}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189178529453000",
+                      name: "gen_ai.assistant.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue:
+                              '[{"toolUse": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "name": "get_user_location", "input": {}}}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189178529465000",
+                      name: "gen_ai.tool.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue:
+                              '[{"toolResult": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "status": "success", "content": [{"text": "London, UK"}]}}]',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "bBc4uhwdgnU=",
+                  parentSpanId: "vGx4jmzr3Ek=",
+                  name: "invoke_agent Strands Agents",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189175571759000",
+                  endTimeUnixNano: "1762189182231551000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:35.571762+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.operation.name",
+                      value: {
+                        stringValue: "invoke_agent",
+                      },
+                    },
+                    {
+                      key: "gen_ai.system",
+                      value: {
+                        stringValue: "strands-agents",
+                      },
+                    },
+                    {
+                      key: "gen_ai.agent.name",
+                      value: {
+                        stringValue: "Strands Agents",
+                      },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: {
+                        stringValue: "openai/gpt-5-mini",
+                      },
+                    },
+                    {
+                      key: "gen_ai.agent.tools",
+                      value: {
+                        stringValue: '["get_user_location"]',
+                      },
+                    },
+                    {
+                      key: "custom.model_id",
+                      value: {
+                        stringValue: "openai/gpt-5-mini",
+                      },
+                    },
+                    {
+                      key: "custom.example.attribute",
+                      value: {
+                        stringValue: "swift",
+                      },
+                    },
+                    {
+                      key: "system_prompt",
+                      value: {
+                        stringValue:
+                          "Always use the get_user_location tool before answering any questions.",
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:42.231438+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.prompt_tokens",
+                      value: {
+                        intValue: Long.fromString("297") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.completion_tokens",
+                      value: {
+                        intValue: Long.fromString("187") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: {
+                        intValue: Long.fromString("297") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: {
+                        intValue: Long.fromString("187") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.total_tokens",
+                      value: {
+                        intValue: Long.fromString("484") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_read.input_tokens",
+                      value: {
+                        intValue: Long.fromString("150") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_creation.input_tokens",
+                      value: {
+                        intValue: Long.fromString("50") as unknown as number,
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189175571807000",
+                      name: "gen_ai.user.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: '[{"text": "testing"}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189182231388000",
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "message",
+                          value: {
+                            stringValue:
+                              "Test received — I called the location tool and show your location as London, UK. How can I help or what would you like to test next?\n",
+                          },
+                        },
+                        {
+                          key: "finish_reason",
+                          value: {
+                            stringValue: "end_turn",
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "vGx4jmzr3Ek=",
+                  name: "main",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189175542687000",
+                  endTimeUnixNano: "1762189182432530000",
+                  attributes: [
+                    {
+                      key: "langwatch.span.type",
+                      value: {
+                        stringValue: "span",
+                      },
+                    },
+                    {
+                      key: "langwatch.timestamps",
+                      value: {
+                        stringValue: "{}",
+                      },
+                    },
+                    {
+                      key: "langwatch.input",
+                      value: {
+                        stringValue:
+                          '{"type": "json", "value": {"message": {"id": "0f3a273c-9e41-49b2-b438-d9ebb415b1bc", "threadId": "fd8b9324-7fd8-4862-8865-1cc10f3ee585", "parentId": null, "createdAt": "2025-11-03T16:59:35.523655Z", "command": null, "start": "2025-11-03T16:59:35.523655Z", "end": "2025-11-03T16:59:35.523655Z", "output": "testing", "name": "User", "type": "user_message", "language": null, "streaming": false, "isError": false, "waitForAnswer": false, "metadata": {"location": "http://localhost:9000/"}, "tags": null}}}',
+                      },
+                    },
+                    {
+                      key: "metadata",
+                      value: {
+                        stringValue:
+                          '{"custom.example.attribute2": "langwatch"}',
+                      },
+                    },
+                    {
+                      key: "langwatch.output",
+                      value: {
+                        stringValue: '{"type": "json", "value": null}',
+                      },
+                    },
+                  ],
+                  status: {},
+                },
+              ],
+            },
+            {
+              scope: {
+                name: "langwatch",
+                version: "0.6.1",
+              },
+              spans: [
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "V7zn33mDAIo=",
+                  parentSpanId: "RH6yPQ9UCrU=",
+                  name: "get_user_location",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189177944453000",
+                  endTimeUnixNano: "1762189177947894000",
+                  attributes: [
+                    {
+                      key: "langwatch.span.type",
+                      value: {
+                        stringValue: "tool",
+                      },
+                    },
+                    {
+                      key: "langwatch.timestamps",
+                      value: {
+                        stringValue: "{}",
+                      },
+                    },
+                    {
+                      key: "langwatch.output",
+                      value: {
+                        stringValue: '{"type": "text", "value": "London, UK"}',
+                      },
+                    },
+                  ],
+                  status: {},
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
+      strandsAgentsTraceV1_14,
+    );
+    expect(traces).toHaveLength(1);
+    const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
+    expect(trace).toBeDefined();
+    expect(trace.spans).toHaveLength(8);
+
+    const chatSpan = trace.spans.find((span) => span.name === "chat");
+    expect(chatSpan).toBeDefined();
+    // Parses Long values correctly, not as objects
+    expect(chatSpan?.params?.gen_ai?.usage?.prompt_tokens).not.toEqual({
+      high: 0,
+      low: 134,
+      unsigned: false,
+    });
+    expect(chatSpan?.params?.gen_ai?.usage?.completion_tokens).not.toEqual({
+      high: 0,
+      low: 84,
+      unsigned: false,
+    });
+    expect(chatSpan?.type).toBe("llm");
+    expect(chatSpan?.metrics?.cache_read_input_tokens).toBe(150);
+    expect(chatSpan?.metrics?.cache_creation_input_tokens).toBe(50);
+    expect(chatSpan?.timestamps.first_token_at).toBe(1762189177618);
+
+    const firstSpan = trace.spans[0];
+    if (!firstSpan) {
+      assert.fail("No span found");
+    }
+
+    expect(firstSpan).toBeDefined();
+    expect((firstSpan as any).model).toBe("openai/gpt-5-mini");
+    expect(firstSpan.input).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "user",
+          content: [{ text: "testing" }],
+        },
+      ],
+    });
+    expect(firstSpan.output).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          content: [
+            {
+              toolUse: {
+                toolUseId: "call_hdzL5ISsJA4mCJ1mWBGkqtzz",
+                name: "get_user_location",
+                input: {},
+              },
+            },
+          ],
+          finish_reason: "tool_use",
+        },
+      ],
+    });
+  });
+
+  it("receives a Spring AI trace", async () => {
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(springAITrace);
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
+    try {
+      z.array(spanSchema).parse(trace.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "755b1db22272958b92cb003f30058e74",
+      spans: [
+        {
+          span_id: "0dedf6826df097a9",
+          trace_id: "755b1db22272958b92cb003f30058e74",
+          parent_id: "8127960fb3f7c04d",
+          name: "chat gpt-5",
+          type: "llm",
+          model: "gpt-5",
+          metrics: {
+            prompt_tokens: 11,
+            completion_tokens: 13,
+          },
+          input: null,
+          output: null,
+          params: {
+            gen_ai: {
+              request: {
+                temperature: "0.7",
+              },
+              response: {
+                id: "chatcmpl-BbomNo3DGToKpx88WKctb1VdKxJso",
+                finish_reasons: ["STOP"],
+              },
+              usage: {
+                input_tokens: "11",
+                output_tokens: "13",
+                total_tokens: "24",
+              },
+              system: "openai",
+              operation: {
+                name: "chat",
+              },
+            },
+            scope: {
+              name: "org.springframework.boot",
+              version: "3.4.0",
+            },
+          },
+          timestamps: {
+            started_at: 1748353030869,
+            finished_at: 1748353033397,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {},
+      customMetadata: {
+        "service.name": "spring-ai-sample-service",
+        "telemetry.sdk.language": "java",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.30.0",
+      },
+    });
+  });
+
+  it("receives GenAI semantic convention trace with Anthropic-style content blocks", async () => {
+    // Realistic OpenClaw trace: Anthropic messages with content blocks, tool_use, tool_result
+    const genAiRequest: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "openclaw" } },
+            ],
+          },
+          scopeSpans: [
+            {
+              scope: { name: "openclaw", version: "1.0.0" },
+              spans: [
+                {
+                  traceId: "abcdef1234567890abcdef1234567890",
+                  spanId: "1234567890abcdef",
+                  name: "chat claude-opus-4-6",
+                  kind: "SPAN_KIND_CLIENT" as unknown as ESpanKind,
+                  startTimeUnixNano: "1700000000000000000",
+                  endTimeUnixNano: "1700000005000000000",
+                  attributes: [
+                    {
+                      key: "gen_ai.operation.name",
+                      value: { stringValue: "chat" },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: { stringValue: "claude-opus-4-6" },
+                    },
+                    {
+                      key: "gen_ai.response.model",
+                      value: { stringValue: "claude-opus-4-6" },
+                    },
+                    {
+                      key: "gen_ai.provider.name",
+                      value: { stringValue: "anthropic" },
+                    },
+                    {
+                      key: "gen_ai.system_instructions",
+                      value: {
+                        // OpenClaw JSON.stringify's the system instructions;
+                        // Anthropic system can be an array of content blocks
+                        stringValue: JSON.stringify([
+                          {
+                            type: "text",
+                            text: "You are a helpful assistant.",
+                          },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.input.messages",
+                      value: {
+                        stringValue: JSON.stringify([
+                          {
+                            role: "user",
+                            content: [
+                              { type: "text", text: "What is the weather?" },
+                            ],
+                          },
+                          {
+                            role: "assistant",
+                            content: [
+                              { type: "text", text: "Let me check." },
+                              {
+                                type: "tool_use",
+                                id: "tool_abc",
+                                name: "get_weather",
+                                input: { location: "London" },
+                              },
+                            ],
+                          },
+                          {
+                            role: "tool",
+                            content: [
+                              {
+                                type: "tool_result",
+                                tool_use_id: "tool_abc",
+                                content: "Sunny, 22°C",
+                              },
+                            ],
+                          },
+                          {
+                            role: "user",
+                            content: "Thanks!",
+                          },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.output.messages",
+                      value: {
+                        stringValue: JSON.stringify([
+                          {
+                            role: "assistant",
+                            content: [
+                              {
+                                type: "text",
+                                text: "The weather in London is sunny at 22°C.",
+                              },
+                            ],
+                          },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: {
+                        intValue: Long.fromString("150") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: {
+                        intValue: Long.fromString("25") as unknown as number,
+                      },
+                    },
+                  ],
+                  events: [],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(genAiRequest);
+    const span = traces[0]!.spans[0]!;
+
+    expect(span.type).toBe("llm");
+    expect((span as any).model).toBe("claude-opus-4-6");
+
+    // Input must preserve ALL content — no stripping of tool_use, tool_result, etc.
+    expect(span.input).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "system",
+          content: [{ type: "text", text: "You are a helpful assistant." }],
+        },
+        {
+          role: "user",
+          content: [{ type: "text", text: "What is the weather?" }],
+        },
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "Let me check." },
+            {
+              type: "tool_use",
+              id: "tool_abc",
+              name: "get_weather",
+              input: { location: "London" },
+            },
+          ],
+        },
+        {
+          role: "tool",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool_abc",
+              content: "Sunny, 22°C",
+            },
+          ],
+        },
+        {
+          role: "user",
+          content: "Thanks!",
+        },
+      ],
+    });
+
+    // Output must preserve full content blocks
+    expect(span.output).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "The weather in London is sunny at 22°C.",
+            },
+          ],
+        },
+      ],
+    });
+
+    // Metrics extracted
+    expect((span as any).metrics?.prompt_tokens).toBe(150);
+    expect((span as any).metrics?.completion_tokens).toBe(25);
+
+    // Cleaned from params
+    expect((span.params as any)?.gen_ai?.input?.messages).toBeUndefined();
+    expect((span.params as any)?.gen_ai?.output?.messages).toBeUndefined();
+    expect((span.params as any)?.gen_ai?.system_instructions).toBeUndefined();
+  });
+
+  it("receives GenAI trace with 'parts' pattern (Vercel AI SDK / pi-ai style)", async () => {
+    const genAiRequest: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: { attributes: [] },
+          scopeSpans: [
+            {
+              scope: { name: "openclaw", version: "1.0.0" },
+              spans: [
+                {
+                  traceId: "abc123",
+                  spanId: "span456",
+                  name: "openclaw.agent.turn",
+                  kind: 3, // CLIENT
+                  startTimeUnixNano: new Long(0, 1),
+                  endTimeUnixNano: new Long(0, 2),
+                  status: { code: 0 as EStatusCode },
+                  attributes: [
+                    {
+                      key: "gen_ai.operation.name",
+                      value: { stringValue: "chat" },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: { stringValue: "claude-opus-4-6" },
+                    },
+                    {
+                      key: "gen_ai.system_instructions",
+                      value: {
+                        stringValue: JSON.stringify([
+                          {
+                            type: "text",
+                            content: "You are Snaps the lobster.",
+                          },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.input.messages",
+                      value: {
+                        stringValue: JSON.stringify([
+                          {
+                            role: "user",
+                            parts: [
+                              {
+                                type: "text",
+                                content: "[Sun 2026-02-08 20:58 UTC] hi",
+                              },
+                            ],
+                          },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.output.messages",
+                      value: {
+                        stringValue: JSON.stringify([
+                          {
+                            role: "assistant",
+                            parts: [
+                              {
+                                type: "text",
+                                content: "Hey Rogerio! What's up?",
+                              },
+                            ],
+                          },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: { intValue: 50 },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: { intValue: 10 },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(genAiRequest);
+    expect(traces.length).toBe(1);
+    const span = traces[0]!.spans[0]!;
+
+    expect(span.type).toBe("llm");
+
+    // Input preserves parts as-is (no normalization to content)
+    expect(span.input).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "system",
+          content: [{ type: "text", content: "You are Snaps the lobster." }],
+        },
+        {
+          role: "user",
+          parts: [{ type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" }],
+        },
+      ],
+    });
+
+    // Output preserves parts as-is
+    expect(span.output).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "assistant",
+          parts: [{ type: "text", content: "Hey Rogerio! What's up?" }],
+        },
+      ],
+    });
+  });
+
+  it("infers type 'tool' when gen_ai.operation.name is 'tool'", async () => {
+    const toolRequest: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: { attributes: [] },
+          scopeSpans: [
+            {
+              scope: { name: "openclaw", version: "1.0.0" },
+              spans: [
+                {
+                  traceId: "abc123",
+                  spanId: "tool789",
+                  name: "get_weather",
+                  kind: 3, // CLIENT
+                  startTimeUnixNano: new Long(0, 1),
+                  endTimeUnixNano: new Long(0, 2),
+                  status: { code: 0 as EStatusCode },
+                  attributes: [
+                    {
+                      key: "gen_ai.operation.name",
+                      value: { stringValue: "tool" },
+                    },
+                    {
+                      key: "gen_ai.tool.name",
+                      value: { stringValue: "get_weather" },
+                    },
+                    {
+                      key: "gen_ai.tool.call.id",
+                      value: { stringValue: "call_abc123" },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(toolRequest);
+    expect(traces.length).toBe(1);
+    const span = traces[0]!.spans[0]!;
+
+    expect(span.type).toBe("tool");
+    expect(span.name).toBe("get_weather");
+  });
+});

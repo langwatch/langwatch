@@ -172,7 +172,7 @@ Feature: AI Gateway Governance — API + CLI + MCP coverage (agentic-first parit
     And every state-change step emits the matching audit row visible in step 5
     # Real-user dogfood gate — the test that proves the MCP surface is
     # genuinely agentic-usable. Mirrors the dogfood discipline from
-    # IngestionTemplate v1 (langwatch/ee/governance/ingestion-templates/<slug>/dogfood.md).
+    # IngestionTemplate v1 (platform/app/ee/governance/ingestion-templates/<slug>/dogfood.md).
 
   # ---------------------------------------------------------------------------
   # RBAC enforcement uniformity

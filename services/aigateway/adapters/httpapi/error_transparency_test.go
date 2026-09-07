@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -188,6 +189,67 @@ func TestRouter_MidStreamPlainError_UsesErrorEventObject(t *testing.T) {
 	assert.NotContains(t, body, `{"error":"`)
 }
 
+// @scenario "A handled failure states the same thing mid-stream as it does before the stream opens"
+//
+// herr.E.Error() renders "code (map[...whole meta...])" plus every wrapped
+// reason, so building the frame from it published the engine's internal cause
+// — the credential parse offset, the unreadable provider body — that the JSON
+// boundary deliberately keeps to the log line. That is also the exact shape
+// the production report arrived in: provider_timeout (map[message:error
+// creating auth token source status:0]).
+func TestRouter_MidStreamHandledError_StatesCustomerCopyNotTheCause(t *testing.T) {
+	handled := herr.New(context.Background(), domain.ErrProviderCredentialInvalid,
+		herr.M{"message": "The credentials configured for this model provider were not accepted."},
+		errors.New("failed to parse auth credentials JSON: {\"private_key\": \"redacted-by-this-fixture\""))
+
+	provider := &mockStreamProvider{
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			return &midStreamErrIter{err: handled}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(true))
+	body := rec.Body.String()
+
+	require.Contains(t, body, "event: error")
+	assert.Contains(t, body, `"type":"provider_credential_invalid"`,
+		"the frame carries the handled code, the way the JSON boundary does")
+	assert.Contains(t, body, "The credentials configured for this model provider were not accepted.")
+	assert.NotContains(t, body, "BEGIN PRIVATE KEY")
+	assert.NotContains(t, body, "failed to parse auth credentials JSON")
+	assert.NotContains(t, body, "map[", "the meta map must not be rendered into the frame")
+}
+
+// A handled error with no customer copy still must not fall back to
+// err.Error(). The code alone is the floor.
+func TestRouter_MidStreamHandledError_WithoutCopyFallsBackToTheCode(t *testing.T) {
+	handled := herr.New(context.Background(), domain.ErrProviderError, herr.M{"provider": "vertex"})
+
+	provider := &mockStreamProvider{
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			return &midStreamErrIter{err: handled}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(true))
+	body := rec.Body.String()
+
+	assert.Contains(t, body, `"message":"provider_error"`)
+	assert.NotContains(t, body, "map[")
+}
+
 // @scenario "Terminal upstream error is identical across stream and non-stream"
 func TestRouter_UpstreamTerminal_IdenticalAcrossPaths(t *testing.T) {
 	const authErrBody = `{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}`
@@ -238,8 +300,9 @@ func TestRouter_UpstreamRetryable429_ForwardedWithHeaders(t *testing.T) {
 				Body:       []byte(rateLimitBody),
 				Message:    "rate limit exceeded",
 				Headers: map[string]string{
-					"Retry-After":    "30",
-					"X-Should-Retry": "true",
+					"Retry-After":           "30",
+					"X-Should-Retry":        "true",
+					herr.HandledErrorHeader: "spoofed_provider_code",
 				},
 			}
 		},
@@ -259,5 +322,36 @@ func TestRouter_UpstreamRetryable429_ForwardedWithHeaders(t *testing.T) {
 		"upstream Retry-After backoff hint must be preserved")
 	assert.Equal(t, "true", rec.Header().Get("X-Should-Retry"),
 		"upstream x-should-retry signal must be forwarded")
+	assert.Empty(t, rec.Header().Get(herr.HandledErrorHeader),
+		"a provider cannot mark its response as a LangWatch handled error")
 	assert.JSONEq(t, rateLimitBody, rec.Body.String())
+}
+
+// @scenario "A provider-set marker header cannot survive the passthrough lane"
+func TestRouter_WriteJSONResponse_StripsSpoofedMarkerHeader(t *testing.T) {
+	const geminiErrBody = `{"error":{"code":429,"message":"quota exceeded","status":"RESOURCE_EXHAUSTED"}}`
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			return &domain.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       []byte(geminiErrBody),
+				Headers: map[string]string{
+					herr.HandledErrorHeader: "spoofed_provider_code",
+				},
+			}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(false))
+
+	require.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.Empty(t, rec.Header().Get(herr.HandledErrorHeader),
+		"a passthrough response's own headers cannot spoof the LangWatch marker")
+	assert.JSONEq(t, geminiErrBody, rec.Body.String())
 }

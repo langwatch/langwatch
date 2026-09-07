@@ -137,9 +137,53 @@ wait_ch_ready() {
   pass "$pod is ready"
 }
 
+# Waits until every live pod behind a label selector is Ready.
+#
+# `kubectl wait pod -l` resolves the selector to pod NAMES once and then watches
+# those names, so a pod that disappears while it waits fails the whole call with
+# `Error from server (NotFound)`. A rolling update deletes the outgoing pods at
+# exactly that moment, and nothing upstream of this helper rules it out: both
+# `helm --wait` and a Deployment's ready check are satisfied by the new replicas
+# alone, while the previous ones are still terminating or not yet even deleted.
+#
+# So the pod set is settled before a single name is taken. Every workload behind
+# the selector is rolled out first, and a rollout only completes once the
+# outgoing pods have left the active count, which means every deletion the
+# controller intends has already been issued. Names are then taken only from
+# pods that carry no deletion timestamp. Together those two mean nothing handed
+# to `kubectl wait` is on its way out, and nothing new is about to go.
+#
+# Deployments are reached through their ReplicaSets rather than by their own
+# labels: a workload's labels need not match the ones it stamps on its pods, but
+# the Deployment controller copies the pod template's labels onto every
+# ReplicaSet it creates and records the Deployment in ownerReferences. A
+# selector that matches no workload at all (a bare pod) simply skips the
+# rollout wait, which is correct: nothing rolls it.
 wait_pod_ready() {
   local selector="$1"
   local timeout="${2:-${TIMEOUT}}"
   info "Waiting for pods with label $selector (${timeout}s)..."
-  kc wait pod -l "$selector" --for=condition=Ready --timeout="${timeout}s"
+
+  local targets target
+  targets=$( {
+    kc get statefulset,daemonset -l "$selector" -o name
+    kc get replicaset -l "$selector" \
+      -o go-template='{{range .items}}{{range .metadata.ownerReferences}}{{if eq .kind "Deployment"}}deployment/{{.name}}{{"\n"}}{{end}}{{end}}{{end}}'
+  } | sort -u )
+  while IFS= read -r target; do
+    [[ -n "$target" ]] || continue
+    kc rollout status "$target" --timeout="${timeout}s"
+  done <<< "$targets"
+
+  local live pod
+  local pods=()
+  live=$(kc get pod -l "$selector" \
+    -o go-template='{{range .items}}{{if not .metadata.deletionTimestamp}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}')
+  while IFS= read -r pod; do
+    [[ -n "$pod" ]] || continue
+    pods+=("$pod")
+  done <<< "$live"
+  [[ ${#pods[@]} -gt 0 ]] || fail "no live pods match $selector"
+
+  kc wait pod "${pods[@]}" --for=condition=Ready --timeout="${timeout}s"
 }

@@ -36,11 +36,14 @@ Feature: Production HTTP server — static asset and SPA fallback behavior
     Then the response status is 404
     And the response is not the index.html document
 
+  # The shell is served with the runtime asset-base resolver injected — see
+  # cdn-asset-base.feature — so it is the index.html document plus that bootstrap,
+  # not a byte-for-byte copy.
   Scenario: Unknown non-asset route falls back to index.html for SPA routing
     When a client requests /projects/foo/traces
     Then the response status is 200
     And the Content-Type header is text/html
-    And the response body equals the contents of index.html
+    And the response body is the index.html document (with the asset-base resolver injected)
 
   Scenario: Asset path traversal is rejected before touching the filesystem
     When a client requests /assets/../../etc/passwd

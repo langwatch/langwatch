@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/migrationorder"
 )
 
-const clickhouseDir = "langwatch/src/server/clickhouse/migrations"
+const clickhouseDir = "platform/app/src/server/clickhouse/migrations"
 
 func gitIn(t *testing.T, root string, args ...string) {
 	t.Helper()
@@ -35,7 +35,12 @@ func initRepo(t *testing.T) string {
 
 func commitMigration(t *testing.T, root, name string) {
 	t.Helper()
-	path := filepath.Join(root, filepath.FromSlash(clickhouseDir), name)
+	commitMigrationAt(t, root, clickhouseDir, name)
+}
+
+func commitMigrationAt(t *testing.T, root, directory, name string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(directory), name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
@@ -95,6 +100,43 @@ func TestRepoInputs(t *testing.T) {
 	}
 }
 
+func TestRepoInputsRelocatedSet(t *testing.T) {
+	// A repo restructure moves the whole migration directory. The relocated
+	// merged migrations are history, not additions — only what the branch adds
+	// on top is judged.
+	previousDir := "langwatch/src/server/clickhouse/migrations"
+	root := initRepo(t)
+	commitMigrationAt(t, root, previousDir, "00040_a.sql")
+	commitMigrationAt(t, root, previousDir, "00041_b.sql")
+	gitIn(t, root, "checkout", "-q", "-b", "restructure")
+	if err := os.MkdirAll(filepath.Join(root, filepath.Dir(filepath.FromSlash(clickhouseDir))), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, root, "mv", previousDir, clickhouseDir)
+	gitIn(t, root, "commit", "-q", "-m", "move migrations")
+	commitMigration(t, root, "00042_mine.sql")
+
+	inputs, err := migrationorder.Repo{Root: root}.Inputs(t.Context(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := slices.IndexFunc(inputs, func(in migrationorder.Input) bool {
+		return in.Set.Name == "ClickHouse"
+	})
+	if index < 0 {
+		t.Fatalf("no ClickHouse input in %+v", inputs)
+	}
+	in := inputs[index]
+
+	// The moved entries surface as base history via the previous directory.
+	if want := []string{"00040_a.sql", "00041_b.sql"}; !slices.Equal(in.Base, want) {
+		t.Errorf("Base = %v, want %v", in.Base, want)
+	}
+	if findings := migrationorder.Check(in); len(findings) != 0 {
+		t.Errorf("got findings for a pure relocation plus an in-order addition: %+v", findings)
+	}
+}
+
 func TestTopLevelEntries(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -105,30 +147,30 @@ func TestTopLevelEntries(t *testing.T) {
 		{
 			name: "prisma directories dedupe to one entry and the lock file is dropped",
 			paths: []string{
-				"langwatch/prisma/migrations/20260102000000_new/migration.sql",
-				"langwatch/prisma/migrations/20260102000000_new/README.md",
-				"langwatch/prisma/migrations/20260101000000_old/migration.sql",
-				"langwatch/prisma/migrations/migration_lock.toml",
+				"platform/app/prisma/migrations/20260102000000_new/migration.sql",
+				"platform/app/prisma/migrations/20260102000000_new/README.md",
+				"platform/app/prisma/migrations/20260101000000_old/migration.sql",
+				"platform/app/prisma/migrations/migration_lock.toml",
 			},
-			directory: "langwatch/prisma/migrations",
+			directory: "platform/app/prisma/migrations",
 			want:      []string{"20260101000000_old", "20260102000000_new"},
 		},
 		{
 			name: "clickhouse files are taken flat and sorted",
 			paths: []string{
-				"langwatch/src/server/clickhouse/migrations/00041_b.sql",
-				"langwatch/src/server/clickhouse/migrations/00040_a.sql",
+				"platform/app/src/server/clickhouse/migrations/00041_b.sql",
+				"platform/app/src/server/clickhouse/migrations/00040_a.sql",
 			},
-			directory: "langwatch/src/server/clickhouse/migrations",
+			directory: "platform/app/src/server/clickhouse/migrations",
 			want:      []string{"00040_a.sql", "00041_b.sql"},
 		},
 		{
 			name: "paths outside the directory are ignored, prefix-alikes included",
 			paths: []string{
-				"langwatch/prisma/migrations_archive/20260101000000_old/migration.sql",
-				"langwatch/prisma/schema.prisma",
+				"platform/app/prisma/migrations_archive/20260101000000_old/migration.sql",
+				"platform/app/prisma/schema.prisma",
 			},
-			directory: "langwatch/prisma/migrations",
+			directory: "platform/app/prisma/migrations",
 			want:      nil,
 		},
 	}

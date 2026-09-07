@@ -19,7 +19,7 @@ import (
 )
 
 // gatewaySignatureWindowSeconds matches `GATEWAY_SIGNATURE_WINDOW_SECONDS`
-// in `langwatch/src/server/routes/gateway-internal.ts`. Both ends must
+// in `platform/app/src/server/routes/gateway-internal.ts`. Both ends must
 // use the same value or replay protection becomes asymmetric.
 const gatewaySignatureWindowSeconds = 300
 
@@ -33,7 +33,7 @@ const gatewaySignatureWindowSeconds = 300
 //
 //	METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
 //
-// Headers (matching `langwatch/ee/governance/services/activity-monitor/ottlGatewayClient.ts`):
+// Headers (matching `platform/app/ee/governance/services/activity-monitor/ottlGatewayClient.ts`):
 //
 //	X-LangWatch-Gateway-Signature  hex(hmac_sha256(secret, canonical))
 //	X-LangWatch-Gateway-Timestamp  unix seconds (±300s window)

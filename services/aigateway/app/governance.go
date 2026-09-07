@@ -36,11 +36,23 @@ func applyGovernanceMessage(resp *domain.Response, err error) (*domain.Response,
 		return resp, err
 	}
 	var ue *domain.UpstreamError
-	if errors.As(err, &ue) && isAccountExhaustion(ue.StatusCode, ue.Body) {
+	if errors.As(err, &ue) && isAccountExhaustionError(ue) {
 		ue.Message = accountExhaustionMessage
 		ue.Body = rewriteErrorMessage(ue.Body, accountExhaustionMessage)
 	}
 	return resp, err
+}
+
+// isAccountExhaustionError is the UpstreamError-shaped twin of
+// isAccountExhaustion. Translated lanes carry the provider's error
+// discriminants on the error itself rather than in a captured body, so the
+// parsed type/code must count too or a quota error's original billing
+// message would reach governed users on those lanes.
+func isAccountExhaustionError(ue *domain.UpstreamError) bool {
+	if ue.ErrorType == "insufficient_quota" || ue.ErrorCode == "insufficient_quota" {
+		return true
+	}
+	return isAccountExhaustion(ue.StatusCode, ue.Body)
 }
 
 // isAccountExhaustion reports whether a provider error is a terminal

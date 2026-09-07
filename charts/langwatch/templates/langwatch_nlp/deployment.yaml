@@ -1,3 +1,4 @@
+{{- if .Values.langwatch_nlp.enabled }}
 # Deployment for the LangWatch NLP service
 apiVersion: apps/v1
 kind: Deployment
@@ -43,10 +44,8 @@ spec:
       # The NLP service does not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
-      {{- with (coalesce .Values.langwatch_nlp.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.langwatch_nlp) | nindent 8 }}
 
       # Node selection - https://kubespec.dev/v1/Pod#spec.nodeSelector
       {{- with (coalesce .Values.langwatch_nlp.nodeSelector .Values.global.scheduling.nodeSelector)}}
@@ -72,10 +71,15 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # PriorityClass - https://kubespec.dev/v1/Pod#spec.priorityClassName
+      {{- with (coalesce .Values.langwatch_nlp.priorityClassName .Values.global.scheduling.priorityClassName)}}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
+      {{- with .Values.langwatch_nlp.extraInitContainers}}
       initContainers:
-        {{- with .Values.langwatch_nlp.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
 
       containers:
         {{- with .Values.langwatch_nlp.extraContainers}}
@@ -83,7 +87,7 @@ spec:
         {{- end }}
         - name: {{ .Release.Name }}-langwatch-nlp
           securityContext:
-            {{- toYaml (coalesce .Values.langwatch_nlp.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.langwatch_nlp) | nindent 12 }}
           image: "{{ .Values.images.langwatch_nlp.repository }}:{{ .Values.images.langwatch_nlp.tag }}"
           imagePullPolicy: "{{ .Values.images.langwatch_nlp.pullPolicy }}"
           ports:
@@ -104,7 +108,25 @@ spec:
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.langwatch_nlp.upstreams.langwatch.scheme | default "http" }}://{{ .Values.langwatch_nlp.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.langwatch_nlp.upstreams.langwatch.port | default 5560 }}
 
+            # Outbound request policy for workflow HTTP nodes, which is what an
+            # HTTP agent runs as. Passed explicitly rather than left to the
+            # binary's default so the rendered Deployment states the policy an
+            # operator can read, and so the allow-list is reachable at all.
+            - name: BLOCK_LOCAL_HTTP_CALLS
+              value: {{ .Values.langwatch_nlp.security.blockLocalHTTPCalls | default false | quote }}
+            {{- with .Values.langwatch_nlp.security.allowedProxyHosts }}
+            - name: ALLOWED_PROXY_HOSTS
+              value: {{ join "," . | quote }}
+            {{- end }}
+
+            # Ceiling on how long a workflow code block may run before nlpgo
+            # kills it. Range-checked inside the helper, which is also what the
+            # app and workers read, so all three carry the same checked number.
+            - name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
+              value: {{ include "langwatch.codeBlockTimeoutSeconds" . | quote }}
+
             {{- with .Values.langwatch_nlp.extraEnvs}}
+            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "langwatch_nlp.extraEnvs") }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
@@ -152,6 +174,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.langwatch_nlp.scratchSizeLimit }}
         - name: log-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.langwatch_nlp.scratchSizeLimit }}
+{{- end }}

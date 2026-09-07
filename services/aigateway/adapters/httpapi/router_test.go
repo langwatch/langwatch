@@ -32,6 +32,7 @@ func (m *mockAuth) Resolve(ctx context.Context, token string) (*domain.Bundle, e
 
 type mockProvider struct {
 	dispatchFn func(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error)
+	listFn     func(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error)
 }
 
 func (m *mockProvider) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
@@ -42,8 +43,11 @@ func (m *mockProvider) DispatchStream(_ context.Context, _ *domain.Request, _ do
 	return nil, nil
 }
 
-func (m *mockProvider) ListModels(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
-	return nil, nil
+func (m *mockProvider) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, creds)
+	}
+	return nil, nil, nil
 }
 
 type mockRateLimiter struct {
@@ -82,6 +86,21 @@ func testBundle() *domain.Bundle {
 			Fallback: domain.FallbackConfig{MaxAttempts: 1},
 		},
 	}
+}
+
+// geminiBundle is testBundle plus the Google slot the /v1beta surface needs.
+// That surface hands the caller's body and URL path to Google unchanged, so
+// the gateway refuses it on a key with no Google credential rather than
+// forwarding the body to another vendor. A test whose subject is anything
+// else on that route binds the slot its own scenario implies; leaving it
+// unbound only proved that a mock provider ignores the credential it is
+// handed.
+func geminiBundle() *domain.Bundle {
+	bundle := testBundle()
+	bundle.Credentials = append(bundle.Credentials, domain.Credential{
+		ID: "cred-gemini", ProviderID: domain.ProviderGemini, APIKey: "goog-test",
+	})
+	return bundle
 }
 
 func successResponse() *domain.Response {
@@ -598,7 +617,7 @@ func TestGeminiModelFromPath(t *testing.T) {
 func TestRouter_GeminiPassthrough_NonStreaming(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			return geminiBundle(), nil
 		},
 	}
 
@@ -647,7 +666,7 @@ func TestRouter_GeminiPassthrough_NonStreaming(t *testing.T) {
 func TestRouter_GeminiPassthrough_Streaming_PicksStream(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			return geminiBundle(), nil
 		},
 	}
 
@@ -745,6 +764,86 @@ func TestRouter_ModelsEndpoint_EmitsOpenAIListShape(t *testing.T) {
 		"the bundle's sole credential provider must be attributed to a plain allowlist entry")
 }
 
+// @scenario "GET /v1/models says so when a provider's catalog cannot be enumerated"
+// @scenario "a failed catalog probe surfaces as a gap, not a silent empty list"
+// Discovery gaps render as the X-Langwatch-Models-Discovery-Incomplete
+// header (provider:reason tokens), so an empty or partial list is
+// diagnosable from the response while the body stays exactly the OpenAI
+// list shape. No gaps, no header.
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestRouter_ModelsEndpoint_SurfacesDiscoveryGapsHeader(t *testing.T) {
+	bundle := testBundle()
+	bundle.Credentials = []domain.Credential{
+		{ID: "cred-1", ProviderID: domain.ProviderAnthropic, APIKey: "sk"},
+		{ID: "cred-2", ProviderID: domain.ProviderBedrock},
+	}
+
+	router := buildRouter(
+		app.WithLogger(zap.NewNop()),
+		app.WithAuth(&mockAuth{
+			resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+				return bundle, nil
+			},
+		}),
+		app.WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{{ID: "claude-haiku-4-5", ProviderID: domain.ProviderAnthropic}},
+					[]domain.ModelDiscoveryGap{
+						{ProviderID: domain.ProviderOpenAI, Reason: domain.ModelDiscoveryProbeFailed},
+						{ProviderID: domain.ProviderBedrock, Reason: domain.ModelDiscoveryNotEnumerable},
+					},
+					nil
+			},
+		}),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer vk-test-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	// Both reasons serialize distinctly: a formatter collapsing every
+	// reason to one token would pass a single-gap assertion.
+	assert.Equal(t, "openai:probe-failed,bedrock:not-enumerable",
+		rec.Header().Get("X-Langwatch-Models-Discovery-Incomplete"))
+	var parsed struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &parsed))
+	require.Len(t, parsed.Data, 1, "the listable provider's models still appear")
+}
+
+// The header is absent when discovery has nothing to report: quiet
+// success must look exactly like it did before the header existed.
+func TestRouter_ModelsEndpoint_NoGapsNoHeader(t *testing.T) {
+	bundle := testBundle()
+	router := buildRouter(
+		app.WithLogger(zap.NewNop()),
+		app.WithAuth(&mockAuth{
+			resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+				return bundle, nil
+			},
+		}),
+		app.WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{{ID: "gpt-5-mini", ProviderID: domain.ProviderOpenAI}}, nil, nil
+			},
+		}),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer vk-test-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	_, present := rec.Header()["X-Langwatch-Models-Discovery-Incomplete"]
+	assert.False(t, present, "no gaps must mean no header")
+}
+
 // A model the gateway cannot attribute to a provider still needs a
 // non-empty `owned_by`: it is a required string in the OpenAI Model
 // object, and a blank one renders as an unlabelled row in model pickers.
@@ -781,4 +880,48 @@ func TestRouter_ModelsEndpoint_AttributesUnownedModelsToGateway(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &parsed))
 	require.Len(t, parsed.Data, 1)
 	assert.Equal(t, "langwatch", parsed.Data[0].OwnedBy)
+}
+
+// `owned_by` names the vendor a client groups its model picker by, so an
+// instance carrying a routing handle keeps its family there. The handle goes
+// in the id, which is the string a caller sends.
+func TestRouter_ModelsEndpoint_KeepsTheFamilyInOwnedBy(t *testing.T) {
+	bundle := testBundle()
+	bundle.Credentials = []domain.Credential{
+		{ID: "cred-1", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+	}
+	bundle.Config.AllowedModels = nil
+
+	router := buildRouter(
+		app.WithLogger(zap.NewNop()),
+		app.WithAuth(&mockAuth{
+			resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+				return bundle, nil
+			},
+		}),
+		app.WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{
+					{ID: "claude-sonnet-5", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+				}, nil, nil
+			},
+		}),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer vk-test-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var parsed struct {
+		Data []struct {
+			ID      string `json:"id"`
+			OwnedBy string `json:"owned_by"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &parsed))
+	require.Len(t, parsed.Data, 1)
+	assert.Equal(t, "eu/claude-sonnet-5", parsed.Data[0].ID)
+	assert.Equal(t, "anthropic", parsed.Data[0].OwnedBy)
 }

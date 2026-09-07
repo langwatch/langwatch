@@ -59,6 +59,103 @@ Feature: A personal workspace is never the ambient context for organization work
       # writes somewhere private.
 
   # ============================================================================
+  # The ambient context is a team the caller is actually on
+  # ============================================================================
+
+  Rule: the ambient team is one the caller holds a membership on
+
+    The teams the app resolves against are the organization's, not the
+    caller's: a member is handed every shared team in the organization, and
+    only their own membership row inside each. A preference expressed purely
+    as "the first team shaped like X" therefore elects a team the member is
+    not on the moment an organization has more than one, and the chrome then
+    refuses the page outright with "You are not part of any team in this
+    organization". The settings surfaces are where it bites, because they
+    write against the ambient project, so the refusal replaces every
+    /settings page at once and the alternative to refusing would be writing
+    into another team's project.
+
+    Background:
+      Given "ACME" has a second shared team "ACME Platform", listed first
+      And mia belongs to the shared team holding "acme-app", and not to
+        "ACME Platform"
+
+    @integration
+    Scenario: A member resolves the team they are on, not the first one listed
+      Given mia has not opened any project yet
+      When mia opens an organization-scoped settings page
+      Then the ambient team is the shared team she belongs to
+      And the page renders instead of refusing her
+
+    @integration
+    Scenario: The ambient project belongs to the team the member is on
+      When mia opens an organization-scoped settings page
+      Then the ambient project is "acme-app"
+
+    @integration
+    Scenario: A remembered team the member is not on does not win
+      Given mia's remembered selection names "ACME Platform"
+      When mia opens an organization-scoped settings page
+      Then the ambient team is still the shared team she belongs to
+
+    @integration
+    Scenario: The remembered selection heals to the team the member is on
+      Given mia's remembered selection names "ACME Platform"
+      When mia opens an organization-scoped settings page
+      Then the remembered team and project become the ones she belongs to
+
+    @integration
+    Scenario: A genuine non-member is still refused
+      Given mia belongs to no team in "ACME"
+      When mia opens an organization-scoped settings page
+      Then a context still resolves
+      And she is told she is not part of any team
+      # The refusal needs a resolved context to render inside. Leaving the
+      # context undefined replaces it with a loading screen that never ends.
+
+    @integration
+    Scenario: A project named in the URL still resolves its own team
+      When mia opens "ACME Platform"'s project by its own address
+      Then the ambient team is "ACME Platform"
+      And she is told she is not part of any team
+      # Typing someone else's project into the address bar is a question
+      # with an honest answer. Only the sticky, unasked-for selection is
+      # held to the membership test.
+
+  # ============================================================================
+  # An organization admin reaches every team of the organization
+  # ============================================================================
+
+  Rule: an admin keeps a selection in any team they are allowed to open
+
+    An organization admin can open every team of the organization and every
+    project in it, whether or not they were added to that team. So a project
+    an admin picks stays picked on the pages that follow, including the pages
+    that name no project in their address and the app root.
+
+    A member is unchanged: they keep only the teams they were added to.
+
+    Background:
+      Given ada is an admin of "ACME"
+      And ada belongs to the shared team holding "acme-app", and not to
+        "ACME Platform"
+
+    @integration
+    Scenario: The admin's picked project survives a page that names no project
+      Given ada has just opened "ACME Platform"'s project
+      When ada opens an organization-scoped settings page
+      Then the ambient project is still "ACME Platform"'s project
+      And the ambient team is "ACME Platform"
+
+    @integration
+    Scenario: The admin's remembered team survives
+      Given ada's remembered selection names "ACME Platform"
+      When ada opens an organization-scoped settings page
+      Then the ambient team is "ACME Platform"
+      # A member still goes back to a team they were added to, which the
+      # rule above keeps covering.
+
+  # ============================================================================
   # The address bar still decides
   # ============================================================================
 
@@ -80,6 +177,18 @@ Feature: A personal workspace is never the ambient context for organization work
       # The remembered selection is stickiness, not intent. It survives the
       # last visit and would otherwise follow her onto every page that
       # carries no project of its own.
+
+    @integration
+    Scenario: A team slug that matches nothing does not address the personal workspace
+      Given jane has just been in her personal project
+      When jane opens an organization-scoped page carrying a team slug no team in "ACME" has
+      Then the ambient team is the shared team
+      And the ambient project is "acme-app"
+      # A team slug left over from a team that was archived, renamed, or
+      # belongs to an organization jane is not in resolves to no team at all,
+      # so it says nothing about where she wants to be. Reading it as intent
+      # would hand the page back to the personal selection the rule above
+      # releases, on a page that never names the project it writes to.
 
     @integration
     Scenario: The remembered selection heals after one organization-scoped page
@@ -123,6 +232,14 @@ Feature: A personal workspace is never the ambient context for organization work
     not exist, even though nothing in the address bar or the remembered
     selection asked for that.
 
+    The personal workspace is held apart from organization-scoped work on both
+    sides. Work carried in from an earlier organization-scoped page never
+    decides `/me`, and a visit to `/me` never becomes the organization-scoped
+    work the reader returns to. When it did, the reader came back to another
+    team's project on the app root, and LLM Ops was greyed out in the product
+    switcher, which had no project to open while the private one was the last
+    one open.
+
     @integration
     Scenario: Visiting the personal-workspace page resolves the personal team
       Given jane's personal team is listed before the shared team
@@ -158,6 +275,34 @@ Feature: A personal workspace is never the ambient context for organization work
       # selection must not follow her onto the personal-workspace page
       # either, because that page can never mean anything but her own
       # workspace.
+
+    @integration
+    Scenario: A project remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page
+      Given jane's last remembered project selection is "acme-app", from an
+        earlier organization-scoped page
+      When jane opens her personal-workspace page
+      Then the ambient team is her personal team
+      And the ambient project is her personal project
+      # The remembered project resolved before any personal-workspace
+      # preference could apply, so /me ran every personal feature against the
+      # shared project.
+
+    @integration
+    Scenario: Organization-scoped work goes on in the project jane left, after a visit to the personal-workspace page
+      Given jane was last working in "acme-app", the second project of the
+        shared team
+      When jane opens her personal-workspace page
+      And she opens an organization-scoped page again
+      Then that page is about "acme-app", the project she left
+      # With one project in the team, coming back to the first one and coming
+      # back to the one she left look the same, so the team holds two here.
+
+    @integration
+    Scenario: The personal workspace is not what the next organization-scoped page is about
+      Given jane has not opened any project yet
+      When jane opens her personal-workspace page
+      And she opens an organization-scoped page again
+      Then that page is about the shared team, not her personal workspace
 
     @integration
     Scenario: A member with no personal workspace of their own falls back to the ambient team

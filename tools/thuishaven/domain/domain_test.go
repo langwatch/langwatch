@@ -148,6 +148,40 @@ func TestOverlayEmitsClickHouseURLOnlyWhenManaged(t *testing.T) {
 	}
 }
 
+func TestOverlayDisablesGoogleDLPWhenAsked(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	// Opted back in (LANGWATCH_DISABLE_GOOGLE_DLP=false): emit nothing so .env decides.
+	if hasKey(base.OverlayEnv(), "LANGWATCH_DISABLE_GOOGLE_DLP") {
+		t.Fatalf("stack that opted back in must leave LANGWATCH_DISABLE_GOOGLE_DLP to .env")
+	}
+	disabled := base
+	disabled.DisableGoogleDLP = true
+	if got := valueOf(disabled.OverlayEnv(), "LANGWATCH_DISABLE_GOOGLE_DLP"); got != "true" {
+		t.Errorf("LANGWATCH_DISABLE_GOOGLE_DLP = %q, want %q", got, "true")
+	}
+}
+
+// The app collects ClickHouse backup-status gauges by default (an unset flag must
+// not disarm the production alerts that read them), so haven's own container,
+// which has no backups and therefore no system.backup_log, has to opt out, or
+// every 15s stats tick fails on a missing table.
+func TestOverlayOptsOutOfBackupMetricsWhenManagingClickHouse(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	if hasKey(base.OverlayEnv(), "CLICKHOUSE_BACKUP_METRICS_ENABLED") {
+		t.Fatalf("unmanaged stack must leave backup metrics to the worktree's own .env")
+	}
+	managed := base
+	managed.ClickHouseHTTPPort = 18123
+	managed.ClickHouseDatabase = "lw_brave_otter"
+	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_BACKUP_METRICS_ENABLED"); got != "false" {
+		t.Errorf("CLICKHOUSE_BACKUP_METRICS_ENABLED = %q, want %q", got, "false")
+	}
+}
+
 func TestOverlayEmitsPostgresURLOnlyWhenManaged(t *testing.T) {
 	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
 		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
@@ -251,6 +285,17 @@ func TestOverlayEmitsHavenSeedLangwatchAPIKey(t *testing.T) {
 	st.LocalAPIKey = DefaultLocalAPIKey
 	if got := valueOf(st.OverlayEnv(), "HAVEN_SEED_LANGWATCH_API_KEY"); got != DefaultLocalAPIKey {
 		t.Errorf("HAVEN_SEED_LANGWATCH_API_KEY = %q, want the stable default %q", got, DefaultLocalAPIKey)
+	}
+}
+
+// @scenario "haven pins the seven-day default for every dev stack"
+func TestOverlayPinsTheSevenDayRetentionDefault(t *testing.T) {
+	st := Stack{Slug: "portless", APIPort: 1, Services: []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}}}
+	if got := valueOf(st.OverlayEnv(), "LANGWATCH_DEFAULT_RETENTION_DAYS"); got != "7" {
+		t.Errorf("LANGWATCH_DEFAULT_RETENTION_DAYS = %q, want 7 (a week; whole weeks align the partition key)", got)
+	}
+	if DefaultRetentionDays%7 != 0 {
+		t.Errorf("DefaultRetentionDays = %d is not a whole number of weeks", DefaultRetentionDays)
 	}
 }
 

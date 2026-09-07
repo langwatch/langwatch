@@ -4,150 +4,115 @@ description: OpenAI-compatible error shapes and a complete type enum.
 sidebarTitle: Errors
 ---
 
-Every gateway error is returned in the OpenAI-compatible envelope:
+Every error the LangWatch AI Gateway writes itself uses one JSON envelope:
 
 ```json
 {
   "error": {
-    "type":    "<type>",
-    "code":    "<code>",
-    "message": "<human-readable>",
-    "param":   "<optional field name>"
+    "type": "budget_exceeded",
+    "code": "budget_exceeded",
+    "message": "The project spending limit (per month) for this request has been reached. Contact your LangWatch admin to raise it.",
+    "meta": {
+      "budget_id": "bgt_01HZX9K3MNN",
+      "budget_scope": "project",
+      "budget_window": "month"
+    },
+    "trace_id": "0af7651916cd43dd8448eb211c80319c",
+    "span_id": "b7ad6b7169203331",
+    "tips": ["Contact your LangWatch admin to raise the project spending limit", "Switch to a cheaper model or reduce request volume to stay within the limit"],
+    "docs_url": "https://docs.langwatch.ai/ai-gateway/budgets",
+    "fault": "customer"
   }
 }
 ```
 
-This matches what the `openai` Python and TypeScript SDKs, plus the Anthropic SDK (which parses a superset), expect. Existing client code raises its usual typed exceptions unchanged.
+The OpenAI, Anthropic and Google SDKs parse this shape and raise their usual typed exceptions.
+
+## Fields
+
+| Field | Always present | What it is |
+|---|---|---|
+| `type` | yes | The coarse discriminant provider SDKs branch on. It carries the same value as `code`. |
+| `code` | yes | The stable machine name for what happened. Branch on this field. |
+| `message` | yes | One sentence for a person. Wording changes, so never parse it. When the failing code attached no message, it repeats the code. |
+| `meta` | no | Structured detail the sentence leaves out, in `lower_snake_case` keys. A `402` carries `budget_id`, `budget_scope`, `budget_window`, and `budget_provider` when a provider-filtered budget emptied the candidate chain. |
+| `trace_id`, `span_id` | no | Correlation handles for the failing request, present when it was traced. Quote them in a support ticket. |
+| `tips` | no | Up to four remediation sentences, in the order to try them. |
+| `docs_url` | no | An absolute link to the page that explains the refusal. |
+| `fault` | no | Who has to act: `customer`, `provider`, or `platform`. |
+| `reasons` | no | The chain of wrapped errors, each in this same shape. |
+
+Ignore fields you do not recognize. New ones are added over time and none of them changes an existing one.
+
+## Error codes
+
+| `code` | HTTP | Cause | What the caller does |
+|---|---|---|---|
+| `invalid_api_key` | 401 | The presented credential matches no virtual key. | Check the key in `Authorization`, `X-Api-Key`, `X-Goog-Api-Key` or `Xi-Api-Key`. |
+| `virtual_key_revoked` | 403 | The key was revoked. Revocation is one way. | Mint a new key. |
+| `virtual_key_disabled` | 403 | The key was disabled. The secret is intact. | Ask an administrator to enable it. |
+| `virtual_key_expired` | 403 | The key's expiration date has passed. | Extend the expiration date, or create a new key. |
+| `budget_exceeded` | 402 | A budget that applies to this request is over its limit. | Raise the limit named in `meta`, or wait for the window to roll over. |
+| `rate_limited` | 429 | The key is over its requests-per-minute or requests-per-day ceiling. | Back off and retry. |
+| `realtime_session_limit` | 429 | The key already holds its maximum of open realtime voice sessions. | Retry when a call ends. |
+| `guardrail_blocked` | 403 | A pre-call or post-call guardrail returned `block`. | Change the content, or change the guardrail on the key. |
+| `guardrail_upstream_unavailable` | 503 | A guardrail evaluator could not be reached, and the key fails closed. | Retry, or set the key's guardrails to fail open. |
+| `policy_violation` | 403 | The request content matched a deny rule in the key's policy rules. | Change the request, or change the policy rule. |
+| `model_not_allowed` | 400 | The model is outside the key's allowlist, or its provider access or routing policy leaves the model's provider out of the chain. | Send a model the key allows, or widen the key. |
+| `model_provider_not_bound` | 400 | The request names a provider the key holds no credential for. | Bind that provider to the key, or send the model to a provider the key holds. |
+| `model_not_recognized` | 400 | No provider on the key declares the model, its name matches no vendor prefix, and the key holds more than one provider. | Send the model as `provider/model`. |
+| `missing_model` | 400 | The request names no model. `meta.request_type` says where the endpoint expects one. | Add the model to the request. |
+| `unsupported_parameter` | 400 | The target lane cannot honor a parameter, or `drop_tuning_params` is `false` and the lane has no mapping for it. | Remove the parameter, or allow the drop. |
+| `end_user_required` | 400 | A per-end-user budget is active on the key and the request carried no end-user id. | Send the `user` body field or the `X-LangWatch-End-User-Id` header, then retry. |
+| `no_provider_configured` | 400 | The key's bundle carries no provider credential at all. | Configure a model provider for the organization. |
+| `provider_credential_invalid` | 400 | The stored credential cannot produce an authenticated call, so the request never left LangWatch. | Re-save the credential in Settings, Model Providers. Retrying does not clear it. |
+| `provider_config_invalid` | 400 | The provider slot cannot serve this request: no key declares the model, a deployment mapping is missing, or the provider does not implement the operation. | Add the model or the deployment mapping to the provider. |
+| `provider_credential_rejected` | 401 | The provider received the credential and refused it. | Check the key or service account is not revoked, expired, or short of permission for the model. |
+| `bad_request` | 400 | The request body or a required part failed validation. | Read `message` for the field, and send the request again. |
+| `payload_too_large` | 413 | The body is over the server's maximum request size. It is rejected at the edge, before auth and before any provider call. | Send a smaller body. |
+| `not_found` | 404 | The resource the request named does not exist. | Check the path. |
+| `provider_error` | 502 | An upstream provider failed and no credential in the chain answered. | Retry with backoff, then check the provider's status page. |
+| `provider_timeout` | 504 | The provider accepted the request and did not answer in time. | Retry with backoff. |
+| `provider_connection_failed` | 502 | The provider's address did not answer, so the request never reached it. | Retry. Check a custom base URL is correct and reachable. |
+| `chain_exhausted` | 502 | Every credential in the fallback chain failed. | Retry, then check the providers on the key. |
+| `circuit_open` | 503 | Repeated upstream failures opened the credential's circuit breaker, so the gateway declined to dial the provider. | Retry after the cooldown. Answered 4xx responses never open the breaker. |
+| `codex_session_expired` | 401 | The codex provider's OpenAI sign-in is dead. | Sign in with OpenAI again on the model provider. |
+| `request_abandoned` | 499 | The caller disconnected, or its deadline expired before the provider answered. | Send the request again if you still need the answer. |
+| `auth_upstream_unavailable` | 503 | The gateway could not reach the LangWatch control plane to resolve the key. | Retry. |
+| `realtime_registry_unavailable` | 503 | The control plane could not record a realtime voice session, so the gateway did not mint a session. | Retry. |
+| `internal_error` | 500 | An unclassified gateway failure. | Retry, and quote `trace_id` in a support ticket. |
+
+## Provider errors
+
+A provider's own terminal response is forwarded instead of being replaced. The status is the provider's, and the body is the provider's own bytes when the adapter captured them. `Retry-After` and `x-should-retry` are forwarded with it, so a client can honor the provider's backoff hint.
+
+When only the status and the message are available, the gateway writes the same envelope with the provider's error discriminant in `type` and `code`, for example `insufficient_quota` or `overloaded_error`, and `provider_error` when the adapter parsed neither.
 
 ## Response headers
 
-Errors (like successes) always carry:
-
-- `X-LangWatch-Request-Id: grq_<ULID>`, use this when filing support tickets.
-- `X-LangWatch-Provider`, present when the error originated from an upstream provider (absent for gateway-internal errors).
-
-## Type enum
-
-| `type` | HTTP | When |
+| Header | When present | Value |
 |---|---|---|
-| `invalid_api_key` | `401` | The `Authorization: Bearer …`, `x-api-key`, `api-key` header is missing, malformed, or points to a non-existent virtual key. |
-| `virtual_key_revoked` | `403` | The VK exists but has been revoked. |
-| `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it, **or** the model matched a `policy_rules.models` deny regex (or fell outside its allow regex). Also used when the model/alias doesn't resolve to any configured provider. |
-| `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
-| `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope (e.g. `Budget exceeded for scope=project window=month`). |
-| `rate_limit_exceeded` | `429` | Gateway-level (per-VK RPM/RPD) or upstream. Gateway-level adds `code = vk_rate_limit_exceeded`, `Retry-After: <seconds>` (RFC 7231), and `X-LangWatch-RateLimit-Dimension: rpm\|rpd` telling you which ceiling fired. TPM is deferred to v1.1. |
-| `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. Post-block also records a zero-cost `blocked_by_guardrail` debit on the budget ledger. |
-| `guardrail_upstream_unavailable` | `503` | A pre- or post-call guardrail's evaluator service was unreachable or errored, and the VK's `guardrails.{request,response}_fail_open` is `false` (the fail-closed default). Flip to fail-open on the VK to pass through on guardrail outages. |
-| `tool_not_allowed` | `403` | The request references a tool name matched by the VK's `policy_rules.tools.deny` (or absent from `allow` if set). |
-| `url_not_allowed` | `403` | Any `http://`, `https://` URL extracted from the request body (user messages, tool-call args, system prompts, anywhere) matched `policy_rules.urls.deny` or fell outside a non-null `allow` list. |
-| `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed or used an unknown mode. |
-| `cache_override_not_implemented` | `400` | The `X-LangWatch-Cache` header was well-formed but named a mode deferred to v1.1 (`force` or `ttl=NNN`). `respect` and `disable` are the v1 modes. |
-| `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
-| `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
-| `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
-| `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
-| `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Request-Id` is how we trace it. |
+| `X-LangWatch-Gateway-Version` | Every response | The gateway build version. |
+| `X-LangWatch-Handled-Error` | The gateway wrote the error | The body's `error.code`. It is removed from a forwarded provider response, so it tells the two apart. |
+| `X-LangWatch-Provider` | A provider error was forwarded and the provider is known | The provider that answered. |
+| `Retry-After`, `x-should-retry` | The provider sent them | The provider's own values, forwarded. |
+| `X-LangWatch-Gateway-Request-Id` | A successful response, and any response a keep-alive byte committed | The request id, and the `gateway_request_id` on spend events. |
+| `X-LangWatch-Budget-Warning` | A budget is at or over its warning threshold | `<scope>:<percent>`, or `<scope>/<model provider id>:<percent>` for a provider-filtered budget. Comma separated. |
 
-## Budget-warning headers (not errors)
+`X-LangWatch-Budget-Warning` is set on successful responses. A budget in warning never becomes an error envelope.
 
-These are *soft* signals on **successful** responses:
-
-- `X-LangWatch-Budget-Warning: <scope>:<pct>`, a budget scope is over its soft threshold. Multiple can be present.
-
-A `warn` breach never turns into an error envelope; it's only a header.
-
-## Examples
-
-### Invalid key
-
-```http
-HTTP/1.1 401 Unauthorized
-Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNM...
-
-{
-  "error": {
-    "type":    "invalid_api_key",
-    "code":    "invalid_api_key",
-    "message": "No active virtual key matches the presented credential.",
-    "param":   null
-  }
-}
-```
-
-### Budget exceeded
-
-```http
-HTTP/1.1 402 Payment Required
-Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNN...
-
-{
-  "error": {
-    "type":    "budget_exceeded",
-    "code":    "budget_exceeded",
-    "message": "Budget exceeded for scope=project window=month",
-    "param":   null
-  }
-}
-```
-
-### Blocked tool
-
-```http
-HTTP/1.1 403 Forbidden
-Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNO...
-
-{
-  "error": {
-    "type":    "tool_not_allowed",
-    "code":    "tool_not_allowed",
-    "message": "Tool 'shell.exec' is blocked by VK policy policy_rules.tools.",
-    "param":   "tools[0].function.name"
-  }
-}
-```
-
-### Upstream timeout after fallback exhaustion
-
-```http
-HTTP/1.1 504 Gateway Timeout
-Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNP...
-X-LangWatch-Provider: anthropic
-X-LangWatch-Fallback-Count: 2
-
-{
-  "error": {
-    "type":    "upstream_timeout",
-    "code":    "upstream_timeout",
-    "message": "All 3 providers in the fallback chain timed out after 30000ms.",
-    "param":   null
-  }
-}
-```
+<Note>A non-streaming call that runs long writes a keep-alive byte, which commits status `200` before the outcome is known. The response then carries `X-LangWatch-Heartbeat-Active: true`, and the body still holds an `error` key when the call failed. Read the body rather than the status on those responses.</Note>
 
 ## Streaming errors
 
-For SSE streaming, a terminal `event: error` frame carries the same envelope and the stream ends:
+Once the stream is open the status is already `200`, so a failure arrives as a terminal `event: error` frame and the stream ends:
 
 ```
 event: error
-data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection reset after 2 chunks","param":null}}
+data: {"type":"error","error":{"type":"provider_error","message":"upstream connection reset"}}
 
 ```
 
-Clients that receive chunks and then an `error` frame should treat the response as incomplete (partial) and `X-LangWatch-Request-Id` still identifies the session in traces.
+`error.type` is the gateway `code` from the table above, or the provider's own error discriminant on a forwarded failure. When the provider sent a native error body, that body is written into the frame verbatim instead.
 
-### Mid-stream `code` values
-
-Once bytes are flowing, the HTTP status is already 200, so the distinguishing signal for clients is the `code` field inside the terminal frame:
-
-| `code` | Source | Meaning |
-|---|---|---|
-| `upstream_mid_stream_failure` | provider path | Upstream errored, reset, or closed unexpectedly after at least one chunk was emitted. Pre-connection failures fall through the transparent-fallback path and never reach the client, so seeing this code means fallback was either not configured, already exhausted, or the failure happened too late. |
-| `stream_chunk_blocked` | guardrail path | A `stream_chunk` guardrail returned `block` on a visible-text frame before emit. Subsequent upstream chunks are discarded (see [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk)). The channel is closed immediately after the frame. |
-| `guardrail_upstream_unavailable` | guardrail path | Terminal path is flag-only for streaming (see [Guardrails → fail-open vs fail-closed](/ai-gateway/guardrails#fail-open-vs-fail-closed)); you'll see this code only if a future iter wires post-stream enforcement. |
-
-<Note>The `type` on a streaming terminal frame always reflects the category (`provider_error`, `guardrail_blocked`), clients keying off `type` will already have a usable classification. The `code` is the granular discriminator if you need it (for example, a retry policy that distinguishes "upstream flaked, retry with a different VK" from "guardrail policy said no, don't retry").</Note>
+Treat a stream that delivered chunks and then an error frame as incomplete.

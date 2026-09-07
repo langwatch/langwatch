@@ -1,0 +1,578 @@
+import {
+  Alert,
+  Button,
+  createListCollection,
+  Grid,
+  GridItem,
+  HStack,
+  Input,
+  Skeleton,
+  Spacer,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@chakra-ui/react";
+import type { Node } from "@xyflow/react";
+import { useCallback, useEffect, useState } from "react";
+import { CheckSquare, Info, TrendingUp } from "react-feather";
+import {
+  Controller,
+  type ControllerRenderProps,
+  FormProvider,
+  type UseFormReturn,
+  useForm,
+} from "react-hook-form";
+
+import { SmallLabel } from "../../components/SmallLabel";
+import { Dialog } from "../../components/ui/dialog";
+import { Select } from "../../components/ui/select";
+import { toaster } from "../../components/ui/toaster";
+import { Tooltip } from "../../components/ui/tooltip";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
+import { DEFAULT_MODEL } from "../../utils/constants";
+import { trackEvent } from "../../utils/tracking";
+import { useGetDatasetData } from "../hooks/useGetDatasetData";
+import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
+import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import type { Entry } from "../types/dsl";
+import { OPTIMIZERS } from "../types/optimizers";
+import { trainTestSplit } from "../utils/datasetUtils";
+import { checkIsEvaluator } from "../utils/nodeUtils";
+
+import { AddModelProviderKey } from "./AddModelProviderKey";
+import { useVersionState } from "./History";
+import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/OptimizationStudioLLMConfigField";
+import { VersionToBeUsed } from "./VersionToBeUsed";
+
+const optimizerOptions: {
+  label: string;
+  value: keyof typeof OPTIMIZERS;
+  description: string;
+}[] = Object.entries(OPTIMIZERS).map(([key, optimizer]) => ({
+  label: optimizer.name,
+  value: key as keyof typeof OPTIMIZERS,
+  description: optimizer.description,
+}));
+
+export function Optimize() {
+  // All hooks MUST run before any conditional return — see the "Rules of
+  // Hooks". The flag-gated early return below requires every hook used in
+  // this component to be called above it.
+  const { open, onToggle, onClose, setOpen } = useDisclosure();
+
+  const { project } = useOrganizationTeamProject();
+  const { optimizationState } = useWorkflowStore(({ state }) => ({
+    optimizationState: state.optimization,
+  }));
+  const engineMode = api.workflow.engineMode.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, staleTime: 60_000 },
+  );
+  const form = useForm<OptimizeForm>({
+    defaultValues: {
+      version: "",
+      commitMessage: "",
+      optimizer: optimizerOptions[0]!,
+      params: {},
+    },
+  });
+
+  // Hide the Optimize button when the project is on the Go NLP engine.
+  // Optimization was DSPy-only and the Go engine intentionally drops DSPy
+  // (see specs/nlp-go/feature-flag.feature). Server-side guards reject
+  // optimize websocket events too — UI hide is the visible half.
+  if (engineMode.data && !engineMode.data.optimizeEnabled) {
+    return null;
+  }
+
+  const isRunning = optimizationState?.status === "running";
+
+  return (
+    <>
+      <Tooltip content={isRunning ? "Optimization is running" : ""}>
+        <Button
+          colorPalette="green"
+          size="sm"
+          onClick={() => {
+            trackEvent("optimize_click", { project_id: project?.id });
+            onToggle();
+          }}
+          disabled={isRunning}
+        >
+          <TrendingUp size={16} />
+          Optimize
+        </Button>
+      </Tooltip>
+      <Dialog.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+        {open && <OptimizeModalContent form={form} onClose={onClose} />}
+      </Dialog.Root>
+    </>
+  );
+}
+
+type OptimizeForm = {
+  version: string;
+  commitMessage: string;
+  optimizer: (typeof optimizerOptions)[number];
+  params: (typeof OPTIMIZERS)[keyof typeof OPTIMIZERS]["params"];
+};
+
+export function OptimizeModalContent({
+  form,
+  onClose,
+}: {
+  form: UseFormReturn<OptimizeForm>;
+  onClose: () => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const {
+    workflowId,
+    getWorkflow,
+    nodes,
+    optimizationState,
+    deselectAllNodes,
+    setOpenResultsPanelRequest,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+    currentVersionId,
+    checkCanCommitNewVersion,
+  } = useWorkflowStore(
+    ({
+      workflow_id: workflowId,
+      getWorkflow,
+      nodes,
+      state,
+      deselectAllNodes,
+      setOpenResultsPanelRequest,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
+    }) => ({
+      workflowId,
+      getWorkflow,
+      nodes,
+      optimizationState: state.optimization,
+      deselectAllNodes,
+      setOpenResultsPanelRequest,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
+    }),
+  );
+
+  const entryNode = getWorkflow().nodes.find((node) => node.type === "entry") as
+    | Node<Entry>
+    | undefined;
+
+  const { total } = useGetDatasetData({
+    dataset: entryNode?.data.dataset,
+    preview: true,
+  });
+
+  const optimizer = OPTIMIZERS[form.watch("optimizer").value];
+  const params = form.watch("params");
+
+  useEffect(() => {
+    if (!optimizer) return;
+    form.setValue(
+      "params",
+      Object.entries({ ...optimizer.params, ...params }).reduce(
+        (acc, [key, value]) => {
+          // @ts-ignore
+          acc[key] = value ? value : optimizer.params[key];
+          return acc;
+        },
+        {} as OptimizeForm["params"],
+      ),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, optimizer]);
+
+  const trainSize = entryNode?.data.train_size ?? 0.8;
+  const testSize = entryNode?.data.test_size ?? 0.2;
+
+  const { train } = trainTestSplit(
+    Array.from({ length: total ?? 0 }, (_, i) => i),
+    {
+      trainSize,
+      testSize,
+    },
+  );
+
+  const { versions } = useVersionState({
+    project,
+    form: form as unknown as UseFormReturn<{
+      version: string;
+      commitMessage: string;
+    }>,
+    allowSaveIfAutoSaveIsCurrentButNotLatest: false,
+  });
+  const canSave = checkCanCommitNewVersion();
+
+  const commitVersion = api.workflow.commitVersion.useMutation();
+  const { startOptimizationExecution } = useOptimizationExecution();
+
+  const [hasStarted, setHasStarted] = useState(false);
+
+  useEffect(() => {
+    if (hasStarted && optimizationState?.status === "running") {
+      onClose();
+      deselectAllNodes();
+      setOpenResultsPanelRequest("optimizations");
+    }
+  }, [
+    optimizationState?.status,
+    hasStarted,
+    onClose,
+    deselectAllNodes,
+    setOpenResultsPanelRequest,
+  ]);
+
+  const onSubmit = useCallback(
+    async ({ version, commitMessage, optimizer, params }: OptimizeForm) => {
+      if (!project || !workflowId) return;
+
+      if (!train.length) {
+        return;
+      }
+
+      if (
+        train.length >= 300 &&
+        !confirm(`Going to optimize on ${train.length} entries. Are you sure?`)
+      ) {
+        return;
+      }
+
+      if (train.length >= 3000) {
+        alert(
+          "Optimiziation is limited to a maximum of 3000 entries total. Please contact support if you need to optimize on more.",
+        );
+        return;
+      }
+
+      let versionId: string | undefined;
+
+      if (canSave) {
+        try {
+          const versionResponse = await commitVersion.mutateAsync({
+            projectId: project.id,
+            workflowId,
+            commitMessage,
+            dsl: {
+              ...getWorkflow(),
+              version,
+            },
+          });
+          versionId = versionResponse.id;
+          setLastCommittedWorkflow(getWorkflow());
+          setCurrentVersionId(versionId);
+          toaster.create({
+            title: "Version saved",
+            description: "New version has been saved successfully",
+            type: "success",
+          });
+        } catch (error) {
+          toaster.create({
+            title: "Error",
+            description: "Failed to save version",
+            type: "error",
+          });
+          throw error;
+        }
+      } else {
+        versionId = currentVersionId;
+      }
+
+      if (!versionId) {
+        toaster.create({
+          title: "Version ID not found for optimization",
+          description: "Failed to find version ID for optimization",
+          type: "error",
+        });
+        return;
+      }
+
+      void versions.refetch();
+
+      startOptimizationExecution({
+        workflow_version_id: versionId,
+        optimizer: optimizer.value,
+        params,
+      });
+      setHasStarted(true);
+    },
+    [
+      canSave,
+      commitVersion,
+      currentVersionId,
+      getWorkflow,
+      project,
+      setCurrentVersionId,
+      setLastCommittedWorkflow,
+      startOptimizationExecution,
+      train.length,
+      versions,
+      workflowId,
+    ],
+  );
+
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
+    useModelProviderKeys({
+      workflow: getWorkflow(),
+      extra_llms:
+        "llm" in optimizer.params && "llm" in params && params.llm
+          ? [params.llm]
+          : undefined,
+    });
+
+  const isRunning = optimizationState?.status === "running";
+
+  if (isRunning) {
+    return null;
+  }
+
+  if (!versions.data) {
+    return (
+      <Dialog.Content bg="bg" borderTop="5px solid" borderColor="green.400">
+        <Dialog.Header fontWeight={600}>Optimize Workflow</Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body>
+          <VStack align="start" width="full">
+            <Skeleton width="full" height="20px" />
+            <Skeleton width="full" height="20px" />
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer />
+      </Dialog.Content>
+    );
+  }
+
+  const hasEvaluator = nodes.some(checkIsEvaluator);
+  const isDisabled =
+    train.length < 20
+      ? "You need at least 20 entries to run the automated optimizer"
+      : hasProvidersWithoutCustomKeys
+        ? "Set up your API keys to run optimizations"
+        : !hasEvaluator
+          ? "You need at least one evaluator node in your workflow to run optimizations"
+          : false;
+
+  const llmConfig = form.watch("params.llm");
+
+  return (
+    <FormProvider {...form}>
+      <Dialog.Content
+        bg="bg"
+        as="form"
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        onSubmit={form.handleSubmit(onSubmit)}
+        borderTop="5px solid"
+        borderColor="green.400"
+      >
+        <Dialog.Header fontWeight={600}>Optimize Workflow</Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body display="flex" flexDirection="column" gap={4}>
+          <VStack align="start" width="full" gap={4}>
+            <VStack align="start" width="full">
+              <VersionToBeUsed />
+            </VStack>
+            <VStack align="start" width="full" gap={2}>
+              <SmallLabel>Optimizer</SmallLabel>
+              <Controller
+                control={form.control}
+                name="optimizer"
+                rules={{ required: "Optimizer is required" }}
+                render={({ field }) => <OptimizerSelect field={field} />}
+              />
+            </VStack>
+          </VStack>
+          <VStack width="full" align="start">
+            {"llm" in optimizer.params && (
+              <VStack align="start" width="full" gap={2}>
+                <HStack>
+                  <SmallLabel>Teacher LLM</SmallLabel>
+                  <Tooltip content="The LLM that will be used to generate the prompts and/or demonstrations. You can, for example, use a more powerful LLM to teach a smaller one.">
+                    <Info size={16} />
+                  </Tooltip>
+                </HStack>
+                <Controller
+                  control={form.control}
+                  name="params.llm"
+                  render={({ field }) => (
+                    <OptimizationStudioLLMConfigField
+                      showProviderKeyMessage={false}
+                      llmConfig={llmConfig ?? { model: DEFAULT_MODEL }}
+                      onChange={(llmConfig) => {
+                        field.onChange(llmConfig);
+                      }}
+                    />
+                  )}
+                />
+              </VStack>
+            )}
+          </VStack>
+          <Grid templateColumns="repeat(2, 1fr)" gap={5}>
+            {"num_candidates" in optimizer.params && (
+              <GridItem>
+                <VStack align="start" gap={2}>
+                  <HStack>
+                    <SmallLabel>Number of Candidate Prompts</SmallLabel>
+                    <Tooltip content="Each candidate and demonstrations combination will be evaluated against the optimization set.">
+                      <Info size={16} />
+                    </Tooltip>
+                  </HStack>
+                  <Input
+                    {...form.register("params.num_candidates")}
+                    type="number"
+                    min={1}
+                    max={100}
+                  />
+                </VStack>
+              </GridItem>
+            )}
+            {"max_bootstrapped_demos" in optimizer.params && (
+              <GridItem>
+                <VStack align="start" width="full" gap={2}>
+                  <HStack>
+                    <SmallLabel>Max Bootstrapped Demos</SmallLabel>
+                    <Tooltip content="Maximum number of few shot demonstrations generated on the fly by the optimizer">
+                      <Info size={16} />
+                    </Tooltip>
+                  </HStack>
+                  <Input
+                    {...form.register("params.max_bootstrapped_demos")}
+                    type="number"
+                    min={1}
+                    max={100}
+                  />
+                </VStack>
+              </GridItem>
+            )}
+            {"max_labeled_demos" in optimizer.params && (
+              <GridItem>
+                <VStack align="start" width="full" gap={2}>
+                  <HStack>
+                    <SmallLabel>Max Labeled Demos</SmallLabel>
+                    <Tooltip content="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
+                      <Info size={16} />
+                    </Tooltip>
+                  </HStack>
+                  <Input
+                    {...form.register("params.max_labeled_demos")}
+                    type="number"
+                    min={1}
+                    max={100}
+                  />
+                </VStack>
+              </GridItem>
+            )}
+          </Grid>
+          {/* {"max_rounds" in optimizer.params && (
+          <VStack align="start" width="full" gap={2}>
+            <SmallLabel>Max Rounds</SmallLabel>
+            <Input
+              {...form.register("params.max_rounds")}
+              type="number"
+              min={1}
+              max={100}
+            />
+          </VStack>
+        )} */}
+          {hasProvidersWithoutCustomKeys ? (
+            <AddModelProviderKey
+              runWhat="run optimizations"
+              nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+            />
+          ) : !hasEvaluator ? (
+            <Alert.Root status="warning">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  You need at least one evaluator node in your workflow to be
+                  able to run optimizations
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
+          ) : null}
+        </Dialog.Body>
+        <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
+          <VStack align="start" width="full" gap={3}>
+            <HStack width="full">
+              <VStack align="start" gap={0}>
+                <Text fontWeight={500}>
+                  {train.length} optimization set entries
+                </Text>
+              </VStack>
+              <Spacer />
+              <Tooltip content={isDisabled}>
+                <Button
+                  variant="outline"
+                  type="submit"
+                  loading={
+                    commitVersion.isPending ||
+                    optimizationState?.status === "waiting"
+                  }
+                  disabled={!!isDisabled}
+                >
+                  <CheckSquare size={16} />
+                  {canSave ? "Save & Run Optimization" : "Run Optimization"}
+                </Button>
+              </Tooltip>
+            </HStack>
+          </VStack>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </FormProvider>
+  );
+}
+
+const OptimizerSelect = ({
+  field,
+}: {
+  field: ControllerRenderProps<OptimizeForm, "optimizer">;
+}) => {
+  const optimizerCollection = createListCollection({
+    items: optimizerOptions,
+  });
+
+  return (
+    <Select.Root
+      {...field}
+      collection={optimizerCollection}
+      value={field.value?.value ? [field.value.value] : []}
+      onChange={undefined}
+      onValueChange={(change) => {
+        const selectedOption = optimizerOptions.find(
+          (option) => option.value === change.value[0],
+        );
+        field.onChange({
+          target: {
+            name: field.name,
+            value: selectedOption,
+          },
+        });
+      }}
+      width="100%"
+    >
+      <Select.Trigger>
+        <Select.ValueText placeholder="Select optimizer" />
+      </Select.Trigger>
+      <Select.Content>
+        {optimizerOptions.map((option) => (
+          <Select.Item item={option} key={option.value}>
+            <VStack align="start" width="full">
+              <Text>{option.label}</Text>
+              <Text fontSize="13px" color="fg.muted">
+                {option.description}
+              </Text>
+            </VStack>
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
+  );
+};

@@ -1,0 +1,38 @@
+/**
+ * Repository for Project data access.
+ * Single Responsibility: Database operations for projects.
+ */
+
+import type { PrismaClient } from "~/generated/prisma/client";
+
+export class ProjectRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  /**
+   * Resolves the organizationId for a project by traversing project -> team -> organization.
+   * Returns null if the project does not exist or has no associated organization.
+   */
+  async getOrganizationId(params: {
+    projectId: string;
+  }): Promise<string | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: params.projectId },
+      include: { team: true },
+    });
+    return project?.team?.organizationId ?? null;
+  }
+
+  async findForLangyCredentials(
+    projectId: string,
+  ): Promise<{ apiKey: string; organizationId: string } | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { apiKey: true, team: { select: { organizationId: true } } },
+    });
+    if (!project?.team) return null;
+    return {
+      apiKey: project.apiKey,
+      organizationId: project.team.organizationId,
+    };
+  }
+}

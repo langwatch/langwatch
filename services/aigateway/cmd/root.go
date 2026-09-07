@@ -28,7 +28,7 @@ func Root(ctx context.Context, _ []string) error {
 		return err
 	}
 
-	application := app.New(
+	opts := []app.Option{
 		app.WithAuth(deps.Auth),
 		app.WithProviders(deps.Providers),
 		app.WithRateLimiter(deps.RateLimiter),
@@ -45,7 +45,17 @@ func Root(ctx context.Context, _ []string) error {
 		app.WithMetrics(deps.Metrics),
 		app.WithCircuitBreaker(deps.Breaker),
 		app.WithLogger(deps.Logger),
-	)
+		// The control plane owns the record of open realtime voice sessions:
+		// a session outlives the request that minted it, and its per-key cap
+		// has to be counted somewhere every replica sees.
+		app.WithRealtimeSessions(deps.ControlPlane),
+	}
+	// Appended conditionally on the concrete type: a nil adapter wrapped in
+	// the interface would defeat the app's nil check.
+	if deps.SpendEmitter != nil {
+		opts = append(opts, app.WithSpend(deps.SpendEmitter))
+	}
+	application := app.New(opts...)
 
 	return aigateway.Serve(ctx, application, deps, cfg)
 }

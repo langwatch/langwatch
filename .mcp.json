@@ -5,7 +5,7 @@
       "command": "bash",
       "args": [
         "-c",
-        "d=$PWD; while [ \"$d\" != / ] && [ ! -f \"$d/scripts/playwright-mcp.sh\" ]; do d=$(dirname \"$d\"); done; [ -f \"$d/scripts/playwright-mcp.sh\" ] || { echo \"playwright-mcp.sh not found above $PWD\" >&2; exit 1; }; exec bash \"$d/scripts/playwright-mcp.sh\" \"$@\"",
+        "d=$PWD; while [ \"$d\" != / ] && [ ! -f \"$d/dev/scripts/playwright-mcp.sh\" ]; do d=$(dirname \"$d\"); done; [ -f \"$d/dev/scripts/playwright-mcp.sh\" ] || { echo \"playwright-mcp.sh not found above $PWD\" >&2; exit 1; }; exec bash \"$d/dev/scripts/playwright-mcp.sh\" \"$@\"",
         "_"
       ],
       "env": {}
@@ -15,7 +15,7 @@
       "command": "bash",
       "args": [
         "-c",
-        "d=$PWD; while [ \"$d\" != / ] && [ ! -f \"$d/scripts/playwright-mcp.sh\" ]; do d=$(dirname \"$d\"); done; [ -f \"$d/scripts/playwright-mcp.sh\" ] || { echo \"playwright-mcp.sh not found above $PWD\" >&2; exit 1; }; exec bash \"$d/scripts/playwright-mcp.sh\" \"$@\"",
+        "d=$PWD; while [ \"$d\" != / ] && [ ! -f \"$d/dev/scripts/playwright-mcp.sh\" ]; do d=$(dirname \"$d\"); done; [ -f \"$d/dev/scripts/playwright-mcp.sh\" ] || { echo \"playwright-mcp.sh not found above $PWD\" >&2; exit 1; }; exec bash \"$d/dev/scripts/playwright-mcp.sh\" \"$@\"",
         "_",
         "--headed"
       ],

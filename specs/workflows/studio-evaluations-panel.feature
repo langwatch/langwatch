@@ -1,7 +1,7 @@
 # Studio evaluations panel — Gherkin Spec
-# Implementation: langwatch/src/optimization_studio/components/ResultsPanel.tsx
+# Implementation: platform/app/src/optimization_studio/components/ResultsPanel.tsx
 # (EvaluationResults) and
-# langwatch/src/components/batch-evaluation-results/BatchSummaryFooter.tsx
+# platform/app/src/components/batch-evaluation-results/BatchSummaryFooter.tsx
 #
 # The evaluations panel at the bottom of the studio shows the runs of the
 # workflow's experiment inline, but the full experiment results page has

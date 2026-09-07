@@ -58,7 +58,9 @@ func (s *ttfbSpyWriter) Write(p []byte) (int, error) {
 func newHeartbeatRouter(provider *mockProvider, interval time.Duration) http.Handler {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			// Covers the Gemini passthrough as well as the /v1 routes, so
+			// the bundle carries the Google slot that surface requires.
+			return geminiBundle(), nil
 		},
 	}
 	reg := health.New("test")

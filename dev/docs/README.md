@@ -6,6 +6,7 @@ Cross-cutting principles that apply everywhere:
 
 - **CODING_STANDARDS.md** - Clean code, SOLID, readability
 - **TESTING_PHILOSOPHY.md** - Test hierarchy, BDD workflow
+- **RELEASES.md** - release-please components, breaking-change scope, version pinning
 
 ## Language & Framework Specific
 

@@ -68,15 +68,56 @@ Feature: Private ClickHouse Routing
   Scenario: Project in a private-CH org routes to the private instance
     Given org "org123" has a private ClickHouse configured
     And a project exists under org "org123"
-    When getClickHouseClientForProject(projectId) is called
+    When getClickHouseClientForTenant(projectId) is called
     Then the returned client connects to the private ClickHouse
 
   @integration
   Scenario: Project in a standard org routes to the shared instance
     Given org "org456" has no private ClickHouse configured
     And a project exists under org "org456"
-    When getClickHouseClientForProject(projectId) is called
+    When getClickHouseClientForTenant(projectId) is called
     Then the returned client connects to the shared ClickHouse
+
+  # ---------------------------------------------------------------------------
+  # Tenant-level routing
+  #
+  # A tenant was a project and nothing else until the grants ledger put an
+  # aggregate per organization into the same event store, at which point every
+  # one of its writes asked to be routed by an id no project carries. Routing
+  # is per-organization either way, so both kinds resolve — and an id that is
+  # neither still refuses, because a tenant nobody can place is exactly the one
+  # whose data must not land on another customer's instance.
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: An organization is a tenant in its own right
+    Given org "org123" has a private ClickHouse configured
+    When a client is resolved for the tenant "org123"
+    Then the returned client connects to the private ClickHouse
+    And no project needs to exist for that id
+
+  @integration
+  Scenario: A tenant that names no project, organization or user is refused
+    Given an id that matches no project, no organization and no user
+    When a client is resolved for that tenant
+    Then resolution fails with an error naming the tenant
+    And the shared client is not returned
+
+  # ---------------------------------------------------------------------------
+  # Access discipline
+  # ---------------------------------------------------------------------------
+  # Routing is only safe while there is one road to a client. The composition
+  # root builds the resolvers once; everything else receives them through the
+  # app or an injected repository, so no module can quietly reach the wrong
+  # instance by importing its own way in.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: The application reaches ClickHouse through the composition root alone
+    Given the composition root builds the tenant and organization resolvers once
+    When any other module needs a ClickHouse client
+    Then it receives one through the app or an injected repository
+    And no module outside the sanctioned boot paths imports the client module's functions directly
 
   # ---------------------------------------------------------------------------
   # Admin / migration operations
@@ -112,3 +153,31 @@ Feature: Private ClickHouse Routing
     When a row is inserted via the routed client for this project
     Then the row exists in container B
     And the row does NOT exist in container A
+
+  # ── The third tenant kind ──────────────────────────────────────────────
+  #
+  # A tenant was a project, then a project or an organization, and now a
+  # user as well: `user_identity` keeps one aggregate per PERSON, so its
+  # tenantId is a user id and every append asked the resolver a question it
+  # could not answer. A user is NOT resolved into an organization on the way
+  # - somebody can be in several, and picking one would put their identity
+  # history on an instance chosen by accident.
+  #
+  # User data always lands on the shared instance. What a user-tenanted event
+  # records is how somebody signs in, which is true of them before, across and
+  # after every organization they belong to - so membership does not enter
+  # into the routing at all.
+
+  @integration
+  Scenario: A user is a tenant in its own right
+    Given a user
+    When the routed client is resolved for that user as the tenant
+    Then it answers the shared ClickHouse
+    And the user is not resolved into any organization to get there
+
+  @integration
+  Scenario: A user in a private-dataplane organization still routes to shared
+    Given a user who is a member of an organization with a private ClickHouse
+    When the routed client is resolved for that user as the tenant
+    Then it answers the shared ClickHouse
+    And their organization's private instance is not consulted
