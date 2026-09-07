@@ -60,6 +60,13 @@ export const ScenarioInfraErrorCode = {
    * connected one.
    */
   AgentPayloadTooLarge: "agent_payload_too_large",
+  /**
+   * The agent's own code raised. NOT an infrastructure failure — it is here
+   * because this classifier is the single place a scenario failure is turned
+   * into something a customer reads, and without it a user-code failure gets
+   * bucketed as one of the infra codes above (lw#3439).
+   */
+  UserCodeError: "scenario_user_code_error",
   /** Anything else that failed at the infrastructure level. */
   Infra: "scenario_infra_error",
 } as const;
@@ -245,6 +252,52 @@ function findMeaningfulLine(text: string): string | undefined {
  * also appears in legitimate prose like `expected <value>`.
  */
 const HTML_DOCUMENT_MARKER = /<!doctype\s+html|<html[\s>]/i;
+
+/**
+ * Pull the customer-facing part out of the adapter's user-code failure.
+ *
+ * The adapter renders `type: <ExceptionClass>` and an indented traceback whose
+ * last line is the exception. That last line is what a developer reads first,
+ * so prefer it, then the declared type, then whatever is left.
+ */
+function extractUserCodeDetail(raw: string): string {
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const exceptionLine = [...lines]
+    .reverse()
+    .find((line) => /^[A-Za-z_][\w.]*(Error|Exception|Warning)\b/.test(line));
+
+  const declaredType = /^type:\s*(\S+)/m.exec(raw)?.[1];
+
+  const withoutHeadline = lines.filter(
+    (line) =>
+      !contains(line, "user code raised an error during execution") &&
+      !contains(line, "user code error:"),
+  );
+
+  // Prefer the exception line, then the declared type, then the remaining
+  // body. `summarize` returns undefined when a candidate is nothing but
+  // noise OR when it exposes our internals, so fall through to the next
+  // candidate and, last, to the same safe generic sentence every other
+  // unreadable failure gets. Returning the raw blob here would bypass both
+  // `summarize`'s truncation and its INTERNALS_PATTERNS check — the exact
+  // leak this file exists to stop — the moment a customer's own code
+  // happens to mention something like a stack frame or a "/app/" path in
+  // its own message and every candidate above gets vetoed for it.
+  for (const candidate of [
+    exceptionLine,
+    declaredType,
+    withoutHeadline.join(" ") || raw,
+  ]) {
+    if (!candidate) continue;
+    const summary = summarize(candidate);
+    if (summary) return summary;
+  }
+  return UNREADABLE_FAILURE_MESSAGE;
+}
 
 /**
  * Collapse a raw error blob (often a multi-line child-process dump) into a
@@ -540,6 +593,32 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   // that a session is too large would otherwise read as a platform timeout, a
   // model-provider rejection, or a session the platform itself refused.
   ...connectedAgentRules(),
+  {
+    /**
+     * MUST stay ahead of every needle-scanning rule below. Those rules scan
+     * for needles like "timed out", "ECONNREFUSED" and "fetch failed" — all
+     * of which routinely appear inside a customer's own Python traceback. The
+     * reported lw#3439 case is literally `httpx.TimeoutException: The read
+     * operation timed out`, so without this rule the customer's bug is
+     * rendered back to them as "The simulation timed out before it finished" —
+     * our infrastructure taking the blame for their code, which is the exact
+     * inversion lw#3439 is about, one layer further down than the adapter.
+     *
+     * It sits just after the connected-agent rules only because those match a
+     * different, more specific prefix (`Connected agent call failed (<code>)`)
+     * and classify by that bracketed code; a code adapter's own user-code
+     * headline never carries it, so the two cannot collide.
+     *
+     * The needle is the adapter's own headline, which is a fixed string it
+     * controls (`format-execution-error.ts`), not a guess at user content.
+     */
+    needles: ["user code raised an error during execution"],
+    build: (text) => ({
+      code: ScenarioInfraErrorCode.UserCodeError,
+      message: `The agent's code raised an error: ${extractUserCodeDetail(text)}`,
+      hint: "This is an error in the agent's own code, not in LangWatch. Open the run's trace for the full traceback.",
+    }),
+  },
   // A model that answered with nothing. Ahead of the provider rule: the two
   // read alike in the raw text, and only this one is true of a request the
   // provider accepted.
@@ -638,7 +717,10 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     }),
   },
   {
-    needles: ["timed out", "ETIMEDOUT"],
+    // "did not respond within" is the serialized adapters' own timeout
+    // wording; without it an adapter timeout fell through to the generic
+    // bucket and lost its actionable hint (lw#3439).
+    needles: ["timed out", "ETIMEDOUT", "did not respond within"],
     build: () => ({
       code: ScenarioInfraErrorCode.ExecutionTimeout,
       message: "The simulation timed out before it finished.",
@@ -904,6 +986,8 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Connected agent busy";
     case ScenarioInfraErrorCode.AgentPayloadTooLarge:
       return "Agent answer too large";
+    case ScenarioInfraErrorCode.UserCodeError:
+      return "The agent's code failed";
     case ScenarioInfraErrorCode.Infra:
       return "Simulation failed";
     default: {
