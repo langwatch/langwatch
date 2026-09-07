@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { error, prismaFake, sendRequirementEmail } = vi.hoisted(() => ({
-  error: vi.fn(),
-  prismaFake: {
-    organization: { findUnique: vi.fn() },
-    user: { findUnique: vi.fn() },
-    organizationUser: { findMany: vi.fn() },
-  },
-  sendRequirementEmail: vi.fn(),
-}));
+const { error, prismaFake, resolveIdentityEmail, sendRequirementEmail } =
+  vi.hoisted(() => ({
+    error: vi.fn(),
+    prismaFake: {
+      organization: { findUnique: vi.fn() },
+      user: { findUnique: vi.fn() },
+      organizationUser: { findMany: vi.fn() },
+    },
+    resolveIdentityEmail: vi.fn(),
+    sendRequirementEmail: vi.fn(),
+  }));
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ error }),
@@ -34,11 +36,15 @@ describe("EmailOrganizationMfaNotifier", () => {
       { userId: "olga", user: { email: "olga@example.com" } },
     ]);
     sendRequirementEmail.mockResolvedValue(undefined);
+    resolveIdentityEmail.mockResolvedValue(null);
   });
 
   /** @scenario "Turning the requirement on is recorded with who did it" */
   it("delivers the change to every active member returned for this organization", async () => {
-    const notifier = new EmailOrganizationMfaNotifier(prisma);
+    const notifier = new EmailOrganizationMfaNotifier(
+      prisma,
+      resolveIdentityEmail,
+    );
 
     await notifier.requirementChanged({
       organizationId: "org-acme",
@@ -74,7 +80,10 @@ describe("EmailOrganizationMfaNotifier", () => {
     sendRequirementEmail
       .mockRejectedValueOnce(new Error("mailbox refused"))
       .mockResolvedValueOnce(undefined);
-    const notifier = new EmailOrganizationMfaNotifier(prisma);
+    const notifier = new EmailOrganizationMfaNotifier(
+      prisma,
+      resolveIdentityEmail,
+    );
 
     await expect(
       notifier.requirementChanged({
@@ -95,6 +104,53 @@ describe("EmailOrganizationMfaNotifier", () => {
         failed: 1,
       },
       "organization MFA requirement notification delivery failed",
+    );
+  });
+
+  it("uses the current primary identity email instead of the stale user column", async () => {
+    prismaFake.organizationUser.findMany.mockResolvedValue([
+      { userId: "ana", user: { email: "detached@example.com" } },
+    ]);
+    resolveIdentityEmail.mockResolvedValue("primary@example.com");
+    const notifier = new EmailOrganizationMfaNotifier(
+      prisma,
+      resolveIdentityEmail,
+    );
+
+    await notifier.requirementChanged({
+      organizationId: "org-acme",
+      actorUserId: "ana",
+      required: true,
+      memberUserIds: ["ana"],
+    });
+
+    expect(sendRequirementEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "primary@example.com" }),
+    );
+    expect(sendRequirementEmail).not.toHaveBeenCalledWith(
+      expect.objectContaining({ to: "detached@example.com" }),
+    );
+  });
+
+  it("sends once when two members resolve to the same normalized destination", async () => {
+    resolveIdentityEmail
+      .mockResolvedValueOnce("Shared@Example.com")
+      .mockResolvedValueOnce(" shared@example.com ");
+    const notifier = new EmailOrganizationMfaNotifier(
+      prisma,
+      resolveIdentityEmail,
+    );
+
+    await notifier.requirementChanged({
+      organizationId: "org-acme",
+      actorUserId: "ana",
+      required: true,
+      memberUserIds: ["ana", "olga"],
+    });
+
+    expect(sendRequirementEmail).toHaveBeenCalledTimes(1);
+    expect(sendRequirementEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "Shared@Example.com" }),
     );
   });
 });
