@@ -58,7 +58,7 @@ const named = (suffix: string): string => {
   return matches[0]!;
 };
 
-const REVOKE_SUFFIX = "_revoke_legacy_impersonating_sessions";
+const IDENTITY_AUTH_SUFFIX = "_identity_auth";
 
 /**
  * Where this wave begins, so the claim below covers it and everything after
@@ -109,7 +109,7 @@ describe("given sessions carrying the legacy impersonation payload", () => {
   describe("when the deliverable is deployed", () => {
     /** @scenario "The one revoke at deploy is the impersonating sessions" */
     it("ends exactly the sessions carrying that payload", () => {
-      const statements = statementsIn(sqlOf(named(REVOKE_SUFFIX)));
+      const statements = statementsIn(sqlOf(named(IDENTITY_AUTH_SUFFIX)));
       const deletes = statements.filter((statement) =>
         /DELETE FROM "Session"/i.test(statement),
       );
@@ -129,7 +129,7 @@ describe("given sessions carrying the legacy impersonation payload", () => {
       // AFTER this one. Unguarded, the run aborted here and never reached the
       // repair — so the repair was unreachable on every database that needed
       // it.
-      const sql = sqlOf(named(REVOKE_SUFFIX));
+      const sql = sqlOf(named(IDENTITY_AUTH_SUFFIX));
 
       expect(sql).toMatch(/information_schema\.columns/i);
       expect(sql).toMatch(/column_name = 'impersonating'/i);
@@ -163,7 +163,9 @@ describe("given sessions carrying the legacy impersonation payload", () => {
       // One statement from this wave onward touches the session table, and it
       // is the impersonation revoke. Nothing keys on `amr`, on
       // `identifierId`, or on a session having recorded nothing.
-      expect(deletes.map(({ name }) => name)).toEqual([named(REVOKE_SUFFIX)]);
+      expect(deletes.map(({ name }) => name)).toEqual([
+        named(IDENTITY_AUTH_SUFFIX),
+      ]);
       expect(deletes[0]?.statement).toContain(
         'DELETE FROM "Session" WHERE "impersonating" IS NOT NULL',
       );

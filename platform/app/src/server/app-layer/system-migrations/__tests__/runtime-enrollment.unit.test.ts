@@ -115,10 +115,10 @@ describe("the PR1 migration registry", () => {
       (migration) => migration.name,
     );
 
-    expect(migrationNames).toEqual([AUTHZ_ENGINE_MIGRATION_NAME]);
-    expect(migrationNames).not.toContain(
+    expect(migrationNames).toEqual([
+      AUTHZ_ENGINE_MIGRATION_NAME,
       IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
-    );
+    ]);
   });
 });
 

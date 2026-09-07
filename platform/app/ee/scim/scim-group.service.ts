@@ -10,6 +10,7 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
+import { ScimWriteOutsideConnectionError } from "./errors";
 import type {
   ScimCreateGroupRequest,
   ScimError,
@@ -20,7 +21,6 @@ import type {
   ScimReplaceGroupRequest,
 } from "./scim.types";
 import { reconcileScimGrants } from "./scim-grants.reconciler";
-import { ScimWriteOutsideConnectionError } from "./errors";
 
 const logger = createLogger("langwatch:scim:group");
 

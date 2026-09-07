@@ -135,7 +135,11 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         ]),
       });
 
-      await expectForbidden(response);
+      expect(await readForbiddenResponse(response)).toMatchObject({
+        status: 403,
+        contentType: expect.stringContaining("application/scim+json"),
+        body: { schemas: [SCIM_ERROR_SCHEMA], status: "403" },
+      });
       expect(await authoritySnapshot(first.organizationId)).toEqual(before);
     });
 
@@ -148,7 +152,11 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         method: "DELETE",
       });
 
-      await expectForbidden(response);
+      expect(await readForbiddenResponse(response)).toMatchObject({
+        status: 403,
+        contentType: expect.stringContaining("application/scim+json"),
+        body: { schemas: [SCIM_ERROR_SCHEMA], status: "403" },
+      });
       expect(await authoritySnapshot(first.organizationId)).toEqual(before);
     });
 
@@ -168,7 +176,11 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         ]),
       });
 
-      await expectForbidden(response);
+      expect(await readForbiddenResponse(response)).toMatchObject({
+        status: 403,
+        contentType: expect.stringContaining("application/scim+json"),
+        body: { schemas: [SCIM_ERROR_SCHEMA], status: "403" },
+      });
       expect(await authoritySnapshot(first.organizationId)).toEqual(before);
     });
   });
@@ -244,7 +256,11 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         method: "DELETE",
       });
 
-      await expectForbidden(response);
+      expect(await readForbiddenResponse(response)).toMatchObject({
+        status: 403,
+        contentType: expect.stringContaining("application/scim+json"),
+        body: { schemas: [SCIM_ERROR_SCHEMA], status: "403" },
+      });
       expect(await authoritySnapshot(first.organizationId)).toEqual(before);
       expect(await tokenLastUsedAt(first.legacyConnectionId)).toBeNull();
     });
@@ -268,7 +284,11 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
       method: "DELETE",
     });
 
-    await expectForbidden(response);
+    expect(await readForbiddenResponse(response)).toMatchObject({
+      status: 403,
+      contentType: expect.stringContaining("application/scim+json"),
+      body: { schemas: [SCIM_ERROR_SCHEMA], status: "403" },
+    });
     expect(await authoritySnapshot(first.organizationId)).toEqual(before);
     expect(await tokenLastUsedAt(first.legacyConnectionId)).toBeNull();
   });
@@ -287,7 +307,11 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
       method: "DELETE",
     });
 
-    await expectForbidden(response);
+    expect(await readForbiddenResponse(response)).toMatchObject({
+      status: 403,
+      contentType: expect.stringContaining("application/scim+json"),
+      body: { schemas: [SCIM_ERROR_SCHEMA], status: "403" },
+    });
     expect(await authoritySnapshot(second.organizationId)).toEqual(before);
     expect(await tokenLastUsedAt(second.directConnectionId)).toBeNull();
   });
@@ -511,15 +535,16 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
     });
   }
 
-  async function expectForbidden(response: Response): Promise<void> {
-    expect(response.status).toBe(403);
-    expect(response.headers.get("content-type")).toContain(
-      "application/scim+json",
-    );
-    await expect(response.json()).resolves.toMatchObject({
-      schemas: [SCIM_ERROR_SCHEMA],
-      status: "403",
-    });
+  async function readForbiddenResponse(response: Response): Promise<{
+    status: number;
+    contentType: string | null;
+    body: unknown;
+  }> {
+    return {
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      body: await response.json(),
+    };
   }
 
   async function clearTokenUse(connectionId: string): Promise<void> {
