@@ -528,5 +528,11 @@ export const buildGenericOAuthConfigs = (
   return genericOAuthConfigs.map((config) => ({
     ...config,
     accountIssuer: issuerForProviderId(config.providerId),
+    // Auth0 and Okta session MFA evidence comes from their callback ID token.
+    // Refuse those providers at initialization when discovery cannot supply
+    // the issuer and JWKS needed for BetterAuth to verify that proof.
+    ...(config.providerId === "auth0" || config.providerId === "okta"
+      ? { requireIdTokenVerification: true }
+      : {}),
   }));
 };

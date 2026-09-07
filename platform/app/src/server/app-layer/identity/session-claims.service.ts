@@ -22,21 +22,27 @@ export interface SessionIdentifierPort {
    */
   findIdentifierIdFor(args: {
     userId: string;
-    provider: string;
+    providerId: string;
+    providerAccountId?: string;
   }): Promise<string | null>;
 }
 
-/** What this person's identity provider asserted on the sign-in just made. */
+export interface AuthenticatedProviderAccount {
+  providerAccountId: string;
+  assertedFactors: readonly string[];
+  verifiedTokenClaims: boolean;
+}
+
+/** The provider account and factors proved by this request's callback. */
 export interface ProviderAssertionPort {
   /**
-   * The `amr` values the provider asserted, read off the token it issued.
-   * An empty answer is the common one and means exactly what it says: the
-   * provider asserted nothing, so nothing is inferred on its behalf.
+   * The account and `amr` values BetterAuth verified in the callback currently
+   * minting this session. Null means there is no callback evidence in this
+   * request, so neither an account nor a factor may be inferred.
    */
-  assertedFactorsFor(args: {
-    userId: string;
-    provider: string;
-  }): Promise<readonly string[]>;
+  authenticatedAccountFor(args: {
+    providerId: string;
+  }): Promise<AuthenticatedProviderAccount | null>;
 }
 
 export interface SessionClaims {
@@ -63,29 +69,44 @@ export class SessionClaimsService {
    * endpoint we have not taught this about degrades to the behaviour the
    * product had before any of it existed.
    */
-  async claimsForMint({
-    userId,
-    path,
-  }: {
-    userId: string;
-    path: string;
-  }): Promise<SessionClaims> {
+  async claimsForMint({ userId, path }: { userId: string; path: string }): Promise<SessionClaims> {
     const provider = signInProviderForPath({ path });
     if (!provider) return NO_SESSION_CLAIMS;
 
-    // Only a federated sign-in can carry an assertion; asking on the
-    // credential path would be a read with one possible answer.
-    const providerAssertedAmr =
-      provider === "credential" || provider === "passkey"
-        ? []
-        : await this.deps.assertions.assertedFactorsFor({ userId, provider });
+    const isLocal = provider === "credential" || provider === "passkey";
+    const authenticatedAccount = isLocal
+      ? null
+      : await this.deps.assertions.authenticatedAccountFor({
+          providerId: provider,
+        });
+
+    // A callback path alone proves nothing. Without current verified evidence
+    // even the protocol label is omitted, so a stale Account token cannot
+    // turn an otherwise empty session into one that appears provider-backed.
+    if (!isLocal && !authenticatedAccount) return NO_SESSION_CLAIMS;
+
+    // A federated session is attributed only when this request carried the
+    // exact accepted provider account. Falling back to "the newest account
+    // for this provider" would let a concurrent or stale callback stamp a
+    // session with somebody else's sign-in evidence.
+    const identifierId = await this.deps.identifiers.findIdentifierIdFor({
+      userId,
+      providerId: provider,
+      ...(authenticatedAccount
+        ? { providerAccountId: authenticatedAccount.providerAccountId }
+        : {}),
+    });
 
     return {
-      identifierId: await this.deps.identifiers.findIdentifierIdFor({
-        userId,
-        provider,
-      }),
-      amr: deriveSessionAmr({ path, providerAssertedAmr }),
+      identifierId,
+      amr:
+        isLocal || authenticatedAccount?.verifiedTokenClaims
+          ? deriveSessionAmr({
+              path,
+              providerAssertedAmr:
+                authenticatedAccount?.assertedFactors ?? [],
+            })
+          : [],
     };
   }
 }

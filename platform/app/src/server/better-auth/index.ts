@@ -18,6 +18,7 @@ import {
   passkeySignUp,
   passwordResetSessionBridge,
   resolveSignInMethodPolicy,
+  sessionCallbackEvidence,
   sessionClaims,
   sessionRevocation,
   signUpConfirmationEndpoint,
@@ -183,6 +184,7 @@ export const auth = betterAuth({
     userErasure: identityCeremonies,
     accountCeremonies: identityBridgeCeremonies,
     sessionClaims,
+    providerAssertions: sessionCallbackEvidence,
   }),
 
   // BetterAuth logger wiring

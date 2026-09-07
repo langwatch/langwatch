@@ -1,10 +1,9 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { tryGetApp } from "~/server/app-layer/app";
-import type {
-  ProviderAssertionPort,
-  SessionIdentifierPort,
-} from "./session-claims.service";
+import type { ProviderAssertionPort, SessionIdentifierPort } from "./session-claims.service";
 import type {
   SessionCachePort,
   SessionRecord,
@@ -16,8 +15,16 @@ import type {
   SessionRevocationCachePort,
   SessionRevocationRecordsPort,
 } from "./session-revocation.service";
+import { signInProviderForPath } from "./session-claims";
 
 const logger = createLogger("langwatch:identity:session-claims");
+
+const verifiedCallbackClaimsSchema = z.object({
+  sub: z.string().min(1),
+  amr: z.array(z.string()).optional(),
+});
+
+const VERIFIED_AMR_PROVIDERS = new Set(["auth0", "okta"]);
 
 /**
  * The reads and writes behind what a session records, behind ending the
@@ -39,13 +46,20 @@ export class PrismaSessionIdentifiers implements SessionIdentifierPort {
 
   async findIdentifierIdFor({
     userId,
-    provider,
+    providerId,
+    providerAccountId,
   }: {
     userId: string;
-    provider: string;
+    providerId: string;
+    providerAccountId?: string;
   }): Promise<string | null> {
     const identifier = await this.prisma.identifier.findFirst({
-      where: { userId, provider, detachedAt: null },
+      where: {
+        userId,
+        providerId,
+        ...(providerAccountId ? { providerAccountId } : {}),
+        detachedAt: null,
+      },
       orderBy: { attachedAt: "desc" },
       select: { id: true },
     });
@@ -54,65 +68,118 @@ export class PrismaSessionIdentifiers implements SessionIdentifierPort {
 }
 
 /**
- * What the identity provider asserted, read off the identity token it issued.
+ * The accepted provider account and assertion for the callback in flight.
  *
- * The `amr` claim is the provider's own statement about what it checked, and
- * it is the ONLY thing that can satisfy an organization's requirement for
- * somebody who signs in through a connection. So it is read from the token
- * rather than configured on our side: a connection reconfigured at the
- * provider this morning starts asserting this morning, with nothing here to
- * update.
+ * Auth0 and Okta require ID-token verification in their provider config.
+ * BetterAuth's generic OAuth callback verifies the token in `getUserInfo` (or
+ * returns no user) before `handleOAuthUserInfo` writes the Account and then
+ * creates the Session. Its Account before-hook records only that current token;
+ * the after-hook separately records the accepted Account subject. Token claims
+ * earn credit only when their subject matches that accepted account.
  *
- * Every failure answers the empty list. A token we cannot read, a provider
- * that issued none, a claim that is not an array - none of them is an error
- * the person can act on, and all of them mean the same thing: nothing was
- * asserted, so nothing is inferred.
+ * Other providers still get exact account attribution from BetterAuth's
+ * accepted Account row, but no token-derived AMR. Nothing is read from request
+ * input or a persisted Account row: either would let unverified or stale
+ * evidence satisfy a current sign-in.
  */
-export class IdTokenProviderAssertions implements ProviderAssertionPort {
-  constructor(private readonly prisma: PrismaClient) {}
+export class VerifiedCallbackProviderAssertions implements ProviderAssertionPort {
+  private readonly scope = new AsyncLocalStorage<{
+    pendingToken: {
+      providerId: string;
+      providerAccountId: string;
+      assertedFactors: readonly string[];
+    } | null;
+    evidence: {
+      providerId: string;
+      providerAccountId: string;
+      assertedFactors: readonly string[];
+      verifiedTokenClaims: boolean;
+    } | null;
+  }>();
 
-  async assertedFactorsFor({
-    userId,
-    provider,
-  }: {
-    userId: string;
-    provider: string;
-  }): Promise<readonly string[]> {
-    const account = await this.prisma.account.findFirst({
-      where: { userId, provider },
-      orderBy: { updatedAt: "desc" },
-      select: { id_token: true },
-    });
-    if (!account?.id_token) return [];
-    return amrClaimIn({ idToken: account.id_token });
+  runWithScope<T>(run: () => Promise<T>): Promise<T> {
+    return this.scope.run({ pendingToken: null, evidence: null }, run);
   }
-}
 
-/**
- * The `amr` claim of a signed identity token.
- *
- * The signature is NOT verified here, deliberately: better-auth verified it
- * before it wrote the row, and re-verifying would need the provider's keys in
- * a module whose job is reading a claim off a row we already trust. What this
- * must not do is throw - a malformed token is an empty assertion.
- */
-export function amrClaimIn({
-  idToken,
-}: {
-  idToken: string;
-}): readonly string[] {
-  const payload = idToken.split(".")[1];
-  if (!payload) return [];
-  try {
-    const decoded = JSON.parse(
-      Buffer.from(payload, "base64url").toString("utf8"),
-    ) as unknown;
-    if (typeof decoded !== "object" || decoded === null) return [];
-    const amr = (decoded as { amr?: unknown }).amr;
-    if (!Array.isArray(amr)) return [];
-    return amr.filter((value): value is string => typeof value === "string");
-  } catch {
-    return [];
+  recordVerifiedCallbackToken({
+    providerId,
+    path,
+    verifiedIdToken,
+  }: {
+    providerId: string;
+    path: string | undefined;
+    verifiedIdToken: string | undefined;
+  }): void {
+    const current = this.scope.getStore();
+    if (!current || !path || !verifiedIdToken) return;
+    if (!VERIFIED_AMR_PROVIDERS.has(providerId)) return;
+
+    const callbackProvider = signInProviderForPath({ path });
+    if (callbackProvider !== providerId) return;
+
+    const payload = verifiedIdToken.split(".")[1];
+    if (!payload) return;
+
+    let claims: unknown;
+    try {
+      claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    } catch {
+      return;
+    }
+
+    const parsedClaims = verifiedCallbackClaimsSchema.safeParse(claims);
+    if (!parsedClaims.success) return;
+
+    const { sub: providerAccountId, amr: assertedFactors = [] } = parsedClaims.data;
+
+    current.pendingToken = {
+      providerId,
+      providerAccountId,
+      assertedFactors,
+    };
+  }
+
+  recordAuthenticatedCallbackAccount({
+    providerId,
+    providerAccountId,
+    path,
+  }: {
+    providerId: string;
+    providerAccountId: string;
+    path: string | undefined;
+  }): void {
+    const current = this.scope.getStore();
+    if (!current || !path || !providerAccountId) return;
+
+    const callbackProvider = signInProviderForPath({ path });
+    if (callbackProvider !== providerId) return;
+
+    const verifiedTokenClaims =
+      current.pendingToken?.providerId === providerId &&
+      current.pendingToken.providerAccountId === providerAccountId;
+
+    current.evidence = {
+      providerId,
+      providerAccountId,
+      assertedFactors: verifiedTokenClaims
+        ? current.pendingToken?.assertedFactors ?? []
+        : [],
+      verifiedTokenClaims,
+    };
+  }
+
+  async authenticatedAccountFor({ providerId }: { providerId: string }): Promise<{
+    providerAccountId: string;
+    assertedFactors: readonly string[];
+    verifiedTokenClaims: boolean;
+  } | null> {
+    const evidence = this.scope.getStore()?.evidence ?? null;
+    if (!evidence || evidence.providerId !== providerId) return null;
+    return {
+      providerAccountId: evidence.providerAccountId,
+      assertedFactors: evidence.assertedFactors,
+      verifiedTokenClaims: evidence.verifiedTokenClaims,
+    };
   }
 }
 
@@ -120,11 +187,7 @@ export function amrClaimIn({
 export class PrismaSessionRecords implements SessionRecordsPort {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async listForUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<readonly SessionRecord[]> {
+  async listForUser({ userId }: { userId: string }): Promise<readonly SessionRecord[]> {
     return this.prisma.session.findMany({
       where: { userId, expires: { gt: new Date() } },
       orderBy: { createdAt: "desc" },
@@ -178,8 +241,7 @@ const SESSION_RECORD_SELECT = {
  * keys it writes for a session are the session itself, under its token, and
  * the per-user index of the tokens that are live.
  */
-const cachedSessionKey = ({ token }: { token: string }) =>
-  `better-auth:${token}`;
+const cachedSessionKey = ({ token }: { token: string }) => `better-auth:${token}`;
 const activeSessionIndexKey = ({ userId }: { userId: string }) =>
   `better-auth:active-sessions-${userId}`;
 
@@ -237,11 +299,7 @@ export class RedisSessionCache implements SessionCachePort {
  * an answer here rather than a failure.
  */
 export class RedisSessionRevocationCache implements SessionRevocationCachePort {
-  async readIndex({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<readonly CachedSession[] | null> {
+  async readIndex({ userId }: { userId: string }): Promise<readonly CachedSession[] | null> {
     const redis = sessionCacheConnection();
     if (!redis) return null;
     const stored = await redis.get(activeSessionIndexKey({ userId }));
@@ -275,10 +333,7 @@ export class RedisSessionRevocationCache implements SessionRevocationCachePort {
   }): Promise<void> {
     const redis = sessionCacheConnection();
     if (!redis) return;
-    await redis.set(
-      activeSessionIndexKey({ userId }),
-      JSON.stringify(sessions),
-    );
+    await redis.set(activeSessionIndexKey({ userId }), JSON.stringify(sessions));
   }
 
   async dropIndex({ userId }: { userId: string }): Promise<void> {
@@ -305,16 +360,10 @@ export class RedisSessionRevocationCache implements SessionRevocationCachePort {
  * window, so a token skipped for being expired is a token better-auth would
  * keep answering from.
  */
-export class PrismaSessionRevocationRecords
-  implements SessionRevocationRecordsPort
-{
+export class PrismaSessionRevocationRecords implements SessionRevocationRecordsPort {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findTokensForUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<readonly string[]> {
+  async findTokensForUser({ userId }: { userId: string }): Promise<readonly string[]> {
     const sessions = await this.prisma.session.findMany({
       where: { userId },
       select: { sessionToken: true },
@@ -336,11 +385,7 @@ export class PrismaSessionRevocationRecords
     return sessions.map((session) => session.sessionToken);
   }
 
-  async findTokenForSession({
-    sessionId,
-  }: {
-    sessionId: string;
-  }): Promise<string | null> {
+  async findTokenForSession({ sessionId }: { sessionId: string }): Promise<string | null> {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
       select: { sessionToken: true },
