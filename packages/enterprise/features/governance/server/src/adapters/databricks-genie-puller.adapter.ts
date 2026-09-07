@@ -69,6 +69,7 @@ import {
   warehouseCostRowSchema,
 } from "../rules/warehouse-cost.rules.ts";
 import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
+import { nowInstant } from "@langwatch/time";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
@@ -784,7 +785,7 @@ class RunBudget {
 
   exhausted(): boolean {
     if (this.requests >= this.maxRequests) return true;
-    return this.deadlineMs !== undefined && Date.now() > this.deadlineMs;
+    return this.deadlineMs !== undefined && nowInstant().epochMilliseconds > this.deadlineMs;
   }
 
   /**
@@ -798,7 +799,9 @@ class RunBudget {
    */
   exhaustedWithin(reserveMs: number): boolean {
     if (this.requests >= this.maxRequests) return true;
-    return this.deadlineMs !== undefined && Date.now() + reserveMs > this.deadlineMs;
+    return (
+      this.deadlineMs !== undefined && nowInstant().epochMilliseconds + reserveMs > this.deadlineMs
+    );
   }
 }
 
@@ -944,7 +947,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     // already-swept space in between. Reading the clock at the end of the run
     // would be the same bug, one step worse.
     const resuming = cursor.spaceId !== null && cursor.sweepStartedAtMs !== null;
-    const sweepStartedAtMs = resuming ? cursor.sweepStartedAtMs! : Date.now();
+    const sweepStartedAtMs = resuming ? cursor.sweepStartedAtMs! : nowInstant().epochMilliseconds;
 
     let sweep: SweepResult;
     try {
@@ -978,7 +981,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         nowMs: sweepStartedAtMs,
         costEnabled: config.warehouseId !== undefined,
       }),
-      toMs: Date.now(),
+      toMs: nowInstant().epochMilliseconds,
     });
 
     return {
@@ -997,7 +1000,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
           sweep,
           sweepStartedAtMs,
           pricedThroughMs,
-          nowMs: Date.now(),
+          nowMs: nowInstant().epochMilliseconds,
         }),
       ),
       errorCount: 0,
@@ -1092,7 +1095,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         // from it would widen the window for no benefit.
         sinceMs: this.warehouseCosts.costReadFloor({
           sinceMs: cursor.sinceMs,
-          nowMs: Date.now(),
+          nowMs: nowInstant().epochMilliseconds,
           costEnabled: config.warehouseId !== undefined,
         }),
         identities,
@@ -2139,7 +2142,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     warehouseId: string;
     chunk: { fromMs: number; toMs: number };
   }): Promise<WarehouseCostRead> {
-    const askedAtMs = Date.now();
+    const askedAtMs = nowInstant().epochMilliseconds;
     const observed = DatabricksGeniePullerAdapter.warehouseCostObserved({
       adapter: this.id,
       warehouseId,
@@ -2189,7 +2192,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         {
           ...observed,
           outcome: read.outcome,
-          elapsedMs: Date.now() - askedAtMs,
+          elapsedMs: nowInstant().epochMilliseconds - askedAtMs,
           statements: read.outcome === "priced" ? read.costByStatementId.size : 0,
           owed: read.outcome === "priced" ? read.owed : false,
         },
@@ -2209,7 +2212,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       logger.warn(
         {
           ...observed,
-          elapsedMs: Date.now() - askedAtMs,
+          elapsedMs: nowInstant().epochMilliseconds - askedAtMs,
           error: error instanceof Error ? error.message : String(error),
         },
         unfinished
@@ -2674,7 +2677,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
   private static isSettling(status: string | null, createdMs: number): boolean {
     if (!status) return false;
     if (TERMINAL_MESSAGE_STATUSES.has(status)) return false;
-    return Date.now() - createdMs < PENDING_SETTLE_GRACE_MS;
+    return nowInstant().epochMilliseconds - createdMs < PENDING_SETTLE_GRACE_MS;
   }
 
   /**
@@ -2847,7 +2850,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
 
   /** A first run with no configured watermark reads the last 30 days. */
   private static defaultSinceMs(): number {
-    return Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return nowInstant().epochMilliseconds - 30 * 24 * 60 * 60 * 1000;
   }
 
   /**

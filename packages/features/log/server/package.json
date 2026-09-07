@@ -11,11 +11,17 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./src/testing.ts",
+      "types": {
+        "langwatch-declarations": "./dist/testing.d.ts",
+        "default": "./src/testing.ts"
+      },
       "default": "./src/testing.ts"
     }
   },
@@ -32,6 +38,7 @@
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/otlp": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
     "@opentelemetry/api": "^1.9.1",

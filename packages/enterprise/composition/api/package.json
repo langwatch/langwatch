@@ -12,103 +12,178 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     },
     "./webhooks": {
-      "types": "./src/webhooks.ts",
+      "types": {
+        "langwatch-declarations": "./dist/webhooks.d.ts",
+        "default": "./src/webhooks.ts"
+      },
       "default": "./src/webhooks.ts"
     },
     "./governance/admin-workspace-view-audit.adapter": {
-      "types": "./src/governance/admin-workspace-view-audit.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/admin-workspace-view-audit.adapter.d.ts",
+        "default": "./src/governance/admin-workspace-view-audit.adapter.ts"
+      },
       "default": "./src/governance/admin-workspace-view-audit.adapter.ts"
     },
     "./governance/cli-session-inventory.adapter": {
-      "types": "./src/governance/cli-session-inventory.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/cli-session-inventory.adapter.d.ts",
+        "default": "./src/governance/cli-session-inventory.adapter.ts"
+      },
       "default": "./src/governance/cli-session-inventory.adapter.ts"
     },
     "./governance/cli-token-revocation.adapter": {
-      "types": "./src/governance/cli-token-revocation.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/cli-token-revocation.adapter.d.ts",
+        "default": "./src/governance/cli-token-revocation.adapter.ts"
+      },
       "default": "./src/governance/cli-token-revocation.adapter.ts"
     },
     "./governance/gateway-debit.adapter": {
-      "types": "./src/governance/gateway-debit.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/gateway-debit.adapter.d.ts",
+        "default": "./src/governance/gateway-debit.adapter.ts"
+      },
       "default": "./src/governance/gateway-debit.adapter.ts"
     },
     "./governance/governance-eventing.adapter": {
-      "types": "./src/governance/governance-eventing.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/governance-eventing.adapter.d.ts",
+        "default": "./src/governance/governance-eventing.adapter.ts"
+      },
       "default": "./src/governance/governance-eventing.adapter.ts"
     },
     "./governance/governance-infrastructure.adapter": {
-      "types": "./src/governance/governance-infrastructure.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/governance-infrastructure.adapter.d.ts",
+        "default": "./src/governance/governance-infrastructure.adapter.ts"
+      },
       "default": "./src/governance/governance-infrastructure.adapter.ts"
     },
     "./governance/governance-kpis.adapter": {
-      "types": "./src/governance/governance-kpis.clickhouse.repository.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/governance-kpis.clickhouse.repository.d.ts",
+        "default": "./src/governance/governance-kpis.clickhouse.repository.ts"
+      },
       "default": "./src/governance/governance-kpis.clickhouse.repository.ts"
     },
     "./governance/governance-ocsf-events.adapter": {
-      "types": "./src/governance/governance-ocsf-events.clickhouse.repository.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/governance-ocsf-events.clickhouse.repository.d.ts",
+        "default": "./src/governance/governance-ocsf-events.clickhouse.repository.ts"
+      },
       "default": "./src/governance/governance-ocsf-events.clickhouse.repository.ts"
     },
     "./governance/governance-products.adapter": {
-      "types": "./src/governance/governance-products.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/governance-products.adapter.d.ts",
+        "default": "./src/governance/governance-products.adapter.ts"
+      },
       "default": "./src/governance/governance-products.adapter.ts"
     },
     "./governance/governance-signals.adapter": {
-      "types": "./src/governance/governance-signals.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/governance-signals.adapter.d.ts",
+        "default": "./src/governance/governance-signals.adapter.ts"
+      },
       "default": "./src/governance/governance-signals.adapter.ts"
     },
     "./governance/governance-subscriber.adapter": {
-      "types": "./src/governance/governance-subscriber.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/governance-subscriber.adapter.d.ts",
+        "default": "./src/governance/governance-subscriber.adapter.ts"
+      },
       "default": "./src/governance/governance-subscriber.adapter.ts"
     },
     "./governance/governance-trace-activity.adapter": {
-      "types": "./src/governance/governance-trace-activity.clickhouse.repository.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/governance-trace-activity.clickhouse.repository.d.ts",
+        "default": "./src/governance/governance-trace-activity.clickhouse.repository.ts"
+      },
       "default": "./src/governance/governance-trace-activity.clickhouse.repository.ts"
     },
     "./governance/governance-webhook.adapter": {
-      "types": "./src/governance/governance-webhook.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/governance-webhook.adapter.d.ts",
+        "default": "./src/governance/governance-webhook.adapter.ts"
+      },
       "default": "./src/governance/governance-webhook.adapter.ts"
     },
     "./governance/ingestion-key.adapter": {
-      "types": "./src/governance/ingestion-key.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/ingestion-key.adapter.d.ts",
+        "default": "./src/governance/ingestion-key.adapter.ts"
+      },
       "default": "./src/governance/ingestion-key.adapter.ts"
     },
     "./governance/ingestion-pull-worker.adapter": {
-      "types": "./src/governance/ingestion-pull-worker.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/ingestion-pull-worker.adapter.d.ts",
+        "default": "./src/governance/ingestion-pull-worker.adapter.ts"
+      },
       "default": "./src/governance/ingestion-pull-worker.adapter.ts"
     },
     "./governance/ingestion-source-activity.adapter": {
-      "types": "./src/governance/ingestion-source-activity.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/ingestion-source-activity.adapter.d.ts",
+        "default": "./src/governance/ingestion-source-activity.adapter.ts"
+      },
       "default": "./src/governance/ingestion-source-activity.adapter.ts"
     },
     "./governance/ingestion-source.adapter": {
-      "types": "./src/governance/ingestion-source.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/ingestion-source.adapter.d.ts",
+        "default": "./src/governance/ingestion-source.adapter.ts"
+      },
       "default": "./src/governance/ingestion-source.adapter.ts"
     },
     "./governance/ottl-gateway.client": {
-      "types": "./src/governance/ottl-gateway.client.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/ottl-gateway.client.d.ts",
+        "default": "./src/governance/ottl-gateway.client.ts"
+      },
       "default": "./src/governance/ottl-gateway.client.ts"
     },
     "./governance/personal-usage.adapter": {
-      "types": "./src/governance/personal-usage.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/personal-usage.adapter.d.ts",
+        "default": "./src/governance/personal-usage.adapter.ts"
+      },
       "default": "./src/governance/personal-usage.adapter.ts"
     },
     "./governance/personal-usage-read.adapter": {
-      "types": "./src/governance/personal-usage.clickhouse.repository.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/personal-usage.clickhouse.repository.d.ts",
+        "default": "./src/governance/personal-usage.clickhouse.repository.ts"
+      },
       "default": "./src/governance/personal-usage.clickhouse.repository.ts"
     },
     "./governance/quarantine-fill-evaluator.adapter": {
-      "types": "./src/governance/quarantine-fill-evaluator.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/quarantine-fill-evaluator.adapter.d.ts",
+        "default": "./src/governance/quarantine-fill-evaluator.adapter.ts"
+      },
       "default": "./src/governance/quarantine-fill-evaluator.adapter.ts"
     },
     "./governance/runtime": {
-      "types": "./src/governance/runtime.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/runtime.d.ts",
+        "default": "./src/governance/runtime.ts"
+      },
       "default": "./src/governance/runtime.ts"
     },
     "./governance/ssrf-safe-anomaly-alert-http.adapter": {
-      "types": "./src/governance/ssrf-safe-anomaly-alert-http.adapter.ts",
+      "types": {
+        "langwatch-declarations": "./dist/governance/ssrf-safe-anomaly-alert-http.adapter.d.ts",
+        "default": "./src/governance/ssrf-safe-anomaly-alert-http.adapter.ts"
+      },
       "default": "./src/governance/ssrf-safe-anomaly-alert-http.adapter.ts"
     }
   },
@@ -145,6 +220,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/project-server": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@trpc/server": "^11.18.0",
     "ioredis": "^5.8.2",
     "nanoid": "^5.1.6"

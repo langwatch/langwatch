@@ -7,6 +7,7 @@ import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 import type { ReplayRepository } from "../repositories/replay.repository.ts";
 import type { OpsReplayRuntime, OpsReplayRuntimePort } from "../ports/replay-runtime.port.ts";
 import { ReplayLockHeartbeatService } from "./replay-lock-heartbeat.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:replay-service");
 
@@ -85,7 +86,7 @@ export class ReplayService {
     const initialStatus: ReplayStatus = {
       state: "running",
       runId,
-      startedAt: new Date().toISOString(),
+      startedAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
       completedAt: null,
       projectionNames: params.projectionNames,
       since: params.since,
@@ -329,7 +330,7 @@ export class ReplayService {
     };
     result: { aggregatesReplayed: number; totalEvents: number };
   }): Promise<void> {
-    const completedAt = new Date().toISOString();
+    const completedAt = nowInstant().toString({ fractionalSecondDigits: 3 });
     const status = await this.repo.getStatus();
     await this.repo.writeStatus({
       status: {
@@ -393,7 +394,7 @@ export class ReplayService {
   }): Promise<void> {
     logger.error({ runId: params.runId, error: params.errorMessage }, "Replay failed");
     const current = await this.repo.getStatus();
-    const completedAt = new Date().toISOString();
+    const completedAt = nowInstant().toString({ fractionalSecondDigits: 3 });
     await this.repo.writeStatus({
       status: {
         ...current,
@@ -432,7 +433,7 @@ export class ReplayService {
   }): Promise<void> {
     logger.info({ runId: params.runId }, "Replay cancelled");
     const current = await this.repo.getStatus();
-    const completedAt = new Date().toISOString();
+    const completedAt = nowInstant().toString({ fractionalSecondDigits: 3 });
     await this.repo.writeStatus({
       status: {
         ...current,

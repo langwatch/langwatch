@@ -23,6 +23,7 @@ import {
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { CodingAgentApp } from "#app/coding-agent.app";
+import { nowInstant } from "@langwatch/time";
 import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
@@ -195,7 +196,7 @@ export class CodingAgentTrpcApi {
             .withOutput(codingAgentUsageTotalsSchema)
             .withPermission(CODING_AGENT_PERMISSION)
             .handle(async ({ ctx, input }) => {
-              const toMs = input.toMs ?? Date.now();
+              const toMs = input.toMs ?? nowInstant().epochMilliseconds;
               const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
               return ctx.app.codingAgentApp.getUsageTotals({
                 projectId: input.projectId,
@@ -216,7 +217,7 @@ export class CodingAgentTrpcApi {
             .withOutput(codingAgentSessionSchema.array())
             .withPermission(CODING_AGENT_PERMISSION)
             .handle(async ({ ctx, input }) => {
-              const toMs = input.toMs ?? Date.now();
+              const toMs = input.toMs ?? nowInstant().epochMilliseconds;
               const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
               return ctx.app.codingAgentApp.listRecent({
                 projectId: input.projectId,

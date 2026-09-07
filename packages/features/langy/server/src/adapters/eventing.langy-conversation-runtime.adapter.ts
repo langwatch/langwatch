@@ -18,6 +18,7 @@ import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port.ts";
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import type { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter.ts";
 import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,
@@ -167,7 +168,7 @@ export class EventingLangyConversationAdapter {
     this.failTurn.resolve((args) =>
       commands.failAgentResponse({
         tenantId: args.projectId,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
         conversationId: args.conversationId,
         turnId: args.turnId,
         error: args.error,
@@ -176,7 +177,7 @@ export class EventingLangyConversationAdapter {
     this.saveTitle.resolve((args) =>
       commands.generateConversationTitle({
         tenantId: args.projectId,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
         conversationId: args.conversationId,
         turnId: args.turnId,
         title: args.title,

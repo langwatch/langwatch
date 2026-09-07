@@ -22,6 +22,7 @@ import {
   processCommandBatch,
 } from "../commands/commandDispatcher.ts";
 import { ConfigurationError, ValidationError } from "../errorHandling.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:event-sourcing:queue-manager");
 
@@ -49,7 +50,9 @@ const logger = createLogger("langwatch:event-sourcing:queue-manager");
  */
 function occurredAtScore(payload: { occurredAt?: unknown }): number {
   const occurredAt = payload.occurredAt;
-  return occurredAt === undefined || occurredAt === null ? Date.now() : (occurredAt as number);
+  return occurredAt === undefined || occurredAt === null
+    ? nowInstant().epochMilliseconds
+    : (occurredAt as number);
 }
 
 /**
@@ -636,7 +639,7 @@ export class QueueManager<EventType extends Event = Event> {
       const jobEntry: JobRegistryEntry = {
         groupKeyFn: commandGroupKeyFn,
         scoreFn: cmdEntry.options.serializeByAggregate
-          ? () => Date.now()
+          ? () => nowInstant().epochMilliseconds
           : (payload: any) => occurredAtScore(payload),
         process: async (payload: any) => {
           await processCommand({ ...commandProcessParams, payload });

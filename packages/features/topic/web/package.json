@@ -9,7 +9,10 @@
   "type": "module",
   "exports": {
     "./screens/topic-clustering": {
-      "types": "./src/screens/topic-clustering/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/screens/topic-clustering/index.d.ts",
+        "default": "./src/screens/topic-clustering/index.ts"
+      },
       "default": "./src/screens/topic-clustering/index.ts"
     }
   },
@@ -21,6 +24,7 @@
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/ui-host": "workspace:*"
   },

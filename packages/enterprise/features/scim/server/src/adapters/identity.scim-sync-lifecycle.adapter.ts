@@ -29,6 +29,7 @@
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
@@ -96,7 +97,7 @@ export class ScimSyncLifecycleAdapter extends ScimSyncLifecyclePort {
     this.guards = deps.guards;
     this.ledger = deps.ledger;
     this.newCommandId = deps.newCommandId;
-    this.now = deps.now ?? (() => Date.now());
+    this.now = deps.now ?? (() => nowInstant().epochMilliseconds);
   }
 
   static create(deps: ScimSyncLifecycleAdapterDeps): ScimSyncLifecycleAdapter {

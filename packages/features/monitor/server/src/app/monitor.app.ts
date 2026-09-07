@@ -37,6 +37,7 @@ import {
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
 import { ZodError } from "zod";
+import { nowInstant } from "@langwatch/time";
 
 /** The window the performance strip reports, and compares to the one before it. */
 const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -291,7 +292,7 @@ export class MonitorApp {
     const monitors = await this.list({ projectId: input.projectId });
     if (monitors.length === 0) return [];
 
-    const endMs = Date.now();
+    const endMs = nowInstant().epochMilliseconds;
     const currentStartMs = endMs - PERFORMANCE_PERIOD_MS;
 
     return this.dependencies.evaluations.getMonitorPerformance({

@@ -15,6 +15,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { LogPreparationPort, type LogPreparationInput } from "../ports/log-preparation.port.ts";
 import type { LogRedactionPort } from "../ports/log-redaction.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 type UnknownRecord = Record<string, unknown>;
 type PIIRedactionLevel = LogPiiRedactionLevel;
@@ -71,7 +72,7 @@ export class CanonicalLogAdapter extends LogPreparationPort {
     const accepted: PreparedCanonicalLogRecord[] = [];
     const errors: string[] = [];
     let rejectedLogRecords = 0;
-    const acceptedAt = args.acceptedAt ?? Date.now();
+    const acceptedAt = args.acceptedAt ?? nowInstant().epochMilliseconds;
 
     const request = exportLogsRequestSchema.safeParse(args.request);
     for (const resourceLogRaw of request.success ? (request.data.resourceLogs ?? []) : []) {

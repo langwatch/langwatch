@@ -1,0 +1,13 @@
+# `x.getTime()` on a receiver the driver has already proven to be an instant
+# in this same file. Fired on any other receiver this would break every Date
+# that survives at a boundary, so it is gated, not scanned.
+id: temporal-instant-epoch-milliseconds
+language: TypeScript
+severity: warning
+message: >
+  An instant's millisecond count is `epochMilliseconds`.
+rule:
+  any:
+    - pattern: $RECEIVER.getTime()
+    - pattern: $RECEIVER.valueOf()
+fix: $RECEIVER.epochMilliseconds

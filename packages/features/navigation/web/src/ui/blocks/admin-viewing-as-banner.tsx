@@ -3,6 +3,7 @@ import { Eye, LogOut, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { NavigationLink } from "../elements/navigation-link.tsx";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Persistent "Viewing as admin" banner rendered in DashboardLayout when
@@ -41,7 +42,7 @@ function loadDismissed(workspaceLabel: string): boolean {
     if (!raw) return false;
     const ts = Number(raw);
     if (!Number.isFinite(ts)) return false;
-    return Date.now() - ts < DISMISS_TTL_MS;
+    return nowInstant().epochMilliseconds - ts < DISMISS_TTL_MS;
   } catch {
     return false;
   }
@@ -50,7 +51,10 @@ function loadDismissed(workspaceLabel: string): boolean {
 function persistDismissed(workspaceLabel: string): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY_PREFIX + workspaceLabel, String(Date.now()));
+    localStorage.setItem(
+      STORAGE_KEY_PREFIX + workspaceLabel,
+      String(nowInstant().epochMilliseconds),
+    );
   } catch {
     // storage may be full / disabled
   }

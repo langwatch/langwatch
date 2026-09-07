@@ -2,6 +2,7 @@ import { Box, HStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { useIsTabActive } from "../../../behavior/use-is-tab-active.ts";
 import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   ChatSendButton,
   ChatSyncCheckbox,
@@ -44,7 +45,7 @@ export function SyncedChatInput({ inProgress, onSend, isVisible = true, onStop }
   const isTabActive = useIsTabActive();
   const lastProcessedTrigger = useRef<number>(
     // This is important: it prevents the chat from submitting on mount.
-    submitTrigger?.timestamp ?? Date.now(),
+    submitTrigger?.timestamp ?? nowInstant().epochMilliseconds,
   );
 
   // Use synced or local input based on sync state

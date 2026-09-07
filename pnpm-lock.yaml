@@ -1565,6 +1565,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
     devDependencies:
       '@langwatch/test-harness':
         specifier: workspace:*
@@ -1719,6 +1722,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       undici:
         specifier: '>=8.9.0 <9'
         version: 8.10.0
@@ -1856,6 +1862,9 @@ importers:
       '@langwatch/project-server':
         specifier: workspace:*
         version: link:../../../features/project/server
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -1878,6 +1887,9 @@ importers:
 
   packages/enterprise/composition/worker:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.1080.0
+        version: 3.1108.0
       '@langwatch/enterprise':
         specifier: workspace:*
         version: link:../..
@@ -2087,12 +2099,12 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../../time
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../../ui-host
-      '@langwatch/workflow-web':
-        specifier: workspace:*
-        version: link:../../../../features/workflow/web
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -2218,6 +2230,9 @@ importers:
       '@langwatch/project-server':
         specifier: workspace:*
         version: link:../../../../features/project/server
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../../../features/trace/contract
@@ -2297,6 +2312,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../../time
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../../ui-host
@@ -2392,6 +2410,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../prisma-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../../time
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -2640,6 +2661,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../prisma-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../../time
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../features/user/contract
@@ -2828,6 +2852,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../prisma-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../../time
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -2902,6 +2929,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../prisma-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -2988,6 +3018,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -3232,9 +3265,6 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/automation-contract':
-        specifier: workspace:*
-        version: link:../../automation/contract
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../dashboard/contract
@@ -3277,12 +3307,6 @@ importers:
       '@trpc/react-query':
         specifier: 11.18.0
         version: 11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2))(typescript@7.0.2))(@trpc/server@11.18.0(typescript@7.0.2))(react@19.2.8)(typescript@7.0.2)
-      '@trpc/server':
-        specifier: 11.18.0
-        version: 11.18.0(typescript@7.0.2)
-      ajv:
-        specifier: ^8.20.0
-        version: 8.20.0
       chakra-react-select:
         specifier: ^6.1.3
         version: 6.1.3(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(next-themes@0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -3319,9 +3343,6 @@ importers:
       recharts:
         specifier: ^3.9.1
         version: 3.9.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.7)(react@19.2.8)(redux@5.0.1)
-      shiki:
-        specifier: ^4.3.0
-        version: 4.3.0
       usehooks-ts:
         specifier: ^3.1.1
         version: 3.1.1(react@19.2.8)
@@ -3389,6 +3410,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
@@ -3600,6 +3627,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -3643,6 +3673,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
@@ -3744,9 +3777,15 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../redis-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
+      '@simplewebauthn/server':
+        specifier: ^13.3.2
+        version: 13.3.2
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -3790,6 +3829,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@paper-design/shaders-react':
         specifier: ^0.0.76
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
@@ -3903,6 +3945,9 @@ importers:
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../../system-migrations
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -4260,6 +4305,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -4699,9 +4747,15 @@ importers:
 
   packages/features/dataset/contract:
     dependencies:
+      '@langwatch/annotation-contract':
+        specifier: workspace:*
+        version: link:../../annotation/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       papaparse:
         specifier: ^5.5.3
         version: 5.5.4
@@ -4751,6 +4805,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -4946,6 +5003,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -4999,6 +5059,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../contract
@@ -5075,13 +5138,13 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       zod:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -5152,6 +5215,9 @@ importers:
       '@langwatch/analytics-web':
         specifier: workspace:*
         version: link:../../analytics/web
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
@@ -5164,9 +5230,6 @@ importers:
       '@langwatch/experiment-web':
         specifier: workspace:*
         version: link:../../experiment/web
-      '@langwatch/handled-error':
-        specifier: workspace:*
-        version: link:../../../handled-error
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -5379,6 +5442,9 @@ importers:
       '@langwatch/suite-server':
         specifier: workspace:*
         version: link:../../suite/server
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -5437,9 +5503,6 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
       '@langwatch/csv':
         specifier: workspace:*
         version: link:../../../csv
@@ -5476,9 +5539,6 @@ importers:
       '@langwatch/model-provider-web':
         specifier: workspace:*
         version: link:../../model-provider/web
-      '@langwatch/observability':
-        specifier: workspace:*
-        version: link:../../../observability
       '@langwatch/prompt-web':
         specifier: workspace:*
         version: link:../../prompt/web
@@ -5518,9 +5578,6 @@ importers:
       '@trpc/react-query':
         specifier: 11.18.0
         version: 11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2))(typescript@7.0.2))(@trpc/server@11.18.0(typescript@7.0.2))(react@19.2.8)(typescript@7.0.2)
-      '@trpc/server':
-        specifier: 11.18.0
-        version: 11.18.0(typescript@7.0.2)
       fast-deep-equal:
         specifier: ^3.1.3
         version: 3.1.3
@@ -5793,6 +5850,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -5988,6 +6048,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -6086,6 +6149,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
@@ -6154,6 +6220,9 @@ importers:
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../../system-migrations
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       nanoid:
         specifier: ^6.0.0
         version: 6.0.0
@@ -6243,6 +6312,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -6465,6 +6537,9 @@ importers:
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../otlp
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -6493,6 +6568,9 @@ importers:
 
   packages/features/metric/contract:
     dependencies:
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -6530,6 +6608,9 @@ importers:
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../otlp
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -6628,6 +6709,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../../topic/contract
@@ -6686,6 +6770,9 @@ importers:
       '@langwatch/prompt-web':
         specifier: workspace:*
         version: link:../../prompt/web
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/ui-drawer':
         specifier: workspace:*
         version: link:../../../ui-drawer
@@ -6802,6 +6889,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -7001,6 +7091,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@sendgrid/mail':
         specifier: ^8.1.6
         version: 8.1.6
@@ -7093,6 +7186,9 @@ importers:
       '@langwatch/project-web':
         specifier: workspace:*
         version: link:../../project/web
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
@@ -7236,6 +7332,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
@@ -7422,6 +7521,9 @@ importers:
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../role/contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -7468,9 +7570,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
-      '@langwatch/feature-flag-contract':
-        specifier: workspace:*
-        version: link:../../feature-flag/contract
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
@@ -7486,9 +7585,6 @@ importers:
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
-      '@langwatch/workflow-web':
-        specifier: workspace:*
-        version: link:../../workflow/web
       lodash-es:
         specifier: ^4.17.21
         version: 4.18.1
@@ -7661,6 +7757,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -7695,9 +7794,15 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       '@langwatch/share-contract':
         specifier: workspace:*
         version: link:../../share/contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../../topic/contract
@@ -7753,6 +7858,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/trace-web':
         specifier: workspace:*
         version: link:../../trace/web
@@ -7954,9 +8062,9 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/scenario-contract':
+      '@langwatch/time':
         specifier: workspace:*
-        version: link:../../scenario/contract
+        version: link:../../../time
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../../topic/contract
@@ -8165,6 +8273,9 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: ^2.0.55
         version: 2.0.55(zod@4.4.3)
+      '@ai-sdk/provider':
+        specifier: ^3.0.13
+        version: 3.0.13
       '@clickhouse/client':
         specifier: ^1.23.0
         version: 1.23.0
@@ -8367,9 +8478,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../time
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       '@langwatch/trace-web':
         specifier: workspace:*
         version: link:../../trace/web
@@ -8744,6 +8852,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.1
@@ -8968,6 +9079,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9002,6 +9116,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9048,9 +9165,6 @@ importers:
 
   packages/features/trace/contract:
     dependencies:
-      '@langwatch/annotation-contract':
-        specifier: workspace:*
-        version: link:../../annotation/contract
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../../data-privacy/contract
@@ -9060,9 +9174,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
-      '@langwatch/prompt-contract':
-        specifier: workspace:*
-        version: link:../../prompt/contract
       liqe:
         specifier: ^3.8.7
         version: 3.8.7
@@ -9076,6 +9187,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -9281,9 +9395,6 @@ importers:
       '@langwatch/coding-agent-web':
         specifier: workspace:*
         version: link:../../coding-agent/web
-      '@langwatch/config':
-        specifier: workspace:*
-        version: link:../../../config
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../../data-privacy/contract
@@ -9311,9 +9422,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
-      '@langwatch/ksuid':
-        specifier: ^2.0.2
-        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/langy-web':
         specifier: workspace:*
         version: link:../../langy/web
@@ -9344,9 +9452,6 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
-      '@langwatch/prompt-web':
-        specifier: workspace:*
-        version: link:../../prompt/web
       '@langwatch/redaction':
         specifier: workspace:*
         version: link:../../../redaction
@@ -9377,9 +9482,6 @@ importers:
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
-      '@langwatch/workflow-web':
-        specifier: workspace:*
-        version: link:../../workflow/web
       '@microlink/react-json-view':
         specifier: ^1.31.21
         version: 1.31.21(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -9419,9 +9521,6 @@ importers:
       chakra-react-select:
         specifier: ^6.1.3
         version: 6.1.3(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(next-themes@0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      langwatch:
-        specifier: workspace:*
-        version: link:../../../../sdks/typescript
       liqe:
         specifier: ^3.8.7
         version: 3.8.7
@@ -9437,9 +9536,6 @@ importers:
       numeral:
         specifier: ^2.0.6
         version: 2.0.6
-      ohm-js:
-        specifier: ^17.5.0
-        version: 17.5.0
       qs:
         specifier: ^6.15.3
         version: 6.15.3
@@ -9473,9 +9569,6 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
-      shiki:
-        specifier: ^4.3.0
-        version: 4.3.0
       slugify:
         specifier: ^1.6.9
         version: 1.6.9
@@ -9486,6 +9579,9 @@ importers:
         specifier: ^4.5.7
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
     devDependencies:
+      '@langwatch/ksuid':
+        specifier: ^2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@tanstack/react-query':
         specifier: 5.101.4
         version: 5.101.4(react@19.2.8)
@@ -9537,6 +9633,9 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -9583,6 +9682,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9638,6 +9740,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@paper-design/shaders-react':
         specifier: ^0.0.76
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
@@ -9766,6 +9871,9 @@ importers:
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9836,9 +9944,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
-      '@langwatch/langy-web':
-        specifier: workspace:*
-        version: link:../../langy/web
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -9863,9 +9968,6 @@ importers:
       '@langwatch/trace-web':
         specifier: workspace:*
         version: link:../../trace/web
-      '@langwatch/ui-drawer':
-        specifier: workspace:*
-        version: link:../../../ui-drawer
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../ui-host
@@ -9887,9 +9989,6 @@ importers:
       '@trpc/react-query':
         specifier: 11.18.0
         version: 11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2))(typescript@7.0.2))(@trpc/server@11.18.0(typescript@7.0.2))(react@19.2.8)(typescript@7.0.2)
-      '@trpc/server':
-        specifier: 11.18.0
-        version: 11.18.0(typescript@7.0.2)
       '@xyflow/react':
         specifier: ^12.11.1
         version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -9956,9 +10055,6 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
-      slugify:
-        specifier: ^1.6.9
-        version: 1.6.9
       use-debounce:
         specifier: ^10.1.1
         version: 10.1.1(react@19.2.8)
@@ -10026,6 +10122,9 @@ importers:
       '@langwatch/task':
         specifier: workspace:*
         version: link:../task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -10104,6 +10203,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@react-email/components':
         specifier: ^1.0.12
         version: 1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -10298,6 +10400,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@prisma/adapter-pg':
         specifier: 7.9.1
         version: 7.9.1
@@ -10368,6 +10473,9 @@ importers:
 
   packages/react-rum:
     dependencies:
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -10493,6 +10601,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -10515,6 +10626,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../prisma-client
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@testcontainers/clickhouse':
         specifier: ^12.1.0
         version: 12.1.0
@@ -22834,11 +22948,11 @@ snapshots:
       chalk: 5.6.2
       ffmpeg-static: 5.3.0
       fft.js: 4.0.4
-      langwatch: 0.16.1(31523fce2f0d736c61b8317c707123f3)
+      langwatch: 0.16.1(1d8175dbf716a59ce537a9e78e24bc2a)
       open: 11.0.0
       openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
       rxjs: 7.8.2
-      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
       ws: 8.21.3(bufferutil@4.1.0)
       xksuid: 0.0.4
       zod: 3.25.76
@@ -29227,9 +29341,9 @@ snapshots:
       openai: 7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
       ws: 8.21.3(bufferutil@4.1.0)
 
-  langwatch@0.16.1(31523fce2f0d736c61b8317c707123f3):
+  langwatch@0.16.1(1d8175dbf716a59ce537a9e78e24bc2a):
     dependencies:
-      '@ai-sdk/openai': 3.0.79(zod@3.25.76)
+      '@ai-sdk/openai': 3.0.79(zod@4.4.3)
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
       '@langchain/langgraph': 0.4.6(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod-to-json-schema@3.25.2(zod@4.4.3))
       '@langchain/openai': 1.5.6(@aws-sdk/credential-provider-node@3.972.81)(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))

@@ -8,6 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   CONTROL_REQUEST_TTL_MS,
   SHARE_CONTROL_COMMAND,
@@ -121,7 +122,7 @@ export class ControlRequestService {
   private constructor(options: ControlRequestServiceOptions) {
     this.store = options.store;
     this.projects = options.projects;
-    this.now = options.now ?? (() => Date.now());
+    this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.ttlMs = options.ttlMs ?? CONTROL_REQUEST_TTL_MS;
     this.mintSessionKey = options.mintSessionKey;
   }

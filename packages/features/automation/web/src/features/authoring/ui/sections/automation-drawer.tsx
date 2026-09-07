@@ -62,8 +62,17 @@ import {
 } from "./draft-model.ts";
 import { useGraphAlertLabels } from "./use-graph-alert-labels.ts";
 import { useAutomationStore } from "./automation-store.ts";
-import { consumeDraftKeptOnSubFlowReturn, isHandingOverToSubFlow } from "../../behavior/sub-flow.ts";
-import { useConditionsSet, useConfigComplete, useDraft, useSection } from "./automation-selectors.ts";
+import {
+  consumeDraftKeptOnSubFlowReturn,
+  isHandingOverToSubFlow,
+} from "../../behavior/sub-flow.ts";
+import {
+  useConditionsSet,
+  useConfigComplete,
+  useDraft,
+  useSection,
+} from "./automation-selectors.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Maps template-validation field metadata to the editor-specific headline. */
 const TEMPLATE_FIELD_TITLES: Record<string, string> = {
@@ -727,7 +736,7 @@ export function AutomationDrawer({
       {
         onSuccess: (r) => {
           pushAttempt({
-            at: Date.now(),
+            at: nowInstant().epochMilliseconds,
             channel: r.channel,
             status: "success",
             recipientCount: r.recipientCount,
@@ -752,7 +761,7 @@ export function AutomationDrawer({
           // registry — the same sentence the toast shows.
           const templateTitle = templateValidationTitle(err);
           pushAttempt({
-            at: Date.now(),
+            at: nowInstant().epochMilliseconds,
             channel,
             status: "failure",
             errorTitle: templateTitle ?? "Test fire failed",

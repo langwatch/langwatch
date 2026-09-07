@@ -1,6 +1,7 @@
 import type IORedis from "ioredis";
 import type { DiscoveredAggregate } from "./replayEventSource.ts";
 import type { ProjectionKind } from "./types.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The GroupQueue's global key prefix. All event-sourcing jobs share one queue
@@ -110,9 +111,9 @@ export async function waitForActiveJobs({
   if (aggregates.length === 0) return;
 
   const tenantIds = new Set(aggregates.map((agg) => agg.tenantId));
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
-  while (Date.now() - start < maxWaitMs) {
+  while (nowInstant().epochMilliseconds - start < maxWaitMs) {
     let allDrained: boolean;
     if (kind === "map" || kind === "state") {
       const jobPath = kind === "map" ? "map" : "state";
@@ -173,9 +174,9 @@ export async function waitForAllActiveJobs({
   const foldProjections = projections.filter((p) => p.kind === "fold");
   const mapProjections = projections.filter((p) => p.kind === "map");
   const tenantIds = new Set(aggregates.map((agg) => agg.tenantId));
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
-  while (Date.now() - start < maxWaitMs) {
+  while (nowInstant().epochMilliseconds - start < maxWaitMs) {
     let foldsDrained = true;
     if (foldProjections.length > 0) {
       const pipeline = redis.pipeline();

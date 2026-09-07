@@ -67,6 +67,7 @@ import type {
 import type { Context } from "hono";
 
 import { GovernanceIngestRateLimitPort } from "../../ports/governance-ingest-rate-limit.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ingest");
 
@@ -270,7 +271,7 @@ function buildWebhookLogRequest(
   rawBody: string,
   source: GovernanceIngestionSource,
 ): IExportLogsServiceRequest {
-  const nowNanos = String(BigInt(Date.now()) * 1_000_000n);
+  const nowNanos = String(BigInt(nowInstant().epochMilliseconds) * 1_000_000n);
   return {
     resourceLogs: [
       {
@@ -616,7 +617,7 @@ export function createGovernanceIngestRestApp(options: {
         try {
           const raw = await c.req.text();
           bodyBytes = raw.length;
-          envelopeId = `envelope-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+          envelopeId = `envelope-${nowInstant().epochMilliseconds}-${Math.random().toString(36).slice(2, 10)}`;
 
           if (bodyBytes > 0) {
             const govProject = await ports.projects().ensureInternal({

@@ -1,4 +1,5 @@
 import { ModelProviderTestRateLimitedError } from "@langwatch/model-provider-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   ModelProviderConnectionRateLimiter,
   type ModelProviderRateLimitPort,
@@ -64,5 +65,5 @@ export class WindowedModelProviderConnectionRateLimiterAdapter extends ModelProv
 }
 
 function retryAfterSeconds(resetAt: number): number {
-  return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+  return Math.max(1, Math.ceil((resetAt - nowInstant().epochMilliseconds) / 1000));
 }

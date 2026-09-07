@@ -30,6 +30,7 @@ import {
 } from "../rules/langy-local-control-keys.rules.ts";
 import type { LangyLocalPresencePort } from "../ports/langy-local-presence.port.ts";
 import { type CallEnvelope, type LocalToolCall, type ResultFrame } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
 
 import {
   storedLocalCallSchema,
@@ -56,7 +57,7 @@ export class LocalCallDispatcherService {
     this.store = options.store;
     this.presence = options.presence;
     this.buffer = options.buffer ?? null;
-    this.now = options.now ?? (() => Date.now());
+    this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.offlineWaitMs = options.offlineWaitMs ?? CALL_OFFLINE_WAIT_MS;
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
   }

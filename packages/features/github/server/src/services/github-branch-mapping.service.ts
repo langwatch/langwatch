@@ -10,6 +10,7 @@ import {
 } from "../ports/github-app-token.port.ts";
 import type { GithubBranchInstallationsPort } from "../ports/github-branch-installations.port.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
+import { nowInstant } from "@langwatch/time";
 import type {
   GithubPullRequestsRepository,
   UpsertGithubPullRequestInput,
@@ -53,7 +54,7 @@ type BranchMappingDeps = {
 };
 
 function nowMs(deps: { now?: () => number }): number {
-  return deps.now?.() ?? Date.now();
+  return deps.now?.() ?? nowInstant().epochMilliseconds;
 }
 
 function backoffMsFor(attempts: number): number {

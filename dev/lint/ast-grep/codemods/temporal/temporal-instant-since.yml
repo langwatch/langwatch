@@ -1,0 +1,11 @@
+# Elapsed milliseconds between two moments. `a - b` on Dates is numeric
+# coercion; on instants it is a `since` duration read in milliseconds. Both
+# operands must be proven instants in the same file.
+id: temporal-instant-since
+language: TypeScript
+severity: warning
+message: >
+  Elapsed time between two instants is `since(...).total("milliseconds")`.
+rule:
+  pattern: $LATER - $EARLIER
+fix: $LATER.since($EARLIER).total("milliseconds")

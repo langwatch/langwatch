@@ -1,4 +1,5 @@
 import type { EmailAttachment } from "../ports/email-delivery.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Maximum bytes one RFC 2047 encoded-word can carry.
  *
@@ -143,7 +144,7 @@ export class EmailMimeService {
     headers?: Record<string, string>;
     attachments: EmailAttachment[];
   }): string {
-    const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const boundary = `----=_Part_${nowInstant().epochMilliseconds}_${Math.random().toString(36).slice(2)}`;
     // Base64-encode the HTML body so we never emit 8-bit or long raw lines.
     const htmlBase64 = this.foldBase64(Buffer.from(html, "utf-8").toString("base64"));
 

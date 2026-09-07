@@ -38,6 +38,7 @@ import { ControlRequestService } from "#services/langy-local-control-request.ser
 import { reconcileSkipPolicy } from "#rules/langy-local-skip-policy.rules";
 import type { UserWaitEvents } from "../../rules/langy-local-user-wait-record.rules.ts";
 import type { LangyRestCredentialPorts } from "./langy-rest-credentials.api.ts";
+import { nowInstant } from "@langwatch/time";
 
 const AUTH_REASON =
   "session key resolved in-handler by the API-key service, then bridged to the owning user by " +
@@ -255,7 +256,7 @@ export function createLangyLocalRestApp(options: {
     });
     await ports.commands().requestLocalControl({
       tenantId: auth.projectId,
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
       conversationId: conversation.id,
       requestId: request.id,
       userId: auth.userId,
@@ -294,7 +295,7 @@ export function createLangyLocalRestApp(options: {
       changePolicy: async (args) => {
         await ports.commands().changeLocalPolicy({
           tenantId: auth.projectId,
-          occurredAt: Date.now(),
+          occurredAt: nowInstant().epochMilliseconds,
           ...args,
         });
       },

@@ -20,6 +20,7 @@ import { usePromptHost } from "../../../model/prompt-host.ts";
 import { generateHumanReadableId } from "../../../model/human-readable-id.ts";
 import type { TabData } from "../studio-internals.ts";
 import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Converts a playground tab's form values to a LocalPromptConfig.
@@ -138,7 +139,7 @@ const convertTabToTarget = (
   const hasChanges = hasUnsavedChanges(tabData, savedPrompt);
 
   // Create target with initial empty mappings
-  const targetId = `target_${Date.now()}_${index}`;
+  const targetId = `target_${nowInstant().epochMilliseconds}_${index}`;
   const targetWithoutMappings: TargetConfig = {
     id: targetId,
     type: "prompt",

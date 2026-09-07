@@ -43,6 +43,7 @@ import {
   type AgentLastSeenWriter,
 } from "../projections/connected-agent-presence.projection.ts";
 import type { ConnectedAgentRuntime, InstanceMeta } from "../ports/connected-agent-runtime.port.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   type ConnectCredentialPort,
   type ResolvedConnectCredential,
@@ -103,7 +104,7 @@ export class AgentSessionService {
     this.agentPlatformUrl = options.agentPlatformUrl;
     this.replicaCount = options.replicaCount;
     this.relayMaxPayloadMb = options.relayMaxPayloadMb;
-    this.now = options.now ?? (() => Date.now());
+    this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.registrations = ConnectedAgentRegistrationService.create({
       runtime: this.runtime,
       agents: this.agents,

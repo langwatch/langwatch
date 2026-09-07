@@ -30,6 +30,7 @@ import { liveGrants } from "../repositories/eventing/eventing.authz-live-rows.ma
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
 import { AUTHZ_AUDIT_ACTION_PREFIX, type AuthzAuditVerb } from "./eventing.authz-audit.adapter.ts";
 import { PostgresAuthzCutoverAdapter } from "./postgres.authz-cutover.adapter.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -165,7 +166,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   private now(): number {
-    return this.options.now?.() ?? Date.now();
+    return this.options.now?.() ?? nowInstant().epochMilliseconds;
   }
 
   private commands() {
@@ -1329,10 +1330,10 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     // injectable business time (frozen in tests for deterministic
     // `occurredAtMs`), and a frozen clock would make this poll loop unable to
     // ever time out.
-    const deadline = Date.now() + poll.timeoutMs;
+    const deadline = nowInstant().epochMilliseconds + poll.timeoutMs;
     for (;;) {
       if (await check()) return true;
-      if (Date.now() >= deadline) {
+      if (nowInstant().epochMilliseconds >= deadline) {
         logger.warn(
           { organizationId, what },
           "grants projection did not land a write within the read-your-writes window; the append is durable and the fold will converge",

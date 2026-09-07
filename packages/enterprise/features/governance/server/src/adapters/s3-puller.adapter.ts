@@ -27,6 +27,7 @@
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
 import type { GovernanceObjectStoragePort } from "../ports/governance-object-storage.port.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   NullIngestionPullDiagnosticsAdapter,
   type IngestionPullDiagnosticsPort,
@@ -105,7 +106,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     let lastSuccessfulKey: string | null = cursor;
 
     for (const key of listed) {
-      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
+      if (options.deadlineMs !== undefined && nowInstant().epochMilliseconds > options.deadlineMs) {
         this.diagnostics.info("deadline reached mid-pull, returning partial results", {
           adapter: this.id,
           key,

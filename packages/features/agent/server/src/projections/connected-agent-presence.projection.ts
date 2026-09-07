@@ -4,6 +4,7 @@
 
 import { LAST_SEEN_WRITE_INTERVAL_MS } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:connected-agents:presence");
 
@@ -31,7 +32,7 @@ export class ConnectedAgentPresenceProjection {
     repository,
     projectId,
     agentId,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
     intervalMs = LAST_SEEN_WRITE_INTERVAL_MS,
   }: {
     repository: AgentLastSeenWriter;

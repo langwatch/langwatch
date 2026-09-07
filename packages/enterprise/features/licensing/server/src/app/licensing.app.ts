@@ -13,6 +13,7 @@ import {
 import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
 import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
 import type { LicenseService } from "../services/license.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The caller, as the enforcement service classifies them: a lite member is
@@ -136,7 +137,7 @@ export class LicensingApp {
       version: 1,
       organizationName: input.organizationName,
       email: input.email,
-      issuedAt: new Date().toISOString(),
+      issuedAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
       expiresAt: input.expiresAt.toISOString(),
       plan: buildMintedPlan({
         type: template?.type ?? input.planType,

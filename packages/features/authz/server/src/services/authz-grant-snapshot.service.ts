@@ -7,6 +7,7 @@ import {
 import type { AuthzEpochPort } from "../ports/authz-epoch.port.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const MAX_CACHE_ENTRIES = 10_000;
 const DEFAULT_CACHE_MAX_AGE_MS = 30_000;
@@ -65,7 +66,9 @@ export class AuthzGrantSnapshotService {
     const entry = this.cache.get(key);
     const maxAgeMs = this.options.cacheMaxAgeMs ?? DEFAULT_CACHE_MAX_AGE_MS;
     const entryIsCurrent =
-      entry && entry.epoch === currentEpoch && Date.now() - entry.storedAt < maxAgeMs;
+      entry &&
+      entry.epoch === currentEpoch &&
+      nowInstant().epochMilliseconds - entry.storedAt < maxAgeMs;
     if (entryIsCurrent) {
       return entry.grants;
     }
@@ -75,7 +78,7 @@ export class AuthzGrantSnapshotService {
     this.cache.set(key, {
       epoch: currentEpoch,
       grants,
-      storedAt: Date.now(),
+      storedAt: nowInstant().epochMilliseconds,
     });
 
     return grants;

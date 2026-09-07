@@ -10,6 +10,7 @@ import {
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua.ts";
 import { CachedLuaScript } from "./cachedLuaScript.ts";
 import { gqJobsDispatchedOverrideTotal } from "./metrics.ts";
+import { nowInstant } from "@langwatch/time";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -1912,7 +1913,7 @@ export class GroupStagingScripts {
       jobDataJson,
       String(shouldExtend ? 1 : 0),
       String(shouldReplace ? 1 : 0),
-      String(Date.now()),
+      String(nowInstant().epochMilliseconds),
       String(this.globalConcurrencyBudget),
       // ARGV[11] — appended after globalBudget so no existing index shifts.
       String(shouldSurviveDispatch ? 1 : 0),
@@ -1979,7 +1980,7 @@ export class GroupStagingScripts {
     // Appended after all per-job args: nowMs then globalBudget last, so the Lua
     // reads globalBudget as ARGV[#ARGV] and nowMs as ARGV[#ARGV-1] regardless of
     // job count.
-    args.push(String(Date.now()));
+    args.push(String(nowInstant().epochMilliseconds));
     args.push(String(this.globalConcurrencyBudget));
 
     const result = await stageBatchScript.run(
@@ -2155,7 +2156,7 @@ export class GroupStagingScripts {
       jobName ?? "",
       `${this.keyPrefix}tenant_active_z:`,
       String(this.tenantConcurrencyCap),
-      String(Date.now()),
+      String(nowInstant().epochMilliseconds),
       dropped ? "1" : "",
     );
 
@@ -2256,7 +2257,7 @@ export class GroupStagingScripts {
       stagedJobId,
       String(activeTtlSec),
       groupId,
-      String(Date.now()),
+      String(nowInstant().epochMilliseconds),
       `${this.keyPrefix}tenant_active_z:`,
     );
 
@@ -2356,7 +2357,7 @@ export class GroupStagingScripts {
       jobDataJson,
       String(retryTtlSec),
       `${this.keyPrefix}tenant_active_z:`,
-      String(Date.now()),
+      String(nowInstant().epochMilliseconds),
       String(attempt),
       String(attemptTtlSec),
     );

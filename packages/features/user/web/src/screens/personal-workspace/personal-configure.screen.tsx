@@ -16,7 +16,10 @@ import { BudgetOverviewList } from "@langwatch/gateway-web/surfaces/budget-overv
 import { Checkbox } from "@langwatch/design-system/checkbox";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
-import { usePersonalToaster, useShowErrorToast } from "../../behavior/personal-workspace-feedback.ts";
+import {
+  usePersonalToaster,
+  useShowErrorToast,
+} from "../../behavior/personal-workspace-feedback.ts";
 import { usePersonalRouter } from "../../behavior/personal-workspace-router.ts";
 import { type PersonalApiKeyRow, usePersonalContext } from "../../behavior/use-personal-context.ts";
 import { formatRelativeTime } from "../../model/relative-time.ts";
@@ -25,10 +28,10 @@ import { DevicesPanel } from "../../ui/sections/devices-panel.tsx";
 import { HomePagePicker } from "../../ui/sections/home-page-picker.tsx";
 import { PersonalOtlpEndpointPanel } from "../../ui/sections/personal-otlp-endpoint-panel.tsx";
 import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout.tsx";
+import { toEpochMs } from "@langwatch/time";
 
 /** The personal keys carry ISO timestamps; the ladder counts milliseconds. */
-const fmtRelative = (iso: string | null): string =>
-  formatRelativeTime(iso ? new Date(iso).getTime() : null);
+const fmtRelative = (iso: string | null): string => formatRelativeTime(iso ? toEpochMs(iso) : null);
 
 export function PersonalConfigureScreen() {
   const ctx = usePersonalContext();

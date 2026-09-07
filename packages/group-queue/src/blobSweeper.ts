@@ -8,6 +8,7 @@ import { BLOB_SWEEP_LUA, BLOB_SWEEP_OUTCOMES, type BlobSweepOutcome } from "./bl
 import { CachedLuaScript } from "./cachedLuaScript.ts";
 import { gqBlobSweepTotal } from "./metrics.ts";
 import { GROUP_QUEUE_REGISTRY_KEY } from "./scripts.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:group-queue:blob-sweeper");
 
@@ -321,7 +322,7 @@ export class BlobSweeper {
   }: {
     dryRun?: boolean;
   } = {}): Promise<BlobSweepReport> {
-    const startedAt = Date.now();
+    const startedAt = nowInstant().epochMilliseconds;
     const totals = emptyTally();
     const queues: BlobSweepReport["queues"] = [];
 
@@ -339,7 +340,7 @@ export class BlobSweeper {
       queues,
       totals,
       dryRun,
-      durationMs: Date.now() - startedAt,
+      durationMs: nowInstant().epochMilliseconds - startedAt,
     };
     if (totals.reclaimed > 0 || totals.repaired > 0 || totals.truncated) {
       logger.info(

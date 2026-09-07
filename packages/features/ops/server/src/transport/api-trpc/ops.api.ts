@@ -167,6 +167,7 @@ import {
 } from "@trpc/server";
 import { z } from "zod";
 import type { OpsApp, OpsOperator } from "#app/ops.app";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The process supplies authentication and the resolved operator scope.
@@ -1171,7 +1172,7 @@ export class OpsTrpcApi {
           .withPermission("ops:view")
           .handle(async ({ input, ctx }) => {
             const DEFAULT_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
-            const sinceMs = input.sinceMs ?? Date.now() - DEFAULT_LOOKBACK_MS;
+            const sinceMs = input.sinceMs ?? nowInstant().epochMilliseconds - DEFAULT_LOOKBACK_MS;
 
             return ctx.app.ops.events.searchAggregates({
               query: input.query,

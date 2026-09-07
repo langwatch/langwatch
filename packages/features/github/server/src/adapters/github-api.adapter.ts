@@ -14,6 +14,7 @@ import {
   type MintInstallationTokenInput,
 } from "../ports/github-app-token.port.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:github:api");
 const HTTP_TIMEOUT_MS = 10_000;
@@ -109,7 +110,7 @@ export class GithubApiAdapter extends GithubApiPort {
     return Boolean(this.appId && this.privateKey);
   }
 
-  signAppJwt(nowSec: number = Math.floor(Date.now() / 1000)): string {
+  signAppJwt(nowSec: number = Math.floor(nowInstant().epochMilliseconds / 1000)): string {
     const key = this.privateKey.includes("\\n")
       ? this.privateKey.replace(/\\n/g, "\n")
       : this.privateKey;

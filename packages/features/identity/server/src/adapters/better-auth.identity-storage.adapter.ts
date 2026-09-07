@@ -22,6 +22,7 @@ import {
 import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules.ts";
 import { BetterAuthIdentityBirthAdapter } from "./better-auth.identity-birth.adapter.ts";
 import type { IdentityBirthPort } from "../ports/identity-birth.port.ts";
+import { nowInstant } from "@langwatch/time";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
@@ -487,7 +488,8 @@ function identityCustomAdapter({
       const born = await birth.bear({
         row: canonical,
         email,
-        createdAtMs: createdAt instanceof Date ? createdAt.getTime() : Date.now(),
+        createdAtMs:
+          createdAt instanceof Date ? createdAt.getTime() : nowInstant().epochMilliseconds,
       });
       // From here the request's remaining routed writes are this user's, and
       // the gate — which cannot see a state row written moments ago on

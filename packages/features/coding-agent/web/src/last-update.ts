@@ -1,5 +1,6 @@
 import { formatShortDate } from "./short-date.ts";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import { nowInstant } from "@langwatch/time";
 
 /** A day, the point where "how long ago" stops beating "which day". */
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -11,7 +12,7 @@ const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
  */
 export function formatLastUpdate({
   timestampMs,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   timestampMs: number;
   now?: number;

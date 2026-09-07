@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
+import { nowInstant } from "@langwatch/time";
 import type {
   TopicClusteringPageOutcome,
   TopicClusteringRunPort,
@@ -34,7 +35,7 @@ export class TopicClusteringRunTask extends Task {
 
     // One stable run identity for the whole walk, so re-recorded pages dedupe
     // instead of appending a fresh topics_recorded chain on every re-run.
-    const runId = `manual-task-${Date.now()}`;
+    const runId = `manual-task-${nowInstant().epochMilliseconds}`;
     let page = 1;
     let searchAfter: TopicClusteringPageOutcome["nextSearchAfter"];
     do {

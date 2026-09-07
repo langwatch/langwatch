@@ -20,6 +20,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { nowInstant } from "@langwatch/time";
 
 /** Where the lock lands when the constructing task names no other path. */
 export const DEFAULT_CLICKHOUSE_SCHEMA_LOCK_PATH = join(
@@ -102,7 +103,7 @@ export class ClickHouseSchemaLock {
       return this.releaseOnce();
     }
 
-    const deadline = Date.now() + this.waitTimeoutMs;
+    const deadline = nowInstant().epochMilliseconds + this.waitTimeoutMs;
     for (;;) {
       const token = randomUUID();
       if (this.tryClaimLock(token)) {
@@ -114,7 +115,7 @@ export class ClickHouseSchemaLock {
 
       this.recoverIfAbandoned();
 
-      if (Date.now() > deadline) throw this.timedOutWaiting();
+      if (nowInstant().epochMilliseconds > deadline) throw this.timedOutWaiting();
       await new Promise((resolve) => setTimeout(resolve, this.pollIntervalMs));
     }
   }
@@ -142,7 +143,7 @@ export class ClickHouseSchemaLock {
   /** Whether the lock has sat untouched long enough to be junk. */
   private olderThanAbandonThreshold(): boolean {
     try {
-      return Date.now() - statSync(this.path).mtimeMs > this.abandonedAfterMs;
+      return nowInstant().epochMilliseconds - statSync(this.path).mtimeMs > this.abandonedAfterMs;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
       throw error;
@@ -226,7 +227,10 @@ export class ClickHouseSchemaLock {
       throw error;
     }
     try {
-      writeSync(handle, `${token} ${process.pid} ${new Date().toISOString()}\n`);
+      writeSync(
+        handle,
+        `${token} ${process.pid} ${nowInstant().toString({ fractionalSecondDigits: 3 })}\n`,
+      );
     } catch (error) {
       unlinkIfPresent(this.path);
       throw error;

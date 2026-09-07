@@ -44,6 +44,7 @@ import { z } from "zod";
 
 import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
 import { AdminUsageReportAdapter } from "./admin-usage-report.adapter.ts";
+import { nowInstant } from "@langwatch/time";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
@@ -227,7 +228,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     let watermark = cursor.watermark;
 
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
-      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
+      if (options.deadlineMs !== undefined && nowInstant().epochMilliseconds > options.deadlineMs) {
         // Everything read so far is kept and the cursor says where to resume,
         // so a deadline costs latency rather than a window.
         return {
@@ -659,7 +660,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
    */
   private static defaultStartingAt(report: "usage" | "cost"): string {
     const daysBack = report === "cost" ? 3 : 1;
-    const d = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+    const d = new Date(nowInstant().epochMilliseconds - daysBack * 24 * 60 * 60 * 1000);
     // Snap to midnight UTC so the timestamp aligns with daily bucket boundaries.
     d.setUTCHours(0, 0, 0, 0);
     return d.toISOString();

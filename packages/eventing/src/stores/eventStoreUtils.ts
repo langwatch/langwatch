@@ -9,6 +9,7 @@ import {
 } from "../services/errorHandling.ts";
 import type { EventStoreReadContext } from "./eventStore.types.ts";
 import type { EventRecord } from "./repositories/eventRepository.types.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Transforms an EventRecord from storage into a domain Event.
@@ -22,9 +23,9 @@ export function recordToEvent<EventType extends Event>(
     timestampMs = record.EventTimestamp;
   } else if (typeof record.EventTimestamp === "string") {
     const parsed = Date.parse(record.EventTimestamp);
-    timestampMs = Number.isNaN(parsed) ? Date.now() : parsed;
+    timestampMs = Number.isNaN(parsed) ? nowInstant().epochMilliseconds : parsed;
   } else {
-    timestampMs = Date.now();
+    timestampMs = nowInstant().epochMilliseconds;
   }
 
   const payload = parseEventPayload(record.EventPayload);

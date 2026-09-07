@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * "16d ago", for the sample spans under the cost-rule regex field.
  *
@@ -22,7 +23,7 @@ const MS_PER_DAY = 86_400_000;
  * left wondering whether `16d` is an age or a duration.
  */
 export function formatRelativeTimeAgo(timestamp: number): string {
-  const elapsed = Date.now() - timestamp;
+  const elapsed = nowInstant().epochMilliseconds - timestamp;
   if (elapsed < MS_PER_MINUTE) return "just now";
   if (elapsed < MS_PER_HOUR) return `${Math.floor(elapsed / MS_PER_MINUTE)}m ago`;
   if (elapsed < MS_PER_DAY) return `${Math.floor(elapsed / MS_PER_HOUR)}h ago`;

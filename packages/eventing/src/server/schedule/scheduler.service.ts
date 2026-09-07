@@ -4,6 +4,7 @@ import type { SchedulerWakeRedis } from "./scheduler-wake.repository.ts";
 import { computeCatchUp, computeNextRunAt } from "./next-run-at.ts";
 import type { SchedulerRegistry } from "./scheduler.registry.ts";
 import type { ScheduledJobRecord, ScheduledJobStore } from "./scheduler.types.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Best-effort cross-pod wake (ADR-044, user decision 2026-07-10). Postgres is
@@ -303,7 +304,7 @@ export class SchedulerService {
   /** Clamp (earliest − now) into [0, maxSleepMs]; full backstop when idle. */
   private sleepMsUntil(earliest: Date | null): number {
     if (!earliest) return this.maxSleepMs;
-    const untilDueMs = earliest.getTime() - Date.now();
+    const untilDueMs = earliest.getTime() - nowInstant().epochMilliseconds;
     if (untilDueMs <= 0) return 0;
     return Math.min(this.maxSleepMs, untilDueMs);
   }
@@ -489,7 +490,7 @@ export class SchedulerService {
     if (attempts + 1 < MAX_ATTEMPTS) {
       // Re-arm `nextRunAt` at a backoff instead of the lease's far edge, so the
       // retry fires promptly once the blip clears rather than after LEASE_MS.
-      const retryAt = new Date(Date.now() + this.backoffMs(attempts));
+      const retryAt = new Date(nowInstant().epochMilliseconds + this.backoffMs(attempts));
       this.logger.warn(
         {
           jobId: job.id,

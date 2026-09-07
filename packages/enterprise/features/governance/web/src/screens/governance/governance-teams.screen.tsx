@@ -8,6 +8,7 @@ import { useGovernanceScope } from "../../behavior/governance-session.ts";
 import { api, type RouterOutputs } from "../../behavior/governance-api.ts";
 import { useGovernanceRouter } from "../../behavior/governance-router.ts";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
+import { nowInstant } from "@langwatch/time";
 type SpendByTeam = RouterOutputs["activityMonitor"]["spendByTeam"][number];
 type SortField = "spend" | "requests" | "lastActivity";
 
@@ -72,7 +73,7 @@ const fmtRelative = (date: Date | string | null): string => {
   if (!date) return "—";
   const d = typeof date === "string" ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return "—";
-  const diffMs = Date.now() - d.getTime();
+  const diffMs = nowInstant().epochMilliseconds - d.getTime();
   if (diffMs < 0) return "just now";
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return `${sec}s ago`;

@@ -16,6 +16,7 @@ import type {
 import { normalizeErrorMessage } from "../rules/ops-error-normalizer.rules.ts";
 import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
 import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 export class OpsDashboardViewService {
   private constructor() {}
@@ -194,7 +195,7 @@ export class OpsDashboardViewService {
         total: topErrors.length,
       },
       snapshot: {
-        computedAt: Date.now(),
+        computedAt: nowInstant().epochMilliseconds,
         detailComputedAt: latestDetail?.computedAt ?? null,
         writerId: writerId,
         leaseEpoch: leaseEpoch,

@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * How long ago something happened, for the personal pages.
  *
@@ -12,7 +13,7 @@
 export function formatRelativeTime(ms: number | null | undefined): string {
   if (!ms) return "Never";
 
-  const sec = Math.floor((Date.now() - ms) / 1000);
+  const sec = Math.floor((nowInstant().epochMilliseconds - ms) / 1000);
   if (sec < 60) return `${sec}s ago`;
 
   const min = Math.floor(sec / 60);

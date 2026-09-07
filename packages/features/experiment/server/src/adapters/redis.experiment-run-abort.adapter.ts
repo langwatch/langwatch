@@ -13,6 +13,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { Redis } from "ioredis";
 import { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:experiment:run-abort");
 
@@ -59,7 +60,7 @@ export class RedisExperimentRunAbortAdapter extends ExperimentRunAbortPort {
   async setRunning({ runId, projectId }: { runId: string; projectId: string }): Promise<void> {
     await this.redis.set(
       `${RUNNING_KEY_PREFIX}${runId}`,
-      JSON.stringify({ projectId, startedAt: Date.now() }),
+      JSON.stringify({ projectId, startedAt: nowInstant().epochMilliseconds }),
       "EX",
       ABORT_TTL_SECONDS,
     );

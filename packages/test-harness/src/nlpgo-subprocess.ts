@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { cachedBinaryIsUsable, digestGoSources, writeStamp } from "./nlpgo-binary-stamp.ts";
+import { nowInstant } from "@langwatch/time";
 
 // nlpgo-subprocess.ts lives in packages/test-harness/src →
 // up 6 = repo root.
@@ -123,8 +124,8 @@ export interface NlpgoSubprocess {
 }
 
 async function waitForNlpgoHealth(port: number, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const deadline = nowInstant().epochMilliseconds + timeoutMs;
+  while (nowInstant().epochMilliseconds < deadline) {
     try {
       const r = await fetch(`http://127.0.0.1:${port}/healthz`);
       if (r.status === 200 || r.status === 503) return;
@@ -242,10 +243,10 @@ export async function collectSSE(
   let buf = "";
   const frames: SSEFrame[] = [];
   let sawTerminal = false;
-  const deadline = Date.now() + timeoutMs;
+  const deadline = nowInstant().epochMilliseconds + timeoutMs;
 
   try {
-    while (Date.now() < deadline && !sawTerminal) {
+    while (nowInstant().epochMilliseconds < deadline && !sawTerminal) {
       const { done, value } = await reader.read();
       if (done) break;
       buf += decoder.decode(value, { stream: true });

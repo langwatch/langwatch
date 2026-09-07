@@ -13,6 +13,7 @@
  */
 import crypto from "node:crypto";
 import type { CustomMetadata, Span } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
 type AuthInput = {
   type: "none" | "bearer" | "api_key" | "basic";
@@ -163,7 +164,7 @@ export function buildAgentTestTrace({
   requestHeaders,
   customAuthHeaderName,
   result,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   agentId: string;
   userId: string;

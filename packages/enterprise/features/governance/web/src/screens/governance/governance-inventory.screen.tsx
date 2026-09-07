@@ -70,11 +70,15 @@ import {
 } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Link } from "../../ui/elements/governance-link.tsx";
-import { useGovernanceToaster, type GovernanceToaster } from "../../behavior/governance-feedback.ts";
+import {
+  useGovernanceToaster,
+  type GovernanceToaster,
+} from "../../behavior/governance-feedback.ts";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { useShowErrorToast } from "../../behavior/governance-feedback.ts";
 import { useGovernancePlan, useGovernanceScope } from "../../behavior/governance-session.ts";
 import { api } from "../../behavior/governance-api.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   type DestinationContext,
   type Source,
@@ -151,7 +155,7 @@ const blankComposer = (): ComposerState => ({
 function fmtRelative(date: Date | string | null): string {
   if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
-  const diffMs = Date.now() - d.getTime();
+  const diffMs = nowInstant().epochMilliseconds - d.getTime();
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return `${sec}s ago`;
   const min = Math.floor(sec / 60);
@@ -3110,7 +3114,7 @@ function buildTestCurl({
               spans: [
                 {
                   name: "chat.completion",
-                  startTimeUnixNano: `${Date.now()}000000`,
+                  startTimeUnixNano: `${nowInstant().epochMilliseconds}000000`,
                   attributes: [
                     {
                       key: "gen_ai.usage.input_tokens",

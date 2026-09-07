@@ -56,6 +56,7 @@ import {
   SLACK_BLOCK_KIT_TEMPLATES,
 } from "../../../slack-templates/index.ts";
 import { SlackBlockKitTemplatePicker } from "../../../slack-templates/index.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** A template field. `usingDefault` means "the author has not customised this"
  *  — it is what the Reset affordance and the default badge read. `value` is the
@@ -435,7 +436,7 @@ function SlackChannelField({
             color="fg.muted"
             _hover={{ color: "fg" }}
             disabled={list.isPending}
-            onClick={() => fetchChannels(fetchKey ?? `manual:${Date.now()}`)}
+            onClick={() => fetchChannels(fetchKey ?? `manual:${nowInstant().epochMilliseconds}`)}
           >
             {list.isPending ? "Loading…" : "Reload"}
           </Button>

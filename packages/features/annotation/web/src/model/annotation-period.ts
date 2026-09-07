@@ -6,7 +6,7 @@
  * picked" is a unit test, not a rendered assertion. Narrowed: no `daysDifference`.
  */
 
-import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";
+import { differenceInCalendarDays, startOfDay, subDays, toEpochMs } from "@langwatch/time";
 
 /** Date range used for time-based filtering. */
 export type AnnotationPeriod = { startDate: Date; endDate: Date };
@@ -40,7 +40,7 @@ const PRESETS_BY_KEY = new Map(ANNOTATION_PERIOD_PRESETS.map((preset) => [preset
 const isPresetKey = (value: unknown): value is AnnotationPeriodPresetKey =>
   typeof value === "string" && PRESETS_BY_KEY.has(value as AnnotationPeriodPresetKey);
 
-const isValidDateString = (value: string) => !Number.isNaN(new Date(value).getTime());
+const isValidDateString = (value: string) => !Number.isNaN(toEpochMs(value));
 
 const daysBetween = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;

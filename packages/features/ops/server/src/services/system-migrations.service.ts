@@ -19,6 +19,7 @@ import {
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules.ts";
 import { systemMigrationLookup } from "./system-migration-lookup.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 export type {
   MigrationEnrollmentRecord,
@@ -197,7 +198,7 @@ export class SystemMigrationsService {
       record.report != null && typeof record.report === "object"
         ? (record.report as Record<string, unknown>)
         : {};
-    const assertedAt = new Date().toISOString();
+    const assertedAt = nowInstant().toString({ fractionalSecondDigits: 3 });
     await this.deps.state.upsertRecord({
       ...record,
       report: {

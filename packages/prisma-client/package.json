@@ -13,15 +13,24 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     },
     "./generated": {
-      "types": "./src/generated/client.ts",
+      "types": {
+        "langwatch-declarations": "./dist/generated/client.d.ts",
+        "default": "./src/generated/client.ts"
+      },
       "default": "./src/generated/client.ts"
     },
     "./errors": {
-      "types": "./src/prisma-error-codes.ts",
+      "types": {
+        "langwatch-declarations": "./dist/prisma-error-codes.d.ts",
+        "default": "./src/prisma-error-codes.ts"
+      },
       "default": "./src/prisma-error-codes.ts"
     }
   },
@@ -36,6 +45,7 @@
   "dependencies": {
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@prisma/adapter-pg": "7.9.1",
     "@prisma/client": "7.9.1",
     "lodash-es": "^4.18.1",

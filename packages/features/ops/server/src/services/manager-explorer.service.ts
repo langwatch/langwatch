@@ -17,6 +17,7 @@ import type {
 } from "@langwatch/ops-contract";
 import type { ProcessOpsRepository } from "../repositories/process-ops.repository.ts";
 import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * One global knob each, per the visibility plan: a wake this far past due means the wake worker is starved or
@@ -68,7 +69,7 @@ export class ManagerExplorerService {
    */
   async getFleetSummary(): Promise<ProcessFleetSummary[]> {
     const counts = await this.fleet.countByProcessName({
-      now: Date.now(),
+      now: nowInstant().epochMilliseconds,
       overdueWakeMs: OVERDUE_WAKE_MS,
       overduePendingMs: OVERDUE_PENDING_MS,
     });
@@ -177,7 +178,7 @@ export class ManagerExplorerService {
   async wakeNow(params: { ref: ProcessRef; actorUserId: string }): Promise<{ woke: boolean }> {
     const result = await this.fleet.wakeInstanceNow({
       ref: params.ref,
-      now: Date.now(),
+      now: nowInstant().epochMilliseconds,
     });
     if (result.woke) {
       await this.audit.append({
@@ -198,7 +199,7 @@ export class ManagerExplorerService {
   }): Promise<{ requeued: number }> {
     const requeued = await this.store.requeueDeadMessages({
       ...params.ref,
-      now: Date.now(),
+      now: nowInstant().epochMilliseconds,
     });
     if (requeued > 0) {
       await this.audit.append({
@@ -221,7 +222,7 @@ export class ManagerExplorerService {
     const result = await this.fleet.tryRedriveDeadMessage({
       ref: params.ref,
       messageId: params.messageId,
-      now: Date.now(),
+      now: nowInstant().epochMilliseconds,
     });
     if (!result) {
       return { redriven: false };
@@ -250,7 +251,7 @@ export class ManagerExplorerService {
     const result = await this.fleet.tryDiscardDeadMessage({
       ref: params.ref,
       messageId: params.messageId,
-      now: Date.now(),
+      now: nowInstant().epochMilliseconds,
     });
     if (!result) {
       return { discarded: false };
@@ -277,7 +278,7 @@ export class ManagerExplorerService {
   }): Promise<{ redriven: number }> {
     const redriven = await this.fleet.redriveAllDeadMessages({
       ...(params.processName ? { processName: params.processName } : {}),
-      now: Date.now(),
+      now: nowInstant().epochMilliseconds,
     });
     if (redriven > 0) {
       await this.audit.append({
@@ -302,7 +303,7 @@ export class ManagerExplorerService {
   }): Promise<{ discarded: number }> {
     const discarded = await this.fleet.discardAllDeadMessages({
       ...(params.processName ? { processName: params.processName } : {}),
-      now: Date.now(),
+      now: nowInstant().epochMilliseconds,
     });
     if (discarded > 0) {
       await this.audit.append({
@@ -339,7 +340,7 @@ export class ManagerExplorerService {
     const result = await this.fleet.tryReleaseLapsedLease({
       ref: params.ref,
       messageId: params.messageId,
-      now: Date.now(),
+      now: nowInstant().epochMilliseconds,
     });
     if (!result) {
       return { released: false };
@@ -431,7 +432,7 @@ export class ManagerExplorerService {
     const { requestedBy, ...rest } = params;
     const requeued = await this.store.requeueDeadMessages({
       ...rest,
-      now: Date.now(),
+      now: nowInstant().epochMilliseconds,
     });
     // Intentionally retain these opaque operational IDs for the audit trail.
     logger.info({ ...rest, requestedBy, requeued }, "ops requeue of dead outbox messages");

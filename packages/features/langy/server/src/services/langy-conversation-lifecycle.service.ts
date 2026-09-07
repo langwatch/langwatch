@@ -20,6 +20,7 @@ import {
   type LangyMessageRow,
 } from "../repositories/langy-message.repository.ts";
 import type { LangyTurnSegment } from "./langy-turn-order.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 import {
   adoptConversationId,
@@ -288,7 +289,7 @@ export class LangyConversationLifecycleService {
 
     await this.deps.commands.updateConversationMetadata({
       tenantId: projectId,
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
       conversationId: id,
       ...(title !== undefined ? { title } : {}),
       ...(isShared !== undefined ? { isShared, sharedById: isShared ? userId : null } : {}),

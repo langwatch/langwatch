@@ -17,6 +17,7 @@ import type { OpsQueueMetricsSourcePort } from "../ports/ops-queue-metrics-sourc
 import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
 import type { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
 import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:metrics-publication");
 
@@ -94,7 +95,7 @@ export class OpsMetricsPublicationService {
         leaseToken,
         snapshot: {
           version: SNAPSHOT_VERSION,
-          computedAt: Date.now(),
+          computedAt: nowInstant().epochMilliseconds,
           writerId: this.writerId,
           leaseEpoch: this.lease().epoch,
           queues: data.queues,
@@ -143,7 +144,7 @@ export class OpsMetricsPublicationService {
       return;
     }
 
-    if (Date.now() - this.lastDetailAt < DETAIL_CYCLE_INTERVAL_MS) {
+    if (nowInstant().epochMilliseconds - this.lastDetailAt < DETAIL_CYCLE_INTERVAL_MS) {
       return;
     }
 
@@ -191,7 +192,7 @@ export class OpsMetricsPublicationService {
 
       const detail: DetailSnapshot = {
         version: SNAPSHOT_VERSION,
-        computedAt: Date.now(),
+        computedAt: nowInstant().epochMilliseconds,
         writerId: this.writerId,
         leaseEpoch: this.lease().epoch,
         topErrors: blocked.clusters.slice(0, MAX_ERROR_CLUSTERS),
@@ -227,13 +228,13 @@ export class OpsMetricsPublicationService {
       }
 
       this.latestDetail = detail;
-      this.lastDetailAt = Date.now();
+      this.lastDetailAt = nowInstant().epochMilliseconds;
     } catch (err) {
       logger.warn({ error: err }, "Failed to publish detail ops snapshot");
       // Back off a full cycle rather than retrying every 2s into a Redis
       // that is already struggling — the failure and the cause usually share
       // a root.
-      this.lastDetailAt = Date.now();
+      this.lastDetailAt = nowInstant().epochMilliseconds;
     }
   }
 

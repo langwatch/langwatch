@@ -26,6 +26,7 @@ import {
   WorkloadIdentityCredential,
 } from "@azure/identity";
 import type { AzureCredentials, AzureTokenAuthMode } from "./azure-blob-credentials.adapter.ts";
+import { nowInstant } from "@langwatch/time";
 
 export type TokenModeCredentials = Extract<AzureCredentials, { mode: AzureTokenAuthMode }>;
 
@@ -188,7 +189,7 @@ async function getAzureBlobToken(credentials: TokenModeCredentials): Promise<str
 
   const isStale =
     entry?.resolvedExpiresOnTimestamp !== undefined &&
-    entry.resolvedExpiresOnTimestamp - Date.now() <= REFRESH_SAFETY_MARGIN_MS;
+    entry.resolvedExpiresOnTimestamp - nowInstant().epochMilliseconds <= REFRESH_SAFETY_MARGIN_MS;
 
   if (!entry || isStale) {
     entry = startExchange(key, credentials);

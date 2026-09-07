@@ -41,6 +41,7 @@ import { useAutomationStore } from "./automation-store.ts";
 import { useDraft } from "./automation-selectors.ts";
 import { ConditionBuilder } from "../blocks/condition-builder.tsx";
 import { QueryFilterInput } from "../elements/query-filter-input.tsx";
+import { nowInstant } from "@langwatch/time";
 
 /** One-line preview shown when the Subject facet is collapsed. */
 function subjectSummary(draft: AutomationDraft): string {
@@ -422,7 +423,7 @@ function TraceQuerySubject({
 
   const trimmed = debounced.trim();
   const timeRange = useMemo(() => {
-    const to = Date.now();
+    const to = nowInstant().epochMilliseconds;
     return { from: to - PREVIEW_WINDOW_MS, to };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced]);

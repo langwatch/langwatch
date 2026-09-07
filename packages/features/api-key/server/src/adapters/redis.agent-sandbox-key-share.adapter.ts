@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 import {
   AGENT_SANDBOX_KEY_REUSE_MS,
@@ -79,7 +80,10 @@ export class RedisAgentSandboxKeyShareAdapter extends AgentSandboxKeySharePort {
     const sealed = this.seal(input.token);
     // Shadow-written to memory always, so the fallback is warm if Redis goes
     // down after this write.
-    this.memory.set(input.projectId, { sealed, expiresAt: Date.now() + this.reuseMs });
+    this.memory.set(input.projectId, {
+      sealed,
+      expiresAt: nowInstant().epochMilliseconds + this.reuseMs,
+    });
     if (!this.redis) return;
 
     try {
@@ -125,7 +129,7 @@ export class RedisAgentSandboxKeyShareAdapter extends AgentSandboxKeySharePort {
   private readMemory(projectId: string): string | undefined {
     const held = this.memory.get(projectId);
     if (!held) return undefined;
-    if (held.expiresAt <= Date.now()) {
+    if (held.expiresAt <= nowInstant().epochMilliseconds) {
       this.memory.delete(projectId);
       return undefined;
     }

@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import {
   WebhookDispatchRateLimiterPort,
   type WebhookDispatchRateLimitResult,
@@ -38,7 +39,7 @@ export class InMemoryWebhookDispatchRateLimiterAdapter extends WebhookDispatchRa
     windowSeconds: number;
     max: number;
   }): Promise<WebhookDispatchRateLimitResult> {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     this.sweepExpired(now);
 
     const existing = this.entries.get(key);

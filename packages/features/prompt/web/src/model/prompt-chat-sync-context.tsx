@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Represents a submit action broadcast to all synced chats.
@@ -80,7 +81,7 @@ export function PromptPlaygroundChatProvider({ children }: PromptPlaygroundChatP
    */
   const triggerSubmit = useCallback(
     (message: string) => {
-      setSubmitTrigger({ message, timestamp: Date.now() });
+      setSubmitTrigger({ message, timestamp: nowInstant().epochMilliseconds });
       // Clear input after broadcasting submit
       setSyncedInput("");
     },

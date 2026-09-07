@@ -31,6 +31,7 @@ import type {
 } from "../ports/topic-clustering-langevals.port.ts";
 import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
 import type { TopicClusteringDatabase } from "../repositories/prisma/prisma.topic-clustering.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Technical dependencies supplied by API/worker composition for Topic execution. */
 export interface TopicClusteringExecutionDependencies {
@@ -120,7 +121,7 @@ export class TopicServerInstallerAdapter {
           ? bootstrap.claimAndBootstrap(projectId)
           : this.commands.requestClustering({
               tenantId: projectId,
-              occurredAt: Date.now(),
+              occurredAt: nowInstant().epochMilliseconds,
               trigger: "bootstrap",
             }),
     };

@@ -1,6 +1,7 @@
 import { METRIC_ROLLUP_INTERVAL_MS } from "../schemas/metric-processing/constants.ts";
 import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point.ts";
 import { bigint, isGap, type MetricRollupSourcePoint } from "./sequence.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** One point of a bucket, with its index into the whole ordered series. */
 export interface BucketEntry {
@@ -42,7 +43,7 @@ function baseRow({
     resetCount: 0,
     gapCount: 0,
     sourcePointCount: 0,
-    updatedAt: Date.now(),
+    updatedAt: nowInstant().epochMilliseconds,
   };
 }
 

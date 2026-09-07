@@ -16,6 +16,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Fragment, type ReactNode, useState } from "react";
 import { EventDetailRow } from "./source-event-detail-panels.tsx";
 import type { SourceEventsPager } from "../../behavior/use-source-events-pager.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The events section of the ingestion-source detail page: a cursor-walked
@@ -68,7 +69,7 @@ const fmtInteger = (value: number): string =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
 
 const formatTimeAgo = (timestampMs: number): string => {
-  const seconds = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000));
+  const seconds = Math.max(0, Math.floor((nowInstant().epochMilliseconds - timestampMs) / 1000));
   if (seconds < 60) return `${seconds} seconds ago`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes} minutes ago`;

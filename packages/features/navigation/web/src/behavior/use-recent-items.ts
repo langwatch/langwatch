@@ -1,4 +1,4 @@
-import { differenceInDays, isToday, isYesterday } from "@langwatch/time";
+import { differenceInDays, isToday, isYesterday, nowInstant } from "@langwatch/time";
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { MAX_RECENT_ITEMS } from "../model/command-bar-constants.ts";
@@ -50,7 +50,7 @@ export function useRecentItems() {
         // Add new item at the beginning with current timestamp
         const newItem: RecentItem = {
           ...item,
-          accessedAt: Date.now(),
+          accessedAt: nowInstant().epochMilliseconds,
         };
 
         const updated = [newItem, ...filtered];
@@ -78,7 +78,7 @@ export function useRecentItems() {
     const parseResult = RecentItemSchema.array().safeParse(recentItems);
     const safeItems = parseResult.success ? parseResult.data : [];
 
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
     // Filter out items older than 30 days

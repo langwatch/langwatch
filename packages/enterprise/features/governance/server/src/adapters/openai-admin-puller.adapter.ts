@@ -52,6 +52,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
 import { AdminUsageReportAdapter } from "./admin-usage-report.adapter.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:openai-admin-puller");
 
@@ -239,7 +240,7 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
     const resumeStart = () => (page === null ? cursor.storedStart : startingAt);
 
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
-      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
+      if (options.deadlineMs !== undefined && nowInstant().epochMilliseconds > options.deadlineMs) {
         // Everything read so far is kept and the cursor says where to resume,
         // so a deadline costs latency rather than a window.
         return {
@@ -717,7 +718,7 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
    * one settled bucket. Snapped to midnight UTC to align with bucket boundaries.
    */
   private static defaultStartingAt(): string {
-    const d = new Date(Date.now() - 3 * MS_PER_DAY);
+    const d = new Date(nowInstant().epochMilliseconds - 3 * MS_PER_DAY);
     d.setUTCHours(0, 0, 0, 0);
     return d.toISOString();
   }

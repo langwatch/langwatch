@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * The RUM session: the window of activity a visit represents.
  *
@@ -36,7 +37,7 @@ const newSessionId = (): string => {
  * throws on `sessionStorage`, and telemetry must never be the reason a page
  * fails to load.
  */
-export function currentSessionId(now = Date.now()): string | undefined {
+export function currentSessionId(now = nowInstant().epochMilliseconds): string | undefined {
   let storage: Storage;
   try {
     storage = window.sessionStorage;

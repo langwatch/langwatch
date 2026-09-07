@@ -21,6 +21,7 @@ import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.ru
 import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
 import { OpsMetricsPublicationService } from "./ops-metrics-publication.service.ts";
 import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   METRICS_COLLECT_INTERVAL_MS,
   OpsMetricsWindowService,
@@ -318,7 +319,7 @@ export class OpsMetricsCollectorService {
 
   /** Redis reports CPU as cumulative seconds; a percent needs the previous sample. */
   private recordRedisCpu(redisInfo: RedisInfo): void {
-    const sampledAt = Date.now();
+    const sampledAt = nowInstant().epochMilliseconds;
     this.window.currentRedisEngineCpuPercent = computeEngineCpuPercent({
       prev: this.window.prevRedisCpu,
       nextUserSec: redisInfo.usedCpuUserMainThreadSeconds,
@@ -345,7 +346,7 @@ export class OpsMetricsCollectorService {
     }
 
     if (discoveredPaths.size > 0) {
-      const timestamp = Date.now();
+      const timestamp = nowInstant().epochMilliseconds;
       await this.metrics.recordKnownPipelinePaths({
         paths: [...discoveredPaths],
         at: timestamp,
@@ -371,7 +372,7 @@ export class OpsMetricsCollectorService {
     }
 
     const totalInFlight = computeTotalInFlight({ queues });
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const elapsed = (now - this.window.lastTimestamp) / 1000;
     const { newCompleted, newFailed } = await this.sampling.computeJobMetrics({
       window: this.window,
@@ -422,7 +423,7 @@ export class OpsMetricsCollectorService {
 
   /** This process's own CPU share since the last cycle. */
   private recordProcessCpu(): void {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const cpuNow = process.cpuUsage(this.window.lastCpuUsage);
     const cpuElapsed = now - this.window.lastCpuTime;
     if (cpuElapsed > 0) {

@@ -4,6 +4,7 @@ import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { LangyPanelSurface } from "@langwatch/langy-web/surfaces/asaplangy";
 import type { StatusCell } from "../types.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The project's numbers, reframed as status, on the SAME Langy surface as
@@ -169,7 +170,7 @@ function OverviewCell({ cell }: { cell: StatusCell }) {
   useEffect(() => {
     if (prevValue.current === cell.value) return;
     prevValue.current = cell.value;
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     if (now - lastPulseAt.current < PULSE_COOLDOWN_MS) return;
     lastPulseAt.current = now;
     setPulseKey((key) => key + 1);

@@ -6,12 +6,12 @@
  * for its own callers and dies with them.
  */
 
-import { format, formatDistanceToNow } from "@langwatch/time";
+import { format, formatDistanceToNow, nowInstant } from "@langwatch/time";
 
 export const formatTimeAgo = (timestamp: number, dateFormat = "dd/MMM HH:mm", maxHours = 24) => {
   const timestampDate = timestamp ? new Date(timestamp) : undefined;
   const timeAgo = timestampDate
-    ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * maxHours
+    ? timestampDate.getTime() < nowInstant().epochMilliseconds - 1000 * 60 * 60 * maxHours
       ? format(timestampDate, dateFormat)
       : formatDistanceToNow(timestampDate, {
           addSuffix: true,

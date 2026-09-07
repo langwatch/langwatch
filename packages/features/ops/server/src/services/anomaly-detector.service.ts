@@ -6,6 +6,7 @@ import type { AnomalyRateTrackerPort } from "../ports/anomaly-rate-tracker.port.
 import type { AnomalyStatePort } from "../ports/anomaly-state.port.ts";
 import { percentile } from "../rules/ops-anomaly-percentile.rules.ts";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../rules/anomaly-constants.rules.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:observability:anomalyDetector");
 
@@ -166,7 +167,7 @@ export class AnomalyDetectorService {
       tier: input.tier,
       currentRate,
       baseline,
-      triggeredAt: input.existing?.triggeredAt ?? Date.now(),
+      triggeredAt: input.existing?.triggeredAt ?? nowInstant().epochMilliseconds,
       reason: `rate ${currentRate}/min is ${overBaseline}× baseline ${baseline}/min sustained ${sustainMinutes}min`,
     };
   }

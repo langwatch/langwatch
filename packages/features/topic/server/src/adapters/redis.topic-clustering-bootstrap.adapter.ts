@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:topic-clustering:bootstrap-gate");
 
@@ -76,7 +77,7 @@ export class RedisTopicClusteringBootstrapAdapter {
 
     await this.commands.requestClustering({
       tenantId: projectId,
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
       trigger: "bootstrap",
     });
   }

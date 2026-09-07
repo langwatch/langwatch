@@ -27,6 +27,7 @@ import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 import { resolveCoalesceMaxBatch } from "./services/queues/queueManager.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
 import type { KillSwitchPort } from "./kill-switch/index.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:event-sourcing");
 
@@ -554,7 +555,7 @@ export class EventSourcing {
       },
       score: (payload: Record<string, unknown>) => {
         const result = this.lookupEntry(payload);
-        if (!result) return Date.now();
+        if (!result) return nowInstant().epochMilliseconds;
         return result.entry.scoreFn(result.clean);
       },
       spanAttributes: (payload: Record<string, unknown>) => {

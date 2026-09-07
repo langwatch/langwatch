@@ -12,7 +12,10 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/typecheck/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
@@ -28,6 +31,7 @@
     "@aws-sdk/client-ses": "^3.1080.0",
     "@langwatch/egress": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
     "@sendgrid/mail": "^8.1.6",

@@ -11,6 +11,7 @@ import {
 } from "../rules/langy-streaming-constants.rules.ts";
 import { langyEmptyTurnLine } from "../rules/langy-empty-turn.rules.ts";
 import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   type LangyStreamRead,
   type LangyStreamRedis,
@@ -502,7 +503,7 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   async heartbeat({
     conversationId,
     turnId,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
   }: {
     conversationId: string;
     turnId: string;
@@ -589,7 +590,7 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   async liveness({
     conversationId,
     turnId,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
     graceMs = LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
   }: {
     conversationId: string;

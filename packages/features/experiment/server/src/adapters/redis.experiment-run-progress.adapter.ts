@@ -13,6 +13,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationV3Event } from "@langwatch/experiment-contract";
 import type { Redis } from "ioredis";
+import { nowInstant } from "@langwatch/time";
 import {
   ExperimentRunProgressPort,
   type ExperimentRunProgressFailure,
@@ -52,7 +53,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
       status: "running",
       progress: 0,
       total: input.total,
-      startedAt: Date.now(),
+      startedAt: nowInstant().epochMilliseconds,
       recentEvents: [],
     };
 
@@ -95,7 +96,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
     if (!state) return;
 
     state.status = "completed";
-    state.finishedAt = Date.now();
+    state.finishedAt = nowInstant().epochMilliseconds;
     state.summary = summary;
     state.progress = state.total;
 
@@ -115,7 +116,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
     if (!state) return;
 
     state.status = "failed";
-    state.finishedAt = Date.now();
+    state.finishedAt = nowInstant().epochMilliseconds;
     state.error = failure.code;
     state.domainError = failure.domainError;
     state.traceId = failure.traceId;
@@ -129,7 +130,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
     if (!state) return;
 
     state.status = "stopped";
-    state.finishedAt = Date.now();
+    state.finishedAt = nowInstant().epochMilliseconds;
 
     await this.write(runId, state);
     logger.info({ runId }, "Run stopped");

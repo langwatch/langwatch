@@ -52,6 +52,7 @@ import {
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { nowInstant } from "@langwatch/time";
 import {
   buildAgentTestTrace,
   buildTraceparentHeader,
@@ -443,7 +444,7 @@ export class HttpProxyTrpcApi {
             });
 
             const traceId = traceIds?.traceId ?? `agent-test-${nanoid(12)}`;
-            const startedAt = Date.now();
+            const startedAt = nowInstant().epochMilliseconds;
 
             let result: HttpProxyResult;
             try {
@@ -457,7 +458,7 @@ export class HttpProxyTrpcApi {
               });
               result = toProxyResult({
                 state,
-                fallbackDuration: Date.now() - startedAt,
+                fallbackDuration: nowInstant().epochMilliseconds - startedAt,
               });
             } catch (err) {
               // Failing to reach the engine is our problem, not the author's, and

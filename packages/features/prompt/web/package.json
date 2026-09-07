@@ -95,7 +95,7 @@
     "@langwatch/onboarding-web": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
-    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-web": "workspace:*",

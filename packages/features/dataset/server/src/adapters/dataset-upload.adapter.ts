@@ -41,6 +41,7 @@ import {
 } from "../rules/presigned-upload.rules.ts";
 import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
 import { stripNullBytes } from "../rules/dataset-sanitize.rules.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Owns upload lifecycle behavior; routes only see DatasetService's contract. */
 export class DatasetUploadAdapter implements DatasetUploadPort {
@@ -85,7 +86,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
     const columns = datasetColumnsSchema.parse(dataset.columnTypes);
     const converted = convertRowsToColumnTypes(rows, columns);
     const entries = converted.map((entry, index) => ({
-      id: `${Date.now()}-${index}`,
+      id: `${nowInstant().epochMilliseconds}-${index}`,
       ...entry,
     }));
     if (dataset.contentLayout === "s3_jsonl") {

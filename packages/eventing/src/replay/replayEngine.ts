@@ -9,6 +9,7 @@ import type {
 import { FoldAccumulator, MapAccumulator } from "./replayExecutor.ts";
 import type { ReplayLogWriter } from "./replayLog.ts";
 import { nullLog } from "./replayLog.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   aggregateKey,
   cleanupAll,
@@ -285,7 +286,7 @@ class FoldMapReplayRun {
   private readonly aggregateBatchSize: number;
   private readonly concurrency: number;
   private readonly runProjectionKind: ProjectionKind;
-  private readonly startTime = Date.now();
+  private readonly startTime = nowInstant().epochMilliseconds;
   private readonly touchedTenants = new Set<string>();
 
   private aggregateProjectionMap: AggregateProjectionMap = new Map();
@@ -399,7 +400,7 @@ class FoldMapReplayRun {
       batchEventsProcessed: 0,
       aggregatesCompleted: this.aggregatesCompleted,
       totalEventsReplayed: this.totalEventsReplayed,
-      elapsedSec: (Date.now() - this.startTime) / 1000,
+      elapsedSec: (nowInstant().epochMilliseconds - this.startTime) / 1000,
       skippedCount: this.skippedCount,
       batchErrors: this.totalBatchErrors,
       firstError: this.firstError,
@@ -414,7 +415,7 @@ class FoldMapReplayRun {
     batchKeys: string[];
     batchNum: number;
   }): Promise<boolean> {
-    const batchStartTime = Date.now();
+    const batchStartTime = nowInstant().epochMilliseconds;
     const progress = this.buildProgress({ batchKeys, batchNum });
     const emit: EmitFn = (phase, eventsProcessed) => {
       progress.batchPhase = phase;
@@ -422,7 +423,7 @@ class FoldMapReplayRun {
         progress.batchEventsProcessed = eventsProcessed;
         progress.totalEventsReplayed = this.totalEventsReplayed + eventsProcessed;
       }
-      progress.elapsedSec = (Date.now() - this.startTime) / 1000;
+      progress.elapsedSec = (nowInstant().epochMilliseconds - this.startTime) / 1000;
       this.callbacks?.onProgress?.({ ...progress });
     };
 
@@ -456,7 +457,7 @@ class FoldMapReplayRun {
       totalBatches: this.totalBatches,
       aggregatesInBatch: batchKeys.length,
       eventsInBatch: batchResult.eventsReplayed,
-      durationSec: (Date.now() - batchStartTime) / 1000,
+      durationSec: (nowInstant().epochMilliseconds - batchStartTime) / 1000,
     });
     return true;
   }
@@ -489,7 +490,7 @@ class FoldMapReplayRun {
 
     progress.batchErrors = this.totalBatchErrors;
     progress.firstError = this.firstError;
-    progress.elapsedSec = (Date.now() - this.startTime) / 1000;
+    progress.elapsedSec = (nowInstant().epochMilliseconds - this.startTime) / 1000;
     // Deliberately unguarded: a cancellation rethrow from this emit is how
     // ReplayCancelledError reaches the caller — the batch's markers are
     // already cleared above, so propagating is safe and required.

@@ -23,6 +23,7 @@ import {
   trace,
 } from "@opentelemetry/api";
 import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
+import { nowInstant } from "@langwatch/time";
 
 import {
   ATTR_NAVIGATION_FROM_PATH,
@@ -124,7 +125,7 @@ function handleFor(span: Span, spanContext: Context): NavigationSpanHandle {
   return {
     commit({ route }: { route?: string }) {
       try {
-        committedAt ??= Date.now();
+        committedAt ??= nowInstant().epochMilliseconds;
         if (route) {
           span.updateName(navigationName(route));
           span.setAttribute(ATTR_HTTP_ROUTE, route);

@@ -29,6 +29,7 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
 import { COPILOT_CONVERSATION_ACTION } from "../services/copilot-studio-trace-mapper.service.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
   DataverseEnvironmentService,
@@ -314,7 +315,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
       environmentUrl: config.environmentUrl,
       config,
       cursor: CopilotStudioDataversePullerAdapter.parseCursor(options.cursor),
-      now: Date.now(),
+      now: nowInstant().epochMilliseconds,
     });
     let pageCount = 0;
 
@@ -703,7 +704,10 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
       },
       event: {
         source_event_id: row.conversationtranscriptid,
-        event_timestamp: row.conversationstarttime ?? row.createdon ?? new Date().toISOString(),
+        event_timestamp:
+          row.conversationstarttime ??
+          row.createdon ??
+          nowInstant().toString({ fractionalSecondDigits: 3 }),
         // Attribution lives on the turns inside the transcript, where the
         // account identifier actually is. A row has no single author.
         actor: "",
@@ -801,7 +805,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
    */
   private static runIsOver(options: PullRunOptions): boolean {
     if (options.signal?.aborted) return true;
-    return Boolean(options.deadlineMs && Date.now() > options.deadlineMs);
+    return Boolean(options.deadlineMs && nowInstant().epochMilliseconds > options.deadlineMs);
   }
 
   /**

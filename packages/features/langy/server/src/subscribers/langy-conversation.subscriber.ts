@@ -14,6 +14,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
 import { LangyTurnErrors, LangyWorkerStoppedError } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
 
 const livenessLogger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");
 const broadcastLogger = createLogger("langwatch:langy:conversation-update-broadcast-subscriber");
@@ -135,7 +136,7 @@ function turnIdOf(event: LangyConversationProcessingEvent): string | null {
 export function createAgentTurnLivenessSubscriber(
   deps: AgentTurnLivenessSubscriberDeps,
 ): EventSubscriberDefinition<LangyConversationProcessingEvent> {
-  const clock = deps.clock ?? (() => Date.now());
+  const clock = deps.clock ?? (() => nowInstant().epochMilliseconds);
   return {
     name: "agentTurnLiveness",
     eventTypes: LIVENESS_EVENT_TYPES,

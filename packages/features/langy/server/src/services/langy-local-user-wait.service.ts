@@ -21,6 +21,7 @@ import {
 import { LangyWaitExpiredError } from "@langwatch/langy-contract";
 import type { PollWaitResponse } from "@langwatch/langy-contract";
 import { turnWaitsKey, waitKey } from "../rules/langy-local-control-keys.rules.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:langy:local-control:waits");
 import {
@@ -55,7 +56,7 @@ export class UserWaitService {
     this.events = options.events;
     this.buffer = options.buffer;
     this.sendPermission = options.sendPermission ?? (async () => undefined);
-    this.now = options.now ?? (() => Date.now());
+    this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
     this.keepaliveMs = options.keepaliveMs ?? LIVE_STREAM_KEEPALIVE_MS;
   }

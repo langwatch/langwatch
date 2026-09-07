@@ -26,6 +26,7 @@ import { JOIN_REQUEST_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 import type { JoinRequestEvent } from "../projections/join-request-state.projection.ts";
 import type { JoinRequestFoldState } from "../projections/join-request-state.projection.ts";
 import { joinRequestEventsFor } from "../intents/join-request-events.intent.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:identity:join-request-ledger");
 
@@ -118,10 +119,10 @@ export class EventingJoinRequestLedgerAdapter implements JoinRequestLedger {
     const context = { aggregateId: joinRequestId, tenantId: createTenantId(tenantId) };
     // Wall-clock, not injectable business time: a frozen test clock would
     // otherwise make this loop unable to time out.
-    const deadline = Date.now() + this.convergence.timeoutMs;
+    const deadline = nowInstant().epochMilliseconds + this.convergence.timeoutMs;
     for (;;) {
       if (await this.foldReached({ joinRequestId, context, last })) return;
-      if (Date.now() >= deadline) {
+      if (nowInstant().epochMilliseconds >= deadline) {
         logger.warn(
           { joinRequestId, commandCount: events.length },
           "join request projection did not land a command's events within the read-your-writes window; the append is durable and the fold will converge",

@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * Reserved column names that cannot be used in datasets because they conflict
  * with system-generated fields or UI functionality.
@@ -43,7 +44,7 @@ export function getSafeColumnName(columnName: string, existingNames: Set<string>
 
     // Safety check to prevent infinite loops (should never happen in practice)
     if (counter > 1000) {
-      candidate = `${columnName}_${Date.now()}`;
+      candidate = `${columnName}_${nowInstant().epochMilliseconds}`;
       break;
     }
   }

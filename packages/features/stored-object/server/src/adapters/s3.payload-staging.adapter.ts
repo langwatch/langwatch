@@ -8,6 +8,7 @@ import type { S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Logger } from "@langwatch/observability";
 import { PayloadStagingPort, type StagedPayload } from "../ports/payload-staging.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Which bucket, on which connection, one project's staged bodies belong in. */
 export type PayloadStagingS3Target = Readonly<{ bucket: string; client: S3Client }>;
@@ -86,5 +87,5 @@ export class S3PayloadStagingAdapter extends PayloadStagingPort {
 }
 
 function defaultUniqueSuffix(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  return `${nowInstant().epochMilliseconds}-${Math.random().toString(36).slice(2, 12)}`;
 }

@@ -55,6 +55,7 @@ import { workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts"
 import { reconcileSkipPolicy } from "../../rules/langy-local-skip-policy.rules.ts";
 import { ControlRequestService } from "../../services/langy-local-control-request.service.ts";
 import type { SkipPermissionsDecision } from "../../services/langy-skip-permissions.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:langy:router");
 
@@ -1154,7 +1155,7 @@ export class LangyTrpcApi {
     }) =>
       ports.local.commands.changeLocalPolicy({
         tenantId: input.projectId,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
         conversationId: input.conversationId,
         userId: input.userId,
         skipPermissions: input.skipPermissions,
@@ -1378,7 +1379,7 @@ export class LangyTrpcApi {
             if (!workspace) return { disconnected: false };
             await ports.local.commands.disconnectLocalWorkspace({
               tenantId: input.projectId,
-              occurredAt: Date.now(),
+              occurredAt: nowInstant().epochMilliseconds,
               conversationId: input.conversationId,
               instanceId: workspace.instanceId,
               reason: "panel",

@@ -42,6 +42,7 @@ import { useOrganizationTeamProject } from "../../behavior/gateway-session.ts";
 import { useRollingWindow } from "../../behavior/use-rolling-window.ts";
 import { api } from "../../behavior/gateway-api.ts";
 import { useGatewayRouter } from "../../behavior/gateway-router.ts";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 
 /** A query bag as a query string, dropping the keys that have no value. */
 function queryString(query: Readonly<Record<string, string | undefined>>): string {
@@ -82,8 +83,8 @@ function traceWindowFor({
   const presetId = typeof days === "number" ? TRACE_WINDOW_PRESETS[days] : null;
   if (presetId) return { presetId };
   return {
-    fromMs: new Date(fromIso).getTime(),
-    toMs: new Date(toIso).getTime(),
+    fromMs: toEpochMs(fromIso),
+    toMs: toEpochMs(toIso),
   };
 }
 
@@ -206,7 +207,7 @@ function GatewayUsagePage() {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    const stamp = new Date().toISOString().split("T")[0];
+    const stamp = nowInstant().toString({ fractionalSecondDigits: 3 }).split("T")[0];
     link.setAttribute(
       "download",
       `gateway_usage_${organization?.slug ?? "organization"}${

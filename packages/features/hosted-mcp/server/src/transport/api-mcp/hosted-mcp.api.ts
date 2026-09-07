@@ -25,6 +25,7 @@ import type { HostedMcpRedis } from "../../ports/hosted-mcp.port.ts";
 import type { HostedMcpDependencies } from "../../ports/hosted-mcp.port.ts";
 import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service.ts";
 import { McpRateLimitService } from "../../services/mcp-rate-limit.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -312,7 +313,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   const REAPER_INTERVAL_MS = 60 * 1000; // 60 seconds
 
   const reaper = setInterval(() => {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
 
     // Sweep idle local transports (Redis entries expire via TTL)
     for (const [id, session] of sessions) {
@@ -570,7 +571,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     userId: string;
   }): Promise<boolean> {
     const cached = grantChecks.get(input.token);
-    if (cached && Date.now() - cached.checkedAt < GRANT_RECHECK_INTERVAL_MS) {
+    if (cached && nowInstant().epochMilliseconds - cached.checkedAt < GRANT_RECHECK_INTERVAL_MS) {
       return cached.granted;
     }
     const project = await validateApiKey(input.apiKey);
@@ -586,7 +587,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       grantChecks.delete(input.token);
       return false;
     }
-    grantChecks.set(input.token, { checkedAt: Date.now(), granted });
+    grantChecks.set(input.token, { checkedAt: nowInstant().epochMilliseconds, granted });
     return granted;
   }
 
@@ -601,7 +602,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     // 1. Check in-memory OAuth token cache
     const memEntry = oauthTokens.get(token);
     if (memEntry) {
-      if (Date.now() < memEntry.expiresAt) {
+      if (nowInstant().epochMilliseconds < memEntry.expiresAt) {
         return { apiKey: memEntry.apiKey, userId: memEntry.userId };
       }
       oauthTokens.delete(token);
@@ -618,7 +619,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
             userId?: string;
             expiresAt: number;
           };
-          if (Date.now() < stored.expiresAt) {
+          if (nowInstant().epochMilliseconds < stored.expiresAt) {
             const apiKey = decrypt(stored.encryptedApiKey);
             // Re-populate in-memory cache
             oauthTokens.set(token, {
@@ -727,7 +728,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     const entry: OAuthTokenEntry = {
       apiKey,
       userId,
-      expiresAt: Date.now() + expiresIn * 1000,
+      expiresAt: nowInstant().epochMilliseconds + expiresIn * 1000,
     };
 
     // Store in memory (plaintext — process-local, not persisted)
@@ -758,7 +759,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     try {
       const data = JSON.stringify({
         encryptedApiKey: encrypt(apiKey),
-        createdAt: Date.now(),
+        createdAt: nowInstant().epochMilliseconds,
       });
       await redis.set(`${REDIS_SESSION_PREFIX}${sessionId}`, data, "EX", SESSION_REDIS_TTL_SECONDS);
       // Track session ID in a per-key set for counting
@@ -916,7 +917,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       `${REDIS_SSE_SESSION_PREFIX}${sessionId}`,
       JSON.stringify({
         encryptedApiKey: encrypt(apiKey),
-        createdAt: Date.now(),
+        createdAt: nowInstant().epochMilliseconds,
       }),
       "EX",
       SSE_SESSION_REDIS_TTL_SECONDS,
@@ -1263,7 +1264,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     }
 
     // Check expiration
-    if (Date.now() >= stored.expiresAt) {
+    if (nowInstant().epochMilliseconds >= stored.expiresAt) {
       sendJson(res, 400, {
         error: "invalid_grant",
         error_description: "Authorization code has expired",
@@ -1346,7 +1347,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       transport,
       apiKey: redisApiKey,
       userId: recoveredCtx?.userId,
-      lastActivityAt: Date.now(),
+      lastActivityAt: nowInstant().epochMilliseconds,
     };
     sessions.set(sessionId, session);
 
@@ -1408,7 +1409,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
           return;
         }
 
-        session.lastActivityAt = Date.now();
+        session.lastActivityAt = nowInstant().epochMilliseconds;
         touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
         await handleWithSessionConfig(session.apiKey, () =>
           session.transport.handleRequest(req, res, body),
@@ -1451,7 +1452,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
             transport,
             apiKey,
             userId,
-            lastActivityAt: Date.now(),
+            lastActivityAt: nowInstant().epochMilliseconds,
           });
           storeSessionInRedis(id, apiKey).catch(() => {});
         },
@@ -1535,7 +1536,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       return;
     }
 
-    session.lastActivityAt = Date.now();
+    session.lastActivityAt = nowInstant().epochMilliseconds;
     touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
     await handleWithSessionConfig(session.apiKey, () => session.transport.handleRequest(req, res));
   }
@@ -1611,7 +1612,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     rawMessage: string;
   }): Promise<void> {
     try {
-      session.lastActivityAt = Date.now();
+      session.lastActivityAt = nowInstant().epochMilliseconds;
       await handleWithSessionConfig(session.apiKey, () =>
         session.transport.handleMessage(JSON.parse(rawMessage)),
       );
@@ -1644,7 +1645,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       transport,
       apiKey,
       userId: sseUserId,
-      lastActivityAt: Date.now(),
+      lastActivityAt: nowInstant().epochMilliseconds,
     };
     sseSessions.set(sessionId, session);
 
@@ -1699,7 +1700,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
         send401(res, "Bearer token does not match session");
         return;
       }
-      localSession.lastActivityAt = Date.now();
+      localSession.lastActivityAt = nowInstant().epochMilliseconds;
       touchSseSessionInRedis(sessionId, localSession.apiKey).catch(() => {});
 
       const body = await readJsonBody(req, res);
@@ -1808,7 +1809,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     method: string;
   }): void {
     try {
-      const startedAt = Date.now();
+      const startedAt = nowInstant().epochMilliseconds;
       res.once("close", () => {
         try {
           logger.info(
@@ -1816,7 +1817,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
               method,
               path: pathname,
               status: res.statusCode,
-              durationMs: Date.now() - startedAt,
+              durationMs: nowInstant().epochMilliseconds - startedAt,
               ...requestLogFields.get(res),
             },
             "MCP request",

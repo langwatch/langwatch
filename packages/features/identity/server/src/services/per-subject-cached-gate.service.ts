@@ -3,6 +3,7 @@
  * per SUBJECT with a TTL so a finishing migration takes effect fleet-wide without a deploy.
  */
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:app-layer:per-subject-cached-gate");
 
@@ -100,7 +101,7 @@ export class PerSubjectCachedGateService implements PerSubjectCachedFlag {
   }): Promise<boolean> {
     const entry = state.cached.get(subject);
     if (entry !== undefined) {
-      if (Date.now() < entry.expiresAt) {
+      if (nowInstant().epochMilliseconds < entry.expiresAt) {
         return entry.isOn;
       }
 
@@ -168,7 +169,7 @@ export class PerSubjectCachedGateService implements PerSubjectCachedFlag {
       PerSubjectCachedGateService.evictUntilUnderCap({ state });
     }
 
-    state.cached.set(subject, { isOn, expiresAt: Date.now() + state.ttlMs });
+    state.cached.set(subject, { isOn, expiresAt: nowInstant().epochMilliseconds + state.ttlMs });
 
     return isOn;
   }
@@ -179,7 +180,7 @@ export class PerSubjectCachedGateService implements PerSubjectCachedFlag {
    * `MAX_CACHE_ENTRIES` for why the map is bounded at all.
    */
   private static evictUntilUnderCap({ state }: { state: GateState }): void {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     for (const [key, entry] of state.cached) {
       if (entry.expiresAt <= now) {
         state.cached.delete(key);

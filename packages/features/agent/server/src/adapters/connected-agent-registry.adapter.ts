@@ -8,8 +8,13 @@ import {
   RESULT_TTL_SECONDS,
 } from "@langwatch/agent-contract";
 
-import { inflightKey, instanceMetaKey, instanceSetKey } from "../rules/connected-agent-keys.rules.ts";
+import {
+  inflightKey,
+  instanceMetaKey,
+  instanceSetKey,
+} from "../rules/connected-agent-keys.rules.ts";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   ConnectedAgentRegistryPort,
   type InstanceMeta,
@@ -38,7 +43,7 @@ export class ConnectedAgentRegistryAdapter extends ConnectedAgentRegistryPort {
   async register({
     meta,
     agentIds,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
   }: {
     meta: InstanceMeta;
     agentIds: string[];
@@ -64,7 +69,7 @@ export class ConnectedAgentRegistryAdapter extends ConnectedAgentRegistryPort {
     projectId,
     instanceId,
     agentIds,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
     meta,
   }: {
     projectId: string;
@@ -114,7 +119,7 @@ export class ConnectedAgentRegistryAdapter extends ConnectedAgentRegistryPort {
     projectId,
     instanceId,
     agentIds,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
   }: {
     projectId: string;
     instanceId: string;
@@ -134,7 +139,7 @@ export class ConnectedAgentRegistryAdapter extends ConnectedAgentRegistryPort {
   async listLive({
     projectId,
     agentId,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
   }: {
     projectId: string;
     agentId: string;
@@ -166,7 +171,7 @@ export class ConnectedAgentRegistryAdapter extends ConnectedAgentRegistryPort {
     projectId,
     agentId,
     instanceId,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
   }: {
     projectId: string;
     agentId: string;

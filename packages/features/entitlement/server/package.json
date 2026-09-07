@@ -11,11 +11,17 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./src/testing.ts",
+      "types": {
+        "langwatch-declarations": "./dist/testing.d.ts",
+        "default": "./src/testing.ts"
+      },
       "default": "./src/testing.ts"
     }
   },
@@ -31,6 +37,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@trpc/server": "^11.18.0",
     "zod": "^4.4.3"
   },

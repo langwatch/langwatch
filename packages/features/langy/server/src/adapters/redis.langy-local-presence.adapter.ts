@@ -7,6 +7,7 @@
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { PRESENCE_TTL_MS } from "@langwatch/langy-contract";
 import { policyKey, presenceKey } from "../rules/langy-local-control-keys.rules.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   connectedWorkspaceSchema,
   type ConnectedWorkspace,
@@ -31,7 +32,7 @@ export class LangyLocalPresenceAdapter extends LangyLocalPresencePort {
   private constructor(options: LocalPresenceOptions) {
     super();
     this.store = options.store;
-    this.now = options.now ?? (() => Date.now());
+    this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.presenceTtlMs = options.presenceTtlMs ?? PRESENCE_TTL_MS;
   }
 

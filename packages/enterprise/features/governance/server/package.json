@@ -11,15 +11,27 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "imports": {
-    "#*": "./src/*.ts"
+    "#*": {
+      "types": {
+        "langwatch-declarations": "./dist/*.d.ts",
+        "default": "./src/*.ts"
+      },
+      "default": "./src/*.ts"
+    }
   },
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./src/testing.ts",
+      "types": {
+        "langwatch-declarations": "./dist/testing.d.ts",
+        "default": "./src/testing.ts"
+      },
       "default": "./src/testing.ts"
     }
   },
@@ -48,6 +60,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/project-server": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
     "@opentelemetry/otlp-transformer": "0.55.0",

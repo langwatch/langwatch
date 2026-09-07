@@ -7,6 +7,7 @@ import type {
   LedgerScope,
 } from "@langwatch/authz-contract";
 import type { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const MINT_GUARD_TTL_MS = 60_000;
 const MINT_GUARD_MAX_ENTRIES = 10_000;
@@ -124,7 +125,7 @@ export class LegacyApiKeyGrantService {
   }
 
   private now(): number {
-    return this.options.now?.() ?? Date.now();
+    return this.options.now?.() ?? nowInstant().epochMilliseconds;
   }
 
   private guardHeld(apiKeyId: string): boolean {

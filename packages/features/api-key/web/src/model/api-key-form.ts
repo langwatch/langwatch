@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * The choices the create and edit drawers offer, as data.
  *
@@ -27,7 +28,7 @@ export const EXPIRATION_OPTIONS = [
 export function resolveExpiresAt({
   preset,
   customDate,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   preset: string;
   customDate: string;

@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * Private port and policy for Langy's Redis-backed feedback cadence.
  *
@@ -38,7 +39,7 @@ export class LangyFeedbackPromptPolicy {
   }
 
   private now(): number {
-    return this.deps.now?.() ?? Date.now();
+    return this.deps.now?.() ?? nowInstant().epochMilliseconds;
   }
 
   async shouldAsk(input: {

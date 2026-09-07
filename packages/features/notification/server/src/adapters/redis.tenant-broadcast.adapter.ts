@@ -1,4 +1,5 @@
 import { createLogger, type Logger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import {
   TenantBroadcastPort,
   TenantBroadcastPublisherPort,
@@ -18,7 +19,7 @@ export class RedisTenantBroadcastAdapter extends TenantBroadcastPort {
     return new RedisTenantBroadcastAdapter(
       options.publisher,
       options.logger ?? createLogger("langwatch:tenant-broadcast"),
-      () => Date.now(),
+      () => nowInstant().epochMilliseconds,
     );
   }
 

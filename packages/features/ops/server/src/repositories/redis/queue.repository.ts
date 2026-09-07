@@ -26,6 +26,7 @@ import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
 import { QueuePayloadDecoderPort } from "../../ports/queue-payload-decoder.port.ts";
 import { QueueRepository } from "../queue.repository.ts";
+import { nowInstant } from "@langwatch/time";
 import type {
   BlockedSummary,
   DlqGroupInfo,
@@ -1109,7 +1110,7 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}group:${params.groupId}:attempt`,
       `${prefix}group:${params.groupId}:failstreak`,
       params.groupId,
-      String(Date.now()),
+      String(nowInstant().epochMilliseconds),
     );
     return { wasBlocked: result === 1 };
   }
@@ -1143,7 +1144,7 @@ export class QueueRedisRepository extends QueueRepository {
         `${prefix}group:${groupId}:attempt`,
         `${prefix}group:${groupId}:failstreak`,
         groupId,
-        String(Date.now()),
+        String(nowInstant().epochMilliseconds),
       ]);
       for (const args of argsByIndex) {
         unblockScript.queue(pipeline, 9, ...args);
@@ -1428,7 +1429,7 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}signal`,
       `${prefix}dlq`,
       params.groupId,
-      String(Date.now()),
+      String(nowInstant().epochMilliseconds),
     );
     return { jobsReplayed: Number(result) };
   }
@@ -1478,7 +1479,7 @@ export class QueueRedisRepository extends QueueRepository {
         `${prefix}signal`,
         `${prefix}dlq`,
         groupId,
-        String(Date.now()),
+        String(nowInstant().epochMilliseconds),
       ]);
       for (const args of argsByIndex) {
         replayFromDlqScript.queue(pipeline, 8, ...args);
@@ -1525,7 +1526,7 @@ export class QueueRedisRepository extends QueueRepository {
         `${prefix}signal`,
         `${prefix}dlq`,
         groupId,
-        String(Date.now()),
+        String(nowInstant().epochMilliseconds),
       ],
       onResult: (result) => {
         const replayed = Number(result);
@@ -1649,7 +1650,7 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}signal`,
       `${prefix}dlq`,
       groupId,
-      String(Date.now()),
+      String(nowInstant().epochMilliseconds),
     ]);
     for (const args of argsByIndex) {
       replayFromDlqScript.queue(pipeline, 8, ...args);
@@ -1712,7 +1713,7 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}group:${groupId}:attempt`,
       `${prefix}group:${groupId}:failstreak`,
       groupId,
-      String(Date.now()),
+      String(nowInstant().epochMilliseconds),
     ]);
     for (const args of argsByIndex) {
       unblockScript.queue(unblockPipeline, 9, ...args);
@@ -1900,7 +1901,7 @@ export class QueueRedisRepository extends QueueRepository {
     const counterKey = `${prefix}stats:total-pending`;
     const markerKey = `${prefix}stats:pending-recon-ts`;
     const holderToken = randomUUID();
-    const startedAtMs = Date.now();
+    const startedAtMs = nowInstant().epochMilliseconds;
 
     // Single-flight gate: only one pod/cycle runs per window. The marker is
     // taken on a refreshable lease rather than for the full window so a pod that
@@ -1980,7 +1981,7 @@ export class QueueRedisRepository extends QueueRepository {
       await this.setReconcileMarkerTtl({
         markerKey,
         holderToken,
-        ttlMs: singleFlightWindowMs - (Date.now() - startedAtMs),
+        ttlMs: singleFlightWindowMs - (nowInstant().epochMilliseconds - startedAtMs),
       });
     }
   }
@@ -2168,7 +2169,7 @@ export class QueueRedisRepository extends QueueRepository {
     const raw = await this.redis.get(`${prefix}${SWEEP_DUE_KEY_SUFFIX}`);
     if (raw === null) return true;
     const dueAt = Number(raw);
-    return !Number.isFinite(dueAt) || Date.now() >= dueAt;
+    return !Number.isFinite(dueAt) || nowInstant().epochMilliseconds >= dueAt;
   }
 
   /**
@@ -2176,7 +2177,9 @@ export class QueueRedisRepository extends QueueRepository {
    */
   private async recordSweepOutcome(params: { prefix: string; adopted: number }): Promise<void> {
     const nextDueAt =
-      params.adopted > 0 ? Date.now() : Date.now() + PENDING_RECONCILE_SWEEP_BACKSTOP_MS;
+      params.adopted > 0
+        ? nowInstant().epochMilliseconds
+        : nowInstant().epochMilliseconds + PENDING_RECONCILE_SWEEP_BACKSTOP_MS;
     await this.redis.set(`${params.prefix}${SWEEP_DUE_KEY_SUFFIX}`, String(nextDueAt));
   }
 

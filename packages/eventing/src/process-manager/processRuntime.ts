@@ -20,6 +20,7 @@ import type {
 import { ProcessManagerService, type SignalHandleResult } from "./processManagerService.ts";
 import type { ProcessStore } from "./stores/processStore.types.ts";
 import { ProcessWakeWorker, type WakeHandlerPort } from "./wake/processWakeWorker.ts";
+import { nowInstant } from "@langwatch/time";
 
 const defaultLogger = createLogger("langwatch:event-sourcing:process-runtime");
 
@@ -232,7 +233,7 @@ export class ProcessRuntime {
           };
           const result = await registered.manager.handleEvent({
             envelope,
-            now: Date.now(),
+            now: nowInstant().epochMilliseconds,
           });
           if (result.outcome === "revisionConflict") {
             throw new Error(
@@ -267,7 +268,7 @@ export class ProcessRuntime {
 
     const result = await registered.manager.handleSignal({
       signal: params.signal,
-      now: params.now ?? Date.now(),
+      now: params.now ?? nowInstant().epochMilliseconds,
       createIfMissing: params.createIfMissing,
     });
     if (result.outcome === "committed" || result.outcome === "duplicateSignal") {
@@ -341,7 +342,7 @@ export class ProcessRuntime {
   }
 
   private armSchedule({ registered }: { registered: RegisteredProcessManager }): void {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const day = new Date(now).toISOString().slice(0, 10);
     const processName = registered.definition.config.name;
     void registered.manager

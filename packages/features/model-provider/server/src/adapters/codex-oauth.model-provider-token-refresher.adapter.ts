@@ -7,6 +7,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { CodexTokenRefresher } from "../ports/model-provider.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Sign in with your OpenAI account for the Codex provider, so requests bill the user's ChatGPT plan instead of API credits. This is OpenAI's own
@@ -234,7 +235,7 @@ export class CodexAccountService {
       CODEX_ACCOUNT_ID: claims.accountId,
       CODEX_PLAN: claims.plan,
       CODEX_EMAIL: claims.email,
-      CODEX_TOKENS_SAVED_AT: new Date().toISOString(),
+      CODEX_TOKENS_SAVED_AT: nowInstant().toString({ fractionalSecondDigits: 3 }),
     };
   }
 

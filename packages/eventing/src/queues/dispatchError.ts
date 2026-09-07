@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * Typed error thrown by outbox dispatch endpoints to signal whether the
  * failure is worth retrying.
@@ -67,7 +68,7 @@ export class DispatchError extends Error {
 const MAX_RETRY_AFTER_MS = 60 * 60 * 1000; // 1h
 export function parseRetryAfterMs(
   headerValue: string | null | undefined,
-  now: number = Date.now(),
+  now: number = nowInstant().epochMilliseconds,
 ): number | undefined {
   if (!headerValue) return undefined;
   const trimmed = headerValue.trim();

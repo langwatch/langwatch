@@ -57,6 +57,7 @@ import {
   eventWorkspace,
 } from "../rules/langy-local-session-contract.rules.ts";
 import { LocalControlLifecycleService } from "./langy-local-session-lifecycle.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:langy:local-control:session");
 
@@ -145,7 +146,7 @@ export class LocalControlSessionCoreService {
     this.dispatcher = options.dispatcher;
     this.waits = options.waits;
     this.requests = options.requests;
-    this.now = options.now ?? (() => Date.now());
+    this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.turns = options.turns;
     this.skipGate = options.skipGate;
     const conversations = options.conversations;

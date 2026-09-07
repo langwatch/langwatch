@@ -17,6 +17,7 @@ import {
 } from "@langwatch/langy-contract";
 import type { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
 import type { ControlSession } from "../../rules/langy-local-session-contract.rules.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:langy:local-control:long-poll");
 
@@ -106,7 +107,7 @@ export class LocalControlLongPoll {
       session: registered.session,
       queue,
       unsubscribe: (async () => undefined) as Unsubscribe,
-      lastSeenAt: Date.now(),
+      lastSeenAt: nowInstant().epochMilliseconds,
       released: false,
       delivered: deliveredWith(registered.inFlightCallIds),
     };
@@ -150,14 +151,15 @@ export class LocalControlLongPoll {
     const orphaned = await this.orphanedCalls(inFlightCallIds);
     if (orphaned.length > 0) return { ok: true, frames: orphaned };
 
-    const until = Date.now() + this.holdMs;
+    const until = nowInstant().epochMilliseconds + this.holdMs;
     for (;;) {
-      entry.lastSeenAt = Date.now();
+      entry.lastSeenAt = nowInstant().epochMilliseconds;
       if (!entry.released) await this.core.heartbeat(entry.session);
       if (entry.queue.length > 0) {
         return { ok: true, frames: entry.queue.splice(0, entry.queue.length) };
       }
-      if (Date.now() >= until || signal?.aborted) return { ok: true, frames: [] };
+      if (nowInstant().epochMilliseconds >= until || signal?.aborted)
+        return { ok: true, frames: [] };
       await sleep(this.pollIntervalMs, signal);
     }
   }
@@ -181,7 +183,7 @@ export class LocalControlLongPoll {
   async frames({ token, frames }: { token: string; frames: CliFrame[] }): Promise<{ ok: boolean }> {
     const entry = this.sessions.get(token);
     if (!entry) return { ok: false };
-    entry.lastSeenAt = Date.now();
+    entry.lastSeenAt = nowInstant().epochMilliseconds;
     // A command line that writes is as alive as one that polls, and a long
     // call means it writes far more often than it polls.
     if (!entry.released) await this.core.heartbeat(entry.session);
@@ -223,7 +225,7 @@ export class LocalControlLongPoll {
    * its own, but the subscription would not, so a command line that was killed
    * mid-poll would leave one open on this pod.
    */
-  async sweep(now = Date.now()): Promise<void> {
+  async sweep(now = nowInstant().epochMilliseconds): Promise<void> {
     for (const [token, entry] of [...this.sessions]) {
       if (now - entry.lastSeenAt < HTTP_SESSION_TTL_SECONDS * 1000) continue;
       logger.info(

@@ -42,6 +42,7 @@ import {
   threadPinKey,
 } from "../rules/connected-agent-keys.rules.ts";
 import type { AgentStateStorePort, Unsubscribe } from "@langwatch/agent-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   ConnectedAgentDispatchPort,
   type ConnectedAgentRegistryPort,
@@ -134,7 +135,7 @@ export class CallDispatcherAdapter extends ConnectedAgentDispatchPort {
    */
   async dispatch(params: DispatchParams): Promise<CallOutcome> {
     await this.start();
-    const now = params.now ?? (() => Date.now());
+    const now = params.now ?? (() => nowInstant().epochMilliseconds);
     const startedAt = now();
     const deadlineAt = startedAt + params.agent.timeoutMs;
 

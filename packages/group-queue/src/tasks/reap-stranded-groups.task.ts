@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 import type { GroupQueueRedis } from "../dependencies-adapter.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:task:group-queue-reap-stranded-groups");
 
@@ -43,7 +44,7 @@ export async function reapStrandedGroups({
   minAgeHours = 6,
   apply = false,
   signal,
-  now = () => Date.now(),
+  now = () => nowInstant().epochMilliseconds,
 }: {
   redis: GroupQueueRedis;
   keyPrefix?: string;

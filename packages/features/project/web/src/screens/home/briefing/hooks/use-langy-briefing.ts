@@ -15,6 +15,7 @@ import { buildAttentionInbox, type CountedSignal } from "../attention-inbox.ts";
 import { getBriefingMock, useBriefingMock } from "../mocks/briefing-mocks.ts";
 import type { BriefingData, ScenarioBar, StatusCell } from "../types.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Derives Langy's home briefing from the project's REAL signals.
@@ -164,7 +165,7 @@ export function useLangyBriefing(): LangyBriefingResult {
   // thus the query key) is stable for the lifetime of the mount — a fresh
   // `Date.now()` every render would spin the query forever.
   const analyticsWindow = useMemo(() => {
-    const endDate = Date.now();
+    const endDate = nowInstant().epochMilliseconds;
     return {
       startDate: endDate - 30 * 24 * 60 * 60 * 1000,
       endDate,

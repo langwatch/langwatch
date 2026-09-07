@@ -3,6 +3,7 @@
  */
 import { InviteThrottledError } from "@langwatch/organization-contract";
 import type { OrganizationInviteRateLimitPort } from "../ports/invite.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 export const INVITE_SEND_WINDOW_SECONDS = 60 * 60;
 export const INVITE_SENDS_PER_WINDOW = 3;
@@ -22,7 +23,7 @@ export class InviteSendThrottleService {
    */
   async assertInviteSendAllowed({
     inviteId,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
   }: {
     inviteId: string;
     now?: number;

@@ -8,6 +8,7 @@ import {
   type UnionToIntersection,
 } from "./eventTypeTransforms.ts";
 import type { FoldProjectionOptions, FoldProjectionStore } from "./foldProjection.types.ts";
+import { nowInstant } from "@langwatch/time";
 
 // ---------------------------------------------------------------------------
 // Schema → event type extraction
@@ -198,7 +199,7 @@ export abstract class AbstractFoldProjection<
    * Do NOT override — implement `initState()` instead.
    */
   init(): State {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     return {
       ...this.initState(),
       [this.createdAtKey]: now,
@@ -221,7 +222,7 @@ export abstract class AbstractFoldProjection<
     const handler = this[handlerName as keyof this] as (e: { type: string }, s: State) => State;
     const newState = handler.call(this, event, state);
     const prevUpdatedAt: number = state[this.updatedAtKey];
-    const nextUpdatedAt = Math.max(Date.now(), prevUpdatedAt + 1);
+    const nextUpdatedAt = Math.max(nowInstant().epochMilliseconds, prevUpdatedAt + 1);
     const eventOccurredAt = (event as Record<string, unknown>).occurredAt;
     const prevLastOccurred: number = state[this.LastEventOccurredAtKey];
     const nextLastOccurred =

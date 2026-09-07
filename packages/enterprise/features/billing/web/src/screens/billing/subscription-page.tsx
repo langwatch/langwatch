@@ -57,6 +57,7 @@ import { CurrentPlanBlock } from "./current-plan-block.tsx";
 import { InvoicesBlock } from "./invoices-block.tsx";
 import { UserManagementDrawer } from "./user-management-drawer.tsx";
 import { useSubscriptionActions } from "./use-subscription-actions.ts";
+import { nowInstant } from "@langwatch/time";
 
 const currencyOptions = [
   { label: "\u20AC EUR", value: PrismaCurrency.EUR },
@@ -252,7 +253,7 @@ export function SubscriptionPage() {
     // 4. Free plan or license override: auto-fill rows with email go to plannedUsers (for upgrade flow)
     if ((isDeveloperPlan || isLicenseOverride) && result.inviteEmails.length > 0) {
       const inviteAsPlanned: PlannedUser[] = result.inviteEmails.map((email, i) => ({
-        id: `invite-${Date.now()}-${i}`,
+        id: `invite-${nowInstant().epochMilliseconds}-${i}`,
         email,
         memberType: "FullMember" as MemberType,
       }));

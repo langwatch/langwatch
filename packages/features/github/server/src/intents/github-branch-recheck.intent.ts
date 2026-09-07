@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 
 import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port.ts";
 import { GITHUB_BRANCH_RECHECK_PROCESS_NAME } from "../processes/github-branch-recheck.process.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:github:branch-recheck");
 const OUTBOX_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -23,7 +24,7 @@ export function runGithubBranchRecheck(deps: GithubBranchRecheckDeps) {
 
 export function runGithubRetentionPrune(deps: GithubBranchRecheckDeps) {
   return async (): Promise<void> => {
-    const startedAt = Date.now();
+    const startedAt = nowInstant().epochMilliseconds;
     const { branchChecks } = await deps.github.pruneStaleBranchLinkage();
     if (branchChecks > 0) {
       logger.info({ branchChecks }, "GitHub branch bookkeeping pruned past the activity horizon");

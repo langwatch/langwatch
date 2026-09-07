@@ -37,6 +37,7 @@ import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.se
 import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
 import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 
@@ -83,7 +84,7 @@ export class ExperimentConnectedCellService {
       cells,
       dispatch ?? ((params) => ports.connectedDispatch.dispatch(params)),
       sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms))),
-      now ?? (() => Date.now()),
+      now ?? (() => nowInstant().epochMilliseconds),
     );
   }
 

@@ -3,6 +3,7 @@ import { EventUtils } from "@langwatch/eventing";
 import type { CanonicalLogRecord, CanonicalTraceLogRecord } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
 import { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   ClickHouseCanonicalLogRecordAppendRepository,
   type LogClickHouseClientResolver,
@@ -81,7 +82,10 @@ export class ClickHouseCanonicalLogRecordRepository extends CanonicalLogRecordRe
       { tenantId },
       "ClickHouseCanonicalLogRecordRepository.getLogsByTraceId",
     );
-    const center = typeof occurredAtMs === "number" && occurredAtMs > 0 ? occurredAtMs : Date.now();
+    const center =
+      typeof occurredAtMs === "number" && occurredAtMs > 0
+        ? occurredAtMs
+        : nowInstant().epochMilliseconds;
     const from = new Date(center - 14 * 24 * 60 * 60 * 1000);
     const to = new Date(center + 2 * 24 * 60 * 60 * 1000);
     const client = await this.resolveClient(tenantId);

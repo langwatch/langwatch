@@ -17,6 +17,7 @@ import {
   type TopicClusteringSkipReason,
 } from "@langwatch/topic-contract";
 import { z } from "zod";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:topic-clustering:process-effects");
 
@@ -474,7 +475,7 @@ export function createTopicClusteringRunHandler(
   deps: TopicClusteringDispatchDeps,
 ): IntentExecutor<TopicClusteringRunIntent> {
   const maxAttempts = deps.maxAttempts ?? TOPIC_CLUSTERING_MAX_ATTEMPTS;
-  const clock = deps.clock ?? (() => Date.now());
+  const clock = deps.clock ?? (() => nowInstant().epochMilliseconds);
 
   return async (payload: TopicClusteringRunIntent, intentContext: IntentContext) => {
     const commands = deps.commands;

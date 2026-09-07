@@ -30,6 +30,7 @@ import {
   mapProviderName,
 } from "../rules/provider-id-mapping.rules.ts";
 import { getReasoningConfig } from "../rules/reasoning-config.rules.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:task:model-registry-sync");
 
@@ -329,7 +330,7 @@ export async function syncModelRegistry({
   });
 
   const registry: LLMModelRegistry = {
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
     modelCount: Object.keys(transformedModels).length,
     models: transformedModels,
   };

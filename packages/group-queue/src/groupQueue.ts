@@ -94,6 +94,7 @@ import {
   WORKER_LIVENESS_REFRESH_MS,
 } from "./scripts.ts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Mutable state shared across one dispatch's bisection descent. */
 interface BisectionDispatchState {
@@ -537,7 +538,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
    * added to the resolved score by the caller; only the producer's own claim
    * about when the work occurred is judged here.
    */
-  private resolveScore(rawScore: unknown, nowMs: number = Date.now()): number {
+  private resolveScore(rawScore: unknown, nowMs: number = nowInstant().epochMilliseconds): number {
     const { score, isRejected } = resolveReadyScore({
       score: rawScore,
       nowMs,
@@ -709,7 +710,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     const dedup = options?.deduplication ?? this.deduplication;
 
     const contextMetadata = this.captureContext();
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
 
     const shouldExtend = dedup ? dedup.extend !== false : true;
     const shouldReplace = dedup ? dedup.replace !== false : true;
@@ -1054,7 +1055,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       try {
         drainedSiblings = await this.scripts.drainGroupReady({
           groupId,
-          nowMs: Date.now(),
+          nowMs: nowInstant().epochMilliseconds,
           maxJobs: maxBatch - 1,
           maxBytes,
           initialBytes,
@@ -1229,7 +1230,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
               // `leasedUntil` is a soft projection of when the queue's retry
               // layer would reschedule the job if it stalled: now +
               // maxBackoffMs. Adapters use it for stuck-state dashboards.
-              const leasedUntil = new Date(Date.now() + JOB_RETRY_CONFIG.maxBackoffMs);
+              const leasedUntil = new Date(
+                nowInstant().epochMilliseconds + JOB_RETRY_CONFIG.maxBackoffMs,
+              );
               await this.runAuditAll(
                 (batchPayloads ?? [payload]).map(
                   (p) => () =>
@@ -1491,7 +1494,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
                   groupId,
                   stagedJobId,
                   newStagedJobId,
-                  dispatchAfterMs: Date.now() + backoffMs,
+                  dispatchAfterMs: nowInstant().epochMilliseconds + backoffMs,
                   jobDataJson: retryJobData,
                   backoffMs,
                   // Written inside the same script as the re-stage. The chain is
@@ -1529,7 +1532,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
 
                 // Audit hook: willRetry=true. Fires for the dispatched
                 // payload + every drained sibling (they all get re-staged).
-                const nextAttemptAt = new Date(Date.now() + backoffMs);
+                const nextAttemptAt = new Date(nowInstant().epochMilliseconds + backoffMs);
                 await this.runAuditAll(
                   (batchPayloads ?? [payload]).map(
                     (p) => () =>
@@ -1641,7 +1644,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       // (merged by the elected snapshot writer on its detail cycle).
       // Fire-and-forget so an instrumentation hiccup never bubbles into the
       // worker pipeline.
-      const completedAtMs = Date.now();
+      const completedAtMs = nowInstant().epochMilliseconds;
       const bucketField = latencyBucketField(jobDurationMs);
       const minuteKey = latencyMinuteBucketKey(this.queueName, completedAtMs);
       const hourKey = latencyHourBucketKey(this.queueName, completedAtMs);
@@ -2503,7 +2506,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       groupId,
       stagedJobId,
       newStagedJobId: stagedJobId,
-      dispatchAfterMs: Date.now() + backoffMs,
+      dispatchAfterMs: nowInstant().epochMilliseconds + backoffMs,
       jobDataJson: withJobAttempt({ value: jobDataJson, attempt }),
       backoffMs,
       attempt,

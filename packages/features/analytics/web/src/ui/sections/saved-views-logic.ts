@@ -5,7 +5,7 @@
  * importing React or server-side dependencies (Prisma, registry).
  */
 
-import { differenceInCalendarDays } from "@langwatch/time";
+import { differenceInCalendarDays, nowInstant } from "@langwatch/time";
 import type { FilterField } from "../../model/filters/types.ts";
 import type { FilterParam } from "./use-filter-params.ts";
 
@@ -203,5 +203,5 @@ export function findMatchingView({
  * Generates a unique ID for a new custom view.
  */
 export function generateViewId(): string {
-  return `view-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return `view-${nowInstant().epochMilliseconds}-${Math.random().toString(36).slice(2, 9)}`;
 }

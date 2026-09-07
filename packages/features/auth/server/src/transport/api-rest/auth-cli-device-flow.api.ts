@@ -20,6 +20,7 @@ import { createLogger } from "@langwatch/observability";
 import type { AuthDirectoryPort } from "../../ports/auth-directory.port.ts";
 import type { Context } from "hono";
 import { z } from "zod";
+import { nowInstant } from "@langwatch/time";
 
 import {
   DEVICE_CODE_TTL_SECONDS,
@@ -346,7 +347,7 @@ export function createAuthCliDeviceFlowRestApp(options: {
       }
 
       // Server-side expiry check, in case the store has not evicted yet.
-      if (Date.now() > record.expires_at) {
+      if (nowInstant().epochMilliseconds > record.expires_at) {
         await ports.sessions.consumeDeviceCode({ record });
         return c.json({ error: "expired_token", error_description: "Device code expired" }, 408);
       }
@@ -560,7 +561,7 @@ export function createAuthCliDeviceFlowRestApp(options: {
       // entry. `session_started_at` is preserved through later rotations so the
       // dashboard shows "logged in 5 days ago" rather than the rotation moment.
       const clientInfo: CliClientInfo | undefined = parsed.data.client_info
-        ? { ...parsed.data.client_info, session_started_at: Date.now() }
+        ? { ...parsed.data.client_info, session_started_at: nowInstant().epochMilliseconds }
         : undefined;
       const session = await ports.sessions.mintSession({
         userId: user.id,
@@ -625,7 +626,7 @@ export function createAuthCliDeviceFlowRestApp(options: {
           401,
         );
       }
-      if (Date.now() > record.expires_at) {
+      if (nowInstant().epochMilliseconds > record.expires_at) {
         await ports.sessions.dropRefreshToken(refresh_token);
         return c.json(
           { error: "invalid_grant", error_description: "Refresh token has expired" },
@@ -642,7 +643,7 @@ export function createAuthCliDeviceFlowRestApp(options: {
         .directory()
         .maxSessionDurationDays(record.organization_id);
       if (maxDurationDays > 0) {
-        const sessionAgeMs = Date.now() - sessionAnchorMs;
+        const sessionAgeMs = nowInstant().epochMilliseconds - sessionAnchorMs;
         if (sessionAgeMs > maxDurationDays * 24 * 60 * 60 * 1000) {
           // Reject AND invalidate the old refresh token, so no further rotation
           // is attempted. The CLI gets 401 and wipes local state.
@@ -746,7 +747,7 @@ export function createAuthCliDeviceFlowRestApp(options: {
           404,
         );
       }
-      if (Date.now() > record.expires_at) {
+      if (nowInstant().epochMilliseconds > record.expires_at) {
         return c.json(
           {
             error: "expired",
@@ -818,7 +819,7 @@ export function createAuthCliDeviceFlowRestApp(options: {
       if (!record) {
         return c.json({ error: "not_found", error_description: "Code not recognised" }, 404);
       }
-      if (Date.now() > record.expires_at) {
+      if (nowInstant().epochMilliseconds > record.expires_at) {
         return c.json({ error: "expired", error_description: "Code has expired" }, 410);
       }
       if (record.status !== "pending") {

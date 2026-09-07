@@ -87,6 +87,7 @@ import {
 } from "@trpc/server";
 import { z } from "zod";
 import type { UserApp } from "#app/user.app";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:user-router");
 
@@ -650,7 +651,7 @@ export class UserTrpcApi {
 
             const askAgainAfter =
               dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000;
-            return { offer: Date.now() >= askAgainAfter };
+            return { offer: nowInstant().epochMilliseconds >= askAgainAfter };
           }),
       )
       /**

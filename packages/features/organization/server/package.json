@@ -10,15 +10,27 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "imports": {
-    "#*": "./src/*.ts"
+    "#*": {
+      "types": {
+        "langwatch-declarations": "./dist/*.d.ts",
+        "default": "./src/*.ts"
+      },
+      "default": "./src/*.ts"
+    }
   },
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     },
     "./composition/organization-invites": {
-      "types": "./src/repositories/prisma/prisma.organization-invite.repository.ts",
+      "types": {
+        "langwatch-declarations": "./dist/repositories/prisma/prisma.organization-invite.repository.d.ts",
+        "default": "./src/repositories/prisma/prisma.organization-invite.repository.ts"
+      },
       "default": "./src/repositories/prisma/prisma.organization-invite.repository.ts"
     }
   },
@@ -43,6 +55,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@trpc/server": "^11.18.0",
     "hono": "^4.12.27",
     "hono-openapi": "^1.3.1",

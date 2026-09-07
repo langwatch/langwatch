@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * A sliding-window request counter, one per caller address.
  */
@@ -24,7 +25,7 @@ export class McpRateLimitService {
   /** Whether the address has already spent its window. Does not record. */
   isBlocked(ip: string): boolean {
     const entry = this.entries.get(ip);
-    if (!entry || Date.now() - entry.windowStart > this.windowMs) {
+    if (!entry || nowInstant().epochMilliseconds - entry.windowStart > this.windowMs) {
       return false;
     }
 
@@ -33,7 +34,7 @@ export class McpRateLimitService {
 
   /** Records one request for this address. */
   track(ip: string): void {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const entry = this.entries.get(ip);
     if (!entry || now - entry.windowStart > this.windowMs) {
       this.entries.set(ip, { count: 1, windowStart: now });
@@ -46,7 +47,7 @@ export class McpRateLimitService {
 
   /** Drops windows that have elapsed, so an idle address costs nothing. */
   sweep(): void {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     for (const [ip, entry] of this.entries) {
       if (now - entry.windowStart > this.windowMs) {
         this.entries.delete(ip);

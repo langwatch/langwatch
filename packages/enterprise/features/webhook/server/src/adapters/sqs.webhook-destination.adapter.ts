@@ -15,6 +15,7 @@ import {
   type WebhookDispatchResult,
 } from "../ports/webhook-destination.port.ts";
 import { parseSqsQueueUrl, sqsHostFor } from "../rules/sqs-queue-url.rules.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * How this process builds an AWS transport — the corporate proxy, the TLS agent, the assumed
@@ -243,7 +244,7 @@ function attributesFor(request: WebhookDispatchRequest): Record<string, MessageA
       ? signWebhookPayload({
           secrets: request.signingSecrets,
           body: request.body,
-          timestampSeconds: Math.floor(Date.now() / 1000),
+          timestampSeconds: Math.floor(nowInstant().epochMilliseconds / 1000),
         })
       : null;
   return sqsMessageAttributes({

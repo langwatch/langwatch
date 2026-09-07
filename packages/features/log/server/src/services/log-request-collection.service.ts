@@ -11,6 +11,7 @@ import { getLangWatchTracer } from "langwatch";
 import { piiRedactionLevelSchema } from "@langwatch/trace-contract";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 import type { LogTraceIoPort } from "../ports/log-trace-io.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Every field optional, all the way down.
@@ -86,7 +87,7 @@ export class LogRequestCollectionService {
           organizationId,
           request: logRequest,
           piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
-          acceptedAt: Date.now(),
+          acceptedAt: nowInstant().epochMilliseconds,
         });
         // Only preparation can reject: it is the sole stage that judges the
         // sender's payload. Everything after it either persists the record or

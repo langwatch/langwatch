@@ -46,6 +46,7 @@ import {
 } from "./conversation-trace-assembly.service.ts";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { GenieSpanAttributesService } from "./genie-span-attributes.service.ts";
+import { nowInstant } from "@langwatch/time";
 import type {
   GenieMessageFrame,
   GenieMessagePayload,
@@ -193,7 +194,7 @@ export class GenieTraceMapperService {
     const eventMs = Date.parse(event.event_timestamp);
     const startMs =
       GenieSpanAttributesService.tryToMs(payload.created_timestamp) ??
-      (Number.isFinite(eventMs) ? eventMs : Date.now());
+      (Number.isFinite(eventMs) ? eventMs : nowInstant().epochMilliseconds);
     const status = (
       payload.status ??
       GenieSpanAttributesService.tryExtraString(event, "status") ??

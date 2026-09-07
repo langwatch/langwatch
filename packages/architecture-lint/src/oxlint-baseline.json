@@ -10050,10 +10050,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/enterprise/composition/api/src/governance/governance-eventing.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/enterprise/composition/api/src/governance/governance-kpis.clickhouse.repository.ts",
       "measured": "2026-09-06"
     },
@@ -10178,14 +10174,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/enterprise/features/billing/web/src/screens/billing/subscription-page.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/enterprise/features/billing/web/src/screens/billing/user-management-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/enterprise/features/governance/contract/src/canonical-cost.ts",
       "measured": "2026-09-06"
     },
@@ -10202,15 +10190,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/enterprise/features/governance/server/src/adapters/http-poller.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/enterprise/features/governance/server/src/adapters/openai-admin-puller.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/enterprise/features/governance/server/src/adapters/s3-puller.adapter.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10326,10 +10306,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/enterprise/features/governance/server/src/transport/api-rest/governance-ingest.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/enterprise/features/governance/server/src/transport/api-trpc/anomaly-rules.api.ts",
       "measured": "2026-09-06"
     },
@@ -10347,10 +10323,6 @@
     },
     {
       "key": "temporal-only|packages/enterprise/features/governance/web/src/features/source-events/ui/sections/source-events-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/enterprise/features/governance/web/src/screens/governance/governance-ingestion-source.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -10422,10 +10394,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/enterprise/features/scim/server/src/adapters/identity.scim-sync-lifecycle.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/enterprise/features/scim/server/src/ports/scim-repository.port.ts",
       "measured": "2026-09-06"
     },
@@ -10443,10 +10411,6 @@
     },
     {
       "key": "temporal-only|packages/enterprise/features/scim/web/src/screens/scim/scim.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/enterprise/features/webhook/server/src/adapters/sqs.webhook-destination.adapter.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10474,23 +10438,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/eventing/src/eventSourcing.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/eventing/src/process-manager/metrics.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/eventing/src/process-manager/processRuntime.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/eventing/src/projections/abstractFoldProjection.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/eventing/src/projections/redisCachedFoldStore.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10498,23 +10446,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/eventing/src/queues/memory.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/eventing/src/replay/replayDiscovery.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/eventing/src/replay/replayDrain.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/eventing/src/replay/replayEngine.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/eventing/src/replay/replayStatePath.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10542,15 +10474,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/eventing/src/services/queues/queueManager.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/eventing/src/stores/eventStoreUtils.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/eventing/src/utils/event.utils.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10562,18 +10486,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/agent/server/src/adapters/connected-agent-dispatch.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/adapters/connected-agent-registry.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/adapters/connected-agent-state.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/agent/server/src/projections/connected-agent-presence.projection.ts",
       "measured": "2026-09-06"
     },
@@ -10582,19 +10494,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/agent/server/src/rules/agent-test-tracing.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/agent/server/src/rules/agent-view.rules.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "temporal-only|packages/features/agent/server/src/services/connected-agent-presence.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/services/connected-agent-session.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10607,10 +10511,6 @@
     },
     {
       "key": "temporal-only|packages/features/agent/server/src/transport/api-rest/agent-legacy.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/transport/api-trpc/http-proxy.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10794,10 +10694,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/api-key/server/src/adapters/redis.agent-sandbox-key-share.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/api-key/server/src/app/api-key.app.ts",
       "measured": "2026-09-06"
     },
@@ -10842,14 +10738,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/api-key/web/src/screens/api-key/cli-auth.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/api-key/web/src/testing.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/api-key/web/src/ui/blocks/ingestion-keys-section.tsx",
       "measured": "2026-09-06"
     },
@@ -10866,19 +10754,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/auth/server/src/services/auth0-password.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/auth/server/src/services/cli-device-session.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/auth/server/src/services/signup-verification.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10930,15 +10806,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/authz/server/src/services/authz-grant-snapshot.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/authz/server/src/services/authz.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/authz/server/src/stores/memory/memory.per-organization-cached-gate.store.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11010,18 +10878,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/automation/web/src/features/authoring/ui/sections/automation-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/web/src/features/authoring/ui/sections/slack.client.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/web/src/features/authoring/ui/sections/subject-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/automation/web/src/features/authoring/ui/sections/view-automation-drawer.tsx",
       "measured": "2026-09-06"
     },
@@ -11043,10 +10899,6 @@
     },
     {
       "key": "temporal-only|packages/features/coding-agent/contract/src/testing.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/server/src/adapters/coding-agent-clock.adapter.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11075,14 +10927,6 @@
     },
     {
       "key": "temporal-only|packages/features/coding-agent/server/src/services/coding-agent-session-seen.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/server/src/transport/api-trpc/coding-agent.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/web/src/last-update.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11142,10 +10986,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/dataset/server/src/adapters/dataset-upload.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/dataset/server/src/ports/dataset.port.ts",
       "measured": "2026-09-06"
     },
@@ -11162,19 +11002,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/dataset/web/src/behavior/use-dataset-editor-store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/web/src/behavior/use-dataset-slug-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/dataset/web/src/model/convert-record-values.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/dataset/web/src/model/reserved-columns.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11187,10 +11015,6 @@
     },
     {
       "key": "temporal-only|packages/features/dataset/web/src/ui/sections/datasets/upload-csv-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/entitlement/server/src/transport/api-trpc/cost.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11258,14 +11082,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/experiment/server/src/adapters/redis.experiment-run-abort.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/experiment/server/src/adapters/redis.experiment-run-progress.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/experiment/server/src/processes/experiment-cell-workflow.process.ts",
       "measured": "2026-09-06"
     },
@@ -11294,27 +11110,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/experiment/server/src/services/experiment-carried-board.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/experiment/server/src/services/experiment-connected-cell.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/experiment/server/src/services/experiment-run-driver.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/experiment/server/src/services/experiment-run-storage.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/experiment/server/src/services/experiment.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/experiment/server/src/transport/api-rest/experiment-dspy-steps.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11614,10 +11410,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/gateway/web/src/screens/gateway/gateway-usage.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/gateway/web/src/screens/gateway/gateway-virtual-key.screen.tsx",
       "measured": "2026-09-06"
     },
@@ -11635,18 +11427,6 @@
     },
     {
       "key": "temporal-only|packages/features/github/server/src/adapters/github-api.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/github/server/src/adapters/github-install-state.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/github/server/src/adapters/github-token-cache.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/github/server/src/intents/github-branch-recheck.intent.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11686,39 +11466,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/github/server/src/transport/api-rest/github.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/hosted-mcp/server/src/services/mcp-rate-limit.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/hosted-mcp/server/src/transport/api-rest/mcp-authorize.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/identity/server/src/adapters/better-auth.identity-storage.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/identity/server/src/adapters/eventing.join-request-ledger.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/identity/server/src/adapters/eventing.sso-connection-ledger.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/identity/server/src/adapters/identity-ledger.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/identity/server/src/adapters/join-request-ledger.adapter.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11742,39 +11490,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/identity/server/src/services/join-requests.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/identity/server/src/services/per-subject-cached-gate.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/identity/server/src/services/sso-connection-backoffice.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/langy/contract/src/langy.service.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "temporal-only|packages/features/langy/server/src/adapters/clickhouse.langy-analytics-event.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/adapters/eventing.langy-conversation-runtime.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/adapters/redis.langy-local-presence.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/adapters/redis.langy-token-buffer.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/ports/langy-feedback-prompt.port.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11790,27 +11510,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/langy/server/src/services/langy-conversation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/services/langy-github-pr-quota.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/services/langy-local-call-dispatcher.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/langy/server/src/services/langy-local-control-request.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/services/langy-local-session.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/services/langy-local-user-wait.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11830,26 +11530,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/langy/server/src/subscribers/langy-conversation.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/transport/api-rest/langy-local-control-long-poll.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/transport/api-rest/langy-local.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/server/src/transport/api-trpc/langy.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/log/server/src/adapters/canonical-log.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/log/server/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts",
       "measured": "2026-09-06"
     },
@@ -11858,19 +11538,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/log/server/src/services/log-request-collection.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/metric/contract/src/metric-rollup/rollup-row.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/metric/contract/src/schemas/metric-processing/metric-data-point.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/metric/server/src/adapters/canonical-metric.adapter.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11882,23 +11550,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/metric/server/src/services/metric-request-collection.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/model-provider/contract/src/model-provider-registry.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/model-provider/server/src/adapters/codex-oauth.model-provider-token-refresher.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/model-provider/server/src/adapters/registry.model-provider-catalog.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/model-provider/server/src/adapters/windowed.model-provider-connection-rate-limiter.adapter.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11907,10 +11563,6 @@
     },
     {
       "key": "temporal-only|packages/features/model-provider/server/src/rules/legacy-model-provider.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/model-provider/server/src/services/model-cost-preview.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11934,23 +11586,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/model-provider/server/src/tasks/model-registry-sync.task.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/model-provider/server/src/transport/api-trpc/model-provider.api.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/model-provider/web/src/behavior/use-codex-device-sign-in.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/model-provider/web/src/model/default-model-cascade.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/model-provider/web/src/model/relative-time.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11959,10 +11599,6 @@
     },
     {
       "key": "temporal-only|packages/features/model-provider/web/src/ui/sections/model-provider-form.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/monitor/server/src/app/monitor.app.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11986,19 +11622,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/navigation/web/src/ui/blocks/admin-viewing-as-banner.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/navigation/web/src/ui/sections/main-menu.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/notification/server/src/adapters/redis.tenant-broadcast.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/notification/server/src/services/email-mime.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12015,14 +11639,6 @@
     },
     {
       "key": "temporal-only|packages/features/onboarding/web/src/behavior/use-project-by-slug-or-latest.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/onboarding/web/src/ui/elements/screen-lifecycle.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/onboarding/web/src/ui/sections/observability/waiting-for-traces-chip.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -12050,14 +11666,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/ops/server/src/repositories/redis/queue.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/repositories/redis/redis.blob-store.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/ops/server/src/repositories/scheduler-ops.repository.ts",
       "measured": "2026-09-06"
     },
@@ -12070,10 +11678,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/ops/server/src/services/anomaly-detector.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/ops/server/src/services/event-explorer.service.ts",
       "measured": "2026-09-06"
     },
@@ -12082,39 +11686,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/ops/server/src/services/manager-explorer.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/ops-dashboard-view.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/ops-metrics-collector.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/ops-metrics-publication.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/ops-metrics-sampling.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/ops-metrics-window.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/ops/server/src/services/ops-snapshot-reader.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/replay-lock-heartbeat.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/replay.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12126,19 +11698,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/ops/server/src/services/system-migration-rollback.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/services/system-migrations.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/ops/server/src/services/usage-stats-collection.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/server/src/transport/api-trpc/ops.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12175,10 +11735,6 @@
     },
     {
       "key": "temporal-only|packages/features/organization/server/src/services/invite-lifecycle.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/organization/server/src/services/invite-send-throttle.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12250,10 +11806,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/project/server/src/app/project.app.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/project/server/src/repositories/project.repository.ts",
       "measured": "2026-09-06"
     },
@@ -12275,14 +11827,6 @@
     },
     {
       "key": "temporal-only|packages/features/project/server/src/transport/api-rest/project.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/project/web/src/screens/home/briefing/components/home-overview-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/project/web/src/screens/home/briefing/hooks/use-langy-briefing.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12314,19 +11858,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/prompt/web/src/model/prompt-chat-sync-context.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/prompt/web/src/model/prompt-form/version-metadata.schemas.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/prompt/web/src/screens/prompt-studio/browser/experiment-from-playground-button.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/prompt/web/src/screens/prompt-studio/chat/synced-chat-input.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -12582,19 +12114,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/stored-object/server/src/adapters/azure-blob-token-provider.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/stored-object/server/src/adapters/azure-blob.stored-object-driver.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/adapters/group-queue.object-storage-migration.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/stored-object/server/src/adapters/s3.payload-staging.adapter.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12678,23 +12198,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/topic/server/src/adapters/redis.topic-clustering-bootstrap.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/topic/server/src/adapters/topic-server-installer.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/topic/server/src/intents/topic-clustering-runner.intent.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/topic/server/src/intents/topic-clustering.intent.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/topic/server/src/migrations/legacy-import.topic-clustering.migration.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12707,14 +12211,6 @@
     },
     {
       "key": "temporal-only|packages/features/topic/server/src/repositories/topic-clustering.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/topic/server/src/tasks/topic-clustering-run.task.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/topic/web/src/screens/topic-clustering/topic-clustering.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -12786,10 +12282,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/user/server/src/transport/api-trpc/user.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/user/web/src/behavior/use-personal-context.ts",
       "measured": "2026-09-06"
     },
@@ -12799,10 +12291,6 @@
     },
     {
       "key": "temporal-only|packages/features/user/web/src/model/relative-time.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -12834,15 +12322,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/workflow/server/src/services/workflow-studio-dispatch.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/workflow/server/src/services/workflow.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/server/src/transport/api-rest/workflow-studio.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12902,15 +12382,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/group-queue/src/blobSweeper.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/group-queue/src/contracts.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/group-queue/src/dispatcher.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12918,35 +12390,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/group-queue/src/metricsCollector.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/group-queue/src/readyScore.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/group-queue/src/scripts.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/group-queue/src/tasks/reap-stranded-groups.task.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/mail/src/providers/mime.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/mail/src/templates/license-email.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/prisma-client/src/slow-query-warning.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/test-harness/src/nlpgo-subprocess.ts",
       "measured": "2026-09-06"
     },
     {

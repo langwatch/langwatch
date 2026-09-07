@@ -27,6 +27,7 @@ import { JOIN_REQUEST_EXPIRY_MS } from "../processes/join-request-lifecycle.proc
 import { type JoinRequestsServiceDeps } from "../rules/join-requests-contract.rules.ts";
 import { JoinRequestAdmissionGuardsService } from "./join-request-admission-guards.service.ts";
 import { JoinDomainSettingService } from "./join-domain-setting.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:identity:join-requests");
 
@@ -50,7 +51,7 @@ export class JoinRequestsService {
 
   private constructor(deps: JoinRequestsServiceDeps) {
     this.deps = deps;
-    this.now = deps.now ?? (() => Date.now());
+    this.now = deps.now ?? (() => nowInstant().epochMilliseconds);
     this.guards = JoinRequestAdmissionGuardsService.create(deps, this.now);
     this.domainSetting = JoinDomainSettingService.create(deps, this.guards);
   }

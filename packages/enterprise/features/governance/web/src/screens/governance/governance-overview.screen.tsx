@@ -29,6 +29,7 @@ import { useGovernanceScope } from "../../behavior/governance-session.ts";
 import type { AuthzPermission as Permission } from "@langwatch/authz-contract";
 import { api, type RouterOutputs } from "../../behavior/governance-api.ts";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
+import { nowInstant } from "@langwatch/time";
 /**
  * Governance overview - spend, users, anomalies, IngestionSource health.
  * Wires the api.activityMonitor.* procedures for live reads off
@@ -63,7 +64,7 @@ const fmtRelative = (date: Date | string | null): string => {
   if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return "-";
-  const diffMs = Date.now() - d.getTime();
+  const diffMs = nowInstant().epochMilliseconds - d.getTime();
   // Future-dated sources (clock skew between LangWatch and the
   // reporting source, or seed scripts that drift past `now`) would
   // otherwise render as "-63236s ago". Clamp to "just now" instead.

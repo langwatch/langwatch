@@ -8,6 +8,7 @@ import type {
   OpsSnapshotLease,
 } from "@langwatch/ops-contract";
 import { OpsSnapshotRepository } from "../repositories/ops-snapshot.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:snapshot-reader");
 
@@ -55,7 +56,7 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
     dlqCount: number;
     computedAt: Date;
   } {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     if (this.badgeCache && now - this.badgeCache.computedAt.getTime() < BADGE_CACHE_TTL_MS) {
       return this.badgeCache;
     }

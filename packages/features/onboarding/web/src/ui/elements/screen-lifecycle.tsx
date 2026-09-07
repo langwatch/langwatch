@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useAnalytics } from "react-contextual-analytics";
+import { nowInstant } from "@langwatch/time";
 
 export const ScreenLifecycle: React.FC = () => {
   const { emit } = useAnalytics();
@@ -7,10 +8,10 @@ export const ScreenLifecycle: React.FC = () => {
   emitRef.current = emit;
 
   useEffect(() => {
-    const start = Date.now();
+    const start = nowInstant().epochMilliseconds;
     return () => {
       emitRef.current("exited", void 0, {
-        timeOnScreenMs: Date.now() - start,
+        timeOnScreenMs: nowInstant().epochMilliseconds - start,
       });
     };
   }, []);

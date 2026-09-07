@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import type { GithubRedisPort } from "../ports/github-app-token.port.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
 import { GithubTokenCachePort } from "../ports/github-token-cache.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const LOCK_TTL_SEC = 15;
 const LOCK_RETRY_MS = 100;
@@ -127,8 +128,8 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
     }
 
     const token = randomBytes(16).toString("hex");
-    const deadline = Date.now() + LOCK_MAX_WAIT_MS;
-    while (Date.now() < deadline) {
+    const deadline = nowInstant().epochMilliseconds + LOCK_MAX_WAIT_MS;
+    while (nowInstant().epochMilliseconds < deadline) {
       try {
         const result = await this.redis.trySet(key, token, "NX", "EX", LOCK_TTL_SEC);
         if (result === "OK") {

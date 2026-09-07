@@ -34,6 +34,7 @@
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@paper-design/shaders-react": "^0.0.76",
     "lucide-react": "^1.22.0",
     "numeral": "^2.0.6",

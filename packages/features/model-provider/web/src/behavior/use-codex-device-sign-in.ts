@@ -4,6 +4,7 @@ import { CODEX_SIGN_IN_TTL_MS } from "@langwatch/model-provider-contract";
 
 import { api } from "./model-provider-api.ts";
 import type { ScopeAssignment } from "../model/scope-assignment.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The Codex device-sign-in state machine, headless: start a device code,
@@ -71,7 +72,7 @@ export function useCodexDeviceSignIn({
       pollTimer.current = setTimeout(() => {
         void (async () => {
           if (attempt !== attemptRef.current) return;
-          if (Date.now() - pending.startedAtMs > CODEX_SIGN_IN_TTL_MS) {
+          if (nowInstant().epochMilliseconds - pending.startedAtMs > CODEX_SIGN_IN_TTL_MS) {
             setPhase({
               name: "error",
               message: "The sign-in timed out before it was approved.",
@@ -135,7 +136,7 @@ export function useCodexDeviceSignIn({
         deviceAuthId: device.deviceAuthId,
         verificationUrl: device.verificationUrl,
         intervalSeconds: device.intervalSeconds,
-        startedAtMs: Date.now(),
+        startedAtMs: nowInstant().epochMilliseconds,
       };
       setPhase(pending);
       schedulePoll({ pending, attempt });

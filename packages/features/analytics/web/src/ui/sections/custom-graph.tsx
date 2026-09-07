@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
-import { format } from "@langwatch/time";
+import { format, nowInstant } from "@langwatch/time";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { LuShield } from "react-icons/lu";
@@ -1476,7 +1476,7 @@ function MonitorGraph({
           {filterParams.startDate &&
             filterParams.endDate &&
             (() => {
-              const now = new Date().getTime();
+              const now = nowInstant().epochMilliseconds;
               const daysDiff = Math.abs(
                 Math.ceil((now - filterParams.endDate) / (1000 * 60 * 60 * 24)),
               );

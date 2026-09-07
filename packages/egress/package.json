@@ -16,11 +16,17 @@
   "types": "src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     },
     "./ssrf": {
-      "types": "./src/ssrf/address.ts",
+      "types": {
+        "langwatch-declarations": "./dist/ssrf/address.d.ts",
+        "default": "./src/ssrf/address.ts"
+      },
       "default": "./src/ssrf/address.ts"
     }
   },
@@ -34,6 +40,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "undici": "^8.5.0"
   },
   "devDependencies": {

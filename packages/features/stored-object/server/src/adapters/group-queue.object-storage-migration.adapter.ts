@@ -5,6 +5,7 @@ import {
   splitEnvelope,
 } from "@langwatch/group-queue/operational";
 import type { QueueMigrationBlocker } from "../services/object-storage-migration.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Small Redis surface used by the one-off migration audit. IORedis implements
@@ -39,7 +40,7 @@ export class GroupQueueObjectStorageMigrationAdapter {
 
   static async audit({
     redis,
-    nowMs = Date.now(),
+    nowMs = nowInstant().epochMilliseconds,
     scanNodes = [redis],
   }: {
     redis: QueueAuditRedis;

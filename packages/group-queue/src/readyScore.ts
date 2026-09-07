@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * A ready score is a dispatch-eligibility time, and for the highest-volume
  * producers it is a value the CUSTOMER supplies: `recordDataPoint`,
@@ -111,7 +112,7 @@ export function isUsableReadyScore(score: unknown, nowMs: number): score is numb
  * pre-NTP clock is pinned to the backstop instead of staging 1970 out of the
  * function whose whole job is to prevent it.
  */
-export function fallbackReadyScore(nowMs: number = Date.now()): number {
+export function fallbackReadyScore(nowMs: number = nowInstant().epochMilliseconds): number {
   return isPlausibleReadyScore(nowMs) ? nowMs : MIN_PLAUSIBLE_EPOCH_MS;
 }
 
@@ -137,7 +138,7 @@ export function fallbackReadyScore(nowMs: number = Date.now()): number {
  */
 export function resolveReadyScore({
   score,
-  nowMs = Date.now(),
+  nowMs = nowInstant().epochMilliseconds,
 }: {
   score: unknown;
   nowMs?: number;

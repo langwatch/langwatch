@@ -15,6 +15,7 @@ import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import type { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 
@@ -238,7 +239,7 @@ export class ExperimentCarriedBoardService {
 
         return dbEvaluator?.name ?? null;
       },
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
     });
 
     for (const dispatch of targetResults) {

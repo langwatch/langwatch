@@ -22,6 +22,7 @@ import type {
   TopicClusteringLangevalsPort,
 } from "../ports/topic-clustering-langevals.port.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
   type TopicClusteringPageOutcome,
@@ -223,7 +224,8 @@ export const clusterTopicsForProject = async (
   if (
     !searchAfter &&
     !isIncrementalProcessing &&
-    lastTopicCreatedAt > new Date(Date.now() - daysFrequency * 24 * 60 * 60 * 1000)
+    lastTopicCreatedAt >
+      new Date(nowInstant().epochMilliseconds - daysFrequency * 24 * 60 * 60 * 1000)
   ) {
     logger.info(
       { projectId },
@@ -360,10 +362,10 @@ export async function fetchCountsFromClickHouse({
   clickhouse: TopicClusteringClickHousePort;
   projectId: string;
 }): Promise<TraceCounts> {
-  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const thirtyDaysAgo = nowInstant().epochMilliseconds - 30 * 24 * 60 * 60 * 1000;
   // Wide MODE window (kept at 365d): light-column scan that decides
   // batch-vs-incremental, so it must reflect the project's whole history.
-  const twelveMonthsAgo = Date.now() - CLUSTERING_MODE_WINDOW_DAYS * DAY_MS;
+  const twelveMonthsAgo = nowInstant().epochMilliseconds - CLUSTERING_MODE_WINDOW_DAYS * DAY_MS;
 
   // trace_summaries is a ReplacingMergeTree, so we count one row per trace
   // (its latest version). Rather than the IN-tuple dedup pattern — which
@@ -420,7 +422,7 @@ export async function fetchTracesFromClickHouse(
 ): Promise<TraceSearchResult> {
   // Narrow FETCH window (49d, hot-tier only): bounds how far cursor-paging
   // reads the heavy ComputedInput column, keeping it off S3 cold storage.
-  const fetchWindowStartMs = Date.now() - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS;
+  const fetchWindowStartMs = nowInstant().epochMilliseconds - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS;
 
   // Page selection runs on the lightweight key columns only: it picks the
   // 2000 most-recent matching traces without ever reading ComputedInput.
@@ -796,12 +798,12 @@ export const storeResults = async (
     await deps.migration.trySeedProjectTopicModel(projectId);
     await deps.commands.recordTopics({
       tenantId: projectId,
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
       mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
       source: "clustering",
       dedupeKey: runContext
         ? `run:${runContext.runId}:page-${runContext.page}`
-        : `adhoc:${Date.now()}`,
+        : `adhoc:${nowInstant().epochMilliseconds}`,
       topics: [
         ...topics.map((topic) => ({
           id: topic.id,
@@ -843,7 +845,7 @@ export const storeResults = async (
             subtopicId: subtopic_id,
             subtopicName: subtopic_id ? (subtopicNameMap.get(subtopic_id) ?? null) : null,
             isIncremental,
-            occurredAt: Date.now(),
+            occurredAt: nowInstant().epochMilliseconds,
           }),
         ),
       );

@@ -6,6 +6,7 @@ import { createLogger } from "@langwatch/observability";
 
 import type { AgentSandboxKeySharePort } from "../ports/agent-sandbox-key-share.port.ts";
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api-key:agent-sandbox");
 
@@ -67,7 +68,7 @@ export class AgentSandboxKeyMintService {
       permissionMode: "restricted",
       permissions: [...AGENT_SANDBOX_PERMISSIONS],
       bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: projectId }],
-      expiresAt: new Date(Date.now() + AGENT_SANDBOX_KEY_TTL_MS),
+      expiresAt: new Date(nowInstant().epochMilliseconds + AGENT_SANDBOX_KEY_TTL_MS),
     });
 
     return token;

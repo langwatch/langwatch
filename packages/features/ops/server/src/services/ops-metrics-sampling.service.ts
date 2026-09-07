@@ -15,6 +15,7 @@ import type {
 } from "@langwatch/ops-contract";
 import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
 import { JOB_NAME_COUNTER_PREFIX, OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:metrics-sampling");
 
@@ -81,7 +82,7 @@ export class OpsMetricsSamplingService {
   async readLatencyWindows(queueNames: string[]): Promise<LatencyWindows> {
     const { minute, hourByQueue, allTime } = await this.metrics.readLatencyHistograms({
       queueNames: queueNames,
-      nowMs: Date.now(),
+      nowMs: nowInstant().epochMilliseconds,
     });
     // Hour buckets come back newest-first per queue; the first 24 of each
     // queue's 168 belong to the day window as well as the week's.

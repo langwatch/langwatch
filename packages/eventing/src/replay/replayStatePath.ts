@@ -9,6 +9,7 @@ import {
 import { StateAccumulator } from "./replayExecutor.ts";
 import type { ReplayLogWriter } from "./replayLog.ts";
 import { aggregateKey } from "./replayMarkers.ts";
+import { nowInstant } from "@langwatch/time";
 import type {
   BatchCompleteInfo,
   RegisteredStateProjection,
@@ -64,7 +65,7 @@ export async function replayStateProjection({
   onProgress?: (progress: ReplayProgress) => void;
   onBatchComplete?: (info: BatchCompleteInfo) => void;
 }): Promise<ReplayResult & { touchedTenants: string[] }> {
-  const startTime = Date.now();
+  const startTime = nowInstant().epochMilliseconds;
   const eventTypes = projection.definition.eventTypes;
 
   // Discover aggregates — when tenantIds is empty, discover across ALL tenants.
@@ -143,7 +144,7 @@ export async function replayStateProjection({
       for (let i = 0; i < tenantAggregates.length; i += aggregateBatchSize) {
         const batch = tenantAggregates.slice(i, i + aggregateBatchSize);
         const batchNum = Math.floor(i / aggregateBatchSize) + 1;
-        const batchStartTime = Date.now();
+        const batchStartTime = nowInstant().epochMilliseconds;
 
         const emit = (batchPhase: ReplayProgress["batchPhase"], batchEventsProcessed: number) => {
           const progress: ReplayProgress = {
@@ -161,7 +162,7 @@ export async function replayStateProjection({
             batchEventsProcessed,
             aggregatesCompleted,
             totalEventsReplayed,
-            elapsedSec: (Date.now() - startTime) / 1000,
+            elapsedSec: (nowInstant().epochMilliseconds - startTime) / 1000,
             skippedCount: 0,
             batchErrors,
             firstError,
@@ -189,7 +190,7 @@ export async function replayStateProjection({
           totalBatches,
           aggregatesInBatch: batch.length,
           eventsInBatch,
-          durationSec: (Date.now() - batchStartTime) / 1000,
+          durationSec: (nowInstant().epochMilliseconds - batchStartTime) / 1000,
         });
       }
 

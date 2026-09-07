@@ -6,6 +6,7 @@ import {
 
 import type { GithubRedisPort } from "../ports/github-app-token.port.ts";
 import { GithubInstallStatePort } from "../ports/github-install-state.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const STATE_MAX_FUTURE_SKEW_MS = 60 * 1000;
@@ -114,7 +115,7 @@ export class GithubInstallStateAdapter extends GithubInstallStatePort {
       return null;
     }
 
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     if (now - payload.issuedAt > STATE_TTL_MS) {
       return null;
     }

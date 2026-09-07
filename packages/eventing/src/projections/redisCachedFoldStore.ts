@@ -12,6 +12,7 @@ import {
 import { decodeFoldCacheEntry, encodeFoldCacheEntry } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionStore } from "./foldProjection.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
 
@@ -80,7 +81,7 @@ function resolveFoldCacheTtlSeconds(configuredSeconds: number | undefined): numb
 
 function readUpdatedAt<State>(state: State): number {
   const value = (state as { UpdatedAt?: unknown })?.UpdatedAt;
-  return typeof value === "number" ? value : Date.now();
+  return typeof value === "number" ? value : nowInstant().epochMilliseconds;
 }
 
 /**

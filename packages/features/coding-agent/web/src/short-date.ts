@@ -1,4 +1,4 @@
-import { format } from "@langwatch/time";
+import { format, nowInstant } from "@langwatch/time";
 
 /**
  * A date as a table cell wants it: "Aug 3" within the current year, "Aug 3,
@@ -7,7 +7,7 @@ import { format } from "@langwatch/time";
  */
 export function formatShortDate({
   timestampMs,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   timestampMs: number;
   now?: number;

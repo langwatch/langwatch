@@ -19,6 +19,7 @@
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
 import type { GovernanceHttpPort, GovernanceHttpResponse } from "../ports/governance-http.port.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   NullIngestionPullDiagnosticsAdapter,
   type IngestionPullDiagnosticsPort,
@@ -117,7 +118,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
 
     while (pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
-      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
+      if (options.deadlineMs !== undefined && nowInstant().epochMilliseconds > options.deadlineMs) {
         this.diagnostics.info("Deadline reached mid-pagination, returning cursor for next run", {
           adapter: this.id,
           pageCount,

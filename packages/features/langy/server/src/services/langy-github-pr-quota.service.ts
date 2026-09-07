@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * Per-user daily cap on PRs Langy may open on the user's behalf.
  * Issue #4747. Spec: specs/langy/langy-github-prs.feature.
@@ -24,7 +25,7 @@ export type GithubPrLimitResult = {
   reserved: boolean;
 };
 
-function dayBucket(now = Date.now()): number {
+function dayBucket(now = nowInstant().epochMilliseconds): number {
   return Math.floor(now / (24 * 60 * 60 * 1000));
 }
 

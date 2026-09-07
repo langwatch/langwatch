@@ -25,6 +25,7 @@ import { useState } from "react";
 import { topicApi } from "../../behavior/topic-api.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useTopicHost } from "../../model/topic-host.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The server sends bare strings for codes/reasons/modes; these lookups narrow them back onto
@@ -100,7 +101,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
   const triggerClustering = topicApi.project.triggerTopicClustering.useMutation({
     onSuccess: (result) => {
       if (result.started) {
-        setLastTriggeredAt(Date.now());
+        setLastTriggeredAt(nowInstant().epochMilliseconds);
         host.succeeded({
           title: "Topic clustering started",
           description: "This can take several minutes.",
@@ -213,7 +214,10 @@ function ClusteringStatusCard({
     {
       refetchInterval: (query) => {
         if (query.state.data?.isRunInFlight) return RUNNING_POLL_MS;
-        if (lastTriggeredAt !== null && Date.now() - lastTriggeredAt < REQUEST_SETTLE_WINDOW_MS) {
+        if (
+          lastTriggeredAt !== null &&
+          nowInstant().epochMilliseconds - lastTriggeredAt < REQUEST_SETTLE_WINDOW_MS
+        ) {
           return RUNNING_POLL_MS;
         }
         return false;

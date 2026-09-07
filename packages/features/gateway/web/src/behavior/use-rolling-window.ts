@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * A rolling `[now - days, now)` window that keeps rolling.
@@ -11,10 +12,13 @@ import { useEffect, useMemo, useState } from "react";
  * enough that this is a refetch a minute rather than one a render.
  */
 export function useRollingWindow(range: number | "mtd", refreshMs = 60_000) {
-  const [tick, setTick] = useState(() => quantiseToMinute(Date.now()));
+  const [tick, setTick] = useState(() => quantiseToMinute(nowInstant().epochMilliseconds));
 
   useEffect(() => {
-    const id = setInterval(() => setTick(quantiseToMinute(Date.now())), refreshMs);
+    const id = setInterval(
+      () => setTick(quantiseToMinute(nowInstant().epochMilliseconds)),
+      refreshMs,
+    );
     return () => clearInterval(id);
   }, [refreshMs]);
 

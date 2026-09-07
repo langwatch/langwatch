@@ -28,7 +28,10 @@ import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
-import { type AddDatasetDrawerProps, AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
+import {
+  type AddDatasetDrawerProps,
+  AddOrEditDatasetDrawer,
+} from "./add-or-edit-dataset-drawer.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/ui-host/toaster";
 import {
@@ -42,6 +45,7 @@ import {
 } from "../../../behavior/direct-upload.ts";
 import { parseHeaderColumns } from "../../../model/parse-header-columns.ts";
 import { getSafeColumnName } from "../../../model/reserved-columns.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   DROPZONE_DOTTED_STYLE,
   DropzonePrompt,
@@ -944,7 +948,7 @@ function buildDatasetFromRows(data: string[][], name: string): InMemoryDataset {
     };
   });
 
-  const now = new Date().getTime();
+  const now = nowInstant().epochMilliseconds;
   const records: DatasetRecordEntry[] = data.slice(1).map((row: string[], index: number) => ({
     id: `${now}-${index}`,
     ...Object.fromEntries(row.map((col, i) => [columns[i]?.name, col])),

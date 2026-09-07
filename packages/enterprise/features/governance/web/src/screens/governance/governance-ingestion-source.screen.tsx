@@ -62,6 +62,7 @@ import { type PageRequest } from "../../features/source-events/model/governance-
 import { SourceEventsTable } from "../../features/source-events/ui/sections/source-events-table.tsx";
 import { useDestinationContext } from "./ingestion-source-forms.ts";
 import { SourceEditDrawer } from "./governance-inventory.screen.tsx";
+import { toEpochMs } from "@langwatch/time";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every
@@ -103,7 +104,7 @@ function isNotFoundError(error: unknown): boolean {
 }
 
 const fmtRelative = (iso: string | null): string =>
-  iso ? (formatTimeAgo(new Date(iso).getTime()) ?? "-") : "-";
+  iso ? (formatTimeAgo(toEpochMs(iso)) ?? "-") : "-";
 
 /** Back link, name, status, and the two manage-only controls. */
 function SourceDetailHeader({

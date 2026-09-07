@@ -14,6 +14,7 @@ import type {
 } from "@langwatch/ops-contract";
 import type { RedisCpuSample } from "../rules/ops-redis-engine-cpu.rules.ts";
 import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:metrics-window");
 
@@ -132,7 +133,8 @@ export class OpsMetricsWindowService {
       byTimestamp.set(point.timestamp, point);
     }
 
-    const cutoff = Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
+    const cutoff =
+      nowInstant().epochMilliseconds - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
 
     return Array.from(byTimestamp.values())
       .filter((point) => point.timestamp > cutoff)
@@ -142,7 +144,7 @@ export class OpsMetricsWindowService {
 
   throughputBuffer: ThroughputPoint[] = [];
   lastTotalInFlight = 0;
-  lastTimestamp = Date.now();
+  lastTimestamp = nowInstant().epochMilliseconds;
   hasBaseline = false;
   currentIngestedPerSec = 0;
   currentCompletedPerSec = 0;
@@ -199,7 +201,7 @@ export class OpsMetricsWindowService {
   prevRedisCpu: RedisCpuSample | null = null;
   currentRedisEngineCpuPercent: number | null = null;
   lastCpuUsage = process.cpuUsage();
-  lastCpuTime = Date.now();
+  lastCpuTime = nowInstant().epochMilliseconds;
   currentCpuPercent = 0;
   peakJobNames = new Map<
     string,
@@ -289,7 +291,7 @@ export class OpsMetricsWindowService {
   async persist(metrics: OpsMetricsRepository): Promise<void> {
     const state: PersistedMetricsState = {
       version: 3,
-      savedAt: Date.now(),
+      savedAt: nowInstant().epochMilliseconds,
       peakCompletedPerSec: this.peakCompletedPerSec,
       peakFailedPerSec: this.peakFailedPerSec,
       peakIngestedPerSec: this.peakIngestedPerSec,

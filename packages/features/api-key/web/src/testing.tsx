@@ -20,6 +20,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
+import { nowInstant } from "@langwatch/time";
 import {
   ApiKeyHostPort,
   ApiKeyHostProvider,
@@ -174,7 +175,7 @@ export class FakeApiKeyHost extends ApiKeyHostPort {
         outcome: "pending",
         userCode,
         status: "pending",
-        expiresAt: Date.now() + 10 * 60_000,
+        expiresAt: nowInstant().epochMilliseconds + 10 * 60_000,
         credentialType: "device_session",
       },
     );

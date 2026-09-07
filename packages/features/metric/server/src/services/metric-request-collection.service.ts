@@ -7,6 +7,7 @@ import type {
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
+import { nowInstant } from "@langwatch/time";
 import {
   piiRedactionLevelSchema,
   type RecordMetricCorrelationCommandData,
@@ -89,7 +90,7 @@ export class MetricRequestCollectionService {
         },
       },
       async (span): Promise<MetricRequestCollectionResult> => {
-        const acceptedAt = Date.now();
+        const acceptedAt = nowInstant().epochMilliseconds;
         const preparation: MetricDataPointPreparation =
           await this.deps.metrics.prepareMetricDataPoints({
             tenantId,

@@ -4,6 +4,7 @@
  * the request they name one this organization owns. Every refusal is thrown, never returned.
  */
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import {
   JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD,
   JoinAutoConnectionAdmitsError,
@@ -164,5 +165,5 @@ export class JoinRequestAdmissionGuardsService {
 
 /** What the screen says is left, from the limiter's own answer. */
 function retryAfterSeconds(resetAt: number): number {
-  return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+  return Math.max(1, Math.ceil((resetAt - nowInstant().epochMilliseconds) / 1000));
 }

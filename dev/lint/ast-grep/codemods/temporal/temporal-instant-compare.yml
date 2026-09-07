@@ -1,0 +1,35 @@
+# Ordering two moments. `Date` relational operators coerce through valueOf;
+# `Temporal.Instant` refuses to, so the operator becomes an explicit compare.
+# Both operands must be proven instants in the same file, which is the
+# driver's job — a mixed comparison silently reverses meaning otherwise.
+id: temporal-instant-compare-lt
+language: TypeScript
+severity: warning
+message: Order two instants with `Temporal.Instant.compare`.
+rule:
+  pattern: $LEFT < $RIGHT
+fix: Temporal.Instant.compare($LEFT, $RIGHT) < 0
+---
+id: temporal-instant-compare-gt
+language: TypeScript
+severity: warning
+message: Order two instants with `Temporal.Instant.compare`.
+rule:
+  pattern: $LEFT > $RIGHT
+fix: Temporal.Instant.compare($LEFT, $RIGHT) > 0
+---
+id: temporal-instant-compare-lte
+language: TypeScript
+severity: warning
+message: Order two instants with `Temporal.Instant.compare`.
+rule:
+  pattern: $LEFT <= $RIGHT
+fix: Temporal.Instant.compare($LEFT, $RIGHT) <= 0
+---
+id: temporal-instant-compare-gte
+language: TypeScript
+severity: warning
+message: Order two instants with `Temporal.Instant.compare`.
+rule:
+  pattern: $LEFT >= $RIGHT
+fix: Temporal.Instant.compare($LEFT, $RIGHT) >= 0

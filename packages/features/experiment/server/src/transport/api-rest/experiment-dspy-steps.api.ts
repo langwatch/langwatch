@@ -33,6 +33,7 @@ import { z } from "zod";
 
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:experiment:dspy");
 
@@ -271,7 +272,7 @@ async function recordStep(input: {
   });
 
   const costs = await ports.listModelCosts({ projectId: project.id });
-  const now = Date.now();
+  const now = nowInstant().epochMilliseconds;
 
   const examples = param.examples.map((example) => ({
     ...example,

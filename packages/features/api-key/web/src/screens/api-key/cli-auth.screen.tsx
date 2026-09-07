@@ -72,6 +72,7 @@ import {
 } from "../../ui/blocks/permission-category-list.tsx";
 import { CliAuthContainer } from "../../ui/sections/cli-auth-container.tsx";
 import { FirstTraceRedirect } from "../../ui/sections/first-trace-redirect.tsx";
+import { nowInstant } from "@langwatch/time";
 
 /** The acquisition source a browser opened by `langwatch login` stamps. */
 export const CLI_LEAD_SOURCE = "cli";
@@ -464,7 +465,10 @@ export default function CliAuthScreen() {
 
   const expiryText = useMemo(() => {
     if (lookup.kind !== "ready") return null;
-    const seconds = Math.max(0, Math.round((lookup.expiresAt - Date.now()) / 1000));
+    const seconds = Math.max(
+      0,
+      Math.round((lookup.expiresAt - nowInstant().epochMilliseconds) / 1000),
+    );
     const minutes = Math.floor(seconds / 60);
     return minutes > 0 ? `Expires in ~${minutes} min` : `Expires in ${seconds}s`;
   }, [lookup]);

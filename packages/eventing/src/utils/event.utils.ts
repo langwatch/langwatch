@@ -7,6 +7,7 @@ import { TenantIdSchema } from "../domain/tenantId.ts";
 import type { Event, EventMetadataBase, Projection } from "../domain/types.ts";
 import { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "../domain/types.ts";
 import { SecurityError } from "../services/errorHandling.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Generates a unique, k-sortable event ID using a KSUID.
@@ -85,7 +86,7 @@ function createEvent<
     idempotencyKey,
   } = params;
 
-  const eventCreatedAt = createdAt ?? Date.now();
+  const eventCreatedAt = createdAt ?? nowInstant().epochMilliseconds;
 
   let finalMetadata = metadata;
   if (includeTraceContext === true) {

@@ -20,6 +20,7 @@ import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import type { SeededTargetOutput } from "./experiment-cell-plan.service.ts";
 import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 
@@ -120,7 +121,7 @@ export class ExperimentRunStorageService {
         workflowVersionId: workflowVersionId ?? null,
         total: totalCells,
         targets,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
       });
     } catch (err) {
       this.chDispatchFailures++;
@@ -152,7 +153,7 @@ export class ExperimentRunStorageService {
         experimentId,
         finishedAt: aborted ? null : finishedAt,
         stoppedAt: aborted ? finishedAt : null,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
       })
       .catch((err) => {
         this.chDispatchFailures++;
@@ -279,7 +280,7 @@ export class ExperimentRunStorageService {
         label: processed ? (evalResult.label ?? undefined) : undefined,
         details: processed ? (evalResult.details ?? undefined) : undefined,
         error: evalResult.status === "error" ? evalResult.details : undefined,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
       });
     } catch (error) {
       logger.error(
@@ -315,7 +316,7 @@ export class ExperimentRunStorageService {
             experimentId,
             event,
             datasetEntry: event.rowIndex !== undefined ? (datasetRows[event.rowIndex] ?? {}) : {},
-            occurredAt: Date.now(),
+            occurredAt: nowInstant().epochMilliseconds,
           })
         : null;
 
@@ -349,7 +350,7 @@ export class ExperimentRunStorageService {
           // Workflow evaluator nodes have no database record, so the name the event carries from
           // the DSL node stands in.
           evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
-          occurredAt: Date.now(),
+          occurredAt: nowInstant().epochMilliseconds,
         }),
       )
       .catch((err) => {

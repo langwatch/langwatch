@@ -29,6 +29,7 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
+import { nowInstant } from "@langwatch/time";
 
 /** The process supplies authentication; authorization arrives as `policy`. */
 export type CostTrpcContext = Readonly<{
@@ -118,7 +119,7 @@ export class CostTrpcApi {
             // only narrows the type.
             if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
-            const now = Date.now();
+            const now = nowInstant().epochMilliseconds;
             const endDate = now - input.endDate < RECENT_WINDOW_MS ? now : input.endDate;
 
             return ports.readOrganizationSpend({

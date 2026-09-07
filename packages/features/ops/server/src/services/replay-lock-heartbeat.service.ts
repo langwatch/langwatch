@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { ReplayRepository } from "../repositories/replay.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:replay-lock-heartbeat");
 
@@ -37,7 +38,7 @@ export class ReplayLockHeartbeatService {
   ) {}
 
   private timer: NodeJS.Timeout | null = null;
-  private lastCheck = Date.now();
+  private lastCheck = nowInstant().epochMilliseconds;
   private stopped = false;
 
   /** Whether this run should stop, because it was cancelled or lost its lock. */
@@ -65,7 +66,7 @@ export class ReplayLockHeartbeatService {
    * throttle is what keeps a chatty projection from turning every callback into a Redis read.
    */
   pollCancelledThrottled(): void {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     if (now - this.lastCheck <= CANCEL_CHECK_INTERVAL_MS) {
       return;
     }

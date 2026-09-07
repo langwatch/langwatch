@@ -16,6 +16,7 @@ import { assertDispatchBudget } from "../webhook/dispatch-budget.ts";
 import { sendHttpDestination } from "../webhook/http-destination.ts";
 import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../webhook/signature.ts";
 import { assertWebhookUrlAllowed, webhookUrlValidator } from "../webhook/url-policy.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The outbound webhook sender both webhook channels run on: the automations
@@ -158,7 +159,7 @@ export class WebhookEgressService {
     return new WebhookEgressService(
       options.rateLimiter,
       options.tls,
-      options.now ?? (() => Date.now()),
+      options.now ?? (() => nowInstant().epochMilliseconds),
     );
   }
 

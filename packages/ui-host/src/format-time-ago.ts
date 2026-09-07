@@ -2,7 +2,7 @@
  * How long ago something happened, in the two shapes this product prints.
  */
 
-import { format, formatDistanceCompact, formatDistanceToNow } from "@langwatch/time";
+import { format, formatDistanceCompact, formatDistanceToNow, nowInstant } from "@langwatch/time";
 
 /** Beyond this, an absolute date reads better than "27 days ago". */
 const RELATIVE_WINDOW_HOURS = 24;
@@ -21,7 +21,7 @@ export function formatTimeAgo(
 ): string | undefined {
   if (!timestamp) return void 0;
   const at = new Date(timestamp);
-  if (at.getTime() < Date.now() - 1000 * 60 * 60 * maxHours) {
+  if (at.getTime() < nowInstant().epochMilliseconds - 1000 * 60 * 60 * maxHours) {
     return format(at, dateFormat);
   }
   return formatDistanceToNow(at, { addSuffix: true });
@@ -29,5 +29,5 @@ export function formatTimeAgo(
 
 /** The same instant in the space a table row has: "2m ago", "1h ago". */
 export function formatTimeAgoCompact(timestamp: number, nowMs?: number): string {
-  return formatDistanceCompact(nowMs ?? Date.now(), timestamp);
+  return formatDistanceCompact(nowMs ?? nowInstant().epochMilliseconds, timestamp);
 }

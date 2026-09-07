@@ -13,6 +13,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import type { ModelCostRegexSafetyService } from "./model-cost-regex-safety.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * How far back the preview looks for spans. Wide enough to catch models that
@@ -140,7 +141,7 @@ export class ModelCostPreviewService {
     }
 
     const candidate = candidateRate(input);
-    const fromMs = Date.now() - PREVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const fromMs = nowInstant().epochMilliseconds - PREVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
     const stats = await spans.getModelUsageStats({
       tenantId: input.projectId,
       fromMs,

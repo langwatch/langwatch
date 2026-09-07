@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:auth0:password");
 
@@ -177,7 +178,7 @@ export class Auth0PasswordService {
     if (
       cachedToken &&
       cachedToken.clientId === config.mgmtClientId &&
-      Date.now() < cachedToken.expiresAtMs - TOKEN_SAFETY_WINDOW_MS
+      nowInstant().epochMilliseconds < cachedToken.expiresAtMs - TOKEN_SAFETY_WINDOW_MS
     ) {
       return cachedToken.token;
     }
@@ -219,7 +220,7 @@ export class Auth0PasswordService {
     if (typeof body.expires_in === "number" && body.expires_in > 0) {
       cachedToken = {
         token: body.access_token,
-        expiresAtMs: Date.now() + body.expires_in * 1000,
+        expiresAtMs: nowInstant().epochMilliseconds + body.expires_in * 1000,
         clientId: config.mgmtClientId,
       };
     } else {

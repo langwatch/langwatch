@@ -35,6 +35,7 @@ import { SSO_CONNECTION_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection.ts";
 import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection.ts";
 import { ssoConnectionEventsFor } from "../intents/sso-connection-events.intent.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:identity:sso-connection-ledger");
 
@@ -144,10 +145,10 @@ export class SsoConnectionLedgerWriterAdapter implements SsoConnectionLedger {
     };
     // Wall-clock, not injectable business time: a frozen test clock would
     // otherwise make this loop unable to time out.
-    const deadline = Date.now() + this.convergence.timeoutMs;
+    const deadline = nowInstant().epochMilliseconds + this.convergence.timeoutMs;
     for (;;) {
       if (await this.foldReached({ connectionId, context, last })) return;
-      if (Date.now() >= deadline) {
+      if (nowInstant().epochMilliseconds >= deadline) {
         logger.warn(
           { connectionId, commandCount: events.length },
           "sso connection projection did not land a command's events within the read-your-writes window; the append is durable and the fold will converge",

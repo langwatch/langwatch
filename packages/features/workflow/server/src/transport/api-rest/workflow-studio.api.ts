@@ -11,6 +11,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
+import { nowInstant } from "@langwatch/time";
 
 import {
   LlmModelNotSetError,
@@ -233,7 +234,7 @@ export function createWorkflowStudioRestApp<TSession extends WorkflowStudioRestS
                           execution_state: {
                             status: "error",
                             error: errorMessage,
-                            timestamps: { finished_at: Date.now() },
+                            timestamps: { finished_at: nowInstant().epochMilliseconds },
                           },
                         },
                       }

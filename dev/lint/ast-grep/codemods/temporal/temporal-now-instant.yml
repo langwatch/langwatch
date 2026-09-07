@@ -1,0 +1,14 @@
+# A bare `new Date()` used as a moment. Applied ONLY through
+# apply-temporal-codemod.mjs, which fires it on a `const` initializer whose
+# every later use is `getTime`, `valueOf`, `toISOString` or a comparison /
+# subtraction against another proven instant. A raw `ast-grep scan -U` with
+# this rule would also hit the Dates handed to Prisma, Intl and calendar
+# stepping, which is why this directory is outside `ruleDirs`.
+id: temporal-now-instant
+language: TypeScript
+severity: warning
+message: >
+  The current moment is a `Temporal.Instant`: call `nowInstant()`.
+rule:
+  pattern: new Date()
+fix: nowInstant()

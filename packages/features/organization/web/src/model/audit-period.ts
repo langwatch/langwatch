@@ -6,7 +6,7 @@
  * inputs / "All time" did not travel — the audit trail always has a window.
  */
 
-import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";
+import { differenceInCalendarDays, startOfDay, subDays, toEpochMs } from "@langwatch/time";
 
 /** The window a read is taken over. */
 export type AuditPeriod = { startDate: Date; endDate: Date };
@@ -39,7 +39,7 @@ export function isAuditPeriodPresetKey(value: unknown): value is AuditPeriodPres
   return typeof value === "string" && PRESETS_BY_KEY.has(value as AuditPeriodPresetKey);
 }
 
-const isReadableDate = (value: string): boolean => !isNaN(new Date(value).getTime());
+const isReadableDate = (value: string): boolean => !isNaN(toEpochMs(value));
 
 /**
  * The [start, end] window for a preset, anchored to `now`.

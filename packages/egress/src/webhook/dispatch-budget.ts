@@ -1,5 +1,6 @@
 import { DispatchError } from "@langwatch/eventing";
 import type { WebhookDispatchRateLimiterPort } from "../ports/webhook-dispatch-rate-limiter.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Per-scope hourly cap on real webhook dispatches — a backstop against an
@@ -57,6 +58,6 @@ export async function assertDispatchBudget({
   throw new DispatchError({
     message: `${label}: webhook dispatch cap (${WEBHOOK_DISPATCH_HOURLY_CAP}/hour) reached — backing off.`,
     retryable: true,
-    retryAfterMs: Math.max(0, limit.resetAt - Date.now()),
+    retryAfterMs: Math.max(0, limit.resetAt - nowInstant().epochMilliseconds),
   });
 }

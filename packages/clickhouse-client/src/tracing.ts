@@ -17,6 +17,7 @@
 
 import { quietly } from "./observability.ts";
 import type { QueryRequest, QueryResult } from "./query.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * A failure, reduced to what is safe to ship.
@@ -110,7 +111,7 @@ export class QueryTracer {
     tracer,
     spanName = "clickhouse.query",
     onComplete,
-    now = () => Date.now(),
+    now = () => nowInstant().epochMilliseconds,
   }: TraceOptions) {
     this.tracer = tracer;
     this.spanName = spanName;

@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:topic-clustering:seed");
 const scheduleLogger = createLogger("langwatch:topic-clustering:schedule-seed");
@@ -112,7 +113,7 @@ export class LegacyImportTopicClusteringMigration {
 
     await this.commands.recordTopics({
       tenantId: projectId,
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
       mode: "replace",
       source: "seed",
       dedupeKey: "seed:v1",
@@ -288,7 +289,7 @@ export class LegacyImportTopicClusteringMigration {
         try {
           await this.commands.requestClustering({
             tenantId: project.id,
-            occurredAt: Date.now(),
+            occurredAt: nowInstant().epochMilliseconds,
             trigger: "bootstrap",
           });
           summary.succeeded++;
@@ -313,7 +314,7 @@ export class LegacyImportTopicClusteringMigration {
     try {
       const claimed = await this.redis.set(
         claimKey,
-        String(Date.now()),
+        String(nowInstant().epochMilliseconds),
         "EX",
         SEED_CLAIM_TTL_SECONDS,
         "NX",
@@ -350,7 +351,7 @@ export class LegacyImportTopicClusteringMigration {
   private async markSeedDone(doneKey: string): Promise<void> {
     if (!this.redis) return;
     try {
-      await this.redis.set(doneKey, String(Date.now()));
+      await this.redis.set(doneKey, String(nowInstant().epochMilliseconds));
     } catch {
       // Best-effort: the next pass just re-derives the same answer.
     }

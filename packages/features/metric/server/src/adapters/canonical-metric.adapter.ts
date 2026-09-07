@@ -17,6 +17,7 @@ import {
   type MetricPreparationInput,
 } from "../ports/metric-preparation.port.ts";
 import type { MetricRedactionPort } from "../ports/metric-redaction.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());
 const exportMetricsRequestSchema = z
@@ -154,7 +155,7 @@ async function prepareMetricDataPoints(
   const redaction = MetricRedactionAdapter.create({ redaction: redactionService });
   const accepted: MetricDataPointPreparation["accepted"] = [];
   const rejections = new RejectionLog();
-  const acceptedAt = args.acceptedAt ?? Date.now();
+  const acceptedAt = args.acceptedAt ?? nowInstant().epochMilliseconds;
 
   const request = exportMetricsRequestSchema.safeParse(args.request);
   const resourceMetrics = containerArray({

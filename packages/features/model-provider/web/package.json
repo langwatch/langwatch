@@ -86,6 +86,7 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",

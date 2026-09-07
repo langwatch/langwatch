@@ -47,6 +47,7 @@ import {} from "../rules/langy-conversation-shape.rules.ts";
 import { LangyConversationReadService } from "./langy-conversation-read.service.ts";
 import { LangyConversationTurnService } from "./langy-conversation-turn.service.ts";
 import { LangyConversationLifecycleService } from "./langy-conversation-lifecycle.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Narrow read port over the canonical event log (ADR-059), satisfied by
@@ -106,7 +107,7 @@ export interface LangyConversationRuntime {
 }
 
 const defaultRuntime: LangyConversationRuntime = {
-  now: () => Date.now(),
+  now: () => nowInstant().epochMilliseconds,
   generateId: (resource) => generate(LANGY_ID_RESOURCES[resource]).toString(),
   createTurnId: () => crypto.randomUUID(),
 };

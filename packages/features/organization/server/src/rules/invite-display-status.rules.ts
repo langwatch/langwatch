@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * What an invitation IS, as a person sees it, separate from the service that mints/mails/spends
  * one. EXPIRED is derived from `expiration` rather than stored, so there's no sweeper to forget.
@@ -16,7 +17,7 @@ export type InviteDisplayStatus =
 
 export function resolveInviteDisplayStatus(
   invite: { status: string; expiration: Date | null },
-  nowMs: number = Date.now(),
+  nowMs: number = nowInstant().epochMilliseconds,
 ): InviteDisplayStatus {
   if (
     invite.status === "PENDING" &&

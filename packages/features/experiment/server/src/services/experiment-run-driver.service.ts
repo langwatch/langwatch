@@ -23,6 +23,7 @@ import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.ser
 import { ExperimentRunStorageService } from "./experiment-run-storage.service.ts";
 import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
 import { ExperimentTargetDataService } from "./experiment-target-data.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:experiment:run-driver");
 
@@ -84,7 +85,7 @@ export class ExperimentRunDriverService {
 
     yield { type: "execution_started", runId, total: loop.totalCells };
 
-    const startTime = Date.now();
+    const startTime = nowInstant().epochMilliseconds;
     logger.info(
       { runId, totalCells: loop.totalCells, concurrency: input.concurrency, experimentId },
       "Starting evaluation execution",
@@ -406,7 +407,7 @@ export class ExperimentRunDriverService {
           runId: run.runId,
           experimentId,
           aborted: loop.aborted,
-          finishedAt: Date.now(),
+          finishedAt: nowInstant().epochMilliseconds,
         });
       }
     }
@@ -434,7 +435,7 @@ export class ExperimentRunDriverService {
       );
     }
 
-    const finishedAt = Date.now();
+    const finishedAt = nowInstant().epochMilliseconds;
     const duration = finishedAt - startTime;
     const counts = {
       runId,

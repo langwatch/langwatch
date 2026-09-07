@@ -24,6 +24,7 @@ import type {
 } from "@langwatch/ops-contract";
 import { BlobStoreRepository } from "../blob-store.repository.ts";
 import type { BlobDeleteResult } from "../blob-store.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Dry-run eval, so the browser reports the same verdict the runner would act on. */
 const previewScript = new CachedLuaScript(BLOB_SWEEP_LUA);
@@ -231,7 +232,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
       }
     }
 
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const byLapsedLease = (blob: BlobFacts): number =>
       // Future deadlines are live leases, not lapses; sort them last.
       blob.earliestLeaseDeadlineMs === null || blob.earliestLeaseDeadlineMs > now

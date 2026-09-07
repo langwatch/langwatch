@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SlugValidation } from "../model/dataset-slug-validation.ts";
 import { datasetApi } from "./dataset-api.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** How long typing has to settle before the trailing check runs. */
 const SETTLE_MS = 500;
@@ -62,7 +63,7 @@ export function useDatasetSlugValidation({
 
   const run = useCallback(() => {
     cancel();
-    lastCheckAt.current = Date.now();
+    lastCheckAt.current = nowInstant().epochMilliseconds;
     void refetchRef.current().then((result) => {
       if (!result.data) return;
       setSlugInfo({
@@ -81,7 +82,7 @@ export function useDatasetSlugValidation({
       return;
     }
 
-    const sinceLastCheck = Date.now() - lastCheckAt.current;
+    const sinceLastCheck = nowInstant().epochMilliseconds - lastCheckAt.current;
     // The first change after a quiet period is checked at once, so a name typed
     // into an empty field shows its slug without a pause.
     if (sinceLastCheck >= MAX_WAIT_MS) {

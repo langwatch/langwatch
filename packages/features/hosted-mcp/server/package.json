@@ -11,7 +11,10 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     }
   },
@@ -25,6 +28,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/mcp-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "ioredis": "5.10.1"
   },

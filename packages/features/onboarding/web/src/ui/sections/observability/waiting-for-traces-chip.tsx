@@ -6,6 +6,7 @@ import { api } from "../../../behavior/onboarding-api.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { useActiveProject } from "../active-project-context.tsx";
+import { nowInstant } from "@langwatch/time";
 
 export function WaitingForTracesChip(): React.ReactElement {
   const accent = useColorRawValue("orange.400");
@@ -26,7 +27,7 @@ export function WaitingForTracesChip(): React.ReactElement {
   }, []);
 
   const timeBounds = useMemo(() => {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
     const oneDay = 24 * 60 * 60 * 1000;
     return { startDate: now - sevenDays, endDate: now + oneDay };

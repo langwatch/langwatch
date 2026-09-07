@@ -11,6 +11,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import type { GithubInstallStatePayload, GithubService } from "@langwatch/github-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   GithubInstallationAccountMismatchError,
   GithubInstallationConflictError,
@@ -190,7 +191,7 @@ async function handleInstall(c: Context, ports: GithubRestPorts): Promise<Respon
     organizationId,
     mode,
     returnTo,
-    issuedAt: Date.now(),
+    issuedAt: nowInstant().epochMilliseconds,
     nonce,
     nonceRegistered,
     ...expected,

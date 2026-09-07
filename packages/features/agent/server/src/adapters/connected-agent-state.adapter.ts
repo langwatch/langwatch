@@ -8,6 +8,7 @@ import { EventEmitter } from "node:events";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import { nowInstant } from "@langwatch/time";
 
 // ---------------------------------------------------------------------------
 // Redis
@@ -252,7 +253,7 @@ function memoryHashOps({
  * the clock through `now` and never waits on a timer.
  */
 function createMemoryStateStore({
-  now = () => Date.now(),
+  now = () => nowInstant().epochMilliseconds,
 }: {
   now?: () => number;
 } = {}): AgentStateStorePort {

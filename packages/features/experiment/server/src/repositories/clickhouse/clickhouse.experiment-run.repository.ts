@@ -15,6 +15,7 @@ import {
   experimentRunWithItemsSchema,
 } from "@langwatch/experiment-contract";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   buildDedupedRunItemsWhere,
   computeOccurredAtRangeForRuns,
@@ -626,7 +627,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
   }
 
   private warnIfRunsAreOld(projectId: string, minMs: number, runCount: number): void {
-    const ageMs = Date.now() - minMs;
+    const ageMs = nowInstant().epochMilliseconds - minMs;
     if (ageMs <= WARN_OLD_RUN_AGE_MS) return;
     this.options.telemetry.warnOldRuns({
       projectId,

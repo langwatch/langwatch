@@ -10,15 +10,24 @@
   "type": "module",
   "exports": {
     "./screens/billing": {
-      "types": "./src/screens/billing/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/screens/billing/index.d.ts",
+        "default": "./src/screens/billing/index.ts"
+      },
       "default": "./src/screens/billing/index.ts"
     },
     "./surfaces/contact-sales": {
-      "types": "./src/surfaces/contact-sales/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/surfaces/contact-sales/index.d.ts",
+        "default": "./src/surfaces/contact-sales/index.ts"
+      },
       "default": "./src/surfaces/contact-sales/index.ts"
     },
     "./surfaces/seat-proration-preview": {
-      "types": "./src/surfaces/seat-proration-preview/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/surfaces/seat-proration-preview/index.d.ts",
+        "default": "./src/surfaces/seat-proration-preview/index.ts"
+      },
       "default": "./src/surfaces/seat-proration-preview/index.ts"
     }
   },
@@ -35,8 +44,8 @@
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
-    "@langwatch/workflow-web": "workspace:*",
     "lucide-react": "^1.22.0",
     "numeral": "^2.0.6",
     "zod": "^4.4.3"

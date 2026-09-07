@@ -11,6 +11,7 @@ import type {
 } from "@langwatch/workflow-contract";
 import type { WorkflowStudioStreamPort } from "../ports/workflow.port.ts";
 import { WorkflowNlpExecutionService } from "./workflow-nlp-execution.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:workflows:studio-dispatch");
 
@@ -222,7 +223,7 @@ function reportAsStudioEvent(error: unknown, input: WorkflowStudioDispatchInput)
         execution_state: {
           status: "error",
           error: message,
-          timestamps: { finished_at: Date.now() },
+          timestamps: { finished_at: nowInstant().epochMilliseconds },
         },
       },
     } as StudioServerEvent);

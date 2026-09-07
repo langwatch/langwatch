@@ -3,9 +3,13 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import { langyCandidatePermissions, type LangyCredentialSession } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port.ts";
-import { LangySessionKeyPort, LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port.ts";
+import {
+  LangySessionKeyPort,
+  LangySessionKeyScopeError,
+} from "../ports/langy-turn-runtime.port.ts";
 import type { LangySessionKeyRepository } from "../repositories/langy-session-key.repository.ts";
 import { LangySessionKeyReapService } from "./langy-session-key-reap.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:langy:session-key");
 const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;
@@ -80,7 +84,7 @@ export class LangySessionKeyService extends LangySessionKeyPort {
       permissionMode: "restricted",
       permissions: permissionsToGrant,
       bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId }],
-      expiresAt: new Date(Date.now() + sessionKeyLifetimeMs),
+      expiresAt: new Date(nowInstant().epochMilliseconds + sessionKeyLifetimeMs),
     });
     this.metrics.record({ operation: "minted" });
 

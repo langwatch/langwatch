@@ -1,5 +1,6 @@
 import type { DiscoveredAggregate } from "./replayEventSource.ts";
 import type { DiscoveryResult, ReplayContext } from "./types.ts";
+import { toEpochMs } from "@langwatch/time";
 
 /**
  * Discovers the aggregates (and total event count) a projection's replay must
@@ -18,7 +19,7 @@ export async function discoverProjectionAggregates({
   since: string;
   tenantId?: string;
 }): Promise<DiscoveryResult> {
-  const sinceMs = new Date(since).getTime();
+  const sinceMs = toEpochMs(since);
   const [aggregates, totalEvents] = await Promise.all([
     eventSource.discoverAffectedAggregates({
       eventTypes,

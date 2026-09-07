@@ -11,7 +11,10 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     }
   },
@@ -31,6 +34,7 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@trpc/server": "^11.18.0",
     "hono": "^4.12.27",
     "jsonwebtoken": "^9.0.2",

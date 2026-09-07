@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
 import type { GithubProjectActivityPort } from "../ports/github-project-activity.port.ts";
+import { nowInstant } from "@langwatch/time";
 import type {
   BranchMappingTarget,
   GithubBranchMappingService,
@@ -75,7 +76,7 @@ export class GithubBranchDemandService {
     try {
       await this.deps.project.touchCodingAgentPullRequestSeen({
         projectId,
-        at: new Date(this.deps.now?.() ?? Date.now()),
+        at: new Date(this.deps.now?.() ?? nowInstant().epochMilliseconds),
       });
     } catch (error) {
       logger.warn({ error, projectId }, "failed to record PR project activity");

@@ -11,6 +11,7 @@ import {
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules.ts";
 import { systemMigrationLookup } from "./system-migration-lookup.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:system-migrations");
 
@@ -54,7 +55,9 @@ export class SystemMigrationRollbackService {
     // cut over again, and rolling it back now is a NEW decision that must not
     // reuse the old moment (and so must not dedupe against the old event).
     const isRetry = record?.status === "rolled_back";
-    const decidedAt = (isRetry ? rollbackDecidedAt(priorReport) : null) ?? new Date().toISOString();
+    const decidedAt =
+      (isRetry ? rollbackDecidedAt(priorReport) : null) ??
+      nowInstant().toString({ fractionalSecondDigits: 3 });
     const pin = {
       migrationName,
       tenantId,

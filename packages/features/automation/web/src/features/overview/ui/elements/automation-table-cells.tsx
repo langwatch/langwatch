@@ -8,6 +8,7 @@ import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
 import type { TriggerActionParams } from "../../model/trigger-action-params.ts";
 import { HelpCircle, Plus } from "lucide-react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { nowInstant } from "@langwatch/time";
 const OPERATOR_LABELS: Record<string, string> = {
   gt: "greater than",
   lt: "less than",
@@ -73,7 +74,7 @@ function DigestScheduleHint({
   if (!active || windowMs <= 0) return null;
 
   const dueAt = lastFiredAt ? new Date(lastFiredAt).getTime() + windowMs : null;
-  const now = Date.now();
+  const now = nowInstant().epochMilliseconds;
   const label =
     dueAt && dueAt > now
       ? `Next digest due in ~${Math.max(1, Math.ceil((dueAt - now) / 60_000))}m`

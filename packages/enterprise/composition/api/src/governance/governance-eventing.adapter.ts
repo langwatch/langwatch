@@ -37,6 +37,7 @@ import { mapCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_KIND } from "@langwatch/project-contract";
 import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:enterprise:governance-eventing");
 
@@ -387,7 +388,7 @@ class AppPipelineGovernanceEventingPort extends GovernanceEventingPort {
   async configureIngestion(input: ConfigureIngestionPullCommand): Promise<void> {
     await this.ingestionPull.configure({
       tenantId: input.tenantId,
-      occurredAt: input.occurredAt ?? Date.now(),
+      occurredAt: input.occurredAt ?? nowInstant().epochMilliseconds,
       ...input.data,
     });
   }
@@ -395,7 +396,7 @@ class AppPipelineGovernanceEventingPort extends GovernanceEventingPort {
   async disableIngestion(input: DisableIngestionPullCommand): Promise<void> {
     await this.ingestionPull.disable({
       tenantId: input.tenantId,
-      occurredAt: input.occurredAt ?? Date.now(),
+      occurredAt: input.occurredAt ?? nowInstant().epochMilliseconds,
       ...input.data,
     });
   }
@@ -403,7 +404,7 @@ class AppPipelineGovernanceEventingPort extends GovernanceEventingPort {
   async recordIngestionRunCompleted(input: RecordIngestionPullRunCompletedCommand): Promise<void> {
     await this.ingestionPull.recordRunCompleted({
       tenantId: input.tenantId,
-      occurredAt: input.occurredAt ?? Date.now(),
+      occurredAt: input.occurredAt ?? nowInstant().epochMilliseconds,
       ...input.data,
     });
   }
@@ -411,7 +412,7 @@ class AppPipelineGovernanceEventingPort extends GovernanceEventingPort {
   async recordIngestionRunFailed(input: RecordIngestionPullRunFailedCommand): Promise<void> {
     await this.ingestionPull.recordRunFailed({
       tenantId: input.tenantId,
-      occurredAt: input.occurredAt ?? Date.now(),
+      occurredAt: input.occurredAt ?? nowInstant().epochMilliseconds,
       ...input.data,
     });
   }
@@ -419,7 +420,7 @@ class AppPipelineGovernanceEventingPort extends GovernanceEventingPort {
   async recordPulledUsage(input: RecordPulledUsageCommand): Promise<void> {
     await this.pulledUsage.recordPulledUsage({
       tenantId: input.tenantId,
-      occurredAt: input.occurredAt ?? Date.now(),
+      occurredAt: input.occurredAt ?? nowInstant().epochMilliseconds,
       ...input.data,
     });
   }

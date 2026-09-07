@@ -11,7 +11,10 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     }
   },
@@ -24,6 +27,7 @@
   "dependencies": {
     "@clickhouse/client": "^1.14.0",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@testcontainers/clickhouse": "^12.1.0",
     "nanoid": "^5.1.6",
     "picomatch": "^4.0.4",

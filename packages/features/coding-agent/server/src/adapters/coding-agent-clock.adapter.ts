@@ -1,4 +1,5 @@
 import { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 export class SystemCodingAgentClockAdapter extends CodingAgentClockPort {
   static create(): SystemCodingAgentClockAdapter {
@@ -10,6 +11,6 @@ export class SystemCodingAgentClockAdapter extends CodingAgentClockPort {
   }
 
   nowMs(): number {
-    return Date.now();
+    return nowInstant().epochMilliseconds;
   }
 }

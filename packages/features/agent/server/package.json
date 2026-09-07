@@ -10,19 +10,34 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "imports": {
-    "#*": "./src/*.ts"
+    "#*": {
+      "types": {
+        "langwatch-declarations": "./dist/*.d.ts",
+        "default": "./src/*.ts"
+      },
+      "default": "./src/*.ts"
+    }
   },
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     },
     "./legacy-rest": {
-      "types": "./src/transport/api-rest/agent-legacy-facade.api.ts",
+      "types": {
+        "langwatch-declarations": "./dist/transport/api-rest/agent-legacy-facade.api.d.ts",
+        "default": "./src/transport/api-rest/agent-legacy-facade.api.ts"
+      },
       "default": "./src/transport/api-rest/agent-legacy-facade.api.ts"
     },
     "./testing": {
-      "types": "./src/testing.ts",
+      "types": {
+        "langwatch-declarations": "./dist/testing.d.ts",
+        "default": "./src/testing.ts"
+      },
       "default": "./src/testing.ts"
     }
   },
@@ -42,6 +57,7 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@trpc/server": "^11.18.0",

@@ -12,15 +12,24 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./src/testing.ts",
+      "types": {
+        "langwatch-declarations": "./dist/testing.d.ts",
+        "default": "./src/testing.ts"
+      },
       "default": "./src/testing.ts"
     },
     "./server": {
-      "types": "./src/server/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/server/index.d.ts",
+        "default": "./src/server/index.ts"
+      },
       "default": "./src/server/index.ts"
     }
   },
@@ -36,6 +45,7 @@
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "croner": "^10.0.1",
     "ioredis": "5.10.1",

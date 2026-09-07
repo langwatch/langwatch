@@ -24,6 +24,7 @@ import type { IdentityEvent } from "../projections/identity-state.projection.ts"
 import type { IdentityFoldState } from "../projections/identity-state.projection.ts";
 import { MetricsIdentityLedgerAdapter } from "./metrics.identity-ledger.adapter.ts";
 import { identityEventsFor } from "../intents/identity-events.intent.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:identity:ledger");
 
@@ -151,10 +152,10 @@ export class IdentityLedgerWriterAdapter implements IdentityLedger {
     const context = { aggregateId: userId, tenantId: createTenantId(tenantId) };
     // Wall-clock, not injectable business time: a frozen test clock would
     // otherwise make this loop unable to time out.
-    const deadline = Date.now() + this.convergence.timeoutMs;
+    const deadline = nowInstant().epochMilliseconds + this.convergence.timeoutMs;
     for (;;) {
       if (await this.foldReached({ userId, context, last })) return;
-      if (Date.now() >= deadline) {
+      if (nowInstant().epochMilliseconds >= deadline) {
         LEDGER_METRICS.recordProjectionConvergenceTimeout();
         logger.warn(
           { userId, commandCount: events.length },

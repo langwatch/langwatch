@@ -14,6 +14,7 @@ import {
   differenceInWeeks,
   format,
   formatDistanceToNow,
+  nowInstant,
 } from "@langwatch/time";
 
 /**
@@ -29,7 +30,7 @@ export const formatTimeAgo = (
 ): string | undefined => {
   const timestampDate = timestamp ? new Date(timestamp) : undefined;
   return timestampDate
-    ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * maxHours
+    ? timestampDate.getTime() < nowInstant().epochMilliseconds - 1000 * 60 * 60 * maxHours
       ? format(timestampDate, dateFormat)
       : formatDistanceToNow(timestampDate, { addSuffix: true })
     : undefined;

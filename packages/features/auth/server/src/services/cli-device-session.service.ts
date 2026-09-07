@@ -11,6 +11,7 @@ import {
 import { randomBytes } from "node:crypto";
 
 import type { CliDeviceSessionStorePort } from "../ports/cli-device-session-store.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Redis key prefix for device-code records. */
 const DEVICE_CODE_PREFIX = "lwcli:device:";
@@ -203,7 +204,7 @@ export class CliDeviceSessionService {
   async startDeviceCode(input: {
     credentialType: CliCredentialType;
   }): Promise<CliDeviceCodeRecord> {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const record: CliDeviceCodeRecord = {
       device_code: randomBytes(32).toString("base64url"),
       user_code: generateUserCode(),
@@ -291,7 +292,7 @@ export class CliDeviceSessionService {
       return { approved: false };
     }
 
-    if (Date.now() > record.expires_at) {
+    if (nowInstant().epochMilliseconds > record.expires_at) {
       return { approved: false };
     }
 
@@ -324,7 +325,7 @@ export class CliDeviceSessionService {
 
   /** Rewrites a device code in place, preserving what is left of its lifetime. */
   private async rewriteDeviceCode(record: CliDeviceCodeRecord): Promise<void> {
-    const remainingMs = Math.max(1000, record.expires_at - Date.now());
+    const remainingMs = Math.max(1000, record.expires_at - nowInstant().epochMilliseconds);
     await this.store.set({
       key: deviceCodeKey(record.device_code),
       value: JSON.stringify(record),
@@ -345,7 +346,7 @@ export class CliDeviceSessionService {
   }): Promise<CliMintedSession> {
     const accessToken = `lw_at_${randomBytes(32).toString("base64url")}`;
     const refreshToken = `lw_rt_${randomBytes(32).toString("base64url")}`;
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const shared = {
       user_id: input.userId,
       organization_id: input.organizationId,
@@ -425,7 +426,7 @@ export class CliDeviceSessionService {
       return null;
     }
 
-    if (Date.now() > record.expires_at) {
+    if (nowInstant().epochMilliseconds > record.expires_at) {
       await this.store.delete(cliAccessTokenKey(token));
 
       return null;

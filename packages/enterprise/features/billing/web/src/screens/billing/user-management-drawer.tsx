@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 import { type BillingInterval, type Currency, formatPrice } from "../../model/billing-plans.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   countFullMembers,
   type DrawerSaveResult,
@@ -79,7 +80,7 @@ export function UserManagementDrawer({
     setInitialAutoFillCount(autoFillCount);
 
     const autoFilledRows: PlannedUser[] = Array.from({ length: autoFillCount }, (_, i) => ({
-      id: `auto-${Date.now()}-${i}`,
+      id: `auto-${nowInstant().epochMilliseconds}-${i}`,
       email: "",
       memberType: "FullMember" as MemberType,
     }));

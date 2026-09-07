@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 
 import type { HostedMcpRedis } from "../../ports/hosted-mcp.port.ts";
 import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 const AUTH_CODE_TTL_SECONDS = 600;
@@ -259,7 +260,7 @@ export function createMcpAuthorizeRestApp(options: {
         // redeemable against another.
         clientId,
         redirectUri,
-        expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
+        expiresAt: nowInstant().epochMilliseconds + AUTH_CODE_TTL_SECONDS * 1000,
       }),
       "EX",
       AUTH_CODE_TTL_SECONDS,

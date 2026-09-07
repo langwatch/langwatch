@@ -5,8 +5,13 @@
 import { createStore, type StoreApi } from "zustand";
 
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import type { AutosaveState, CellPosition, RowHeightMode } from "../model/dataset-table-context.tsx";
+import type {
+  AutosaveState,
+  CellPosition,
+  RowHeightMode,
+} from "../model/dataset-table-context.tsx";
 import type { PendingSavedChanges } from "../model/pending-saved-changes.ts";
+import { nowInstant } from "@langwatch/time";
 
 export type EditorColumn = {
   id: string;
@@ -53,7 +58,7 @@ export function rekeyEditorRecords(
 let newRecordSeq = 0;
 const generateRecordId = () => {
   newRecordSeq += 1;
-  return `new_${Date.now()}_${newRecordSeq}`;
+  return `new_${nowInstant().epochMilliseconds}_${newRecordSeq}`;
 };
 
 export type DatasetEditorState = {

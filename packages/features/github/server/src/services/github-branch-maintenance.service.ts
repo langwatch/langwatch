@@ -1,4 +1,5 @@
 import type { GithubPullRequestsRepository } from "../repositories/github-pull-requests.repository.ts";
+import { nowInstant } from "@langwatch/time";
 import type {
   BranchMappingTarget,
   GithubBranchMappingService,
@@ -20,7 +21,7 @@ export class GithubBranchMaintenanceService {
   private constructor(private readonly deps: GithubBranchMaintenanceDeps) {}
 
   async recheckDueBranches(): Promise<number> {
-    const now = this.deps.now?.() ?? Date.now();
+    const now = this.deps.now?.() ?? nowInstant().epochMilliseconds;
     const due = await this.deps.repository.findRecheckDue({
       now: new Date(now),
       activeWithinMs: ACTIVE_WINDOW_MS,
@@ -38,7 +39,7 @@ export class GithubBranchMaintenanceService {
   }
 
   pruneStaleBranchLinkage(): Promise<{ branchChecks: number }> {
-    const now = this.deps.now?.() ?? Date.now();
+    const now = this.deps.now?.() ?? nowInstant().epochMilliseconds;
 
     return this.deps.repository.deleteStaleBefore({
       before: new Date(now - ACTIVE_WINDOW_MS),

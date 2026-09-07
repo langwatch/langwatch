@@ -1,4 +1,5 @@
 import type { EmailAttachment } from "./types.ts";
+import { nowInstant } from "@langwatch/time";
 
 export const sanitizeHeaderValue = (value: string): string => value.replace(/[\r\n]+/g, " ").trim();
 
@@ -124,7 +125,7 @@ export const buildRawMimeMessage = ({
   headers?: Record<string, string>;
   attachments: EmailAttachment[];
 }): string => {
-  const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const boundary = `----=_Part_${nowInstant().epochMilliseconds}_${Math.random().toString(36).slice(2)}`;
 
   // Base64-encode the HTML body so we never emit 8-bit or long raw lines
   const htmlBase64 = foldBase64(Buffer.from(html, "utf-8").toString("base64"));

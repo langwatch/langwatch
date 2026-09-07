@@ -4,6 +4,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { gqJobsDispatchedTotal } from "./metrics.ts";
 import type { DispatchResult, GroupStagingScripts } from "./scripts.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Max jobs to dispatch per Lua call to bound script execution time. */
 const MAX_BATCH_SIZE = 200;
@@ -118,7 +119,7 @@ export class GroupQueueDispatcher {
     try {
       const earliest = await this.params.scripts.getEarliestReadyScore();
       if (earliest === null) return this.params.signalTimeoutSec;
-      const untilDueSec = (earliest - Date.now()) / 1000;
+      const untilDueSec = (earliest - nowInstant().epochMilliseconds) / 1000;
       return Math.min(this.params.signalTimeoutSec, Math.max(untilDueSec, 0.05));
     } catch {
       // Peek is best-effort; fall back to the fixed interval.
@@ -137,7 +138,7 @@ export class GroupQueueDispatcher {
 
     const maxJobs = Math.min(availableSlots, MAX_BATCH_SIZE);
     const results = await this.params.scripts.dispatchBatch({
-      nowMs: Date.now(),
+      nowMs: nowInstant().epochMilliseconds,
       activeTtlSec: this.params.activeTtlSec,
       maxJobs,
     });

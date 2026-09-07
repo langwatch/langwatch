@@ -1,4 +1,5 @@
 import { createLogger, createWarnThrottle } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Warns when a Postgres operation takes longer than its budget.
@@ -84,7 +85,7 @@ export function reportQueryDuration({
   args,
   durationMs,
   budgetMs = DEFAULT_SLOW_QUERY_MS,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   model?: string;
   action: string;

@@ -17,6 +17,7 @@ import {
 } from "./metrics.ts";
 import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore.ts";
 import { type DispatchResult, type GroupStagingScripts, pendingGroupsKey } from "./scripts.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * How many of the soonest-future-scored ("nearest deferred") ready groups the
@@ -216,7 +217,7 @@ export class GroupQueueMetricsCollector {
     readyKey: string;
     keyPrefix: string;
   }): Promise<void> {
-    const nowMs = Date.now();
+    const nowMs = nowInstant().epochMilliseconds;
     const oldestEligible = await this.params.redisConnection.zrangebyscore(
       readyKey,
       MIN_PLAUSIBLE_EPOCH_MS,

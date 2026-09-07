@@ -7,6 +7,7 @@ import {
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 import { newSsoConnectionCommandId, newSsoConnectionId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionBackofficeRepository } from "../repositories/sso-connection-backoffice.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * What the back office reads and commands (D05 tier 1). The write half is a THIN pass-through on
@@ -218,7 +219,7 @@ export class SsoConnectionBackofficeService {
       organizationId,
       connectionId,
       commandId: newSsoConnectionCommandId(),
-      occurredAtMs: Date.now(),
+      occurredAtMs: nowInstant().epochMilliseconds,
       actor: { type: "user" as const, id: operator.userId },
       source: "self-serve" as const,
     };

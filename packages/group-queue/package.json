@@ -12,11 +12,17 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/index.d.ts",
+        "default": "./src/index.ts"
+      },
       "default": "./src/index.ts"
     },
     "./operational": {
-      "types": "./src/operational.ts",
+      "types": {
+        "langwatch-declarations": "./dist/operational.d.ts",
+        "default": "./src/operational.ts"
+      },
       "default": "./src/operational.ts"
     }
   },
@@ -31,6 +37,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "fastq": "^1.20.1",
     "ioredis": "5.10.1",

@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:authz:per-organization-cached-gate");
 
@@ -113,7 +114,7 @@ export class PerOrganizationCachedGateStore {
   }
 
   private now(): number {
-    return this.options.now?.() ?? Date.now();
+    return this.options.now?.() ?? nowInstant().epochMilliseconds;
   }
 
   private maxEntries(): number {

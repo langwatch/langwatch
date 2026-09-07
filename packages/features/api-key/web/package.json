@@ -9,11 +9,17 @@
   "type": "module",
   "exports": {
     "./screens/api-key": {
-      "types": "./src/screens/api-key/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/screens/api-key/index.d.ts",
+        "default": "./src/screens/api-key/index.ts"
+      },
       "default": "./src/screens/api-key/index.ts"
     },
     "./screens/authorize": {
-      "types": "./src/screens/authorize/index.ts",
+      "types": {
+        "langwatch-declarations": "./dist/screens/authorize/index.d.ts",
+        "default": "./src/screens/authorize/index.ts"
+      },
       "default": "./src/screens/authorize/index.ts"
     }
   },
@@ -28,6 +34,7 @@
     "@langwatch/authz-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "lucide-react": "^1.22.0",
     "motion": "^12.42.2"

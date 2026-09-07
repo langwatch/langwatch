@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * How far back a read of a time-partitioned table has to look.
  *
@@ -124,7 +125,7 @@ export class RetentionFloorService {
 
   /** The oldest timestamp a read of `table` for `tenantId` can find a row at. */
   async getFloorMs(query: RetentionFloorQuery & { nowMs?: number }): Promise<number> {
-    const { nowMs = Date.now(), ...rest } = query;
+    const { nowMs = nowInstant().epochMilliseconds, ...rest } = query;
     return nowMs - (await this.getLookbackMs(rest));
   }
 
@@ -158,7 +159,7 @@ export class RetentionFloorService {
     // NUL-joined: neither a tenant id nor a table name can contain it, so two
     // different pairs can never collide on one key.
     const key = `${tenantId}\u0000${table}`;
-    const nowMs = Date.now();
+    const nowMs = nowInstant().epochMilliseconds;
     const hit = this.cache.get(key);
     if (hit && hit.expiresAtMs > nowMs) return hit.days;
 
