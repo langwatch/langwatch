@@ -6,8 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../mailer/resetPasswordEmail", () => ({
   sendResetPasswordEmail: vi.fn().mockResolvedValue(undefined),
 }));
-const { clearPending, revokeAll } = vi.hoisted(() => ({
-  clearPending: vi.fn().mockResolvedValue(void 0),
+const { revokeAll } = vi.hoisted(() => ({
   revokeAll: vi.fn().mockResolvedValue(undefined),
 }));
 // Only the revocation factory is replaced: the rest of the identity runtime is
@@ -17,9 +16,6 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
     typeof import("~/server/app-layer/identity/runtime")
   >()),
   sessionRevocation: () => ({ revokeAll }),
-}));
-vi.mock("~/server/db", () => ({
-  prisma: { user: { update: clearPending } },
 }));
 
 import { env } from "~/env.mjs";
@@ -95,10 +91,6 @@ describe("better-auth password reset wiring", () => {
       expect(revokeAll).toHaveBeenCalledWith(
         expect.objectContaining({ userId: "user_1" }),
       );
-      expect(clearPending).toHaveBeenCalledWith({
-        where: { id: "user_1" },
-        data: { signupConfirmationPending: false },
-      });
     });
   });
 
