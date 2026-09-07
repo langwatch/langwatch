@@ -1,8 +1,10 @@
 import {
+  type AccountSignInMethods,
   type IdentityFact,
   type IdentityFactInput,
   type IdentityCommand,
   type IdentityHeads,
+  reduceIdentity,
 } from "@langwatch/identity";
 import {
   IdentityGuards,
@@ -32,7 +34,10 @@ const OPERATOR_ID = "user_olive";
 const NOW = 1_700_000_000_000;
 
 class Heads implements IdentityHeadsRepository {
-  constructor(private readonly current: IdentityHeads) {}
+  constructor(
+    private current: IdentityHeads,
+    private readonly projected?: { current: IdentityHeads },
+  ) {}
 
   async findUserHashKey(): Promise<string | null> {
     return null;
@@ -59,6 +64,23 @@ class Heads implements IdentityHeadsRepository {
 
   async findIdentifierIdForAccount(): Promise<string | null> {
     return null;
+  }
+
+  fold(facts: readonly IdentityFactInput[], occurredAt: number): void {
+    this.current = facts.reduce(
+      (heads, fact, index) =>
+        reduceIdentity({
+          heads,
+          fact: {
+            ...fact,
+            id: `fact_${index}`,
+            aggregateId: heads.userId,
+            occurredAt,
+          } as IdentityFact,
+        }),
+      this.current,
+    );
+    if (this.projected) this.projected.current = this.current;
   }
 }
 
@@ -93,10 +115,17 @@ class Reservations implements IdentityReservationRepository {
   }
 }
 
-function ledgerThatRecords(committed: IdentityCommandRecord[]) {
+function ledgerThatRecords(
+  committed: IdentityCommandRecord[],
+  afterCommit?: (
+    facts: readonly IdentityFactInput[],
+    occurredAt: number,
+  ) => void,
+) {
   const ledger: IdentityLedger = {
     commit: async ({ command, facts }) => {
       committed.push({ command, facts });
+      afterCommit?.(facts, command.data.occurredAtMs);
       return facts.map(
         (fact, index) =>
           ({
@@ -119,13 +148,55 @@ interface IdentityCommandRecord {
 function identityServiceFor(
   identifiers: IdentityHeads["identifiers"],
   committed: IdentityCommandRecord[],
+  projected?: { current: IdentityHeads },
+  account?: AccountState,
 ) {
+  const heads = new Heads(
+    { userId: USER_ID, identifiers },
+    projected,
+  );
   const guards = new IdentityGuards(
-    new Heads({ userId: USER_ID, identifiers }),
+    heads,
     new Users(),
     new Reservations(),
   );
-  return new IdentityService(guards, ledgerThatRecords(committed));
+  return new IdentityService(
+    guards,
+    ledgerThatRecords(committed, (facts, occurredAt) => {
+      heads.fold(facts, occurredAt);
+      if (!account) return;
+      const active = Object.values(projected?.current.identifiers ?? identifiers).filter(
+        (identifier) => identifier.state === "VERIFIED" || identifier.state === "PRIMARY",
+      );
+      account.current = {
+        hasPassword: active.some((identifier) => identifier.provider === "email"),
+        hasPasskey: active.some((identifier) => identifier.provider === "passkey"),
+        providerIds: active.flatMap((identifier) =>
+          identifier.provider === "email" || identifier.provider === "passkey"
+            ? []
+            : [identifier.provider],
+        ),
+        connectionIds: active.flatMap((identifier) =>
+          identifier.connectionId ? [identifier.connectionId] : [],
+        ),
+      };
+      const methods = account.current;
+      if (!methods) return;
+      const allIdentifiers = Object.values(
+        projected?.current.identifiers ?? identifiers,
+      );
+      account.byAddress = new Map(
+        allIdentifiers.flatMap((identifier) =>
+          identifier.value === null
+            ? []
+            : [[
+                identifier.value,
+                active.includes(identifier) ? methods : null,
+              ] as const],
+        ),
+      );
+    }),
+  );
 }
 
 function proposal({
@@ -148,15 +219,26 @@ function proposal({
 function linksFor(
   record: LinkProposalRecord,
   committed: IdentityCommandRecord[],
-  linked: { calls: string[] },
+  linked: { calls: LinkCall[] },
+  account?: AccountState,
 ) {
   const proposals: LinkProposalReadsRepository = {
     findProposal: async () => record,
     findProposals: async () => [record],
   };
   const directory = {
-    linkProviderAccount: async ({ userId }: { userId: string }) => {
-      linked.calls.push(userId);
+    linkProviderAccount: async (input: LinkCall) => {
+      linked.calls.push(input);
+      if (account) {
+        account.current = {
+          hasPassword: false,
+          hasPasskey: false,
+          providerIds: [input.provider],
+          connectionIds: input.connectionId ? [input.connectionId] : [],
+        };
+        account.byAddress ??= new Map();
+        account.byAddress.set(input.normalizedEmail, account.current);
+      }
     },
   };
   return new LinkProposalService({
@@ -167,7 +249,22 @@ function linksFor(
   });
 }
 
-function router() {
+interface LinkCall {
+  userId: string;
+  connectionId: string | null;
+  provider: string;
+  subject: string;
+  normalizedEmail: string;
+}
+
+interface AccountState {
+  current: AccountSignInMethods | null;
+  byAddress?: Map<string, AccountSignInMethods | null>;
+}
+
+function router(
+  account: AccountState = { current: null },
+) {
   return new SignInRouterService({
     domains: {
       findConnectionForDomain: async () => null,
@@ -175,14 +272,36 @@ function router() {
     },
     policy: {
       resolvePolicy: async () => ({
-        defaultMethods: [],
-        localMethods: [],
+        defaultMethods: [
+          {
+            id: "password",
+            kind: "password" as const,
+            connectionId: null,
+          },
+          {
+            id: "oidc",
+            kind: "federated" as const,
+            connectionId: "ssoc_acme",
+          },
+        ],
+        localMethods: [
+          {
+            id: "password",
+            kind: "password" as const,
+            connectionId: null,
+          },
+        ],
         federationLicensed: true,
         selfHosted: false,
       }),
     },
     breakGlass: { allow: async () => false },
-    accounts: { findAccountMethods: async () => null },
+    accounts: {
+      findAccountMethods: async ({ normalizedValue }) =>
+        account.byAddress?.has(normalizedValue)
+          ? (account.byAddress.get(normalizedValue) ?? null)
+          : account.current,
+    },
   });
 }
 
@@ -234,7 +353,8 @@ describe("platform operator identity lookup service", () => {
     /** @scenario "Confirming a proposed sign-in attaches the method and lets the person in" */
     it("uses the ordinary link ceremony and records the operator actor", async () => {
       const committed: IdentityCommandRecord[] = [];
-      const linked = { calls: [] as string[] };
+      const linked = { calls: [] as LinkCall[] };
+      const account = { current: null as AccountSignInMethods | null };
       const service = new IdentityLookupService({
         reads: readsFor(),
         history,
@@ -242,9 +362,9 @@ describe("platform operator identity lookup service", () => {
           findProposal: async () => proposal(),
           findProposals: async () => [proposal()],
         },
-        router,
+        router: () => router(account),
         identity: () => identityServiceFor({}, committed),
-        links: () => linksFor(proposal(), committed, linked),
+        links: () => linksFor(proposal(), committed, linked, account),
         sessions: { endAllForUser: async () => {}, endForIdentifier: async () => {} },
         invitations: { resend: async () => ({ expiresAtMs: null }), extend: async () => ({ expiresAtMs: null }) },
         now: () => NOW,
@@ -256,19 +376,44 @@ describe("platform operator identity lookup service", () => {
         operator: { userId: OPERATOR_ID },
       });
 
-      expect(linked.calls).toEqual([USER_ID]);
+      expect(linked.calls).toEqual([
+        {
+          userId: USER_ID,
+          connectionId: "ssoc_acme",
+          provider: "oidc",
+          subject: "subject_1",
+          normalizedEmail: "sam@acme.com",
+        },
+      ]);
       expect(committed[0]?.command.data).toMatchObject({
         tenantId: USER_ID,
         userId: USER_ID,
         actor: { type: "user", id: OPERATOR_ID },
         occurredAtMs: NOW,
       });
+      expect(committed[0]?.facts[0]).toMatchObject({
+        type: "lw.identity.link_confirmed",
+        data: {
+          proposalId: "proposal_1",
+          userId: USER_ID,
+          actor: { type: "user", id: OPERATOR_ID },
+        },
+      });
+
+      const nextSignIn = await router(account).route({
+        identifier: "sam@acme.com",
+      });
+      expect(nextSignIn).toMatchObject({
+        outcome: "method_picker",
+        reasonCode: "account_methods",
+      });
+      expect(nextSignIn.methodSet.map((method) => method.id)).toEqual(["oidc"]);
     });
 
     /** @scenario "Rejecting a proposed sign-in records the decision and changes nothing else" */
     it("records rejection with the operator and does not link an account", async () => {
       const committed: IdentityCommandRecord[] = [];
-      const linked = { calls: [] as string[] };
+      const linked = { calls: [] as LinkCall[] };
       const pending = proposal();
       const service = new IdentityLookupService({
         reads: readsFor(),
@@ -427,12 +572,17 @@ describe("platform operator identity lookup service", () => {
           detachedAtMs: null,
         },
       };
+      const projected = {
+        current: { userId: USER_ID, identifiers },
+      };
+      const account = { current: null as AccountSignInMethods | null };
       const service = new IdentityLookupService({
         reads: readsFor(),
         history,
         proposals: { findProposal: async () => null, findProposals: async () => [] },
-        router,
-        identity: () => identityServiceFor(identifiers, committed),
+        router: () => router(account),
+        identity: () =>
+          identityServiceFor(identifiers, committed, projected, account),
         links: () => linksFor(proposal(), committed, { calls: [] }),
         sessions: { endAllForUser: async () => {}, endForIdentifier: async () => {} },
         invitations: { resend: async () => ({ expiresAtMs: null }), extend: async () => ({ expiresAtMs: null }) },
@@ -457,11 +607,29 @@ describe("platform operator identity lookup service", () => {
         type: "lw.identity.identifier_detached",
         data: { identifierId: "idf_personal" },
       });
+      expect(projected.current.identifiers.idf_personal?.state).toBe("DETACHED");
+      expect(projected.current.identifiers.idf_work?.state).toBe("VERIFIED");
+
+      const nextSignIn = await router(account).route({
+        identifier: "sam@acme.com",
+      });
+      expect(nextSignIn).toMatchObject({
+        outcome: "method_picker",
+        reasonCode: "account_methods",
+      });
+      expect(nextSignIn.methodSet.map((method) => method.id)).toEqual(["password"]);
+
+      const detachedSignIn = await router(account).route({
+        identifier: "sam@example.com",
+      });
+      expect(detachedSignIn).toMatchObject({
+        outcome: "route_to_signup",
+        reasonCode: "identifier_unknown",
+      });
     });
   });
 
   describe("when sessions are ended", () => {
-    /** @scenario "Sessions can be ended for a person or for one of their sign-in methods" */
     it("routes method-only and person-wide revocation to the session boundary", async () => {
       const endAllForUser = vi.fn(async () => {});
       const endForIdentifier = vi.fn(async () => {});
