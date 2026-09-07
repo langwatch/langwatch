@@ -226,7 +226,7 @@ function ConfirmAndJoin({
   inviteCode: string;
   organizationName: string;
 }) {
-  const accept = api.organization.acceptInvite.useMutation({
+  const accept = api.invite.acceptInvite.useMutation({
     onSuccess: (data) => {
       // A hard navigation on purpose: caches primed with the pre-invite "no
       // organization" state have to go, or the next page bounces the new

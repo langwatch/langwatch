@@ -90,7 +90,7 @@ export const onboardingRouter = createTRPCRouter({
         // moment onboarding finishes instead of an empty shell whose contents
         // depend on a command the user has not run yet.
         //
-        // Non-fatal by design, matching organization.acceptInvite: a failure
+        // Non-fatal by design, matching invite.acceptInvite: a failure
         // here must not cost the user the organization they just created, and
         // `user.personalContext` backfills lazily on the next session.
         if (input.primaryIntent === "AGENT_GOVERNANCE") {

@@ -65,7 +65,7 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    organization: {
+    invite: {
       acceptInvite: {
         useMutation: () => ({
           mutate: acceptMock,

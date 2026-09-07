@@ -13,7 +13,7 @@ import {
   INVITE_NOT_READY_MESSAGE,
 } from "../../../invites/errors";
 import { createInnerTRPCContext } from "../../trpc";
-import { organizationRouter } from "../organization";
+import { inviteRouter } from "../invite";
 
 vi.mock("../../../../env.mjs", () => ({
   env: {
@@ -125,7 +125,7 @@ function makeInvite(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("organization.acceptInvite", () => {
+describe("invite.acceptInvite", () => {
   let findUniqueMock: ReturnType<typeof vi.fn>;
   let inviteUpdateMock: ReturnType<typeof vi.fn>;
   let createManyMock: ReturnType<typeof vi.fn>;
@@ -165,7 +165,7 @@ describe("organization.acceptInvite", () => {
       project: { findFirst: vi.fn().mockResolvedValue(null) },
     };
     (ctx as any).prisma = prismaStub;
-    return organizationRouter.createCaller(ctx);
+    return inviteRouter.createCaller(ctx);
   }
 
   describe("when invite status is PENDING", () => {
