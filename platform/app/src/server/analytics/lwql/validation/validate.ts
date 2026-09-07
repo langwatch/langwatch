@@ -2,7 +2,7 @@
  * LangWatchQL analytics SQL — the default-deny AST validator.
  *
  * The gateway's half of the isolation model. The database's half is already
- * proven and shipped in `../provisioning.ts`: a readonly identity, per-object
+ * proven and shipped in `../provisioning/accessModel.ts`: a readonly identity, per-object
  * row policies, and a tenant capability the caller cannot forge. This validator
  * does not carry tenant isolation — it is defense in depth, and the reason it
  * exists is that a query which never reaches the database cannot exercise a bug
@@ -65,7 +65,7 @@
  * safe today" never becomes a question anyone has to re-answer.
  *
  * @see specs/analytics/lwql-api.feature
- * @see ../provisioning.ts — the database-layer isolation this backs up
+ * @see ../provisioning/accessModel.ts — the database-layer isolation this backs up
  */
 
 import {

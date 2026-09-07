@@ -1,7 +1,7 @@
 /**
  * Production LangWatchQL provisioning — pure composition only.
  *
- * `provisioning.ts`, `views.ts` and `postgresMapping.ts` generate the SQL;
+ * `accessModel.ts`, `catalogStatements.ts` and `postgresMapping.ts` generate the SQL;
  * this module decides which of it a real deploy runs and in what order, from
  * the runtime `LWQL_*` connection. No I/O happens here — every function
  * takes its inputs as parameters and returns SQL statements, a name, or a
@@ -9,47 +9,37 @@
  * `src/tasks/provisionLwql.ts` is the only caller and the only place that
  * touches a client, an env var beyond what it hands in here, or Postgres.
  *
- * ## What this deploy provisions, and where the access model comes from
+ * ## What this deploy provisions, and what it does not
  *
- * Outside SaaS the ClickHouse access model — restricted user, settings
- * profile, grants, row policies — is self-provisioned by default: this module
- * only composes its SQL ({@link ./provisioning.ts}'s
- * `lwqlClickHouseSetupStatements`) and decides whether to run it
- * ({@link shouldSelfProvisionLwqlAccessModel}); {@link tasks/provisionLwql.ts}
- * applies it. SaaS is the exception — there the access model and the
- * PostgreSQL-mapped reader role stay Terraform's job, provisioned out of band
- * against a server-managed identity a `CREATE USER`/`GRANT` issued from the
- * app runtime would be rejected against, so that Terraform stays the single
- * writer to that security boundary and the multi-tenant prod runtime holds no
- * grant-rewriting capability.
- *
- * The SQL objects this module composes are still only three: the
- * ClickHouse-native views ({@link productionClickHouseObjectStatements}), the
- * PostgreSQL-side approved views
- * ({@link productionPostgresApprovedViewStatements}), and the key-map backfill
- * plan ({@link planLwqlKeyMapBackfill}). The access-model SQL it does not
- * generate — that lives in `provisioning.ts`, this module only gates it.
+ * The ClickHouse access model — restricted user, settings profile, grants,
+ * row policies — and the PostgreSQL-mapped views are infra's job: terraform
+ * provisions both out of band, against a server-managed identity a
+ * `CREATE USER`/`GRANT` issued here would be rejected against. This module
+ * therefore composes only three things: the ClickHouse-native views
+ * ({@link productionClickHouseObjectStatements}), the PostgreSQL-side
+ * approved views ({@link productionPostgresApprovedViewStatements}), and the
+ * key-map backfill plan ({@link planLwqlKeyMapBackfill}).
  *
  * @see specs/analytics/lwql-api.feature
  */
 
-import { lwqlTenantCapability } from "./capability";
-import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
-import type { LangWatchQLViewDefinition } from "./catalog/types";
-import { isPostgresResident } from "./catalog/types";
-import type { LangWatchQLConnection } from "./executor";
+import { lwqlTenantCapability } from "../capability";
+import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
+import type { LangWatchQLViewDefinition } from "../catalog/types";
+import { isPostgresResident } from "../catalog/types";
+import type { LangWatchQLConnection } from "../connection";
+import { postgresLiteral, postgresQuoted } from "../sqlText";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   qualified,
-} from "./provisioning";
-import { postgresLiteral, postgresQuoted } from "./sqlText";
+} from "./accessModel";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
   lwqlViewStatement,
   SHIPPED_LWQL_DEDUP,
-} from "./views";
+} from "./catalogStatements";
 
 /**
  * Literal, hard-coded match for the table name the SaaS row-filter subqueries
@@ -95,43 +85,6 @@ export function lwqlPostgresSchemaFromDatabaseUrl(
 }
 
 /**
- * Whether this deploy provisions the ClickHouse access model itself, rather
- * than leaving it to out-of-band infra.
- *
- * Self-provisioning is the DEFAULT everywhere except SaaS. SaaS is the one
- * exception: there the access model stays Terraform-owned, so Terraform is the
- * single writer to that security boundary during incidents, the unprivileged
- * Cloud runtime identity holds no grant-rewriting capability, and the
- * multi-tenant prod app runtime never issues `CREATE USER`/`GRANT`.
- *
- * `LWQL_SELF_PROVISION_ACCESS_MODEL` is an explicit override in both
- * directions, so a SaaS deploy can opt in and a self-hoster with externally
- * managed grants can opt out:
- *
- *  - `"true"`  — always on, even on SaaS
- *  - `"false"` — always off
- *  - unset     — `!isSaas` (on outside SaaS, off on SaaS)
- *
- * Pure by design: takes the override string and the SaaS flag as parameters
- * rather than reading `process.env`/`env`, so the decision is unit-testable
- * without an environment. {@link tasks/provisionLwql.ts} is the only caller and
- * the one place that feeds it the live values.
- */
-export function shouldSelfProvisionLwqlAccessModel({
-  override,
-  isSaas,
-}: {
-  /** Raw `process.env.LWQL_SELF_PROVISION_ACCESS_MODEL`. */
-  override: string | undefined;
-  /** `env.IS_SAAS`. */
-  isSaas: boolean | undefined;
-}): boolean {
-  if (override === "true") return true;
-  if (override === "false") return false;
-  return !isSaas;
-}
-
-/**
  * Builds the object names a production deploy provisions under, from the
  * validated `LWQL_*` connection. `settingsProfile` is derived rather than
  * configured, mirroring the test harness's `lwql_${slug}_profile` convention
@@ -172,10 +125,9 @@ export function lwqlKeyMapTableQualifiedName({
 
 /**
  * ClickHouse-native views only. Never grants, policies, a user, a profile, or
- * the key-map table (migration 00084 already created it): the access-model SQL
- * lives in `provisioning.ts` and is applied by {@link tasks/provisionLwql.ts}
- * — self-provisioned outside SaaS, Terraform-owned in SaaS (see the module doc
- * comment). This function composes the views alone.
+ * the key-map table (migration 00084 already created it) — the ClickHouse
+ * access model and the PostgreSQL-mapped views are infra's job, provisioned
+ * out of band (see the module doc comment).
  */
 export function productionClickHouseObjectStatements({
   names,

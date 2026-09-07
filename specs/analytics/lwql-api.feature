@@ -802,6 +802,63 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the table-function and SSRF policy is looked up
     Then a dedicated ADR documents why user-supplied table functions remain blocked via AST and grants
 
+  # --- Self-provisioning and cluster topology ---
+  # Chart-managed ClickHouse self-provisioning (issue #7331)
+
+  @e2e
+  Scenario: A ClickHouse mode transition rolls the application automatically
+    Given the chart is rendered with chart-managed ClickHouse at one replica and at three replicas
+    Then the application pod template differs between the two renders
+
+  # Design C: whoever owns the ClickHouse server owns the access model. The app
+  # self-provisions ONLY when it owns nothing else — external/BYO ClickHouse. For
+  # chart-managed ClickHouse the owning pod renders the access model as config, so
+  # the app must not also run the provisioning DDL (one owner per entity name).
+  @e2e
+  Scenario: App self-provisioning is exclusive to external ClickHouse under Design C
+    Given the chart is rendered once with chart-managed ClickHouse and once with external ClickHouse
+    Then the application carries the LangWatchQL self-provisioning environment variable only in the external-ClickHouse render
+    And the chart-managed render leaves provisioning to the ClickHouse server that owns the access model
+
+  @e2e
+  Scenario: A single-replica deployment provisions LangWatchQL unchanged
+    Given the chart is installed with chart-managed ClickHouse at one replica
+    Then the ClickHouse server starts
+    And the restricted identity, its row policies and its named collection all exist
+
+  @e2e @unimplemented
+  Scenario: Clustered chart-managed ClickHouse provisions the full LangWatchQL access model
+    Given the chart is installed with chart-managed ClickHouse at three replicas
+    When the application boots
+    Then the restricted identity, its settings profile, its grants, its row policies, its named collection and its engine tables all exist
+    # Tracking issue #7387 — covering test coming in follow-up batch
+
+  @integration
+  Scenario: Provisioning does not alter the migrated database
+    Given the ClickHouse migrations have created the application database
+    When LangWatchQL provisioning runs
+    Then the database engine is unchanged
+    And provisioning against a database name that differs from the connection URL's is refused
+
+  # P1 (#6635): under LWQL_SELF_PROVISION every app pod runs the convergence at
+  # boot, and it is destructive (CREATE USER OR REPLACE, drop/recreate the
+  # PostgreSQL-engine tables, grants, row policies). Two pods running it at once
+  # race — one recreating the restricted identity while another queries through
+  # it mid-drop. A single global Postgres advisory lock gates entry so the
+  # sequence runs one pod at a time; the convergence is idempotent, so the pod
+  # that waits simply re-runs it.
+  @integration
+  Scenario: Concurrent self-provision runs are serialized by the advisory lock
+    Given two pods run the LangWatchQL self-provision convergence at the same time
+    Then the two locked bodies never overlap
+    And one run finishes before the other starts
+
+  @integration
+  Scenario: The lock is a transaction-scoped Postgres advisory lock on the global key
+    Given a pod holds the LangWatchQL self-provision lock inside its transaction
+    Then another connection cannot acquire the same key while it is held
+    And the key becomes acquirable again once the transaction ends
+
 # --- AC Coverage Map ---
 # Issue #6480 ACs → scenarios (grouped as in the issue body).
 #
@@ -997,7 +1054,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #   → Scenario: Missing time buckets diagnostic fires (MISSING_TIME_BUCKETS)
 # AC "clean = no known issue detected" → Scenario: Clean diagnostic status is documented as no known issue detected
 # (a fifth rule beyond the four the issue scopes, because the partition-pruning
-#  measurement recorded in src/server/analytics/lwql/views.ts puts an
+#  measurement recorded in src/server/analytics/lwql/provisioning/catalogStatements.ts puts an
 #  eight-fold read cost on the shape it reports)
 #   → Scenario: An unbounded read is reported as covering the whole history (UNBOUNDED_TIME_RANGE)
 #
@@ -1013,9 +1070,14 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #   → Scenario: The restricted identity cannot write through a PG-engine mapped table
 #   → Scenario: Every approved view is named under the prefix the reader's grants match
 
+  # The self-provisioning DDL embeds the restricted identity's password and the
+  # named collection's PostgreSQL reader password, and a ClickHouse error echoes
+  # the statement that failed. Self-provisioning is non-fatal by contract (the
+  # pod boots, the endpoint stays refused), so the failure is logged, and what
+  # is logged must not carry either secret.
   @unit
-  Scenario: A failed access-model reconciliation aborts the deploy without leaking the password
+  Scenario: A failed self-provisioning run is logged without leaking a password
     Given the self-provisioned ClickHouse access model whose DDL embeds the restricted user's password
-    When reconciling it fails and the error echoes that DDL
-    Then the deploy is aborted rather than continuing with the executor available
-    And the password and the admin connection string are redacted from anything logged or re-thrown
+    When a statement fails and the error echoes that DDL
+    Then the password and the connection strings are redacted from the logged error
+    And an empty or unset secret never matches

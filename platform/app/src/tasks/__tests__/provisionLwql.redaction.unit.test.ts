@@ -1,28 +1,29 @@
 /**
- * The access-model reconciliation step embeds `LWQL_CLICKHOUSE_PASSWORD` in
- * the DDL it runs, and a ClickHouse error can echo that DDL back. `redactSecrets`
- * is the wrapper that keeps the password (and the admin connection string) out
- * of anything logged or re-thrown from that step.
+ * The self-provisioning path embeds the restricted identity's password and the
+ * PostgreSQL reader password in the DDL it runs, and a ClickHouse error echoes
+ * the statement that failed. `redactSecrets` is what every logged provisioning
+ * error goes through so neither secret, nor the connection strings, reaches
+ * the log.
  *
  * @see specs/analytics/lwql-api.feature
  */
 
 import { describe, expect, it } from "vitest";
 
-import {
-  failClosedOnAccessModelReconciliation,
-  redactSecrets,
-} from "../provisionLwql";
+import { redactSecrets } from "../provisionLwql";
 
 describe("redactSecrets", () => {
   describe("given a message that echoes a secret", () => {
     describe("when the secret appears once", () => {
+      /** @scenario "A failed self-provisioning run is logged without leaking a password" */
       it("replaces it with the marker", () => {
         const out = redactSecrets(
-          "CREATE USER lwql IDENTIFIED BY 's3cr3t' failed",
+          "CREATE USER lwql IDENTIFIED WITH sha256_password BY 's3cr3t' failed",
           ["s3cr3t"],
         );
-        expect(out).toBe("CREATE USER lwql IDENTIFIED BY '[REDACTED]' failed");
+        expect(out).toBe(
+          "CREATE USER lwql IDENTIFIED WITH sha256_password BY '[REDACTED]' failed",
+        );
         expect(out).not.toContain("s3cr3t");
       });
     });
@@ -35,57 +36,39 @@ describe("redactSecrets", () => {
     });
 
     describe("when several secrets are supplied", () => {
-      it("redacts the password and the connection string together", () => {
+      /** @scenario "A failed self-provisioning run is logged without leaking a password" */
+      it("redacts the passwords and the connection strings together", () => {
         const out = redactSecrets(
-          "clickhouse://user:p4ss@host/db rejected 's3cr3t'",
-          ["s3cr3t", "clickhouse://user:p4ss@host/db"],
+          "clickhouse://user:p4ss@host/db rejected 's3cr3t' dialling postgresql://ro:pgpw@pg/app",
+          [
+            "s3cr3t",
+            "pgpw",
+            "clickhouse://user:p4ss@host/db",
+            "postgresql://ro:pgpw@pg/app",
+          ],
         );
         expect(out).not.toContain("s3cr3t");
         expect(out).not.toContain("p4ss");
+        expect(out).not.toContain("pgpw");
+      });
+    });
+
+    describe("when a secret contains regexp metacharacters", () => {
+      it("matches it literally", () => {
+        const out = redactSecrets("password 'a.b*c+(d)' rejected", [
+          "a.b*c+(d)",
+        ]);
+        expect(out).toBe("password '[REDACTED]' rejected");
       });
     });
   });
 
   describe("given empty or undefined secrets", () => {
+    /** @scenario "A failed self-provisioning run is logged without leaking a password" */
     it("leaves the message untouched and never matches an empty string", () => {
       expect(redactSecrets("nothing to hide", [undefined, ""])).toBe(
         "nothing to hide",
       );
-    });
-  });
-});
-
-describe("failClosedOnAccessModelReconciliation", () => {
-  describe("given a reconciliation error that echoes the password", () => {
-    describe("when the failure is handled", () => {
-      /** @scenario "A failed access-model reconciliation aborts the deploy without leaking the password" */
-      it("aborts the deploy rather than continuing", () => {
-        expect(() =>
-          failClosedOnAccessModelReconciliation({
-            error: new Error("boom"),
-            secrets: [],
-          }),
-        ).toThrow();
-      });
-
-      /** @scenario "A failed access-model reconciliation aborts the deploy without leaking the password" */
-      it("re-throws with the password and connection string redacted", () => {
-        let thrown: unknown;
-        try {
-          failClosedOnAccessModelReconciliation({
-            error: new Error(
-              "CREATE USER lwql IDENTIFIED BY 's3cr3t' at clickhouse://u:p4ss@h/db failed",
-            ),
-            secrets: ["s3cr3t", "clickhouse://u:p4ss@h/db"],
-          });
-        } catch (error) {
-          thrown = error;
-        }
-        expect(thrown).toBeInstanceOf(Error);
-        const message = (thrown as Error).message;
-        expect(message).not.toContain("s3cr3t");
-        expect(message).not.toContain("p4ss");
-      });
     });
   });
 });
