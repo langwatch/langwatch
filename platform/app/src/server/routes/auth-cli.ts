@@ -163,6 +163,13 @@ const REFRESH_TOKEN_TTL_SECONDS = positiveIntFromEnv(
 );
 /** Min seconds between successive /exchange polls per device_code. */
 const POLL_RATE_LIMIT_SECONDS = 4;
+/**
+ * How long one /exchange holds the exclusive redemption claim on an approved
+ * device code. Long enough to cover the Prisma reads, the personal-workspace
+ * ensure and the login-key mint the redemption does; short enough that an
+ * unexpected throw before the release frees the code well inside its TTL.
+ */
+const EXCHANGE_CLAIM_SECONDS = 30;
 
 const DEVICE_CODE_PREFIX = "lwcli:device:"; // Redis key prefix for device-code records
 const REFRESH_TOKEN_PREFIX = "lwcli:refresh:"; // Redis key prefix for refresh-token records
@@ -368,6 +375,16 @@ async function validateAccessToken(
 
 function pollRateKey(deviceCode: string): string {
   return `${POLL_RATE_PREFIX}${deviceCode}`;
+}
+
+/**
+ * Redemption claim for an approved device code. A settled code skips the
+ * poll-rate window, so this claim is what serialises concurrent /exchange
+ * calls on the approved branch: one request redeems the code, the rest get
+ * the same slow_down the window would have given them.
+ */
+function deviceExchangeClaimKey(deviceCode: string): string {
+  return `${DEVICE_CODE_PREFIX}claim:${deviceCode}`;
 }
 
 function getRedis() {
@@ -762,6 +779,35 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       );
     }
 
+    // Exclusive redemption. Everything below hands out a credential the
+    // device code is only supposed to buy once: the project-key branch
+    // returns the project apiKey, the device-session branch mints an ApiKey
+    // and a token pair, and the mint revokes the previous login key for the
+    // same device label. Two concurrent exchanges both reaching that would
+    // hand out two sets and let the second revoke the first's key, so the
+    // approved branch is entered by one request at a time. The loser gets
+    // the same slow_down a too-fast poll gets, which the CLI already
+    // retries, and the winner deletes the device code on every path that
+    // consumes it.
+    const claimKey = deviceExchangeClaimKey(device_code);
+    const claimed = await redis.set(
+      claimKey,
+      "1",
+      "EX",
+      EXCHANGE_CLAIM_SECONDS,
+      "NX",
+    );
+    if (claimed !== "OK") {
+      return c.json(
+        {
+          error: "slow_down",
+          error_description:
+            "Polling too fast. Increase your interval before retrying.",
+        },
+        429,
+      );
+    }
+
     // Look up user + org details for the response payload. We only fetch
     // the fields the CLI actually needs to print on success.
     const user = await prisma.user.findUnique({
@@ -776,6 +822,9 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       logger.error(
         `[auth-cli] approved device_code refers to missing user (${record.user_id}) or org (${record.organization_id})`,
       );
+      // Nothing was consumed, so the code stays redeemable for whatever
+      // retry the CLI makes next.
+      await redis.del(claimKey);
       return c.json(
         {
           error: "server_error",
@@ -827,6 +876,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         logger.warn(
           `[auth-cli] approved project_api_key device_code ${device_code} missing project payload — returning pending`,
         );
+        await redis.del(claimKey);
         return c.json(
           {
             error: "authorization_pending",
@@ -960,6 +1010,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
             410,
           );
         }
+        await redis.del(claimKey);
         throw err;
       }
       cliApiKey = minted.token;

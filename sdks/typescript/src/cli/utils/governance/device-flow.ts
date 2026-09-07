@@ -362,11 +362,17 @@ export async function pollUntilDone(
   const deadline = Date.now() + dc.expires_in * 1000;
 
   const watch = watchDeviceApproval({ opts, deviceCode: dc.device_code });
-  let approval: Promise<void> | null = watch.settled;
-  // A signal fires once. Racing a resolved promise every round would turn the
-  // loop into a hot poll if /exchange somehow still answered `pending`.
-  void watch.settled.then(() => {
-    approval = null;
+  const approval = watch.settled;
+  // A signal fires once, so it is tracked in two parts. `signalled` says the
+  // frame arrived, `spent` says a poll has already been let through because
+  // of it. A frame that lands while an /exchange is in flight therefore still
+  // shortens the next wait instead of being dropped, and once it is spent the
+  // loop stops racing an already-resolved promise, which would otherwise turn
+  // into a hot poll if /exchange somehow still answered `pending`.
+  let signalled = false;
+  let spent = false;
+  void approval.then(() => {
+    signalled = true;
   });
 
   try {
@@ -377,8 +383,14 @@ export async function pollUntilDone(
       }
       if (firstPoll) {
         firstPoll = false;
+      } else if (signalled && !spent) {
+        // The browser settled the code while the previous poll was in
+        // flight. Poll again straight away rather than sleeping out an
+        // interval the signal exists to skip.
+        spent = true;
       } else {
-        await waitForNextPoll({ ms: interval, approval });
+        await waitForNextPoll({ ms: interval, approval: spent ? null : approval });
+        if (signalled) spent = true;
       }
       try {
         return await exchange(opts, dc.device_code);

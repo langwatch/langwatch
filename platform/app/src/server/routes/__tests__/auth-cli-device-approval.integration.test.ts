@@ -10,7 +10,9 @@
  *     settles the code, and emits one right away for a code already settled.
  *   - `POST /api/auth/cli/exchange` skips its per-device poll window once the
  *     code has settled, so the poll the stream just asked for is answered
- *     instead of being told to slow down.
+ *     instead of being told to slow down, and takes an exclusive redemption
+ *     claim instead, so two polls arriving together still redeem the approval
+ *     once.
  *
  * Spec: specs/ai-gateway/governance/cli-login.feature
  */
@@ -19,6 +21,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
+import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
@@ -34,12 +37,16 @@ import { app, approveDeviceCode, denyDeviceCode } from "../auth-cli";
 const suffix = nanoid(8);
 const USER_ID = `usr-approval-${suffix}`;
 const ORG_ID = `org-approval-${suffix}`;
+const PROJECT_ID = `proj-approval-${suffix}`;
+const PROJECT_API_KEY = `sk-lw-approval-${suffix}-${"a".repeat(36)}`;
 
-async function mintDeviceCode(): Promise<string> {
+async function mintDeviceCode(
+  request: Record<string, unknown> = {},
+): Promise<string> {
   const res = await app.request("/api/auth/cli/device-code", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify(request),
   });
   if (res.status !== 200) {
     throw new Error(`/device-code answered ${res.status}`);
@@ -107,11 +114,38 @@ describe("CLI device-approval stream", () => {
     ({ redisConnection } = await startTestContainers());
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
+
+    // The redemption path re-derives membership from Postgres, so the user and
+    // org the approvals below name have to exist for an exchange to reach 200.
+    await prisma.organization.create({
+      data: {
+        id: ORG_ID,
+        name: `Approval Org ${suffix}`,
+        slug: `approval-${suffix}`,
+      },
+    });
+    await prisma.user.create({
+      data: {
+        id: USER_ID,
+        email: `approval-${suffix}@example.com`,
+        name: `Approval ${suffix}`,
+      },
+    });
+    await prisma.organizationUser.create({
+      data: { userId: USER_ID, organizationId: ORG_ID, role: "ADMIN" },
+    });
   });
 
   afterAll(async () => {
     await resetDeviceApprovalSubscriber().catch(() => {});
     await resetApp();
+    await prisma.organizationUser
+      .deleteMany({ where: { userId: USER_ID, organizationId: ORG_ID } })
+      .catch(() => {});
+    await prisma.user.deleteMany({ where: { id: USER_ID } }).catch(() => {});
+    await prisma.organization
+      .deleteMany({ where: { id: ORG_ID } })
+      .catch(() => {});
     await stopTestContainers().catch(() => {});
   });
 
@@ -151,7 +185,7 @@ describe("CLI device-approval stream", () => {
     });
 
     describe("when the code settles while the stream is still subscribing", () => {
-      /** @scenario "A publication reaches nobody if the stream has not subscribed yet" */
+      /** @scenario "A publication is lost if the stream has not subscribed yet" */
       it("is a window a publication falls into, since pub/sub keeps nothing for a late subscriber", async () => {
         const deviceCode = await mintDeviceCode();
         const abort = new AbortController();
@@ -234,6 +268,44 @@ describe("CLI device-approval stream", () => {
         // Inside the same window, but the code has settled: this is the poll
         // the stream just asked for, and it gets its answer.
         expect((await callExchange(deviceCode)).status).toBe(410);
+      });
+    });
+
+    describe("when two polls for the same approval arrive together", () => {
+      /** @scenario "Two exchanges racing the same approval redeem it once" */
+      it("hands the credential to one of them and tells the other to slow down", async () => {
+        const deviceCode = await mintDeviceCode({
+          credential_type: "project_api_key",
+        });
+        await approveDeviceCode({
+          deviceCode,
+          userId: USER_ID,
+          organizationId: ORG_ID,
+          projectApiKey: {
+            project_id: PROJECT_ID,
+            project_slug: `approval-proj-${suffix}`,
+            project_name: `Approval Project ${suffix}`,
+            api_key: PROJECT_API_KEY,
+          },
+        });
+
+        // A settled code skips the poll window, so nothing else stands between
+        // these two: without the redemption claim both reach the credential.
+        const [first, second] = await Promise.all([
+          callExchange(deviceCode),
+          callExchange(deviceCode),
+        ]);
+
+        expect([first.status, second.status].sort()).toEqual([200, 429]);
+
+        const winner = first.status === 200 ? first : second;
+        const loser = first.status === 200 ? second : first;
+        expect(((await winner.json()) as { api_key: string }).api_key).toBe(
+          PROJECT_API_KEY,
+        );
+        expect(((await loser.json()) as { error: string }).error).toBe(
+          "slow_down",
+        );
       });
     });
   });

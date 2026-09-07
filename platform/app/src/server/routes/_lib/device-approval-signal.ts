@@ -86,8 +86,8 @@ export async function publishDeviceCodeSettled({
  * `subscribed` resolves once the channel is live, or once it is known that it
  * never will be. It is what lets the caller re-read the record before it
  * commits to waiting: a code settled between the caller's own read and this
- * subscribe published to nobody, and Redis pub/sub keeps nothing for a late
- * subscriber.
+ * subscribe published while the channel had no listener, and Redis pub/sub
+ * keeps nothing for a late subscriber.
  *
  * `settled` resolves with the published status, or with null when the signal
  * aborts first or the subscribe failed.

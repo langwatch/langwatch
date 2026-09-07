@@ -148,7 +148,7 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And the pod refuses a new stream once it holds too many, so the CLI polls
 
   @integration @cli @device-flow @login-latency
-  Scenario: A publication reaches nobody if the stream has not subscribed yet
+  Scenario: A publication is lost if the stream has not subscribed yet
     Given a device code settles before the stream subscribes to its channel
     When the stream subscribes afterwards
     Then it hears nothing, because the channel keeps no history
@@ -160,6 +160,20 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     When the code is approved or denied and the CLI polls again straight away
     Then the response carries the settled outcome instead of 429
     And a code still pending inside that window is told to slow down
+
+  @integration @cli @device-flow @login-latency
+  Scenario: Two exchanges racing the same approval redeem it once
+    Given a device code has been approved
+    When two exchange calls for that code arrive at the same time
+    Then exactly one of them receives the credential
+    And the other is told to slow down instead of receiving a second one
+
+  @unit @cli @device-flow @login-latency
+  Scenario: An approval that lands during a poll still cuts the next wait short
+    Given the CLI has a poll in flight
+    When the approval stream emits a frame before that poll answers
+    Then the next poll goes out without waiting the interval
+    And the frame is spent by that poll, so the loop keeps its interval afterwards
 
   # ---------------------------------------------------------------------------
   # Token persistence and refresh

@@ -297,6 +297,54 @@ describe("pollUntilDone", () => {
     expect(Date.now() - started).toBeGreaterThanOrEqual(150);
   });
 
+  /** @scenario "An approval that lands during a poll still cuts the next wait short" */
+  it("polls at once when the frame landed while the previous poll was in flight", async () => {
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+    // Held in an object so the stream's `start` can hand the emitter back out.
+    const frame: { emit: (() => void) | null } = { emit: null };
+    const approval = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            frame.emit = () =>
+              controller.enqueue(
+                new TextEncoder().encode('data: {"status":"approved"}\n\n'),
+              );
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "text/event-stream" } },
+      );
+
+    const pollTimes: number[] = [];
+    let firstPollReturnedAt = 0;
+    const fetchImpl = vi.fn().mockImplementation(async (url: string) => {
+      if (String(url).includes("/device-approval")) return approval();
+      pollTimes.push(Date.now());
+      if (pollTimes.length > 2) return jsonResponse(200, sessionBody);
+      if (pollTimes.length === 1) {
+        // The browser settles the code while this poll is still in flight,
+        // the window in which the wakeup has no wait to cut short yet.
+        for (let i = 0; i < 50 && !frame.emit; i++) await tick();
+        frame.emit?.();
+        for (let i = 0; i < 50; i++) await tick();
+        firstPollReturnedAt = Date.now();
+      }
+      return emptyResponse(428);
+    });
+
+    const r = await pollUntilDone(
+      { baseUrl: "http://x", fetchImpl },
+      { ...deviceCode, interval: 0.2 },
+    );
+
+    expect(r.kind).toBe("device_session");
+    expect(pollTimes).toHaveLength(3);
+    // The frame is what sends the second poll out, so it does not wait.
+    expect(pollTimes[1]! - firstPollReturnedAt).toBeLessThan(150);
+    // And it is spent by that poll: the third one waits the interval again.
+    expect(pollTimes[2]! - pollTimes[1]!).toBeGreaterThanOrEqual(150);
+  });
+
   it("propagates denied without retrying further", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(410));
     await expect(
