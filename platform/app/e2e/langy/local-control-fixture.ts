@@ -712,6 +712,26 @@ export function buildCli(): Promise<void> {
   return cliBuildPromise;
 }
 
+/**
+ * A folder holding one `langwatch` that runs the build this test made.
+ *
+ * The terminal starts the command line by its built entry point, but every
+ * `langwatch` the agent types into the shared folder is resolved on PATH, and
+ * that finds whatever copy is installed on the machine. A scenario asserting on
+ * a flag the branch just added would read the installed copy's "unknown option"
+ * instead.
+ */
+async function cliBinDir(at: string): Promise<string> {
+  await fs.mkdir(at, { recursive: true });
+  const shim = path.join(at, "langwatch");
+  await fs.writeFile(
+    shim,
+    `#!/bin/sh\nexec node ${JSON.stringify(CLI_ENTRY)} "$@"\n`,
+    { encoding: "utf8", mode: 0o755 },
+  );
+  return at;
+}
+
 /** The terminal the command line runs in, and the ways a test drives it. */
 export interface CliTerminal {
   sessionName: string;
@@ -807,6 +827,9 @@ export async function startShareControl({
   const sessionName = `langy-${label}-${Date.now().toString(36)}`;
   const configPath = path.join(repo.root, "..", `${sessionName}-config.json`);
   await writeCliLoginConfig({ configPath });
+  const binDir = await cliBinDir(
+    path.join(repo.root, "..", `${sessionName}-bin`),
+  );
   const script = path.join(repo.root, "..", `${sessionName}.sh`);
   // The terminal signs in through the login config alone: a project key in
   // its environment would make the command line act as the project, and a
@@ -819,6 +842,7 @@ export async function startShareControl({
       "unset LANGWATCH_API_KEY",
       `export LANGWATCH_ENDPOINT=${JSON.stringify(APP_BASE)}`,
       `export LANGWATCH_CLI_CONFIG=${JSON.stringify(configPath)}`,
+      `export PATH=${JSON.stringify(binDir)}:"$PATH"`,
       "export FORCE_COLOR=0",
       "unset TRACEPARENT",
       `exec node ${JSON.stringify(CLI_ENTRY)} langy --share-control`,
