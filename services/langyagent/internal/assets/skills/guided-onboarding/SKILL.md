@@ -108,7 +108,7 @@ Options, in this order, with the same `{title}`:
 1. Create "{title}" as your first scenario test
 2. "Chat about this", quiet
 
-The first scenario is the agent's golden path: the thing the agent exists to do, end to end, with inputs the code accepts. Refusals, expired inputs and edge cases come in the suite after it, never first. `{title}` names that path in a few words, for example "Guest completes checkout"; `{reason}` says in one clause why it goes first.
+The first scenario is the agent's golden path: the thing the agent exists to do, end to end, with inputs the code accepts. Refusals, expired inputs and edge cases come in the suite after it, never first. `{title}` names that path in a few words, for example "Guest completes checkout"; `{reason}` says in one clause why it goes first. Its criteria name what the person can see in the conversation, never the tool that produces it: "returns an order number", not "calls place_order". The judge reads the transcript; a criterion that names a tool sends it to the traces for proof the trace may not carry, and a run the agent passed comes back failed.
 
 **"Chat about this"**: say the line below with `say`, verbatim and in full, and end the turn right after that call, so the composer takes the cursor and the turn waits for their description. The line is the whole of the turn's words: no reply text before or after it, no other tool call, and never an empty turn in its place:
 
@@ -173,6 +173,8 @@ langwatch scenario create "<title>" --situation "..." --criteria "..." --test-su
 langwatch test-suite run <suite_id> --target connected:<agent name> --wait --format json
 langwatch navigate open <the scenariorun_ id the suite run printed>
 ```
+
+Every scenario of the suite carries, in its situation, the concrete input it hinges on, read from the code: the discount code, the card number the code declines, the id. A situation that says only "a card that is declined" leaves the simulated user to invent a number the code accepts, and the run fails for the wrong reason. Read the file that holds the rule before writing the situation. The criteria name outcomes, as for the first scenario, never tools.
 
 Item 9: the commit and the pull request exist since step 2, so commit and push again only when a file changed since; the change lands on the same pull request, and with no remote it stays on the branch. Leave the branch checked out: the agent you started runs on it.
 

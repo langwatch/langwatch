@@ -149,6 +149,25 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).not.toContain("are written before the question of step 3 is called");
     });
 
+    /** @scenario "The scenarios name outcomes and carry the inputs they hinge on" */
+    it("names observable outcomes in the criteria and puts the concrete input in every suite situation", () => {
+      expect(rendered).toContain(
+        'Its criteria name what the person can see in the conversation, never the tool that produces it: "returns an order number", not "calls place_order".',
+      );
+      expect(rendered).toContain(
+        "Every scenario of the suite carries, in its situation, the concrete input it hinges on, read from the code: the discount code, the card number the code declines, the id.",
+      );
+      expect(rendered).toContain(
+        "Read the file that holds the rule before writing the situation. The criteria name outcomes, as for the first scenario, never tools.",
+      );
+      // The rule sits with the suite commands, after them and before item 9.
+      const suite = rendered.indexOf('langwatch test-suite create "Full regression"');
+      const inputs = rendered.indexOf("Every scenario of the suite carries, in its situation");
+      const item9 = rendered.indexOf("Item 9: the commit and the pull request exist since step 2");
+      expect(inputs).toBeGreaterThan(suite);
+      expect(item9).toBeGreaterThan(inputs);
+    });
+
     /** @scenario "Every scripted line is said with the say tool at its moment" */
     it("says every scripted line with the say tool, and leaves the proposal in the question field", () => {
       expect(rendered).toContain(

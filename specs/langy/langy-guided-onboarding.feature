@@ -780,6 +780,17 @@ Feature: Langy guides the first setup after sign-up
       And the closing line of every path is said after complete-path, with no reply text after it
       And the proposal stays the question field of the bare question
 
+    # A take's suite came back failed on runs the agent had passed: the
+    # criteria named tools ("calls place_order"), so the judge went to the
+    # traces for proof and found none, and one situation said "a card that is
+    # declined" without the number the code declines, so the simulated user
+    # invented one the code accepted.
+    @unit
+    Scenario: The scenarios name outcomes and carry the inputs they hinge on
+      When the compiled guided-onboarding skill is read
+      Then the first scenario's criteria name what the person can see in the conversation, never the tool that produces it
+      And every scenario of the suite carries in its situation the concrete input it hinges on, read from the code
+
     @e2e
     Scenario: Going ahead creates the scenario in the drawer beside the panel
       Given Langy proposed the first scenario
