@@ -7,12 +7,35 @@ import {
   SERVER_ONLY_CONTRACT_ARTIFACT,
   SERVER_PATTERNS,
   isLowerKebabFilename,
+  isFeatureApiContract,
 } from "../../grammar/feature-layout-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 const SERVER_HOMES =
   "services/, ports/, repositories/, stores/, adapters/, projections/, subscribers/, " +
   "processes/, intents/, rules/, tasks/, transport/<surface>/, migrations/, app/, fixtures/";
+
+function contractVisitors(context, source) {
+  const { name, sourcePath } = source;
+  if (name === "index.ts" || isFeatureApiContract(sourcePath, source.feature)) return {};
+  const report = (messageId, data = {}) => ({
+    Program(node) {
+      context.report({ node, messageId, data: { name, ...data } });
+    },
+  });
+  if (/^(?:commands|errors|events|queries|service)\.ts$/.test(name)) {
+    return report("contractMissingSubject", { artifact: name.replace(/\.ts$/, "") });
+  }
+  if (SERVER_ONLY_CONTRACT_ARTIFACT.test(name)) return report("contractServerArtifact");
+  const malformedArtifact =
+    CONTRACT_ARTIFACT_SUFFIX.test(name) &&
+    !CONTRACT_ARTIFACT.test(name) &&
+    isLowerKebabFilename(name);
+  if (malformedArtifact) {
+    return report("contractFilename");
+  }
+  return {};
+}
 
 export const featureSourceLayoutRule = defineRule({
   name: "feature-source-layout",
@@ -46,28 +69,9 @@ export const featureSourceLayoutRule = defineRule({
   create(context, file) {
     const source = file.strictSource;
     if (!source) return {};
-    const { name, sourcePath, role } = source;
+    const { sourcePath, role } = source;
 
-    if (role === "contract") {
-      if (name === "index.ts") return {};
-      const report = (messageId, data = {}) => ({
-        Program(node) {
-          context.report({ node, messageId, data: { name, ...data } });
-        },
-      });
-      if (/^(?:commands|errors|events|queries|service)\.ts$/.test(name)) {
-        return report("contractMissingSubject", { artifact: name.replace(/\.ts$/, "") });
-      }
-      if (SERVER_ONLY_CONTRACT_ARTIFACT.test(name)) return report("contractServerArtifact");
-      if (
-        CONTRACT_ARTIFACT_SUFFIX.test(name) &&
-        !CONTRACT_ARTIFACT.test(name) &&
-        isLowerKebabFilename(name)
-      ) {
-        return report("contractFilename");
-      }
-      return {};
-    }
+    if (role === "contract") return contractVisitors(context, source);
 
     if (role !== "server") return {};
 
@@ -102,7 +106,9 @@ export const featureSourceLayoutRule = defineRule({
           report(node, "a class");
         },
         NewExpression(node) {
-          if (node.callee?.type === "Identifier" && PURE_VALUE_CONSTRUCTORS.has(node.callee.name)) {
+          const pureValue =
+            node.callee?.type === "Identifier" && PURE_VALUE_CONSTRUCTORS.has(node.callee.name);
+          if (pureValue) {
             return;
           }
           report(node, "a `new` expression");
@@ -110,7 +116,8 @@ export const featureSourceLayoutRule = defineRule({
       };
     }
 
-    if (SERVER_PATTERNS.some((pattern) => pattern.test(sourcePath))) return {};
+    const hasServerHome = SERVER_PATTERNS.some((pattern) => pattern.test(sourcePath));
+    if (hasServerHome) return {};
 
     return {
       Program(node) {

@@ -49,6 +49,11 @@ export const SERVER_ARCHITECTURAL_QUALIFIERS = [
   "routed",
 ];
 
+/** The feature API token has one portable home; other API modules are transports. */
+export function isFeatureApiContract(sourcePath, feature) {
+  return sourcePath === `${feature}.api.ts`;
+}
+
 export const CONTRACT_ARTIFACT = new RegExp(
   `^${NAME}\\.(?:commands|errors|events|queries|service)\\.ts$`,
 );
@@ -137,7 +142,8 @@ export function isLowerKebabFilename(name) {
   if (parts.length === 3 && CANONICAL_ARTIFACTS.has(parts[2])) {
     return parts.every((part) => NAME_RE.test(part));
   }
-  if (CANONICAL_ARTIFACTS.has(parts.at(-1))) return false;
+  const hasArtifactSuffix = CANONICAL_ARTIFACTS.has(parts.at(-1));
+  if (hasArtifactSuffix) return false;
   // Non-architectural domain qualifiers (generated, native) are retained when
   // their components are already lower kebab case.
   return parts.every((part) => NAME_RE.test(part));

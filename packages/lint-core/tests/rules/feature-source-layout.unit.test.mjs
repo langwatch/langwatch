@@ -74,3 +74,14 @@ describe("given a strict feature server module", () => {
     });
   });
 });
+
+it("accepts the canonical feature API contract", () => {
+  expect(report("packages/features/agent/contract/src/agent.api.ts")).toEqual([]);
+});
+
+it.each([
+  "packages/features/agent/contract/src/other.api.ts",
+  "packages/features/agent/contract/src/nested/agent.api.ts",
+])("keeps noncanonical API modules out of contracts: %s", (file) => {
+  expect(report(file).map((entry) => entry.messageId)).toEqual(["contractServerArtifact"]);
+});

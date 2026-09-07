@@ -6,6 +6,7 @@ import { readFeatureCatalogue } from "./feature-catalogue.ts";
 import { lintFeatureAppContracts } from "./feature-app-contract.ts";
 import {
   CONTRACT_ARTIFACT,
+  isFeatureApiContract,
   PROCESS_MANAGER_SERVICE_PATTERN,
   RULES_PATTERN,
   SERVICE_MODULE_PATTERN,
@@ -55,7 +56,8 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
     if (TEST_DIRECTORY.test(path)) return false;
 
     const filename = path.slice(path.lastIndexOf("/") + 1);
-    return CONTRACT_ARTIFACT.test(filename) || filename === `${pkg.feature}.api.ts`;
+
+    return CONTRACT_ARTIFACT.test(filename) || isFeatureApiContract(path, pkg.feature);
   });
   const violations: ArchitectureViolation[] = [];
   if (services.length > 0) {
@@ -70,7 +72,9 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
       for (const statement of parsed.statements) {
         if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
           continue;
+
         if (statement.moduleSpecifier.text !== "@langwatch/runtime-composition") continue;
+
         violations.push(
           violation(
             api,
@@ -80,6 +84,7 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
         );
       }
     }
+
     return violations;
   }
 
@@ -270,7 +275,7 @@ function manifestTargets(value: unknown): string[] {
   return Object.values(value as Record<string, unknown>).flatMap(manifestTargets);
 }
 
-/** Every entrypoint a consumer can import: the package.json `exports` map, plus `src/index.ts` always. */
+/** Public entrypoints from the exports map and src/index.ts. */
 function packageEntrypoints(pkg: ClassifiedPackage): string[] {
   const targets = new Set<string>(["src/index.ts"]);
   for (const target of manifestTargets(pkg.manifest.exports)) {
@@ -284,7 +289,7 @@ function packageEntrypoints(pkg: ClassifiedPackage): string[] {
 
 const packageImportsCache = new Map<string, Record<string, unknown> | undefined>();
 
-/** The package's `imports` field (self-referencing aliases such as `#app/*`), read once per package. */
+/** Read self-referencing package aliases once per package. */
 function packageImportsMap(pkg: ClassifiedPackage): Record<string, unknown> | undefined {
   if (packageImportsCache.has(pkg.manifestPath)) return packageImportsCache.get(pkg.manifestPath);
 
@@ -326,7 +331,7 @@ function resolveImportsAlias(specifier: string, pkg: ClassifiedPackage): string 
   return void 0;
 }
 
-/** Resolves a relative or `#`-aliased specifier to the file it loads, or `undefined` for anything else (bare package specifiers are out of scope: they cannot name this package's own private directories). */
+/** Resolve local aliases; bare package imports cannot name private directories. */
 function resolveSpecifier(
   fromFile: string,
   specifier: string,
