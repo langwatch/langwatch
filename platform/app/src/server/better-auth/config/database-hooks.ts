@@ -1,6 +1,14 @@
 import type { BetterAuthOptions } from "better-auth";
+import { z } from "zod";
 import type { SessionClaimsPort } from "../session-claims-hook";
 import { sessionClaimsData } from "../session-claims-hook";
+
+const hookContextSchema = z.object({ path: z.string().optional() });
+
+function hookPath(context: unknown): string | null {
+  const parsed = hookContextSchema.safeParse(context);
+  return parsed.success ? (parsed.data.path ?? null) : null;
+}
 
 export interface LegacyDatabaseHooksPort {
   beforeUserCreate(args: {
@@ -110,13 +118,24 @@ export function databaseHooks({
   return {
     user: {
       create: {
-        before: async (user) =>
-          hooks().beforeUserCreate({
+        before: async (user, context) => {
+          const refusal = await hooks().beforeUserCreate({
             user: user as {
               email: string;
               deactivatedAt?: Date | null;
             } & Record<string, unknown>,
-          }),
+          });
+          if (refusal === false) {
+            return false;
+          }
+          const path = hookPath(context);
+          if (path !== "/sign-up/email") {
+            return;
+          }
+          return {
+            data: { ...user, signupConfirmationPending: true },
+          };
+        },
         after: async (user) => {
           await hooks().afterUserCreate({
             user: user as { id: string; email: string; name: string },
@@ -237,10 +256,12 @@ export function databaseHooks({
           const refusal = await hooks().beforeSessionCreate({
             session: { userId: session.userId },
           });
-          if (refusal === false) return false;
+          if (refusal === false) {
+            return false;
+          }
           return sessionClaimsData({
             userId: session.userId,
-            path: (context as { path?: string } | undefined)?.path,
+            path: hookPath(context) ?? void 0,
             claims: sessionClaims(),
           });
         },

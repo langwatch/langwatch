@@ -73,6 +73,7 @@ describe("given the sign-up confirmation endpoint", () => {
         accountCreated: false,
         accountExists: true,
         addressProof: null,
+        freshClaim: true,
       });
     });
 
@@ -132,6 +133,24 @@ describe("given the sign-up confirmation endpoint", () => {
       });
       expect(setSessionCookie).not.toHaveBeenCalled();
     });
+
+    /** @scenario Opening a confirmation link a second time confirms, rather than refusing */
+    it("does not mint another session when a spent link is reopened", async () => {
+      completeVerification.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: true,
+        addressProof: null,
+        freshClaim: false,
+      });
+      const { ctx, createSession } = fakeContext({ token: "spent-token" });
+
+      const answer = await run(ctx);
+
+      expect(createSession).not.toHaveBeenCalled();
+      expect(setSessionCookie).not.toHaveBeenCalled();
+      expect(answer.body).toMatchObject({ signedIn: false });
+    });
   });
 
   describe("when the link confirms an address with no account behind it", () => {
@@ -142,6 +161,7 @@ describe("given the sign-up confirmation endpoint", () => {
         accountCreated: false,
         accountExists: false,
         addressProof: "proof-1",
+        freshClaim: true,
       });
       const { ctx, createSession } = fakeContext({ token: "a-token" });
 

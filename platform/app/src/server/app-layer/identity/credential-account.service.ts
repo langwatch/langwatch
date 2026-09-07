@@ -115,6 +115,7 @@ export interface CredentialAccountRecordsPort {
    */
   createPasskeyUser(args: {
     email: string;
+    claimHash: string;
   }): Promise<{ id: string; created: boolean }>;
 }
 
@@ -303,10 +304,15 @@ export class CredentialAccountService {
    */
   async openPasskeyAccount({
     email,
+    claimHash,
   }: {
     email: string;
+    claimHash: string;
   }): Promise<{ id: string; created: boolean }> {
-    const outcome = await this.deps.records.createPasskeyUser({ email });
+    const outcome = await this.deps.records.createPasskeyUser({
+      email,
+      claimHash,
+    });
     if (outcome.created) {
       this.deps.milestones.signedUp({ userId: outcome.id });
     }

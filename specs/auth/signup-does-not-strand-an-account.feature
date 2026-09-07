@@ -60,6 +60,38 @@ Feature: Signing up never strands an account
     And finishing it signs me in to the account the first attempt left behind
     And I am counted as having signed up once, not twice
 
+  @unit
+  Scenario: Only the same browser can continue an unfinished passkey sign-up
+    Given a passkey sign-up left an unconfirmed account and its browser retained the claim
+    When that browser retries with the same normalized address and claim
+    Then it adopts the unfinished account and does not create another
+
+  @unit
+  Scenario: Another browser cannot claim an unfinished passkey sign-up
+    Given a passkey sign-up left an unconfirmed account for another browser
+    When a different browser presents a distinct claim for the same address
+    Then adoption is refused and the unfinished account is unchanged
+
+  @unit
+  Scenario: Legacy unfinished accounts without a claim are not publicly adoptable
+    Given an unfinished passkey account predates browser claims
+    When any browser presents a claim for its address
+    Then adoption is refused and the ordinary recovery path remains available
+
+  @integration
+  Scenario: Concurrent browsers cannot both claim one free address
+    Given two browsers hold distinct claims for the same free address
+    When both complete passkey registration concurrently
+    Then exactly one creates and owns the pending account
+    And the other is refused without adopting it
+
+  @integration
+  Scenario: Client session flags cannot bypass address confirmation
+    Given a new local account is awaiting address confirmation
+    When a client requests any session-minting path with createSession enabled
+    Then session creation is refused until a valid emailed proof is consumed
+    And a legacy unverified account not carrying the pending latch keeps its existing behavior
+
   # The other side of that boundary, and the reason the first one is safe:
   # an account anybody can reach holds a credential, and is still refused.
   @unit

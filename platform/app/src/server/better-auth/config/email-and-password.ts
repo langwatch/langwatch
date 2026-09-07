@@ -41,6 +41,7 @@ export interface EmailAndPasswordDeps {
   revokeAllSessions: (args: { userId: string }) => Promise<void>;
   /** Who reset, remembered for the after-hook that opens the new session. */
   recordPasswordReset: (args: { userId: string }) => void;
+  clearSignUpConfirmationPending: (args: { userId: string }) => Promise<void>;
 }
 
 /**
@@ -68,6 +69,7 @@ export function emailAndPassword({
   hashRounds,
   revokeAllSessions,
   recordPasswordReset,
+  clearSignUpConfirmationPending,
 }: EmailAndPasswordDeps): BetterAuthOptions["emailAndPassword"] {
   return {
     enabled: isEmailPasswordEnabled(env),
@@ -141,6 +143,7 @@ export function emailAndPassword({
      */
     onPasswordReset: async ({ user }) => {
       await revokeAllSessions({ userId: user.id });
+      await clearSignUpConfirmationPending({ userId: user.id });
       // Every old session is gone; the after-hook opens the one new session
       // this reset earned, for the device that set the password. Recorded
       // AFTER the revoke so the new session is never among the revoked.

@@ -152,18 +152,18 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
       ).resolves.toBeUndefined();
     });
 
-    /** @scenario A fresh unlicensed deployment bootstraps via email signup */
-    it("leaves fresh email sign-up open", async () => {
+    /** @scenario Client session flags cannot bypass address confirmation */
+    it("refuses BetterAuth's raw sign-up route in favor of the confirmed registration flow", async () => {
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-up/email")),
-      ).resolves.toBeUndefined();
+      ).rejects.toMatchObject({ statusCode: 404 });
     });
 
     /** @scenario No password can be attached to an SSO account without inbox proof */
     it("still refuses credential-mutation endpoints", async () => {
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/set-password")),
-      ).rejects.toMatchObject({ statusCode: 400 });
+      ).rejects.toMatchObject({ statusCode: 404 });
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/change-password")),
       ).rejects.toMatchObject({ statusCode: 400 });

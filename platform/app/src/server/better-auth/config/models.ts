@@ -16,6 +16,12 @@ export function models(): Pick<
       modelName: "User",
       additionalFields: {
         pendingSsoSetup: { type: "boolean", defaultValue: false, input: false },
+        signupConfirmationPending: {
+          type: "boolean",
+          defaultValue: false,
+          input: false,
+          returned: false,
+        },
         deactivatedAt: { type: "date", required: false, input: false },
         lastLoginAt: { type: "date", required: false, input: false },
       },

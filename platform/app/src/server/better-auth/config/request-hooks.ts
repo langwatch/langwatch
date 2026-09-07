@@ -172,6 +172,17 @@ export function requestHooks({
       const pathname = normalizedRequestPathname(url);
       const endpointPath = ctx.path ?? pathname;
 
+      // Local account creation belongs to `user.register`, which writes the
+      // pending-confirmation latch and sends its continuation email. Leaving
+      // BetterAuth's raw route reachable would create an account with no
+      // supported way to request that proof.
+      if (pathname === "/sign-up/email") {
+        throw new APIError("NOT_FOUND", {
+          code: "NOT_FOUND",
+          message: "Not found",
+        });
+      }
+
       // ADR-119, on the two removals that reach no ceremony: the passkey
       // plugin owns its own table so `account.delete.before` never sees a
       // passkey going, and the plugin's `/two-factor/disable` is mounted

@@ -161,6 +161,12 @@ export const auth = betterAuth({
     hashRounds: PASSWORD_HASH_ROUNDS,
     revokeAllSessions: ({ userId }) =>
       sessionRevocation().revokeAll({ userId }),
+    clearSignUpConfirmationPending: async ({ userId }) => {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { signupConfirmationPending: false },
+      });
+    },
     recordPasswordReset: ({ userId }) =>
       passwordResetSessionBridge().recordPasswordReset({ userId }),
   }),

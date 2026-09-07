@@ -447,7 +447,10 @@ describe("afterUserCreate", () => {
       // says the row is there; it says nothing about the grant.
       const alreadyExists = new Prisma.PrismaClientKnownRequestError(
         "Unique constraint failed",
-        { code: "P2002", clientVersion: "7.0.0" },
+        {
+          code: "P2002",
+          clientVersion: "7.0.0",
+        },
       );
       const prisma = makePrismaMock({
         organization: {
@@ -862,6 +865,28 @@ describe("afterAccountCreate", () => {
 });
 
 describe("beforeSessionCreate", () => {
+  describe("when sign-up confirmation is pending", () => {
+    /** @scenario Client session flags cannot bypass address confirmation */
+    it("blocks every session mint", async () => {
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            deactivatedAt: null,
+            signupConfirmationPending: true,
+          }),
+          update: vi.fn(),
+        },
+      });
+
+      const result = await beforeSessionCreate({
+        prisma,
+        session: { userId: "user_1" },
+      });
+
+      expect(result).toBe(false);
+    });
+  });
+
   describe("when the user is deactivated", () => {
     /** @scenario Deactivated user is blocked from signing in */
     it("blocks the session", async () => {
@@ -886,7 +911,10 @@ describe("beforeSessionCreate", () => {
     it("allows the session", async () => {
       const prisma = makePrismaMock({
         user: {
-          findUnique: vi.fn().mockResolvedValue({ deactivatedAt: null }),
+          findUnique: vi.fn().mockResolvedValue({
+            deactivatedAt: null,
+            signupConfirmationPending: false,
+          }),
           update: vi.fn(),
         },
       });

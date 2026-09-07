@@ -288,7 +288,10 @@ describe("CredentialAccountService", () => {
       });
 
       await expect(
-        service.openPasskeyAccount({ email: "sam@acme.com" }),
+        service.openPasskeyAccount({
+          email: "sam@acme.com",
+          claimHash: "same-browser-claim",
+        }),
       ).resolves.toEqual({ id: "newcomer", created: true });
       expect(countedSignUps).toEqual(["newcomer"]);
     });
@@ -299,7 +302,10 @@ describe("CredentialAccountService", () => {
       });
 
       // Somebody who needed two attempts is one sign-up, not two.
-      await service.openPasskeyAccount({ email: "sam@acme.com" });
+      await service.openPasskeyAccount({
+        email: "sam@acme.com",
+        claimHash: "same-browser-claim",
+      });
 
       expect(countedSignUps).toEqual([]);
     });

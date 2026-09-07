@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("~/env.mjs", () => ({
+  env: { NEXTAUTH_SECRET: "passkey-signup-test-secret" },
+}));
+
 // The registration under test is constructed here, over in-memory stand-ins
 // for its three collaborators.
 //
@@ -31,6 +35,9 @@ import {
 const findAddressHolder = vi.fn();
 const createPasskeyUser = vi.fn();
 const requestVerification = vi.fn();
+
+const signUpContext = (email: string, claim = "a".repeat(43)) =>
+  JSON.stringify({ email, claim });
 
 const registration = () =>
   new PasskeySignUpRegistration({
@@ -109,7 +116,10 @@ describe("given passkey sign-up, which creates an account with no session", () =
       findAddressHolder.mockResolvedValue(signable("someone_else"));
 
       await expect(
-        resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: signUpContext("victim@corp.com"),
+        }),
       ).rejects.toMatchObject({
         body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN },
       });
@@ -120,7 +130,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       findAddressHolder.mockResolvedValue(signable("someone_else"));
 
       await expect(
-        afterVerification({ ctx, context: "victim@corp.com" }),
+        afterVerification({ ctx, context: signUpContext("victim@corp.com") }),
       ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
       expect(createPasskeyUser).not.toHaveBeenCalled();
     });
@@ -135,7 +145,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
       await resolveUser({
         ctx: fakeContext().ctx,
-        context: "Victim@Corp.com",
+        context: signUpContext("Victim@Corp.com"),
       }).catch(() => void 0);
 
       expect(findAddressHolder).toHaveBeenCalledWith({
@@ -156,7 +166,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
       const resolved = await resolveUser({
         ctx: fakeContext().ctx,
-        context: "someone@example.com",
+        context: signUpContext("someone@example.com"),
       });
 
       expect(resolved.name).toBe("someone@example.com");
@@ -170,7 +180,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
       const result = await afterVerification({
         ctx,
-        context: "someone@example.com",
+        context: signUpContext("someone@example.com"),
       });
 
       expect(result.userId).toBe("half_made");
@@ -190,7 +200,10 @@ describe("given passkey sign-up, which creates an account with no session", () =
       });
 
       await expect(
-        resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: signUpContext("victim@corp.com"),
+        }),
       ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
     });
 
@@ -209,7 +222,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
       const resolved = await resolveUser({
         ctx: fakeContext().ctx,
-        context: "someone@example.com",
+        context: signUpContext("someone@example.com"),
       });
 
       expect(resolved.name).toBe("someone@example.com");
@@ -229,7 +242,10 @@ describe("given passkey sign-up, which creates an account with no session", () =
       });
 
       await expect(
-        resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: signUpContext("victim@corp.com"),
+        }),
       ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
     });
 
@@ -249,7 +265,10 @@ describe("given passkey sign-up, which creates an account with no session", () =
       );
 
       await expect(
-        afterVerification({ ctx, context: "someone@example.com" }),
+        afterVerification({
+          ctx,
+          context: signUpContext("someone@example.com"),
+        }),
       ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
     });
 
@@ -260,7 +279,10 @@ describe("given passkey sign-up, which creates an account with no session", () =
       });
 
       await expect(
-        resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: signUpContext("victim@corp.com"),
+        }),
       ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
     });
 
@@ -281,7 +303,10 @@ describe("given passkey sign-up, which creates an account with no session", () =
       });
 
       await expect(
-        resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: signUpContext("victim@corp.com"),
+        }),
       ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
     });
   });
@@ -308,7 +333,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("shows the address in the prompt, which is what a person recognises", async () => {
       const resolved = await resolveUser({
         ctx: fakeContext().ctx,
-        context: "Someone@Example.com",
+        context: signUpContext("Someone@Example.com"),
       });
 
       expect(resolved.name).toBe("someone@example.com");
@@ -318,7 +343,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("hands the authenticator a handle that is not the address", async () => {
       const resolved = await resolveUser({
         ctx: fakeContext().ctx,
-        context: "someone@example.com",
+        context: signUpContext("someone@example.com"),
       });
 
       expect(resolved.id).not.toContain("someone");
@@ -328,11 +353,11 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("hands back the same handle every time, so a retry replaces the credential", async () => {
       const first = await resolveUser({
         ctx: fakeContext().ctx,
-        context: "someone@example.com",
+        context: signUpContext("someone@example.com"),
       });
       const second = await resolveUser({
         ctx: fakeContext().ctx,
-        context: "someone@example.com",
+        context: signUpContext("someone@example.com"),
       });
 
       expect(first.id).toBe(second.id);
@@ -341,7 +366,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("creates nothing merely for being asked", async () => {
       await resolveUser({
         ctx: fakeContext().ctx,
-        context: "someone@example.com",
+        context: signUpContext("someone@example.com"),
       });
 
       expect(createPasskeyUser).not.toHaveBeenCalled();
@@ -352,10 +377,14 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("creates the account for the address the ceremony was started with", async () => {
       const { ctx } = fakeContext();
 
-      await afterVerification({ ctx, context: "Someone@Example.com" });
+      await afterVerification({
+        ctx,
+        context: signUpContext("Someone@Example.com"),
+      });
 
       expect(createPasskeyUser).toHaveBeenCalledWith({
         email: "someone@example.com",
+        claimHash: expect.any(String),
       });
     });
 
@@ -364,7 +393,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
       const result = await afterVerification({
         ctx,
-        context: "someone@example.com",
+        context: signUpContext("someone@example.com"),
       });
 
       expect(result.userId).toBe("user_1");
@@ -376,13 +405,13 @@ describe("given passkey sign-up, which creates an account with no session", () =
      * ceremony is the bug this pins: the hand-rolled mint that predated
      * better-auth 1.7 would now run beside the plugin's.
      */
-    /** @scenario Signing up with a passkey creates the account and the session together */
+    /** @scenario Signing up with a passkey creates a pending account until the address is confirmed */
     it("leaves the session to the transaction that writes the credential", async () => {
       const { ctx, createSession } = fakeContext();
 
       const result = await afterVerification({
         ctx,
-        context: "someone@example.com",
+        context: signUpContext("someone@example.com"),
       });
 
       expect(createSession).not.toHaveBeenCalled();
@@ -393,7 +422,10 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("sends the address confirmation after them, not in front of them", async () => {
       const { ctx } = fakeContext();
 
-      await afterVerification({ ctx, context: "someone@example.com" });
+      await afterVerification({
+        ctx,
+        context: signUpContext("someone@example.com"),
+      });
 
       expect(requestVerification).toHaveBeenCalledWith({
         email: "someone@example.com",
@@ -405,7 +437,10 @@ describe("given passkey sign-up, which creates an account with no session", () =
       requestVerification.mockRejectedValue(new Error("mailer unreachable"));
 
       await expect(
-        afterVerification({ ctx, context: "someone@example.com" }),
+        afterVerification({
+          ctx,
+          context: signUpContext("someone@example.com"),
+        }),
       ).resolves.toMatchObject({ userId: "user_1" });
     });
   });
@@ -454,7 +489,9 @@ describe("given somebody who is already signed in", () => {
 
       await expect(
         afterVerification({ ctx, context: undefined }),
-      ).resolves.toMatchObject({ userId: "signed_in_user" });
+      ).resolves.toMatchObject({
+        userId: "signed_in_user",
+      });
     });
 
     /**
