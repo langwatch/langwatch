@@ -20,3 +20,4 @@ export * from "./team.rest.ts";
 export * from "./organization.rows.ts";
 export * from "./onboarding.responses.ts";
 export * from "./organization-membership.errors.ts";
+export * from "./organization.api.ts";
