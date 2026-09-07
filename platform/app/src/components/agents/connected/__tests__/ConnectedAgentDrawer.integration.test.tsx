@@ -45,11 +45,22 @@ const agentRow = {
       defaultValue: "gpt-5-mini",
       description: "Which model answers",
     },
-  ],
+  ] as unknown[],
+  parameterDefaults: {} as Record<string, string | number | boolean>,
   config: {
     sdk: { name: "langwatch-python", version: "1.2.3", language: "python" },
   },
 };
+
+/** The parameter set every test starts from; a test may replace it. */
+const baseParameters = agentRow.parameters;
+
+// One controllable mock of the user-default mutation: it records the variables
+// it was called with, and drives onSuccess or onError so a test can prove the
+// drawer keeps the previously saved value when a save is refused.
+const setDefaultMutate = vi.fn();
+const setDefaultState = { shouldError: false, error: null as unknown };
+const getByIdInvalidate = vi.fn();
 
 const testMutate = vi.fn();
 const testState = {
@@ -91,12 +102,28 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: agentRow, isLoading: false, error: null }),
       },
       update: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      setParameterDefault: {
+        useMutation: (opts?: {
+          onSuccess?: () => void;
+          onError?: (error: unknown) => void;
+        }) => ({
+          mutate: (vars: unknown) => {
+            setDefaultMutate(vars);
+            if (setDefaultState.shouldError) {
+              opts?.onError?.(setDefaultState.error);
+            } else {
+              opts?.onSuccess?.();
+            }
+          },
+          isPending: false,
+        }),
+      },
       testTurn: { useMutation: () => testState },
     },
     useUtils: () => ({
       agents: {
         getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn() },
+        getById: { invalidate: getByIdInvalidate },
       },
     }),
   },
@@ -116,7 +143,13 @@ describe("<ConnectedAgentDrawer />", () => {
     testState.data = undefined;
     testState.error = null;
     testMutate.mockClear();
+    setDefaultMutate.mockClear();
+    getByIdInvalidate.mockClear();
+    setDefaultState.shouldError = false;
+    setDefaultState.error = null;
     agentRow.status = "online";
+    agentRow.parameters = baseParameters;
+    agentRow.parameterDefaults = {};
   });
   afterEach(cleanup);
 
@@ -234,6 +267,92 @@ describe("<ConnectedAgentDrawer />", () => {
       const result = await screen.findByTestId("agent-test-result");
       expect(result).toHaveTextContent("Hello back");
       expect(result).toHaveTextContent("build-box (eu-pod)");
+    });
+  });
+
+  describe("when the owner edits a parameter's default and saves", () => {
+    /** @scenario "A user sets a default value in the drawer and it applies to new runs" */
+    it("writes the user default for that one parameter and refreshes", async () => {
+      const user = userEvent.setup();
+      await renderDrawer();
+
+      const editor = await screen.findByTestId(
+        "connected-agent-parameter-default-model",
+      );
+      await user.selectOptions(editor, "gpt-5");
+      await user.click(
+        screen.getByTestId("connected-agent-parameter-save-model"),
+      );
+
+      expect(setDefaultMutate).toHaveBeenCalledWith({
+        projectId: "project_1",
+        id: "agent_1",
+        name: "model",
+        value: "gpt-5",
+      });
+      expect(getByIdInvalidate).toHaveBeenCalled();
+    });
+  });
+
+  describe("given a user default whose parameter the code no longer declares", () => {
+    /** @scenario "A reconnect with a removed parameter shows the override as stale" */
+    it("renders a stale row with the stored value and a way to clear it", async () => {
+      agentRow.parameterDefaults = { plan: "pro" };
+      await renderDrawer();
+
+      const badge = await screen.findByTestId(
+        "connected-agent-parameter-stale-plan",
+      );
+      expect(badge).toHaveTextContent("Stale");
+      const table = screen.getByTestId("connected-agent-parameters");
+      expect(table).toHaveTextContent("plan");
+      expect(table).toHaveTextContent("pro");
+      expect(
+        screen.getByTestId("connected-agent-parameter-reset-plan"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a secret parameter", () => {
+    /** @scenario "A secret parameter cannot have a user default" */
+    it("shows its default read-only with no edit control", async () => {
+      agentRow.parameters = [{ name: "token", type: "string", secret: true }];
+      await renderDrawer();
+
+      expect(
+        await screen.findByTestId("connected-agent-parameter-secret-token"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("connected-agent-parameter-default-token"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a save is refused by the server", () => {
+    /** @scenario "An invalid user-supplied value is rejected at save time" */
+    it("shows the error inline and does not refresh the read", async () => {
+      const user = userEvent.setup();
+      setDefaultState.shouldError = true;
+      setDefaultState.error = {
+        code: "agent_parameter_default_invalid",
+        message: "agent_parameter_default_invalid",
+      };
+      await renderDrawer();
+
+      const editor = await screen.findByTestId(
+        "connected-agent-parameter-default-model",
+      );
+      await user.selectOptions(editor, "gpt-5");
+      await user.click(
+        screen.getByTestId("connected-agent-parameter-save-model"),
+      );
+
+      expect(
+        await screen.findByTestId("connected-agent-parameter-error-model"),
+      ).toBeInTheDocument();
+      // The previously saved value is untouched: no read is invalidated, so the
+      // rejected value is never shown as if it had been accepted.
+      expect(getByIdInvalidate).not.toHaveBeenCalled();
     });
   });
 });

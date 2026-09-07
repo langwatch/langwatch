@@ -50,6 +50,12 @@ export interface ConnectedAgentView {
   selectable: boolean;
   notSelectableReason: ConnectedAgentNotSelectableReason | null;
   parameters: ScenarioParameterDefinition[];
+  /**
+   * The owner's user defaults per declared parameter name (issue 7948). The
+   * drawer overlays these on the code defaults and shows an entry whose name no
+   * parameter carries as stale. Missing reads as none.
+   */
+  parameterDefaults?: Record<string, string | number | boolean>;
   config: { description?: string; sdk?: ConnectedAgentSdk } & Record<
     string,
     unknown
