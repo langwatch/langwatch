@@ -1330,6 +1330,9 @@ importers:
       rich-textarea:
         specifier: ^0.27.0
         version: 0.27.0(react@19.2.8)
+      samlify:
+        specifier: 2.13.1
+        version: 2.13.1
       sass:
         specifier: ^1.101.0
         version: 1.101.0
