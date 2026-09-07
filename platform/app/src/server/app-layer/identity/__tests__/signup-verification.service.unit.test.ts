@@ -56,6 +56,24 @@ function makeService({
         }
         return { identifier: record.identifier };
       },
+      claimExpected: async ({ token, identifier, now }) => {
+        const index = issued.findIndex(
+          (record) =>
+            record.token === token &&
+            record.identifier === identifier &&
+            record.expires > now,
+        );
+        if (index === -1) return false;
+        issued.splice(index, 1);
+        return true;
+      },
+      hasExpected: async ({ token, identifier, now }) =>
+        issued.some(
+          (record) =>
+            record.token === token &&
+            record.identifier === identifier &&
+            record.expires > now,
+        ),
       findSpent: async ({ token, now }) => {
         const marker = spentMarkers.get(token);
         if (!marker || marker.expires <= now) return null;
@@ -71,15 +89,6 @@ function makeService({
       stateFor: async () => {
         if (!addressIsTaken) return "unknown";
         return addressIsConfirmed ? "confirmed" : "awaiting_confirmation";
-      },
-    },
-    accounts: {
-      createCredentialAccount: async (account) => {
-        created.push(account);
-        addressIsTaken = true;
-      },
-      markAddressConfirmed: async ({ email }) => {
-        confirmed.push(email);
       },
     },
     buildVerificationUrl: ({ token }) =>
@@ -244,41 +253,29 @@ describe("given a sign-up address to confirm", () => {
       });
     }
 
-    it("still creates the account it promised", async () => {
+    it("never enrols the credential carried by the old link", async () => {
       seedLinkCarryingCredential(harness);
 
       await expect(
         harness.service.completeVerification({ token: "link-in-flight" }),
       ).resolves.toEqual({
         email: "sam@acme.com",
-        accountCreated: true,
-        accountExists: true,
-        addressProof: null,
+        accountCreated: false,
+        accountExists: false,
+        addressProof: expect.any(String),
       });
-      expect(harness.created).toEqual([
-        { email: "sam@acme.com", passwordHash: FAKE_PASSWORD_HASH },
-      ]);
-      // Created AND proven: the link that made the account confirmed the
-      // address in the same breath.
-      expect(harness.confirmed).toEqual(["sam@acme.com"]);
+      expect(harness.created).toHaveLength(0);
+      expect(harness.confirmed).toHaveLength(0);
     });
 
     it("creates nothing when the address gained an account meanwhile", async () => {
       seedLinkCarryingCredential(harness);
       harness.takeAddress();
 
-      // The link confirms an ADDRESS; it does not entitle it to overwrite
-      // whatever now answers for it. So the account stands and the address is
-      // still proven — which is the whole of what a link is for now.
       await expect(
         harness.service.completeVerification({ token: "link-in-flight" }),
-      ).resolves.toEqual({
-        email: "sam@acme.com",
-        accountCreated: false,
-        accountExists: true,
-        addressProof: null,
-      });
-      expect(harness.confirmed).toEqual(["sam@acme.com"]);
+      ).rejects.toMatchObject({ code: "identity_verification_expired" });
+      expect(harness.confirmed).toHaveLength(0);
       expect(harness.created).toHaveLength(0);
     });
   });
@@ -296,10 +293,7 @@ describe("given a confirmation link I have already opened", () => {
   beforeEach(async () => {
     harness = makeService();
     await harness.service.requestVerification({ email: "sam@acme.com" });
-    // Sign-up made the account; the link is the address catching up with it.
-    harness.takeAddress();
     await harness.service.completeVerification({ token: "token-1" });
-    harness.confirmAddress();
   });
 
   describe("when I open the same link again", () => {
@@ -310,7 +304,7 @@ describe("given a confirmation link I have already opened", () => {
       ).resolves.toEqual({
         email: "sam@acme.com",
         accountCreated: false,
-        accountExists: true,
+        accountExists: false,
         addressProof: null,
       });
     });
@@ -377,9 +371,7 @@ describe("given a link that proved an address with no account yet", () => {
         accountCreated: false,
         accountExists: false,
       });
-      // A FRESH proof, never the spent one: proofs are single-use on their
-      // own account, so handing the same one back is handing back nothing.
-      expect(again.addressProof).not.toBeNull();
+      expect(again.addressProof).toBeNull();
       expect(again.addressProof).not.toBe(first.addressProof);
     });
   });

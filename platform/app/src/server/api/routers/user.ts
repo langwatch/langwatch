@@ -6,7 +6,11 @@ import { PersonalWorkspaceService } from "@ee/governance/services/personalWorksp
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { ValidationError } from "@langwatch/handled-error";
-import { normalizeIdentifierValue, passwordProblem } from "@langwatch/identity";
+import {
+  IdentityVerificationExpiredError,
+  normalizeIdentifierValue,
+  passwordProblem,
+} from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -242,7 +246,7 @@ export const userRouter = createTRPCRouter({
          * had no account behind it. Where it checks out, the account is born
          * confirmed and no second link is sent.
          */
-        addressProof: z.string().min(1).optional(),
+        addressProof: z.string().min(1),
       }),
     )
     .noPermission({
@@ -289,6 +293,18 @@ export const userRouter = createTRPCRouter({
         });
       }
 
+      // The mailbox proof is the authority to enrol a credential. It is spent
+      // before hashing or writing anything, and is bound to this exact
+      // normalised address by the token repository's conditional delete.
+      const verification = signUpVerification();
+      const proofClaimed = await verification.claimAddressProof({
+        token: input.addressProof,
+        email,
+      });
+      if (!proofClaimed) {
+        throw new IdentityVerificationExpiredError();
+      }
+
       // Refuses an address somebody already holds, hashes the password and
       // states the credential identifier the front door routes on — all of it
       // the service's, so the router never holds a plaintext password past
@@ -298,50 +314,6 @@ export const userRouter = createTRPCRouter({
         email,
         password,
       });
-
-      // An address an emailed link already proved does not get asked again.
-      // The proof is spent here, so it confirms exactly one account, and it
-      // is checked against THIS address, so a proof for one address cannot
-      // confirm another. Anything that does not check out simply falls
-      // through to the ordinary link below.
-      const verification = signUpVerification();
-      if (
-        input.addressProof &&
-        (await verification.claimAddressProof({
-          token: input.addressProof,
-          email,
-        }))
-      ) {
-        await verification.markAddressConfirmed({ email });
-        return { id: newUser.id };
-      }
-
-      // The confirmation link, sent from HERE (ADR-117 §6). Sign-up creates
-      // the account but opens no session: the address is confirmed before
-      // anybody gets in, so there is no session for the screen to send this
-      // from. The alternative — a public "send a confirmation to this
-      // address" — is a mailer pointed at anything anybody types, and the
-      // guard that keeps `requestSignUpVerification` honest (refusing an
-      // address that already has an account) is exactly the guard such an
-      // endpoint could not have, since by this line the account is the point.
-      //
-      // Sending it from the call that CREATED the account closes that: the
-      // only address reachable is the one just registered, and the mail is a
-      // consequence of the write rather than a favour done for a caller.
-      //
-      // Awaited, unlike the passkey path's, because nothing navigates behind
-      // it and the screen it returns to is the one that says a link is on its
-      // way. A mailer that is down must not lose the account, though, so a
-      // failure is logged and swallowed: the account exists, and the way on
-      // is the "send it again" the next screen offers.
-      try {
-        await verification.requestVerification({ email });
-      } catch (failure) {
-        logger.warn(
-          { error: failure, userId: newUser.id },
-          "sign-up could not send the address confirmation",
-        );
-      }
 
       return { id: newUser.id };
     }),

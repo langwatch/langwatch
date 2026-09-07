@@ -55,6 +55,16 @@ export interface SignUpVerificationTokenStore {
   }): Promise<{
     identifier: string;
   } | null>;
+  claimExpected(input: {
+    token: string;
+    identifier: string;
+    now: Date;
+  }): Promise<boolean>;
+  hasExpected(input: {
+    token: string;
+    identifier: string;
+    now: Date;
+  }): Promise<boolean>;
   /**
    * The identifier a token was spent for, while its marker is still live.
    *
@@ -93,28 +103,10 @@ export interface SignUpAccountDirectory {
   stateFor(input: { email: string }): Promise<SignUpAddressState>;
 }
 
-/** Creates the account a confirmed pending credential earned. */
-export interface SignUpAccountFactory {
-  createCredentialAccount(input: {
-    email: string;
-    passwordHash: string;
-  }): Promise<void>;
-  /**
-   * The link came back, so the address is proven.
-   *
-   * This is the whole job of a link now. Confirmation used to be implicit —
-   * the account did not exist until a link created it, so "has an account"
-   * and "proved the address" were one fact. Sign-up creates the account up
-   * front, so the two have come apart and the second has to be written down.
-   */
-  markAddressConfirmed(input: { email: string }): Promise<void>;
-}
-
 export interface SignUpVerificationDeps {
   tokens: SignUpVerificationTokenStore;
   mailer: SignUpVerificationMailer;
   directory: SignUpAccountDirectory;
-  accounts: SignUpAccountFactory;
   /** Builds the link the email carries, from a minted token. */
   buildVerificationUrl(input: { token: string }): string;
   now?: () => Date;
@@ -295,19 +287,11 @@ export class SignUpVerificationService {
       email: pending.email,
     });
 
-    // The ordinary case now: sign-up made the account and this link is the
-    // address catching up with it. Confirming is the whole job.
+    // A verification link proves an address. It never adopts or confirms an
+    // account that was created before the proof arrived, because that account
+    // may already contain credentials chosen by somebody else.
     if (alreadyRegistered) {
-      await this.deps.accounts.markAddressConfirmed({ email: pending.email });
-      return completedVerification(
-        {
-          email: pending.email,
-          accountCreated: false,
-          accountExists: true,
-          addressProof: null,
-        },
-        true,
-      );
+      throw new IdentityVerificationExpiredError();
     }
 
     // No account, and no credential to make one from: the link came from the
@@ -315,29 +299,15 @@ export class SignUpVerificationService {
     // screen takes it from here — and carries the proof, so the account it
     // creates is born confirmed instead of being mailed a second link for the
     // address this one just proved.
-    if (!pending.passwordHash) {
-      return completedVerification(
-        {
-          email: pending.email,
-          accountCreated: false,
-          accountExists: false,
-          addressProof: await this.issueAddressProof({ email: pending.email }),
-        },
-        true,
-      );
-    }
-
-    await this.deps.accounts.createCredentialAccount({
-      email: pending.email,
-      passwordHash: pending.passwordHash,
-    });
-    await this.deps.accounts.markAddressConfirmed({ email: pending.email });
+    // Old links may contain a password hash. It is untrusted enrollment state:
+    // holding the mailbox link proves the address, not that the holder chose
+    // the credential embedded in a token minted before this flow changed.
     return completedVerification(
       {
         email: pending.email,
-        accountCreated: true,
-        accountExists: true,
-        addressProof: null,
+        accountCreated: false,
+        accountExists: false,
+        addressProof: await this.issueAddressProof({ email: pending.email }),
       },
       true,
     );
@@ -364,28 +334,24 @@ export class SignUpVerificationService {
     // is opened by a person who may open it again; a proof is spent once by
     // the screen that was handed it, and a second use is not somebody
     // repeating themselves — so it leaves nothing behind to recognise.
-    const claimed = await this.deps.tokens.claim({
+    return await this.deps.tokens.claimExpected({
       token,
+      identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
       now: this.now(),
-      keepSpentUntil: null,
     });
-    if (!claimed?.identifier.startsWith(CONFIRMED_ADDRESS_NAMESPACE)) {
-      return false;
-    }
-    return (
-      claimed.identifier.slice(CONFIRMED_ADDRESS_NAMESPACE.length) ===
-      normalizeIdentifierValue(email)
-    );
   }
 
-  /**
-   * Records that an address is proved. Called where the proof and the account
-   * arrive in the other order — `user.register` creating an account for an
-   * address a link confirmed a screen earlier.
-   */
-  async markAddressConfirmed({ email }: { email: string }): Promise<void> {
-    await this.deps.accounts.markAddressConfirmed({
-      email: normalizeIdentifierValue(email),
+  async validateAddressProof({
+    token,
+    email,
+  }: {
+    token: string;
+    email: string;
+  }): Promise<boolean> {
+    return await this.deps.tokens.hasExpected({
+      token,
+      identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      now: this.now(),
     });
   }
 
@@ -412,34 +378,13 @@ export class SignUpVerificationService {
 
     const state = await this.deps.directory.stateFor({ email: pending.email });
 
-    // The account was made between the two openings and its address never
-    // caught up — the register call's own proof did not land. This link is
-    // still the proof it always was, so it finishes the job now.
-    if (state === "awaiting_confirmation") {
-      await this.deps.accounts.markAddressConfirmed({ email: pending.email });
-    }
-
-    // Still no account: the first opening handed the screen a proof and the
-    // password was never chosen. A fresh proof costs nothing anybody has not
-    // already earned — the same address, proven by the same link, and the
-    // proof is single-use and short-lived on its own account.
-    if (state === "unknown") {
-      return completedVerification(
-        {
-          email: pending.email,
-          accountCreated: false,
-          accountExists: false,
-          addressProof: await this.issueAddressProof({ email: pending.email }),
-        },
-        false,
-      );
-    }
-
+    // A spent link is status only. Reopening it cannot mint fresh enrollment
+    // authority or finish an account that appeared after the original proof.
     return completedVerification(
       {
         email: pending.email,
         accountCreated: false,
-        accountExists: true,
+        accountExists: state !== "unknown",
         addressProof: null,
       },
       false,

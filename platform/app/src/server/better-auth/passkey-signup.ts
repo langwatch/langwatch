@@ -54,7 +54,11 @@ export interface PasskeySignUpAccountsPort {
 
 /** The address confirmation that follows a new account in. */
 export interface PasskeySignUpVerificationPort {
-  requestVerification(args: { email: string }): Promise<void>;
+  validateAddressProof(args: {
+    token: string;
+    email: string;
+  }): Promise<boolean>;
+  claimAddressProof(args: { token: string; email: string }): Promise<boolean>;
 }
 
 export interface PasskeySignUpRegistrationDeps {
@@ -87,11 +91,13 @@ function provisionalHandle(email: string): string {
 const signUpContextSchema = z.object({
   email: z.string(),
   claim: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  addressProof: z.string().min(1),
 });
 
 function requireSignUpContext(context: string | null | undefined): {
   email: string;
   claimHash: string;
+  addressProof: string;
 } {
   let decoded: unknown;
   try {
@@ -126,6 +132,7 @@ function requireSignUpContext(context: string | null | undefined): {
     claimHash: createHash("sha256")
       .update(carried.data.claim)
       .digest("base64url"),
+    addressProof: carried.data.addressProof,
   };
 }
 
@@ -186,7 +193,18 @@ export class PasskeySignUpRegistration {
     ctx: GenericEndpointContext;
     context?: string | null | undefined;
   }): Promise<{ id: string; name: string; displayName: string }> {
-    const { email } = requireSignUpContext(context);
+    const { email, addressProof } = requireSignUpContext(context);
+    if (
+      !(await this.deps.verification.validateAddressProof({
+        token: addressProof,
+        email,
+      }))
+    ) {
+      throw new APIError("FORBIDDEN", {
+        code: "VERIFICATION_REQUIRED",
+        message: "Verify this email address before creating a passkey.",
+      });
+    }
     await this.refuseIfRegistered(email);
 
     return {
@@ -241,13 +259,25 @@ export class PasskeySignUpRegistration {
       return { userId: session.user.id, name: session.user.email };
     }
 
-    const { email, claimHash } = requireSignUpContext(context);
+    const { email, claimHash, addressProof } = requireSignUpContext(context);
     // Again, because the check in `resolveUser` was one network round trip ago
     // and an account can be created in that window. This is the one that
     // answers in WORDS; the decision that actually holds is taken inside the
     // write's own transaction, which is the only place a read of the account
     // and the write that depends on it cannot be separated.
     await this.refuseIfRegistered(email);
+
+    if (
+      !(await this.deps.verification.claimAddressProof({
+        token: addressProof,
+        email,
+      }))
+    ) {
+      throw new APIError("FORBIDDEN", {
+        code: "VERIFICATION_REQUIRED",
+        message: "Verify this email address before creating a passkey.",
+      });
+    }
 
     const user = await this.deps.accounts
       .createPasskeyUser({ email, claimHash })
@@ -263,28 +293,6 @@ export class PasskeySignUpRegistration {
           throw addressIsTaken();
         }
         throw error;
-      });
-
-    // The address confirmation follows them in, exactly as it does on the
-    // password path (ADR-117 §6, revised). Sent from HERE rather than from the
-    // screen because the screen navigates away the moment this returns, and a
-    // send that races a navigation is a send that sometimes does not happen.
-    //
-    // Not awaited and not allowed to fail the ceremony: the account is made and
-    // the person is signed in, so a mailer that is down is not theirs to solve
-    // on the way through the door. It is recoverable from inside the app.
-    //
-    // It can outlive a transaction that then rolls back, in which case a link
-    // arrives for an address with no account behind it. That link does not
-    // break anything — it confirms an address, finds nothing to mark, and lands
-    // on the same "pick a way in" step an unspent link always lands on.
-    void this.deps.verification
-      .requestVerification({ email })
-      .catch((failure: unknown) => {
-        logger.warn(
-          { error: failure, userId: user.id },
-          "passkey sign-up could not send the address confirmation",
-        );
       });
 
     return {
