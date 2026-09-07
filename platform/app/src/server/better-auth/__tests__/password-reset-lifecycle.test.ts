@@ -26,7 +26,9 @@ type MemoryDB = Record<string, Record<string, unknown>[]>;
 const email = "credential-user@example.com";
 const oldPassword = "old-password-1";
 const newPassword = "new-password-2";
-const sessionSchema = z.object({ user: z.object({ email: z.string() }) }).nullable();
+const sessionSchema = z
+  .object({ user: z.object({ email: z.string() }) })
+  .nullable();
 const refusalSchema = z.object({
   code: z.string(),
   message: z.string(),
@@ -49,7 +51,17 @@ function buildHarness() {
   const passwordOptions = emailAndPassword({
     hashRounds: 4,
     revokeAllSessions: async ({ userId }) => {
-      db.session = rows(db, "session").filter((session) => session.userId !== userId);
+      db.session = rows(db, "session").filter(
+        (session) => session.userId !== userId,
+      );
+    },
+    clearSignUpConfirmationPending: async ({ userId }) => {
+      const user = rows(db, "user").find(
+        (candidate) => candidate.id === userId,
+      );
+      if (user) {
+        user.signupConfirmationPending = false;
+      }
     },
     recordPasswordReset: ({ userId }) => {
       bridge.recordPasswordReset({ userId });
@@ -112,7 +124,9 @@ async function signIn(
   candidateEmail: string,
   password: string,
 ): Promise<Response> {
-  return harness.auth.handler(post("/sign-in/email", { email: candidateEmail, password }));
+  return harness.auth.handler(
+    post("/sign-in/email", { email: candidateEmail, password }),
+  );
 }
 
 async function requestReset(harness: Harness): Promise<string> {
@@ -131,7 +145,10 @@ async function requestReset(harness: Harness): Promise<string> {
     throw new Error("the reset email was not sent");
   }
 
-  const token = new URL(sent.resetUrl, "http://localhost:3000").searchParams.get("token");
+  const token = new URL(
+    sent.resetUrl,
+    "http://localhost:3000",
+  ).searchParams.get("token");
   if (!token) {
     throw new Error("the reset email carried no token");
   }
@@ -149,7 +166,9 @@ async function submitReset({
   password?: string;
 }): Promise<Response> {
   return harness.bridge.runWithScope(() =>
-    harness.auth.handler(post("/reset-password", { token, newPassword: password })),
+    harness.auth.handler(
+      post("/reset-password", { token, newPassword: password }),
+    ),
   );
 }
 
@@ -242,7 +261,9 @@ describe("better-auth password reset token lifecycle", () => {
     expect(refusalSchema.parse(await replay.json()).code).toBe("INVALID_TOKEN");
     expect(snapshotCredentialAndSessions(harness)).toEqual(afterFirstUse);
     expect((await signIn(harness, email, newPassword)).status).toBe(200);
-    expect((await signIn(harness, email, "attacker-chosen-password-3")).status).toBe(401);
+    expect(
+      (await signIn(harness, email, "attacker-chosen-password-3")).status,
+    ).toBe(401);
   });
 
   /** @scenario An expired reset token cannot change credentials or mint a session */
@@ -260,7 +281,9 @@ describe("better-auth password reset token lifecycle", () => {
     const expired = await submitReset({ harness, token });
 
     expect(expired.status).toBe(400);
-    expect(refusalSchema.parse(await expired.json()).code).toBe("INVALID_TOKEN");
+    expect(refusalSchema.parse(await expired.json()).code).toBe(
+      "INVALID_TOKEN",
+    );
     expect(snapshotCredentialAndSessions(harness)).toEqual(beforeExpiredUse);
     expect((await signIn(harness, email, oldPassword)).status).toBe(200);
     expect((await signIn(harness, email, newPassword)).status).toBe(401);
@@ -275,7 +298,11 @@ describe("better-auth generic password refusal", () => {
     const beforeRefusal = snapshotCredentialAndSessions(harness);
 
     const wrongPassword = await signIn(harness, email, "wrong-password-9");
-    const unknownEmail = await signIn(harness, "unknown-user@example.com", oldPassword);
+    const unknownEmail = await signIn(
+      harness,
+      "unknown-user@example.com",
+      oldPassword,
+    );
 
     expect(wrongPassword.status).toBe(401);
     expect(unknownEmail.status).toBe(401);

@@ -2,6 +2,7 @@ import type { SignInMethod } from "@langwatch/identity";
 import { useRef, useState } from "react";
 import { authClient, navigate, safeRedirectTarget } from "~/utils/auth-client";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
+import { passkeySignUpContext } from "../logic/passkey-sign-up-claim";
 import {
   endPasskeyCeremony,
   startPasskeyCeremony,
@@ -69,7 +70,7 @@ async function createAccountWithPasskey(
 ): Promise<Refusal | "created"> {
   try {
     const result = await authClient.passkey.addPasskey({
-      context: email,
+      context: passkeySignUpContext(email),
       name: email,
       // Only where the address has already been proved. Sign-up confirms the
       // address BEFORE anybody gets in (ADR-117 §6), so the ordinary path

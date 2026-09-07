@@ -591,17 +591,37 @@ export const beforeSessionCreate = async ({
   prisma,
   session,
 }: {
-  prisma: PrismaClient;
+  prisma: {
+    user: {
+      findUnique(args: {
+        where: { id: string };
+        select: {
+          deactivatedAt: true;
+          signupConfirmationPending: true;
+        };
+      }): Promise<{
+        deactivatedAt: Date | null;
+        signupConfirmationPending: boolean;
+      } | null>;
+    };
+  };
   session: { userId: string };
 }): Promise<boolean | void> => {
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { deactivatedAt: true },
+    select: { deactivatedAt: true, signupConfirmationPending: true },
   });
   if (user?.deactivatedAt) {
     logger.warn(
       { userId: session.userId },
       "Blocked session create: user deactivated",
+    );
+    return false;
+  }
+  if (user?.signupConfirmationPending) {
+    logger.warn(
+      { userId: session.userId },
+      "Blocked session create: sign-up confirmation pending",
     );
     return false;
   }

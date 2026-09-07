@@ -1,8 +1,9 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { normalizeIdentifierValue } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError, getSessionFromCtx } from "better-auth/api";
+import { z } from "zod";
 import { env } from "~/env.mjs";
 import {
   belongsToSomebody,
@@ -47,6 +48,7 @@ export interface PasskeySignUpDirectoryPort {
 export interface PasskeySignUpAccountsPort {
   createPasskeyUser(args: {
     email: string;
+    claimHash: string;
   }): Promise<{ id: string; created: boolean }>;
 }
 
@@ -82,8 +84,25 @@ function provisionalHandle(email: string): string {
 }
 
 /** The address the ceremony was started for, or a refusal. */
-function requireEmail(context: string | null | undefined): string {
-  const email = normalizeIdentifierValue(context ?? "");
+const signUpContextSchema = z.object({
+  email: z.string(),
+  claim: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+});
+
+function requireSignUpContext(context: string | null | undefined): {
+  email: string;
+  claimHash: string;
+} {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(context ?? "");
+  } catch {
+    decoded = null;
+  }
+  const carried = signUpContextSchema.safeParse(decoded);
+  const email = carried.success
+    ? normalizeIdentifierValue(carried.data.email)
+    : "";
   // Deliberately shallow. This is the shape check that keeps junk out of a
   // User row; whether the address RECEIVES mail is settled by the confirmation
   // that follows somebody in, not by a regular expression standing in front of
@@ -96,7 +115,18 @@ function requireEmail(context: string | null | undefined): string {
       message: "Enter an email address to create an account.",
     });
   }
-  return email;
+  if (!carried.success) {
+    throw new APIError("BAD_REQUEST", {
+      code: PASSKEY_SIGNUP_EMAIL_INVALID,
+      message: "Restart passkey sign-up from this browser.",
+    });
+  }
+  return {
+    email,
+    claimHash: createHash("sha256")
+      .update(carried.data.claim)
+      .digest("base64url"),
+  };
 }
 
 /** The one refusal an address that is somebody's answers with. */
@@ -156,7 +186,7 @@ export class PasskeySignUpRegistration {
     ctx: GenericEndpointContext;
     context?: string | null | undefined;
   }): Promise<{ id: string; name: string; displayName: string }> {
-    const email = requireEmail(context);
+    const { email } = requireSignUpContext(context);
     await this.refuseIfRegistered(email);
 
     return {
@@ -211,7 +241,7 @@ export class PasskeySignUpRegistration {
       return { userId: session.user.id, name: session.user.email };
     }
 
-    const email = requireEmail(context);
+    const { email, claimHash } = requireSignUpContext(context);
     // Again, because the check in `resolveUser` was one network round trip ago
     // and an account can be created in that window. This is the one that
     // answers in WORDS; the decision that actually holds is taken inside the
@@ -220,7 +250,7 @@ export class PasskeySignUpRegistration {
     await this.refuseIfRegistered(email);
 
     const user = await this.deps.accounts
-      .createPasskeyUser({ email })
+      .createPasskeyUser({ email, claimHash })
       .catch((error: unknown) => {
         // The transaction found what the guard above could not: the address
         // became somebody's in between. Same refusal, same code, so the screen

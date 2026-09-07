@@ -175,7 +175,7 @@ export class PrismaIdentityUsersRepository
   async updateAddressConfirmed({ email }: { email: string }): Promise<void> {
     await this.prisma.user.updateMany({
       where: { email: { equals: email, mode: "insensitive" } },
-      data: { emailVerified: true },
+      data: { emailVerified: true, signupConfirmationPending: false },
     });
   }
 }

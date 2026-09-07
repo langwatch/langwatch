@@ -861,8 +861,8 @@ export function passkeySignUp(): PasskeySignUpRegistration {
   return new PasskeySignUpRegistration({
     directory: identityUsers,
     accounts: {
-      createPasskeyUser: ({ email }) =>
-        credentialAccounts().openPasskeyAccount({ email }),
+      createPasskeyUser: ({ email, claimHash }) =>
+        credentialAccounts().openPasskeyAccount({ email, claimHash }),
     },
     verification: {
       requestVerification: ({ email }) =>

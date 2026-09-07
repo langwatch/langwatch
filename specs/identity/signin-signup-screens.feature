@@ -249,11 +249,11 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # Creating the account only once the ceremony succeeds is what keeps an
   # abandoned attempt free: asking for options writes nothing down.
   @unit @e2e
-  Scenario: Signing up with a passkey creates the account and the session together
+  Scenario: Signing up with a passkey creates a pending account until the address is confirmed
     Given I have typed an address that has no account
     When I create a passkey instead of choosing a password
     Then my account is created and the passkey belongs to it
-    And I am signed in without a second system prompt
+    And no session is opened before I consume the emailed proof
     And a confirmation link is sent without my having to wait for it
 
   # THE one that matters. Registration without a session is what lets somebody
@@ -620,6 +620,14 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I open the same link again
     Then the screen carries on as though it had just worked
     And nothing is created a second time
+    And no additional session or session cookie is minted
+
+  @integration
+  Scenario: Simultaneous confirmation-link consumers mint one session
+    Given one unspent confirmation link for an account awaiting confirmation
+    When two requests consume that link at the same time
+    Then exactly one request opens the account's first session and sets its cookie
+    And the other request confirms the address without minting another session
 
   @unit
   Scenario: A spent link stops working once its grace window closes
