@@ -26,12 +26,15 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   credentialAccounts: () => ({ secureAccountFacts }),
 }));
 
-vi.mock("~/server/app-layer/identity/signin-method-policy", async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import("~/server/app-layer/identity/signin-method-policy")
-  >()),
-  deploymentOffersTwoStepVerification: () => twoStepOffered(),
-}));
+vi.mock(
+  "~/server/app-layer/identity/signin-method-policy",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("~/server/app-layer/identity/signin-method-policy")
+    >()),
+    deploymentOffersTwoStepVerification: () => twoStepOffered(),
+  }),
+);
 
 const NOW = new Date("2026-09-07T12:00:00.000Z");
 
@@ -93,14 +96,17 @@ describe("userRouter.secureAccountNudge", () => {
       account: facts({ twoStepEnabled: true }),
       expected: { passkey: true, twoStep: false },
     },
-  ])("removes the $held half and leaves the other", async ({ account, expected }) => {
-    secureAccountFacts.mockResolvedValue(account);
+  ])(
+    "removes the $held half and leaves the other",
+    async ({ account, expected }) => {
+      secureAccountFacts.mockResolvedValue(account);
 
-    await expect(caller().secureAccountNudge({})).resolves.toMatchObject({
-      offer: true,
-      ...expected,
-    });
-  });
+      await expect(caller().secureAccountNudge({})).resolves.toMatchObject({
+        offer: true,
+        ...expected,
+      });
+    },
+  );
 
   /** @scenario "Only what the deployment offers is offered" */
   it("keeps the permanent passkey offer when two-step setup is unavailable", async () => {
