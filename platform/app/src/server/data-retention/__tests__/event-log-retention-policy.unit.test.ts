@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   classifyEventLogRowRetention,
@@ -96,6 +97,26 @@ describe("event log retention policy", () => {
         "EventType IN ('lw.governance.vk_lifecycle') OR " +
         "AggregateType IN ('authz_grant', 'authz_role', 'user_identity', 'sso_connection', " +
         "'join_request', 'scim_sync'))",
+    );
+  });
+
+  it("keeps the operational backfill aligned with the ingestion predicate", () => {
+    const runbook = readFileSync(
+      new URL(
+        "../../../../../../dev/docs/runbooks/security-event-retention-backfill.md",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const normaliseSql = (sql: string) =>
+      sql
+        .replace(/\s+/g, " ")
+        .replace(/\(\s+/g, "(")
+        .replace(/\s+\)/g, ")")
+        .replace(/,\s+/g, ",");
+
+    expect(normaliseSql(runbook)).toContain(
+      normaliseSql(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE),
     );
   });
 
