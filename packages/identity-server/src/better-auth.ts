@@ -49,6 +49,10 @@ export {
   createIdentityStorageAdapter,
   type IdentityStorageAdapterDeps,
 } from "./better-auth/identity-storage-adapter";
+export {
+  IdentityAccountWriter,
+  type IdentityAccountWriterDeps,
+} from "./better-auth/identity-account-writer";
 export type {
   IdentityAccountRow,
   IdentityAccountSecrets,

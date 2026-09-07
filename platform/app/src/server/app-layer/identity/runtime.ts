@@ -26,8 +26,8 @@ import {
   MfaGuards,
   MfaService,
   newIdentityCommandId,
-  SignInRouterService,
   ShadowComparingDomainRoutingRepository,
+  SignInRouterService,
   SsoConnectionGrandfatherService,
   SsoConnectionGuards,
   SsoConnectionService,
@@ -38,6 +38,7 @@ import {
   birthAwareGate,
   bridgeAccountCeremonies,
   createIdentityStorageAdapter,
+  IdentityAccountWriter,
   IdentityCeremonies,
   MfaCeremonies,
 } from "@langwatch/identity-server/better-auth";
@@ -46,6 +47,7 @@ import { compare, hash } from "bcrypt";
 import type { BetterAuthOptions } from "better-auth";
 import type { AdapterFactory } from "better-auth/adapters";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { changeAuth0Password } from "../../auth0/passwordService";
@@ -76,6 +78,7 @@ import { LocalDoorBreakGlassBinding } from "./break-glass-binding";
 import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
 import { IdentitySsoConnectionGrandfatherMigration } from "./connection-grandfather.migration";
 import { CredentialAccountService } from "./credential-account.service";
+import { CredentialAccountStorageAdapter } from "./credential-account.storage-adapter";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
 import { IdentityLookupService } from "./identity-lookup.service";
 import {
@@ -914,8 +917,21 @@ export const PASSWORD_HASH_ROUNDS = 10;
  * counted, and this root states what does the hashing and the counting.
  */
 export function credentialAccounts(): CredentialAccountService {
+  const legacyRecords = new PrismaCredentialAccountRepository(prisma);
+  const identityWriter = IdentityAccountWriter.create({
+    accounts: identityAccounts,
+    ceremonies: identityCeremonies(),
+  });
+
   return new CredentialAccountService({
-    records: new PrismaCredentialAccountRepository(prisma),
+    records: CredentialAccountStorageAdapter.create({
+      legacy: legacyRecords,
+      identityAccounts,
+      identityWriter,
+      routesToIdentity: routesToIdentityBranch,
+      newAccountId: nanoid,
+      now: () => new Date(),
+    }),
     // The one case-insensitive address lookup, shared with the identity
     // guards rather than re-spelled for registration (ADR-129 rule 4).
     directory: identityUsers,
