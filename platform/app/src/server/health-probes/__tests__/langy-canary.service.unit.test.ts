@@ -234,7 +234,10 @@ describe("runLangyCanary", () => {
         let clock = 0;
         const deps: LangyCanaryDeps = {
           startTurn: async () => STARTED,
-          awaitSettlement: () => new Promise(() => {}),
+          awaitSettlement: () =>
+            new Promise(() => {
+              // Intentionally never resolved: the double ignores its signal.
+            }),
           now: () => clock,
         };
 
