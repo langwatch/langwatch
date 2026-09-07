@@ -3,15 +3,22 @@ import type {
   PasskeyRemovalOutcome,
   PasskeyRemovalPort,
 } from "@langwatch/identity-server/better-auth";
+import { z } from "zod";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { isUsableCredential } from "../../../users/credential-user";
 
 const MAX_SERIALIZATION_ATTEMPTS = 4;
 
+const driverWriteConflictSchema = z.object({
+  name: z.literal("DriverAdapterError"),
+  cause: z.object({ kind: z.literal("TransactionWriteConflict") }),
+});
+
 function isSerializationConflict(error: unknown): boolean {
   return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2034"
+    (error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034") ||
+    driverWriteConflictSchema.safeParse(error).success
   );
 }
 
