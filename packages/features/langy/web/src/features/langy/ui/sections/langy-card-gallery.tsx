@@ -22,6 +22,7 @@
  * its connect card instead of an error — which is the behaviour item 19 hangs
  * on, made visible).
  */
+import { Temporal } from "@langwatch/time";
 import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
@@ -55,7 +56,7 @@ function call(name: string, output: unknown, input: unknown = {}) {
 }
 
 /** Fixed so the gallery's trace times don't drift between renders. */
-const TRACE_FIXTURE_NOW = Date.parse("2026-07-11T14:03:00Z");
+const TRACE_FIXTURE_NOW = Temporal.Instant.from("2026-07-11T14:03:00Z").epochMilliseconds;
 
 /**
  * One trace, in the shape `POST /api/trace/search` actually returns under

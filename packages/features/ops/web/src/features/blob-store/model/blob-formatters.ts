@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { formatTimeAgo } from "../../../model/ops-formatters.ts";
 
 /** Verdict a sweep would reach, phrased for a reader rather than for the script. */
@@ -40,6 +41,6 @@ export function formatTtl(seconds: number | null): string {
  */
 export function formatLeaseLapse(deadlineMs: number | null): string {
   if (deadlineMs === null) return "None";
-  if (deadlineMs >= Date.now()) return "Live";
+  if (deadlineMs >= nowInstant().epochMilliseconds) return "Live";
   return formatTimeAgo(deadlineMs);
 }

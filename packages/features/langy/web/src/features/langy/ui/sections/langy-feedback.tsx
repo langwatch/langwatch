@@ -110,7 +110,8 @@ export function LangyFeedback({
   useEffect(() => {
     if (origin === "preview" || origin === "requested") return;
     if (markedShownRef.current || !conversationId || !project?.id) return;
-    if (messageId && useLangyStore.getState().dismissedFeedbackMessageIds.has(messageId)) {
+    const dismissed = useLangyStore.getState().dismissedFeedbackMessageIds;
+    if (messageId && dismissed.has(messageId)) {
       return;
     }
     markedShownRef.current = true;

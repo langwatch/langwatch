@@ -628,7 +628,8 @@ export function isProposalOutput(output: unknown): boolean {
  * view already shows, e.g. `{` or `"id": "scenario_0002Yw…",` where a sentence belongs.
  */
 export function isSerializedDocumentLine(line: string): boolean {
-  if (/^[[{]/.test(line) && /[\]}]$/.test(line)) return true;
+  const opensAndCloses = /^[[{]/.test(line) && /[\]}]$/.test(line);
+  if (opensAndCloses) return true;
   if (/^[[\]{},]+$/.test(line)) return true;
   if (/^"[^"]*"\s*:/.test(line)) return true;
   // One element of a pretty-printed array: `"refunds",`. A quoted word with

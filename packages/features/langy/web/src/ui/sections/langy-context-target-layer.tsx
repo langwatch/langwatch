@@ -315,11 +315,10 @@ function ActiveLayer() {
     // Our own floating button counts as "still on the target" — see OVERLAY_ATTR.
     const onOwnOverlay = !!hit?.closest(`[${OVERLAY_ATTR}]`);
     const hitTarget = hit?.closest<HTMLElement>("[data-langy-target]");
+    const reachableTarget = hitTarget && isReachable(hitTarget) ? hitTarget : null;
     const hovered = onOwnOverlay
       ? useLangyContextTargetStore.getState().hoveredId
-      : hitTarget && isReachable(hitTarget)
-        ? (hitTarget.dataset.langyTarget ?? null)
-        : null;
+      : (reachableTarget?.dataset.langyTarget ?? null);
 
     // Reaching for a revealed target holds its light. The reveal is a couple of
     // seconds long by design ("a look, not a state"), which is plenty to SEE and

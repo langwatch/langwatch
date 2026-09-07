@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "../../../behavior/use-reduced-motion.ts";
 
@@ -34,10 +35,10 @@ function trackReaderGestures(el: HTMLElement) {
   } | null = null;
 
   const onWheel = (event: WheelEvent) => {
-    if (event.deltaY < 0) lastUpwardAt = Date.now();
+    if (event.deltaY < 0) lastUpwardAt = nowInstant().epochMilliseconds;
   };
   const onKeyDown = (event: KeyboardEvent) => {
-    if (UPWARD_KEYS.has(event.key)) lastUpwardAt = Date.now();
+    if (UPWARD_KEYS.has(event.key)) lastUpwardAt = nowInstant().epochMilliseconds;
   };
   const onTouchStart = (event: TouchEvent) => {
     touchY = event.touches[0]?.clientY ?? null;
@@ -46,7 +47,7 @@ function trackReaderGestures(el: HTMLElement) {
     const y = event.touches[0]?.clientY;
     if (y === undefined) return;
     // A finger travelling DOWN the glass drags the column up.
-    if (touchY !== null && y > touchY) lastUpwardAt = Date.now();
+    if (touchY !== null && y > touchY) lastUpwardAt = nowInstant().epochMilliseconds;
     touchY = y;
   };
   // Touch reports its own direction above, so a resting finger is not a drag.
@@ -65,7 +66,7 @@ function trackReaderGestures(el: HTMLElement) {
   const onPointerMove = (event: PointerEvent) => {
     if (!drag || event.pointerId !== drag.pointerId) return;
     if (drag.isOnScrollbar || event.clientY < drag.topEdge) {
-      lastUpwardAt = Date.now();
+      lastUpwardAt = nowInstant().epochMilliseconds;
     }
   };
   const onPointerUp = (event: PointerEvent) => {
@@ -85,7 +86,7 @@ function trackReaderGestures(el: HTMLElement) {
   window.addEventListener("pointercancel", onPointerUp, opts);
 
   return {
-    droveTheColumnUp: () => Date.now() - lastUpwardAt <= USER_GESTURE_WINDOW_MS,
+    droveTheColumnUp: () => nowInstant().epochMilliseconds - lastUpwardAt <= USER_GESTURE_WINDOW_MS,
     dispose: () => controller.abort(),
   };
 }

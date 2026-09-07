@@ -1,7 +1,7 @@
 import { Badge, Box, Card, HStack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
-import { formatDuration } from "../../../../model/ops-formatters.ts";
+import { formatDuration, readableDate } from "../../../../model/ops-formatters.ts";
 import { replayStateColor } from "../elements/replay-state-badge.tsx";
 
 export interface ReplayHistoryEntryView {
@@ -54,7 +54,7 @@ export function ReplayHistorySection({
               </Text>
               <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap">
                 {latestEntry.completedAt
-                  ? new Date(latestEntry.completedAt).toLocaleString([], {
+                  ? readableDate(latestEntry.completedAt).toLocaleString([], {
                       month: "short",
                       day: "numeric",
                       hour: "2-digit",

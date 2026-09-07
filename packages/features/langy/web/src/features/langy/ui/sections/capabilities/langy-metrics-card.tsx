@@ -2,6 +2,7 @@
  * Analytics capability card (`get_analytics`).
  */
 
+import { Temporal, toEpochMs } from "@langwatch/time";
 import { Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy-contract";
 import { type LangyTurnMetric } from "../../../../../model/values/langy-turn.ts";
@@ -70,7 +71,8 @@ function parseAnalytics(output: unknown): ParsedAnalytics {
     if (cells.length < 2) continue;
     const last = cells[cells.length - 1]!;
     const num = Number(last.replace(/,/g, ""));
-    if (!Number.isNaN(num) && /^-?[\d.,]+$/.test(last)) values.push(num);
+    const isNumericCell = !Number.isNaN(num) && /^-?[\d.,]+$/.test(last);
+    if (isNumericCell) values.push(num);
   }
   const latest = values.length > 0 ? values[values.length - 1]! : null;
   return { metric, aggregation, latest, points: values.length, empty };
@@ -125,9 +127,9 @@ function periodCaption(input: unknown): string | undefined {
 /** One ISO day from an epoch or a date string, or undefined if unreadable. */
 function asDay(value: unknown): string | undefined {
   if (typeof value !== "number" && typeof value !== "string") return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return date.toISOString().slice(0, 10);
+  const epochMs = toEpochMs(value);
+  if (Number.isNaN(epochMs)) return undefined;
+  return Temporal.Instant.fromEpochMilliseconds(epochMs).toString().slice(0, 10);
 }
 
 export function LangyMetricsCard({ input, output, projectSlug }: CapabilityCardInput) {
@@ -153,6 +155,7 @@ export function LangyMetricsCard({ input, output, projectSlug }: CapabilityCardI
   if (points > 0) {
     metrics.push({ value: points, label: points === 1 ? "point" : "points" });
   }
+  const hasNoMetrics = empty || metrics.length === 0;
 
   return (
     <LangyCapabilityCard
@@ -167,15 +170,17 @@ export function LangyMetricsCard({ input, output, projectSlug }: CapabilityCardI
       // worse than no link, because it looks like it would.
       deepLink={false}
     >
-      {isUnreadable(parsed) ? (
+      {isUnreadable(parsed) && (
         <Text textStyle="xs" color="fg.muted">
           Couldn&apos;t read this result. Open Analytics to see it.
         </Text>
-      ) : empty || metrics.length === 0 ? (
+      )}
+      {!isUnreadable(parsed) && hasNoMetrics && (
         <Text textStyle="xs" color="fg.muted">
           No data for this period.
         </Text>
-      ) : (
+      )}
+      {!isUnreadable(parsed) && !hasNoMetrics && (
         <VStack align="stretch" gap={1.5}>
           <StreamingStatCard metrics={metrics} />
           {period ? (

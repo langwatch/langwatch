@@ -1,5 +1,6 @@
 import { Badge, Box, HStack, Spacer, Text, VStack, Wrap } from "@chakra-ui/react";
 
+import { nowInstant } from "@langwatch/time";
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 
@@ -38,7 +39,7 @@ function instanceStatus(instance: DejaViewProcessManagerInstance | null): {
   palette: string;
 } {
   if (!instance) return { label: "Not started", palette: "gray" };
-  if (instance.nextWakeAt !== null && instance.nextWakeAt > Date.now()) {
+  if (instance.nextWakeAt !== null && instance.nextWakeAt > nowInstant().epochMilliseconds) {
     return { label: "Waiting to wake", palette: "blue" };
   }
   return { label: "Active", palette: "green" };

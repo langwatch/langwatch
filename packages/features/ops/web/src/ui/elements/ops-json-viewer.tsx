@@ -12,14 +12,18 @@ function findChangedPaths(prev: unknown, curr: unknown, path = ""): Set<string> 
 
   if (prev === curr) return changed;
 
-  if (prev === null || curr === null || typeof prev !== "object" || typeof curr !== "object") {
+  const eitherIsAScalar =
+    prev === null || curr === null || typeof prev !== "object" || typeof curr !== "object";
+  if (eitherIsAScalar) {
     if (prev !== curr && path) {
       changed.add(path);
     }
     return changed;
   }
 
-  if (Array.isArray(prev) && Array.isArray(curr)) {
+  const prevIsArray = Array.isArray(prev);
+  const currIsArray = Array.isArray(curr);
+  if (prevIsArray && currIsArray) {
     const maxLen = Math.max(prev.length, curr.length);
     for (let i = 0; i < maxLen; i++) {
       const childPath = path ? `${path}[${i}]` : `[${i}]`;
@@ -36,7 +40,7 @@ function findChangedPaths(prev: unknown, curr: unknown, path = ""): Set<string> 
     return changed;
   }
 
-  if (Array.isArray(prev) !== Array.isArray(curr)) {
+  if (prevIsArray !== currIsArray) {
     if (path) changed.add(path);
     return changed;
   }
@@ -63,12 +67,9 @@ function findChangedPaths(prev: unknown, curr: unknown, path = ""): Set<string> 
 
 function isPathOrAncestorChanged(path: string, changedPaths: Set<string>): boolean {
   if (changedPaths.has(path)) return true;
-  for (const changed of changedPaths) {
-    if (changed.startsWith(path + ".") || changed.startsWith(path + "[")) {
-      return true;
-    }
-  }
-  return false;
+  return [...changedPaths].some(
+    (changed) => changed.startsWith(`${path}.`) || changed.startsWith(`${path}[`),
+  );
 }
 
 interface RenderContext {

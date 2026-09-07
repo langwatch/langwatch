@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { Box, HStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
@@ -71,9 +72,12 @@ export function LangyThinkingLine({
   // panel mounts it on `isBusy`). This is what lets silence escalate.
   const [elapsedMs, setElapsedMs] = useState(0);
   useEffect(() => {
-    const startedAt = Date.now();
+    const startedAt = nowInstant().epochMilliseconds;
     setElapsedMs(0);
-    const id = setInterval(() => setElapsedMs(Date.now() - startedAt), ELAPSED_TICK_MS);
+    const id = setInterval(
+      () => setElapsedMs(nowInstant().epochMilliseconds - startedAt),
+      ELAPSED_TICK_MS,
+    );
     return () => clearInterval(id);
   }, [activityKey, pageActivity]);
 

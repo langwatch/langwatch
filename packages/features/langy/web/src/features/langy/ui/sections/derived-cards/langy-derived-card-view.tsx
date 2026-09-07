@@ -31,12 +31,12 @@ export function LangyDerivedCardView({ projectSlug, ...props }: LangyDerivedCard
       choiceRefRows={choiceRefRows}
       resolveExploreHref={(query, slug) => {
         const search = readTraceSearchQuery(query);
-        if (
+        const asksNothing =
           search.query === undefined &&
           !search.origins?.length &&
           search.startDate === undefined &&
-          search.endDate === undefined
-        ) {
+          search.endDate === undefined;
+        if (asksNothing) {
           return null;
         }
         return buildTraceExplorerHref({ projectSlug: slug, search });

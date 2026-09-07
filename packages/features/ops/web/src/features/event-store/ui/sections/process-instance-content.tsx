@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { PinnedAwareJsonView } from "../../../../ui/elements/ops-pinned-json-view.tsx";
@@ -87,6 +88,7 @@ function InstanceOutboxSection({
   now,
 }: OutboxSectionProps) {
   const total = outbox?.total ?? 0;
+  const hasOutboxMessages = outbox !== null && outbox.messages.length > 0;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const last = Math.min(total, page * pageSize);
@@ -118,9 +120,8 @@ function InstanceOutboxSection({
           </HStack>
         )}
       </HStack>
-      {outboxLoading ? (
-        <Spinner size="xs" />
-      ) : outbox && outbox.messages.length > 0 ? (
+      {outboxLoading && <Spinner size="xs" />}
+      {!outboxLoading && hasOutboxMessages ? (
         <VStack align="stretch" gap={2}>
           {outbox.messages.map((message) => (
             <OutboxMessageCard
@@ -136,7 +137,8 @@ function InstanceOutboxSection({
             />
           ))}
         </VStack>
-      ) : (
+      ) : null}
+      {!outboxLoading && !hasOutboxMessages && (
         <Text textStyle="xs" color="fg.muted">
           No outbox messages.
         </Text>
@@ -166,7 +168,7 @@ export function ProcessInstanceContent({
   onDiscardMessage,
   onReleaseLease,
   actionPending,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   detail: ProcessInstanceDetail | null;
   isLoading: boolean;

@@ -1,4 +1,5 @@
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
+import { nowInstant } from "@langwatch/time";
 import { formatTimeAgo } from "../../../model/ops-formatters.ts";
 
 /** Anything the summary counted as wrong — decides row tinting. */
@@ -13,7 +14,10 @@ export function hasFleetTrouble(row: ProcessFleetSummary): boolean {
  * countdown, a past-due wake is an AGE ("due 3m ago") — a bare countdown
  * shape for an overdue wake would read as scheduled rather than as stuck.
  */
-export function describeNextWake(nextWakeAt: number | null, now = Date.now()): string {
+export function describeNextWake(
+  nextWakeAt: number | null,
+  now = nowInstant().epochMilliseconds,
+): string {
   if (nextWakeAt === null) return "none";
   if (nextWakeAt > now) return formatTimeAgo(nextWakeAt, now);
   return `due ${formatTimeAgo(nextWakeAt, now)}`;

@@ -7,6 +7,7 @@
 // The Explorer's own value-quoting rule. Imported rather than reimplemented so
 // a model id with a slash, or an origin with a space, is escaped here exactly
 // as the filter sidebar would escape it.
+import { toEpochMs } from "@langwatch/time";
 import { escapeValue } from "@langwatch/trace-contract";
 
 /** The CLI's `trace search` arguments, normalized. */
@@ -311,7 +312,7 @@ function readEpochMs(value: unknown): number | undefined {
   const asNumber = Number(value);
   if (Number.isFinite(asNumber)) return asNumber;
 
-  const parsed = Date.parse(value);
+  const parsed = toEpochMs(value);
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 

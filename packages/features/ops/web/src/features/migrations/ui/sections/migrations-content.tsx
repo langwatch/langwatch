@@ -1,3 +1,4 @@
+import { readableDate } from "../../../../model/ops-formatters.ts";
 import {
   Badge,
   Box,
@@ -467,6 +468,21 @@ function EnrollAction({
   );
 }
 
+/** Who the cohort draws from and who it leaves out, as one sentence pair. */
+function describeScope({
+  included,
+  heldBack,
+  sentence,
+}: {
+  included: string[];
+  heldBack: string[];
+  sentence: (phrases: string[], verb: string) => string;
+}): string {
+  if (included.length === 0) return sentence(heldBack, "are left out.");
+  if (heldBack.length === 0) return sentence(included, "can be drawn.");
+  return `${sentence(included, "can be drawn;")} ${sentence(heldBack, "are left out.").toLowerCase()}`;
+}
+
 /**
  * Enroll a sampled cohort for THIS migration in one action. The first step's sample is drawn
  * from organizations not yet enrolled; a later step's from the step before it.
@@ -498,15 +514,7 @@ function cohortDialogDescription({
   ].filter((phrase) => phrase !== undefined);
   const sentence = (phrases: string[], verb: string) =>
     `Organizations ${phrases.join(" or ")} ${verb}`;
-  const scope =
-    included.length === 0
-      ? `${sentence(heldBack, "are left out.")}`
-      : heldBack.length === 0
-        ? `${sentence(included, "can be drawn.")}`
-        : `${sentence(included, "can be drawn;")} ${sentence(
-            heldBack,
-            "are left out.",
-          ).toLowerCase()}`;
+  const scope = describeScope({ included, heldBack, sentence });
   return pool + consequence + scope;
 }
 
@@ -920,7 +928,7 @@ function EnrollmentRow({
           </Text>
         )}
       </Table.Cell>
-      <Table.Cell>{new Date(enrollment.createdAt).toLocaleString()}</Table.Cell>
+      <Table.Cell>{readableDate(enrollment.createdAt).toLocaleString()}</Table.Cell>
       {canManage && (
         <Table.Cell textAlign="right">
           <Button
@@ -953,7 +961,7 @@ function AttentionRow({ record }: { record: MigrationListing["attention"][number
             {STATUS_LABEL[record.status] ?? record.status}
           </Badge>
         </Table.Cell>
-        <Table.Cell>{new Date(record.updatedAt).toLocaleString()}</Table.Cell>
+        <Table.Cell>{readableDate(record.updatedAt).toLocaleString()}</Table.Cell>
         <Table.Cell>
           {record.report == null ? (
             <Text fontSize="sm" color="fg.muted">

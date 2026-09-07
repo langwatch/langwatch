@@ -1,4 +1,5 @@
 import { Box, Button, Card, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Skull } from "lucide-react";
 import { ProcessRecentActions } from "./process-recent-actions-panel.tsx";
 import { hasFleetTrouble } from "../../model/process-presentation.ts";
@@ -36,7 +37,7 @@ export function EventSourcingOverview() {
   const deadByProcess = dead.data ?? [];
   const deadTotal = deadByProcess.reduce((sum, row) => sum + row.count, 0);
   const troubled = rows.filter(hasFleetTrouble);
-  const now = fleet.dataUpdatedAt || Date.now();
+  const now = fleet.dataUpdatedAt || nowInstant().epochMilliseconds;
 
   return (
     <VStack align="stretch" gap={4}>

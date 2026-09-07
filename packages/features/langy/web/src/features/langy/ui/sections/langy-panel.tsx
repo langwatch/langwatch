@@ -1,3 +1,5 @@
+import { nowInstant } from "@langwatch/time";
+import { readableDate } from "../../../../model/langy-row-format.ts";
 import { Box, chakra, HStack, IconButton, Separator, Text, VStack } from "@chakra-ui/react";
 import { mergeContextChips } from "../../../../behavior/langy-context-chips.ts";
 import { removeContextChip } from "../../../../behavior/langy-context-target.store.ts";
@@ -147,7 +149,10 @@ import { useLangyExternalLinkGuard } from "./use-langy-external-link-guard.ts";
 import { useLangyFreshness } from "../../behavior/use-langy-freshness.ts";
 import { useLangyPageContext } from "./use-langy-page-context.ts";
 import { useLangyStickToBottom } from "../../behavior/use-langy-stick-to-bottom.ts";
-import { turnHadSideEffects, useLangyTurnRecovery } from "../../behavior/use-langy-turn-recovery.ts";
+import {
+  turnHadSideEffects,
+  useLangyTurnRecovery,
+} from "../../behavior/use-langy-turn-recovery.ts";
 import { useLangyWarmWorker } from "../../behavior/use-langy-warm-worker.ts";
 import { syncLangyAfterDefaultModelWrite } from "../../behavior/logic/coding-default-sync.ts";
 import {
@@ -540,7 +545,7 @@ function applyProgressSignal(signal: Extract<LangyTurnSignalEntry, { type: "prog
     total,
     ...(signal.batchItems !== undefined ? { batchItems: signal.batchItems } : {}),
     ...(signal.batchDurationMs !== undefined ? { batchDurationMs: signal.batchDurationMs } : {}),
-    receivedAtMs: Date.now(),
+    receivedAtMs: nowInstant().epochMilliseconds,
   });
 }
 
@@ -1560,7 +1565,8 @@ function LangyPanel({
     // `/feedback` is a client command, not a message: it summons the rating card under
     // the latest answer (bypassing the backend cadence — the user asking to rate is
     // never nagging) and sends nothing to Langy.
-    if (text.trim().toLowerCase() === "/feedback") {
+    const typed = text.trim().toLowerCase();
+    if (typed === "/feedback") {
       setDraft("");
       if (latestAssistantMessage) {
         useLangyStore.getState().pinFeedback(latestAssistantMessage.id);
@@ -3152,7 +3158,9 @@ function LangyPanel({
                   <HStack paddingX={floating ? "19px" : "14px"} paddingBottom="4px" gap={2}>
                     <Text textStyle="2xs" color="orange.fg" fontWeight="600">
                       Viewing tape @{" "}
-                      {timeTravel.atMs ? new Date(timeTravel.atMs).toLocaleTimeString() : "start"}
+                      {timeTravel.atMs
+                        ? readableDate(timeTravel.atMs).toLocaleTimeString()
+                        : "start"}
                     </Text>
                     <chakra.button
                       type="button"

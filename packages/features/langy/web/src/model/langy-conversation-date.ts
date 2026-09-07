@@ -1,13 +1,19 @@
+import { nowInstant, startOfDay } from "@langwatch/time";
+import { readableDate } from "./langy-row-format.ts";
+
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
 /** Compact, scannable date for a history row; the full timestamp stays native. */
-export function formatLangyConversationDate(timestampMs: number, nowMs = Date.now()): string {
+export function formatLangyConversationDate(
+  timestampMs: number,
+  nowMs = nowInstant().epochMilliseconds,
+): string {
   if (!Number.isFinite(timestampMs) || timestampMs <= 0) return "Unknown date";
 
-  const date = new Date(timestampMs);
-  const now = new Date(nowMs);
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const date = readableDate(timestampMs);
+  const now = readableDate(nowMs);
+  const startOfToday = startOfDay(now).getTime();
+  const startOfDate = startOfDay(date).getTime();
   const dayDifference = Math.round((startOfToday - startOfDate) / DAY_MS);
 
   if (dayDifference === 0) return "Today";
@@ -17,7 +23,8 @@ export function formatLangyConversationDate(timestampMs: number, nowMs = Date.no
     month: "short",
     day: "numeric",
   };
-  if (date.getFullYear() !== now.getFullYear()) {
+  const isAnotherYear = date.getFullYear() !== now.getFullYear();
+  if (isAnotherYear) {
     options.year = "numeric";
   }
 

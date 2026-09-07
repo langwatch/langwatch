@@ -85,9 +85,10 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
   const queuesWithBlocked = (queuesQuery.data ?? []).filter((q) => q.blockedGroupCount > 0);
 
   if (blockedQuery.isLoading) return null;
-  if (!blockedQuery.data || blockedQuery.data.clusters.length === 0) return null;
+  const blocked = blockedQuery.data;
+  if (blocked === undefined || blocked.clusters.length === 0) return null;
 
-  const clusters = blockedQuery.data.clusters;
+  const clusters = blocked.clusters;
 
   return (
     <>
@@ -102,7 +103,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
             flexWrap="wrap"
           >
             <Text textStyle="sm" fontWeight="medium" color="red.500">
-              Blocked — {blockedQuery.data.totalBlocked} groups, {clusters.length} error patterns
+              Blocked — {blocked.totalBlocked} groups, {clusters.length} error patterns
             </Text>
             <Spacer />
             {hasAccess && (

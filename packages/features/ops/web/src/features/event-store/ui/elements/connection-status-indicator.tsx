@@ -1,4 +1,5 @@
 import { Status } from "@chakra-ui/react";
+import { nowInstant } from "@langwatch/time";
 import { formatDurationMs } from "../../../../model/ops-formatters.ts";
 import { isSnapshotStale } from "../../model/snapshot-staleness.ts";
 
@@ -28,7 +29,7 @@ const labelMap: Record<OpsConnectionStatus, string> = {
 export function ConnectionStatusIndicator({
   status,
   computedAtMs,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   status: OpsConnectionStatus;
   /** When the snapshot behind this page was computed, in ms. Null when unknown. */

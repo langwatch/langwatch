@@ -1,9 +1,10 @@
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Badge, Center, EmptyState, HStack, Spinner, Table, Text } from "@chakra-ui/react";
 import { CalendarClock } from "lucide-react";
 import type { OpsScheduledJob, SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import type { ReactNode } from "react";
 import type { SchedulerJobStatus } from "../../model/scheduler-presentation.ts";
-import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import { formatTimeAgo, readableDate } from "../../../../model/ops-formatters.ts";
 import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 import { SchedulerHeader } from "../blocks/scheduler-header.tsx";
 import { SchedulerRecentActions } from "../elements/scheduler-recent-actions.tsx";
@@ -26,7 +27,7 @@ export function SchedulerContentView({
   recentActions,
   isLoading,
   hasAccess,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
   renderActions,
 }: {
   jobs: OpsScheduledJob[];
@@ -142,16 +143,16 @@ function ScheduleRow({
         </Text>
       </Table.Cell>
       <Table.Cell>
-        <Text textStyle="xs" title={new Date(job.nextRunAt).toLocaleString()}>
-          {formatTimeAgo(new Date(job.nextRunAt).getTime(), now)}
+        <Text textStyle="xs" title={readableDate(job.nextRunAt).toLocaleString()}>
+          {formatTimeAgo(toEpochMs(job.nextRunAt), now)}
         </Text>
       </Table.Cell>
       <Table.Cell color="fg.muted">
         <Text
           textStyle="xs"
-          title={job.lastSlot ? new Date(job.lastSlot).toLocaleString() : undefined}
+          title={job.lastSlot ? readableDate(job.lastSlot).toLocaleString() : undefined}
         >
-          {job.lastSlot ? formatTimeAgo(new Date(job.lastSlot).getTime(), now) : "never"}
+          {job.lastSlot ? formatTimeAgo(toEpochMs(job.lastSlot), now) : "never"}
         </Text>
       </Table.Cell>
       <Table.Cell>

@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -28,6 +29,7 @@ import {
   isOverdue,
   matchesStatusFilter,
   sortGroupsBySeverity,
+  type GroupClassification,
 } from "../../model/queue-pipeline-utils.ts";
 import { type StatusFilter } from "../../model/queue-types.ts";
 import { GroupStateBadge } from "../elements/queue-group-state-badge.tsx";
@@ -37,6 +39,34 @@ import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-ta
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 const GROUPS_VIEWPORT_HEIGHT = 480;
 const GROUPS_ROW_HEIGHT = 36;
+
+/** What stands in for the table while it loads, is idle, or is filtered empty. */
+function GroupsPlaceholder({ isLoading, anyGroups }: { isLoading: boolean; anyGroups: boolean }) {
+  if (isLoading) {
+    return (
+      <Center paddingY={6}>
+        <Spinner size="sm" />
+      </Center>
+    );
+  }
+  return (
+    <Box padding={4}>
+      <Text textStyle="xs" color="fg.muted">
+        {anyGroups ? "No groups match current filters." : "No groups \u2014 queues are idle."}
+      </Text>
+    </Box>
+  );
+}
+
+/**
+ * The tint answers "what is wrong RIGHT NOW" at a glance: red for groups an
+ * operator must act on, orange for groups still failing on their own.
+ */
+function groupTint(classification: GroupClassification) {
+  const needsAnOperator = classification.state === "blocked" || classification.state === "stale";
+  if (needsAnOperator) return "red.subtle";
+  return classification.isFailing ? "orange.subtle" : undefined;
+}
 
 export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const toaster = useOpsToaster();
@@ -68,7 +98,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   // Classification compares dispatch-eligibility scores against "now"; pinning
   // now to the fetch instant keeps the rows stable between refreshes instead of
   // reclassifying on every unrelated render.
-  const now = groupsQuery.dataUpdatedAt || Date.now();
+  const now = groupsQuery.dataUpdatedAt || nowInstant().epochMilliseconds;
 
   const filteredGroups = useMemo(() => {
     let groups = allGroups;
@@ -108,6 +138,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   }, [statusFilter, search]);
 
   const isLoading = !!primaryQueue && groupsQuery.isLoading;
+  const hasGroupsToShow = !isLoading && filteredGroups.length > 0;
 
   const groupDetail = useOpsOverlay("group");
   const openGroup = readOverlayParts(groupDetail.value, 2);
@@ -172,7 +203,8 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   // search input the operator was already typing for filter scope.
   const tenantScope = useMemo(() => {
     const s = search.trim();
-    if (!s || s.includes("/") || s.includes(" ")) return null;
+    const isOneTenantPrefix = s !== "" && !s.includes("/") && !s.includes(" ");
+    if (!isOneTenantPrefix) return null;
     if (!s.startsWith("project_")) return null;
     return s;
   }, [search]);
@@ -401,23 +433,10 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
             </HStack>
           )}
 
-          {isLoading ? (
-            <Center paddingY={6}>
-              <Spinner size="sm" />
-            </Center>
-          ) : allGroups.length === 0 ? (
-            <Box padding={4}>
-              <Text textStyle="xs" color="fg.muted">
-                No groups — queues are idle.
-              </Text>
-            </Box>
-          ) : filteredGroups.length === 0 ? (
-            <Box padding={4}>
-              <Text textStyle="xs" color="fg.muted">
-                No groups match current filters.
-              </Text>
-            </Box>
-          ) : (
+          {!hasGroupsToShow && (
+            <GroupsPlaceholder isLoading={isLoading} anyGroups={allGroups.length > 0} />
+          )}
+          {hasGroupsToShow && (
             <Box
               ref={scrollContainerRef}
               maxHeight={`${GROUPS_VIEWPORT_HEIGHT}px`}
@@ -462,15 +481,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                       const group = filteredGroups[i]!;
                       const c = classifyGroup(group, now);
                       const overdue = !group.isBlocked && isOverdue(group.oldestJobMs);
-                      // The tint answers "what is wrong RIGHT NOW" at a glance:
-                      // red for groups an operator must act on, orange for
-                      // groups still failing on their own.
-                      const tint =
-                        c.state === "blocked" || c.state === "stale"
-                          ? "red.subtle"
-                          : c.isFailing
-                            ? "orange.subtle"
-                            : undefined;
+                      const tint = groupTint(c);
                       return (
                         <Table.Row
                           key={`${group.queueName}:${group.groupId}`}

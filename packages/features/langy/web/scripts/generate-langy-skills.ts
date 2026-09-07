@@ -145,7 +145,8 @@ if (isMain) {
   // deliberately excludes Dockerfile.langyagent (nothing to derive from). The
   // committed output IS the catalogue there; only a tree that can regenerate
   // does. A tree with neither still fails loudly below.
-  if (!fs.existsSync(DOCKERFILE) && fs.existsSync(OUT)) {
+  const isPublishedArtifact = !fs.existsSync(DOCKERFILE) && fs.existsSync(OUT);
+  if (isPublishedArtifact) {
     console.log(
       "Dockerfile.langyagent not in this tree (published artifact) — keeping the committed Langy skill catalogue.",
     );

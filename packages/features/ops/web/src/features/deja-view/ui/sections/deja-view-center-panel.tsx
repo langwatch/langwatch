@@ -4,6 +4,33 @@ import { hashEventTypeColor } from "../../model/deja-view-fragment.ts";
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import type { EventResult } from "../../model/deja-view-types.ts";
 
+/** The replayed projection state, while it loads and when there is none. */
+function ProjectionStateBody({
+  loading,
+  state,
+  previousState,
+}: {
+  loading: boolean;
+  state: unknown;
+  previousState: unknown;
+}) {
+  if (loading) {
+    return (
+      <Center paddingY={8}>
+        <Spinner size="sm" />
+      </Center>
+    );
+  }
+  if (state == null) {
+    return (
+      <Text textStyle="xs" color="fg.muted">
+        No projection state computed. This projection may not handle the events for this aggregate.
+      </Text>
+    );
+  }
+  return <JsonViewer data={state} previousData={previousState} maxHeight="calc(100vh - 300px)" />;
+}
+
 export function DejaViewCenterPanel({
   currentEvent,
   previousEvent,
@@ -70,22 +97,11 @@ export function DejaViewCenterPanel({
           </Button>
         </HStack>
         <Box flex={1} padding={4} overflow="auto">
-          {projectionStateLoading ? (
-            <Center paddingY={8}>
-              <Spinner size="sm" />
-            </Center>
-          ) : projectionState != null ? (
-            <JsonViewer
-              data={projectionState}
-              previousData={showDiff ? previousProjectionState : void 0}
-              maxHeight="calc(100vh - 300px)"
-            />
-          ) : (
-            <Text textStyle="xs" color="fg.muted">
-              No projection state computed. This projection may not handle the events for this
-              aggregate.
-            </Text>
-          )}
+          <ProjectionStateBody
+            loading={projectionStateLoading}
+            state={projectionState}
+            previousState={showDiff ? previousProjectionState : void 0}
+          />
         </Box>
       </Box>
     );

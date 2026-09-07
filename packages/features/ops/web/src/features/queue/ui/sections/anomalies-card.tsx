@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { Badge, Button, Card, HStack, Spacer, Spinner, Table, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
@@ -116,7 +117,7 @@ export function AnomaliesCard() {
 }
 
 function formatAge(triggeredAt: number): string {
-  const ageMs = Date.now() - triggeredAt;
+  const ageMs = nowInstant().epochMilliseconds - triggeredAt;
   const m = Math.floor(ageMs / 60_000);
   if (m < 1) return "<1m ago";
   if (m < 60) return `${m}m ago`;

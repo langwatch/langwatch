@@ -19,6 +19,25 @@ export type LangyStopTarget =
       reason: "no-conversation" | "turn-not-identified";
     };
 
+/**
+ * Which turn a stop names: this tab's live one, none while a send is in
+ * flight, else the durable one.
+ */
+function resolveTurnId({
+  ownsLiveTurn,
+  localTurnId,
+  localSendPending,
+  durableTurnId,
+}: {
+  ownsLiveTurn: boolean;
+  localTurnId: string | null;
+  localSendPending: boolean;
+  durableTurnId: string | null;
+}): string | null {
+  if (ownsLiveTurn) return localTurnId;
+  return localSendPending ? null : durableTurnId;
+}
+
 export function resolveLangyStopTarget({
   projectId,
   conversationId,
@@ -45,7 +64,7 @@ export function resolveLangyStopTarget({
   // A send this tab made but the server has not answered is newer than the durable id, and its
   // turn has no id here. The durable id may then name a turn that already ended, so it is not
   // offered: the caller keeps the stop and sends it when the ids land (`stopPending`).
-  const turnId = ownsLiveTurn ? localTurnId : localSendPending ? null : durableTurnId;
+  const turnId = resolveTurnId({ ownsLiveTurn, localTurnId, localSendPending, durableTurnId });
   if (!turnId) {
     return { kind: "unavailable", reason: "turn-not-identified" };
   }

@@ -1,3 +1,4 @@
+import type { TimeInput } from "@langwatch/time";
 import { Badge, Box, Button, HStack, SimpleGrid, Table, Text, VStack } from "@chakra-ui/react";
 import { Copy, Download } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -75,7 +76,7 @@ export default function BugReportsView() {
 
 interface BugReportRow {
   id: string;
-  createdAt: string | Date;
+  createdAt: TimeInput;
   source: string;
   kind: string;
   title: string;
@@ -155,6 +156,12 @@ function BugReportsTable({
   );
 }
 
+/** How an attached session transcript reads in the fact grid. */
+function describeTranscript(report: { sessionData: string | null; sessionTruncated: boolean }) {
+  if (!report.sessionData) return "none";
+  return report.sessionTruncated ? "attached, truncated" : "attached";
+}
+
 function BugReportDrawer({ reportId, onClose }: { reportId: string | null; onClose: () => void }) {
   const toaster = useOpsToaster();
   const report = api.bugReports.getById.useQuery(
@@ -210,13 +217,7 @@ function BugReportDrawer({ reportId, onClose }: { reportId: string | null; onClo
                 <Fact label="CLI version">{report.data.cliVersion ?? "unknown"}</Fact>
                 <Fact label="Project">{report.data.linkedProjectId ?? "not linked"}</Fact>
                 <Fact label="Contact">{report.data.contactEmail ?? "none"}</Fact>
-                <Fact label="Transcript">
-                  {report.data.sessionData
-                    ? report.data.sessionTruncated
-                      ? "attached, truncated"
-                      : "attached"
-                    : "none"}
-                </Fact>
+                <Fact label="Transcript">{describeTranscript(report.data)}</Fact>
               </SimpleGrid>
 
               {report.data.summary && (

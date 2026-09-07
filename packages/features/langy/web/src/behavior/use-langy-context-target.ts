@@ -91,7 +91,8 @@ export function useLangyContextTarget(
   );
 
   useEffect(() => {
-    if (!isActive || !id || !kind || !label) return;
+    const registrable = isActive && id && kind && label;
+    if (!registrable) return;
     register({ id, kind, label, ref: chipRef });
     return () => unregister(id);
   }, [isActive, id, kind, label, chipRef, register, unregister]);

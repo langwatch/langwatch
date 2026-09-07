@@ -2,12 +2,17 @@
  * Trace-sample card (`langwatch.trace.search`).
  */
 
+import { readableDate } from "../../../../../model/langy-row-format.ts";
 import { Button, Text } from "@chakra-ui/react";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { traceContextChip } from "../../../../../behavior/langy-context-chips.ts";
-import { collectionOf, textValue, totalOf } from "../../../../../model/langy-cli-result-document.ts";
+import {
+  collectionOf,
+  textValue,
+  totalOf,
+} from "../../../../../model/langy-cli-result-document.ts";
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
@@ -297,7 +302,7 @@ function metaLine(trace: SampledTrace): string {
 }
 
 function formatWhen(startedAt: number): string {
-  return new Date(startedAt).toLocaleString(undefined, {
+  return readableDate(startedAt).toLocaleString(undefined, {
     day: "numeric",
     month: "short",
     hour: "2-digit",

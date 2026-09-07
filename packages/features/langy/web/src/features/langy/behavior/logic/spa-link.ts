@@ -29,14 +29,9 @@ export function useSpaLinkClick(href: string): (event: MouseEvent<HTMLAnchorElem
   const router = useRouter();
   return (event) => {
     if (!isInternalHref(href)) return;
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey
-    ) {
+    const opensElsewhere = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+    const notAPlainLeftClick = event.defaultPrevented || event.button !== 0;
+    if (notAPlainLeftClick || opensElsewhere) {
       return;
     }
     event.preventDefault();

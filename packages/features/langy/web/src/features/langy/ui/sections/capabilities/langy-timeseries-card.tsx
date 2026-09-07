@@ -112,7 +112,8 @@ function percentChange(value: number, baseline: number): number | null {
   // Dividing by a zero baseline yields Infinity, which renders as "∞%" and
   // means nothing — "up from nothing" is the honest reading, and the two raw
   // figures beside it already say that.
-  if (!Number.isFinite(value) || !Number.isFinite(baseline) || baseline === 0) {
+  const comparable = Number.isFinite(value) && Number.isFinite(baseline) && baseline !== 0;
+  if (!comparable) {
     return null;
   }
   return ((value - baseline) / Math.abs(baseline)) * 100;

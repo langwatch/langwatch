@@ -215,7 +215,8 @@ export function isMutatingLangyTool(toolName: string): boolean {
     .toLowerCase()
     .replace(/^tool-/, "");
   if (MUTATING_TOOL_NAMES.has(name)) return true;
-  if (name.includes("github") || name.includes("pull_request")) return true;
+  const touchesGithub = name.includes("github") || name.includes("pull_request");
+  if (touchesGithub) return true;
   return MUTATING_TOOL_PREFIXES.some((prefix) => name.startsWith(prefix));
 }
 

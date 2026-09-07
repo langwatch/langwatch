@@ -1,6 +1,6 @@
 import { Badge, Card, HStack, Status, Table, Text } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
-import { formatDuration } from "../../../../model/ops-formatters.ts";
+import { formatDuration, readableDate } from "../../../../model/ops-formatters.ts";
 import { replayStateColor } from "../elements/replay-state-badge.tsx";
 import type { ReplayHistoryEntry } from "@langwatch/ops-contract";
 import { api } from "../../../../behavior/ops-api.ts";
@@ -85,7 +85,7 @@ export function ReplayHistoryTable() {
                     <Table.Cell>
                       <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap">
                         {run.startedAt
-                          ? new Date(run.startedAt).toLocaleString([], {
+                          ? readableDate(run.startedAt).toLocaleString([], {
                               month: "short",
                               day: "numeric",
                               hour: "2-digit",

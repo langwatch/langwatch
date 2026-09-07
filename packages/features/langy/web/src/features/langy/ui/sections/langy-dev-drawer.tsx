@@ -2,6 +2,7 @@
  * Developer mode's inspector — a drawer that slides out of the LEFT edge of the Langy
  * panel.
  */
+import { readableDate } from "../../../../model/langy-row-format.ts";
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Eraser, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -340,7 +341,7 @@ function TimeScrubber({
         <Text textStyle="2xs" color="fg.subtle" css={MONO} flexShrink={0}>
           {live
             ? `${records.length} entries`
-            : `@ ${at ? new Date(at.atMs).toLocaleTimeString() : "start"} · ${visibleRecords.length}/${records.length}`}
+            : `@ ${at ? readableDate(at.atMs).toLocaleTimeString() : "start"} · ${visibleRecords.length}/${records.length}`}
         </Text>
         <Text
           textStyle="2xs"
@@ -629,20 +630,43 @@ function EphemeralTab({ records, live }: { records: LangyDevLogRecord[]; live: b
   );
 }
 
+type StreamEntry = Extract<LangyDevLogRecord, { lane: "stream" }>["entry"];
+
+/** One scannable line per signal, so the list reads without expanding every row. */
+function summariseEntry(entry: StreamEntry): string {
+  if (entry.type === "status") return entry.status || "(cleared)";
+  if (entry.type === "error") return entry.error;
+  if (entry.type === "reasoning") return entry.text;
+  if (entry.type === "progress") return entry.message ?? "";
+  return "";
+}
+
+/** The tint a tool call's name carries: failed, still running, or finished. */
+function callTint({ isError, running }: { isError: boolean; running: boolean }) {
+  if (isError) return "red.fg";
+  return running ? "fg.muted" : "orange.fg";
+}
+
+/** What a tool call ended in, or how long it has been running. */
+function callOutcome({
+  isError,
+  running,
+  durationMs,
+}: {
+  isError: boolean;
+  running: boolean;
+  durationMs: number | undefined;
+}): string {
+  if (isError) return "error";
+  if (running) return "running\u2026";
+  return `${durationMs?.toLocaleString() ?? "?"}ms`;
+}
+
 function SignalRow({ record }: { record: Extract<LangyDevLogRecord, { lane: "stream" }> }) {
   const [open, setOpen] = useState(false);
   const { entry } = record;
   // One scannable line, so the list reads without expanding every row.
-  const summary =
-    entry.type === "status"
-      ? entry.status || "(cleared)"
-      : entry.type === "error"
-        ? entry.error
-        : entry.type === "reasoning"
-          ? entry.text
-          : entry.type === "progress"
-            ? (entry.message ?? "")
-            : "";
+  const summary = summariseEntry(entry);
 
   return (
     <Box>
@@ -759,7 +783,7 @@ function EventRow({ call }: { call: DevToolCall }) {
         <Text
           textStyle="2xs"
           fontWeight="600"
-          color={call.isError ? "red.fg" : running ? "fg.muted" : "orange.fg"}
+          color={callTint({ isError: call.isError, running })}
           flex={1}
           minWidth={0}
           whiteSpace="nowrap"
@@ -770,11 +794,7 @@ function EventRow({ call }: { call: DevToolCall }) {
           {call.name}
         </Text>
         <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
-          {call.isError
-            ? "error"
-            : running
-              ? "running…"
-              : `${call.durationMs?.toLocaleString() ?? "?"}ms`}
+          {callOutcome({ isError: call.isError, running, durationMs: call.durationMs })}
         </Text>
       </chakra.button>
 

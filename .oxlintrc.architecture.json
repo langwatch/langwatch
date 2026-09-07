@@ -20,6 +20,7 @@
     "langwatch/comment-block-size": "error",
     "langwatch/comment-block-size-warning": "warn",
     "langwatch/conditional-type-depth": "error",
+    "langwatch/zod-object-composition": "error",
     "langwatch/fallible-result-naming": "error",
     "langwatch/feature-source-filename": "error",
     "langwatch/feature-source-layout": "error",

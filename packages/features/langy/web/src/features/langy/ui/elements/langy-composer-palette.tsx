@@ -71,6 +71,17 @@ interface PaletteItem {
   searchText: string;
 }
 
+/** The value prefixes a palette row can carry, in the order they are stripped. */
+const SPOTLIGHT_PREFIXES = ["chip:", "target:"] as const;
+
+/** The mark each palette group carries beside its rows. */
+function PaletteGroupIcon({ group }: { group: PaletteGroup }) {
+  if (group === "Commands") return <Cpu size={13} />;
+  if (group === "On this page") return <Plus size={13} />;
+  if (group === "Context") return <Waypoints size={13} />;
+  return <Sparkles size={13} />;
+}
+
 /** Where a skill lands in the list, by where its ability comes from. */
 function groupForSkill(skill: LangySkill): PaletteGroup {
   if (skill.source === "recipe") return "Recipes";
@@ -147,12 +158,12 @@ export function LangyComposerPalette({
   // the user to match a label against nine of them. Cleared on the way out, so
   // a dismissed palette never leaves the page glowing.
   useEffect(() => () => setSpotlight(null), [setSpotlight]);
-  const spotlightFor = (value: string) =>
-    value.startsWith("chip:")
-      ? value.slice("chip:".length)
-      : value.startsWith("target:")
-        ? value.slice("target:".length)
-        : null;
+  const spotlightFor = (value: string) => {
+    for (const prefix of SPOTLIGHT_PREFIXES) {
+      if (value.startsWith(prefix)) return value.slice(prefix.length);
+    }
+    return null;
+  };
 
   const items = useMemo(() => {
     const pageTargets = Object.values(registeredTargets).filter(
@@ -332,15 +343,7 @@ export function LangyComposerPalette({
                           placeItems="center"
                           paddingTop="1px"
                         >
-                          {item.group === "Commands" ? (
-                            <Cpu size={13} />
-                          ) : item.group === "On this page" ? (
-                            <Plus size={13} />
-                          ) : item.group === "Context" ? (
-                            <Waypoints size={13} />
-                          ) : (
-                            <Sparkles size={13} />
-                          )}
+                          <PaletteGroupIcon group={item.group} />
                         </Box>
                         <VStack align="start" gap={0} flex={1} minWidth={0}>
                           <Combobox.ItemText css={{ width: "100%" }}>

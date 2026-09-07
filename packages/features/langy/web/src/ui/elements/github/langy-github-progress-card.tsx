@@ -38,6 +38,26 @@ const SETTLED_LABELS: { stage: GithubProgressStage; label: string }[] = [
   { stage: "cloning", label: "Cloned" },
 ];
 
+/**
+ * The one mono line the card shows: the pull request once opened, the furthest
+ * step reached once the turn ended, else what it is working on right now.
+ */
+function progressLabel({
+  opened,
+  live,
+  reached,
+  latest,
+}: {
+  opened: boolean;
+  live: boolean;
+  reached: Set<GithubProgressStage>;
+  latest: string | undefined;
+}): string {
+  if (opened) return "Opened";
+  if (!live) return SETTLED_LABELS.find((entry) => reached.has(entry.stage))?.label ?? "Finished";
+  return latest ? `Working on it \u00b7 ${latest}` : "Working on it";
+}
+
 export function LangyGitHubProgressCard({
   events,
   live = false,
@@ -54,13 +74,7 @@ export function LangyGitHubProgressCard({
   const prUrl = events.find((event) => event.stage === "opened")?.url;
   // Single mono label line, e.g. "WORKING ON IT · PUSHING BRANCH…" while the
   // turn runs, and the furthest step reached once it has ended.
-  const label = opened
-    ? "Opened"
-    : !live
-      ? (SETTLED_LABELS.find((entry) => reached.has(entry.stage))?.label ?? "Finished")
-      : latest
-        ? `Working on it · ${latest}`
-        : "Working on it";
+  const label = progressLabel({ opened, live, reached, latest });
 
   return (
     <Box

@@ -46,7 +46,7 @@ export function PipelineTreeNode({
         opacity={paused ? 0.6 : 1}
       >
         <Box width="14px" flexShrink={0}>
-          {hasChildren ? isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} /> : null}
+          {hasChildren && (isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />)}
         </Box>
 
         <Text
@@ -85,7 +85,7 @@ export function PipelineTreeNode({
 
         {hasAccess && (
           <Box flexShrink={0} onClick={(e) => e.stopPropagation()}>
-            {directlyPaused ? (
+            {directlyPaused && (
               <Button
                 variant="ghost"
                 size="2xs"
@@ -94,7 +94,8 @@ export function PipelineTreeNode({
               >
                 <Play size={10} />
               </Button>
-            ) : !paused ? (
+            )}
+            {!directlyPaused && !paused && (
               <Button
                 variant="ghost"
                 size="2xs"
@@ -103,7 +104,7 @@ export function PipelineTreeNode({
               >
                 <Pause size={10} />
               </Button>
-            ) : null}
+            )}
           </Box>
         )}
       </HStack>

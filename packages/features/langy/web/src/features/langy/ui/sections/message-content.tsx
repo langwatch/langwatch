@@ -82,6 +82,30 @@ export type ProposalHandlers = Record<
   (payload: Record<string, unknown>) => Promise<AppliedOutcome>
 >;
 
+/** Why the feedback prompt is on screen, as the origin it reports. */
+function feedbackOrigin({
+  requested,
+  shouldAskFeedback,
+}: {
+  requested: boolean;
+  shouldAskFeedback: boolean;
+}) {
+  if (requested) return "directive";
+  return shouldAskFeedback ? "asked" : "requested";
+}
+
+/** What the proposal's primary button says, before and during the action. */
+function proposalActionLabel({
+  isApplying,
+  destructive,
+}: {
+  isApplying: boolean;
+  destructive: boolean;
+}) {
+  if (isApplying) return destructive ? "Deleting\u2026" : "Applying\u2026";
+  return destructive ? "Delete" : "Apply";
+}
+
 function MessageContentImpl({
   message,
   organizationId,
@@ -291,6 +315,15 @@ function MessageContentImpl({
   // reading "No content" under a card the reader can see is worse than saying
   // nothing.
   const hasBlocks = !isPlainText && hasLangyBlockParts(message.parts);
+  // WHEN to ask is the backend's `shouldAskFeedback`, the agent's own directive,
+  // or /feedback. `showFeedback` is only the position + settled gate.
+  const feedbackWasAskedFor =
+    isFeedbackPinned ||
+    feedbackDirective.requested ||
+    (shouldAskFeedback && isSubstantiveLangyAnswer(displayText));
+  const showsFeedbackPrompt = Boolean(
+    showFeedback && !isStreaming && displayText && feedbackWasAskedFor,
+  );
   const hasContent = Boolean(
     displayText ||
     hasBlocks ||
@@ -504,19 +537,15 @@ function MessageContentImpl({
             Interrupted
           </Text>
         ) : null}
-        {showFeedback &&
-        !isStreaming &&
-        displayText &&
-        (isFeedbackPinned ||
-          feedbackDirective.requested ||
-          (shouldAskFeedback && isSubstantiveLangyAnswer(displayText))) ? (
+        {showsFeedbackPrompt ? (
           <LangyFeedback
             conversationId={conversationId ?? undefined}
             messageId={message.id}
             sentiment={feedbackDirective.sentiment}
-            origin={
-              feedbackDirective.requested ? "directive" : shouldAskFeedback ? "asked" : "requested"
-            }
+            origin={feedbackOrigin({
+              requested: feedbackDirective.requested,
+              shouldAskFeedback,
+            })}
           />
         ) : null}
       </VStack>
@@ -660,15 +689,16 @@ function AnswerSegment({
           pullRequestLinks={context.pullRequestLinks}
         />
       );
-    case "card":
+    case "card": {
+      const card = segment.part.card;
       return (
         <LangyCardBoundary scope="this derived card">
           <LangyDerivedCardView
-            card={segment.part.card}
+            card={card}
             hints={segment.part.hints}
             projectSlug={context.projectSlug}
             choicesLockState={
-              segment.part.card.kind === "choices"
+              card.kind === "choices"
                 ? deriveLangyChoicesLockState({
                     blockId: segment.part.blockId,
                     timeline: context.choicesTimeline ?? [],
@@ -680,6 +710,7 @@ function AnswerSegment({
           />
         </LangyCardBoundary>
       );
+    }
     case "failed":
       return (
         <LangyCardBoundary scope="this card">
@@ -881,13 +912,7 @@ export function ProposalCard({
             {!destructive && <LangyMeshLayer borderRadius="md" active={isApplying} />}
             <Box position="relative" zIndex={1} display="flex" alignItems="center" gap={1.5}>
               <Check size={12} />
-              {isApplying
-                ? destructive
-                  ? "Deleting…"
-                  : "Applying…"
-                : destructive
-                  ? "Delete"
-                  : "Apply"}
+              {proposalActionLabel({ isApplying, destructive })}
             </Box>
           </chakra.button>
           <Button size="xs" variant="outline" onClick={onDiscard} disabled={isApplying}>
@@ -897,19 +922,20 @@ export function ProposalCard({
       )}
       {isApplied && hasOpen && (
         <HStack paddingTop={2.5}>
-          {onOpen ? (
+          {onOpen && (
             <Button size="xs" variant="outline" colorPalette="green" onClick={triggerOpen}>
               {openLabel}
               <ArrowRight size={12} />
             </Button>
-          ) : openHref ? (
+          )}
+          {!onOpen && openHref && (
             <Button size="xs" variant="outline" colorPalette="green" asChild>
               <a href={openHref} onClick={onOpenHrefClick}>
                 {openLabel}
                 <ArrowRight size={12} />
               </a>
             </Button>
-          ) : null}
+          )}
         </HStack>
       )}
     </Box>

@@ -61,7 +61,10 @@ export function readJobKind(data: Record<string, unknown> | null): JobKindInfo {
 export function jobMatchesFilter(job: JobEntry, filter: string): boolean {
   const needle = filter.trim().toLowerCase();
   if (!needle) return true;
-  if (job.jobId.toLowerCase().includes(needle)) return true;
-  if (job.data && JSON.stringify(job.data).toLowerCase().includes(needle)) return true;
-  return job.envelope?.blobId?.toLowerCase().includes(needle) ?? false;
+  const jobId = job.jobId.toLowerCase();
+  if (jobId.includes(needle)) return true;
+  const payload = job.data === undefined ? "" : JSON.stringify(job.data).toLowerCase();
+  if (payload.includes(needle)) return true;
+  const blobId = job.envelope?.blobId?.toLowerCase();
+  return blobId?.includes(needle) ?? false;
 }

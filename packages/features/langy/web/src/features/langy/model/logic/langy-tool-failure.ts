@@ -85,17 +85,23 @@ function readStructuredError(errorText: unknown): CliHandledError | null {
   return readCliErrorDocument(errorText);
 }
 
+/** The text a frame carried: the string itself, its `text` field, or the whole record. */
+function readFailureText({
+  errorText,
+  value,
+}: {
+  errorText: unknown;
+  value: RecordValue | null;
+}): string | undefined {
+  if (typeof errorText === "string") return errorText;
+  if (typeof value?.text === "string") return value.text;
+  return value ? safeStringify(value) : undefined;
+}
+
 /** Everything a frame gave us, as text, with terminal escapes stripped. */
 function rawFailureText(errorText: unknown): string | undefined {
   const value = asRecord(errorText);
-  const text =
-    typeof errorText === "string"
-      ? errorText
-      : typeof value?.text === "string"
-        ? value.text
-        : value
-          ? safeStringify(value)
-          : undefined;
+  const text = readFailureText({ errorText, value });
   if (!text) return undefined;
   const cleaned = text.replace(/\u001b\[[0-9;]*m/g, "").trim();
   return cleaned.length > 0 ? cleaned : undefined;
@@ -177,7 +183,8 @@ function limitLabel(limitType: unknown): string | undefined {
 
 /** The plan allowance behind a failure, or null when it was not one. */
 function readPlanLimit(domain: CliHandledError): LangyToolFailureLimit | null {
-  if (!PLAN_LIMIT_CODES.has(normalizedCode(domain))) return null;
+  const code = normalizedCode(domain);
+  if (!PLAN_LIMIT_CODES.has(code)) return null;
   const label = limitLabel(domain.meta.limitType);
   if (!label) return null;
   return {

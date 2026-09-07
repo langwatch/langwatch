@@ -101,6 +101,12 @@ export const AWAITING_ANSWER_TERMINAL_PLACEHOLDER = LANGY_ANSWER_HERE_OR_TERMINA
 // so it is not gated on the layout the way the tagline below it is.
 const COMPOSER_DATA_USE_NOTICE = "Note: these chats are used by LangWatch to improve Langy.";
 
+/** The gutter under the composer card: none on the hero, tighter when floating. */
+function composerGutter({ hero, floating }: { hero: boolean; floating: boolean }) {
+  if (hero) return 0;
+  return floating ? 2 : 3.5;
+}
+
 /**
  * The composer rail — affordances that sit beside the model picker.
  */
@@ -164,6 +170,7 @@ function ComposerImpl({
 }) {
   const floating = variant === "floating";
   const hero = variant === "hero";
+  const composerPaddingBottom = composerGutter({ hero, floating });
   const reduceMotion = useReducedMotion();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // The draft subscription lives in ComposerInputRow, NOT here.
@@ -236,7 +243,7 @@ function ComposerImpl({
       // read as tighter or more squashed than the floating one.
       paddingX={hero ? 0 : 3.5}
       paddingTop={hero ? 0 : 3}
-      paddingBottom={hero ? 0 : floating ? 2 : 3.5}
+      paddingBottom={composerPaddingBottom}
       // Transparent in BOTH layouts: the footer is a sibling BELOW the scroller
       // (its content can't bleed past it), so a solid backing bought nothing and
       // only painted a grey box around the card. Transparent lets the panel

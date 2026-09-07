@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -108,6 +109,25 @@ function normaliseProgress(progress: number): number {
 }
 
 /**
+ * The running rate: a fresh sample is blended into the previous one while the
+ * same operation continues, and a new operation starts from the sample alone.
+ */
+function blendRate({
+  observedRate,
+  sameOperation,
+  previousRate,
+}: {
+  observedRate: number;
+  sameOperation: boolean;
+  previousRate: number;
+}): number {
+  if (observedRate <= 0) return sameOperation ? previousRate : 0;
+  const carriesForward = sameOperation && previousRate > 0;
+  if (!carriesForward) return observedRate;
+  return previousRate * (1 - RATE_NEW_SAMPLE_WEIGHT) + observedRate * RATE_NEW_SAMPLE_WEIGHT;
+}
+
+/**
  * Smooth a measured X/Y stream between real samples.
  */
 export function useProjectedProgress({
@@ -142,15 +162,11 @@ export function useProjectedProgress({
     const sameOperation = previous.total === sample.total && sample.current >= previous.current;
     const observedRate =
       sample.batchItems && sample.batchDurationMs ? sample.batchItems / sample.batchDurationMs : 0;
-    const itemsPerMs =
-      observedRate > 0
-        ? sameOperation && previous.itemsPerMs > 0
-          ? previous.itemsPerMs * (1 - RATE_NEW_SAMPLE_WEIGHT) +
-            observedRate * RATE_NEW_SAMPLE_WEIGHT
-          : observedRate
-        : sameOperation
-          ? previous.itemsPerMs
-          : 0;
+    const itemsPerMs = blendRate({
+      observedRate,
+      sameOperation,
+      previousRate: previous.itemsPerMs,
+    });
 
     estimate.current = {
       current: sample.current,
@@ -170,7 +186,7 @@ export function useProjectedProgress({
     const tick = () => {
       const observation = estimate.current;
       if (observation.total <= 0 || observation.itemsPerMs <= 0) return;
-      const elapsedMs = Math.max(0, Date.now() - observation.receivedAtMs);
+      const elapsedMs = Math.max(0, nowInstant().epochMilliseconds - observation.receivedAtMs);
       const projectedItems = observation.current + elapsedMs * observation.itemsPerMs;
       const projectedPercent = Math.min(
         MAX_UNCONFIRMED_PERCENT,

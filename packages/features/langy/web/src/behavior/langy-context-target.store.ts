@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { create } from "zustand";
 import { type LangyContextChip, useLangyStore } from "./langy.store.ts";
 
@@ -23,14 +24,13 @@ export function readDraggedTarget(transfer: DataTransfer | null): LangyContextTa
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      typeof (parsed as LangyContextTarget).id === "string" &&
-      typeof (parsed as LangyContextTarget).label === "string"
-    ) {
-      return parsed as LangyContextTarget;
-    }
+    const candidate = parsed as LangyContextTarget | null;
+    const isTarget =
+      typeof candidate === "object" &&
+      candidate !== null &&
+      typeof candidate.id === "string" &&
+      typeof candidate.label === "string";
+    if (isTarget) return candidate;
   } catch {
     // Another app's drag that happens to claim our MIME. Not ours; ignore it.
   }
@@ -224,7 +224,7 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()((set
       // mounting on the page it navigated to. Light each one up as it
       // arrives (capped), and let the shared timer close the burst.
       const pending = state.pendingReveal;
-      if (pending && Date.now() - pending.requestedAt > PENDING_REVEAL_TTL_MS) {
+      if (pending && nowInstant().epochMilliseconds - pending.requestedAt > PENDING_REVEAL_TTL_MS) {
         return { targets, pendingReveal: null };
       }
       if (pending && pending.kind === target.kind && state.revealedIds.size < REVEAL_MAX_TARGETS) {
@@ -270,7 +270,7 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()((set
       }
       // Nothing of that kind here — hold the ask for the page being
       // navigated to, where `register` will answer it.
-      return { pendingReveal: { kind, requestedAt: Date.now() } };
+      return { pendingReveal: { kind, requestedAt: nowInstant().epochMilliseconds } };
     }),
 
   holdReveal: () => {

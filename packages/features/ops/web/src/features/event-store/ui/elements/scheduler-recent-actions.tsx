@@ -1,3 +1,4 @@
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
@@ -18,7 +19,7 @@ const ACTION_LABELS: Record<string, string> = {
  */
 export function SchedulerRecentActions({
   entries,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   entries: SchedulerAuditEntryView[];
   now?: number;
@@ -33,7 +34,7 @@ export function SchedulerRecentActions({
       {entries.map((entry) => (
         <HStack key={entry.id} gap={2} paddingY={0.5}>
           <Text textStyle="xs" color="fg.muted" minWidth="60px">
-            {formatTimeAgo(new Date(entry.at).getTime(), now)}
+            {formatTimeAgo(toEpochMs(entry.at), now)}
           </Text>
           <Text textStyle="xs">
             {entry.actor ?? "An operator"} {ACTION_LABELS[entry.action] ?? entry.action}{" "}

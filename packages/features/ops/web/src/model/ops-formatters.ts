@@ -1,4 +1,11 @@
-export function formatTimeAgo(ms: number | null, now = Date.now()): string {
+import { nowInstant, Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
+
+/** The moment a screen prints, as the `Date` the Intl formatters take. */
+export function readableDate(value: TimeInput) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
+}
+
+export function formatTimeAgo(ms: number | null, now = nowInstant().epochMilliseconds): string {
   if (ms === null) return "—";
   const diff = now - ms;
   const absDiff = Math.abs(diff);
@@ -45,8 +52,8 @@ export function formatMs(ms: number): string {
  * When `completedAt` is null/undefined, computes elapsed from `startedAt` to now.
  */
 export function formatDuration(startedAt: string, completedAt?: string | null): string {
-  const end = completedAt ? new Date(completedAt).getTime() : Date.now();
-  return formatDurationMs(end - new Date(startedAt).getTime());
+  const end = completedAt ? toEpochMs(completedAt) : nowInstant().epochMilliseconds;
+  return formatDurationMs(end - toEpochMs(startedAt));
 }
 
 /**

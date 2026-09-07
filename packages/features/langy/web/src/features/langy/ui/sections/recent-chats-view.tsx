@@ -1,6 +1,8 @@
 /**
  * Langy's conversation history, as a FULL VIEW inside the panel.
  */
+import { nowInstant, startOfDay } from "@langwatch/time";
+import { readableDate } from "../../../../model/langy-row-format.ts";
 import {
   Box,
   Button,
@@ -49,12 +51,10 @@ const DAY_MS = 24 * 60 * 60 * 1_000;
  * as `formatLangyConversationDate`, coarser buckets: rows sort newest-first, so equal
  * buckets are always contiguous and each one can carry a single header.
  */
-function chatGroupFor(timestampMs: number, nowMs = Date.now()): ChatGroup {
+function chatGroupFor(timestampMs: number, nowMs = nowInstant().epochMilliseconds): ChatGroup {
   if (!Number.isFinite(timestampMs) || timestampMs <= 0) return "Older";
-  const date = new Date(timestampMs);
-  const now = new Date(nowMs);
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const startOfToday = startOfDay(nowMs).getTime();
+  const startOfDate = startOfDay(timestampMs).getTime();
   const dayDifference = Math.round((startOfToday - startOfDate) / DAY_MS);
   if (dayDifference <= 0) return "Today";
   if (dayDifference === 1) return "Yesterday";
@@ -310,7 +310,7 @@ export function RecentChatsView({
         )}
       />
 
-      {history.hasNextPage ? (
+      {history.hasNextPage && (
         <Box paddingX={pad} paddingY={2}>
           <Button
             width="full"
@@ -324,11 +324,12 @@ export function RecentChatsView({
             {history.isFetchingNextPage ? <Spinner size="xs" /> : "Load older chats"}
           </Button>
         </Box>
-      ) : history.isFetchingNextPage ? (
+      )}
+      {!history.hasNextPage && history.isFetchingNextPage && (
         <HStack justify="center" paddingY={2} aria-label="Loading older conversations">
           <Spinner size="xs" />
         </HStack>
-      ) : null}
+      )}
     </VStack>
   );
 }
@@ -561,7 +562,7 @@ const ChatRow = memo(function ChatRow({
                   <chakra.time
                     dateTime={
                       item.lastActivityAtMs > 0
-                        ? new Date(item.lastActivityAtMs).toISOString()
+                        ? readableDate(item.lastActivityAtMs).toISOString()
                         : undefined
                     }
                     textStyle="2xs"

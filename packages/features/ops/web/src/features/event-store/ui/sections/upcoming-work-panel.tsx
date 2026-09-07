@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { api } from "../../../../behavior/ops-api.ts";
 import { UpcomingWorkCard as UpcomingWorkCardView } from "../elements/upcoming-work-card.tsx";
 
@@ -8,7 +9,9 @@ export function UpcomingWorkCard() {
     { refetchInterval: 30_000 },
   );
   const wakesQuery = api.ops.listUpcomingWakes.useQuery({ limit: 50 }, { refetchInterval: 30_000 });
-  const now = Math.max(schedulesQuery.dataUpdatedAt, wakesQuery.dataUpdatedAt) || Date.now();
+  const now =
+    Math.max(schedulesQuery.dataUpdatedAt, wakesQuery.dataUpdatedAt) ||
+    nowInstant().epochMilliseconds;
 
   return (
     <UpcomingWorkCardView

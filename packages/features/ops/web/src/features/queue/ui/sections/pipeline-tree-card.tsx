@@ -118,19 +118,21 @@ export function PipelineTreeCard({
           )}
         </HStack>
 
-        {pipelineTree.length === 0 ? (
+        {pipelineTree.length === 0 && (
           <Box padding={4}>
             <Text textStyle="xs" color="fg.muted">
               No pipelines discovered yet.
             </Text>
           </Box>
-        ) : filteredTree === null ? (
+        )}
+        {pipelineTree.length > 0 && filteredTree === null && (
           <Box padding={4}>
             <Text textStyle="xs" color="fg.muted">
               No pipelines match &quot;{filter}&quot;
             </Text>
           </Box>
-        ) : (
+        )}
+        {pipelineTree.length > 0 && filteredTree !== null && (
           <>
             {filteredTree.map((node) => (
               <Box

@@ -34,7 +34,8 @@ function statusFromPayload(output: unknown): string | null {
  */
 function verdictFromText(output: unknown): string | null {
   const text = extractToolText(output).trim();
-  if (!text || isSerializedDocumentLine(text.split("\n")[0]!.trim())) {
+  const firstLine = text.split("\n")[0]!.trim();
+  if (!text || isSerializedDocumentLine(firstLine)) {
     return null;
   }
   const verdict = text.match(/\b(passed|failed|success|error|running|pending|completed)\b/i);

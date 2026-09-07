@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { formatTimeAgo } from "../../../model/ops-formatters.ts";
 import type { OpsPipelineNode, OpsQueueGroup } from "./queue-presentation.ts";
 import type { StatusFilter } from "./queue-types.ts";
@@ -28,7 +29,8 @@ export function filterTree(nodes: OpsPipelineNode[], query: string): OpsPipeline
   const lower = query.toLowerCase();
 
   function prune(node: OpsPipelineNode): OpsPipelineNode | null {
-    if (node.name.toLowerCase().includes(lower)) return node;
+    const name = node.name.toLowerCase();
+    if (name.includes(lower)) return node;
     const filtered = node.children.map(prune).filter((c): c is OpsPipelineNode => c !== null);
     if (filtered.length > 0) return { ...node, children: filtered };
     return null;
@@ -41,7 +43,7 @@ export function filterTree(nodes: OpsPipelineNode[], query: string): OpsPipeline
 export function isOverdue(ms: number | null): boolean {
   if (ms === null) return false;
   // Consider a group overdue if its oldest job is more than 5 minutes old
-  return Date.now() - ms > 5 * 60 * 1000;
+  return nowInstant().epochMilliseconds - ms > 5 * 60 * 1000;
 }
 
 export type GroupState = "blocked" | "stale" | "retrying" | "active" | "due" | "scheduled" | "idle";
@@ -80,7 +82,10 @@ function hasUnclearedError(g: OpsQueueGroup, attempt: number, now: number): bool
   return g.errorTimestamp !== null && now - g.errorTimestamp < FAILING_ERROR_MAX_AGE_MS;
 }
 
-export function classifyGroup(g: OpsQueueGroup, now = Date.now()): GroupClassification {
+export function classifyGroup(
+  g: OpsQueueGroup,
+  now = nowInstant().epochMilliseconds,
+): GroupClassification {
   const attempt = g.retryCount ?? 0;
   const isFailing = hasUnclearedError(g, attempt, now);
   const deferredUntilMs = g.score > now ? g.score : null;
@@ -114,7 +119,10 @@ const STATE_SEVERITY: Record<GroupState, number> = {
  * Trouble first, then depth. The server orders by pending count alone, which
  * buries one blocked group under two hundred healthy fan-out rows.
  */
-export function sortGroupsBySeverity<T extends OpsQueueGroup>(groups: T[], now = Date.now()): T[] {
+export function sortGroupsBySeverity<T extends OpsQueueGroup>(
+  groups: T[],
+  now = nowInstant().epochMilliseconds,
+): T[] {
   return [...groups].sort((a, b) => {
     const severityDelta =
       STATE_SEVERITY[classifyGroup(a, now).state] - STATE_SEVERITY[classifyGroup(b, now).state];
@@ -125,7 +133,10 @@ export function sortGroupsBySeverity<T extends OpsQueueGroup>(groups: T[], now =
 }
 
 /** The "Next run" cell: when the dispatcher will next touch this group. */
-export function describeNextRun(c: GroupClassification, now = Date.now()): string {
+export function describeNextRun(
+  c: GroupClassification,
+  now = nowInstant().epochMilliseconds,
+): string {
   switch (c.state) {
     case "active":
       return "running";
@@ -148,7 +159,7 @@ export function describeNextRun(c: GroupClassification, now = Date.now()): strin
 export function matchesStatusFilter(
   g: OpsQueueGroup,
   filter: StatusFilter,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 ): boolean {
   if (filter === "all") return true;
   const { state, isFailing } = classifyGroup(g, now);

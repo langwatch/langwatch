@@ -73,6 +73,7 @@
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/ops-web": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",

@@ -26,6 +26,12 @@ export const PHASE_LABELS: Record<string, string> = {
 
 const PHASES = ["discover", "mark", "pause", "drain", "cutoff", "replay", "write", "unmark"];
 
+/** The colour a phase chip carries: the current phase wins over a done one. */
+function phaseTint({ isCurrent, isDone }: { isCurrent: boolean; isDone: boolean }) {
+  if (isCurrent) return "orange";
+  return isDone ? "green" : null;
+}
+
 export function PhaseTimeline({
   currentPhase,
   completedState,
@@ -41,6 +47,7 @@ export function PhaseTimeline({
         const isDone = completedState === "completed" || i < currentIdx;
         const isCurrent = !completedState && i === currentIdx;
         const icon = PHASE_ICONS[phase] ?? "·";
+        const tint = phaseTint({ isCurrent, isDone });
 
         return (
           <HStack
@@ -49,14 +56,14 @@ export function PhaseTimeline({
             paddingX={1.5}
             paddingY={0.5}
             borderRadius="sm"
-            bg={isCurrent ? "orange.subtle" : isDone ? "green.subtle" : "bg.muted"}
+            bg={tint ? `${tint}.subtle` : "bg.muted"}
             opacity={isDone || isCurrent ? 1 : 0.4}
           >
             <Text textStyle="xs">{icon}</Text>
             <Text
               textStyle="xs"
               fontWeight={isCurrent ? "semibold" : "normal"}
-              color={isCurrent ? "orange.fg" : isDone ? "green.fg" : "fg.muted"}
+              color={tint ? `${tint}.fg` : "fg.muted"}
             >
               {phase}
             </Text>

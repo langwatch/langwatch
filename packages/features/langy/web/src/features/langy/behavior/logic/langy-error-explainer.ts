@@ -134,10 +134,12 @@ export function promoteCodexAgentError(domain: LangyDomainError): LangyDomainErr
     }
   };
   walk(domain.reasons);
-  if (flat.some((reason) => reason.kind === "codex_session_expired")) {
+  const sessionExpired = flat.some((reason) => reason.kind === "codex_session_expired");
+  if (sessionExpired) {
     return { ...domain, code: "langy_codex_session_expired" };
   }
-  if (flat.some((reason) => PLAN_LIMIT_REASONS.has(reason.kind))) {
+  const hitPlanLimit = flat.some((reason) => PLAN_LIMIT_REASONS.has(reason.kind));
+  if (hitPlanLimit) {
     return { ...domain, code: "langy_codex_plan_limit" };
   }
   return domain;
@@ -220,6 +222,14 @@ function hasReasonKind(
  * captures the model provider's own error text there and that text is "safe to show".
  */
 
+/** The first of a list of maybe-strings that is a string, or null. */
+function firstString(values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string") return value;
+  }
+  return null;
+}
+
 function parseReasons(value: unknown): LangySerializedReason[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const reasons = value
@@ -268,12 +278,7 @@ export function readLangyStreamError(message: string | undefined | null): LangyD
     reasons?: unknown;
     retryable?: unknown;
   };
-  const code =
-    typeof value.code === "string"
-      ? value.code
-      : typeof value.kind === "string"
-        ? value.kind
-        : null;
+  const code = firstString([value.code, value.kind]);
   if (code === null) return null;
   return {
     code,

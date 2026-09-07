@@ -43,6 +43,28 @@ function optionRowText({
   return { primary: option.label, ...(secondary !== undefined ? { secondary } : {}) };
 }
 
+/** The tint an option's glyph carries: picked, struck out, or plain. */
+function choiceMarkColor({ marked, dead }: { marked: boolean; dead: boolean }) {
+  if (marked) return "purple.fg";
+  return dead ? "fg.subtle" : "fg.muted";
+}
+
+/** The glyph beside an option: struck out, ticked, or an empty box waiting. */
+function ChoiceMark({ dead, marked, multi }: { dead: boolean; marked: boolean; multi: boolean }) {
+  if (dead) return <CircleSlash size={13} />;
+  if (marked) return <Check size={13} />;
+  return (
+    <Box
+      width="11px"
+      height="11px"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.emphasized"
+      borderRadius={multi ? "2px" : "full"}
+    />
+  );
+}
+
 export function LangyChoicesCard({
   card,
   lockState,
@@ -118,6 +140,8 @@ export function LangyChoicesCard({
           const dead = refRow.state === "dead";
           const isChosen = chosen.has(option.id);
           const isPicked = picked.has(option.id);
+          const marked = isChosen || isPicked;
+          const markColor = choiceMarkColor({ marked, dead });
           const selectable = open && !dead;
 
           const { primary, secondary } = optionRowText({ option, refRow });
@@ -142,29 +166,12 @@ export function LangyChoicesCard({
               cursor={selectable ? "pointer" : "default"}
               opacity={dead || (answered && !isChosen) ? 0.55 : 1}
               aria-disabled={!selectable}
-              aria-pressed={isChosen || isPicked}
+              aria-pressed={marked}
               _hover={selectable ? { background: "bg.muted" } : undefined}
               transition="background 120ms ease, border-color 120ms ease"
             >
-              <Box
-                flexShrink={0}
-                color={isChosen || isPicked ? "purple.fg" : dead ? "fg.subtle" : "fg.muted"}
-                display="flex"
-              >
-                {dead ? (
-                  <CircleSlash size={13} />
-                ) : isChosen || isPicked ? (
-                  <Check size={13} />
-                ) : (
-                  <Box
-                    width="11px"
-                    height="11px"
-                    borderWidth="1px"
-                    borderStyle="solid"
-                    borderColor="border.emphasized"
-                    borderRadius={multi ? "2px" : "full"}
-                  />
-                )}
+              <Box flexShrink={0} color={markColor} display="flex">
+                <ChoiceMark dead={dead} marked={marked} multi={multi} />
               </Box>
               <VStack align="stretch" gap={0} flex={1} minWidth={0}>
                 <Text textStyle="xs" color={dead ? "fg.muted" : "fg"} truncate>
@@ -189,61 +196,60 @@ export function LangyChoicesCard({
           </HStack>
         ) : null}
 
-        {open && card.allowOther === true ? (
-          otherOpen ? (
-            <HStack gap={1.5}>
-              <chakra.input
-                autoFocus
-                value={otherText}
-                onChange={(event) => setOtherText(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" || otherText.trim() === "") return;
-                  answer({
-                    blockId: card.blockId,
-                    optionIds: [],
-                    otherText: otherText.trim(),
-                  });
-                }}
-                placeholder="Your own answer…"
-                flex={1}
-                textStyle="xs"
-                paddingX={2}
-                paddingY={1.5}
-                borderWidth="1px"
-                borderStyle="solid"
-                borderColor="border.muted"
-                borderRadius="md"
-                background="transparent"
-                color="fg"
-                _focus={{ borderColor: "purple.emphasized", outline: "none" }}
-              />
-              <Button
-                size="xs"
-                variant="outline"
-                disabled={otherText.trim() === ""}
-                onClick={() =>
-                  answer({
-                    blockId: card.blockId,
-                    optionIds: [],
-                    otherText: otherText.trim(),
-                  })
-                }
-              >
-                Send
-              </Button>
-            </HStack>
-          ) : (
+        {open && card.allowOther === true && otherOpen && (
+          <HStack gap={1.5}>
+            <chakra.input
+              autoFocus
+              value={otherText}
+              onChange={(event) => setOtherText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" || otherText.trim() === "") return;
+                answer({
+                  blockId: card.blockId,
+                  optionIds: [],
+                  otherText: otherText.trim(),
+                });
+              }}
+              placeholder="Your own answer…"
+              flex={1}
+              textStyle="xs"
+              paddingX={2}
+              paddingY={1.5}
+              borderWidth="1px"
+              borderStyle="solid"
+              borderColor="border.muted"
+              borderRadius="md"
+              background="transparent"
+              color="fg"
+              _focus={{ borderColor: "purple.emphasized", outline: "none" }}
+            />
             <Button
               size="xs"
-              variant="ghost"
-              alignSelf="flex-start"
-              color="fg.muted"
-              onClick={() => setOtherOpen(true)}
+              variant="outline"
+              disabled={otherText.trim() === ""}
+              onClick={() =>
+                answer({
+                  blockId: card.blockId,
+                  optionIds: [],
+                  otherText: otherText.trim(),
+                })
+              }
             >
-              Other…
+              Send
             </Button>
-          )
-        ) : null}
+          </HStack>
+        )}
+        {open && card.allowOther === true && !otherOpen && (
+          <Button
+            size="xs"
+            variant="ghost"
+            alignSelf="flex-start"
+            color="fg.muted"
+            onClick={() => setOtherOpen(true)}
+          >
+            Other…
+          </Button>
+        )}
 
         {superseded ? (
           <Text textStyle="2xs" color="fg.subtle" paddingX={2} paddingTop={0.5}>

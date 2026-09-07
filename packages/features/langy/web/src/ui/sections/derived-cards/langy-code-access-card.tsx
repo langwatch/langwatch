@@ -2,6 +2,7 @@
  * The code access card (ADR-129): four states, all read from `langy.getLocalWorkspace` rather
  * than the tool call, which is only where the card hangs, never what it says.
  */
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Box, Button, chakra, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
 import { Check, FolderCode, GitPullRequest } from "lucide-react";
@@ -12,7 +13,10 @@ import { describeError } from "../../../behavior/errors.tsx";
 import { SHARE_CONTROL_COMMAND } from "@langwatch/langy-contract";
 import { api } from "../../../behavior/langy-api.ts";
 
-import { readLocalFolderPick, writeLocalFolderPick } from "../../../model/langy-code-access-pick.ts";
+import {
+  readLocalFolderPick,
+  writeLocalFolderPick,
+} from "../../../model/langy-code-access-pick.ts";
 import { useLangyLocalControlStore } from "../../../behavior/langy-local-control.store.ts";
 import { LangyGitHubConnectCard } from "../../../features/langy/ui/sections/github/langy-git-hub-connect-card.tsx";
 
@@ -181,8 +185,8 @@ function CodeAccessBody({
     return (
       <CardShell>
         <WaitingState
-          expiresAt={request ? Date.parse(request.expiresAt) : null}
-          now={now ?? Date.now}
+          expiresAt={request ? toEpochMs(request.expiresAt) : null}
+          now={now ?? (() => nowInstant().epochMilliseconds)}
           onAskAgain={onAskAgain}
         />
       </CardShell>

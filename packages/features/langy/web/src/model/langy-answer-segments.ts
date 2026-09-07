@@ -109,7 +109,8 @@ export function langyAnswerSegmentsFromText(text: string): LangyAnswerSegment[] 
   let ordinal = 0;
   return fenced.flatMap((segment): LangyAnswerSegment[] => {
     if (segment.type === "text") {
-      return segment.text.trim().length > 0 ? [{ type: "text", text: segment.text }] : [];
+      const hasProse = segment.text.trim().length > 0;
+      return hasProse ? [{ type: "text", text: segment.text }] : [];
     }
     ordinal += 1;
     return [fenceSegment({ raw: segment.raw, ordinal })];

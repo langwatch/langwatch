@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { Box, Button, Flex, Input, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState } from "react";
@@ -6,6 +7,12 @@ import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts"
 import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
 import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
+
+/** The mark each run outcome shows in the log; anything else reads as failed. */
+const LOG_STATUS_ICONS: Record<string, string> = {
+  pending: "⏳",
+  success: "✅",
+};
 
 export function ExecutionControls({ compact = false }: { compact?: boolean }) {
   const {
@@ -34,11 +41,11 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
     });
     try {
       for (let i = 0; i < batchCount; i++) {
-        const logId = `log-${Date.now()}-${i}`;
+        const logId = `log-${nowInstant().epochMilliseconds}-${i}`;
         addLogEntry({
           id: logId,
           traceId: logId,
-          timestamp: Date.now(),
+          timestamp: nowInstant().epochMilliseconds,
           status: "pending",
         });
         try {
@@ -176,9 +183,7 @@ function LogEntry({
         setTimeout(() => setCopied(false), 2000);
       }}
     >
-      <Text flexShrink={0}>
-        {entry.status === "pending" ? "⏳" : entry.status === "success" ? "✅" : "❌"}
-      </Text>
+      <Text flexShrink={0}>{LOG_STATUS_ICONS[entry.status] ?? "❌"}</Text>
       <Text flex={1} truncate fontFamily="mono" color="fg.muted">
         {entry.traceId}
       </Text>

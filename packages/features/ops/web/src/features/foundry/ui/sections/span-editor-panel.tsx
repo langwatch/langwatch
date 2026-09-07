@@ -21,8 +21,16 @@ import {
   SPAN_TYPE_ICONS,
   SPAN_TYPES,
   type SpanConfig,
+  type SpanInputOutput,
   type SpanType,
 } from "../../model/foundry-types.ts";
+
+/** What a span payload reads as in the textarea: text verbatim, anything else as JSON. */
+function spanPayloadText(payload: SpanInputOutput | undefined): string {
+  if (payload === undefined) return "";
+  if (payload.type === "text") return payload.value as string;
+  return JSON.stringify(payload.value, null, 2);
+}
 
 function findSpan(spans: SpanConfig[], id: string): SpanConfig | undefined {
   for (const span of spans) {
@@ -213,13 +221,7 @@ export function SpanEditorPanel() {
             fontSize="xs"
             rows={3}
             placeholder="Span input..."
-            value={
-              span.input?.type === "text"
-                ? (span.input.value as string)
-                : span.input
-                  ? JSON.stringify(span.input.value, null, 2)
-                  : ""
-            }
+            value={spanPayloadText(span.input)}
             onChange={(e) =>
               updateSpan(span.id, {
                 input: e.target.value ? { type: "text", value: e.target.value } : undefined,
@@ -236,13 +238,7 @@ export function SpanEditorPanel() {
             fontSize="xs"
             rows={3}
             placeholder="Span output..."
-            value={
-              span.output?.type === "text"
-                ? (span.output.value as string)
-                : span.output
-                  ? JSON.stringify(span.output.value, null, 2)
-                  : ""
-            }
+            value={spanPayloadText(span.output)}
             onChange={(e) =>
               updateSpan(span.id, {
                 output: e.target.value ? { type: "text", value: e.target.value } : undefined,

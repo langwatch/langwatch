@@ -1,3 +1,4 @@
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import type { Context, Tracer } from "@opentelemetry/api";
 import { context, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import { createFoundryProvider } from "./otel-browser.ts";
@@ -104,7 +105,7 @@ function createFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
   const tracer = provider.getTracer("foundry", "1.0.0");
 
   const emitTrace = (traceConfig: TraceConfig): string => {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     let traceId = "";
     for (const spanConfig of traceConfig.spans) {
       const id = buildSpan(tracer, spanConfig, ROOT_CONTEXT, now, traceConfig, otelDeps);
@@ -147,6 +148,11 @@ function createFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
   };
 }
 
+/** The `Date` the OpenTelemetry span API takes for a moment. */
+function spanTime(epochMs: number) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
+}
+
 function buildSpan(
   tracer: Tracer,
   config: SpanConfig,
@@ -162,7 +168,7 @@ function buildSpan(
   const startTimeMs = baseTime + config.offsetMs;
   const endTimeMs = startTimeMs + config.durationMs;
 
-  const span = tracer.startSpan(config.name, { startTime: new Date(startTimeMs) }, parentContext);
+  const span = tracer.startSpan(config.name, { startTime: spanTime(startTimeMs) }, parentContext);
 
   span.setAttribute("langwatch.span.type", config.type);
   // Foundry-emitted traces are always tagged "sample" so they're trivial to
@@ -189,8 +195,9 @@ function buildSpan(
     if (traceConfig.metadata.customerId) {
       span.setAttribute("langwatch.customer.id", traceConfig.metadata.customerId);
     }
-    if (traceConfig.metadata.labels?.length) {
-      span.setAttribute("langwatch.labels", traceConfig.metadata.labels);
+    const labels = traceConfig.metadata.labels;
+    if (labels?.length) {
+      span.setAttribute("langwatch.labels", labels);
     }
   }
 
@@ -224,7 +231,7 @@ function buildSpan(
         span.addEvent(
           `gen_ai.${msg.role}.message`,
           { role: msg.role, content: msg.content },
-          new Date(startTimeMs),
+          spanTime(startTimeMs),
         );
       }
       const lastAssistant = [...config.llm.messages].reverse().find((m) => m.role === "assistant");
@@ -239,7 +246,7 @@ function buildSpan(
               content: lastAssistant.content,
             }),
           },
-          new Date(endTimeMs),
+          spanTime(endTimeMs),
         );
       }
       span.setAttribute(
@@ -253,26 +260,28 @@ function buildSpan(
         );
       }
     }
-    if (config.llm.metrics) {
-      if (config.llm.metrics.promptTokens !== undefined) {
-        span.setAttribute("gen_ai.usage.input_tokens", config.llm.metrics.promptTokens);
+    const metrics = config.llm.metrics;
+    if (metrics) {
+      if (metrics.promptTokens !== undefined) {
+        span.setAttribute("gen_ai.usage.input_tokens", metrics.promptTokens);
       }
-      if (config.llm.metrics.completionTokens !== undefined) {
-        span.setAttribute("gen_ai.usage.output_tokens", config.llm.metrics.completionTokens);
+      if (metrics.completionTokens !== undefined) {
+        span.setAttribute("gen_ai.usage.output_tokens", metrics.completionTokens);
       }
       span.setAttribute(
         "langwatch.metrics",
         JSON.stringify({
-          prompt_tokens: config.llm.metrics.promptTokens,
-          completion_tokens: config.llm.metrics.completionTokens,
-          cost: config.llm.metrics.cost,
+          prompt_tokens: metrics.promptTokens,
+          completion_tokens: metrics.completionTokens,
+          cost: metrics.cost,
         }),
       );
     }
   }
 
-  if (config.rag?.contexts.length) {
-    span.setAttribute("langwatch.rag.contexts", JSON.stringify(config.rag.contexts));
+  const ragContexts = config.rag?.contexts;
+  if (ragContexts?.length) {
+    span.setAttribute("langwatch.rag.contexts", JSON.stringify(ragContexts));
   }
 
   if (config.prompt) {
@@ -318,7 +327,7 @@ function buildSpan(
       for (const [k, v] of Object.entries(event.attributes)) {
         attrs[k] = typeof v === "string" ? v : JSON.stringify(v);
       }
-      span.addEvent(event.name, attrs, new Date(eventTimeMs));
+      span.addEvent(event.name, attrs, spanTime(eventTimeMs));
     }
   }
 
@@ -346,10 +355,20 @@ function buildSpan(
     buildSpan(tracer, child, childContext, startTimeMs, traceConfig, otel);
   }
 
-  span.end(new Date(endTimeMs));
+  span.end(spanTime(endTimeMs));
 
   return span.spanContext().traceId;
 }
+
+/** The vendor families a model id alone can name, in the order they are tested. */
+const GEN_AI_SYSTEMS: { system: string; prefixes?: string[]; fragments?: string[] }[] = [
+  { system: "openai", prefixes: ["gpt", "o1", "o3"] },
+  { system: "anthropic", fragments: ["claude"] },
+  { system: "vertex_ai", fragments: ["gemini", "palm"] },
+  { system: "mistral_ai", fragments: ["mistral", "mixtral"] },
+  { system: "meta", fragments: ["llama"] },
+  { system: "cohere", prefixes: ["command"], fragments: ["cohere"] },
+];
 
 /**
  * Map a model string to the OTel `gen_ai.system` enum value. Heuristic:
@@ -359,12 +378,11 @@ function buildSpan(
  */
 function inferGenAiSystem(model: string | undefined): string | undefined {
   if (!model) return undefined;
-  const m = model.toLowerCase();
-  if (m.startsWith("gpt") || m.startsWith("o1") || m.startsWith("o3")) return "openai";
-  if (m.includes("claude")) return "anthropic";
-  if (m.includes("gemini") || m.includes("palm")) return "vertex_ai";
-  if (m.includes("mistral") || m.includes("mixtral")) return "mistral_ai";
-  if (m.includes("llama")) return "meta";
-  if (m.includes("cohere") || m.startsWith("command")) return "cohere";
-  return undefined;
+  const id = model.toLowerCase();
+  const family = GEN_AI_SYSTEMS.find(
+    ({ prefixes = [], fragments = [] }) =>
+      prefixes.some((prefix) => id.startsWith(prefix)) ||
+      fragments.some((fragment) => id.includes(fragment)),
+  );
+  return family?.system;
 }

@@ -25,8 +25,16 @@ interface SpanNodeData {
   [key: string]: unknown;
 }
 
+/** The border and fill a span node carries: selection wins over an error. */
+function spanNodeTint({ isSelected, errored }: { isSelected: boolean; errored: boolean }) {
+  if (isSelected) return { border: "orange.400", background: "orange.subtle" };
+  if (errored) return { border: "red.600", background: "red.subtle" };
+  return { border: "border", background: "bg.panel" };
+}
+
 function SpanNode({ data }: { data: SpanNodeData }) {
   const color = SPAN_TYPE_COLORS[data.type as keyof typeof SPAN_TYPE_COLORS] ?? "gray.400";
+  const tint = spanNodeTint({ isSelected: data.isSelected, errored: data.status === "error" });
 
   return (
     <>
@@ -43,10 +51,8 @@ function SpanNode({ data }: { data: SpanNodeData }) {
       <Box
         borderRadius="lg"
         borderWidth="1px"
-        borderColor={
-          data.isSelected ? "orange.400" : data.status === "error" ? "red.600" : "border"
-        }
-        bg={data.isSelected ? "orange.subtle" : data.status === "error" ? "red.subtle" : "bg.panel"}
+        borderColor={tint.border}
+        bg={tint.background}
         paddingX={3}
         paddingY={2}
         minWidth="140px"

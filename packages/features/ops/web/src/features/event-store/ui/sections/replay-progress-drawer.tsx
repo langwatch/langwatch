@@ -1,3 +1,4 @@
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -20,6 +21,13 @@ import { useReplayStatus } from "../../behavior/use-replay-status.ts";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 
+/** The tint each terminal replay state carries; anything running stays blue. */
+const STATE_COLORS: Record<string, string> = {
+  completed: "green",
+  failed: "red",
+  cancelled: "orange",
+};
+
 export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const { hasAccess } = useOpsPermission();
@@ -37,14 +45,7 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
   const activeProjectionNames = parseActiveProjections(status?.currentProjection);
   const activeProjections = new Set(activeProjectionNames);
 
-  const stateColor =
-    status?.state === "completed"
-      ? "green"
-      : status?.state === "failed"
-        ? "red"
-        : status?.state === "cancelled"
-          ? "orange"
-          : "blue";
+  const stateColor = STATE_COLORS[status?.state ?? ""] ?? "blue";
 
   const progressPercent =
     status && status.aggregatesTotal > 0
@@ -53,8 +54,8 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
 
   const throughputRate = useMemo(() => {
     if (!status?.startedAt || !status.eventsProcessed) return null;
-    const end = status.completedAt ? new Date(status.completedAt).getTime() : Date.now();
-    const elapsed = (end - new Date(status.startedAt).getTime()) / 1000;
+    const end = status.completedAt ? toEpochMs(status.completedAt) : nowInstant().epochMilliseconds;
+    const elapsed = (end - toEpochMs(status.startedAt)) / 1000;
     if (elapsed < 1) return null;
     return Math.round(status.eventsProcessed / elapsed);
   }, [status?.startedAt, status?.completedAt, status?.eventsProcessed]);

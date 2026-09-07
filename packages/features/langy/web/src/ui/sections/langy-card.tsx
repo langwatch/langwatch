@@ -99,7 +99,7 @@ export function LangyCard({
   ) : null;
 
   const titleNode =
-    title == null ? null : typeof title === "string" ? (
+    typeof title === "string" ? (
       <Text
         color="fg"
         lineHeight="1.3"
@@ -111,7 +111,7 @@ export function LangyCard({
         {title}
       </Text>
     ) : (
-      title
+      (title ?? null)
     );
 
   const body = (

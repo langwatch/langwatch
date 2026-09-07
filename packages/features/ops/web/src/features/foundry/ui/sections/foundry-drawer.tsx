@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { Box, Button, Flex, Heading, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -46,11 +47,11 @@ export function FoundryDrawer({ onClose }: { onClose: () => void }) {
   async function handleSend() {
     if (running || !apiKey) return;
     setRunning(true);
-    const logId = `log-${Date.now()}`;
+    const logId = `log-${nowInstant().epochMilliseconds}`;
     addLogEntry({
       id: logId,
       traceId: logId,
-      timestamp: Date.now(),
+      timestamp: nowInstant().epochMilliseconds,
       status: "pending",
     });
     const executor = getFoundryExecutor({

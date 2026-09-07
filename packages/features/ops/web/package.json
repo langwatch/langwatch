@@ -43,6 +43,7 @@
     "@langwatch/feature-flag-web": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.221.0",

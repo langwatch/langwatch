@@ -21,6 +21,27 @@ const QUICK_NAME = /(?:^|[-_.])(flash|haiku|instant|lite|mini|nano|small)(?:$|[-
 const QUICK_DESCRIPTION = /\b(fast|faster|low[- ]latency|reduced latency|compact)\b/i;
 const LONG_RUNNING = /\b(deep research|deep-research|research model|long-running)\b/i;
 
+/** Which shelf a model sits on; the first trait that fits wins. */
+function modelGroup({
+  isCustom,
+  isLongRunning,
+  generatesMedia,
+  isQuick,
+  hasReasoning,
+}: {
+  isCustom: boolean;
+  isLongRunning: boolean;
+  generatesMedia: boolean;
+  isQuick: boolean;
+  hasReasoning: boolean;
+}): LangyModelGroup {
+  if (isCustom) return "custom";
+  if (isLongRunning) return "reasoning";
+  if (generatesMedia) return "multimodal";
+  if (isQuick) return "quick";
+  return hasReasoning ? "reasoning" : "balanced";
+}
+
 /**
  * Present registry capabilities as user intent. Speed is deliberately called
  * out only when the model's own name/description signals it; unknown and
@@ -48,17 +69,8 @@ export function profileLangyModel({
     metadata?.supportsAudioOutput,
   );
 
-  const group: LangyModelGroup = isCustom
-    ? "custom"
-    : isLongRunning
-      ? "reasoning"
-      : metadata?.supportsImageOutput || metadata?.supportsAudioOutput
-        ? "multimodal"
-        : isQuick
-          ? "quick"
-          : hasReasoning
-            ? "reasoning"
-            : "balanced";
+  const generatesMedia = Boolean(metadata?.supportsImageOutput || metadata?.supportsAudioOutput);
+  const group = modelGroup({ isCustom, isLongRunning, generatesMedia, isQuick, hasReasoning });
 
   return { group, isQuick, isLongRunning, hasReasoning, isMultimodal };
 }

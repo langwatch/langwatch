@@ -1,4 +1,12 @@
 import { Text } from "@chakra-ui/react";
+import {
+  currentTimeZone,
+  Temporal,
+  toDate,
+  toEpochMs,
+  type Instant,
+  type TimeInput,
+} from "@langwatch/time";
 import type { PropsWithChildren } from "react";
 
 export interface PaginationState {
@@ -17,18 +25,26 @@ export function EmptyCell({ children }: PropsWithChildren) {
   );
 }
 
-/** Human-readable date (respects locale, uses the user's TZ). */
-export function formatDate(value: string | Date | null | undefined): string {
-  if (!value) return "—";
-  const date = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString();
+/** The moment a cell prints, or null when the value is not a moment at all. */
+function readableMoment(value: TimeInput): Instant | null {
+  const epochMs = toEpochMs(value);
+  if (Number.isNaN(epochMs)) return null;
+  return Temporal.Instant.fromEpochMilliseconds(epochMs);
 }
 
-export function formatDateTime(value: string | Date | null | undefined): string {
+/** Human-readable date (respects locale, uses the user's TZ). */
+export function formatDate(value: TimeInput | null | undefined): string {
   if (!value) return "—";
-  const date = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(date.getTime())) return "—";
+  const moment = readableMoment(value);
+  if (moment === null) return "—";
+  return toDate(moment).toLocaleDateString();
+}
+
+export function formatDateTime(value: TimeInput | null | undefined): string {
+  if (!value) return "—";
+  const moment = readableMoment(value);
+  if (moment === null) return "—";
+  const date = toDate(moment);
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 }
 
@@ -39,10 +55,14 @@ export function formatDateTime(value: string | Date | null | undefined): string 
 export function dateInputToISO(value: string): string | null {
   if (!value) return null;
   const parts = value.split("-").map(Number);
-  if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
-    return null;
-  }
+  const isCalendarDay = parts.length === 3 && parts.every((part) => !Number.isNaN(part));
+  if (!isCalendarDay) return null;
   const [year, month, day] = parts;
-  const date = new Date(year!, month! - 1, day!, 12, 0, 0, 0);
-  return date.toISOString();
+  const noonLocally = Temporal.PlainDateTime.from({
+    year: year!,
+    month: month!,
+    day: day!,
+    hour: 12,
+  }).toZonedDateTime(currentTimeZone());
+  return toDate(noonLocally).toISOString();
 }

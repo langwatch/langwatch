@@ -2,6 +2,7 @@
  * CAPABILITY_HYDRATORS — how each CLI resource's card fetches CURRENT data.
  */
 
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { api } from "../../../../behavior/langy-api.ts";
 import { asFreeTextTerm } from "../../../../model/langy-trace-explorer-link.ts";
 import { traceMetaLine, truncateRowText } from "../../../../model/langy-row-format.ts";
@@ -72,7 +73,7 @@ function queryEpochMs(query: Record<string, unknown>, keys: string[]): number | 
   if (raw === undefined) return undefined;
   const asNumber = Number(raw);
   if (Number.isFinite(asNumber)) return asNumber;
-  const parsed = Date.parse(raw);
+  const parsed = toEpochMs(raw);
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
@@ -134,7 +135,7 @@ async function traceByQuery({
   query: Record<string, unknown>;
   limit: number;
 }): Promise<CapabilityHydration> {
-  const to = queryEpochMs(query, ["end-date", "endDate"]) ?? Date.now();
+  const to = queryEpochMs(query, ["end-date", "endDate"]) ?? nowInstant().epochMilliseconds;
   const from = queryEpochMs(query, ["start-date", "startDate"]) ?? to - DEFAULT_SEARCH_WINDOW_MS;
   const text = queryText(query, ["q", "query"]);
 

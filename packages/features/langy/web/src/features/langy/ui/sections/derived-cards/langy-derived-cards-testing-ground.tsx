@@ -228,6 +228,24 @@ function StreamingPlayground() {
   );
 }
 
+/** Where a choices card stands: answered, overtaken by a later turn, or open. */
+function choicesLockState({
+  selection,
+  movedOn,
+}: {
+  selection: LangyChoiceSelection | null;
+  movedOn: boolean;
+}): LangyChoicesLockState {
+  if (selection) {
+    return {
+      status: "answered",
+      optionIds: selection.optionIds,
+      ...(selection.otherText !== undefined ? { otherText: selection.otherText } : {}),
+    };
+  }
+  return movedOn ? { status: "superseded" } : { status: "open" };
+}
+
 /**
  * A live choices card with the lock state derived from what YOU do to it —
  * answer it and it locks with the choice marked; supersede it and it grays;
@@ -243,15 +261,7 @@ function ChoicesPlayground({
   const [selection, setSelection] = useState<LangyChoiceSelection | null>(null);
   const [movedOn, setMovedOn] = useState(false);
 
-  const lockState: LangyChoicesLockState = selection
-    ? {
-        status: "answered",
-        optionIds: selection.optionIds,
-        ...(selection.otherText !== undefined ? { otherText: selection.otherText } : {}),
-      }
-    : movedOn
-      ? { status: "superseded" }
-      : { status: "open" };
+  const lockState = choicesLockState({ selection, movedOn });
 
   return (
     <VStack align="stretch" gap={1.5}>

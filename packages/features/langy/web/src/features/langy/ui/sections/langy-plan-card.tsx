@@ -7,7 +7,11 @@ import { Check, ChevronRight, Square, SquareCheck } from "lucide-react";
 import { useState } from "react";
 import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
-import type { LangyPlan, LangyPlanItem, LangyPlanItemStatus } from "../../../../model/langy-plan.ts";
+import type {
+  LangyPlan,
+  LangyPlanItem,
+  LangyPlanItemStatus,
+} from "../../../../model/langy-plan.ts";
 import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
 
 const dotPulse = keyframes`
@@ -57,7 +61,7 @@ export function LangyPlanCard({
         expanded={cardOpen}
       />
 
-      {cardOpen ? (
+      {cardOpen && (
         <>
           <VStack align="stretch" gap={1.5} role="list">
             {plan.items.map((item, index) => (
@@ -92,7 +96,8 @@ export function LangyPlanCard({
             </VStack>
           ) : null}
         </>
-      ) : currentItem ? (
+      )}
+      {!cardOpen && currentItem ? (
         <PlanStep item={currentItem} isCurrent isStreaming={isStreaming} reduce={reduce} />
       ) : null}
     </LangyCard>
@@ -168,6 +173,78 @@ function PlanOverline({
   );
 }
 
+/** The tint each plan step's text carries; a running step keeps the default. */
+const PLAN_STEP_COLORS: Record<LangyPlanItemStatus, string | undefined> = {
+  completed: "fg",
+  pending: "fg.muted",
+  cancelled: "fg.subtle",
+  in_progress: undefined,
+};
+
+/** Every step reads as a checkbox: checked when done, a filled square while it
+ * runs, an empty square before it starts. Shape and colour carry the status on
+ * screen; the label carries it for anyone not reading either. */
+function PlanStepMarker({
+  item,
+  statusLabel,
+  pulsing,
+}: {
+  item: LangyPlanItem;
+  statusLabel: string;
+  pulsing: boolean;
+}) {
+  if (item.status === "completed") {
+    return (
+      <Box
+        color="green.fg"
+        display="flex"
+        flexShrink={0}
+        width="12px"
+        role="img"
+        aria-label={statusLabel}
+        data-plan-marker="completed"
+      >
+        <SquareCheck size={12} />
+      </Box>
+    );
+  }
+  if (item.status === "in_progress") {
+    return (
+      <Box
+        width="12px"
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        flexShrink={0}
+        role="img"
+        aria-label={statusLabel}
+        data-plan-marker="in_progress"
+      >
+        <Box
+          width="8px"
+          height="8px"
+          borderRadius="2px"
+          background="orange.solid"
+          css={pulsing ? { animation: `${dotPulse} 1.4s ease-in-out infinite` } : undefined}
+        />
+      </Box>
+    );
+  }
+  return (
+    <Box
+      color="fg.subtle"
+      display="flex"
+      flexShrink={0}
+      width="12px"
+      role="img"
+      aria-label={statusLabel}
+      data-plan-marker={item.status}
+    >
+      <Square size={12} />
+    </Box>
+  );
+}
+
 function PlanStep({
   item,
   isCurrent,
@@ -190,51 +267,7 @@ function PlanStep({
   // visible to agree with. The status is shape and colour on screen, so the
   // marker carries the same answer as a label for anyone not reading either.
   const statusLabel = PLAN_STATUS_LABEL[item.status];
-  const marker =
-    item.status === "completed" ? (
-      <Box
-        color="green.fg"
-        display="flex"
-        flexShrink={0}
-        width="12px"
-        role="img"
-        aria-label={statusLabel}
-        data-plan-marker="completed"
-      >
-        <SquareCheck size={12} />
-      </Box>
-    ) : item.status === "in_progress" ? (
-      <Box
-        width="12px"
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        flexShrink={0}
-        role="img"
-        aria-label={statusLabel}
-        data-plan-marker="in_progress"
-      >
-        <Box
-          width="8px"
-          height="8px"
-          borderRadius="2px"
-          background="orange.solid"
-          css={pulsing ? { animation: `${dotPulse} 1.4s ease-in-out infinite` } : undefined}
-        />
-      </Box>
-    ) : (
-      <Box
-        color="fg.subtle"
-        display="flex"
-        flexShrink={0}
-        width="12px"
-        role="img"
-        aria-label={statusLabel}
-        data-plan-marker={item.status}
-      >
-        <Square size={12} />
-      </Box>
-    );
+  const marker = <PlanStepMarker item={item} statusLabel={statusLabel} pulsing={pulsing} />;
 
   const rowText = (
     <Text
@@ -243,15 +276,7 @@ function PlanStep({
       flex={1}
       minWidth={0}
       fontWeight={item.status === "in_progress" ? "640" : "500"}
-      color={
-        item.status === "completed"
-          ? "fg"
-          : item.status === "pending"
-            ? "fg.muted"
-            : item.status === "cancelled"
-              ? "fg.subtle"
-              : undefined
-      }
+      color={PLAN_STEP_COLORS[item.status]}
       textDecoration={item.status === "cancelled" ? "line-through" : undefined}
       css={pulsing ? shimmer : undefined}
     >

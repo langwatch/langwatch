@@ -191,7 +191,7 @@ function ConnectionsTable({
             <Table.Cell>
               <ProvedBy connection={connection} />
             </Table.Cell>
-            <Table.Cell>{formatDateTime(new Date(connection.updatedAtMs))}</Table.Cell>
+            <Table.Cell>{formatDateTime(connection.updatedAtMs)}</Table.Cell>
             <Table.Cell textAlign="right">
               <Box width="full" height="full" display="flex" justifyContent="end">
                 <RowActions connection={connection} onOpen={onOpen} />
@@ -593,7 +593,7 @@ function ConnectionDomains({ connection }: { connection: ConnectionRow }) {
             <Text>{entry.domain}</Text>
             <Badge colorPalette="gray">{METHOD_LABEL[entry.method] ?? entry.method}</Badge>
             <Text fontSize="sm" color="fg.muted">
-              {formatDateTime(new Date(entry.verifiedAtMs))}
+              {formatDateTime(entry.verifiedAtMs)}
               {entry.actorId ? ` by ${entry.actorId}` : ""}
             </Text>
           </HStack>

@@ -1,3 +1,4 @@
+import { nowInstant, toDate } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -200,7 +201,8 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
     );
   }
 
-  if (projectionsQuery.data && projectionsQuery.data.projections.length === 0) {
+  const projections = projectionsQuery.data?.projections;
+  if (projections?.length === 0) {
     return (
       <Center paddingY={20}>
         <EmptyState.Root>
@@ -260,7 +262,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
               { label: "3 months", months: 3 },
               { label: "6 months", months: 6 },
             ].map(({ label, months }) => {
-              const d = new Date();
+              const d = toDate(nowInstant());
               if (months === 0) {
                 d.setDate(1);
               } else {

@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -195,7 +196,7 @@ export function ProcessInstancesDrawer({ processName, onClose, onOpenInstance }:
     },
     { refetchInterval: 15_000 },
   );
-  const now = query.dataUpdatedAt || Date.now();
+  const now = query.dataUpdatedAt || nowInstant().epochMilliseconds;
   const total = query.data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rows = query.data?.instances ?? [];

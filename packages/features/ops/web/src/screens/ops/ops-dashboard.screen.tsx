@@ -7,6 +7,18 @@ import { OpsBlobsDrawer } from "../../features/blob-store/ui/sections/ops-blobs-
 import { ConnectionStatusIndicator } from "../../features/event-store/ui/elements/connection-status-indicator.tsx";
 import { OpsDashboardContent } from "../../features/event-store/ui/sections/ops-dashboard-content.tsx";
 
+/** Whether the page is reading a live snapshot, still waiting, or cut off. */
+function describeSnapshotConnection({
+  isError,
+  isSuccess,
+}: {
+  isError: boolean;
+  isSuccess: boolean;
+}) {
+  if (isError) return "disconnected";
+  return isSuccess ? "connected" : "connecting";
+}
+
 /**
  * The Ops landing page.
  *
@@ -27,6 +39,8 @@ export default function OpsDashboardScreen() {
 
   const data = snapshot.data ?? null;
 
+  const connectionStatus = describeSnapshotConnection(snapshot);
+
   return (
     <>
       <PageLayout.Header>
@@ -38,9 +52,7 @@ export default function OpsDashboardScreen() {
         {/* The snapshot's own age, not just the poll's health: this page can be
             reading numbers no writer has refreshed. */}
         <ConnectionStatusIndicator
-          status={
-            snapshot.isError ? "disconnected" : snapshot.isSuccess ? "connected" : "connecting"
-          }
+          status={connectionStatus}
           computedAtMs={data?.snapshot.computedAt ?? null}
         />
       </PageLayout.Header>

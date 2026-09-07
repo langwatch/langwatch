@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { api } from "../../../../behavior/ops-api.ts";
 import { isSlotStale } from "../../model/scheduler-presentation.ts";
@@ -15,7 +16,7 @@ export function SchedulerContent() {
     },
   );
   const { hasAccess } = useOpsPermission();
-  const now = jobsQuery.dataUpdatedAt || Date.now();
+  const now = jobsQuery.dataUpdatedAt || nowInstant().epochMilliseconds;
   const jobs = jobsQuery.data ?? [];
 
   return (

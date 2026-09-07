@@ -23,7 +23,8 @@ export function useLangyContextDropZone(): {
   const onDragOver = useCallback((event: DragEvent<HTMLElement>) => {
     // `types` is the only thing readable mid-drag — the DATA is withheld until
     // the drop, by design, so a page can't read what you're dragging over it.
-    if (!event.dataTransfer.types.includes(LANGY_CONTEXT_DRAG_MIME)) return;
+    const types = event.dataTransfer.types;
+    if (!types.includes(LANGY_CONTEXT_DRAG_MIME)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
     setIsOver(true);

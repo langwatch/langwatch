@@ -26,6 +26,8 @@ const CLOSES_OBJECT_REGEX = /^\}/;
  * fragments, single-line crammed objects), fall back to a structural
  * indenter that at least produces line-per-key output without erroring.
  */
+const WHITESPACE = new Set([" ", "\t", "\n", "\r"]);
+
 function tolerantPrettyJson(content: string): string {
   const indentUnit = "  ";
   let depth = 0;
@@ -47,7 +49,7 @@ function tolerantPrettyJson(content: string): string {
       out += ch;
       continue;
     }
-    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") continue;
+    if (WHITESPACE.has(ch)) continue;
     if (ch === "{" || ch === "[") {
       out += ch;
       depth += 1;

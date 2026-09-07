@@ -22,14 +22,21 @@ import {
 } from "../../../../model/langy-capability-digest.ts";
 import { isCodeAccessToolPart } from "../../../../model/langy-code-access-tool.ts";
 import { isPlanToolPart } from "../../../../model/langy-plan.ts";
-import { isQuestionToolPart, questionToolCardParts } from "../../../../model/langy-question-tool.ts";
+import {
+  isQuestionToolPart,
+  questionToolCardParts,
+} from "../../../../model/langy-question-tool.ts";
 import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
 import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note.tsx";
 import {
   type LangyToolErrorPresentation,
   presentLangyToolError,
 } from "../../model/logic/langy-tool-failure.ts";
-import { commandOf, describeToolCall, effectiveToolName } from "../../model/logic/langy-tool-label.ts";
+import {
+  commandOf,
+  describeToolCall,
+  effectiveToolName,
+} from "../../model/logic/langy-tool-label.ts";
 import {
   type CapabilityProgress,
   isProposalOutput,
@@ -397,7 +404,9 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     // an activity it read as a dead "Question…" stuck in-flight forever. Only a
     // payload the choices contract can actually render is excluded — a broken
     // one stays here, where raw honesty belongs.
-    if (isQuestionToolPart(part) && questionToolCardParts(part).length > 0) {
+    const rendersAsAChoicesCard =
+      isQuestionToolPart(part) && questionToolCardParts(part).length > 0;
+    if (rendersAsAChoicesCard) {
       return;
     }
     // The `code_access` tool is the code access card (ADR-129), for the same
@@ -417,10 +426,9 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     // failed one falls back here (there is no result to draw, so raw JSON is
     // the honest answer).
     const isKnownCapability = resolveCapability(name) !== null;
-    if (
-      (isKnownCapability && !DONE_STATES.has(part.state ?? "")) ||
-      hasCapabilityCard(partToCall(part, name))
-    ) {
+    const stillRunning = isKnownCapability && !DONE_STATES.has(part.state ?? "");
+    const drawsItsOwnCard = hasCapabilityCard(partToCall(part, name));
+    if (stillRunning || drawsItsOwnCard) {
       return;
     }
 
@@ -523,12 +531,12 @@ export function LangyActivityParts({
   const capabilityBatches = batchCapabilityCalls(capabilityCalls);
   const pending = toPendingCapabilities(view);
   const failures = toFailedToolCalls(view);
-  if (
+  const nothingToShow =
     groups.length === 0 &&
     capabilityCalls.length === 0 &&
     pending.length === 0 &&
-    failures.length === 0
-  ) {
+    failures.length === 0;
+  if (nothingToShow) {
     return null;
   }
 
@@ -1280,11 +1288,8 @@ function lastAnswerTextIndex(view: PartsView): number {
   let last = -1;
   view.parts.forEach((part, index) => {
     const candidate = part as { type?: string; text?: string };
-    if (
-      candidate?.type === "text" &&
-      typeof candidate.text === "string" &&
-      candidate.text.trim().length > 0
-    ) {
+    const carriesText = typeof candidate.text === "string" && candidate.text.trim().length > 0;
+    if (candidate?.type === "text" && carriesText) {
       last = index;
     }
   });

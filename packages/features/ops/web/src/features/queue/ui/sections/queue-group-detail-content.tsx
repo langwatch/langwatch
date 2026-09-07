@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { Badge, Box, Card, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { GroupInfo, OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import type { ReactNode } from "react";
@@ -151,7 +152,7 @@ export function GroupDetailContent({
   jobFilter = "",
   onJobFilterChange,
   traceUrlForTraceId,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   detail: GroupInfo | null;
   isLoading: boolean;

@@ -1,3 +1,4 @@
+import { nowInstant, toDate } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -120,19 +121,10 @@ export default function ProjectsView() {
                 <Table.Cell>{project.language ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{project.framework ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>
-                  {project.archivedAt ? (
-                    <Badge size="sm" colorPalette="gray">
-                      Archived
-                    </Badge>
-                  ) : project.integrated ? (
-                    <Badge size="sm" colorPalette="green">
-                      Integrated
-                    </Badge>
-                  ) : (
-                    <Badge size="sm" colorPalette="yellow">
-                      Pending
-                    </Badge>
-                  )}
+                  <ProjectStatusBadge
+                    archivedAt={project.archivedAt}
+                    integrated={project.integrated}
+                  />
                 </Table.Cell>
                 <Table.Cell>{formatDate(project.createdAt)}</Table.Cell>
                 <Table.Cell textAlign="right">
@@ -175,6 +167,35 @@ interface FormState {
   s3SecretAccessKey: string;
   s3Bucket: string;
   archive: boolean;
+}
+
+/** Where a project stands, as the one badge its row shows. */
+function ProjectStatusBadge({
+  archivedAt,
+  integrated,
+}: {
+  archivedAt: string | null;
+  integrated: boolean;
+}) {
+  if (archivedAt) {
+    return (
+      <Badge size="sm" colorPalette="gray">
+        Archived
+      </Badge>
+    );
+  }
+  if (integrated) {
+    return (
+      <Badge size="sm" colorPalette="green">
+        Integrated
+      </Badge>
+    );
+  }
+  return (
+    <Badge size="sm" colorPalette="yellow">
+      Pending
+    </Badge>
+  );
 }
 
 function nullIfEmpty(raw: string): string | null {
@@ -243,7 +264,7 @@ function ProjectEditDrawer({
     if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
     const currentlyArchived = !!project.archivedAt;
     if (form.archive !== currentlyArchived) {
-      data.archivedAt = form.archive ? new Date().toISOString() : null;
+      data.archivedAt = form.archive ? toDate(nowInstant()).toISOString() : null;
     }
 
     if (Object.keys(data).length === 0) {

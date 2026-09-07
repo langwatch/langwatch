@@ -62,10 +62,30 @@ const singleQuestionSchema = z
   .loose()
   .transform((question) => [question]);
 
+/** The first of a list of maybe-strings that carries text, or null. */
+function firstNonEmpty(values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim() !== "") return value;
+  }
+  return null;
+}
+
+/** The questions a call carries, read as a list or as one on its own. */
+function readCandidates({
+  list,
+  single,
+}: {
+  list: { success: boolean; data?: unknown[] };
+  single: { success: boolean; data?: unknown[] };
+}): unknown[] {
+  if (list.success) return list.data ?? [];
+  return single.success ? (single.data ?? []) : [];
+}
+
 function parseQuestions(input: unknown) {
   const list = questionListSchema.safeParse(input);
   const single = singleQuestionSchema.safeParse(input);
-  const candidates = list.success ? list.data : single.success ? single.data : [];
+  const candidates = readCandidates({ list, single });
   return candidates.flatMap((candidate) => {
     const parsed = rawQuestionSchema.safeParse(candidate);
     return parsed.success ? [parsed.data] : [];
@@ -90,12 +110,7 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
     // `question` is the full text; `header` is the tool's short label. The
     // card has one line, so the full text wins and the header only stands in
     // when the model sent nothing else.
-    const question =
-      typeof raw.question === "string" && raw.question.trim() !== ""
-        ? raw.question
-        : typeof raw.header === "string" && raw.header.trim() !== ""
-          ? raw.header
-          : null;
+    const question = firstNonEmpty([raw.question, raw.header]);
     if (!question) return;
 
     const parsedOptions = z.array(rawQuestionOptionSchema).safeParse(raw.options);

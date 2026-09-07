@@ -17,6 +17,15 @@ import {
   LangyCapabilityCard,
 } from "./langy-capability-card.tsx";
 
+/** A first table cell that carries a dataset name, not a rule line or a header. */
+function isNameCell(cells: string[] | null): cells is string[] {
+  const first = cells?.[0];
+  if (first === undefined) return false;
+  if (/^-+$/.test(first)) return false;
+  const header = first.toLowerCase();
+  return header !== "name" && header !== "date";
+}
+
 function parseDataset(output: unknown): {
   count: number | null;
   names: string[];
@@ -53,18 +62,27 @@ function parseDataset(output: unknown): {
           .filter(Boolean)
       : null;
     if (bullet) names.push(bullet[1]!.replace(/\*\*/g, ""));
-    else if (
-      cells &&
-      cells.length > 0 &&
-      !/^-+$/.test(cells[0]!) &&
-      cells[0]!.toLowerCase() !== "name" &&
-      cells[0]!.toLowerCase() !== "date"
-    ) {
+    else if (isNameCell(cells)) {
       names.push(cells[0]!);
     }
     if (names.length >= 5) break;
   }
   return { count, names };
+}
+
+/** Why a dataset row is not on screen, phrased for the reader. */
+function describeMissingDatasets({
+  unavailable,
+  returned,
+}: {
+  unavailable: boolean;
+  returned: number;
+}): string {
+  if (unavailable)
+    return "Couldn't load these datasets right now \u2014 open Datasets to see them.";
+  return returned === 1
+    ? "This dataset is no longer available."
+    : "These datasets are no longer available.";
 }
 
 export function LangyDatasetCard({
@@ -98,9 +116,10 @@ export function LangyDatasetCard({
         projectSlug={projectSlug}
         resourceId={digest?.primaryId ?? id}
       >
-        {hydration.isHydrating && hydration.rows.length === 0 ? (
+        {hydration.isHydrating && hydration.rows.length === 0 && (
           <CapabilityRowSkeletons count={Math.min(digest?.counts?.returned ?? 3, 5)} />
-        ) : hydration.rows.length > 0 ? (
+        )}
+        {hydration.rows.length > 0 ? (
           <VStack align="stretch" gap={0}>
             {hydration.rows.map((row) => (
               <CapabilityRow
@@ -110,13 +129,13 @@ export function LangyDatasetCard({
               />
             ))}
           </VStack>
-        ) : (
+        ) : null}
+        {!hydration.isHydrating && hydration.rows.length === 0 && (
           <Text textStyle="xs" color="fg.muted">
-            {hydration.status === "unavailable"
-              ? "Couldn't load these datasets right now — open Datasets to see them."
-              : (digest?.counts?.returned ?? 0) === 1
-                ? "This dataset is no longer available."
-                : "These datasets are no longer available."}
+            {describeMissingDatasets({
+              unavailable: hydration.status === "unavailable",
+              returned: digest?.counts?.returned ?? 0,
+            })}
           </Text>
         )}
       </LangyCapabilityCard>

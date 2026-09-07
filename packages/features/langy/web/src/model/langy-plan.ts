@@ -158,7 +158,8 @@ function fresherSnapshot({
 }): LangyPlanItem[] | null {
   if (!override || override.length === 0) return derived;
   if (!derived || derived.length === 0) return override;
-  return completedCountOf(derived) > completedCountOf(override) ? derived : override;
+  const derivedIsFurther = completedCountOf(derived) > completedCountOf(override);
+  return derivedIsFurther ? derived : override;
 }
 
 /** How many steps of one snapshot are finished. */

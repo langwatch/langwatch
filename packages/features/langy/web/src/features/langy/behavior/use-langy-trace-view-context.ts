@@ -1,3 +1,4 @@
+import { readableDate } from "../../../model/langy-row-format.ts";
 import { useMemo } from "react";
 import type { TimeRange } from "@langwatch/trace-web/surfaces/trace-filters";
 import { useFilterStore, useViewStore } from "@langwatch/trace-web/surfaces/trace-view-state";
@@ -64,8 +65,8 @@ export function traceViewContextChip({
 }): LangyContextChip {
   const query = queryText.trim();
   const rangeLabel = timeRange.label?.trim() || "Custom time range";
-  const from = new Date(timeRange.from).toISOString();
-  const to = new Date(timeRange.to).toISOString();
+  const from = readableDate(timeRange.from).toISOString();
+  const to = readableDate(timeRange.to).toISOString();
   const sourceLabel = `${source[0]!.toUpperCase()}${source.slice(1)}`;
   const lensLabel = lens?.name.trim();
   const scopeId = timeRange.presetId ?? `${timeRange.from}:${timeRange.to}`;

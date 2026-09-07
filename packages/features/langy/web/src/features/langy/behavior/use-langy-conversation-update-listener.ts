@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSSESubscription } from "@langwatch/trace-web/surfaces/sse-subscription";
 import {
@@ -86,7 +87,7 @@ export function useLangyConversationUpdateListener({
           const raw = typeof data.event === "string" ? JSON.parse(data.event) : data.event;
           const parsed = langyConversationUpdateSignalSchema.safeParse(raw);
           if (!parsed.success) return;
-          setLastEventAt(Date.now());
+          setLastEventAt(nowInstant().epochMilliseconds);
           schedule(parsed.data);
         } catch {
           // Non-JSON payload — ignore.

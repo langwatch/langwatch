@@ -3,6 +3,7 @@
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
  */
 
+import type { TimeInput } from "@langwatch/time";
 import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 import type {
   AggregateDiscovery,
@@ -100,7 +101,7 @@ export type OpsProjectMatch = {
 /** One report in the issue inbox's listing. */
 export type BugReportListingRow = {
   id: string;
-  createdAt: string | Date;
+  createdAt: TimeInput;
   source: string;
   kind: string;
   title: string;

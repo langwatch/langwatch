@@ -1814,10 +1814,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/use-capability-data.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/behavior/use-langy-conversation-update-listener.ts",
       "measured": "2026-09-06"
     },
@@ -1858,10 +1854,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-declarative-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-metrics-card.tsx",
       "measured": "2026-09-06"
     },
@@ -1883,10 +1875,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/features/langy/ui/sections/langy-plan-card.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1922,10 +1910,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-model-profile.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-plan.ts",
       "measured": "2026-09-06"
     },
@@ -1935,10 +1919,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/langy/web/src/model/langy-trace-explorer-link.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/langy/web/src/ui/elements/github/langy-github-progress-card.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -2262,19 +2242,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/ops/web/src/features/deja-view/ui/sections/deja-view-center-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/ops/web/src/features/deja-view/ui/sections/deja-view-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/ops/web/src/features/deja-view/ui/sections/deja-view-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/ops/web/src/features/event-store/ui/elements/phase-timeline.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -2315,10 +2283,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/ops/web/src/features/foundry/ui/sections/generate-trace-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/ops/web/src/features/foundry/ui/sections/span-editor-panel.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -4850,10 +4814,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/features/langy/web/src/features/langy/ui/sections/composer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
       "measured": "2026-09-06"
     },
@@ -7150,114 +7110,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/langy/web/scripts/generate-langy-skills.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/behavior/langy-context-target.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/behavior/use-langy-context-drop-zone.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/behavior/use-langy-context-target.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/behavior/logic/langy-durable-catch-up.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/behavior/logic/langy-error-explainer.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/behavior/logic/langy-recovery-policy.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/behavior/logic/spa-link.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/model/logic/langy-tool-failure.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/model/logic/langy-tool-label.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-dataset-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-declarative-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-metrics-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-scenario-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-timeseries-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/derived-cards/langy-derived-card-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/langy-feedback.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/langy-spa-anchor.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/langy-tool-activity.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/features/langy/ui/sections/message-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/model/langy-answer-segments.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/model/langy-capability-registry.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/model/langy-choices-timeline.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/model/langy-conversation-date.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/model/langy-plan.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/langy/web/src/model/shared/langy/github-pr-card.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/log/server/src/adapters/canonical-log.adapter.ts",
       "measured": "2026-09-06"
     },
@@ -7463,54 +7315,6 @@
     },
     {
       "key": "condition-shape|packages/features/ops/server/src/transport/api-trpc/bug-report.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/features/backoffice/ui/elements/backoffice-cells.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/features/backoffice/ui/sections/organizations-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/features/backoffice/ui/sections/subscriptions-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/features/deja-view/model/deja-view-fragment.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/features/event-store/ui/sections/bulk-replay-wizard.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/features/foundry/behavior/trace-executor.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/features/queue/model/queue-job-context.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/features/queue/model/queue-pipeline-utils.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/features/queue/ui/sections/blocked-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/features/queue/ui/sections/groups-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/ui/elements/ops-json-viewer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/ops/web/src/ui/elements/ops-pinned-json-view.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -9798,103 +9602,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/behavior/logic/langy-error-explainer.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/behavior/use-capability-data.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/model/logic/langy-tool-failure.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/model/logic/langy-tool-label.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/elements/langy-composer-palette.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-dataset-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-declarative-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-metrics-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/composer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/derived-cards/langy-derived-cards-testing-ground.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/langy-dev-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/langy-plan-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/message-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/project-langy-layout.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/features/langy/ui/sections/recent-chats-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/model/langy-model-profile.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/model/langy-question-tool.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/model/langy-stop-target.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/ui/elements/github/langy-github-progress-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/ui/sections/derived-cards/langy-choices-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/ui/sections/derived-cards/langy-derived-card-frame.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/ui/sections/langy-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/ui/sections/langy-context-target-layer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/langy/web/src/ui/sections/streaming-status-line.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -10007,78 +9715,6 @@
     },
     {
       "key": "nested-ternary|packages/features/ops/server/src/transport/api-rest/admin.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/backoffice/ui/sections/bug-reports-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/backoffice/ui/sections/projects-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/backoffice/ui/sections/users-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/deja-view/ui/sections/deja-view-center-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/deja-view/ui/sections/deja-view-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/event-store/ui/elements/dashboard-linked-stat.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/event-store/ui/elements/phase-timeline.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/event-store/ui/sections/process-instance-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/event-store/ui/sections/replay-progress-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/foundry/ui/sections/execution-controls.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/foundry/ui/sections/generate-trace-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/foundry/ui/sections/graph-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/foundry/ui/sections/span-editor-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/migrations/ui/sections/migrations-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/queue/ui/blocks/queue-pipeline-tree-node.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/queue/ui/sections/groups-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/features/queue/ui/sections/pipeline-tree-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/ops/web/src/screens/ops/ops-dashboard.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -13170,78 +12806,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/langy/web/src/behavior/langy-context-target.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/behavior/capabilities/capability-hydrators.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/behavior/stores/langy-dev-log.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/behavior/use-langy-conversation-update-listener.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/behavior/use-langy-stick-to-bottom.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/behavior/use-langy-trace-view-context.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-metrics-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-trace-sample-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/langy-card-gallery.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/langy-dev-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/recent-chats-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/model/langy-conversation-date.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/model/langy-row-format.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/model/langy-trace-explorer-link.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/ui/sections/derived-cards/langy-code-access-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/ui/sections/langy-thinking-line.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/langy/web/src/ui/sections/streaming-status-line.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/log/server/src/adapters/canonical-log.adapter.ts",
       "measured": "2026-09-06"
     },
@@ -13535,170 +13099,6 @@
     },
     {
       "key": "temporal-only|packages/features/ops/server/src/transport/api-trpc/ops.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/behavior/ops-api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/elements/backoffice-cells.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/bug-reports-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/organizations-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/projects-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/sso-connections-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/subscriptions-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/users-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/blob-store/model/blob-formatters.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/deja-view/model/deja-view-fragment.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/deja-view/ui/blocks/deja-view-manager-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/model/process-presentation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/model/scheduler-presentation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/blocks/replay-history-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/elements/connection-status-indicator.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/elements/scheduler-recent-actions.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/elements/throughput-chart.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/elements/upcoming-work-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/bulk-replay-wizard.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/dead-letters-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/event-sourcing-overview.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/process-instance-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/process-instances-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/process-recent-actions-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/replay-history-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/replay-progress-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/replay-progress-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/scheduler-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/scheduler-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/single-aggregate-replay.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/upcoming-work-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/foundry/behavior/trace-executor.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/foundry/ui/sections/execution-controls.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/foundry/ui/sections/foundry-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/foundry/ui/sections/generate-conversation-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/migrations/ui/sections/migrations-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/queue/model/queue-pipeline-utils.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/queue/ui/sections/anomalies-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/queue/ui/sections/groups-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/features/queue/ui/sections/queue-group-detail-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/ops/web/src/model/ops-formatters.ts",
       "measured": "2026-09-06"
     },
     {

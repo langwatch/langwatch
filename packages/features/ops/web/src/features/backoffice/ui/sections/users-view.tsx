@@ -1,3 +1,4 @@
+import { nowInstant, toDate } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -153,23 +154,7 @@ export default function UsersView() {
                 <Table.Cell>{formatDate(user.createdAt)}</Table.Cell>
                 <Table.Cell>{formatDateTime(user.lastLoginAt)}</Table.Cell>
                 <Table.Cell>
-                  {user.deactivatedAt ? (
-                    <Badge colorPalette="red" size="sm">
-                      Deactivated
-                    </Badge>
-                  ) : user.pendingSsoSetup ? (
-                    <Badge colorPalette="yellow" size="sm">
-                      Pending SSO
-                    </Badge>
-                  ) : user.emailVerified ? (
-                    <Badge colorPalette="green" size="sm">
-                      Active
-                    </Badge>
-                  ) : (
-                    <Badge colorPalette="gray" size="sm">
-                      Unverified
-                    </Badge>
-                  )}
+                  <UserStatusBadge user={user} />
                 </Table.Cell>
                 <Table.Cell textAlign="right">
                   <Box width="full" height="full" display="flex" justifyContent="end">
@@ -201,6 +186,36 @@ export default function UsersView() {
       <UserEditDrawer user={editing} onClose={() => setEditing(null)} />
       <ImpersonateDialog user={impersonating} onClose={() => setImpersonating(null)} />
     </>
+  );
+}
+
+/** Where an account stands, as the one badge its row shows. */
+function UserStatusBadge({ user }: { user: AdminUser }) {
+  if (user.deactivatedAt) {
+    return (
+      <Badge colorPalette="red" size="sm">
+        Deactivated
+      </Badge>
+    );
+  }
+  if (user.pendingSsoSetup) {
+    return (
+      <Badge colorPalette="yellow" size="sm">
+        Pending SSO
+      </Badge>
+    );
+  }
+  if (user.emailVerified) {
+    return (
+      <Badge colorPalette="green" size="sm">
+        Active
+      </Badge>
+    );
+  }
+  return (
+    <Badge colorPalette="gray" size="sm">
+      Unverified
+    </Badge>
   );
 }
 
@@ -347,7 +362,7 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
     }
     const currentlyDeactivated = !!user.deactivatedAt;
     if (deactivate !== currentlyDeactivated) {
-      data.deactivatedAt = deactivate ? new Date().toISOString() : null;
+      data.deactivatedAt = deactivate ? toDate(nowInstant()).toISOString() : null;
     }
     if (Object.keys(data).length === 0) {
       onClose();

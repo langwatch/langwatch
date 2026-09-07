@@ -1,3 +1,4 @@
+import { nowInstant, toDate } from "@langwatch/time";
 import { Badge, Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
@@ -21,7 +22,7 @@ export function SingleAggregateReplay({
   const [tenantId, setTenantId] = useState("");
   const [selectedProjections, setSelectedProjections] = useState<Set<string>>(new Set());
   const [since] = useState(() => {
-    const d = new Date();
+    const d = toDate(nowInstant());
     d.setMonth(d.getMonth() - 3);
     return d.toISOString().slice(0, 10);
   });

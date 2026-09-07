@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
@@ -126,7 +127,7 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
     record: (entry, turnId) =>
       append((seq) => ({
         seq,
-        atMs: Date.now(),
+        atMs: nowInstant().epochMilliseconds,
         conversationId: attributed(),
         lane: "stream",
         turnId,
@@ -135,7 +136,7 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
     recordOutbound: (kind, label, detail) =>
       append((seq) => ({
         seq,
-        atMs: Date.now(),
+        atMs: nowInstant().epochMilliseconds,
         // The send/stop callers put the conversation in the detail payload;
         // read it from there so the tag survives even when the store has not
         // adopted the conversation yet (a stop raced against a fresh send).
@@ -152,7 +153,7 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
     recordDurableEvent: (event) =>
       append((seq) => ({
         seq,
-        atMs: Date.now(),
+        atMs: nowInstant().epochMilliseconds,
         // Every wire event names its conversation — the fold's identity.
         conversationId: attributed(event.data.conversationId),
         lane: "durable",
@@ -162,7 +163,7 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
     recordSnapshot: ({ conversationId, cursor, currentTurnId }) =>
       append((seq) => ({
         seq,
-        atMs: Date.now(),
+        atMs: nowInstant().epochMilliseconds,
         conversationId,
         lane: "durable",
         source: "snapshot",
@@ -172,7 +173,7 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
     recordSignal: ({ conversationId, cursor }) =>
       append((seq) => ({
         seq,
-        atMs: Date.now(),
+        atMs: nowInstant().epochMilliseconds,
         conversationId,
         lane: "signal",
         cursor,

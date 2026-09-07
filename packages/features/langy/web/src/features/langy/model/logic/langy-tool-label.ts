@@ -26,7 +26,8 @@ function readString(input: unknown, keys: readonly string[]): string | undefined
 }
 
 export function shellCommandOf(name: string, input: unknown): string | undefined {
-  if (!SHELL_TOOLS.has(name.toLowerCase())) return undefined;
+  const lower = name.toLowerCase();
+  if (!SHELL_TOOLS.has(lower)) return undefined;
   return readString(input, COMMAND_KEYS);
 }
 
@@ -54,6 +55,19 @@ export interface LangyToolLabel {
   detail?: string;
   /** Consecutive calls sharing a key collapse into one card. */
   key: string;
+}
+
+/** The second line under a generic tool: the file it touched, else what it searched for. */
+function genericDetail({
+  path,
+  query,
+}: {
+  path: string | undefined;
+  query: string | undefined;
+}): string | undefined {
+  if (path === undefined) return query === undefined ? undefined : truncate(query);
+  const name = basename(path);
+  return /^tool_[a-z0-9]/i.test(name) ? "Previous tool output" : name;
 }
 
 /** `src/agents/router.ts` → `router.ts`. A full path is noise in a chat. */
@@ -248,13 +262,7 @@ export function describeToolCall({
     const query = readString(input, ["pattern", "query", "url"]);
     return {
       title: generic.title,
-      detail: path
-        ? /^tool_[a-z0-9]/i.test(basename(path))
-          ? "Previous tool output"
-          : basename(path)
-        : query
-          ? truncate(query)
-          : undefined,
+      detail: genericDetail({ path, query }),
       key: generic.key,
     };
   }

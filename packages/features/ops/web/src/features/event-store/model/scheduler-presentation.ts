@@ -8,6 +8,7 @@
  * state of its own, sorts to the top, and is counted in the header.
  */
 
+import { toEpochMs } from "@langwatch/time";
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 
 export interface SchedulerJobLike {
@@ -52,7 +53,7 @@ export function deriveStatus({
 
 /** Milliseconds past due; zero or negative when the schedule is not late. */
 export function latenessMs({ job, now }: { job: SchedulerJobLike; now: number }): number {
-  return now - new Date(job.nextRunAt).getTime();
+  return now - toEpochMs(job.nextRunAt);
 }
 
 /** Statuses that mean somebody should look, in the order they should look. */
@@ -105,7 +106,7 @@ export function isSlotStale({
 }): boolean {
   if (!job.currentSlot) return false;
   const heldSince = job.updatedAt ?? job.currentSlot;
-  return now - new Date(heldSince).getTime() >= SLOT_STALE_AFTER_MS;
+  return now - toEpochMs(heldSince) >= SLOT_STALE_AFTER_MS;
 }
 
 /**
@@ -127,7 +128,7 @@ export function compareForAttention({
     ATTENTION_ORDER.indexOf(deriveStatus({ job: a, now })) -
     ATTENTION_ORDER.indexOf(deriveStatus({ job: b, now }));
   if (rank !== 0) return rank;
-  return new Date(a.nextRunAt).getTime() - new Date(b.nextRunAt).getTime();
+  return toEpochMs(a.nextRunAt) - toEpochMs(b.nextRunAt);
 }
 
 export interface SchedulerHeaderCounts {
@@ -201,7 +202,7 @@ export function deriveLoopHealth({ jobs, now }: { jobs: SchedulerJobLike[]; now:
   const active = jobs.filter((job) => job.active);
 
   const firedAts = active
-    .map((job) => (job.lastSlot ? new Date(job.lastSlot).getTime() : null))
+    .map((job) => (job.lastSlot ? toEpochMs(job.lastSlot) : null))
     .filter((fired): fired is number => fired !== null);
   const lastFiredAt = firedAts.length > 0 ? Math.max(...firedAts) : null;
 

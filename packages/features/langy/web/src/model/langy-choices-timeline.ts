@@ -51,7 +51,8 @@ export function langyChoicesTimeline(
         // (see langyQuestionTool.ts) — its cards must appear on the timeline
         // or the lock derivation would call them "never recorded" and render
         // every one permanently closed.
-        if (isQuestionToolPart(part) && pushQuestionToolCards(part, timeline)) {
+        const pushedCards = isQuestionToolPart(part) && pushQuestionToolCards(part, timeline);
+        if (pushedCards) {
           sawQuestion = true;
         }
       }

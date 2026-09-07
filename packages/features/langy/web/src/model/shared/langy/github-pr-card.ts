@@ -56,7 +56,8 @@ export function parseGithubPrCard(output: unknown): GithubPrCardData | null {
   const number = num(pr.number);
   // Without the identity there is no card. These four are exactly what stdout
   // guarantees, so a card that cannot produce them is not a PR we opened.
-  if (!owner || !repo || !url || number === undefined) return null;
+  const identified = owner && repo && url && number !== undefined;
+  if (!identified) return null;
 
   const state = STATES.includes(pr.state as GithubPrState) ? (pr.state as GithubPrState) : "open";
 

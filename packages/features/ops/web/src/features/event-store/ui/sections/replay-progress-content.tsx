@@ -1,3 +1,4 @@
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -19,7 +20,7 @@ import { parseActiveProjections } from "../../model/replay-presentation.ts";
 import { CowboyAnimation } from "../elements/cowboy-animation.tsx";
 import { PhaseTimeline } from "../elements/phase-timeline.tsx";
 import { replayStateColor } from "../elements/replay-state-badge.tsx";
-import { formatDuration } from "../../../../model/ops-formatters.ts";
+import { formatDuration, readableDate } from "../../../../model/ops-formatters.ts";
 import { Link } from "../../../../ui/elements/ops-link.tsx";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { useReplayStatus } from "../../behavior/use-replay-status.ts";
@@ -143,8 +144,8 @@ function LiveRunView({
 }) {
   const throughputRate = useMemo(() => {
     if (!status.startedAt || !status.eventsProcessed) return null;
-    const end = status.completedAt ? new Date(status.completedAt).getTime() : Date.now();
-    const elapsed = (end - new Date(status.startedAt).getTime()) / 1000;
+    const end = status.completedAt ? toEpochMs(status.completedAt) : nowInstant().epochMilliseconds;
+    const elapsed = (end - toEpochMs(status.startedAt)) / 1000;
     if (elapsed < 1) return null;
     return Math.round(status.eventsProcessed / elapsed);
   }, [status.startedAt, status.completedAt, status.eventsProcessed]);
@@ -329,7 +330,7 @@ function HistoricalRunView({
               {entry.completedAt && (
                 <Text textStyle="xs" color="fg.muted">
                   {entry.state === "completed" ? "Completed" : "Ended"} at{" "}
-                  {new Date(entry.completedAt).toLocaleString()}
+                  {readableDate(entry.completedAt).toLocaleString()}
                 </Text>
               )}
               {entry.userName && (

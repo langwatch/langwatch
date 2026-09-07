@@ -1,4 +1,5 @@
 import { Button, Center, HStack, Input, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { nowInstant } from "@langwatch/time";
 import { RotateCcw, XCircle } from "lucide-react";
 import { useState } from "react";
 import { DeadLetterAttemptHistory } from "../elements/dead-letter-attempt-history.tsx";
@@ -52,7 +53,7 @@ export function DeadLettersContent() {
   const byProcess = query.data?.byProcess ?? [];
   const total = query.data?.total ?? 0;
   const fleetTotal = byProcess.reduce((sum, row) => sum + row.count, 0);
-  const now = query.dataUpdatedAt || Date.now();
+  const now = query.dataUpdatedAt || nowInstant().epochMilliseconds;
 
   if (fleetTotal === 0) return <DeadLettersEmpty />;
 

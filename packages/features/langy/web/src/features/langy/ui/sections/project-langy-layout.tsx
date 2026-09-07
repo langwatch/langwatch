@@ -47,6 +47,12 @@ const ProjectLangySubtree = memo(function ProjectLangySubtree({
   );
 });
 
+/** Who reserves the dock's room: the page wrapper, a claiming app shell, or nobody. */
+function dockReservation({ shifted, shellClaimed }: { shifted: boolean; shellClaimed: boolean }) {
+  if (!shifted) return "none";
+  return shellClaimed ? "shell" : "page";
+}
+
 /**
  * Wraps the routed page in a box that reserves room on the right while the docked panel
  * is open (so content slides over instead of hiding under it), and renders the panel
@@ -70,9 +76,7 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
     setDockShifted(shifted);
     return () => setDockShifted(false);
   }, [shifted, setDockShifted]);
-  // Who reserves the dock's room right now: the page wrapper ("page"), a
-  // claiming app shell ("shell"), or nobody ("none", panel closed/floating).
-  const reservation = !shifted ? "none" : shellClaimed ? "shell" : "page";
+  const reservation = dockReservation({ shifted, shellClaimed });
   return (
     <>
       <Box

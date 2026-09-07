@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { Box, Button, Flex, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { MessagesSquare } from "lucide-react";
 import { useState } from "react";
@@ -39,11 +40,11 @@ export function GenerateConversationDialog() {
         resourceAttributes: traces[0]?.resourceAttributes,
       });
       for (let i = 0; i < traces.length; i++) {
-        const logId = `conv-${Date.now()}-${i}`;
+        const logId = `conv-${nowInstant().epochMilliseconds}-${i}`;
         addLogEntry({
           id: logId,
           traceId: logId,
-          timestamp: Date.now(),
+          timestamp: nowInstant().epochMilliseconds,
           status: "pending",
         });
         try {

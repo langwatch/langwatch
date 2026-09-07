@@ -299,7 +299,8 @@ function FactsBody({
   document: unknown;
   projectSlug: string | null;
 }) {
-  if (Array.isArray(document) || collectionOf(document)) {
+  const isCollection = Array.isArray(document) || collectionOf(document) !== null;
+  if (isCollection) {
     // The document is a collection after all — read it as one.
     return <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
   }
@@ -377,13 +378,14 @@ function DiffBody({
           Version {version}
         </Text>
       ) : null}
-      {fields.length > 0 ? (
+      {fields.length > 0 && (
         <VStack align="stretch" gap={0}>
           {fields.map((field) => (
             <CapabilityRow key={field} primary={labelize(field)} secondary="changed" />
           ))}
         </VStack>
-      ) : content ? (
+      )}
+      {fields.length === 0 && content ? (
         <Box
           as="pre"
           textStyle="2xs"
@@ -403,9 +405,8 @@ function DiffBody({
         >
           {content}
         </Box>
-      ) : (
-        <BodyLine>Saved as a new version.</BodyLine>
-      )}
+      ) : null}
+      {fields.length === 0 && !content && <BodyLine>Saved as a new version.</BodyLine>}
     </VStack>
   );
 }
@@ -511,6 +512,22 @@ export function LangyDeclarativeCard({
   );
 }
 
+/** Why the rows are not on screen, phrased in the surface's own noun. */
+function describeMissingRows({
+  status,
+  returned,
+  noun,
+}: {
+  status: CapabilityData["status"];
+  returned: number | null;
+  noun: CapabilityDescriptor["noun"];
+}): string {
+  if (status === "unavailable") return `Couldn't load these ${noun.plural} right now.`;
+  return returned === 1
+    ? `This ${noun.singular} is no longer available.`
+    : `These ${noun.plural} are no longer available.`;
+}
+
 /**
  * A collection read rendered from its REFERENCES: rows hydrated fresh through the
  * product's own API, titled by the digest's honest counts.
@@ -547,9 +564,10 @@ function HydratedRowsCard({
       projectSlug={projectSlug}
       icon={descriptor.icon}
     >
-      {hydration.isHydrating && hydration.rows.length === 0 ? (
+      {hydration.isHydrating && hydration.rows.length === 0 && (
         <CapabilityRowSkeletons count={Math.min(returned ?? 3, MAX_ROWS)} />
-      ) : hydration.rows.length > 0 ? (
+      )}
+      {hydration.rows.length > 0 ? (
         <VStack align="stretch" gap={0}>
           {hydration.rows.map((row) => (
             <CapabilityRow
@@ -569,14 +587,9 @@ function HydratedRowsCard({
             </Text>
           ) : null}
         </VStack>
-      ) : (
-        <BodyLine>
-          {hydration.status === "unavailable"
-            ? `Couldn't load these ${noun.plural} right now.`
-            : returned === 1
-              ? `This ${noun.singular} is no longer available.`
-              : `These ${noun.plural} are no longer available.`}
-        </BodyLine>
+      ) : null}
+      {!hydration.isHydrating && hydration.rows.length === 0 && (
+        <BodyLine>{describeMissingRows({ status: hydration.status, returned, noun })}</BodyLine>
       )}
     </LangyCapabilityCard>
   );

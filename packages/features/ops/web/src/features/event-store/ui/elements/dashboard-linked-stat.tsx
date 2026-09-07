@@ -28,7 +28,7 @@ export function LinkedStat({
   hint,
   link,
 }: LinkedStatProps) {
-  const warningAttribute = warning === void 0 ? void 0 : warning ? "true" : "false";
+  const warningAttribute = warning === void 0 ? void 0 : String(warning);
   const content = (
     <Stat.Root
       cursor={href ? "pointer" : void 0}

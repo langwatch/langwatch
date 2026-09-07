@@ -21,6 +21,25 @@ const DEPTH_PRESETS = [
   { label: "Deep", value: 14 },
 ] as const;
 
+/** What the "use real prompts" toggle says about the project it would sample. */
+function describeRealPrompts({
+  hasProject,
+  useRealPrompts,
+  loading,
+  promptCount,
+}: {
+  hasProject: boolean;
+  useRealPrompts: boolean;
+  loading: boolean;
+  promptCount: number;
+}): string {
+  if (!hasProject) return "Select a project first";
+  if (!useRealPrompts) return "Attach real prompt IDs to LLM spans";
+  if (loading) return "Loading prompts\u2026";
+  if (promptCount === 0) return "No prompts in this project";
+  return `Sampling from ${promptCount} prompt${promptCount === 1 ? "" : "s"}`;
+}
+
 export function GenerateTraceDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const setTrace = useTraceStore((s) => s.setTrace);
@@ -190,15 +209,12 @@ export function GenerateTraceDialog() {
                     Use real prompts
                   </Text>
                   <Text textStyle="2xs" color="fg.subtle">
-                    {!selectedProjectId
-                      ? "Select a project first"
-                      : useRealPrompts
-                        ? promptsQuery.isLoading
-                          ? "Loading prompts…"
-                          : promptsQuery.prompts?.length
-                            ? `Sampling from ${promptsQuery.prompts.length} prompt${promptsQuery.prompts.length === 1 ? "" : "s"}`
-                            : "No prompts in this project"
-                        : "Attach real prompt IDs to LLM spans"}
+                    {describeRealPrompts({
+                      hasProject: Boolean(selectedProjectId),
+                      useRealPrompts,
+                      loading: promptsQuery.isLoading,
+                      promptCount: promptsQuery.prompts?.length ?? 0,
+                    })}
                   </Text>
                 </Box>
                 <Switch

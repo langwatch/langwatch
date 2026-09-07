@@ -94,10 +94,8 @@ export async function catchUpConversationFold({
   // repair and no history worth refetching.
   if (outcome === "abandoned") return;
 
-  if (
-    outcome === "behind" ||
-    isLangyTurnProjectionTerminal(useLangyStore.getState().turnProjection)
-  ) {
+  const turnEnded = isLangyTurnProjectionTerminal(useLangyStore.getState().turnProjection);
+  if (outcome === "behind" || turnEnded) {
     void utils.langy.messages.invalidate({ projectId, conversationId });
   }
 }

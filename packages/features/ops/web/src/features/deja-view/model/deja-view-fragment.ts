@@ -1,3 +1,4 @@
+import { readableDate } from "../../../model/ops-formatters.ts";
 import { EVENT_TYPE_COLORS } from "./deja-view-types.ts";
 
 export function hashEventTypeColor(eventType: string): string {
@@ -12,9 +13,9 @@ export function hashEventTypeColor(eventType: string): string {
 
 export function formatTimestamp(ts: string) {
   try {
-    const date = new Date(parseInt(ts, 10));
-    if (isNaN(date.getTime())) return ts;
-    return date.toISOString().replace("T", " ").replace("Z", "");
+    const epochMs = parseInt(ts, 10);
+    if (isNaN(epochMs)) return ts;
+    return readableDate(epochMs).toISOString().replace("T", " ").replace("Z", "");
   } catch {
     return ts;
   }

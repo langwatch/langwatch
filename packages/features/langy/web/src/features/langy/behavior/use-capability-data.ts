@@ -45,6 +45,18 @@ const IDLE: CapabilityData = {
   isHydrating: false,
 };
 
+/** How this capability fetches: by the ids the answer named, by its query, or not at all. */
+function hydrationMode({
+  canHydrateByIds,
+  canHydrateByQuery,
+}: {
+  canHydrateByIds: boolean;
+  canHydrateByQuery: boolean;
+}) {
+  if (canHydrateByIds) return "ids" as const;
+  return canHydrateByQuery ? ("query" as const) : null;
+}
+
 export function useCapabilityData({
   command,
   digest,
@@ -75,12 +87,9 @@ export function useCapabilityData({
   const queryEligible = digest == null || digest.strategy === "query-ref";
   const query = queryEligible ? (digest?.query ?? command?.query ?? null) : null;
 
-  const mode =
-    ids && hydrator?.byIds
-      ? ("ids" as const)
-      : query && hydrator?.byQuery
-        ? ("query" as const)
-        : null;
+  const canHydrateByIds = Boolean(ids && hydrator?.byIds);
+  const canHydrateByQuery = Boolean(query && hydrator?.byQuery);
+  const mode = hydrationMode({ canHydrateByIds, canHydrateByQuery });
 
   const enabled = projectId !== null && mode !== null;
 

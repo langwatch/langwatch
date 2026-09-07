@@ -1,3 +1,4 @@
+import { readableDate } from "../../../../model/ops-formatters.ts";
 import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { DashboardData } from "@langwatch/ops-contract";
 import { useMemo, useRef, useState } from "react";
@@ -103,14 +104,14 @@ function downsample(raw: DashboardData["throughputHistory"], bucketMs: number): 
 }
 
 function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], {
+  return readableDate(ts).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
 }
 
 function formatTimeWithSeconds(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], {
+  return readableDate(ts).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",

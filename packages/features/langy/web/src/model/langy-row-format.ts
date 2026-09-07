@@ -2,13 +2,20 @@
  * Row wording shared by the capability cards and the hydrators.
  */
 
+import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
+
+/** The moment a row prints, as the `Date` the Intl formatters take. */
+export function readableDate(value: TimeInput) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
+}
+
 export function truncateRowText(text: string, max: number): string {
   const clean = text.replace(/\s+/g, " ").trim();
   return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`;
 }
 
 export function formatRowWhen(startedAt: number): string {
-  return new Date(startedAt).toLocaleString(undefined, {
+  return readableDate(startedAt).toLocaleString(undefined, {
     day: "numeric",
     month: "short",
     hour: "2-digit",

@@ -80,15 +80,13 @@ export function LangyDerivedCardFrame({
         )}
       </HStack>
 
-      {title !== undefined && title !== null ? (
-        typeof title === "string" ? (
-          <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
-            {title}
-          </Text>
-        ) : (
-          title
-        )
-      ) : null}
+      {typeof title === "string" ? (
+        <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
+          {title}
+        </Text>
+      ) : (
+        (title ?? null)
+      )}
 
       {children}
 

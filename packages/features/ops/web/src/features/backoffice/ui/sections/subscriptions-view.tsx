@@ -1,3 +1,4 @@
+import { Temporal, toEpochMs } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -265,9 +266,9 @@ const EMPTY_FORM: FormState = {
 
 function toDateInputValue(value: string | null | undefined): string {
   if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().slice(0, 10);
+  const epochMs = toEpochMs(value);
+  if (Number.isNaN(epochMs)) return "";
+  return Temporal.Instant.fromEpochMilliseconds(epochMs).toString().slice(0, 10);
 }
 
 function numOrNull(raw: string): number | null {

@@ -1,3 +1,4 @@
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Badge, Card, HStack, Table, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import type { OpsScheduledJob } from "@langwatch/ops-contract";
@@ -86,7 +87,7 @@ function TimedWorkRowView({ row, now }: { row: TimedWorkRow; now: number }) {
 export function UpcomingWorkCard({
   schedules,
   wakes,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   schedules: OpsScheduledJob[];
   wakes: UpcomingProcessWake[];
@@ -101,7 +102,7 @@ export function UpcomingWorkCard({
         kind: "schedule",
         what: `${job.targetType}/${job.targetId}`,
         where: job.projectName ?? job.projectId,
-        dueAtMs: new Date(job.nextRunAt).getTime(),
+        dueAtMs: toEpochMs(job.nextRunAt),
       });
     }
     for (const wake of wakes) {

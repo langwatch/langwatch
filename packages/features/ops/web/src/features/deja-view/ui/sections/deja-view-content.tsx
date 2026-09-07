@@ -1,6 +1,7 @@
+import { useDejaViewKeyboard } from "../../behavior/use-deja-view-keyboard.ts";
 import { Box, Center, EmptyState, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Eye, Info } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { AggregateTable } from "../blocks/deja-view-aggregate-table.tsx";
 import { DejaViewCenterPanel } from "./deja-view-center-panel.tsx";
 import { EventTimeline } from "../blocks/deja-view-event-timeline.tsx";
@@ -25,6 +26,141 @@ type EventSubscriber = {
   aggregateType: string;
   eventTypes: readonly string[];
 };
+
+/** What stands in for the tape while it loads, fails, or comes back empty. */
+function AggregateEventsPlaceholder({
+  loading,
+  errorMessage,
+}: {
+  loading: boolean;
+  errorMessage?: ReactNode;
+}) {
+  if (loading) {
+    return (
+      <Center flex={1}>
+        <Spinner size="lg" />
+      </Center>
+    );
+  }
+  if (errorMessage) return <Center flex={1}>{errorMessage}</Center>;
+  return (
+    <Center flex={1}>
+      <Text textStyle="sm" color="fg.muted">
+        No events found for this aggregate.
+      </Text>
+    </Center>
+  );
+}
+
+/** The landing screen: find an aggregate before any tape can be replayed. */
+function AggregateSearchScreen({
+  searchQuery,
+  tenantFilter,
+  hasSearched,
+  searchResults,
+  searchLoading,
+  searchError,
+  searchLookbackDays,
+  hotTierDays,
+  hotTierEnvVar,
+  onSearchQueryChange,
+  onTenantFilterChange,
+  onSearch,
+  onSelectAggregate,
+}: {
+  searchQuery: string;
+  tenantFilter: string;
+  hasSearched: boolean;
+  searchResults: AggregateResult[] | undefined;
+  searchLoading: boolean;
+  searchError?: ReactNode;
+  searchLookbackDays: number | null;
+  hotTierDays: number | null;
+  hotTierEnvVar: string | null;
+  onSearchQueryChange: (value: string) => void;
+  onTenantFilterChange: (value: string) => void;
+  onSearch: () => void;
+  onSelectAggregate: (aggregateId: string, tenantId: string) => void;
+}) {
+  return (
+    <>
+      <SearchHeader
+        searchQuery={searchQuery}
+        tenantFilter={tenantFilter}
+        onSearchQueryChange={onSearchQueryChange}
+        onTenantFilterChange={onTenantFilterChange}
+        onSearch={onSearch}
+        isLoading={searchLoading}
+      />
+      <Box paddingX={6} paddingY={4} w="full">
+        <VStack align="stretch" gap={4}>
+          {searchLookbackDays !== null && (
+            <Box
+              padding={3}
+              borderRadius="md"
+              borderWidth="1px"
+              borderColor="border.muted"
+              bg="bg.muted"
+            >
+              <HStack gap={2} align="start">
+                <Box color="fg.muted" paddingTop={0.5}>
+                  <Info size={14} />
+                </Box>
+                <Text textStyle="xs" color="fg.muted">
+                  Search is bounded to the last {searchLookbackDays} days.
+                  {hotTierDays !== null && (
+                    <>
+                      {" "}
+                      Aggregates older than {hotTierDays} days within that window live in cold
+                      storage and load quite some slower (set by{" "}
+                      {hotTierEnvVar ?? "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS"}).
+                    </>
+                  )}
+                </Text>
+              </HStack>
+            </Box>
+          )}
+
+          {searchLoading && !searchResults && (
+            <Center paddingY={10}>
+              <Spinner size="lg" />
+            </Center>
+          )}
+
+          {searchError}
+
+          {hasSearched && !searchLoading && searchResults && searchResults.length === 0 && (
+            <Center paddingY={10}>
+              <EmptyState.Root>
+                <EmptyState.Content>
+                  <EmptyState.Indicator>
+                    <Eye size={32} />
+                  </EmptyState.Indicator>
+                  <EmptyState.Title>No aggregates found</EmptyState.Title>
+                  <EmptyState.Description>
+                    No aggregates match your search criteria. Try a different query or tenant ID.
+                  </EmptyState.Description>
+                </EmptyState.Content>
+              </EmptyState.Root>
+            </Center>
+          )}
+
+          {!hasSearched && (
+            <Center paddingY={10}>
+              <Text textStyle="sm" color="fg.muted">
+                Search for an aggregate ID to get started.
+              </Text>
+            </Center>
+          )}
+
+          {searchResults && searchResults.length > 0 && (
+            <AggregateTable aggregates={searchResults} onSelect={onSelectAggregate} />
+          )}
+        </VStack>
+      </Box>
+    </>
+  );
+}
 
 /**
  * Controlled DejaView workspace. The app supplies the transport results and
@@ -104,118 +240,35 @@ export function DejaView({
   onToggleEventDetail: () => void;
   onSelectEvent: (index: number) => void;
 }) {
-  useEffect(() => {
-    if (!selectedAggregate || events.length === 0) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      switch (event.key) {
-        case "ArrowLeft":
-        case "h":
-          event.preventDefault();
-          onSelectEvent(Math.max(0, eventCursor - 1));
-          break;
-        case "ArrowRight":
-        case "l":
-          event.preventDefault();
-          onSelectEvent(Math.min(events.length - 1, eventCursor + 1));
-          break;
-        case "e":
-          event.preventDefault();
-          onToggleEventDetail();
-          break;
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedAggregate, events.length, eventCursor, onSelectEvent, onToggleEventDetail]);
+  useDejaViewKeyboard({
+    active: Boolean(selectedAggregate),
+    eventCount: events.length,
+    eventCursor,
+    onSelectEvent,
+    onToggleEventDetail,
+  });
 
   if (!selectedAggregate) {
     return (
-      <>
-        <SearchHeader
-          searchQuery={searchQuery}
-          tenantFilter={tenantFilter}
-          onSearchQueryChange={onSearchQueryChange}
-          onTenantFilterChange={onTenantFilterChange}
-          onSearch={onSearch}
-          isLoading={searchLoading}
-        />
-        <Box paddingX={6} paddingY={4} w="full">
-          <VStack align="stretch" gap={4}>
-            {searchLookbackDays !== null && (
-              <Box
-                padding={3}
-                borderRadius="md"
-                borderWidth="1px"
-                borderColor="border.muted"
-                bg="bg.muted"
-              >
-                <HStack gap={2} align="start">
-                  <Box color="fg.muted" paddingTop={0.5}>
-                    <Info size={14} />
-                  </Box>
-                  <Text textStyle="xs" color="fg.muted">
-                    Search is bounded to the last {searchLookbackDays} days.
-                    {hotTierDays !== null && (
-                      <>
-                        {" "}
-                        Aggregates older than {hotTierDays} days within that window live in cold
-                        storage and load quite some slower (set by{" "}
-                        {hotTierEnvVar ?? "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS"}).
-                      </>
-                    )}
-                  </Text>
-                </HStack>
-              </Box>
-            )}
-
-            {searchLoading && !searchResults && (
-              <Center paddingY={10}>
-                <Spinner size="lg" />
-              </Center>
-            )}
-
-            {searchError}
-
-            {hasSearched && !searchLoading && searchResults && searchResults.length === 0 && (
-              <Center paddingY={10}>
-                <EmptyState.Root>
-                  <EmptyState.Content>
-                    <EmptyState.Indicator>
-                      <Eye size={32} />
-                    </EmptyState.Indicator>
-                    <EmptyState.Title>No aggregates found</EmptyState.Title>
-                    <EmptyState.Description>
-                      No aggregates match your search criteria. Try a different query or tenant ID.
-                    </EmptyState.Description>
-                  </EmptyState.Content>
-                </EmptyState.Root>
-              </Center>
-            )}
-
-            {!hasSearched && (
-              <Center paddingY={10}>
-                <Text textStyle="sm" color="fg.muted">
-                  Search for an aggregate ID to get started.
-                </Text>
-              </Center>
-            )}
-
-            {searchResults && searchResults.length > 0 && (
-              <AggregateTable aggregates={searchResults} onSelect={onSelectAggregate} />
-            )}
-          </VStack>
-        </Box>
-      </>
+      <AggregateSearchScreen
+        searchQuery={searchQuery}
+        tenantFilter={tenantFilter}
+        hasSearched={hasSearched}
+        searchResults={searchResults}
+        searchLoading={searchLoading}
+        searchError={searchError}
+        searchLookbackDays={searchLookbackDays}
+        hotTierDays={hotTierDays}
+        hotTierEnvVar={hotTierEnvVar}
+        onSearchQueryChange={onSearchQueryChange}
+        onTenantFilterChange={onTenantFilterChange}
+        onSearch={onSearch}
+        onSelectAggregate={onSelectAggregate}
+      />
     );
   }
+
+  const hasEventsToShow = !eventsLoading && !eventsError && events.length > 0;
 
   return (
     <Box
@@ -234,19 +287,7 @@ export function DejaView({
         onBack={onBack}
       />
 
-      {eventsLoading ? (
-        <Center flex={1}>
-          <Spinner size="lg" />
-        </Center>
-      ) : eventsError ? (
-        <Center flex={1}>{eventsError}</Center>
-      ) : events.length === 0 ? (
-        <Center flex={1}>
-          <Text textStyle="sm" color="fg.muted">
-            No events found for this aggregate.
-          </Text>
-        </Center>
-      ) : (
+      {hasEventsToShow ? (
         <>
           <Box display="flex" flex={1} overflow="hidden" minH={0} w="full">
             <LeftPanel
@@ -288,6 +329,8 @@ export function DejaView({
 
           <DejaViewKeyboardHints renderKey={renderKey} />
         </>
+      ) : (
+        <AggregateEventsPlaceholder loading={eventsLoading} errorMessage={eventsError} />
       )}
     </Box>
   );
