@@ -142,6 +142,17 @@ describe("given the Insights screen", () => {
     ).toBeInTheDocument();
   });
 
+  /** @scenario "Insights opens on an empty brief with one sentence of promise" */
+  it("paints the Langy mark without the Langy panel mounted", () => {
+    // Outside `.langy-root` the mark fills from an SVG gradient that only
+    // the Langy panel mounts, so a viewer without Langy would see nothing.
+    // Inside it the theme paints the mark in currentColor. The card must
+    // therefore BE the scope, not merely sit near one.
+    const { container } = renderPage(InsightsPage);
+    expect(container.querySelector(".langy-root .langy-mark")).not.toBeNull();
+    expect(container.querySelector(".langy-root linearGradient")).toBeNull();
+  });
+
   /** @scenario "Open Langy opens the Langy panel" */
   it("opens the Langy panel from Open Langy", () => {
     renderPage(InsightsPage);

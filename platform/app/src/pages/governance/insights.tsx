@@ -8,18 +8,10 @@ import {
 } from "~/components/governance/platform/InsightsSetupDialog";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import {
-  LangyMark,
-  LangyMarkGradientDefs,
-} from "~/features/langy/components/LangyMark";
+import { LangyPanelSurface } from "~/features/asaplangy/components/LangyPanelSurface";
+import { SERIF } from "~/features/asaplangy/tokens";
+import { LangyMark } from "~/features/langy/components/LangyMark";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
-
-/**
- * Own paint server for the mark. The Langy panel mounts the shared one,
- * but a viewer without Langy never has it, and a mark filled from a missing
- * gradient paints nothing.
- */
-const INSIGHTS_MARK_GRADIENT_ID = "governance-insights-mark-grad";
 
 /**
  * The Insights inbox before there is anything in it.
@@ -47,77 +39,71 @@ function InsightsPage() {
           </Text>
         </VStack>
 
-        {/* Langy's own empty state, transplanted: the bare mark, the serif
-            display line under it, one quiet sentence, then the keys. No tile
-            behind the mark, one hairline, no shadow — see
-            features/langy/components/EmptyState.tsx and langyTheme.ts for
-            why each of those is a rule and not a taste. `langy-root` scopes
-            Langy's type face and dark palette to the card. */}
-        <VStack
-          className="langy-root"
+        {/* Langy's own empty state on Langy's own material. The surface is
+            the one the home briefing wears (`langy-root`, hairline, no
+            shadow, the panel's palette in dark); inside it, the panel's
+            empty-state grammar: the bare mark, the serif display line, one
+            quiet sentence, then the keys — see
+            features/langy/components/EmptyState.tsx. The scope also paints
+            the mark in currentColor (langyTheme.css), which is why the card
+            carries no gradient defs: outside it the mark would fill from a
+            paint server only the Langy panel mounts. */}
+        <LangyPanelSurface
           data-testid="insights-empty-brief"
           alignSelf="center"
-          width="full"
           maxWidth="900px"
-          gap={0}
-          paddingY={16}
-          paddingX={8}
-          borderWidth="1px"
-          borderStyle="dashed"
-          borderColor="border"
-          borderRadius="xl"
-          background="bg.surface"
         >
-          <LangyMarkGradientDefs id={INSIGHTS_MARK_GRADIENT_ID} />
-          <LangyMark size={44} gradientId={INSIGHTS_MARK_GRADIENT_ID} />
-          <Text
-            as="h2"
-            fontFamily="var(--langy-font-serif)"
-            // 44px mark ÷ φ, the same pairing the panel's greeting uses.
-            fontSize="27px"
-            fontWeight="500"
-            letterSpacing="-0.02em"
-            lineHeight="1.2"
-            color="fg"
-            textAlign="center"
-            marginTop={4}
-          >
-            Langy writes your brief here
-          </Text>
-          <Text
-            textStyle="sm"
-            color="fg.muted"
-            lineHeight="1.5"
-            textAlign="center"
-            textWrap="balance"
-            maxWidth="380px"
-            marginTop={2}
-          >
-            Every morning a background job reads yesterday&apos;s traffic and
-            files a couple of high-signal insights: not fifteen a day.
-          </Text>
-          <HStack gap={2} marginTop={6}>
-            <Button
-              size="sm"
-              colorPalette="orange"
-              onClick={() => setSetupOpen(true)}
+          <VStack gap={0} paddingY={16} paddingX={8}>
+            <LangyMark size={44} />
+            <Text
+              as="h2"
+              fontFamily={SERIF}
+              // 44px mark ÷ φ, the same pairing the panel's greeting uses.
+              fontSize="27px"
+              fontWeight="500"
+              letterSpacing="-0.02em"
+              lineHeight="1.2"
+              color="fg"
+              textAlign="center"
+              marginTop={4}
             >
-              Set up data
+              Langy writes your brief here
+            </Text>
+            <Text
+              textStyle="sm"
+              color="fg.muted"
+              lineHeight="1.5"
+              textAlign="center"
+              textWrap="balance"
+              maxWidth="380px"
+              marginTop={2}
+            >
+              Every morning a background job reads yesterday&apos;s traffic and
+              files a couple of high-signal insights: not fifteen a day.
+            </Text>
+            <HStack gap={2} marginTop={6}>
+              <Button
+                size="sm"
+                colorPalette="orange"
+                onClick={() => setSetupOpen(true)}
+              >
+                Set up data
+              </Button>
+              <Button size="sm" variant="subtle" onClick={openLangy}>
+                Open Langy
+              </Button>
+            </HStack>
+            <Button
+              variant="plain"
+              size="xs"
+              fontWeight="400"
+              color="fg.subtle"
+              marginTop={3}
+            >
+              or preview a sample inbox
             </Button>
-            <Button size="sm" variant="subtle" onClick={openLangy}>
-              Open Langy
-            </Button>
-          </HStack>
-          <Button
-            variant="plain"
-            size="xs"
-            fontWeight="400"
-            color="fg.subtle"
-            marginTop={3}
-          >
-            or preview a sample inbox
-          </Button>
-        </VStack>
+          </VStack>
+        </LangyPanelSurface>
       </VStack>
 
       <InsightsSetupDialog
