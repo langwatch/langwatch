@@ -21,7 +21,7 @@ The brief is the whole input. Never run `langwatch onboarding state` during a gu
 - **Everything picked** is the order the user chose; the Home page offers the rest later, so set up only the current path.
 - **Provider** is already connected when the brief names one. Never ask for a key.
 - **Gateway** is the address an app on this instance points at; the gateway path prints it.
-- **Virtual key** names the key the tour minted, with its preview (the first characters) and its reveal id, or says none was minted. The secret is never in the brief: the reveal id is what shows it, once, through the `secret_snippet` card.
+- **Virtual key** names the key the tour minted, with its preview (the first characters) and its reveal id, or says none was minted. When it names a reveal id, the line itself says what to do, and that is the whole gateway path: show the key with `secret_snippet` using this reveal id, and do not list, ask or create keys. The secret is never in the brief: the reveal id is what shows it, once, through the `secret_snippet` card.
 - **Tour: skipped** adds one line before the path's own opener, exactly:
 
   No worries! Everything the tour covers is in the menu on the left. I'll be right here when you need me.
@@ -209,8 +209,8 @@ langwatch onboarding complete-path coding
 
 Three cases, checked in this order. The first that matches is the whole path; the ones after it never run. Read the `Virtual key:` line of the brief before any tool call.
 
-1. **The brief carries a reveal id.** The tour minted the key, and the reveal id in hand is what shows its secret: the `Virtual key:` line of the brief carries its name, its preview and its reveal id, and that is where they come from. Say nothing about the key having existed; open with the line below as if it were just made. No list, no question, no minting: go straight to "Show the key" with the brief's reveal id and preview.
-2. **No reveal id in the brief, and the key exists.** Run `langwatch virtual-keys list --format json`. When a row is named `production-app`, its secret was shown once, at creation, and cannot be shown again: go to "No reveal id in hand: ask first".
+1. **The brief carries a reveal id.** The line reads "Virtual key: production-app is live (preview ..., reveal id ...). Show it with secret_snippet using this reveal id. Do not list, ask or create keys." Do exactly that. The tour minted the key, and the reveal id in hand is what shows its secret: the `Virtual key:` line of the brief carries its name, its preview and its reveal id, and that is where they come from. Say nothing about the key having existed; open with the line below as if it were just made. No list, no question, no minting: go straight to "Show the key" with the brief's reveal id and preview. `langwatch virtual-keys list` is never run while the brief names a reveal id; there is nothing to check, the key is in hand.
+2. **No reveal id in the brief, and the key exists.** Only now, with the brief saying none was minted, run `langwatch virtual-keys list --format json`. When a row is named `production-app`, its secret was shown once, at creation, and cannot be shown again: go to "No reveal id in hand: ask first".
 3. **No reveal id in the brief, and no key.** No row is named `production-app`: mint it.
 
 ```bash

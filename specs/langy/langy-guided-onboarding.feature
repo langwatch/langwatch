@@ -155,8 +155,29 @@ Feature: Langy guides the first setup after sign-up
     Scenario: The brief names the key the tour minted, by its reveal id
       When the panel builds the kickoff brief after the gateway tour minted a key
       Then the brief carries the key's name, its preview and its reveal id on one line
+      And that line says to show it with secret_snippet using this reveal id, and not to list, ask or create keys
       And the brief never carries the secret
       And a brief for a tour that minted no key says so
+
+    # The skill's prose put the reveal case first and a model still ran the
+    # list, asked and minted over a reveal it held. The instruction now rides
+    # on the brief line itself, next to the reveal id, and the skill's case
+    # one repeats it word for word: the one place both read is the line.
+    @unit
+    Scenario: The settled Virtual key line tells Langy what to do with the reveal
+      Given the stored guided state holds the tour's key with its reveal id
+      When the kickoff is settled on the server
+      Then the Virtual key line names the key as live with its preview and reveal id
+      And says to show it with secret_snippet using this reveal id, and not to list, ask or create keys
+      And a state that holds no key settles to "Virtual key: none minted by the tour" with no instruction
+
+    @unit
+    Scenario: The skill's case one repeats the brief's Virtual key instruction word for word
+      When the compiled guided-onboarding skill is read
+      Then case one of the gateway path quotes the brief's Virtual key line and says to do exactly that
+      And says the list command is never run while the brief names a reveal id
+      And the list command appears only under the case with no reveal id in the brief
+      And no sentence in the skill says to check the keys first without that condition
 
     # The panel composes the kickoff from the guided state it holds, and the
     # drawer records the key the tour minted seconds before the tour ends: a

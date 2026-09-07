@@ -226,6 +226,32 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).not.toMatch(/OPENAI_BASE_URL="<[^>]*>"/);
     });
 
+    /** @scenario "The skill's case one repeats the brief's Virtual key instruction word for word" */
+    it("reads the brief's instruction in case one and never runs the list while a reveal id is in hand", () => {
+      const section = rendered.slice(
+        rendered.indexOf("## gateway: Gateway"),
+        rendered.indexOf("## governance: Governance"),
+      );
+      const caseOne = section.slice(
+        section.indexOf("1. **The brief carries a reveal id.**"),
+        section.indexOf("2. **No reveal id in the brief, and the key exists.**"),
+      );
+      expect(caseOne).toContain(
+        'The line reads "Virtual key: production-app is live (preview ..., reveal id ...). Show it with secret_snippet using this reveal id. Do not list, ask or create keys." Do exactly that.',
+      );
+      expect(caseOne).toContain(
+        "`langwatch virtual-keys list` is never run while the brief names a reveal id",
+      );
+      expect(caseOne).not.toContain("langwatch virtual-keys list --format json");
+      expect(section).toContain(
+        "Only now, with the brief saying none was minted, run `langwatch virtual-keys list --format json`.",
+      );
+      expect(rendered).toContain(
+        "When it names a reveal id, the line itself says what to do, and that is the whole gateway path: show the key with `secret_snippet` using this reveal id, and do not list, ask or create keys.",
+      );
+      expect(rendered).not.toMatch(/check first|checked first|may already have minted|list first/i);
+    });
+
     it("checks for the production-app key before minting one", () => {
       const list = rendered.indexOf("langwatch virtual-keys list --format json");
       const create = rendered.indexOf(

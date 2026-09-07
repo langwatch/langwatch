@@ -152,7 +152,10 @@ export function buildGuidedKickoffBrief({
   if (continuing) lines.push(guidedPathContinuationLine(input.path));
   // Every line after the opener is a label, a colon and its value, and the
   // value is the whole rest of the line: a sentence stop after the gateway
-  // address was copied into the snippet with it.
+  // address was copied into the snippet with it. The virtual key line is the
+  // one exception: its values sit in parentheses, and the rest of the line
+  // is the instruction that goes with them, since the skill's prose alone was
+  // not enough to keep a model from listing and minting over a reveal it held.
   lines.push(
     GUIDED_KICKOFF_BRIEF_OPENER,
     `Path to set up now: ${describePath(input.path)}`,
@@ -178,7 +181,7 @@ export function buildGuidedKickoffBrief({
   );
   lines.push(
     input.virtualKeyName && input.virtualKeyRevealId
-      ? `Virtual key: ${input.virtualKeyName}, preview ${input.virtualKeyPreview ?? "vk-lw-"}, reveal ${input.virtualKeyRevealId}`
+      ? `Virtual key: ${input.virtualKeyName} is live (preview ${input.virtualKeyPreview ?? "vk-lw-"}, reveal id ${input.virtualKeyRevealId}). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.`
       : "Virtual key: none minted by the tour",
   );
   return lines.join("\n");

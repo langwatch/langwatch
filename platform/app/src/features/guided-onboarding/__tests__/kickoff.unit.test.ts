@@ -96,7 +96,7 @@ describe("the guided onboarding kickoff", () => {
         },
       });
       expect(brief.split("\n")).toContain(
-        "Virtual key: production-app, preview vk-lw-01HZX9N, reveal rvl_abc123",
+        "Virtual key: production-app is live (preview vk-lw-01HZX9N, reveal id rvl_abc123). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.",
       );
       expect(buildGuidedKickoffBrief({ input: KICKOFF })).toContain(
         "Virtual key: none minted by the tour",
@@ -239,7 +239,7 @@ describe("settleGuidedKickoffParts", () => {
       });
       expect(brief.type).toBe("text");
       expect(brief.text).toContain(
-        "Virtual key: production-app, preview vk-lw-01M1X40, reveal rvl_late",
+        "Virtual key: production-app is live (preview vk-lw-01M1X40, reveal id rvl_late)",
       );
       expect(brief.text).toContain(
         "Everything picked, in the order it was picked: gateway (Gateway), llmops (Evals & LLM Ops)",
@@ -266,7 +266,27 @@ describe("settleGuidedKickoffParts", () => {
       expect(settled[1].text.startsWith("Let's set up Gateway then.\n")).toBe(
         true,
       );
-      expect(settled[1].text).toContain("reveal rvl_late");
+      expect(settled[1].text).toContain("reveal id rvl_late");
+    });
+
+    /** @scenario "The settled Virtual key line tells Langy what to do with the reveal" */
+    it("writes the instruction into the Virtual key line when the state holds a reveal, and the none line when it holds none", () => {
+      const withReveal = settleGuidedKickoffParts({
+        parts: snapshot,
+        facts: recordedLater,
+      }) as [unknown, { text: string }];
+      expect(withReveal[1].text.split("\n")).toContain(
+        "Virtual key: production-app is live (preview vk-lw-01M1X40, reveal id rvl_late). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.",
+      );
+
+      const withoutReveal = settleGuidedKickoffParts({
+        parts: snapshot,
+        facts: guidedKickoffStateFactsOf({ paths: ["gateway", "llmops"] }),
+      }) as [unknown, { text: string }];
+      expect(withoutReveal[1].text.split("\n")).toContain(
+        "Virtual key: none minted by the tour",
+      );
+      expect(withoutReveal[1].text).not.toContain("secret_snippet");
     });
 
     it("carries no virtual key field at all when the state recorded none", () => {

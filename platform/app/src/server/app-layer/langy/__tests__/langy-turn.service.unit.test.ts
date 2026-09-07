@@ -207,7 +207,7 @@ describe("LangyTurnService.startConversationTurn", () => {
         userMessage: { parts: Array<Record<string, unknown>> };
       };
       const settledLine =
-        "Virtual key: production-app, preview vk-lw-01M1X40, reveal rvl_late";
+        "Virtual key: production-app is live (preview vk-lw-01M1X40, reveal id rvl_late). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.";
       expect(accepted.questionParts[1]?.text).toContain(settledLine);
       expect(accepted.userMessage.parts[1]?.text).toContain(settledLine);
       expect(accepted.userMessage.parts[0]).toMatchObject({
