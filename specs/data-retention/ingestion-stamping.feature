@@ -43,6 +43,12 @@ Feature: Retention stamping at ingestion time
     When identity, MFA, SSO, join-request, SCIM, authorization, or virtual-key lifecycle events are recorded
     Then their event_log records have _retention_days = 0
 
+  @unit
+  Scenario: Tenant retention never enrolls durable security projections
+    When the ClickHouse retention table registry is built
+    Then identity, credential, SSO, SCIM, membership, and authorization projection stores are absent
+    And explicit revocation, teardown, erasure, session expiry, and proof expiry remain unchanged
+
   Scenario: Non-security event families remain policy-bound
     When trace, log, metric, evaluation, Langy-conversation, topic-model, governance budget-crossing, gateway-spend, pulled-usage, ingestion-pull, automation-trigger, or coding-agent-fact events are recorded
     Then their event_log records use the traces retention category

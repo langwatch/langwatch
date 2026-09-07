@@ -119,6 +119,13 @@ as budget crossings. Every non-security family follows the matching customer
 category, including automation, coding-agent, ingestion, usage, gateway,
 configuration, operational, and billing events.
 
+The corresponding identity, SSO, SCIM, credential, membership, and
+authorization heads remain in PostgreSQL and are outside tenant retention.
+`SECURITY_RETENTION_EXEMPT_TABLES` reserves their storage names against the
+ClickHouse retention registry, and startup fails if a future table mapping
+tries to enroll one. This does not override explicit revocation, teardown,
+user/privacy erasure, or the normal expiry of sessions and verification proofs.
+
 PG carries `RetentionPolicy(scopeType, scopeId, category, retentionDays)`
 with a denormalized `organizationId` anchor for plan-gating and
 invalidation queries.

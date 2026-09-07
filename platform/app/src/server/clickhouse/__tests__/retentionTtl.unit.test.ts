@@ -7,6 +7,7 @@ import {
   RETENTION_MANAGED_TABLES,
   RETENTION_TABLE_CATEGORY_MAP,
   RETENTION_TTL_MANAGED_TABLES,
+  SECURITY_RETENTION_EXEMPT_TABLES,
 } from "../../data-retention/retentionPolicy.schema";
 import {
   buildRetentionTTLExpression,
@@ -130,6 +131,16 @@ describe("RETENTION_MANAGED_TABLES", () => {
     expect(RETENTION_MANAGED_TABLES).toContain("experiment_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("experiment_run_items");
     expect(RETENTION_MANAGED_TABLES).toContain("dspy_steps");
+  });
+
+  /** @scenario Tenant retention never enrolls durable security projections */
+  it("never enrolls durable identity, SSO, SCIM, or authorization state", () => {
+    for (const table of SECURITY_RETENTION_EXEMPT_TABLES) {
+      expect(RETENTION_MANAGED_TABLES).not.toContain(table);
+      expect(TABLE_TTL_CONFIG.map((config) => config.table)).not.toContain(
+        table,
+      );
+    }
   });
 
   it("does not include billable_events", () => {
