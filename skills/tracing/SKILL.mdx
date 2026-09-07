@@ -88,7 +88,7 @@ Before you start the process, check that the key is visible to it the way the pr
 uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
 ```
 
-`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. TypeScript:
+`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. Always `-c`, never `python -` with a heredoc: python-dotenv's loader looks for its caller's file and fails on standard input. TypeScript:
 
 ```bash
 node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"

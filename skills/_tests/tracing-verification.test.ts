@@ -53,6 +53,7 @@ describe("given the tracing skill", () => {
         "This is the first and only check: copy the command for the language as written, run it once from the project root",
       );
       expect(rendered).toContain("No variant before it");
+      expect(rendered).toContain("Always `-c`, never `python -` with a heredoc");
       expect(rendered).toContain(
         "```bash\nuv run python -c \"from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))\"\n```",
       );

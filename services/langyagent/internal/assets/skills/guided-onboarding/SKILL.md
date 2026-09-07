@@ -69,12 +69,18 @@ and call `code_access` again, this time without `offer_describe`. Keep their des
 
 With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language, then say one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That line is part of this step, before the branch and the first edit.
 
-Work on a branch of your own, never on the branch the user has checked out: `git checkout -b langy/<slug> origin/<default>` (a worktree when the tree is dirty), as step 2 of `code-changes` says. On that branch, in this order:
+Work on a branch of your own, never on the branch the user has checked out: `git checkout -b langy/<slug> origin/<default>` (a worktree when the tree is dirty), as step 2 of `code-changes` says. On that branch, load the `tracing` and `connect-agent` skills with the `skill` tool, then, in this order:
 
 1. `tracing` for the detected framework. Read one docs page, `langwatch docs integration/<python|typescript>/integrations/<framework>` (for example `integration/python/integrations/langgraph`), and no other. Keep the order the tracing skill pins: the environment loads first and LangWatch initialises after it, so `langwatch.setup()` sits below the import that loads the env file, never at the top of the entry file.
 2. `connect-agent`: the connect call with a stable agent name and the environment the process runs in. The skill carries the whole pattern and there is no docs page for it: never search `langwatch docs` for one. The connect function is an adapter you write beside the startup code: it calls the app's own function and returns the reply text, or one message, or a list of messages. Never put the decorator on a function the app already has that returns its own result: the SDK cannot turn a dict into a reply, and every turn of the run times out.
 3. Call `local_langwatch_env` once, with the env file the app loads (`.env` next to the manifest unless the code loads another). It writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT there with the user's own login. The key never reaches you: never ask for it, never write it yourself and never read the file back for it.
-4. Run the tracing skill's key check once, copied as written for the language, from the project root, through the project's own runner. It is the first and only check, and it prints only whether the key is set. One run: never a second try with another path or another loader, and no probe of your own before it.
+4. Run the tracing skill's key check once, copied as written for the language, from the project root, through the project's own runner. It is the first and only check, and it prints only whether the key is set. One run: never a second try with another path or another loader, and no probe of your own before it. For Python that is this command, with `-c` and never `python -` with a heredoc (the loader fails on standard input):
+
+   ```bash
+   uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
+   ```
+
+   `False` is not a failed step: fix the load order of step 1 and run the same command again.
 5. Start the agent from that branch the way the repo starts it (the `local_*` tools run the process), then run `langwatch agent list --wait-online <agent name> --format json` once: it prints the list as soon as the row's `status` is `online`, and it fails after two minutes when the row never does. Never write a loop of your own around `agent list`. Nothing runs against an agent that is not online: no scenario, no suite. Every `--target` below is `connected:<that name>`.
 6. Commit the instrumentation on that branch, in one command: stage the files you edited or wrote, by name (the manifest, the tracing edit, the connect adapter, a lockfile the repository tracks), never the env file and never `git add -A`, with this message and no trailer:
 
@@ -85,6 +91,8 @@ git add <the files you changed> && git commit -m "Add LangWatch tracing and the 
 Then say in one line of your own words that the tracing and the connect call are on branch `langy/<slug>` for them to review. Keep that branch checked out while the agent you started runs; the push and the pull request come in step 5.
 
 ### 3. Propose the first scenario, and stop
+
+This question is the gate of step 4: no `scenario create`, no run and no suite before the person has answered it. Whatever arrives first, a message describing a scenario, a question, or a setup that stopped at a failed step and was then fixed, finish step 2 and ask it; a scenario the person described before the question becomes `{title}` in it, and the answer is still theirs to give.
 
 Do not create it yet. Ask with the `question` tool, verbatim, with the braces filled from what you read:
 
@@ -101,11 +109,11 @@ The first scenario is the agent's golden path: the thing the agent exists to do,
 
 Of course. Tell me what the scenario should cover and I'll write it with you.
 
-Their next message describes the scenario. Write it with them, then continue at step 4 with what they agreed.
+After that pick, their next message describes the scenario. Write it with them, then continue at step 4 with what they agreed.
 
 ### 4. The checklist, then create, explain, run
 
-On "Sure, go ahead!", or on the agreed scenario, before any command, write this list into `todowrite`, in this order and these words, every item pending:
+On "Sure, go ahead!", or on the scenario agreed after "Chat about this", before any command, write this list into `todowrite`, in this order and these words, every item pending:
 
 1. Create the first scenario
 2. Open it beside the panel

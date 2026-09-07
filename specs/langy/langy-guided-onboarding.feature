@@ -413,6 +413,27 @@ Feature: Langy guides the first setup after sign-up
 
     # A film said the chat line and added a sentence about the tracing edit in
     # the same turn, so the person's cursor never got the composer.
+    # A run whose setup turn stopped at a failed key check got the person's
+    # next message, read it as the agreed scenario, and created and ran it
+    # with no question asked. The proposal is a plan decision: Langy proposes,
+    # never acts unasked, whatever message arrives first.
+    @unit
+    Scenario: The proposal is the gate of step 4
+      When the compiled guided-onboarding skill is read
+      Then no scenario is created or run before the person has answered the proposal question
+      And a message that arrives before the question, a scenario description included, finishes the setup and gets the question
+      And a scenario described before the question becomes the title in it, with the answer still the person's
+
+    # The key check was improvised twice because the model never loaded the
+    # tracing skill that carries the command; the skills are loaded with the
+    # skill tool and the command is in the guided skill too.
+    @unit
+    Scenario: The skills are loaded, not recalled
+      When the compiled guided-onboarding skill is read
+      Then the tracing and connect-agent skills are loaded with the skill tool before the first edit
+      And the key check command is written in the skill, with -c and never a heredoc
+      And a False answer is not a failed step: the load order is fixed and the same command runs again
+
     @unit
     Scenario: Chat about this ends the turn on the line alone
       When the compiled guided-onboarding skill is read

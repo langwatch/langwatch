@@ -277,6 +277,32 @@ describe("the guided-onboarding skill", () => {
       expect(branch).toBeGreaterThan(report);
     });
 
+    /** @scenario "The proposal is the gate of step 4" */
+    it("asks the proposal before any scenario command, whatever message arrives first", () => {
+      expect(rendered).toContain(
+        "This question is the gate of step 4: no `scenario create`, no run and no suite before the person has answered it.",
+      );
+      expect(rendered).toContain(
+        "a scenario the person described before the question becomes `{title}` in it, and the answer is still theirs to give",
+      );
+      expect(rendered).toContain("After that pick, their next message describes the scenario.");
+      expect(rendered).toContain(
+        'On "Sure, go ahead!", or on the scenario agreed after "Chat about this", before any command',
+      );
+    });
+
+    /** @scenario "The skills are loaded, not recalled" */
+    it("loads the tracing and connect-agent skills with the skill tool and carries the key check command itself", () => {
+      expect(rendered).toContain(
+        "load the `tracing` and `connect-agent` skills with the `skill` tool, then, in this order:",
+      );
+      expect(rendered).toContain(
+        `uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"`,
+      );
+      expect(rendered).toContain("never `python -` with a heredoc");
+      expect(rendered).toContain("`False` is not a failed step: fix the load order of step 1 and run the same command again.");
+    });
+
     /** @scenario "The connect endpoint comes from the connect-agent skill" */
     it("never searches the docs for a connect-agent page and reads one framework page only", () => {
       expect(rendered).toContain(
