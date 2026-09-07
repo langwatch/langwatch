@@ -25,6 +25,10 @@ packages:
   # The capture half of visualdiff (tools/visualdiff): Playwright is Node, so
   # the Go CLI orchestrates and this package drives the browsers.
   - "tools/*/runner"
+  # The contributor-only backend launcher: the API and worker applications in
+  # one local process (ADR-004, amendment 2026-09-07). Private, never shipped,
+  # and the one package architecture-lint lets combine both runtimes.
+  - "tools/dev-runtime"
   - "skills"
   - "dev/tests/agentic-e2e"
   - "dev/tests/e2e-stack"

@@ -1,38 +1,34 @@
 # Replaces specs/setup/in-process-workers-dev.feature, which described a mode
 # that no longer exists. `[gone]` is gone; the product is three Node
-# applications, and each is its own process in development exactly as it is in
-# production. See dev/docs/adr/004-docker-dev-environment.md
-# ("Amendment: three processes, no in-process worker, 2026-09-03").
+# applications, each its own deployment in production. See
+# dev/docs/adr/004-docker-dev-environment.md.
+#
+# LOCALLY the api and the worker share ONE process and the Go data-plane
+# services share another — the 2026-09-07 amendment, specified in
+# specs/setup/haven-local-topology.feature. What survives here is what did not
+# change: the ports, the pre-flight, the port hand-off, and the fact that no
+# variable can move work between lanes. What lanes there ARE, and how one is
+# restarted, is the other file's subject.
 
 Feature: The local development process topology
   As a developer running LangWatch locally
   I want every entry point to run the same three applications
   So that a stack can never boot looking healthy while processing no jobs
 
-  # The three Node lanes are ui (apps/ui, Vite), api (apps/api) and workers
-  # (apps/worker). Every entry point runs all three:
-  #
-  #   pnpm dev            dev/scripts/dev-stack.sh, under concurrently
-  #   make haven up       three supervised children (tools/thuishaven)
-  #   make quickstart …   the ui, api and workers compose services
-  #
-  # None of them is selectable. There is no in-process worker mode to choose,
-  # no "all" process role, and no roleRunsWorkers: WORKERS_IN_PROCESS and
-  # START_WORKERS are dead variables that nothing reads.
+  # No lane is selectable. There is no in-process worker MODE to choose, no
+  # "all" process role, and no roleRunsWorkers: WORKERS_IN_PROCESS and
+  # START_WORKERS are dead variables that nothing reads. The local launcher
+  # that hosts the api and the worker together is exactly that — a launcher,
+  # not a role — and no value of either variable changes what it starts.
   #
   # Ports are derived from PORT (default 5560): ui on PORT, api on PORT + 1000,
   # the worker's metrics/healthz listener on PORT - 2561, and the AI Gateway on
   # PORT + 3.
 
-  # --- Every entry point runs all three ---
-
-  @unit
-  Scenario: Every stack runs the three Node lanes
-    Given a worktree with no service selection of its own
-    When haven plans the stack's children
-    Then it plans a "ui" lane, an "api" lane and a "workers" lane
-    And each runs its own workspace package's dev script from the workspace root
-    And no lane carries WORKERS_IN_PROCESS or START_WORKERS
+  # --- No knob moves work between lanes ---
+  #
+  # Which lanes a stack runs is specs/setup/haven-local-topology.feature's
+  # subject.
 
   @unit
   Scenario: A retired service delta is refused by name
@@ -48,14 +44,8 @@ Feature: The local development process topology
     Then it refuses whichever value the variable carries
     And it says the variable no longer does anything, naming no replacement
 
-  # --- Restarting one lane cannot reach another ---
-
-  @unit
-  Scenario: Bouncing the workers lane touches only its own process group
-    Given a running stack
-    When "haven restart workers" runs
-    Then only the process group holding the worker metrics port is terminated
-    And the API's group is untouched
+  # Restarting one lane cannot reach another: see
+  # specs/setup/haven-local-topology.feature.
 
   # --- The port pre-flight ---
 
@@ -83,7 +73,7 @@ Feature: The local development process topology
   Scenario: Each lane is told the port that was derived for it
     Given a dev launcher deriving its ports from PORT
     When it starts the lanes
-    Then the api lane is given PORT + 1000, not the browser application's port
+    Then the API is given PORT + 1000, not the browser application's port
     And the worker is given the metrics port the pre-flight reserved
     And the AI Gateway is given the port the launcher announced
 
@@ -105,17 +95,27 @@ Feature: The local development process topology
 
   # --- Debounced restart on change ---
 
-  # `tsx watch` (apps/api and apps/worker's dev script) restarts the instant a
-  # file changes, with no quiet window: an agent editing five files across a
-  # feature package in the same second is five restarts, not one — five
-  # reconnects to Postgres/ClickHouse/Redis. dev/scripts/dev-supervisor.mjs's
-  # `--watch` mode wraps the same command with a debounced quiet window
-  # instead, coalescing a burst into one restart. See
+  # A watcher that restarts the instant a file changes, with no quiet window,
+  # turns an agent editing five files across a feature package in the same
+  # second into five restarts — five reconnects to Postgres/ClickHouse/Redis.
+  # dev/scripts/dev-supervisor.mjs's `--watch` mode wraps the command with a
+  # debounced quiet window instead (LANGWATCH_DEV_WATCH_DEBOUNCE_MS, default
+  # 750 ms), coalescing a burst into one restart. See
   # dev/scripts/__tests__/dev-supervisor-watch.unit.test.mjs.
+
+  # Hundreds of files over several seconds, in bursts with gaps between them,
+  # is what an agent renaming across a feature package actually writes. A short
+  # window turns that into a restart per gap.
+  @unit
+  Scenario: A write storm from an agent restarts the backend once
+    Given the backend lane running under a debounced watch
+    When an agent writes hundreds of files in bursts inside the quiet window
+    Then exactly one restart happens once the tree is still
+    And every file that contributed is named to it
 
   @unit
   Scenario: A burst of source changes restarts the API once
-    Given the api lane's dev script running under a debounced watch
+    Given the backend lane's dev script running under a debounced watch
     When five files change within the same quiet window
     Then exactly one restart happens
     And it reports how many files triggered it

@@ -759,6 +759,9 @@ importers:
       '@langwatch/api-key-web':
         specifier: workspace:*
         version: link:../../packages/features/api-key/web
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/auth/contract
       '@langwatch/auth-web':
         specifier: workspace:*
         version: link:../../packages/features/auth/web
@@ -786,6 +789,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/billing/contract
       '@langwatch/enterprise-billing-web':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/billing/web
@@ -798,15 +804,24 @@ importers:
       '@langwatch/enterprise-managed-provider-web':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/managed-provider/web
+      '@langwatch/enterprise-saas-contract':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/saas/contract
       '@langwatch/enterprise-scim-web':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/scim/web
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/evaluation/contract
       '@langwatch/evaluator-web':
         specifier: workspace:*
         version: link:../../packages/features/evaluator/web
       '@langwatch/experiment-web':
         specifier: workspace:*
         version: link:../../packages/features/experiment/web
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/gateway/contract
       '@langwatch/gateway-web':
         specifier: workspace:*
         version: link:../../packages/features/gateway/web
@@ -831,12 +846,18 @@ importers:
       '@langwatch/navigation-web':
         specifier: workspace:*
         version: link:../../packages/features/navigation/web
+      '@langwatch/notification-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/notification/contract
       '@langwatch/notification-web':
         specifier: workspace:*
         version: link:../../packages/features/notification/web
       '@langwatch/onboarding-web':
         specifier: workspace:*
         version: link:../../packages/features/onboarding/web
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/ops/contract
       '@langwatch/ops-web':
         specifier: workspace:*
         version: link:../../packages/features/ops/web
@@ -882,6 +903,9 @@ importers:
       '@langwatch/user-web':
         specifier: workspace:*
         version: link:../../packages/features/user/web
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/workflow/contract
       '@langwatch/workflow-web':
         specifier: workspace:*
         version: link:../../packages/features/workflow/web
@@ -4807,6 +4831,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -4844,6 +4871,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -6479,6 +6509,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -6728,6 +6761,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -6762,6 +6798,9 @@ importers:
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../otlp
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../time
@@ -6796,6 +6835,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../time
@@ -6836,6 +6878,9 @@ importers:
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../otlp
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../time

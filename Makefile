@@ -138,12 +138,16 @@ service:
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
-		if [ -n "$$LANGWATCH_LANE" ]; then exec go run ./cmd/service $(svc); else \
-			set -o pipefail; go run ./cmd/service $(svc) 2>&1 \
+		if [ -n "$$LANGWATCH_LANE" ]; then exec go run ./cmd/service $(svc) $(args); else \
+			set -o pipefail; go run ./cmd/service $(svc) $(args) 2>&1 \
 				| node dev/scripts/log-render.mjs $(svc) --color; fi
 
-# Run a Go service with live reload on file changes.
+# Run a Go service with live reload on file changes. A rebuild that fails
+# leaves the running process alone and prints the compile error; only a
+# successful build restarts. The quiet window before a rebuild is
+# LANGWATCH_DEV_WATCH_DEBOUNCE_MS, the same knob the Node lane debounces on.
 # Usage: make service-watch svc=aigateway
+#        make service-watch svc=combined args="aigateway nlpgo"
 service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
 	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed .env first" && exit 1)
@@ -154,8 +158,9 @@ service-watch:
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
 		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
-			--build.bin "./tmp/$(svc) $(svc)" \
+			--build.bin "./tmp/$(svc) $(svc) $(args)" \
 			--build.include_ext "go" \
+			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750} \
 			--build.exclude_dir "tmp,vendor,node_modules"
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`

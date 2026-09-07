@@ -297,3 +297,122 @@ unconditionally — there is no mode in which one of them is unbound.
   owns the schema: Prisma deploy then the ClickHouse task, once, before the
   process starts. The ui lane waits on it, so a browser never loads the SPA
   against a half-migrated database.
+
+## Amendment: two local processes — `backend` and `go` (2026-09-07)
+
+The "three processes, no in-process worker (2026-09-03)" amendment above held
+that development should match production process-for-process. It does not any
+more, for development only. **Production is unchanged**: three Node deployments
+(`apps/ui`, `apps/api`, `apps/worker`) and each Go service its own container.
+
+### Context
+
+Matching production locally costs a laptop three Node runtimes and two to four
+Go ones per worktree, and a developer running several worktrees pays that
+several times. The thing the 2026-09-03 amendment was protecting against — a
+stack that boots, serves pages and quietly processes no jobs — was never the
+*process count*. It was the **switch**: `WORKERS_IN_PROCESS` and `START_WORKERS`
+let a stack be configured into a topology nobody could see. Remove the switch
+and the process count is free to be a local convenience again.
+
+### Decision
+
+Locally, a stack is **four lanes**, not six:
+
+| Lane      | Process                                     | What it is                                                                    |
+| --------- | ------------------------------------------- | ----------------------------------------------------------------------------- |
+| `ui`      | Vite (`apps/ui`)                            | the browser application, its own process as before                            |
+| `backend` | Node (`tools/dev-runtime`)                  | the **api application and the worker application in one process**             |
+| `go`      | Go (`cmd/service combined`)                 | **aigateway and nlpgo in one process**, on the two ports they already bind    |
+| `langy`   | Go (`cmd/service langyagent`), optional     | its own lane — see below                                                      |
+
+`backend` is a **launcher, not a process role.** Neither application learns it
+is sharing a process:
+
+- each resolves its own secrets through `SecretEnvironmentService`, parses its
+  own config with its own Zod schema, and composes its own graph — in the same
+  order, once each, as when it runs alone;
+- neither shares a Prisma client, a Redis connection or a ClickHouse client with
+  the other. They are shareable only where both applications already accept an
+  injected instance, and today neither standalone composition does. Two clients
+  is the same count two processes had; only the Node runtime is saved;
+- both health and metrics endpoints keep working: the API serves its own, the
+  worker serves its own metrics/healthz listener on `PORT - 2561`;
+- `WORKERS_IN_PROCESS` and `START_WORKERS` stay dead. Nothing reads either,
+  `haven up` still refuses a stack whose environment names one on any value, and
+  no value of either changes what the launcher starts;
+- `apps/api`'s and `apps/worker`'s own entrypoints are untouched and are what
+  production runs. `pnpm dev:api` and `pnpm dev:worker` still run one alone.
+
+**Boot order is worker, then api**, because the API can enqueue on its first
+request and consumers that are not yet attached let work pile up invisibly. If
+the API then fails to boot, the worker is drained before the failure is
+re-thrown.
+
+**Shutdown order is the reverse: drain the worker, then close the API
+listener.** The worker's jobs call back into the API's in-process graph; closing
+the listener first fails them mid-drain, and a job that fails during shutdown is
+indistinguishable from one that failed on its merits. The API is closed even
+when the drain throws, so a wedged queue cannot leave a listening socket behind.
+This ordering is the one thing the backend process owns that neither half can
+know about, and it is where its tests are.
+
+`go` hosts the two **data-plane** services under one `errgroup` with one signal
+handler and a per-service logger. Each keeps its own configuration, its own
+dependencies and its own telemetry identity (`langwatch-service-aigateway`,
+`langwatch-service-nlp`), so nothing in Grafana changes. `SERVER_ADDR` cannot
+address two listeners in one process, so each is handed its own:
+`LANGWATCH_GO_AIGATEWAY_ADDR` and `LANGWATCH_GO_NLPGO_ADDR`. The first service
+to fail cancels the group; `make service svc=aigateway` still runs one alone.
+
+**`langyagent` stays its own lane.** It is not a request/response server: it
+spawns one sandboxed worker subprocess per conversation and owns their
+lifetimes, so folding it into a lane that restarts on every Go source change
+would take live conversations with it. It is also optional (`haven up +langy`),
+and the rest of the Go code should not wait on an image or a tier resolution.
+
+### Hot reload, debounced
+
+Both lanes restart on change. This is **restart-on-change, not in-process module
+swapping** — no Node module graph is patched and no Go plugin is reloaded; the
+process is taken down (SIGTERM, then SIGKILL after a grace period) and a new one
+is started.
+
+- The `backend` lane reuses `dev/scripts/dev-supervisor.mjs --watch`, which
+  already coalesces a burst of writes into one restart and already reports how
+  many files triggered it. Its roots are the package's own `src` plus
+  `../../packages` (architecture-lint forbids a backend graph from importing a
+  browser package, so that is a safe superset), and it ignores tests, build
+  output, generated code and watcher noise.
+- The `go` lane is `air`, which rebuilds the one binary and **restarts only on a
+  successful build** — a broken edit prints the compile error once and leaves
+  the previous process serving.
+- One knob sets both quiet periods, so they cannot drift:
+  `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`, **default 750 ms** after the last write.
+  An agent writing hundreds of files across a feature package in a few seconds
+  produces one restart, not hundreds of reconnects to Postgres, ClickHouse and
+  Redis.
+- `LANGWATCH_DEV_SUPERVISOR=0` runs the Node lane unwatched.
+
+### Consequences and risks
+
+- **One shared event loop.** The API and the worker now compete for one event
+  loop locally. A worker job that blocks it (a large JSON parse, a synchronous
+  crypto call) shows up as API latency, which it would not in production. That
+  is a real difference in what a laptop measures; performance work belongs on
+  the two-process shape (`pnpm dev:api` + `pnpm dev:worker`), not here.
+- **One crash takes both.** An uncaught exception in either half ends the
+  process. It is reported with the half it came from and the lane restarts, but
+  a wedged worker does mean a wedged API locally.
+- **The port layout is unchanged.** ui on `PORT`, api on `PORT + 1000`, worker
+  metrics on `PORT - 2561`, gateway on `PORT + 3`. Two ports are now bound by
+  one process; `dev/scripts/check-ports.sh` still reserves all of them.
+- `haven logs api` and `haven restart api` are gone as names — the lane is
+  `backend`, and `haven logs backend` / `haven restart backend` name it. Same
+  for `haven logs gateway` and `haven logs nlp`, which are `haven logs go`:
+  offering the old names would let someone bounce one service and silently take
+  the other down with it. `haven logs` still renders a pre-2026-09-07 log file
+  in its original lane colour.
+- The lanes are still not selectable. `haven up ±workers`, `±api` and `±backend`
+  are refused by name; `+gateway` / `-nlp` still choose which services the `go`
+  lane hosts, and a `go` lane hosting neither is not started at all.

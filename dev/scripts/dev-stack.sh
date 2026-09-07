@@ -5,19 +5,25 @@
 # as its own deployment (see the image's CMD); nothing here is on that path, so
 # there is no production branch to keep in step.
 #
-# Lanes:
-#   ui       apps/ui       — Vite on PORT (default 5560), proxying /api to the api lane
-#   api      apps/api      — tRPC + REST + SSE on PORT + 1000. Its own `dev`
-#                              script migrates both schemas first (apps/api's
-#                              start:prepare:db), so a stack has exactly one
-#                              migrator wherever the api lane is started from.
-#   workers  apps/worker   — queues, schedulers, projections; metrics on PORT - 2561
-#   gateway  services/aigateway (Go)  — auto-started on PORT + 3 when Go is present
-#   nlpgo    services/nlpgo (Go)      — auto-started on the port the api lane dials
+# Lanes (ADR-004, amendment 2026-09-07 — the local topology):
+#   ui       apps/ui           — Vite on PORT (default 5560), proxying /api to
+#                                the backend lane
+#   backend  tools/dev-runtime — the API application AND the worker application
+#                                in ONE Node process: tRPC + REST + SSE on
+#                                PORT + 1000, worker metrics on PORT - 2561.
+#                                It migrates both schemas first (apps/api's
+#                                start:prepare:db), so a stack has exactly one
+#                                migrator. Restart-on-change, debounced.
+#   go       cmd/service       — aigateway AND nlpgo in ONE Go process, on the
+#                                same two ports they bind on their own.
+#   langy    services/langyagent (Go) — its own lane: it owns per-conversation
+#                                worker subprocesses, so it must not be
+#                                restarted with the rest of the Go code.
 #
-# The three Node lanes always run. The two Go lanes are conveniences: each is
-# skipped, with a line saying so, when the toolchain is absent, when something
-# already listens on its port, or when its opt-out variable is set.
+# The ui and backend lanes always run. The go lane is a convenience: it is
+# skipped, with a line saying so, when the toolchain is absent, when its ports
+# are already held, or when both opt-out variables are set. Production is
+# unchanged — three Node deployments and separate Go services.
 #
 # Requires `concurrently` to be resolvable from the workspace root.
 #
@@ -120,14 +126,26 @@ echo "  ✓ gateway: port=${GATEWAY_PORT} cp=${GATEWAY_CONTROL_PLANE_URL} public
 
 RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
 
-# --- the Go lanes ----------------------------------------------------------
+# The quiet window every restart-on-change lane waits out before it acts. An
+# agent editing across a feature package writes hundreds of files in a few
+# seconds; without a window that is hundreds of restarts, each one reconnecting
+# to Postgres, ClickHouse and Redis. One knob, so the Node lane's debouncer and
+# the Go lane's rebuild delay can never drift apart.
+export LANGWATCH_DEV_WATCH_DEBOUNCE_MS="${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750}"
+
+# --- the Go lane -----------------------------------------------------------
+#
+# One process hosts both data-plane services (`service combined`). Each is
+# still selected on its own, and each still binds the port this script
+# reserved for it — SERVER_ADDR cannot answer for two listeners, so each has
+# its own address variable.
+GO_SERVICES=()
 
 # AI Gateway data plane. Bundled in so the CLI wrappers (langwatch claude /
 # codex / cursor / gemini / opencode) reach a live gateway without a second
 # terminal running `make service svc=aigateway`. Skipped, with a line saying so,
 # when the port is already held (another worktree's gateway, or a manual run),
 # when the Go toolchain is absent, and via LANGWATCH_SKIP_AIGATEWAY=1.
-START_GATEWAY_COMMAND=""
 if [ "${LANGWATCH_SKIP_AIGATEWAY:-}" != "1" ]; then
   if ! command -v go >/dev/null 2>&1; then
     echo "  ! aigateway: skipped (Go toolchain not in PATH); run \`make service svc=aigateway\` manually"
@@ -145,8 +163,9 @@ if [ "${LANGWATCH_SKIP_AIGATEWAY:-}" != "1" ]; then
     # number this script reserved and announced. Passing it is what keeps the
     # two in step — `make service` re-applies the inbound environment over
     # `.env`, so this wins there as well.
-    START_GATEWAY_COMMAND="SERVER_ADDR=\":${GATEWAY_PORT}\" make -C \"$REPO_ROOT\" service svc=aigateway"
-    echo "  ✓ aigateway: auto-start on :$GATEWAY_PORT"
+    GO_SERVICES+=(aigateway)
+    export LANGWATCH_GO_AIGATEWAY_ADDR=":${GATEWAY_PORT}"
+    echo "  ✓ aigateway: auto-start on :$GATEWAY_PORT (in the go lane)"
   fi
 fi
 
@@ -158,7 +177,6 @@ fi
 # points load it AFTER this script runs, so a pinned LANGWATCH_NLP_SERVICE is
 # what the api lane dials while this shell sees nothing at all. Reading it here
 # is what keeps engine and caller on one port.
-START_NLP_COMMAND=""
 if [ "${LANGWATCH_SKIP_NLP:-}" != "1" ]; then
   # shellcheck source=./lib/resolve-nlp-service.sh
   . "$HERE/lib/resolve-nlp-service.sh"
@@ -180,8 +198,10 @@ if [ "${LANGWATCH_SKIP_NLP:-}" != "1" ]; then
     # SERVER_ADDR overrides the inherited gateway port; LANGWATCH_ENDPOINT is the
     # address the engine calls back for evaluator and agent-workflow nodes
     # (mirrors dev/compose.dev.yml).
-    START_NLP_COMMAND="SERVER_ADDR=\":${_NLP_PORT}\" LANGWATCH_ENDPOINT=\"http://localhost:${APP_PORT}\" make -C \"$REPO_ROOT\" service svc=nlpgo"
-    echo "  ✓ nlpgo: auto-start on :$_NLP_PORT"
+    GO_SERVICES+=(nlpgo)
+    export LANGWATCH_GO_NLPGO_ADDR=":${_NLP_PORT}"
+    export LANGWATCH_ENDPOINT="${LANGWATCH_ENDPOINT:-http://localhost:${APP_PORT}}"
+    echo "  ✓ nlpgo: auto-start on :$_NLP_PORT (in the go lane)"
   fi
 fi
 
@@ -205,6 +225,15 @@ fi
 
 COMMANDS=()
 NAMES=()
+GO_LANE_COMMAND=""
+if [ ${#GO_SERVICES[@]} -gt 0 ]; then
+  # One binary, both services, one signal handler. `service-watch` is air:
+  # it rebuilds on a Go change and only restarts when the build succeeded, so
+  # a broken edit leaves the previous process serving. Its delay is the same
+  # quiet window the Node lane debounces on.
+  GO_LANE_COMMAND="make -C \"$REPO_ROOT\" service-watch svc=combined args=\"${GO_SERVICES[*]}\""
+  echo "  ✓ go lane: ${GO_SERVICES[*]} in one process"
+fi
 
 # Every lane's output goes through the shared renderer, so a `pnpm dev`
 # terminal reads exactly like a `haven logs` one: one clock, one lane column,
@@ -216,21 +245,20 @@ add_lane() {
   COMMANDS+=("bash \"$HERE/lane.sh\" $1 \"$2\"")
 }
 
-# Workers first, so the queue consumers are up before anything can enqueue.
-add_lane workers "$RUNTIME_ENV pnpm -s --filter @langwatch/worker dev"
 add_lane ui "$RUNTIME_ENV pnpm -s --filter @langwatch/ui dev"
 
-if [ -n "$START_GATEWAY_COMMAND" ]; then
-  add_lane gateway "$START_GATEWAY_COMMAND"
-fi
-if [ -n "$START_NLP_COMMAND" ]; then
-  add_lane nlpgo "$START_NLP_COMMAND"
+if [ -n "$GO_LANE_COMMAND" ]; then
+  add_lane go "$GO_LANE_COMMAND"
 fi
 if [ -n "$START_LANGY_COMMAND" ]; then
   add_lane langy "$START_LANGY_COMMAND"
 fi
 
-add_lane api "$RUNTIME_ENV pnpm -s --filter @langwatch/platform-api dev"
+# Last, and one lane: the API application and the worker application share this
+# process. It boots the worker first, so the queue consumers are attached
+# before anything can enqueue, and it migrates both schemas before either
+# starts.
+add_lane backend "$RUNTIME_ENV pnpm -s --filter @langwatch/dev-runtime dev"
 
 NAMES_STR=$(
   IFS=,

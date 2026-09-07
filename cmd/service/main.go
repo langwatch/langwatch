@@ -49,6 +49,10 @@ var services = map[string]ServiceBoot{
 	"idpsim":     idpsim.Root,
 	"langyagent": langyagent.Root,
 	"nlpgo":      nlpgo.Root,
+	// The development topology (ADR-004, 2026-09-07): the Go data-plane
+	// services in one process. Never a deployment — each service is still its
+	// own container in production.
+	combinedCommand: combinedRoot,
 }
 
 func main() {

@@ -124,8 +124,17 @@ const NESTED = "LANGWATCH_DEV_SUPERVISED";
 const SENTINEL_FLAG = "--sentinel";
 /** Opts a command into debounced watch-and-restart instead of a one-shot run. */
 const WATCH_FLAG = "--watch";
-/** Default quiet window: how long the tree must be still before restarting. */
-const DEFAULT_WATCH_DEBOUNCE_MS = 400;
+/**
+ * Default quiet window: how long the tree must be still before restarting.
+ *
+ * 750 ms rather than a few hundred because the writer that matters is an agent
+ * editing across a feature package, which lands hundreds of files over several
+ * seconds with gaps between them. A short window turns that into a restart per
+ * gap — each one a fresh set of Postgres, ClickHouse and Redis connections. The
+ * same number is the Go lane's rebuild delay (Makefile `service-watch`), so the
+ * two halves of a stack can never drift apart.
+ */
+const DEFAULT_WATCH_DEBOUNCE_MS = 750;
 /** Default watch roots, relative to cwd: the package's own source, plus every
  * workspace package (architecture-lint already forbids api/worker code from
  * reaching a web/ui package, so this needs no per-app allowlist). */

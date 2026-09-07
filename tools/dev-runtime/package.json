@@ -1,0 +1,26 @@
+{
+  "name": "@langwatch/dev-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Contributor-only: the two Node applications in one local process.",
+  "exports": {
+    ".": {
+      "types": "./src/backend.process.ts",
+      "default": "./src/backend.process.ts"
+    }
+  },
+  "scripts": {
+    "start:prepare:db": "pnpm -s --filter @langwatch/platform-api run start:prepare:db",
+    "dev": "pnpm -s run start:prepare:db && node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
+    "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/platform-api": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/worker": "workspace:*"
+  }
+}

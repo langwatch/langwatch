@@ -93,10 +93,10 @@ describe("shouldIgnoreWatchPath", () => {
 });
 
 describe("resolveWatchConfig", () => {
-  it("defaults to src and ../../packages with a 400ms window", () => {
+  it("defaults to src and ../../packages with a 750ms window", () => {
     const config = resolveWatchConfig({});
     assert.deepEqual(config.dirs, ["src", "../../packages"]);
-    assert.equal(config.debounceMs, 400);
+    assert.equal(config.debounceMs, 750);
   });
 
   it("reads an override for both the dirs and the debounce window", () => {
@@ -110,7 +110,7 @@ describe("resolveWatchConfig", () => {
 
   it("falls back to the default debounce for a non-numeric override", () => {
     const config = resolveWatchConfig({ LANGWATCH_DEV_WATCH_DEBOUNCE_MS: "not-a-number" });
-    assert.equal(config.debounceMs, 400);
+    assert.equal(config.debounceMs, 750);
   });
 });
 
@@ -138,6 +138,36 @@ describe("createDebouncer", () => {
       },
     });
     for (let i = 0; i < 5; i += 1) debouncer.note(`src/f${i}.ts`);
+  });
+
+  // The writer that matters is an agent, not a person: a rename across a
+  // feature package lands hundreds of files, in bursts with gaps between them.
+  // Every one of those has to collapse into ONE restart, or a single edit
+  // session is dozens of cold starts and dozens of reconnects to Postgres,
+  // ClickHouse and Redis.
+  /** @scenario "A write storm from an agent restarts the backend once" */
+  it("given a write storm of hundreds of files spread across the window, when it settles, fires exactly once with all of them", (t, done) => {
+    let fireCount = 0;
+    const debouncer = createDebouncer({
+      debounceMs: 60,
+      onFire: (files) => {
+        fireCount += 1;
+        assert.equal(fireCount, 1);
+        assert.equal(files.length, 400);
+      },
+    });
+    // Four bursts of a hundred files, 20 ms apart — every gap shorter than the
+    // window, so the window keeps restarting and nothing fires until the tree
+    // is genuinely still.
+    for (let burst = 0; burst < 4; burst += 1) {
+      setTimeout(() => {
+        for (let i = 0; i < 100; i += 1) debouncer.note(`packages/features/x/src/f${burst}-${i}.ts`);
+      }, burst * 20);
+    }
+    setTimeout(() => {
+      assert.equal(fireCount, 1);
+      done();
+    }, 300);
   });
 
   it("given a new change inside the quiet window, when it lands, restarts the window instead of firing twice", (t, done) => {

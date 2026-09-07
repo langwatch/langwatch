@@ -104,6 +104,11 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // and per-step recording scenarios are proved by its vitest suite, which
   // lives beside it under tools/ rather than in packages/.
   "tools/visualdiff/runner/src",
+  // The contributor-only backend launcher (tools/dev-runtime): the API and the
+  // worker in one local process. Its boot order and its shutdown ordering —
+  // drain the worker, then close the API listener — are asserted by its own
+  // vitest suite and by nothing else.
+  "tools/dev-runtime/src",
   // What we SHIP as instructions is behavior too: the skill sources and the
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
@@ -199,6 +204,11 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
+  // The mono-binary's own dispatch, including the combined Go development
+  // process (`service combined`). Which services it hosts, what telemetry
+  // identity each keeps and which address variable each binds are asserted
+  // here and nowhere else.
+  "cmd/service",
   // visualdiff: the boot, classification and teardown rules in
   // specs/tooling/visual-diff.feature are asserted by these Go tests and by
   // nothing else. Its Playwright half binds from the TS roots below.

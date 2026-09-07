@@ -110,11 +110,14 @@ hit `app.<slug>.../api` for the API. `.localhost` resolves to loopback natively,
 so there is no `/etc/hosts`, DNS, or sudo for name resolution, and two worktrees
 can never collide.
 
-haven supervises the three Node applications as three lanes — `ui`, `api` and
-`workers`, each `pnpm --filter <package> dev` from the workspace root — beside
-the Go ones. They are not selectable (`haven up ±workers` is refused by name);
-`haven logs ui`, `haven restart api` and `haven status --json`'s `lanes` array
-all name the same three.
+haven supervises **two** Node lanes — `ui` and `backend`, each `pnpm --filter
+<package> dev` from the workspace root — beside a single `go` lane hosting the
+data-plane services. None is selectable (`haven up ±workers`, `±api` and
+`±backend` are refused by name); `haven logs ui`, `haven restart backend` and
+`haven status --json`'s `lanes` array all name the same lanes. `haven logs go`
+is where the gateway and the NLP engine now read, and restarting either means
+restarting the lane — offering `gateway` on its own would silently take the NLP
+engine down with it.
 
 Hostname routing is **opt-in** — `pnpm dev` uses the plain `PORT`+offset scheme;
 `make haven up` (or `make haven up`) routes through haven.
@@ -161,18 +164,26 @@ For per-PR / per-issue cloud environments via boxd, see `dev/docs/runbooks/boxd-
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
-**Running the applications outside Docker (the default for TS work):** just run `pnpm dev` from the repo root (or `PORT=5570 pnpm dev` for a second instance). It runs `dev/scripts/dev-stack.sh`, which derives every port from `PORT`, starts the three Node lanes under `concurrently`, and adds the two Go services when their toolchain is present and nothing already holds their ports. You never need to hunt processes by hand. If the ports are already held, `dev/scripts/check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; `dev/scripts/kill-dev-tree.sh` already does it correctly and port-scoped.
+**Running the applications outside Docker (the default for TS work):** just run `pnpm dev` from the repo root (or `PORT=5570 pnpm dev` for a second instance). It runs `dev/scripts/dev-stack.sh`, which derives every port from `PORT`, starts the ui and backend lanes under `concurrently`, and adds the one Go lane when its toolchain is present and nothing already holds its ports. You never need to hunt processes by hand. If the ports are already held, `dev/scripts/check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; `dev/scripts/kill-dev-tree.sh` already does it correctly and port-scoped.
 
-**Three processes, always.** There is no in-process worker mode and no process-role switch: `apps/worker` is its own application, so `pnpm dev` runs three Node processes and dev matches the way production deploys them. `WORKERS_IN_PROCESS` and `START_WORKERS` are dead — nothing reads either, and haven refuses a stack whose environment still carries one, whichever way it is set. The dev surface is four scripts and no flags to remember, all runnable from the repo root:
+**Two local processes, no switch.** Locally `pnpm dev` runs **one** Node process for the backend — the api application and the worker application together — and **one** Go process for the data-plane services. Production is unchanged: three Node deployments and each Go service its own container.
 
-| Script            | What runs                                |
-| ----------------- | ---------------------------------------- |
-| `pnpm dev`        | ui + api + workers, plus the Go services |
-| `pnpm dev:ui`     | the browser application alone            |
-| `pnpm dev:api`    | the API alone                            |
-| `pnpm dev:worker` | the background worker alone              |
+The backend lane is a **launcher, not a process role**. Each application still resolves its own secrets, parses its own config and composes its own graph, once each, in the same order it does alone; neither shares a Prisma client or a Redis connection with the other; both health and metrics endpoints keep working. `WORKERS_IN_PROCESS` and `START_WORKERS` are still dead — nothing reads either, haven still refuses a stack whose environment carries one whichever way it is set, and no value of either changes what the launcher starts. Boot order is worker then api; **shutdown drains the worker before closing the api listener**, because worker jobs call back into the api's in-process graph.
 
-The port layout is derived from `PORT` (default 5560): the ui lane binds it, the api lane `PORT + 1000`, the worker's metrics/healthz listener `PORT - 2561`, and the gateway `PORT + 3`. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment, 2026-09-03: three processes).
+| Script             | What runs                                                      |
+| ------------------ | -------------------------------------------------------------- |
+| `pnpm dev`         | `ui` + `backend` + `go` (+ `langy` when selected)              |
+| `pnpm dev:ui`      | the browser application alone                                  |
+| `pnpm dev:backend` | the api and the worker in one process                          |
+| `pnpm dev:go`      | aigateway + nlpgo in one process                               |
+| `pnpm dev:api`     | the API alone, its own process                                 |
+| `pnpm dev:worker`  | the background worker alone, its own process                   |
+
+Use `dev:api` + `dev:worker` when you need the production process shape — one shared event loop locally means a worker job that blocks it reads as API latency, and one crash takes both. `langyagent` keeps its own lane: it owns per-conversation worker subprocesses, so it must not be restarted with the rest of the Go code.
+
+Both lanes **restart on change, debounced** (this is restart-on-change, not module swapping): the Node lane through `dev/scripts/dev-supervisor.mjs --watch`, the Go lane through `air`, which restarts only on a build that succeeded. One knob sets both quiet periods — `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`, default **750 ms** — so a write storm from an agent is one restart, not hundreds.
+
+The port layout is unchanged and still derived from `PORT` (default 5560): the ui lane binds it, the api `PORT + 1000`, the worker's metrics/healthz listener `PORT - 2561`, and the gateway `PORT + 3`. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment, 2026-09-07: two local processes) and `specs/setup/haven-local-topology.feature`.
 
 ### AI Gateway (Go, services/aigateway/)
 
@@ -347,6 +358,7 @@ packages/features/*/ # One feature each, as {contract,server,web}
 services/nlpgo/      # Go NLP engine (:5561, built as langwatch/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
 services/langevals/  # Python evaluators
+tools/dev-runtime/   # Contributor-only: api + worker in one local process
 charts/gateway/      # Helm sub-chart for the gateway
 packages/            # Shared TypeScript workspace packages
 sdks/python/         # Python SDK

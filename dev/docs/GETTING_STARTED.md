@@ -29,9 +29,11 @@ langwatch/
 └── dev/            these docs, the scripts, the compose files
 ```
 
-Three of the Node applications run all the time: `ui`, `api` and `worker`. There
-is no in-process worker mode and no process-role switch, on purpose. A stack
-missing the worker serves pages and quietly processes no jobs, which looks
+Three Node applications run all the time: `ui`, `api` and `worker` — locally the
+last two share one process (the `backend` lane), and in production each is its
+own deployment. There is no in-process worker MODE and no process-role switch,
+on purpose. A stack missing the worker serves pages and quietly processes no
+jobs, which looks
 exactly like a healthy one right up to the moment you expected a job to have
 run.
 
@@ -101,14 +103,23 @@ rule refuses `process.env.<SECRET_KEY>` outside the secrets package. See
 Plain `pnpm dev` is the default for TypeScript work.
 
 ```bash
-pnpm dev            # ui + api + workers, plus the Go services
+pnpm dev            # ui + backend + go (+ langy when selected)
 pnpm dev:ui         # the browser application alone
-pnpm dev:api        # the API alone
-pnpm dev:worker     # the background worker alone
+pnpm dev:backend    # the api and the worker in one process
+pnpm dev:go         # aigateway + nlpgo in one process
+pnpm dev:api        # the API alone, its own process
+pnpm dev:worker     # the background worker alone, its own process
 ```
 
+Locally the api and the worker share ONE process — the `backend` lane — and the
+Go data-plane services share another (`go`). It is a launcher, not a process
+role: each application still parses its own config and composes its own graph,
+and `dev:api` + `dev:worker` still run them apart when you need the production
+process shape. Both lanes restart on change, debounced by
+`LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (750 ms), so a burst of edits is one restart.
+
 Every port derives from `PORT` (default 5560): the ui lane binds it, the api
-lane `PORT + 1000`, the worker's metrics listener `PORT - 2561`, the gateway
+`PORT + 1000`, the worker's metrics listener `PORT - 2561`, the gateway
 `PORT + 3`. A second stack is `PORT=5570 pnpm dev`. If the ports are already
 held, `dev/scripts/check-ports.sh` refuses to start and prints two pasteable
 options, one of which kills only the node processes on those exact ports. Do not
@@ -119,7 +130,7 @@ Hostname routing is the alternative, and it is opt-in.
 ```bash
 make haven up          # start this worktree's stack
 make haven status      # every stack, service health, shared servers
-haven logs api -t      # tail one lane from any terminal
+haven logs backend -t  # tail one lane from any terminal
 ```
 
 haven gives every worktree's services a stable hostname through the portless
