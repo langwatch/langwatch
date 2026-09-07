@@ -108,7 +108,7 @@ export function EmailIdentifiersSection({
     try {
       if (row.value && row.value === ownAddress) {
         // Reuses the shell nudge's own mutation: one address, one sender.
-        await resendOwnAddress.mutateAsync({});
+        return await ownResend.resend();
       } else {
         const { codeVerifier, codeChallenge } = await mintAddressCeremony();
         await resendAdded.mutateAsync({

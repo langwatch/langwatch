@@ -393,7 +393,6 @@ const LEGACY_INERT: string[] = [
   "specs/coding-agent/personal-usage.feature",
   "specs/components/code-block-editor.feature",
   "specs/data-retention/data-size-metering.feature",
-  "specs/data-retention/ingestion-stamping.feature",
   "specs/data-retention/monitoring.feature",
   "specs/data-retention/plan-gated-retention-menu.feature",
   "specs/data-retention/retention-policy-configuration.feature",
