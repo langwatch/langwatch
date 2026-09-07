@@ -1125,44 +1125,31 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     );
   }
 
-  // Phase 8 — enforce admin-configured max session duration. The
-  // session-start anchor is `client_info.session_started_at` (set at
-  // /exchange and preserved across rotations); fall back to
-  // record.issued_at for sessions started before client_info was
-  // captured. When maxSessionDurationDays > 0 and the session is
-  // older, reject the refresh — the user must re-run `langwatch login`.
   const sessionAnchorMs =
     record.client_info?.session_started_at ?? record.issued_at;
-  const org = await prisma.organization.findUnique({
-    where: { id: record.organization_id },
-    select: { maxSessionDurationDays: true },
-  });
-  const maxDurationDays = org?.maxSessionDurationDays ?? 0;
-  if (maxDurationDays > 0) {
-    const sessionAgeMs = Date.now() - sessionAnchorMs;
-    const maxDurationMs = maxDurationDays * 24 * 60 * 60 * 1000;
-    if (sessionAgeMs > maxDurationMs) {
-      // Reject + invalidate the old refresh token to prevent further
-      // rotation attempts. The CLI gets 401 → wipes local state.
-      await redis.del(refreshTokenKey(refresh_token));
-      await retireExpiredSessionKey(record);
-      logger.info(
-        {
-          userId: record.user_id,
-          organizationId: record.organization_id,
-          sessionAgeDays: Math.round(sessionAgeMs / 86_400_000),
-          maxDurationDays,
-        },
-        "rejecting refresh: session exceeded org max-duration policy",
-      );
-      return c.json(
-        {
-          error: "invalid_grant",
-          error_description: `Session exceeded organization max-duration policy of ${maxDurationDays} days. Please run \`langwatch login\` to start a new session.`,
-        },
-        401,
-      );
-    }
+  const ceiling = await sessionCeiling({ record, sessionAnchorMs });
+  const { maxDurationDays } = ceiling;
+  if (ceiling.exceeded) {
+    // Reject + invalidate the old refresh token to prevent further
+    // rotation attempts. The CLI gets 401 → wipes local state.
+    await redis.del(refreshTokenKey(refresh_token));
+    await retireExpiredSessionKey(record);
+    logger.info(
+      {
+        userId: record.user_id,
+        organizationId: record.organization_id,
+        sessionAgeDays: Math.round(ceiling.sessionAgeMs / 86_400_000),
+        maxDurationDays,
+      },
+      "rejecting refresh: session exceeded org max-duration policy",
+    );
+    return c.json(
+      {
+        error: "invalid_grant",
+        error_description: `Session exceeded organization max-duration policy of ${maxDurationDays} days. Please run \`langwatch login\` to start a new session.`,
+      },
+      401,
+    );
   }
 
   // Rotation mints a new credential pair, so it re-derives membership the way
@@ -1293,6 +1280,41 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     200,
   );
 });
+
+/**
+ * The organization's ceiling on this session, how old the session is, and
+ * whether it has run past it.
+ *
+ * The anchor is `client_info.session_started_at`, written at /exchange and
+ * carried across every rotation; a session started before that field existed
+ * falls back to the record's own issue time. Zero days means the
+ * organization sets no ceiling at all, which nothing can exceed.
+ */
+async function sessionCeiling({
+  record,
+  sessionAnchorMs,
+}: {
+  record: RefreshTokenRecord;
+  sessionAnchorMs: number;
+}): Promise<{
+  maxDurationDays: number;
+  sessionAgeMs: number;
+  exceeded: boolean;
+}> {
+  const org = await prisma.organization.findUnique({
+    where: { id: record.organization_id },
+    select: { maxSessionDurationDays: true },
+  });
+  const maxDurationDays = org?.maxSessionDurationDays ?? 0;
+  const sessionAgeMs = Date.now() - sessionAnchorMs;
+  return {
+    maxDurationDays,
+    sessionAgeMs,
+    exceeded:
+      maxDurationDays > 0 &&
+      sessionAgeMs > maxDurationDays * 24 * 60 * 60 * 1000,
+  };
+}
 
 /**
  * A refused refresh is the end of the session, so the login key it minted

@@ -128,7 +128,7 @@ An agent connecting through the OAuth flow as an admin can fully configure gover
 2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/governance/ingestion-templates/clone`)
 3. `governance_anomaly_rules_create`, rule on org spend > $100/day
 4. `governance_role_bindings_assign_to_user`, give a user `governance:view`
-5. `governance_audit_log_query`, verify steps 2–4 all emitted audit rows
+5. `governance_audit_log_query`, verify steps 2 to 4 all emitted audit rows
 
 If every step succeeds and step 5 returns the matching audit rows, an agent can run the whole setup without a single UI click.
 

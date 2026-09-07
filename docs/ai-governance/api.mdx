@@ -84,7 +84,7 @@ Three consequences:
 
 - **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `ik-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
 - **`source_type` selects the shaping**: the mint body's `source_type` records which upstream tool the key ingests for, so the gateway can apply the matching ingestion-template OTTL transform when traces arrive on that key. A key minted for an org-authored template carries that template's id.
-- **A CLI key follows its session**: a key the CLI mints stores the session's login key as `parentApiKeyId`. Logout, a revoke from the devices tab, a re-login from the same device and session expiry all revoke the login key, and every key parented to it is revoked with cause `session` (or `expired`). A mint from a session whose login key is already revoked answers 401. `install` and the MCP mint have no session and accept only source types a published template names; a tool the CLI wraps answers `ingestion_key_source_not_allowed` there.
+- **A CLI key follows its session**: a key the CLI mints stores the session's login key as `parentApiKeyId`. Logout, a devices-tab revoke, a re-login from the same device and session expiry all revoke that login key, and every key parented to it goes with it under cause `session` or `expired`. A mint from a revoked session answers 401. `install` and the MCP mint accept only source types a published template names; a tool the CLI wraps answers `ingestion_key_source_not_allowed`.
 
 The Zod schemas backing each request and response body are the same schemas the corresponding service-layer function consumes. The OpenAPI generator (`describeRoute` + `hono-openapi`) reads them directly, so the spec and the runtime are guaranteed in sync.
 
@@ -150,7 +150,9 @@ The setup pattern in this file (project + ingest-only RoleBinding + `aiTools:man
 
 **Cross-surface audit-uniformity regression**: `platform/app/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via all four surfaces, tRPC service-direct, Hono REST, CLI REST (with `X-LangWatch-Surface: cli`), and MCP service-direct, in one test (Lane B-8 at `d96cd4300`, extended to 4 surfaces at `cb4c8224c`); asserts the four audit rows have **identical** payload shape, same `action`, same `targetKind`, same `organizationId`, same metadata-key-set, with only `metadata.surface` varying (`"trpc"`, `"hono"`, `"cli"`, `"mcp"`). Slug regex format identical, no default-fallback leakage.
 
-**Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`; asserts all three audit rows fall back to `metadata.surface === "hono"`. Locks Alexis's `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags, the only legal value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. Together with the cross-surface uniformity test this exhaustively pins the umbrella spec's `@audit-uniform` invariant for v1.
+**Surface-spoof rejection regression**: same file as above. Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`; asserts all three audit rows fall back to `metadata.surface === "hono"`.
+
+The `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` is the defense against external HTTP callers forging in-process surface tags: the only value the Hono surface accepts inbound is `cli`, everything else falls through to the route's default `"hono"`. With the cross-surface uniformity test this pins the umbrella spec's `@audit-uniform` invariant.
 
 To run locally:
 
