@@ -1,15 +1,14 @@
 import { EnterpriseCatalogue } from "@langwatch/enterprise";
-import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type {
   ManagedProviderConfigurationPort,
   ManagedProviderCredentialsPort,
 } from "@langwatch/enterprise-managed-provider-server";
-import { PostgresManagedProviderAdapter } from "@langwatch/enterprise-managed-provider-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import { ManagedProviderService } from "@langwatch/enterprise-managed-provider-server";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 export type EnterpriseWorkerCompositionOptions = {
   managedProvider: {
-    projects: ProjectService;
+    projects: ProjectApi;
     configuration: ManagedProviderConfigurationPort;
     credentials: ManagedProviderCredentialsPort;
   };
@@ -28,11 +27,11 @@ export class EnterpriseWorkerComposition {
   ): EnterpriseWorkerComposition & { readonly managedProviders: ManagedProviderService };
   static create(options?: EnterpriseWorkerCompositionOptions): EnterpriseWorkerComposition {
     const managedProviders = options
-      ? PostgresManagedProviderAdapter.create({
-          projects: options.managedProvider.projects,
+      ? ManagedProviderService.create({
           configuration: options.managedProvider.configuration,
+          projects: options.managedProvider.projects,
           credentials: options.managedProvider.credentials,
-        }).build()
+        })
       : undefined;
 
     return new EnterpriseWorkerComposition(EnterpriseCatalogue.create(), managedProviders);
