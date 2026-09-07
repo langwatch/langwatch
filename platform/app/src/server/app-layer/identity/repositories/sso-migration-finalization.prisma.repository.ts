@@ -76,14 +76,13 @@ export class PrismaSsoMigrationFinalizationRepository
       legacyAccounts,
       legacyDirectoryTokens,
       recovery,
-    ] =
-      await this.readOperationalEvidence({
-        organizationId,
-        replacementConnectionId,
-        legacyConnectionId: view.legacy.connectionId,
-        legacyProviderId: view.legacy.providerId,
-        activeDomains,
-      });
+    ] = await this.readOperationalEvidence({
+      organizationId,
+      replacementConnectionId,
+      legacyConnectionId: view.legacy.connectionId,
+      legacyProviderId: view.legacy.providerId,
+      activeDomains,
+    });
     const blockers = finalizationBlockers(view.blockers, {
       replacementActive: replacementState.state === "ACTIVE",
       qualifiedProofs,

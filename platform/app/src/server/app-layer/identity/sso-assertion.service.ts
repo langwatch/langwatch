@@ -183,8 +183,7 @@ export class SsoAssertionService {
         isConfiguredLegacySsoRoute({
           source: connection.source,
           providerId: connection.providerId,
-        }) &&
-        connection.verifiedDomains.includes(domain);
+        }) && connection.verifiedDomains.includes(domain);
       if (standing.proved || legacyCompatibility) return carryOn;
       if (!standing.lapsed || !accountId) return refuse;
 

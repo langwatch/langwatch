@@ -3,10 +3,10 @@ import {
   DOMAIN_JOIN_SETTINGS,
   type DomainJoinSetting,
   isPublicEmailDomain,
-  qualifySsoDomainOwnership,
-  type SsoDomainVerification,
   type JoinCandidateOrganization,
   type JoinRequestAggregateState,
+  qualifySsoDomainOwnership,
+  type SsoDomainVerification,
 } from "@langwatch/identity";
 import type {
   JoinCandidateRepository,
@@ -279,8 +279,7 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
       connections
         .filter(
           (row) =>
-            row.state === "ACTIVE" &&
-            connectionHasQualifiedProof(row, domain),
+            row.state === "ACTIVE" && connectionHasQualifiedProof(row, domain),
         )
         .map((row) => row.organizationId),
     );

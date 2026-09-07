@@ -244,11 +244,11 @@ import { PrismaMfaEnrollmentRepository } from "./identity/repositories/mfa-enrol
 import { PrismaMfaEnrollmentProjectionRepository } from "./identity/repositories/mfa-enrollment-projection.prisma.repository";
 import { PrismaScimSyncProjectionRepository } from "./identity/repositories/scim-sync-projection.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
-import { PrismaSsoConnectionRegistrationRepository } from "./identity/repositories/sso-connection-registration.prisma.repository";
 import {
   PrismaSsoConnectionReadRepository,
   PrismaSsoConnectionStrandingRepository,
 } from "./identity/repositories/sso-connection-reads.prisma.repository";
+import { PrismaSsoConnectionRegistrationRepository } from "./identity/repositories/sso-connection-registration.prisma.repository";
 import { ssoBreakGlass, ssoEngineProviderDerivation } from "./identity/runtime";
 import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
 import { LicenseDomainClaimAuthority } from "./identity/sso-self-serve-adapters";

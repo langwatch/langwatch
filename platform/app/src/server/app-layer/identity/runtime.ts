@@ -16,16 +16,16 @@ import { ensureUserSyncedToCio } from "@ee/billing/nurturing/hooks/userSync";
 import { PlanTypes } from "@ee/billing/planTypes";
 import { ScimDeprovisionService } from "@ee/scim/scim-deprovision.service";
 import { ScimRequestLogService } from "@ee/scim/scim-request-log.service";
-import { ScimTokenService } from "@ee/scim/scim-token.service";
 import { scimSyncLifecycle } from "@ee/scim/scim-sync.runtime";
 import type { ScimSyncLifecycle } from "@ee/scim/scim-sync.service";
+import { ScimTokenService } from "@ee/scim/scim-token.service";
 import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import { SsoLicenseRepository } from "@ee/sso/sso-license.repository";
 import {
   normalizeIdentifierValue,
-  SSO_DNS_REPROOF_GRACE_MS,
   type SignInMethod,
   type SignInRoutingReasonCode,
+  SSO_DNS_REPROOF_GRACE_MS,
   type SsoConnectionState,
 } from "@langwatch/identity";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
@@ -43,9 +43,9 @@ import {
   MfaGuards,
   MfaService,
   newIdentityCommandId,
+  newSsoBreakGlassBindingId,
   newSsoConnectionCommandId,
   SignInRouterService,
-  newSsoBreakGlassBindingId,
   SsoBreakGlassService,
   SsoConnectionGrandfatherService,
   SsoConnectionGuards,
@@ -174,18 +174,18 @@ import { PrismaSsoAccountReconciliationRepository } from "./repositories/sso-acc
 import { PrismaSsoBreakGlassRepository } from "./repositories/sso-break-glass.prisma.repository";
 import { PrismaSsoConnectionIssuers } from "./repositories/sso-connection-issuers.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./repositories/sso-connection-projection.prisma.repository";
-import { PrismaSsoConnectionRegistrationRepository } from "./repositories/sso-connection-registration.prisma.repository";
 import {
   PrismaSsoConnectionReadRepository,
   PrismaSsoConnectionStrandingRepository,
   PrismaSsoDomainClaimQueueRepository,
 } from "./repositories/sso-connection-reads.prisma.repository";
+import { PrismaSsoConnectionRegistrationRepository } from "./repositories/sso-connection-registration.prisma.repository";
 import { SsoConnectionDomainRoutingRepository } from "./repositories/sso-connection-routing.prisma.repository";
 import { PrismaSsoCredentialStore } from "./repositories/sso-credential.prisma.repository";
 import { PrismaSsoMembershipRepository } from "./repositories/sso-membership.prisma.repository";
-import { PrismaSsoMigrationProgressRepository } from "./repositories/sso-migration-progress.prisma.repository";
 import { PrismaSsoMigrationCallbackPolicy } from "./repositories/sso-migration-callback-policy.prisma.repository";
 import { PrismaSsoMigrationFinalizationRepository } from "./repositories/sso-migration-finalization.prisma.repository";
+import { PrismaSsoMigrationProgressRepository } from "./repositories/sso-migration-progress.prisma.repository";
 import { ConnectionFirstDomainRoutingRepository } from "./repositories/sso-routing-connection-first.repository";
 import {
   ScimOversightService,

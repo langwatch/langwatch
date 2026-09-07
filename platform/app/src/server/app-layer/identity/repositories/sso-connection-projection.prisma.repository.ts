@@ -174,7 +174,10 @@ export class PrismaSsoConnectionProjectionRepository
       const activationCommandIds = state.ActivationReservationCommandIds ?? [];
       const terminal = TERMINAL_STATES.includes(state.state);
       if (activationCommandIds.length > 0 || terminal) {
-        await lockSsoRecoveryOrganizationInTransaction(tx, state.organizationId);
+        await lockSsoRecoveryOrganizationInTransaction(
+          tx,
+          state.organizationId,
+        );
       }
       await tx.ssoConnection.upsert({
         where: { id },

@@ -1,6 +1,6 @@
 import {
-  breakGlassIsLive,
   type BreakGlassBinding,
+  breakGlassIsLive,
   SsoBreakGlassLastWayInError,
   SsoConnectionActivationBlockedError,
 } from "@langwatch/identity";

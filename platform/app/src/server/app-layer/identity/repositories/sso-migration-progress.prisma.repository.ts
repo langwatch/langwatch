@@ -66,7 +66,10 @@ export class PrismaSsoMigrationProgressRepository
       ...memberWhere,
       user: {
         identifiers: {
-          some: { connectionId: replacement.connectionId, state: { in: liveStates } },
+          some: {
+            connectionId: replacement.connectionId,
+            state: { in: liveStates },
+          },
         },
       },
     } as const;
@@ -75,7 +78,10 @@ export class PrismaSsoMigrationProgressRepository
       ...(cursor ? { userId: { gt: cursor } } : {}),
       user: {
         identifiers: {
-          none: { connectionId: replacement.connectionId, state: { in: liveStates } },
+          none: {
+            connectionId: replacement.connectionId,
+            state: { in: liveStates },
+          },
         },
       },
     } as const;
@@ -151,7 +157,8 @@ export class PrismaSsoMigrationProgressRepository
         replacement.createdAtMs,
       lastLegacyAuthentication?.authenticatedAt.getTime() ?? 0,
     );
-    const quietComplete = this.now() - quietStartMs >= MIGRATION_QUIET_PERIOD_MS;
+    const quietComplete =
+      this.now() - quietStartMs >= MIGRATION_QUIET_PERIOD_MS;
     const scimStatus =
       legacyScim === null
         ? "not-applicable"
@@ -196,13 +203,15 @@ export class PrismaSsoMigrationProgressRepository
     if (scimStatus === "needs-repointing") {
       blockers.push({
         code: "scim-needs-repointing",
-        message: "Repoint directory provisioning to the replacement connection.",
+        message:
+          "Repoint directory provisioning to the replacement connection.",
       });
     }
     if (sharedLegacyIdentifiers) {
       blockers.push({
         code: "shared-legacy-identifiers",
-        message: "A legacy identity is shared with another organization and needs review.",
+        message:
+          "A legacy identity is shared with another organization and needs review.",
       });
     }
 
@@ -247,7 +256,9 @@ export class PrismaSsoMigrationProgressRepository
             legacyActivityByUser.get(row.userId)?.getTime() ?? null,
         })),
         nextCursor:
-          stragglerRows.length > limit ? (pageRows.at(-1)?.userId ?? null) : null,
+          stragglerRows.length > limit
+            ? (pageRows.at(-1)?.userId ?? null)
+            : null,
       },
       quietPeriod: {
         lastLegacyAuthenticationAtMs:
@@ -293,7 +304,10 @@ export class PrismaSsoMigrationProgressRepository
   }): Promise<boolean> {
     if (userIds.length === 0) return false;
     const otherMemberships = await this.prisma.organizationUser.findMany({
-      where: { userId: { in: userIds }, organizationId: { not: organizationId } },
+      where: {
+        userId: { in: userIds },
+        organizationId: { not: organizationId },
+      },
       distinct: ["organizationId"],
       select: { organizationId: true },
     });

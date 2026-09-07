@@ -42,11 +42,18 @@ export class PrismaSsoConnectionRegistrationRepository
       );
       const isLive = (slot: SsoConnectionRegistrationSlot): boolean => {
         const state = stateByConnection.get(slot.connectionId);
-        return state === undefined || (state !== "DISCARDED" && state !== "TORN_DOWN");
+        return (
+          state === undefined ||
+          (state !== "DISCARDED" && state !== "TORN_DOWN")
+        );
       };
 
       const held = slots.find((slot) => slot.kind === candidate.kind);
-      if (held && held.connectionId !== candidate.connectionId && isLive(held)) {
+      if (
+        held &&
+        held.connectionId !== candidate.connectionId &&
+        isLive(held)
+      ) {
         return held;
       }
 

@@ -163,11 +163,7 @@ function migrationLifecycle(): SsoConnectionEvent[] {
       { connectionId: CONNECTION },
       5_000,
     ),
-    event(
-      MIGRATION_FINALIZED_EVENT_TYPE,
-      { connectionId: CONNECTION },
-      6_000,
-    ),
+    event(MIGRATION_FINALIZED_EVENT_TYPE, { connectionId: CONNECTION }, 6_000),
   ];
 }
 

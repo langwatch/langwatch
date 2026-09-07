@@ -1,10 +1,13 @@
-import { emptySsoConnection, type SsoConnectionLifecycleState } from "@langwatch/identity";
+import {
+  emptySsoConnection,
+  type SsoConnectionLifecycleState,
+} from "@langwatch/identity";
 import { SsoBreakGlassService } from "@langwatch/identity-server";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { createTenantId } from "~/server/event-sourcing";
-import { PrismaSsoConnectionProjectionRepository } from "../sso-connection-projection.prisma.repository";
 import { PrismaSsoBreakGlassRepository } from "../sso-break-glass.prisma.repository";
+import { PrismaSsoConnectionProjectionRepository } from "../sso-connection-projection.prisma.repository";
 
 const RUN = `${Date.now()}`;
 const ORG = `org_break_glass_${RUN}`;
@@ -59,12 +62,14 @@ describe("atomic break-glass revocation", () => {
     await seed(FIRST);
     await seed(SECOND);
     expect(
-      await new PrismaSsoBreakGlassRepository(prisma).reserveActivationRecovery({
-        organizationId: ORG,
-        connectionId: CONNECTION,
-        commandId: COMMAND,
-        nowMs: T0,
-      }),
+      await new PrismaSsoBreakGlassRepository(prisma).reserveActivationRecovery(
+        {
+          organizationId: ORG,
+          connectionId: CONNECTION,
+          commandId: COMMAND,
+          nowMs: T0,
+        },
+      ),
     ).toBe(true);
 
     const attempts = await Promise.allSettled([
@@ -72,11 +77,14 @@ describe("atomic break-glass revocation", () => {
       service().revoke({ bindingId: SECOND, organizationId: ORG }),
     ]);
 
-    expect(attempts.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
+    expect(
+      attempts.filter(({ status }) => status === "fulfilled"),
+    ).toHaveLength(1);
     expect(
       attempts.filter(
         (attempt) =>
-          attempt.status === "rejected" && attempt.reason?.code === "sso_break_glass_last_way_in",
+          attempt.status === "rejected" &&
+          attempt.reason?.code === "sso_break_glass_last_way_in",
       ),
     ).toHaveLength(1);
     expect(
@@ -154,25 +162,25 @@ describe("atomic break-glass revocation", () => {
     expect(await reservationCount()).toBe(1);
   });
 
-  it.each(["DISCARDED", "TORN_DOWN"] as const)(
-    "cancels the durable reservation when projection lands %s",
-    async (state) => {
-      await seed(FIRST);
-      const connectionId = `${CONNECTION}_${state.toLowerCase()}`;
-      const commandId = `${COMMAND}_${state.toLowerCase()}`;
-      const repository = new PrismaSsoBreakGlassRepository(prisma);
-      await repository.reserveActivationRecovery({
-        organizationId: ORG,
-        connectionId,
-        commandId,
-        nowMs: T0,
-      });
+  it.each([
+    "DISCARDED",
+    "TORN_DOWN",
+  ] as const)("cancels the durable reservation when projection lands %s", async (state) => {
+    await seed(FIRST);
+    const connectionId = `${CONNECTION}_${state.toLowerCase()}`;
+    const commandId = `${COMMAND}_${state.toLowerCase()}`;
+    const repository = new PrismaSsoBreakGlassRepository(prisma);
+    await repository.reserveActivationRecovery({
+      organizationId: ORG,
+      connectionId,
+      commandId,
+      nowMs: T0,
+    });
 
-      await projectConnection({ connectionId, state });
+    await projectConnection({ connectionId, state });
 
-      expect(await reservationCount()).toBe(0);
-    },
-  );
+    expect(await reservationCount()).toBe(0);
+  });
 
   it("atomically consumes the exact reservation with the ACTIVE projection", async () => {
     await seed(FIRST);
@@ -202,17 +210,22 @@ describe("atomic break-glass revocation", () => {
   it("does not mutate a binding through another organization", async () => {
     await seed(FOREIGN, OTHER_ORG);
 
-    await expect(service().revoke({ bindingId: FOREIGN, organizationId: ORG })).rejects.toThrow(
-      /not one of organization/,
-    );
-    expect(await prisma.ssoBreakGlassBinding.findUnique({ where: { id: FOREIGN } })).toMatchObject({
+    await expect(
+      service().revoke({ bindingId: FOREIGN, organizationId: ORG }),
+    ).rejects.toThrow(/not one of organization/);
+    expect(
+      await prisma.ssoBreakGlassBinding.findUnique({ where: { id: FOREIGN } }),
+    ).toMatchObject({
       supersededAt: null,
     });
   });
 
   it("returns an already-ended binding without rewriting it", async () => {
     await seed(FIRST, ORG, true);
-    const ended = await service().revoke({ bindingId: FIRST, organizationId: ORG });
+    const ended = await service().revoke({
+      bindingId: FIRST,
+      organizationId: ORG,
+    });
 
     expect(ended.supersededAtMs).toBe(T0 - 500);
   });
