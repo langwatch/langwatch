@@ -340,6 +340,17 @@ Feature: Langy guides the first setup after sign-up
       And never on the branch the user has checked out
       And the branch stays checked out while the agent Langy started runs on it
 
+    # A film left the tracing edit uncommitted in the working tree: the branch
+    # existed and its diff against main was empty. The commit is the first
+    # thing after the agent reads online, not the last thing of the path.
+    @unit
+    Scenario: The instrumentation is committed once the agent is online
+      When the compiled guided-onboarding skill is read
+      Then the tracing edit and the connect adapter are committed on the langy/ branch as soon as the agent is online
+      And the commit stages the changed files by name, never the env file, with the message "Add LangWatch tracing and the connect endpoint" and no trailer
+      And Langy says in one line that the changes are on that branch for review
+      And the push and the pull request come at the end of the path
+
     @unit
     Scenario: The credentials are written after the tracing edit
       When the compiled guided-onboarding skill is read
@@ -357,11 +368,27 @@ Feature: Langy guides the first setup after sign-up
       And it never writes a loop of its own around the agent list
       And no scenario or suite runs against an agent that is not online
 
+    # A film proposed the expired discount code as the first scenario, so the
+    # first run failed by design and the two-things line had nothing to prove.
+    @unit
+    Scenario: The first scenario is the golden path
+      When the compiled guided-onboarding skill is read
+      Then the first scenario proposed is the agent's golden path, end to end, with inputs the code accepts
+      And refusals, expired inputs and edge cases come in the suite after it
+
+    # A film ended the turn on "Running it against your agent now." with no
+    # run behind it: the line read as an answer and the developer waited.
+    @unit
+    Scenario: The running line and the run are one step
+      When the compiled guided-onboarding skill is read
+      Then the run command is called in the same step as the running line
+      And the turn never ends on the running line
+
     @unit
     Scenario: The path ends in a fixed order
       When the compiled guided-onboarding skill is read
       Then the scenario is created and opened, the why-a-scenario line is said, the run happens
-      And the two-things line, the suite, its run, the open run, the commit and pull request follow
+      And the two-things line, the suite, its run, the open run, the push and pull request follow
       And the closing line comes before complete-path, which is last
 
     # The line is true whatever the verdict: the agent answered and the traces
@@ -375,7 +402,8 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: A failed step stops with one line and no completion
       When the compiled guided-onboarding skill is read
-      Then a run that answers an error instead of a verdict stops the path
+      Then a step fails when a command answers an error, never when a judge answers a verdict
+      And a run that answers an error instead of a verdict stops the path
       And Langy says in one line what is not done and what it needs, and ends the turn
       And neither the why-a-scenario line, the two-things line, the closing line nor complete-path follow
 

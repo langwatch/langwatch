@@ -145,6 +145,45 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain("Leave the branch checked out");
     });
 
+    /** @scenario "The instrumentation is committed once the agent is online" */
+    it("commits the instrumentation on the langy branch as soon as the agent is online, with one fixed message", () => {
+      const online = rendered.indexOf("run `langwatch agent list --wait-online <agent name> --format json` once");
+      const commit = rendered.indexOf(
+        'git add <the files you changed> && git commit -m "Add LangWatch tracing and the connect endpoint"',
+      );
+      const proposal = rendered.indexOf("### 3. Propose the first scenario, and stop");
+      expect(online).toBeGreaterThan(-1);
+      expect(commit).toBeGreaterThan(online);
+      expect(proposal).toBeGreaterThan(commit);
+      expect(rendered).toContain("never the env file and never `git add -A`");
+      expect(rendered).toContain("with this message and no trailer");
+      expect(rendered).toContain(
+        "say in one line of your own words that the tracing and the connect call are on branch `langy/<slug>` for them to review",
+      );
+      expect(rendered).toContain("The commit exists since step 2; commit again only when a file changed since.");
+    });
+
+    /** @scenario "The first scenario is the golden path" */
+    it("proposes the agent's golden path first and keeps failure cases for the suite", () => {
+      expect(rendered).toContain(
+        "The first scenario is the agent's golden path: the thing the agent exists to do, end to end, with inputs the code accepts",
+      );
+      expect(rendered).toContain(
+        "Refusals, expired inputs and edge cases come in the suite after it, never first",
+      );
+    });
+
+    /** @scenario "The running line and the run are one step" */
+    it("never ends the turn on the running line", () => {
+      const line = rendered.indexOf(VERBATIM_LINES["the running line"]);
+      const run = rendered.indexOf("langwatch scenario run <scenario_id>");
+      expect(line).toBeGreaterThan(-1);
+      expect(run).toBeGreaterThan(line);
+      expect(rendered).toContain(
+        "call the run in the same step you say the line in, and never end the turn on the line",
+      );
+    });
+
     it("names the docs page by language and framework", () => {
       expect(rendered).toContain(
         "`langwatch docs integration/<python|typescript>/integrations/<framework>`",
@@ -179,7 +218,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The path ends in a fixed order" */
     it("states the end of the path as one fixed order", () => {
       expect(rendered).toContain(
-        "create the scenario, open it, the why-a-scenario line, run it, the two-things line, the suite with its scenarios, the suite run, open the run, the commit and the pull request, the closing line, and `complete-path` last",
+        "create the scenario, open it, the why-a-scenario line, run it, the two-things line, the suite with its scenarios, the suite run, open the run, the push and the pull request, the closing line, and `complete-path` last",
       );
       const order = [
         'langwatch scenario create "<title>"',
@@ -190,7 +229,7 @@ describe("the guided-onboarding skill", () => {
         'langwatch test-suite create "Full regression"',
         "langwatch test-suite run <suite_id>",
         "langwatch navigate open <the scenariorun_ id the suite run printed>",
-        "commit and open the pull request",
+        "push the branch and open the pull request",
         VERBATIM_LINES["the closing line"],
         "langwatch onboarding complete-path llmops",
       ];
@@ -232,6 +271,9 @@ describe("the guided-onboarding skill", () => {
         "the why-a-scenario line, the two-things line and the closing line are not said",
       );
       expect(section).toContain("a scenario or suite run answers an error instead of a verdict");
+      expect(section).toContain(
+        "A step fails when a command answers an error, never when a judge answers a verdict",
+      );
       expect(rendered).toContain(
         "never one that stopped at a failed step",
       );

@@ -78,7 +78,13 @@ Then call `local_langwatch_env` once, with the env file the app loads (`.env` ne
 
 Start the agent from that branch the way the repo starts it (the `local_*` tools run the process; the connect-agent skill says how to keep it up), then run `langwatch agent list --wait-online <agent name> --format json` once: it reads the list again every few seconds and prints it as soon as the row's `status` is `online`, and it fails after two minutes when the row never does. Never write a loop of your own around `agent list`. Nothing runs against an agent that is not online: no scenario, no suite. Note the agent name: every `--target` below is `connected:<that name>`.
 
-Keep that branch checked out while the agent you started runs; the commit and the pull request come at the end of step 5.
+With the agent online, commit the instrumentation on that branch before anything else: the running app and the online row are the check that the change works. Stage the files you edited or wrote, by name (the manifest, the tracing edit, the connect adapter, a lockfile the repository tracks), never the env file and never `git add -A`, and commit in the same command with this message and no trailer:
+
+```bash
+git add <the files you changed> && git commit -m "Add LangWatch tracing and the connect endpoint"
+```
+
+Then say in one line of your own words that the tracing and the connect call are on branch `langy/<slug>` for them to review. Keep that branch checked out while the agent you started runs; the push and the pull request come at the end of step 5.
 
 ### 3. Propose the first scenario, and stop
 
@@ -91,7 +97,7 @@ Options, in this order:
 1. "Sure, go ahead!"
 2. "Chat about this", quiet
 
-`{title}` is the scenario's name in a few words, for example "Guest completes checkout". `{reason}` says in one clause why this path first: the one most users take, the one that crosses the most steps, the one the code guards hardest.
+The first scenario is the agent's golden path: the thing the agent exists to do, end to end, with inputs the code accepts, the way the README and the code describe it. Refusals, expired inputs and edge cases come in the suite after it, never first: a first run built on an input the code rejects fails by design and proves nothing about the agent. `{title}` is that path's name in a few words, for example "Guest completes checkout". `{reason}` says in one clause why this path first: the one most users take, the one that crosses the most steps.
 
 **"Chat about this"**: say, verbatim, and end the turn so the composer takes the cursor:
 
@@ -101,7 +107,7 @@ Write the scenario with them from their next message, and only then continue at 
 
 ### 4. Create, explain, run
 
-Steps 4 and 5 run in one fixed order, and nothing in it is skipped or moved: create the scenario, open it, the why-a-scenario line, run it, the two-things line, the suite with its scenarios, the suite run, open the run, the commit and the pull request, the closing line, and `complete-path` last.
+Steps 4 and 5 run in one fixed order, and nothing in it is skipped or moved: create the scenario, open it, the why-a-scenario line, run it, the two-things line, the suite with its scenarios, the suite run, open the run, the push and the pull request, the closing line, and `complete-path` last.
 
 On "Sure, go ahead!":
 
@@ -125,6 +131,8 @@ Running it against your agent now.
 langwatch scenario run <scenario_id> --target connected:<agent name> --wait --format json
 ```
 
+The line and the run are one step: call the run in the same step you say the line in, and never end the turn on the line. A turn that ends on "Running it against your agent now." ran nothing, and the developer waits on a run that does not exist.
+
 ### 5. From one run to a suite
 
 A run that answers a verdict, passed or failed, gets the two-things line. **If the run failed**, the explanation comes first: say in plain words what the judge saw and why the agent did not meet the criteria, and point at the run so they can replay the conversation. A failing first scenario is a finding, not a blocker, and the run still proved what the line says: the agent answered, and the traces flowed. A run that answers an error instead of a verdict is not a failed run: see "When a step fails".
@@ -142,7 +150,7 @@ langwatch test-suite run <suite_id> --target connected:<agent name> --wait --for
 langwatch navigate open <the scenariorun_ id the suite run printed>
 ```
 
-With the suite run open, commit and open the pull request as steps 4 to 6 of `code-changes` say, and report the address. A folder with no remote or no `gh` login gets the branch and the commit but no pull request: say so in one line, report the branch name, and go on. Leave the branch checked out: the agent you started runs on it, and say so in one line.
+With the suite run open, push the branch and open the pull request as steps 5 and 6 of `code-changes` say, and report the address. The commit exists since step 2; commit again only when a file changed since. A folder with no remote or no `gh` login gets the branch and the commit but no pull request: say so in one line, report the branch name, and go on. Leave the branch checked out: the agent you started runs on it, and say so in one line.
 
 Say, verbatim, as the last line:
 
@@ -156,7 +164,7 @@ langwatch onboarding complete-path llmops
 
 ### When a step fails
 
-The credentials call answers that the key was refused, the tracing edit cannot be applied, the agent is not online after two minutes, or a scenario or suite run answers an error instead of a verdict (a 422, a target it cannot find, a run that never starts, a connected agent call that times out): stop there, without diagnosing. No further reads or commands, and never the env file or the process log: say in one line what is not done and what the error names as the cause, and end the turn. Nothing later in the script happens: no scenario or suite runs against an agent that is not online, the why-a-scenario line, the two-things line and the closing line are not said, and `langwatch onboarding complete-path` does not run. When the credentials call was refused, the line says that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT go into the env file by hand, from the project's settings page.
+A step fails when a command answers an error, never when a judge answers a verdict: a scenario or suite run that comes back failed is a finding about the agent, and step 5 goes on with the explanation, the two-things line and the suite. A step fails when a command answers an error, never when a judge answers a verdict: a scenario or suite run that comes back failed is a finding about the agent, and step 5 goes on with the explanation, the two-things line and the suite. The credentials call answers that the key was refused, the tracing edit cannot be applied, the agent is not online after two minutes, or a scenario or suite run answers an error instead of a verdict (a 422, a target it cannot find, a run that never starts, a connected agent call that times out): stop there, without diagnosing. No further reads or commands, and never the env file or the process log: say in one line what is not done and what the error names as the cause, and end the turn. Nothing later in the script happens: no scenario or suite runs against an agent that is not online, the why-a-scenario line, the two-things line and the closing line are not said, and `langwatch onboarding complete-path` does not run. When the credentials call was refused, the line says that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT go into the env file by hand, from the project's settings page.
 
 ## coding: Coding agents
 
