@@ -38,6 +38,8 @@ describe("the spender display rows", () => {
 
       expect(shown[0]?.label).toBe(NOT_NAMED_LABEL);
       expect(shown[0]?.notNamed).toBe(true);
+      // It spans providers, so it carries none — the renderer draws no pill.
+      expect(shown[0]?.provider).toBe("");
     });
   });
 

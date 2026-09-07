@@ -92,9 +92,12 @@ function SpenderName({ row }: { row: SpenderDisplayRow }) {
       >
         {row.label}
       </Text>
-      <Badge size="xs" variant="subtle" colorPalette="gray" title="provider">
-        {row.provider}
-      </Badge>
+      {/* The bucket row spans providers and carries none — no empty pill. */}
+      {row.provider !== "" && (
+        <Badge size="xs" variant="subtle" colorPalette="gray" title="provider">
+          {row.provider}
+        </Badge>
+      )}
       {row.agentId !== "" && (
         <Badge size="xs" variant="subtle" colorPalette="gray" title="agent">
           {row.agentId}
