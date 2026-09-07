@@ -132,6 +132,30 @@ export function openaiKey(): string {
 }
 
 /**
+ * The provider values the demo application reads from its own `.env`.
+ * `app/graph.py` builds an Azure model when the three Azure values are set and
+ * an OpenAI one otherwise, so a run moves the demo with LANGY_GUIDED_PROVIDER
+ * the same way it moves Langy and the judge.
+ */
+export function demoProviderEnvLines(): string[] {
+  if (process.env.LANGY_GUIDED_PROVIDER !== "azure") {
+    return [`OPENAI_API_KEY=${openaiKey()}`];
+  }
+  const resource = process.env.AZURE_RESOURCE_NAME;
+  const key = process.env.AZURE_API_KEY;
+  if (!resource || !key) {
+    throw new Error(
+      "AZURE_RESOURCE_NAME and AZURE_API_KEY are required with LANGY_GUIDED_PROVIDER=azure",
+    );
+  }
+  return [
+    `AZURE_OPENAI_ENDPOINT=https://${resource}.openai.azure.com`,
+    `AZURE_OPENAI_API_KEY=${key}`,
+    `AZURE_OPENAI_API_VERSION=${process.env.AZURE_API_VERSION ?? "2024-10-21"}`,
+  ];
+}
+
+/**
  * Polls until `read` answers something truthy, then returns it.
  *
  * Every wait in this file goes through here so a timeout says what it was
@@ -1773,7 +1797,7 @@ export async function startDemoApp({
       `LANGWATCH_ENDPOINT=${APP_BASE}`,
       `LANGWATCH_API_KEY=${apiKey}`,
       "LANGWATCH_AGENT_CONNECT=1",
-      `OPENAI_API_KEY=${openaiKey()}`,
+      ...demoProviderEnvLines(),
       "",
     ].join("\n"),
     "utf8",

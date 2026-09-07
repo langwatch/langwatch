@@ -15,7 +15,6 @@
  *   cd platform/app/e2e/langy && npx vitest run guided-onboarding-llmops-chat-and-failure.scenario.test.ts --reporter=verbose
  */
 
-import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -28,6 +27,7 @@ import {
   GUIDED_OPTIONS,
   GUIDED_TONE_CRITERIA,
   type GuidedOrganization,
+  guidedHarnessModel,
   isProposalQuestion,
   listProjectScenarios,
   listProjectSuites,
@@ -54,7 +54,7 @@ import {
 } from "./local-control-fixture";
 import { runScenarioAndLog } from "./scenario-logger";
 
-const model = openai("gpt-5-mini");
+const model = guidedHarnessModel();
 
 const LONG_RUN_TIMEOUT_MS = 2_700_000;
 

@@ -14,6 +14,8 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { openai } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { expect } from "vitest";
 import {
   buildGuidedKickoffParts,
@@ -23,6 +25,7 @@ import {
 import type { GuidedPath } from "~/features/guided-onboarding/paths";
 import {
   GUIDED_PROVIDERS,
+  type GuidedProvider,
   guidedChatModels,
 } from "~/features/guided-onboarding/takeover/providers";
 import {
@@ -178,7 +181,60 @@ export interface GuidedOrganization {
   provider: { provider: string; model: string } | null;
 }
 
-const PROVIDER = "openai";
+/**
+ * The provider the seeded organization connects, and the one the harness's own
+ * judge and simulator answer from. The committed default is OpenAI; a run moves
+ * both onto another provider by setting LANGY_GUIDED_PROVIDER, so no file has
+ * to change when an account runs out of credit.
+ *
+ * Azure names a model by its deployment, so AZURE_DEPLOYMENT is both the model
+ * the takeover types and the deployment the harness calls.
+ */
+const PROVIDER = (process.env.LANGY_GUIDED_PROVIDER ??
+  "openai") as GuidedProvider["id"];
+
+const AZURE_API_VERSION = process.env.AZURE_API_VERSION ?? "2024-10-21";
+
+/** The model the harness's judge and simulator use when the provider is OpenAI. */
+const HARNESS_OPENAI_MODEL = "gpt-5-mini";
+
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `${name} is required with LANGY_GUIDED_PROVIDER=${PROVIDER}; the run script exports it from platform/app/.env`,
+    );
+  }
+  return value;
+}
+
+const azureBaseUrl = (): string =>
+  `https://${requiredEnv("AZURE_RESOURCE_NAME")}.openai.azure.com`;
+
+/**
+ * The model the scenario harness runs its simulator and its judge on, which is
+ * the same model the seeded organization gives Langy.
+ *
+ * Azure goes through the OpenAI-compatible provider rather than @ai-sdk/azure,
+ * which this checkout does not carry: the deployment is in the base URL, the
+ * key is a header and the API version is a query parameter.
+ */
+export function guidedHarnessModel() {
+  if (PROVIDER === "azure") {
+    return createOpenAICompatible({
+      name: "azure",
+      baseURL: `${azureBaseUrl()}/openai/deployments/${MODEL}`,
+      headers: { "api-key": requiredEnv("AZURE_API_KEY") },
+      queryParams: { "api-version": AZURE_API_VERSION },
+    })(MODEL);
+  }
+  if (PROVIDER !== "openai") {
+    throw new Error(
+      `LANGY_GUIDED_PROVIDER=${PROVIDER} has no harness model here; platform/app carries @ai-sdk/openai and @ai-sdk/openai-compatible only`,
+    );
+  }
+  return openai(HARNESS_OPENAI_MODEL);
+}
 
 /**
  * The model the guided provider screen lands on for OpenAI, resolved the way
@@ -189,14 +245,17 @@ const PROVIDER = "openai";
  * and the gateway path then passed every run while the live path failed every
  * run, because the skill's wording convinced one model and not the other.
  */
-const MODEL = guidedChatModels(
-  GUIDED_PROVIDERS.find((provider) => provider.id === PROVIDER)!,
-)[0]!;
+const MODEL =
+  PROVIDER === "azure"
+    ? requiredEnv("AZURE_DEPLOYMENT")
+    : guidedChatModels(
+        GUIDED_PROVIDERS.find((provider) => provider.id === PROVIDER)!,
+      )[0]!;
 
 /**
  * A fresh organization as the takeover leaves it: the guided variant, the
- * picks, the current path, the tour outcome, and the OpenAI provider attached
- * at organization scope as the Langy model (what the provider screen writes).
+ * picks, the current path, the tour outcome, and the provider attached at
+ * organization scope as the Langy model (what the provider screen writes).
  * One project, because Langy needs one and the takeover creates one.
  *
  * The signed-in test user owns it, so every tRPC call this suite makes as
@@ -322,8 +381,8 @@ export async function seedGuidedOrganization({
 }
 
 /**
- * The provider the takeover connects: the OpenAI row at organization scope
- * with the checkout's own key, then the Langy role pointed at it, then the
+ * The provider the takeover connects: its row at organization scope with the
+ * checkout's own credentials, then the Langy role pointed at it, then the
  * organization's guided state told about it (`useGuidedProviderConnect`).
  */
 async function attachProvider({
@@ -335,11 +394,20 @@ async function attachProvider({
   organizationId: string;
   projectId: string;
 }): Promise<void> {
-  const key = openaiKey();
-  if (!key) {
-    throw new Error(
-      "no OPENAI_API_KEY in the environment or platform/app/.env; the seeded provider needs one",
-    );
+  let customKeys: Record<string, string>;
+  if (PROVIDER === "azure") {
+    customKeys = {
+      AZURE_OPENAI_ENDPOINT: azureBaseUrl(),
+      AZURE_OPENAI_API_KEY: requiredEnv("AZURE_API_KEY"),
+    };
+  } else {
+    const key = openaiKey();
+    if (!key) {
+      throw new Error(
+        "no OPENAI_API_KEY in the environment or platform/app/.env; the seeded provider needs one",
+      );
+    }
+    customKeys = { OPENAI_API_KEY: key };
   }
   await trpcMutate({
     cookie,
@@ -349,7 +417,7 @@ async function attachProvider({
       projectId,
       provider: PROVIDER,
       enabled: true,
-      customKeys: { OPENAI_API_KEY: key },
+      customKeys,
       defaultModel: MODEL,
       scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
     },
