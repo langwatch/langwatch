@@ -11,6 +11,7 @@ import {
   getAgent,
   updateAgent,
 } from "../langwatch-api-agents.js";
+import { handleSearchTraces } from "../tools/search-traces.js";
 
 // --- Canned responses for every API endpoint ---
 
@@ -1075,11 +1076,8 @@ describe("All MCP tools integration", () => {
     });
 
     describe("when trace ids are named", () => {
-      /** @scenario An empty batch id lookup gives advice for that request */
+      /** @scenario "An empty batch id lookup gives advice for that request" */
       it("suggests an earlier window instead of repeating traceIds guidance", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
         const result = await handleSearchTraces({
           traceIds: ["unknown-trace-id"],
         });

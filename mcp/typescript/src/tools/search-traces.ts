@@ -59,9 +59,9 @@ function buildEmptyResult({
   startDate: number;
   endDate: number;
 }): string {
-  const namesTraceIds = (traceIds?.length ?? 0) > 0;
+  const hasTraceIds = (traceIds?.length ?? 0) > 0;
   const lines = [
-    namesTraceIds
+    hasTraceIds
       ? "No traces matched the requested trace ids in the searched window."
       : "No traces found matching your query.",
     "",
@@ -88,7 +88,7 @@ function buildEmptyResult({
     );
   }
 
-  if (namesTraceIds) {
+  if (hasTraceIds) {
     lines.push(
       "- Retry with an earlier startDate, or relax the query and filters if you supplied them.",
       "- Looking up one full id? `get_trace` has no time window. A unique 8–31 character hex prefix searches the last 90 days.",
@@ -121,8 +121,8 @@ export async function handleSearchTraces(params: {
   format?: "digest" | "json";
 }): Promise<string> {
   const now = Date.now();
-  const namesTraceIds = (params.traceIds?.length ?? 0) > 0;
-  const defaultSpanMs = namesTraceIds ? ID_LOOKUP_WINDOW_MS : TEXT_SEARCH_WINDOW_MS;
+  const hasTraceIds = (params.traceIds?.length ?? 0) > 0;
+  const defaultSpanMs = hasTraceIds ? ID_LOOKUP_WINDOW_MS : TEXT_SEARCH_WINDOW_MS;
 
   const endDate =
     params.endDate !== undefined ? parseRelativeDate(params.endDate) : now;
