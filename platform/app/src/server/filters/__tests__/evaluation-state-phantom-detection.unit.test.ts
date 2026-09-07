@@ -178,9 +178,7 @@ describe("findNonCanonicalStateValues", () => {
         expect(() =>
           findNonCanonicalStateValues(["evaluations.state"]),
         ).not.toThrow();
-        expect(findNonCanonicalStateValues(["evaluations.state"])).toEqual(
-          [],
-        );
+        expect(findNonCanonicalStateValues(["evaluations.state"])).toEqual([]);
       });
     });
   });

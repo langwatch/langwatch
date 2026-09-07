@@ -24,13 +24,11 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
-
-import { PrismaClient, type Prisma } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "~/server/db";
+import { type Prisma, PrismaClient } from "~/generated/prisma/client";
 import { evaluationRunDataSchema } from "~/server/app-layer/evaluations/types";
+import { prisma } from "~/server/db";
 
 /**
  * The canonical execution-state domain, derived from the schema so this
@@ -166,7 +164,9 @@ async function snapshotXmins({
     FROM "Trigger"
     WHERE "id" = ANY(${triggerIds}::text[])
   `;
-  return Object.fromEntries(rows.map((row) => [row.id, row.xmin]));
+  return Object.fromEntries(
+    rows.map((row: { id: string; xmin: string }) => [row.id, row.xmin]),
+  );
 }
 
 async function createTrigger({
@@ -323,7 +323,10 @@ describe("evaluation-state report-only migration (TriggerFilterFinding)", () => 
 
     // Captured BEFORE the scan runs so the report-only guarantee test
     // below can compare "across the run".
-    xminBeforeScan = await snapshotXmins({ db: rawDb, triggerIds: allTriggerIds });
+    xminBeforeScan = await snapshotXmins({
+      db: rawDb,
+      triggerIds: allTriggerIds,
+    });
 
     await runMigrationStatements({ db: rawDb, sql: migrationSql });
   }, 60_000);
@@ -491,11 +494,17 @@ describe("evaluation-state report-only migration (TriggerFilterFinding)", () => 
     });
 
     it("adds zero findings when the scan runs a second time", async () => {
-      const before = await countFindings({ db: rawDb, triggerIds: allTriggerIds });
+      const before = await countFindings({
+        db: rawDb,
+        triggerIds: allTriggerIds,
+      });
 
       await runMigrationStatements({ db: rawDb, sql: migrationSql });
 
-      const after = await countFindings({ db: rawDb, triggerIds: allTriggerIds });
+      const after = await countFindings({
+        db: rawDb,
+        triggerIds: allTriggerIds,
+      });
       expect(after).toBe(before);
     });
   });

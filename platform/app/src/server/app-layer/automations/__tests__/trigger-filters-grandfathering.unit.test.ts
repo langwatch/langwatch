@@ -1,5 +1,9 @@
-import { TriggerAction, type Prisma, type PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import {
+  type Prisma,
+  type PrismaClient,
+  TriggerAction,
+} from "~/generated/prisma/client";
 import { PrismaTriggerRepository } from "../repositories/trigger.prisma.repository";
 
 /**

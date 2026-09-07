@@ -27,7 +27,11 @@ export type StateFinding = {
  * primitive — yields `[]` rather than throwing.
  */
 export function findNonCanonicalStateValues(filters: unknown): StateFinding[] {
-  if (typeof filters !== "object" || filters === null || Array.isArray(filters)) {
+  if (
+    typeof filters !== "object" ||
+    filters === null ||
+    Array.isArray(filters)
+  ) {
     return [];
   }
 
