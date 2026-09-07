@@ -1,11 +1,4 @@
-import {
-  Badge,
-  chakra,
-  HStack,
-  Separator,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, chakra, Separator, Text, VStack } from "@chakra-ui/react";
 import { Archive, Bell, Clock, Inbox, Mail } from "lucide-react";
 
 /**
@@ -97,7 +90,7 @@ export function InsightsRail({
             ) : null}
             <chakra.button
               type="button"
-              aria-current={active ? "page" : undefined}
+              aria-current={active ? "true" : undefined}
               onClick={() => onSelect(folder.id)}
               display="flex"
               alignItems="center"
@@ -114,25 +107,33 @@ export function InsightsRail({
               _hover={{ background: "bg.muted/60" }}
             >
               <Icon size={15} />
-              <Text flex={1}>{folder.label}</Text>
-              <HStack gap={0} aria-label={`${folder.label} count`}>
-                {folder.stream ? (
-                  <Badge
-                    size="sm"
-                    borderRadius="full"
-                    variant={count > 0 ? "solid" : "subtle"}
-                    colorPalette={count > 0 ? "orange" : "gray"}
-                    minWidth="22px"
-                    justifyContent="center"
-                  >
-                    {count}
-                  </Badge>
-                ) : (
-                  <Text fontSize="10.5px" fontWeight="500" color="fg.subtle">
-                    {count}
-                  </Text>
-                )}
-              </HStack>
+              <Text as="span" flex={1}>
+                {folder.label}
+              </Text>
+              {/* The count is plain text in the row, so the button's own
+                  name carries it ("Inbox 0"): no label on a generic box,
+                  which assistive tech would ignore (see RunsSidebarEntry). */}
+              {folder.stream ? (
+                <Badge
+                  size="sm"
+                  borderRadius="full"
+                  variant={count > 0 ? "solid" : "subtle"}
+                  colorPalette={count > 0 ? "orange" : "gray"}
+                  minWidth="22px"
+                  justifyContent="center"
+                >
+                  {count}
+                </Badge>
+              ) : (
+                <Text
+                  as="span"
+                  fontSize="10.5px"
+                  fontWeight="500"
+                  color="fg.subtle"
+                >
+                  {count}
+                </Text>
+              )}
             </chakra.button>
           </VStack>
         );

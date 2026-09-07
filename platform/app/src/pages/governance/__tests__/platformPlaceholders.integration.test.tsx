@@ -230,6 +230,7 @@ describe("given the Insights screen", () => {
     renderPage(InsightsPage);
     const rail = screen.getByRole("navigation", { name: "Insights folders" });
 
+    // The count rides in the row's own accessible name: "Inbox 0".
     for (const label of [
       "Inbox",
       "Stale",
@@ -237,13 +238,15 @@ describe("given the Insights screen", () => {
       "Alerts",
       "Notifications",
     ]) {
-      expect(within(rail).getByLabelText(`${label} count`)).toHaveTextContent(
-        "0",
-      );
+      expect(
+        within(rail).getByRole("button", {
+          name: new RegExp(`^${label}\\s*0$`),
+        }),
+      ).toBeInTheDocument();
     }
     expect(within(rail).getByRole("button", { name: /Inbox/ })).toHaveAttribute(
       "aria-current",
-      "page",
+      "true",
     );
 
     fireEvent.click(within(rail).getByRole("button", { name: /Stale/ }));
