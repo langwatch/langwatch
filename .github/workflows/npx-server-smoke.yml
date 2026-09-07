@@ -183,6 +183,13 @@ jobs:
         run: >
           pnpm --filter @langwatch/server-cli run test:invariants
 
+      - name: Check the Langy worker predependency contract
+        run: >
+          pnpm --filter @langwatch/server-cli exec vitest run
+          test/predeps/langy-worker.test.ts
+          test/services/langyagent.test.ts
+          test/services/runtime.test.ts
+
       # Same prebuild as npx-server-publish.yml: every published artifact
       # ships platform/app/dist + mcp/typescript/dist (the publish sanity check
       # asserts both), so the artifact THIS job boots must carry them too —
@@ -250,6 +257,11 @@ jobs:
         id: start
         env:
           OPENAI_API_KEY: ${{ secrets.NPX_SERVER_OPENAI_API_KEY }}
+          # The PR tarball is built before its release assets exist. Exercise
+          # the Langy download and runtime wiring in the focused tests above,
+          # then disable it for this full-stack boot. The publish workflow
+          # builds and uploads the matching worker before it publishes npm.
+          LANGWATCH_ENABLE_LANGY: "false"
         run: |
           set -e
           mkdir -p "$LANGWATCH_HOME"
@@ -368,23 +380,21 @@ jobs:
           probe langevals "http://127.0.0.1:$((base + 2))/"        /tmp/health-langevals.json
           probe gateway   "http://127.0.0.1:$((base + 3))/healthz" /tmp/health-gateway.json
 
-      # The assistant has exactly two legitimate outcomes, and the CLI's own
-      # log says which one happened: `langyagent` reached healthy, or it was
-      # deliberately skipped because the downloaded release binary predates
-      # the langyagent service (the smoke tests an unreleased CLI against the
-      # PREVIOUS release's binary, so the skip is the expected path until the
-      # next release publishes fresh binaries). Anything else — crash-looping,
-      # or a "healthy" verdict without a listener actually answering on the
-      # port — fails the smoke. The port re-probe exists because a stray
-      # listener on the assistant's port once let a dead langyagent pass as
-      # healthy on ubuntu runners.
+      # The assistant has exactly two legitimate outcomes: this unreleased
+      # smoke artifact explicitly disables it, or `langyagent` reached healthy.
+      # Anything else - crash-looping, or a "healthy" verdict without a listener
+      # answering on the port - fails the smoke. The port re-probe exists because
+      # a stray listener on the assistant's port once let a dead langyagent pass
+      # as healthy on ubuntu runners.
       - name: Assert the assistant either booted or declared itself skipped
+        env:
+          LANGWATCH_ENABLE_LANGY: "false"
         run: |
           set -eo pipefail
           base=${RESOLVED_BASE}
           log="$GITHUB_WORKSPACE/_smoke.log"
-          if grep -q "langy assistant disabled" "$log"; then
-            echo "✓ assistant skipped with the release-binary notice (expected until the next release's binaries exist)"
+          if [ "$LANGWATCH_ENABLE_LANGY" = "false" ]; then
+            echo "✓ assistant explicitly skipped for the unreleased smoke artifact"
             exit 0
           fi
           if grep -qE "langyagent +healthy in" "$log"; then
