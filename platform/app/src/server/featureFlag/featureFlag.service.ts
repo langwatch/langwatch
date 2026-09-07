@@ -104,6 +104,8 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       organizationId: toRuleContextId(opts.organizationId),
       // The caller's identity is what a percentage rollout rule buckets on.
       distinctId: opts.distinctId,
+      // The session's email is what an email domain rule compares against.
+      userEmail: opts.userEmail ?? undefined,
     };
 
     if (definition?.scope === "SYSTEM" || definition?.scope === "PRODUCT") {

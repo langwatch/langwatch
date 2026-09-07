@@ -11,8 +11,8 @@ import { z } from "zod";
  * through to the registry default.
  *
  * The shape is intentionally open-ended — today it carries `projectId`,
- * `organizationId`, `organizationCreatedAfter` and `percentageRollout`,
- * tomorrow it can grow `userEmail`, etc., without a schema migration.
+ * `organizationId`, `organizationCreatedAfter`, `percentageRollout` and
+ * `emailDomain`, tomorrow it can grow more without a schema migration.
  */
 
 const KNOWN_MATCH_KEYS = [
@@ -20,6 +20,7 @@ const KNOWN_MATCH_KEYS = [
   "organizationId",
   "organizationCreatedAfter",
   "percentageRollout",
+  "emailDomain",
 ] as const;
 type KnownMatchKey = (typeof KNOWN_MATCH_KEYS)[number];
 
@@ -45,6 +46,14 @@ const featureFlagRuleMatchSchema = z
      * for different flags. A read without a `distinctId` never matches.
      */
     percentageRollout: z.number().optional(),
+    /**
+     * Team QA in production: matches every signed-in user whose email is at
+     * one of these domains, and no one else. Written lowercase without the
+     * `@`, and compared exactly against the part after the last `@` of the
+     * read's `userEmail`, so a subdomain only matches when it is listed. A
+     * read without a user email never matches.
+     */
+    emailDomain: z.union([z.string(), z.array(z.string())]).optional(),
   })
   // Future-proof: keep unknown fields on the parsed object rather than
   // rejecting them, so a newer writer can ship a rule shape the running
@@ -111,7 +120,40 @@ export const featureFlagRulesWriteSchema = featureFlagRulesSchema
     {
       message: "A percentage rollout rule needs a percentage between 0 and 100",
     },
+  )
+  .refine(
+    (rules) =>
+      rules.every((rule) => {
+        if (rule.match.emailDomain === undefined) return true;
+        const domains = emailDomainsOf(rule.match.emailDomain);
+        return domains.length > 0 && domains.every(isWritableEmailDomain);
+      }),
+    {
+      message:
+        "An email domain rule needs one or more lowercase domains without the @",
+    },
   );
+
+/** The domains an `emailDomain` condition names, one or several, as a list. */
+export function emailDomainsOf(
+  emailDomain: string | string[] | undefined,
+): string[] {
+  if (emailDomain === undefined) return [];
+  return Array.isArray(emailDomain) ? emailDomain : [emailDomain];
+}
+
+/**
+ * The stored form of one domain: lowercase, no padding, no `@`, no
+ * whitespace. The matcher would still read a padded or capitalised domain,
+ * but a canonical row is what the Ops UI reopens and the summary line names.
+ */
+function isWritableEmailDomain(domain: string): boolean {
+  return (
+    domain.length > 0 &&
+    domain === domain.trim().toLowerCase() &&
+    !/[@\s]/.test(domain)
+  );
+}
 
 export type FeatureFlagRuleMatch = z.infer<typeof featureFlagRuleMatchSchema>;
 export type FeatureFlagRule = z.infer<typeof featureFlagRuleSchema>;
@@ -140,6 +182,12 @@ export interface RuleEvaluationContext {
    * can match.
    */
   flagKey?: string;
+  /**
+   * The signed-in user's email, for an email domain rule. Absent on every
+   * read without a session (a job, an API key, a sign-up), so no domain
+   * rule can match there.
+   */
+  userEmail?: string;
 }
 
 /** Buckets in a percentage rollout: a bucket is an integer in [0, 100). */
@@ -260,9 +308,8 @@ export function resolveEffectiveForListing({
 
 /**
  * Fail closed on unknown match keys: a newer writer might have added a
- * condition (e.g. userEmail) that this reader doesn't understand. Treating
- * it as "no constraint" would silently turn that rule into a global match
- * for every context.
+ * condition this reader doesn't understand. Treating it as "no constraint"
+ * would silently turn that rule into a global match for every context.
  */
 function hasOnlyKnownKeys(match: FeatureFlagRuleMatch): boolean {
   return Object.keys(match).every((key) =>
@@ -277,31 +324,56 @@ function matchesContext(
   if (!hasOnlyKnownKeys(match)) return false;
   // Every specified field must match the context. An entirely empty
   // match acts as a default-rule and matches every context.
-  if (match.projectId !== undefined && match.projectId !== ctx.projectId) {
-    return false;
-  }
-  if (
-    match.organizationId !== undefined &&
-    match.organizationId !== ctx.organizationId
-  ) {
-    return false;
-  }
-  if (
-    match.organizationCreatedAfter !== undefined &&
-    !isOrganizationNewerThan(
+  return CONDITIONS.every((holds) => holds(match, ctx));
+}
+
+type Condition = (
+  match: FeatureFlagRuleMatch,
+  ctx: RuleEvaluationContext,
+) => boolean;
+
+/** One entry per known match key: an unset key holds, a set key must match. */
+const CONDITIONS: readonly Condition[] = [
+  (match, ctx) =>
+    match.projectId === undefined || match.projectId === ctx.projectId,
+  (match, ctx) =>
+    match.organizationId === undefined ||
+    match.organizationId === ctx.organizationId,
+  (match, ctx) =>
+    match.organizationCreatedAfter === undefined ||
+    isOrganizationNewerThan(
       match.organizationCreatedAfter,
       ctx.organizationCreatedAt,
-    )
-  ) {
-    return false;
-  }
-  if (
-    match.percentageRollout !== undefined &&
-    !isInRollout(match.percentageRollout, ctx)
-  ) {
-    return false;
-  }
-  return true;
+    ),
+  (match, ctx) =>
+    match.percentageRollout === undefined ||
+    isInRollout(match.percentageRollout, ctx),
+  (match, ctx) =>
+    match.emailDomain === undefined ||
+    isEmailInDomain(match.emailDomain, ctx.userEmail),
+];
+
+/**
+ * Whether the read's user is at one of the rule's domains. The comparison is
+ * on the part after the last `@`, lowercased on both sides, and exact: a rule
+ * naming `acme.com` does not match `eu.acme.com` unless that is listed too.
+ * Fails closed on a read with no email and on an email with no `@`.
+ */
+function isEmailInDomain(
+  emailDomain: string | string[],
+  userEmail: string | undefined,
+): boolean {
+  if (!userEmail) return false;
+  const at = userEmail.lastIndexOf("@");
+  if (at < 0) return false;
+  const domain = userEmail
+    .slice(at + 1)
+    .trim()
+    .toLowerCase();
+  if (domain === "") return false;
+  return emailDomainsOf(emailDomain).some(
+    (candidate) => candidate.trim().toLowerCase() === domain,
+  );
 }
 
 /**

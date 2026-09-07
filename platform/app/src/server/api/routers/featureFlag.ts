@@ -134,6 +134,7 @@ export const featureFlagRouter = createTRPCRouter({
         input.flag as FeatureFlagKey,
         {
           distinctId: userId,
+          userEmail: ctx.session.user.email,
           defaultValue: false,
           projectId: input.projectId ?? NOT_TARGETED,
           organizationId: input.organizationId ?? NOT_TARGETED,
@@ -203,6 +204,7 @@ export const featureFlagRouter = createTRPCRouter({
         allowedOrganizationIds.map((organizationId) =>
           featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
             distinctId: userId,
+            userEmail: ctx.session.user.email,
             defaultValue: false,
             // The procedure asks one organization at a time by design, and
             // the surfaces that call it have no project of their own.
@@ -261,6 +263,7 @@ export const featureFlagRouter = createTRPCRouter({
             organizationId,
             await featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
               distinctId: userId,
+              userEmail: ctx.session.user.email,
               defaultValue: false,
               // Same as above: an organization-at-a-time read from a
               // workspace surface that has no project.

@@ -2841,6 +2841,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   const governanceEnabled = await featureFlagService
     .isEnabled("release_ui_ai_governance_enabled", {
       distinctId: session.user.id,
+      userEmail: session.user.email,
       // Device login picks an organization, not a project.
       projectId: NOT_TARGETED,
       organizationId: organization_id,

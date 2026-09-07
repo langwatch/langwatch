@@ -66,6 +66,12 @@ Feature: Guided onboarding variant
     When the flag is read through the feature flag service for a user
     Then the store evaluates the rule against that user's distinct id
 
+  @integration
+  Scenario: a fresh account at the team's email domain lands in the guided flow with only a domain rule set
+    Given the flag's only rule enables it for users at the team's email domain
+    When the welcome flow reads the flag for a new user at that domain, before any organization exists
+    Then it resolves enabled, so the guided variant is chosen without a percentage rule
+
   # ============================================================================
   # The classic variant stays untouched, dev overrides force the guided one
   # ============================================================================

@@ -1,4 +1,4 @@
-import type { FeatureFlagRules } from "~/server/featureFlag";
+import { emailDomainsOf, type FeatureFlagRules } from "~/server/featureFlag";
 
 /**
  * One line under a flag's toggle saying who a rule has already switched the
@@ -33,6 +33,8 @@ export interface TargetingSummary {
   enabledNewUsers: AgeRange | null;
   /** The share of users, in percent, the first percentage rule switches on. */
   enabledPercentage: number | null;
+  /** The domains the first email domain rule switches on, empty when none. */
+  enabledEmailDomains: string[];
   /**
    * Targets an earlier rule switches off. Only read alongside
    * `enabledForEveryone`, where the catch-all would otherwise claim the whole
@@ -66,6 +68,7 @@ export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
     enabledProjectCount: count({ decisions: projects, enabled: true }),
     enabledNewUsers: bare(ages.find((range) => range.enabled)),
     enabledPercentage: enabledPercentage(reachable),
+    enabledEmailDomains: enabledEmailDomains(reachable),
     excludedOrganizationCount: count({
       decisions: organizations,
       enabled: false,
@@ -106,6 +109,9 @@ export function targetingLabel(summary: TargetingSummary): string | null {
     summary.enabledPercentage !== null
       ? `${summary.enabledPercentage}% of users`
       : null,
+    summary.enabledEmailDomains.length > 0
+      ? `users at ${summary.enabledEmailDomains.join(", ")}`
+      : null,
   ]);
   return targets ? `Enabled for ${targets}` : null;
 }
@@ -124,6 +130,24 @@ function enabledPercentage(rules: FeatureFlagRules): number | null {
     return rule.enabled ? percentage : null;
   }
   return null;
+}
+
+/**
+ * The domains the first email domain rule switches on, or none. As with the
+ * percentage, only a rule whose sole condition is the domain counts: one that
+ * also names an organization speaks for that organization's users alone.
+ */
+function enabledEmailDomains(rules: FeatureFlagRules): string[] {
+  for (const rule of rules) {
+    if (
+      rule.match.emailDomain === undefined ||
+      Object.keys(rule.match).length > 1
+    ) {
+      continue;
+    }
+    return rule.enabled ? emailDomainsOf(rule.match.emailDomain) : [];
+  }
+  return [];
 }
 
 /**

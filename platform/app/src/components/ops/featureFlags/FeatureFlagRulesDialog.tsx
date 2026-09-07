@@ -70,6 +70,7 @@ const SCOPE_COLLECTION = createListCollection<{
     { value: "PROJECT", label: "Project" },
     { value: "NEW_USERS", label: "New users" },
     { value: "PERCENTAGE", label: "Percentage of users" },
+    { value: "EMAIL_DOMAIN", label: "Email domain" },
   ],
 });
 
@@ -79,6 +80,7 @@ const SCOPE_FIELD_LABEL: Record<ScopeKind, string> = {
   PROJECT: "Project id",
   NEW_USERS: "Organization created on or after",
   PERCENTAGE: "Percentage of users",
+  EMAIL_DOMAIN: "Email domains",
 };
 
 const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
@@ -87,6 +89,7 @@ const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
   PROJECT: "project_xxxx",
   NEW_USERS: "",
   PERCENTAGE: "50",
+  EMAIL_DOMAIN: "acme.com, acme.io",
 };
 
 const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
@@ -95,6 +98,8 @@ const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
   PROJECT: "Every project rule needs a project id.",
   NEW_USERS: "Every new users rule needs a date.",
   PERCENTAGE: "Every percentage rule needs a number between 0 and 100.",
+  EMAIL_DOMAIN:
+    "Every email domain rule needs one or more domains, without the @.",
 };
 
 export function FeatureFlagRulesDialog({
@@ -389,7 +394,10 @@ function ScopeField({
   );
 }
 
-/** What the chosen scope needs beside it: an id, a date, or nothing. */
+/**
+ * What the chosen scope needs beside it: an id, a date, a number, a list of
+ * domains, or nothing.
+ */
 function TargetField({
   rule,
   onChange,
@@ -399,6 +407,7 @@ function TargetField({
 }) {
   const isNewUsers = rule.scopeKind === "NEW_USERS";
   const isPercentage = rule.scopeKind === "PERCENTAGE";
+  const isEmailDomain = rule.scopeKind === "EMAIL_DOMAIN";
   const inputType = isNewUsers ? "date" : isPercentage ? "number" : "text";
 
   return (
@@ -429,6 +438,13 @@ function TargetField({
           Matches this share of users. Each user lands in a stable bucket for
           this flag, so they see the same value on every visit. Reads without a
           signed-in user never match.
+        </Field.HelperText>
+      )}
+      {isEmailDomain && (
+        <Field.HelperText fontSize="xs">
+          Matches signed-in users whose email is at one of these domains, comma
+          separated, without the @. A subdomain only matches when it is listed.
+          Reads without a signed-in user never match.
         </Field.HelperText>
       )}
     </Field.Root>
