@@ -50,7 +50,8 @@ Every empty search response states the exact window it searched. It also:
 - suggests the next wider window, up to 90 days.
 
 When only `endDate` is supplied, the default-width window is anchored to that
-end. An explicit `startDate` after `endDate` is rejected before the API call.
+end. Empty date values and a `startDate` at or after `endDate` are rejected
+before the API call.
 
 A narrow shape check recognises `trace_` ids and hex strings of at least eight
 characters. It may add advice to an empty result. It must never reroute the
@@ -80,7 +81,8 @@ the common path to address an id-specific problem.
 
 An agent holding one id has clear guidance to use `get_trace`. An agent holding
 several ids can fetch them through the exact filter in one paginated search.
-Empty results no longer hide the searched period.
+Empty results no longer hide the searched period. An empty batch-id result
+suggests an earlier window instead of telling the caller to pass the ids again.
 
 Free-text search by trace id remains unavailable. The product trace list also
 does not expose `traceIds`; that is outside this decision.

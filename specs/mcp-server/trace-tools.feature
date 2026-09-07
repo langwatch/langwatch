@@ -79,6 +79,11 @@ Feature: MCP Trace Tools
     Then the response explains that startDate must be before endDate
     And the server receives no trace search request
 
+  Scenario: An empty date input fails before the API call
+    When the agent calls search_traces with an empty startDate
+    Then the response explains that the date is invalid
+    And the server receives no trace search request
+
   Scenario: Agent pastes a trace id into the search query
     When the agent calls search_traces with query "63dc535cea6335c506bc81ef3543a07d"
     Then the response reports that no traces matched
@@ -113,6 +118,12 @@ Feature: MCP Trace Tools
     Given traces exist with ids "63dc535cea6335c506bc81ef3543a07d" and "a3c6656cf433e97549f654034be02955"
     When the agent calls search_traces with traceIds for both
     Then the response contains exactly those two traces
+
+  Scenario: An empty batch id lookup gives advice for that request
+    When the agent calls search_traces with traceIds that are not found
+    Then the response says no requested trace ids matched in the searched window
+    And the response suggests an earlier startDate
+    But the response does not tell the agent to pass traceIds again
 
   # Naming ids is an exact-match intent; answering it against yesterday alone is
   # a false negative by construction. 90 days is the bound prefix resolution

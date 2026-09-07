@@ -1075,6 +1075,22 @@ describe("All MCP tools integration", () => {
     });
 
     describe("when trace ids are named", () => {
+      /** @scenario An empty batch id lookup gives advice for that request */
+      it("suggests an earlier window instead of repeating traceIds guidance", async () => {
+        const { handleSearchTraces } = await import(
+          "../tools/search-traces.js"
+        );
+        const result = await handleSearchTraces({
+          traceIds: ["unknown-trace-id"],
+        });
+
+        expect(result).toContain(
+          "No traces matched the requested trace ids in the searched window.",
+        );
+        expect(result).toContain("Retry with an earlier startDate");
+        expect(result).not.toContain("pass `traceIds`");
+      });
+
       /** @scenario Agent looks up several traces by id in one call */
       it("fetches exactly those traces in one call", async () => {
         const { handleSearchTraces } = await import(

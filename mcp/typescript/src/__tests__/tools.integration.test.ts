@@ -250,6 +250,14 @@ describe("handleSearchTraces()", () => {
       ).rejects.toThrow("must be before endDate");
       expect(mockSearchTraces).not.toHaveBeenCalled();
     });
+
+    /** @scenario An empty date input fails before the API call */
+    it("rejects an empty date before calling the API", async () => {
+      await expect(handleSearchTraces({ startDate: "" })).rejects.toThrow(
+        'Invalid date: ""',
+      );
+      expect(mockSearchTraces).not.toHaveBeenCalled();
+    });
   });
 
   describe("when pageSize is specified", () => {

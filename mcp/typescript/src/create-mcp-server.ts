@@ -229,12 +229,14 @@ function registerTools(server: McpServer): void {
         ),
       startDate: z
         .string()
+        .min(1)
         .optional()
         .describe(
           'Start of the window: ISO date, or relative like "24h", "7d", "4w", "3m" — units are h (hours), d (days), w (weeks), m (30-day months). Defaults to 24h ago for a text search, or 90d when traceIds is set. Widen this when a search comes back empty.'
         ),
       endDate: z
         .string()
+        .min(1)
         .optional()
         .describe("End of the window: ISO date or relative. Default: now"),
       pageSize: z

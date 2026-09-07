@@ -46,18 +46,26 @@ function suggestWiderWindow(spanMs: number): string | undefined {
  */
 function buildEmptyResult({
   query,
+  traceIds,
   spanMs,
   windowWasDefaulted,
   startDate,
   endDate,
 }: {
   query?: string;
+  traceIds?: string[];
   spanMs: number;
   windowWasDefaulted: boolean;
   startDate: number;
   endDate: number;
 }): string {
-  const lines = ["No traces found matching your query.", ""];
+  const namesTraceIds = (traceIds?.length ?? 0) > 0;
+  const lines = [
+    namesTraceIds
+      ? "No traces matched the requested trace ids in the searched window."
+      : "No traces found matching your query.",
+    "",
+  ];
 
   const range = `${new Date(startDate).toISOString()} to ${new Date(endDate).toISOString()}`;
   lines.push(
@@ -80,10 +88,17 @@ function buildEmptyResult({
     );
   }
 
-  lines.push(
-    "- Looking up a known trace id? `get_trace` takes a traceId. A full id has no time window; a unique 8–31 character hex prefix searches the last 90 days.",
-    "- To fetch several known trace ids at once, pass `traceIds` instead of `query`.",
-  );
+  if (namesTraceIds) {
+    lines.push(
+      "- Retry with an earlier startDate, or relax the query and filters if you supplied them.",
+      "- Looking up one full id? `get_trace` has no time window. A unique 8–31 character hex prefix searches the last 90 days.",
+    );
+  } else {
+    lines.push(
+      "- Looking up a known trace id? `get_trace` takes a traceId. A full id has no time window; a unique 8–31 character hex prefix searches the last 90 days.",
+      "- To fetch several known trace ids at once, pass `traceIds` instead of `query`.",
+    );
+  }
 
   return lines.join("\n");
 }
@@ -109,8 +124,9 @@ export async function handleSearchTraces(params: {
   const namesTraceIds = (params.traceIds?.length ?? 0) > 0;
   const defaultSpanMs = namesTraceIds ? ID_LOOKUP_WINDOW_MS : TEXT_SEARCH_WINDOW_MS;
 
-  const endDate = params.endDate ? parseRelativeDate(params.endDate) : now;
-  const startDate = params.startDate
+  const endDate =
+    params.endDate !== undefined ? parseRelativeDate(params.endDate) : now;
+  const startDate = params.startDate !== undefined
     ? parseRelativeDate(params.startDate)
     : endDate - defaultSpanMs;
 
@@ -136,8 +152,9 @@ export async function handleSearchTraces(params: {
   if (traces.length === 0) {
     return buildEmptyResult({
       query: params.query,
+      traceIds: params.traceIds,
       spanMs: endDate - startDate,
-      windowWasDefaulted: !params.startDate,
+      windowWasDefaulted: params.startDate === undefined,
       startDate,
       endDate,
     });
