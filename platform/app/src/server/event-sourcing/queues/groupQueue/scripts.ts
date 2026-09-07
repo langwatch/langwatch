@@ -916,6 +916,7 @@ local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
 local totalPendingKey  = KEYS[4]
+local allowedGroupsKey = KEYS[5]
 
 local keyPrefix      = ARGV[1]
 local nowMs          = tonumber(ARGV[2])
@@ -988,7 +989,12 @@ local function scanBatch(effCap, bypassPark, dispatched)
   local tenantCapCache = {}
 
   while scanned < scanBudget and dispatched < maxJobs do
-    local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
+    local groups
+    if allowedGroupsKey == "" then
+      groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
+    else
+      groups = redis.call("ZRANGE", allowedGroupsKey, offset, offset + pageSize - 1)
+    end
     if #groups == 0 then break end
     scanned = scanned + #groups
 
@@ -1000,9 +1006,18 @@ local function scanBatch(effCap, bypassPark, dispatched)
     -- tenant, the scan could page past a quiet tenant's only group and return
     -- empty while eligible work existed.
     local removed = 0
+    local removedAllowed = 0
 
     for _, groupId in ipairs(groups) do
       if dispatched >= maxJobs then break end
+
+      local readyScore = nil
+      local groupDue = true
+      if allowedGroupsKey ~= "" then
+        readyScore = redis.call("ZSCORE", readyKey, groupId)
+        groupDue = readyScore and tonumber(readyScore) <= nowMs
+      end
+      if groupDue then
 
       -- Tenant cap check (no-op when effCap == 0). capTenantId resolved
       -- regardless of bypassPark so the slot is still recorded; only the PARK
@@ -1026,7 +1041,6 @@ local function scanBatch(effCap, bypassPark, dispatched)
           end
         end
       end
-
       -- Tenant-level pause: park OUT of ready instead of skip-in-place so a large
       -- paused backlog cannot plug the bounded scan and starve others.
       local tenantPaused = false
@@ -1125,15 +1139,26 @@ local function scanBatch(effCap, bypassPark, dispatched)
             end
             removed = removed + 1
           end
-        end
       end
+      end
+      end
+      elseif allowedGroupsKey ~= "" and not readyScore then
+        local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
+        local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+        if redis.call("EXISTS", activeKey) == 0 and redis.call("ZCARD", jobsKey) == 0 then
+          removedAllowed = removedAllowed + redis.call("ZREM", allowedGroupsKey, groupId)
+        end
       end
     end
 
     if #groups < pageSize then break end
     -- Advance only past the entries that stayed in the due window; the removed
     -- ones shifted everything after them left by exactly that many positions.
-    offset = offset + #groups - removed
+    if allowedGroupsKey == "" then
+      offset = offset + #groups - removed
+    else
+      offset = offset + #groups - removedAllowed
+    end
   end
 
   return dispatched
@@ -1957,6 +1982,28 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
 const stageScript = new CachedLuaScript(STAGE_LUA);
 const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
 const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
+
+const INSPECT_PREFLIGHT_TARGETS_LUA = `
+local targetKey = KEYS[1]
+local blockedKey = KEYS[2]
+local keyPrefix = ARGV[1]
+local groups = redis.call("SMEMBERS", targetKey)
+local pending = 0
+local active = 0
+local failed = 0
+local blocked = 0
+for _, groupId in ipairs(groups) do
+  local groupPrefix = keyPrefix .. "group:" .. groupId
+  pending = pending + redis.call("ZCARD", groupPrefix .. ":jobs")
+  active = active + redis.call("EXISTS", groupPrefix .. ":active")
+  failed = failed + redis.call("EXISTS", groupPrefix .. ":error")
+  blocked = blocked + redis.call("SISMEMBER", blockedKey, groupId)
+end
+return {pending, active, failed, blocked, #groups}
+`;
+const inspectPreflightTargetsScript = new CachedLuaScript(
+  INSPECT_PREFLIGHT_TARGETS_LUA,
+);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const completeScript = new CachedLuaScript(COMPLETE_LUA);
 const refreshScript = new CachedLuaScript(REFRESH_LUA);
@@ -2184,10 +2231,12 @@ export class GroupStagingScripts {
     nowMs,
     activeTtlSec,
     maxJobs,
+    allowedGroupsKey,
   }: {
     nowMs: number;
     activeTtlSec: number;
     maxJobs: number;
+    allowedGroupsKey?: string;
   }): Promise<DispatchResult[]> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
@@ -2198,11 +2247,12 @@ export class GroupStagingScripts {
 
     const result = await dispatchBatchScript.run(
       this.redis,
-      4,
+      5,
       readyKey,
       blockedKey,
       pausedJobKey,
       totalPendingKey,
+      allowedGroupsKey ?? "",
       this.keyPrefix,
       String(nowMs),
       String(activeTtlSec),
@@ -2729,6 +2779,29 @@ export class GroupStagingScripts {
    */
   async getReadySize(): Promise<number> {
     return this.redis.zcard(`${this.keyPrefix}ready`);
+  }
+
+  async inspectPreflightTargets(targetKey: string): Promise<{
+    pending: number;
+    active: number;
+    failed: number;
+    blocked: number;
+    groups: number;
+  }> {
+    const result = (await inspectPreflightTargetsScript.run(
+      this.redis,
+      2,
+      targetKey,
+      `${this.keyPrefix}blocked`,
+      this.keyPrefix,
+    )) as number[];
+    return {
+      pending: Number(result[0] ?? 0),
+      active: Number(result[1] ?? 0),
+      failed: Number(result[2] ?? 0),
+      blocked: Number(result[3] ?? 0),
+      groups: Number(result[4] ?? 0),
+    };
   }
 
   /**

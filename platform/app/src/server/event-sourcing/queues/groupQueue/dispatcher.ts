@@ -26,6 +26,7 @@ export class GroupQueueDispatcher {
       activeTtlSec: number;
       signalTimeoutSec: number;
       logger: Logger;
+      dispatchGroupAllowListKey?: string;
     },
   ) {}
 
@@ -151,6 +152,7 @@ export class GroupQueueDispatcher {
       nowMs: Date.now(),
       activeTtlSec: this.params.activeTtlSec,
       maxJobs,
+      allowedGroupsKey: this.params.dispatchGroupAllowListKey,
     });
 
     for (const result of results) {

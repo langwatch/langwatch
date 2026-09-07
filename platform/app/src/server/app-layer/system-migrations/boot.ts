@@ -23,8 +23,8 @@ export class SystemMigrationPreflightError extends Error {
  *
  * One pass cannot observe events it just emitted. A later pass is therefore
  * required to prove the resulting projections and finalize each tenant. The
- * first pass that advances nothing proves quiescence, except when every tenant
- * was claimed elsewhere: that pass observed no work and must be retried.
+ * A no-progress pass proves quiescence only after its queue effects drain,
+ * every tenant outcome is visible, and no finite migration remains held.
  *
  * Runner failures and failure to converge are startup failures. They reject
  * this promise so the one-shot task exits non-zero and no runtime lane starts.
@@ -32,6 +32,7 @@ export class SystemMigrationPreflightError extends Error {
 export async function runSystemMigrationsToQuiescence(args?: {
   redis?: Redis | Cluster | null;
   signal?: AbortSignal;
+  awaitPassEffects?: () => Promise<void>;
 }): Promise<MigrationPassSummary> {
   const signal = args?.signal ?? new AbortController().signal;
 
@@ -48,11 +49,16 @@ export async function runSystemMigrationsToQuiescence(args?: {
       logger.error({ error, pass }, "system migration preflight pass failed");
       throw new SystemMigrationPreflightError(
         `System migration preflight failed on pass ${pass}`,
-        { cause: error },
+        {
+          cause: error,
+        },
       );
     }
 
     signal.throwIfAborted();
+
+    await settlePassEffects({ pass, settle: args?.awaitPassEffects });
+    assertPassCanConverge({ summary, pass });
 
     if (converged(summary)) {
       logger.info(
@@ -69,21 +75,57 @@ export async function runSystemMigrationsToQuiescence(args?: {
     }
   }
 
-  const message = `System migration preflight still reported progress after ${MAX_PASSES} passes`;
+  const message = `System migration preflight did not converge after ${MAX_PASSES} passes`;
   logger.error({ passes: MAX_PASSES }, message);
   throw new SystemMigrationPreflightError(message);
 }
 
+async function settlePassEffects({
+  pass,
+  settle,
+}: {
+  pass: number;
+  settle?: () => Promise<void>;
+}): Promise<void> {
+  try {
+    await settle?.();
+  } catch (error) {
+    throw new SystemMigrationPreflightError(
+      `System migration queue failed to settle on pass ${pass}`,
+      { cause: error },
+    );
+  }
+}
+
+function assertPassCanConverge({
+  summary,
+  pass,
+}: {
+  summary: MigrationPassSummary;
+  pass: number;
+}): void {
+  if (summary.parked > 0) {
+    throw new SystemMigrationPreflightError(
+      `System migration preflight parked ${summary.parked} tenant migrations on pass ${pass}`,
+    );
+  }
+  const finiteHeld = summary.finiteHeld ?? summary.held;
+  if (finiteHeld > 0 && summary.advanced === 0) {
+    throw new SystemMigrationPreflightError(
+      `System migration preflight left ${finiteHeld} finite migrations held on pass ${pass}`,
+    );
+  }
+}
+
 function continuingBecause(summary: MigrationPassSummary): string {
   return summary.advanced === 0
-    ? "every organization was claimed by another process; the preflight keeps going rather than reading that as convergence"
+    ? "one or more tenants were claimed by another process; the preflight waits until every outcome is known"
     : "system migration pass advanced the fleet; another pass follows";
 }
 
 function converged(summary: MigrationPassSummary): boolean {
   if (summary.advanced > 0) return false;
-  if (summary.tenantsSeen === 0) return true;
-  return summary.claimed < summary.tenantsSeen;
+  return summary.claimed === 0;
 }
 
 function sleep({

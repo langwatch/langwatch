@@ -96,18 +96,18 @@ fi
 # output starts with real logs, not the script header. Child stdout is untouched.
 #
 # Dev runs the app from source via tsx (hot reload); production runs the
-# pre-built bundle on plain node (start:app -> node dist/server/server.cjs), so
+# pre-built bundle on plain node (runtime:app -> node dist/server/server.cjs), so
 # the prod image ships no tsx. Same split for the standalone workers lane below.
 if [[ "$NODE_ENV" = "development" ]]; then
-  START_APP_COMMAND="pnpm -s run start:app:dev"
+  START_APP_COMMAND="pnpm -s run runtime:app:dev"
 else
-  START_APP_COMMAND="pnpm -s run start:app"
+  START_APP_COMMAND="pnpm -s run runtime:app"
 fi
 
 # Dev-only single-process mode: WORKERS_IN_PROCESS=1 hosts the worker stack
-# inside `start:app` (the app boots with the "all" role) instead of a separate
+# inside `runtime:app` (the app boots with the "all" role) instead of a separate
 # concurrently lane. When it's set we skip the standalone workers command below
-# and let start:app inherit the flag from the environment. Production never sets
+# and let runtime:app inherit the flag from the environment. Production never sets
 # this — it runs web and worker as separate deployments.
 START_WORKERS_COMMAND=""
 if [[ "$NODE_ENV" = "development" && ( "$WORKERS_IN_PROCESS" = "true" || "$WORKERS_IN_PROCESS" = "1" ) ]]; then
@@ -119,9 +119,9 @@ elif [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
   # app: tsx only for an explicit development env, the bundle otherwise — the
   # prod image has no tsx, so START_WORKERS=1 there must not select it.
   if [[ "$NODE_ENV" = "development" ]]; then
-    START_WORKERS_COMMAND="pnpm -s run start:workers:dev && exit 1"
+    START_WORKERS_COMMAND="pnpm -s run runtime:workers:dev && exit 1"
   else
-    START_WORKERS_COMMAND="pnpm -s run start:workers && exit 1"
+    START_WORKERS_COMMAND="pnpm -s run runtime:workers && exit 1"
   fi
 fi
 
@@ -224,8 +224,8 @@ if [[ "$NODE_ENV" = "development" ]]; then
   fi
 fi
 
-pnpm run start:prepare:db
-pnpm run task system-migrations
+source "$(dirname "$0")/start-runtime.sh"
+run_startup_preflight
 
 COMMANDS=()
 NAMES=()

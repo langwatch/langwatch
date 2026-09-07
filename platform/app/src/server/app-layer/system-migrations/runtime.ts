@@ -344,6 +344,7 @@ function mergeSummaries(
     tenantsSeen: a.tenantsSeen + b.tenantsSeen,
     finalized: a.finalized + b.finalized,
     held: a.held + b.held,
+    finiteHeld: (a.finiteHeld ?? 0) + (b.finiteHeld ?? 0),
     parked: a.parked + b.parked,
     skipped: a.skipped + b.skipped,
     alreadyFinalized: a.alreadyFinalized + b.alreadyFinalized,

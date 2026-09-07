@@ -4,7 +4,6 @@ import {
   roleConsumesEventQueue,
   roleRunsWorkers,
   roleSatisfiesRunIn,
-  roleUsesMigrationEventQueue,
 } from "../config";
 
 describe("roleRunsWorkers", () => {
@@ -43,9 +42,8 @@ describe("roleRunsWorkers", () => {
 });
 
 describe("event queue roles", () => {
-  it("lets migration consume its isolated queue without hosting workers", () => {
+  it("lets migration consume the canonical queue without hosting workers", () => {
     expect(roleConsumesEventQueue("migration")).toBe(true);
-    expect(roleUsesMigrationEventQueue("migration")).toBe(true);
     expect(roleRunsWorkers("migration")).toBe(false);
   });
 
@@ -58,7 +56,6 @@ describe("event queue roles", () => {
       undefined,
     ];
 
-    expect(roles.filter(roleUsesMigrationEventQueue)).toEqual(["migration"]);
     expect(roles.filter(roleConsumesEventQueue)).toEqual([
       "worker",
       "migration",

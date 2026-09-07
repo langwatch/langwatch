@@ -76,12 +76,24 @@ describe("runSystemMigrationsToQuiescence", () => {
     stubs.runPass.mockResolvedValue({
       ...summaryOf({ advanced: 0 }),
       held: 1,
+      finiteHeld: 0,
     });
 
     await expect(runSystemMigrationsToQuiescence()).resolves.toMatchObject({
       held: 1,
     });
     expect(stubs.runPass).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects finite held work that cannot converge", async () => {
+    stubs.runPass.mockResolvedValue({
+      ...summaryOf({ advanced: 0 }),
+      held: 1,
+      finiteHeld: 1,
+    });
+    await expect(runSystemMigrationsToQuiescence()).rejects.toThrow(
+      "finite migrations held",
+    );
   });
 
   /** @scenario A pass shut out by another process is not convergence */
@@ -104,6 +116,40 @@ describe("runSystemMigrationsToQuiescence", () => {
 
     await expect(run).resolves.toMatchObject({ tenantsSeen: 0 });
     expect(stubs.runPass).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries when even one tenant outcome is hidden by a concurrent claim", async () => {
+    stubs.runPass
+      .mockResolvedValueOnce({
+        ...summaryOf({ advanced: 0 }),
+        tenantsSeen: 12,
+        claimed: 1,
+      })
+      .mockResolvedValue(summaryOf({ advanced: 0 }));
+    const run = runSystemMigrationsToQuiescence();
+    await vi.runAllTimersAsync();
+    await expect(run).resolves.toMatchObject({ claimed: 0 });
+    expect(stubs.runPass).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a parked tenant at the startup boundary", async () => {
+    stubs.runPass.mockResolvedValue({
+      ...summaryOf({ advanced: 0 }),
+      parked: 1,
+    });
+    await expect(runSystemMigrationsToQuiescence()).rejects.toThrow("parked 1");
+  });
+
+  it("waits for queue effects and propagates barrier failures", async () => {
+    const failure = new Error("blocked subscriber group");
+    stubs.runPass.mockResolvedValue(summaryOf({ advanced: 0 }));
+    await expect(
+      runSystemMigrationsToQuiescence({
+        awaitPassEffects: async () => {
+          throw failure;
+        },
+      }),
+    ).rejects.toMatchObject({ cause: failure });
   });
 
   /** @scenario A loop that never converges prevents startup */
