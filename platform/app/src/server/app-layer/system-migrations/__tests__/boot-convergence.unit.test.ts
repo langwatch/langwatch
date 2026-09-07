@@ -201,6 +201,7 @@ describe("runSystemMigrationsToQuiescence", () => {
     expect(stubs.runPass).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario "Cancelling startup stops the loop between passes" */
   it("rejects an abort between passes without starting another pass", async () => {
     stubs.runPass.mockResolvedValue(summaryOf({ advanced: 1 }));
     const controller = new AbortController();

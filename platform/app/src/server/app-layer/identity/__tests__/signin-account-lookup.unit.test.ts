@@ -151,6 +151,7 @@ async function routeAccount({
 
 describe("ProjectionSignInAccountLookup legacy fallback", () => {
   /** @scenario "An account still waiting for identifier backfill keeps its way in" */
+  /** @scenario "An account the sign-up form just made is not mistaken for no account" */
   it("offers the password held by an unlatched account", async () => {
     const decision = await routeLegacyAccount({
       account: legacyAccount({ hasPassword: true }),
