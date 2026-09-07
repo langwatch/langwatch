@@ -167,7 +167,7 @@ export function requestHooks({
   signInAfterPasswordReset,
 }: RequestHooksDeps): BetterAuthOptions["hooks"] {
   return {
-    before: async (ctx) => {
+    before: createAuthMiddleware(async (ctx) => {
       const url = ctx.request?.url ?? "";
       const pathname = normalizedRequestPathname(url);
       const endpointPath = ctx.path ?? pathname;
@@ -222,7 +222,7 @@ export function requestHooks({
       // the gate inside the policy is the same per-process memo, so a license
       // still takes effect on restart and never mid-flight.
       enforceGate({ url, pathname, policy: await resolveSignInMethodPolicy() });
-    },
+    }),
     /**
      * D06 follow-up 1: the two-factor endpoints, as identity facts.
      *
