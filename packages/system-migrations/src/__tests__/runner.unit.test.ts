@@ -285,6 +285,7 @@ describe("SystemMigrationRunnerService", () => {
 
   describe("when a tenant was finalized on an earlier pass", () => {
     /** @scenario "A finalized organization is never processed again" */
+    /** @scenario "A restart skips the tenants an earlier pass finalized" */
     it("skips it without calling the migration", async () => {
       await state.upsertRecord({
         migrationName: "m1",
@@ -457,6 +458,7 @@ describe("SystemMigrationRunnerService", () => {
   });
 
   describe("when the previous attempt for a tenant parked", () => {
+    /** @scenario "A background migration resumes from its persisted checkpoint" */
     it("hands the migration that record so it can finish stranded work", async () => {
       await state.upsertRecord({
         migrationName: "m1",

@@ -52,6 +52,21 @@ the accepted ADRs and the architecture linter.
   Enterprise-licensed; `ops` is core. Core never imports Enterprise
   implementations.
 
+## Composition
+
+- One feature installer, one construction path, explicit lifecycle
+  ([ADR-133](dev/docs/adr/133-composition-spec.md), spec
+  `specs/server/composition-spec.feature`). A feature declares its required
+  contract services, typed config, provided service and transport/background
+  contributions; its setup constructs its repositories and service once per
+  process; API and worker reuse that setup.
+- Declaring installs nothing. Boot validates the declarations and constructs;
+  start begins serving. Imports and constructors never start background work.
+- System migrations run one framework in two modes: startup (blocking, gates
+  readiness until finalized) and background (incremental, resumes from a
+  persisted checkpoint). Awaiting the convergence helper is not a completion
+  assertion.
+
 ## Eventing
 
 - Projections and process managers are deterministic and synchronous. They do

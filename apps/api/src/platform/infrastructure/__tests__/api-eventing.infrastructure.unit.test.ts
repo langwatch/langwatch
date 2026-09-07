@@ -79,6 +79,7 @@ describe("ApiEventingInfrastructure", () => {
     });
 
     /** @scenario "The API process's Eventing runtime runs no process managers" */
+    /** @scenario "The API role installs no event consumers" */
     it("registers the pipeline and declines the process manager it could not drain", () => {
       const composed = ApiEventingInfrastructure.create({
         resources: new ResourceScope(),

@@ -459,6 +459,7 @@ describe("given what apps/ui serves itself", () => {
       expect(installedUiFeatures.capabilities?.feedback).toBeInstanceOf(UiFeedbackPort);
     });
 
+    /** @scenario "The browser application installs one session for every feature" */
     it("reads the deployment's own session", () => {
       expect(installedUiFeatures.session).toBeTypeOf("function");
     });

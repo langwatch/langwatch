@@ -76,6 +76,7 @@ describe("WorkerApplication", () => {
     expect(second.close).toHaveBeenCalledBefore(first.close);
   });
 
+  /** @scenario "The worker installs each feature consumer exactly once" */
   it("shares concurrent starts without registering a feature twice", async () => {
     const installer = new FeatureInstaller();
     const application = WorkerApplication.create({
@@ -135,6 +136,7 @@ describe("WorkerApplication", () => {
     await expect(application.start()).rejects.toThrow("Worker application is closed.");
   });
 
+  /** @scenario "A failed installation closes what was already installed" */
   it("closes an installed feature when a later installation fails", async () => {
     const first = new FeatureInstaller();
     const second = new FeatureInstaller();
@@ -229,6 +231,7 @@ describe("WorkerApplication", () => {
     expect(first.close).toHaveBeenCalledOnce();
   });
 
+  /** @scenario "Shutdown drains in-flight work before releasing infrastructure" */
   it("drains Eventing before releasing feature and runtime infrastructure", async () => {
     const phases: string[] = [];
     const feature = new FeatureInstaller();

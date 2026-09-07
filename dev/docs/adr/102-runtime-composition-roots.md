@@ -3,7 +3,9 @@
 **Date:** 2026-08-21
 
 **Status:** Accepted; physical application extraction superseded by
-[ADR-111](./111-physical-application-workspaces.md)
+[ADR-111](./111-physical-application-workspaces.md); the feature-installer and
+lifecycle design superseded in part by
+[ADR-133](./133-composition-spec.md)
 
 **Behavioural contract:**
 [App and worker runtime encapsulation](../../../specs/dependencies/runtime-composition.feature)
