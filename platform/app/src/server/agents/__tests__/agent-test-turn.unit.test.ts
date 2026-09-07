@@ -1,8 +1,9 @@
 /**
  * @vitest-environment node
  *
- * One turn from the Test panel to an agent that is not connected: the call
- * deadline the platform holds every kind of agent to.
+ * One turn from the Test panel: the call deadline the platform holds every
+ * kind of agent to, and the parameter checks a connected agent's overrides
+ * go through.
  *
  * @see specs/agents/agent-test-run.feature
  */
@@ -29,6 +30,10 @@ vi.mock("~/server/connected-agents/runtime", () => ({
 
 vi.mock("~/server/suites/connected-targets", () => ({
   assertConnectedAgentsRunnable: vi.fn().mockResolvedValue(undefined),
+  agentParameterDefinitionsOf: (agent: { config: unknown }) => {
+    const config = agent.config as { parameters?: unknown[] } | null;
+    return config?.parameters ?? [];
+  },
 }));
 
 const prefetchScenarioData = vi.fn();
@@ -89,6 +94,42 @@ function sendTurn() {
   });
 }
 
+/** A connected agent whose code declares one parameter with two options. */
+function connectedAgent(): AgentWithFields {
+  return {
+    ...httpAgent(),
+    id: "agent_connected",
+    name: "support-agent",
+    type: "connected",
+    config: {
+      parameters: [
+        {
+          name: "model",
+          type: "string",
+          options: ["gpt-4", "gpt-5"],
+          defaultValue: "gpt-4",
+        },
+      ],
+      sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+    },
+    environment: "production",
+  } as AgentWithFields;
+}
+
+function sendConnectedTurn(params: Record<string, string | number | boolean>) {
+  return sendAgentTestTurn({
+    projectId: "proj_1",
+    agentId: "agent_connected",
+    message: "ping",
+    params,
+    actor: { id: "user_1", label: "user" },
+    deps: {
+      readAgent: vi.fn().mockResolvedValue(connectedAgent()),
+      users: {} as Pick<PrismaClient, "user">,
+    },
+  });
+}
+
 beforeEach(() => {
   prefetchScenarioData.mockResolvedValue({
     success: true,
@@ -129,6 +170,26 @@ describe("given an HTTP agent that answers inside the deadline", () => {
 
       expect(result.output).toBe("pong");
       expect(result.instance).toBeNull();
+    });
+  });
+});
+
+describe("given a connected agent that declares the parameter model", () => {
+  describe("when a test turn names a parameter it does not declare", () => {
+    /** @scenario "A test turn naming an undeclared parameter is refused" */
+    it("is refused as scenario_parameter_unknown before any instance is reached", async () => {
+      await expect(sendConnectedTurn({ locale: "de" })).rejects.toMatchObject({
+        code: "scenario_parameter_unknown",
+      });
+    });
+  });
+
+  describe("when a test turn sets model outside its options", () => {
+    /** @scenario "A test turn value outside the declared options is refused" */
+    it("is refused as scenario_parameter_option_invalid before any instance is reached", async () => {
+      await expect(sendConnectedTurn({ model: "gpt-6" })).rejects.toMatchObject(
+        { code: "scenario_parameter_option_invalid" },
+      );
     });
   });
 });
