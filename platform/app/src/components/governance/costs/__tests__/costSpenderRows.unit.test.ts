@@ -55,6 +55,21 @@ describe("the spender display rows", () => {
     });
   });
 
+  describe("given the same person billed at two providers", () => {
+    it("carries each row's provider so two rows with one label read as two providers, not a duplicate", () => {
+      const shown = spenderDisplayRows([
+        row({ provider: "openai_admin", amountUsd: 2 }),
+        row({ provider: "databricks", amountUsd: 6 }),
+      ]);
+
+      expect(shown.map((r) => r.provider).sort()).toEqual([
+        "databricks",
+        "openai_admin",
+      ]);
+      expect(new Set(shown.map((r) => r.key)).size).toBe(2);
+    });
+  });
+
   describe("given one spender across two agents", () => {
     it("keeps the two pairings distinct, each with its own agent and figure", () => {
       const shown = spenderDisplayRows([

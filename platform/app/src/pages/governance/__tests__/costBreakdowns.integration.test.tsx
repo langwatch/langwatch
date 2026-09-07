@@ -15,7 +15,13 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -27,6 +33,12 @@ const harness = vi.hoisted(() => ({
     spendByDepartment: undefined as unknown,
     spendByUser: undefined as unknown,
     spendOverTime: undefined as unknown,
+  },
+  /** The spender breakdown read: its answer, whether it failed, retry spy. */
+  spenders: {
+    data: undefined as unknown,
+    isError: false,
+    refetch: undefined as unknown,
   },
 }));
 
@@ -61,9 +73,13 @@ vi.mock("~/components/LoadingScreen", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     governanceCost: {
-      // The spender panel is its own read with its own tests; here it
-      // answers nothing so these tests stay about their own subject.
-      spenders: { useQuery: () => ({ data: undefined }) },
+      spenders: {
+        useQuery: () => ({
+          data: harness.spenders.data,
+          isError: harness.spenders.isError,
+          refetch: harness.spenders.refetch,
+        }),
+      },
       summary: {
         useQuery: () => ({
           data: {
@@ -112,6 +128,7 @@ beforeEach(() => {
     spendByUser: undefined,
     spendOverTime: undefined,
   };
+  harness.spenders = { data: undefined, isError: false, refetch: vi.fn() };
 });
 
 afterEach(() => cleanup());
@@ -205,6 +222,60 @@ describe("the cost breakdown panels", () => {
       expect(
         screen.getAllByText("Nothing in this window yet.").length,
       ).toBeGreaterThan(0);
+    });
+  });
+
+  describe("given the spender breakdown answers with rows", () => {
+    beforeEach(() => {
+      harness.spenders.data = {
+        rows: [
+          {
+            provider: "openai_admin",
+            rawActorId: "u_ada",
+            label: "ada@acme.test",
+            agentId: "",
+            amountUsd: 4,
+            cellsWithoutAmount: 0,
+          },
+          {
+            provider: "databricks",
+            rawActorId: "ada@acme.test",
+            label: "ada@acme.test",
+            agentId: "",
+            amountUsd: 6,
+            cellsWithoutAmount: 0,
+          },
+        ],
+        windowDays: 30,
+      };
+    });
+
+    it("names each row's provider, so one person billed at two providers is not a duplicate", () => {
+      renderScreen();
+
+      expect(screen.getByText("openai_admin")).toBeInTheDocument();
+      expect(screen.getByText("databricks")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the spender breakdown read fails", () => {
+    beforeEach(() => {
+      harness.spenders.isError = true;
+    });
+
+    it("says the read failed instead of vanishing as if nobody spent anything", () => {
+      renderScreen();
+
+      expect(screen.getByText("Billed spend by person")).toBeInTheDocument();
+      expect(screen.getByTestId("cost-spenders-error")).toBeInTheDocument();
+    });
+
+    it("offers a retry that asks the read to run again", () => {
+      renderScreen();
+
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      expect(harness.spenders.refetch).toHaveBeenCalled();
     });
   });
 

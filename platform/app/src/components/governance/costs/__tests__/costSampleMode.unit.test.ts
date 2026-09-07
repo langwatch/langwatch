@@ -14,7 +14,70 @@ import {
   resolveRealDataState,
   sampleModeActive,
   settleRealDataState,
+  summaryAsRead,
 } from "../costSampleMode";
+
+/** A headline summary in the wire shape, empty unless overridden. */
+function summary(
+  overrides: Partial<Parameters<typeof summaryAsRead>[0] & object> = {},
+) {
+  return {
+    unavailableReason: null,
+    billed: { amountUsd: null, cellsWithoutAmount: 0 },
+    gateway: { amountUsd: null, cellsWithoutAmount: 0 },
+    seats: { status: "awaiting_data" },
+    ...overrides,
+  };
+}
+
+describe("reading the headline summary as a real-data read", () => {
+  describe("given the read has not answered", () => {
+    it("stays an unanswered read", () => {
+      expect(summaryAsRead(undefined)).toBeNull();
+    });
+  });
+
+  describe("given the screen is structurally unavailable", () => {
+    it("answers as measured and empty rather than waiting forever", () => {
+      expect(
+        summaryAsRead(summary({ unavailableReason: "no_cost_store" })),
+      ).toEqual({ length: 0 });
+    });
+  });
+
+  describe("given a pulled bill and nothing else", () => {
+    it("counts as real data — a real bill must keep the invented panels off", () => {
+      const read = summaryAsRead(
+        summary({ billed: { amountUsd: 123.45, cellsWithoutAmount: 0 } }),
+      );
+      expect(resolveRealDataState([read])).toBe("present");
+    });
+  });
+
+  describe("given a bill whose total is withheld for currency", () => {
+    it("still counts as real data — withheld is not absent", () => {
+      const read = summaryAsRead(
+        summary({ billed: { amountUsd: null, cellsWithoutAmount: 4 } }),
+      );
+      expect(resolveRealDataState([read])).toBe("present");
+    });
+  });
+
+  describe("given seat pools and no money", () => {
+    it("counts as real data", () => {
+      const read = summaryAsRead(
+        summary({ seats: { status: "reported", pools: [{}] } }),
+      );
+      expect(resolveRealDataState([read])).toBe("present");
+    });
+  });
+
+  describe("given every lane answered with nothing", () => {
+    it("reads as measured and empty", () => {
+      expect(resolveRealDataState([summaryAsRead(summary())])).toBe("absent");
+    });
+  });
+});
 
 describe("reading the real cost reads", () => {
   describe("given every read has answered with rows", () => {

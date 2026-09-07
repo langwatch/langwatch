@@ -473,13 +473,15 @@ Feature: One cost screen, three honest lanes
       Given pulled cost recorded under a spender id that discovery has seen
       When a viewer holding both the cost and the identity permissions opens the cost screen
       Then a spender panel lists that spender with their window total
-      And the panel is labeled as billed spend, apart from the gateway cost-by-user panel
-      # The screen already carries a gateway cost-by-user panel reading the
-      # gateway's own attribution; the two measure different money and stay
-      # side by side, each labeled — same lane discipline as the totals.
+      And the panel is labeled as billed spend, apart from the trace-cost cost-by-user panel
+      # The screen already carries a "Cost by user" panel summing the cost
+      # recorded on traces; the two measure different money and stay side
+      # by side, each labeled — same lane discipline as the totals.
       # Rendered from the same gates as the lanes: no panel on an
       # unavailable screen, and the panel absent rather than zero-filled
-      # when the breakdown holds no rows.
+      # when the breakdown holds no rows. A failed read is the exception:
+      # that is an outage, not an empty account, so the panel says it
+      # failed instead of vanishing as if nobody spent anything.
 
     @integration
     Scenario: The spender breakdown stays behind the identity screen's permission

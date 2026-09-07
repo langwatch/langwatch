@@ -1,4 +1,12 @@
-import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { getHexColorForString } from "~/utils/rotatingColors";
 import { fmtMoney } from "./CostCharts";
 
@@ -7,7 +15,7 @@ import { fmtMoney } from "./CostCharts";
  *
  * This panel reads the PULLED lane's spender breakdown — what the provider's
  * own bill attributed to each person — which is different money from the
- * "Cost by user" panel beside it (the gateway's metering of traffic it
+ * "Cost by user" panel beside it (the cost recorded on traces as they were
  * served). The two disagree on purpose and are never reconciled here; each is
  * labeled for its lane, same discipline as the totals.
  *
@@ -34,6 +42,12 @@ export interface SpenderDisplayRow {
   label: string;
   /** True on the bucket row, so it is styled as a remainder, not a person. */
   notNamed: boolean;
+  /**
+   * Shown on every row, not only ambiguous ones: the same person billed at
+   * two providers is two rows with one label, and without the provider on
+   * screen that reads as an accidental duplicate.
+   */
+  provider: string;
   /** Empty when the provider named no agent. */
   agentId: string;
   /** Null when the figure is withheld — never 0 as a stand-in. */
@@ -57,6 +71,7 @@ export function spenderDisplayRows(rows: SpenderRow[]): SpenderDisplayRow[] {
     key: `${row.provider}\u0000${row.rawActorId}\u0000${row.agentId}`,
     label: row.label ?? NOT_NAMED_LABEL,
     notNamed: row.label === null,
+    provider: row.provider,
     agentId: row.agentId,
     amountUsd: row.amountUsd,
     cellsWithoutAmount: row.cellsWithoutAmount,
@@ -77,6 +92,9 @@ function SpenderName({ row }: { row: SpenderDisplayRow }) {
       >
         {row.label}
       </Text>
+      <Badge size="xs" variant="subtle" colorPalette="gray" title="provider">
+        {row.provider}
+      </Badge>
       {row.agentId !== "" && (
         <Badge size="xs" variant="subtle" colorPalette="gray" title="agent">
           {row.agentId}
@@ -123,6 +141,30 @@ function SpenderFigure({ row }: { row: SpenderDisplayRow }) {
     >
       {row.amountUsd === null ? "—" : fmtMoney(row.amountUsd)}
     </Text>
+  );
+}
+
+/**
+ * The breakdown read failed. Rendered in the panel's place rather than
+ * dropping the panel: absence is this screen's word for "nobody spent
+ * anything", and a failed read does not know that — same rule as the lanes'
+ * own failed-read state.
+ */
+export function CostSpenderError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Alert.Root status="error" data-testid="cost-spenders-error">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Billed spend by person could not be loaded</Alert.Title>
+        <Alert.Description>
+          Something went wrong reading who spent this money. The totals above
+          are a separate read and stand on their own.
+        </Alert.Description>
+      </Alert.Content>
+      <Button size="xs" variant="outline" onClick={onRetry} alignSelf="center">
+        Try again
+      </Button>
+    </Alert.Root>
   );
 }
 

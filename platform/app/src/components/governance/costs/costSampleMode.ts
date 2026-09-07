@@ -75,6 +75,40 @@ export function useSettledRealDataState(
 }
 
 /**
+ * The lanes' headline summary, translated into the pseudo-read shape the
+ * resolver takes. The lanes are real data too: an organization whose bill has
+ * been pulled but whose gateway has served nothing would otherwise count as
+ * empty, and the invented panels would render beside a real headline figure —
+ * the exact confusion the sample rule exists to prevent.
+ *
+ * A lane counts when it holds a figure OR reported cells it could not price:
+ * a withheld total is still a real bill. `unavailable` is a structural empty,
+ * so it answers as such rather than staying unknown forever.
+ */
+export function summaryAsRead(
+  data:
+    | {
+        unavailableReason: string | null;
+        billed: { amountUsd: number | null; cellsWithoutAmount: number };
+        gateway: { amountUsd: number | null; cellsWithoutAmount: number };
+        seats: { status: string; pools?: ReadonlyArray<unknown> };
+      }
+    | undefined,
+): { length: number } | null {
+  if (data === undefined) return null;
+  if (data.unavailableReason !== null) return { length: 0 };
+  const laneReported = (lane: {
+    amountUsd: number | null;
+    cellsWithoutAmount: number;
+  }) => lane.amountUsd !== null || lane.cellsWithoutAmount > 0;
+  const reported =
+    (laneReported(data.billed) ? 1 : 0) +
+    (laneReported(data.gateway) ? 1 : 0) +
+    ((data.seats.pools?.length ?? 0) > 0 ? 1 : 0);
+  return { length: reported };
+}
+
+/**
  * Whether the sample panels render.
  *
  * `optIn` is the reader's own choice — `null` until they touch the toggle,

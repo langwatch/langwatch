@@ -42,11 +42,13 @@ import {
   CostSampleToggle,
 } from "~/components/governance/costs/CostSampleControls";
 import {
+  CostSpenderError,
   CostSpenderList,
   type SpenderRow,
 } from "~/components/governance/costs/CostSpenderPanel";
 import {
   sampleModeActive,
+  summaryAsRead,
   useSettledRealDataState,
 } from "~/components/governance/costs/costSampleMode";
 import {
@@ -171,7 +173,14 @@ function useSpenderRows({
     { organizationId, windowDays },
     { enabled, refetchOnWindowFocus: false },
   );
-  return spenders.data?.rows ?? null;
+  return {
+    rows: spenders.data?.rows ?? null,
+    // Carried out separately instead of collapsed into null: null is this
+    // screen's word for "unanswered or absent", and a failed read is neither
+    // — hiding the panel on an outage would claim nobody spent anything.
+    isError: spenders.isError,
+    retry: () => void spenders.refetch(),
+  };
 }
 
 /**
@@ -183,13 +192,19 @@ function useSpenderRows({
  *
  * Adoption counts as real data even with no spend behind it yet: showing a
  * measured headcount beside invented money is the confusion this toggle
- * exists to prevent.
+ * exists to prevent. So does the headline summary: a pulled bill with no
+ * activity behind it is still real money, and must keep the invented panels
+ * off the screen it heads.
  */
-function useSampleMode(breakdowns: ReturnType<typeof useBreakdownQueries>) {
+function useSampleMode(
+  breakdowns: ReturnType<typeof useBreakdownQueries>,
+  summaryData: Parameters<typeof summaryAsRead>[0],
+) {
   const [optIn, setOptIn] = useState<boolean | null>(null);
   const showSample = sampleModeActive({
     optIn,
     realData: useSettledRealDataState([
+      summaryAsRead(summaryData),
       breakdowns.departmentRows,
       breakdowns.userRows,
       breakdowns.overTime,
@@ -231,7 +246,7 @@ function CostsPage() {
     // the other gets the lanes and no failed queries underneath them.
     enabled: !!organizationId && hasAnyPermission("activityMonitor:view"),
   });
-  const spenderRows = useSpenderRows({
+  const spenders = useSpenderRows({
     organizationId,
     windowDays: filters.windowDays,
     enabled: !!organizationId && hasAnyPermission("governance:view"),
@@ -239,7 +254,7 @@ function CostsPage() {
 
   useDepartmentSelectionReset({ filters, breakdowns, setFilters });
 
-  const { showSample, toggleSample } = useSampleMode(breakdowns);
+  const { showSample, toggleSample } = useSampleMode(breakdowns, summary.data);
 
   return (
     <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
@@ -273,7 +288,7 @@ function CostsPage() {
           filters={filters}
           breakdowns={breakdowns}
           showSample={showSample}
-          spenderRows={spenderRows}
+          spenders={spenders}
         />
       </VStack>
     </GovernanceLayout>
@@ -580,22 +595,57 @@ function totalPerSeries(buckets: DailyBucket[]): RankRow[] {
   return [...totals.values()];
 }
 
+/**
+ * The billed-spend-by-person panel's slot in the grid.
+ *
+ * Different money from "Cost by user" on purpose: that panel is the cost
+ * recorded on traces, this one is what the provider's BILL said each person
+ * spent (the pulled lane). They disagree legitimately and are never
+ * reconciled — each is labeled for its lane. Absent, not zero-filled, when
+ * the breakdown holds no rows or the viewer lacks the People screen's
+ * permission. A failed read is neither empty nor refused, so it says so
+ * instead of vanishing.
+ */
+function SpenderPanelSlot({
+  spenders,
+}: {
+  spenders: { rows: SpenderRow[] | null; isError: boolean; retry: () => void };
+}) {
+  if (spenders.isError) {
+    return (
+      <CostPanel title="Billed spend by person">
+        <CostSpenderError onRetry={spenders.retry} />
+      </CostPanel>
+    );
+  }
+  if (spenders.rows === null || spenders.rows.length === 0) return null;
+  return (
+    <CostPanel title="Billed spend by person">
+      <CostSpenderList rows={spenders.rows} />
+    </CostPanel>
+  );
+}
+
 function CostBreakdowns({
   filters,
   breakdowns,
   showSample,
-  spenderRows,
+  spenders,
 }: {
   filters: CostFilters;
   breakdowns: Breakdowns;
   showSample: boolean;
   /**
-   * The pulled lane's spender breakdown, or null while unanswered — the read
-   * is refused without the People screen's permission, and the panel is then
-   * simply absent. Null and empty both render nothing: an absent panel, never
-   * a zero-filled one.
+   * The pulled lane's spender breakdown. Rows are null while unanswered — the
+   * read is refused without the People screen's permission, and the panel is
+   * then simply absent. Null and empty both render nothing: an absent panel,
+   * never a zero-filled one. A failed read renders as a failure instead.
    */
-  spenderRows: SpenderRow[] | null;
+  spenders: {
+    rows: SpenderRow[] | null;
+    isError: boolean;
+    retry: () => void;
+  };
 }) {
   const days = useMemo(
     () => recentDays(filters.windowDays),
@@ -686,17 +736,7 @@ function CostBreakdowns({
         <CostPanel title="Cost by user">
           <CostRankList rows={userRows} />
         </CostPanel>
-        {/* Different money from "Cost by user" on purpose: that panel is the
-            gateway's own metering, this one is what the provider's BILL said
-            each person spent (the pulled lane). They disagree legitimately
-            and are never reconciled — each is labeled for its lane. Absent,
-            not zero-filled, when the breakdown holds no rows or the viewer
-            lacks the People screen's permission. */}
-        {spenderRows !== null && spenderRows.length > 0 && (
-          <CostPanel title="Billed spend by person">
-            <CostSpenderList rows={spenderRows} />
-          </CostPanel>
-        )}
+        <SpenderPanelSlot spenders={spenders} />
 
         {showSample && (
           <>
