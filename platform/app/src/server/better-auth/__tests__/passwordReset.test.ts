@@ -7,7 +7,7 @@ vi.mock("../../mailer/resetPasswordEmail", () => ({
   sendResetPasswordEmail: vi.fn().mockResolvedValue(undefined),
 }));
 const { clearPending, revokeAll } = vi.hoisted(() => ({
-  clearPending: vi.fn().mockResolvedValue(undefined),
+  clearPending: vi.fn().mockResolvedValue(void 0),
   revokeAll: vi.fn().mockResolvedValue(undefined),
 }));
 // Only the revocation factory is replaced: the rest of the identity runtime is
