@@ -17,6 +17,7 @@ import {
   type ExperimentRowState,
   type WorkbenchWriteResult,
 } from "../experiment.repository.ts";
+import { toDate, type Instant } from "@langwatch/time";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -239,7 +240,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     projectId: string;
     id: string;
     archivedSlug: string;
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<boolean> {
     const result = await this.database.experiment.updateMany({
       where: {
@@ -248,7 +249,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
         archivedAt: null,
       },
       data: {
-        archivedAt: input.archivedAt,
+        archivedAt: toDate(input.archivedAt),
         slug: input.archivedSlug,
       },
     });

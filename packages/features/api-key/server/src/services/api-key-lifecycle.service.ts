@@ -19,6 +19,7 @@ import {
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
+import { fromDate } from "@langwatch/time";
 
 const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
 
@@ -94,7 +95,7 @@ export class ApiKeyLifecycleService {
       createdByUserId: parsed.createdByUserId ?? null,
       createdByDeviceLabel: parsed.createdByDeviceLabel ?? null,
       organizationId: parsed.organizationId,
-      expiresAt: parsed.expiresAt ?? null,
+      expiresAt: parsed.expiresAt ? fromDate(parsed.expiresAt) : null,
       ingestSourceType: parsed.ingestSourceType ?? null,
       ingestionTemplateId: parsed.ingestionTemplateId ?? null,
       startsDisabled: true,

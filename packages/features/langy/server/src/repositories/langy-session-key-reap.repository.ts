@@ -8,6 +8,8 @@
  * `LangySessionKeyRepository` extends this one — so nothing is duplicated by
  * naming the narrow half on its own.
  */
+
+import type { Instant } from "@langwatch/time";
 export abstract class LangySessionKeyReapRepository {
   /**
    * Revokes every elapsed, unrevoked key carrying `name`; answers how many.
@@ -17,5 +19,5 @@ export abstract class LangySessionKeyReapRepository {
    * name is chosen one layer up, where a caller has no argument with which to
    * widen it.
    */
-  abstract revokeExpiredByName(input: { name: string; now: Date }): Promise<number>;
+  abstract revokeExpiredByName(input: { name: string; now: Instant }): Promise<number>;
 }

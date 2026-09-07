@@ -38,9 +38,11 @@
 
 import type {
   ApiKeyListEntry,
+  ApiKeyMinted,
   ApiKeyProject,
   ApiKeyTeam,
   ApiKeyUser,
+  CreateApiKeyInput,
   NamedApiKeyBinding,
 } from "@langwatch/api-key-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
@@ -105,17 +107,14 @@ export type ApiKeyApiMap = {
         input: OrganizationScope & {
           name: string;
           description?: string;
-          expiresAt?: Date;
+          expiresAt?: CreateApiKeyInput["expiresAt"];
           permissionMode: string;
           keyType: "personal" | "service";
           assignedToUserId?: string;
           permissions?: string[];
           bindings: ApiKeyBindingWrite[];
         };
-        output: {
-          token: string;
-          apiKey: { id: string; name: string; createdAt: Date };
-        };
+        output: ApiKeyMinted;
       };
     };
 

@@ -9,7 +9,7 @@ import {
 } from "../ports/langy-turn-runtime.port.ts";
 import type { LangySessionKeyRepository } from "../repositories/langy-session-key.repository.ts";
 import { LangySessionKeyReapService } from "./langy-session-key-reap.service.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:langy:session-key");
 const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;
@@ -84,7 +84,7 @@ export class LangySessionKeyService extends LangySessionKeyPort {
       permissionMode: "restricted",
       permissions: permissionsToGrant,
       bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId }],
-      expiresAt: new Date(nowInstant().epochMilliseconds + sessionKeyLifetimeMs),
+      expiresAt: toDate(nowInstant().add({ milliseconds: sessionKeyLifetimeMs })),
     });
     this.metrics.record({ operation: "minted" });
 
@@ -130,7 +130,7 @@ export class LangySessionKeyService extends LangySessionKeyPort {
       return "already_revoked";
     }
 
-    await this.repository.revoke(key.id, new Date());
+    await this.repository.revoke(key.id, nowInstant());
     this.metrics.record({ operation: "revoked" });
 
     return "revoked";
@@ -141,7 +141,7 @@ export class LangySessionKeyService extends LangySessionKeyPort {
    * registered pipeline and the packaged worker's — and only one of them reaches it through this
    * service.
    */
-  reapExpired(now = new Date()): Promise<number> {
+  reapExpired(now = nowInstant()): Promise<number> {
     return LangySessionKeyReapService.create({
       repository: this.repository,
       metrics: this.metrics,

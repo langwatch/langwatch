@@ -23,6 +23,7 @@ import {
 } from "../../../model/batch-evaluation-results.run-state.ts";
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import { RunDisplayName } from "../../elements/batch-results/run-display-name.tsx";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Summary data for a single evaluation run
@@ -94,7 +95,7 @@ const isRunInterrupted = (timestamps: BatchRunSummary["timestamps"]): boolean =>
 
   // No updates for 5 minutes - considered interrupted
   if (timestamps.updatedAt) {
-    const timeSinceUpdate = Date.now() - timestamps.updatedAt;
+    const timeSinceUpdate = nowInstant().epochMilliseconds - timestamps.updatedAt;
     return timeSinceUpdate > INTERRUPTED_THRESHOLD_MS;
   }
 

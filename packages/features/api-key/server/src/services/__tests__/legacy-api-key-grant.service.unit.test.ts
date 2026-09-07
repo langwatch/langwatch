@@ -3,9 +3,11 @@ import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract
 import { describe, expect, it, vi } from "vitest";
 import { ApiKeyDiagnosticsPort } from "../../ports/api-key-diagnostics.port.ts";
 import { LegacyApiKeyGrantService } from "../legacy-api-key-grant.service.ts";
+import { fromDate } from "@langwatch/time";
 
 const CREATED_AT = new Date("2024-03-01T10:00:00.000Z");
 const CUTOVER_AT = new Date("2024-06-01T00:00:00.000Z");
+const CUTOVER_INSTANT = fromDate(CUTOVER_AT);
 
 function apiKey(overrides: Partial<ApiKey> = {}): ApiKey {
   return {
@@ -50,7 +52,7 @@ function harness(
 ) {
   const tryGetEngineCutoverAt = vi
     .fn()
-    .mockResolvedValue(options.cutoverAt === undefined ? CUTOVER_AT : options.cutoverAt);
+    .mockResolvedValue(options.cutoverAt === undefined ? CUTOVER_INSTANT : options.cutoverAt);
   const attachBindings =
     options.attachBindings ?? vi.fn().mockResolvedValue({ attached: [], duplicates: [] });
   const diagnostics = new RecordingDiagnostics();
@@ -121,7 +123,7 @@ describe("LegacyApiKeyGrantService", () => {
     await settle();
     expect(attachBindings).not.toHaveBeenCalled();
 
-    tryGetEngineCutoverAt.mockResolvedValue(CUTOVER_AT);
+    tryGetEngineCutoverAt.mockResolvedValue(CUTOVER_INSTANT);
     service.mint(apiKey());
     await settle();
     expect(attachBindings).toHaveBeenCalledTimes(1);
@@ -164,13 +166,13 @@ describe("legacy API-key grant facts", () => {
     expect(
       LegacyApiKeyGrantService.keyPredatesAuthzEngine({
         apiKey: apiKey(),
-        cutoverAt: CUTOVER_AT,
+        cutoverAt: fromDate(CUTOVER_AT),
       }),
     ).toBe(true);
     expect(
       LegacyApiKeyGrantService.keyPredatesAuthzEngine({
         apiKey: apiKey({ createdAt: CUTOVER_AT }),
-        cutoverAt: CUTOVER_AT,
+        cutoverAt: fromDate(CUTOVER_AT),
       }),
     ).toBe(false);
   });

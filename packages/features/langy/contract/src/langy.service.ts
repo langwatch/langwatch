@@ -12,13 +12,14 @@ import type { CliToolResult } from "./cards/tool-result.ts";
 import type { LangyConversationTurnWireEvent } from "./event-sourcing/contracts/turn-wire.ts";
 import type { LangyEventCursor } from "./event-sourcing/contracts/cursor.ts";
 import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
+import type { Instant } from "@langwatch/time";
 
 export type LangyConversationListItem = {
   id: string;
   title: string | null;
   isShared: boolean;
   isOwn: boolean;
-  lastActivityAt: Date;
+  lastActivityAt: Instant;
   messageCount: number;
 };
 
@@ -44,7 +45,7 @@ export type LangyMessageRow = {
   id: string;
   role: "user" | "assistant" | "tool" | "system";
   parts: unknown[];
-  createdAt: Date;
+  createdAt: Instant;
 };
 
 export type LangyConversationEventPage = {

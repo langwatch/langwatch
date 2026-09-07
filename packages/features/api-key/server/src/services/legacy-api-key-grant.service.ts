@@ -7,7 +7,7 @@ import type {
   LedgerScope,
 } from "@langwatch/authz-contract";
 import type { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port.ts";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
 
 const MINT_GUARD_TTL_MS = 60_000;
 const MINT_GUARD_MAX_ENTRIES = 10_000;
@@ -29,9 +29,12 @@ export class LegacyApiKeyGrantService {
 
   static keyPredatesAuthzEngine(input: {
     apiKey: Pick<ApiKey, "createdAt">;
-    cutoverAt: Date | null;
+    cutoverAt: Instant | null;
   }): boolean {
-    return input.cutoverAt !== null && input.apiKey.createdAt.getTime() < input.cutoverAt.getTime();
+    return (
+      input.cutoverAt !== null &&
+      Temporal.Instant.compare(fromDate(input.apiKey.createdAt), input.cutoverAt) < 0
+    );
   }
 
   static tryLegacyGrantForApiKey(
@@ -108,7 +111,12 @@ export class LegacyApiKeyGrantService {
       return;
     }
 
-    if (!LegacyApiKeyGrantService.keyPredatesAuthzEngine({ apiKey, cutoverAt })) {
+    if (
+      !LegacyApiKeyGrantService.keyPredatesAuthzEngine({
+        apiKey,
+        cutoverAt,
+      })
+    ) {
       return;
     }
 

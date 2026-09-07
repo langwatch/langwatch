@@ -14,7 +14,7 @@ import {
   type MintInstallationTokenInput,
 } from "../ports/github-app-token.port.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:github:api");
 const HTTP_TIMEOUT_MS = 10_000;
@@ -74,7 +74,10 @@ function tryReadRateLimit(response: Response): GithubRateLimitedError | null {
   const resetSec = resetHeader ? Number(resetHeader) : null;
   return new GithubRateLimitedError({
     retryAfterSec: hasRetryAfter ? retryAfterSec : null,
-    resetAt: resetSec !== null && Number.isFinite(resetSec) ? new Date(resetSec * 1000) : null,
+    resetAt:
+      resetSec !== null && Number.isFinite(resetSec)
+        ? Temporal.Instant.fromEpochMilliseconds(resetSec * 1000)
+        : null,
   });
 }
 

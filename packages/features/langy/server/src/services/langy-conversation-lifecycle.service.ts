@@ -30,6 +30,7 @@ import type {
   LangyConversationCommands,
   LangyConversationRuntime,
 } from "./langy-conversation.service.ts";
+import { Temporal } from "@langwatch/time";
 
 /**
  * A conversation's own life: created, adopted under a caller-chosen id, forked, renamed,
@@ -195,11 +196,13 @@ export class LangyConversationLifecycleService {
         id: messageId,
         role: sourceMessage.role,
         parts: sourceMessage.parts,
-        createdAt: new Date(occurredAt),
+        createdAt: Temporal.Instant.fromEpochMilliseconds(occurredAt),
       });
     }
 
-    const lastActivityAt = new Date(startedAt + sourceMessages.length);
+    const lastActivityAt = Temporal.Instant.fromEpochMilliseconds(
+      startedAt + sourceMessages.length,
+    );
 
     return {
       conversation: {

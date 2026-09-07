@@ -2,11 +2,12 @@ import {
   GithubInstallationAccountMismatchError,
   GithubInstallationConflictError,
   GithubInstallationNotFromFlowError,
+  type GithubInstallation,
   type GithubRepositoryRef,
   type GithubTurnToken,
 } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { GithubAppTokenPort } from "../ports/github-app-token.port.ts";
 import type {
@@ -14,6 +15,7 @@ import type {
   GithubInstallationsRepository,
 } from "../repositories/github-installations.repository.ts";
 import type { GithubInstallationAccessService } from "./github-installation-access.service.ts";
+import { toDate, toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:github:installations");
 
@@ -29,7 +31,7 @@ export class GithubInstallationsService {
   static create(
     repository: GithubInstallationsRepository,
     appTokens: GithubAppTokenPort,
-    organization: OrganizationService,
+    organization: OrganizationApi,
     access: GithubInstallationAccessService,
   ): GithubInstallationsService {
     return new GithubInstallationsService(repository, appTokens, organization, access);
@@ -38,7 +40,7 @@ export class GithubInstallationsService {
   private constructor(
     private readonly repository: GithubInstallationsRepository,
     private readonly appTokens: GithubAppTokenPort,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly access: GithubInstallationAccessService,
   ) {}
 
@@ -50,15 +52,19 @@ export class GithubInstallationsService {
     return this.organization.isMember(input);
   }
 
-  getAllForOrganization(organizationId: string): Promise<GithubInstallationRow[]> {
-    return this.repository.findAllForOrganization(organizationId);
+  async getAllForOrganization(organizationId: string): Promise<GithubInstallation[]> {
+    const rows = await this.repository.findAllForOrganization(organizationId);
+
+    return rows.map(toContractInstallation);
   }
 
   // This read attributes a verified webhook and remains valid without
   // credentials. It goes through the access service because branch mapping
   // reads it there too, and one row should have one reader.
-  tryGetByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
-    return this.access.tryGetByInstallationId(installationId);
+  async tryGetByInstallationId(installationId: string): Promise<GithubInstallation | null> {
+    const row = await this.access.tryGetByInstallationId(installationId);
+
+    return row ? toContractInstallation(row) : null;
   }
 
   /**
@@ -247,6 +253,16 @@ function accountsMatch(expected: string, accountLogin: string, accountId: string
 /** Clock skew allowed between GitHub's creation stamp and our own state. */
 const INSTALLATION_CREATION_SKEW_MS = 60_000;
 
+/** One stored installation, as the contract carries it: instants become the wire's dates. */
+function toContractInstallation(row: GithubInstallationRow): GithubInstallation {
+  return {
+    ...row,
+    suspendedAt: row.suspendedAt && toDate(row.suspendedAt),
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
+  };
+}
+
 /**
  * Whether GitHub's creation stamp puts the installation inside this flow. An installation
  * GitHub declines to date cannot be shown to belong to the flow, so it is refused: the whole
@@ -257,7 +273,7 @@ function installationBelongsToFlow(createdAt: string | null, flowStartedAt: numb
     return false;
   }
 
-  const created = Date.parse(createdAt);
+  const created = toEpochMs(createdAt);
   if (Number.isNaN(created)) {
     return false;
   }

@@ -1,4 +1,3 @@
-import { nowInstant } from "@langwatch/time";
 /**
  * The choices the create and edit drawers offer, as data.
  *
@@ -8,6 +7,8 @@ import { nowInstant } from "@langwatch/time";
  * imports a component library is a layer inversion the drawer can avoid by
  * building its own from the same array.
  */
+
+import { Temporal, nowInstant, toDate, toEpochMs, type Instant } from "@langwatch/time";
 
 export const EXPIRATION_OPTIONS = [
   { label: "No expiration", value: "" },
@@ -33,17 +34,20 @@ export function resolveExpiresAt({
   preset: string;
   customDate: string;
   now?: number;
-}): Date | undefined {
-  if (preset === "custom") return customDate ? new Date(customDate) : undefined;
+}): Instant | undefined {
+  if (preset === "custom") {
+    return customDate ? Temporal.Instant.fromEpochMilliseconds(toEpochMs(customDate)) : undefined;
+  }
   if (!preset) return undefined;
   const days = parseInt(preset, 10);
   if (Number.isNaN(days)) return undefined;
-  return new Date(now + days * 24 * 60 * 60 * 1000);
+
+  return Temporal.Instant.fromEpochMilliseconds(now + days * 24 * 60 * 60 * 1000);
 }
 
 /** The earliest day a custom expiration may name: tomorrow, in the reader's zone. */
-export function earliestCustomExpiration(now: Date = new Date()): string {
-  const d = new Date(now);
+export function earliestCustomExpiration(now: Instant = nowInstant()): string {
+  const d = toDate(now);
   d.setDate(d.getDate() + 1);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");

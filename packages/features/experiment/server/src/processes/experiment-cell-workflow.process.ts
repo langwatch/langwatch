@@ -40,6 +40,7 @@ import type {
   WorkflowBuilderInput,
   WorkflowBuilderOutput,
 } from "@langwatch/experiment-contract";
+import type { Instant } from "@langwatch/time";
 
 // ============================================================================
 // Main Workflow Builder
@@ -535,7 +536,7 @@ const buildPromptIdentity = (identity: {
   handle?: string | null;
   versionId?: string | null;
   versionNumber?: number | null;
-  versionCreatedAt?: Date | string | null;
+  versionCreatedAt?: Instant | string | null;
 }): Partial<{
   configId: string;
   handle: string | null;

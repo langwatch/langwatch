@@ -1,4 +1,5 @@
 import type { GithubRepositoryRef } from "@langwatch/github-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 /**
  * Data-access layer for the organization's GitHub connection. The
@@ -20,9 +21,9 @@ export interface GithubInstallationRow {
   accountId: string;
   repositorySelection: string;
   repositories: GithubRepositoryRef[] | null;
-  suspendedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  suspendedAt: Instant | null;
+  createdAt: Instant;
+  updatedAt: Instant;
 }
 
 export interface UpsertGithubInstallationInput {
@@ -77,7 +78,7 @@ export class NullGithubInstallationsRepository extends GithubInstallationsReposi
   async insertOrGetExisting(
     input: UpsertGithubInstallationInput,
   ): Promise<{ wasInserted: boolean; row: GithubInstallationRow }> {
-    const now = new Date();
+    const now = nowInstant();
     return {
       wasInserted: true,
       row: { ...input, suspendedAt: null, createdAt: now, updatedAt: now },

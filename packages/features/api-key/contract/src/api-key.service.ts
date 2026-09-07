@@ -23,6 +23,7 @@ import type {
   ResolvedApiKeyToken,
 } from "./api-key.tokens.ts";
 import type { ApiKeyVisibleProjects, ApiKeyVisibleProjectsInput } from "./api-key.visibility.ts";
+import type { Instant } from "@langwatch/time";
 export type ApiKeySelectionInput = {
   userId: string;
   organizationId: string;
@@ -107,7 +108,7 @@ export abstract class ApiKeyService {
     organizationId: string;
     deviceLabel: string;
     exceptApiKeyId?: string;
-    createdBefore?: Date;
+    createdBefore?: Instant;
   }): Promise<void>;
   abstract revokeCliLoginKeyForLogout(input: {
     apiKeyId: string;

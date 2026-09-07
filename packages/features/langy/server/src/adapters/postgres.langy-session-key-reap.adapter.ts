@@ -4,6 +4,7 @@ import {
   type PrismaLangySessionKeyReapDatabase,
 } from "../repositories/prisma/prisma.langy-session-key-reap.repository.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
+import type { Instant } from "@langwatch/time";
 
 /**
  * The process's Prisma client, as the sweep receives it.
@@ -27,7 +28,7 @@ export class PostgresLangySessionKeyReapAdapter {
   static create(options: {
     database: LangySessionKeyReapDatabase;
     metrics: LangySessionKeyMetricsPort;
-    now?: () => Date;
+    now?: () => Instant;
   }): PostgresLangySessionKeyReapAdapter {
     return new PostgresLangySessionKeyReapAdapter(options);
   }
@@ -36,7 +37,7 @@ export class PostgresLangySessionKeyReapAdapter {
     private readonly options: {
       database: LangySessionKeyReapDatabase;
       metrics: LangySessionKeyMetricsPort;
-      now?: () => Date;
+      now?: () => Instant;
     },
   ) {}
 

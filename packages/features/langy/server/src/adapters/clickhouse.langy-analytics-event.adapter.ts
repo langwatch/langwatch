@@ -4,6 +4,13 @@ import {
   LangyAnalyticsEventSinkPort,
   type LangyAnalyticsEventRecord,
 } from "../ports/langy-analytics-event-sink.port.ts";
+import { Temporal, toDate } from "@langwatch/time";
+
+/**
+ * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an
+ * instant serialises to `{}`, so the conversion happens here and nowhere above.
+ */
+type ClickHouseDateTime = ReturnType<typeof toDate>;
 
 /**
  * The one ClickHouse operation this sink performs, named structurally.
@@ -39,8 +46,8 @@ type ClickHouseLangyAnalyticsEventRecord = {
   Outcome: string | null;
   Model: string | null;
   DurationMs: string | null;
-  OccurredAt: Date;
-  AcceptedAt: Date;
+  OccurredAt: ClickHouseDateTime;
+  AcceptedAt: ClickHouseDateTime;
   _retention_days: number;
 };
 
@@ -64,8 +71,8 @@ function toClickHouseRecord(
     Outcome: record.outcome,
     Model: record.model,
     DurationMs: record.durationMs === null ? null : String(Math.round(record.durationMs)),
-    OccurredAt: new Date(record.occurredAtMs),
-    AcceptedAt: new Date(record.acceptedAtMs),
+    OccurredAt: toDate(Temporal.Instant.fromEpochMilliseconds(record.occurredAtMs)),
+    AcceptedAt: toDate(Temporal.Instant.fromEpochMilliseconds(record.acceptedAtMs)),
     _retention_days: retentionDays,
   };
 }

@@ -10,7 +10,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import type { CodexTokenRefresher, ModelProviderRepository } from "../ports/model-provider.port.ts";
 import type { ModelProviderQueryService } from "./model-provider-query.service.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 
 type ModelProviderCodexOptions = {
   repository: ModelProviderRepository;
@@ -85,7 +85,7 @@ export class ModelProviderCodexService {
 }
 
 function isRecent(savedAt: string): boolean {
-  const savedAtMs = Date.parse(savedAt);
+  const savedAtMs = toEpochMs(savedAt);
 
   return Number.isFinite(savedAtMs) && nowInstant().epochMilliseconds - savedAtMs < 30_000;
 }

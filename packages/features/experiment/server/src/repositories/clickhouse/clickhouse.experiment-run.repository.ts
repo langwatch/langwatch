@@ -22,6 +22,7 @@ import {
   OCCURRED_AT_BUFFER_MS,
   WARN_OLD_RUN_AGE_MS,
 } from "./clickhouse.experiment-run.mapper.ts";
+import { toEpochMs } from "@langwatch/time";
 
 type QueryResult = { json<T>(): Promise<T[]> };
 type ExperimentClickHouseClient = {
@@ -638,7 +639,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
   }
 }
 function timestamps(row: RunRow) {
-  const parse = (value: string): number => new Date(`${value.replace(" ", "T")}Z`).getTime();
+  const parse = (value: string): number => toEpochMs(`${value.replace(" ", "T")}Z`);
   return {
     createdAt: parse(row.CreatedAt),
     updatedAt: parse(row.UpdatedAt),

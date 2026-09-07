@@ -17,6 +17,7 @@ import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
+import { Temporal, fromDate, type Instant } from "@langwatch/time";
 
 export class ApiKeyCliService {
   static create(
@@ -168,7 +169,7 @@ export class ApiKeyCliService {
         organizationId: input.organizationId,
         deviceLabel: input.deviceLabel,
         exceptApiKeyId: created.apiKey.id,
-        createdBefore: created.apiKey.createdAt,
+        createdBefore: fromDate(created.apiKey.createdAt),
       });
     } catch (error) {
       await this.lifecycle
@@ -191,7 +192,7 @@ export class ApiKeyCliService {
     organizationId: string;
     deviceLabel: string;
     exceptApiKeyId?: string;
-    createdBefore?: Date;
+    createdBefore?: Instant;
   }): Promise<void> {
     const keys = await this.repository.listForUser({
       userId: input.userId,
@@ -202,7 +203,8 @@ export class ApiKeyCliService {
         !key.name.startsWith("CLI login - ") ||
         key.createdByDeviceLabel !== input.deviceLabel ||
         key.id === input.exceptApiKeyId ||
-        (input.createdBefore && key.createdAt >= input.createdBefore)
+        (input.createdBefore &&
+          Temporal.Instant.compare(fromDate(key.createdAt), input.createdBefore) >= 0)
       ) {
         continue;
       }

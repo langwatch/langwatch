@@ -243,7 +243,7 @@ function toListItemDto(item: ConversationListItem): LangyConversationListItemDto
     isShared: item.isShared,
     isOwn: item.isOwn,
     messageCount: item.messageCount,
-    lastActivityAtMs: item.lastActivityAt.getTime(),
+    lastActivityAtMs: item.lastActivityAt.epochMilliseconds,
   };
 }
 
@@ -507,7 +507,7 @@ export class LangyTrpcApi {
               id: row.id,
               role: langyMessageRoleSchema.catch("assistant").parse(row.role),
               parts: Array.isArray(row.parts) ? (row.parts as LangyMessageDto["parts"]) : [],
-              createdAtMs: row.createdAt.getTime(),
+              createdAtMs: row.createdAt.epochMilliseconds,
             }));
             const isTurnInFlight =
               conversation.status === LANGY_CONVERSATION_STATUS.ACTIVE ||

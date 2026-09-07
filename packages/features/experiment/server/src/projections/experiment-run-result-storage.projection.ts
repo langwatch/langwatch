@@ -8,6 +8,13 @@ import {
 } from "../processes/experiment-run-events.process.ts";
 import { normalizeDurationMs } from "../processes/experiment-run-duration.process.ts";
 import { ExperimentRunIds } from "../processes/experiment-run-id.process.ts";
+import { Temporal, toDate } from "@langwatch/time";
+
+/**
+ * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an
+ * instant serialises to `{}`, so the conversion happens here and nowhere above.
+ */
+type ClickHouseDateTime = ReturnType<typeof toDate>;
 
 /**
  * Record type matching the experiment_run_items ClickHouse table schema.
@@ -44,7 +51,7 @@ export interface ClickHouseExperimentRunResultRecord {
    * its verdicts and scores read every row.
    */
   CarriedOver: number;
-  OccurredAt: Date;
+  OccurredAt: ClickHouseDateTime;
 }
 
 const resultEvents = [targetResultEventSchema, evaluatorResultEventSchema] as const;
@@ -121,7 +128,7 @@ export class ExperimentRunResultStorageMapProjection
       EvaluationInputs: null,
       EvaluationDurationMs: null,
       CarriedOver: event.data.carriedOver ? 1 : 0,
-      OccurredAt: new Date(event.occurredAt),
+      OccurredAt: toDate(Temporal.Instant.fromEpochMilliseconds(event.occurredAt)),
     };
   }
 
@@ -163,7 +170,7 @@ export class ExperimentRunResultStorageMapProjection
       EvaluationInputs: event.data.inputs ? JSON.stringify(event.data.inputs) : null,
       EvaluationDurationMs: normalizeDurationMs(event.data.duration),
       CarriedOver: event.data.carriedOver ? 1 : 0,
-      OccurredAt: new Date(event.occurredAt),
+      OccurredAt: toDate(Temporal.Instant.fromEpochMilliseconds(event.occurredAt)),
     };
   }
 }

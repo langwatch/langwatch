@@ -32,6 +32,7 @@ import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
+import { nowInstant } from "@langwatch/time";
 import {
   BatchEvaluationV2EvaluationSummary,
   formatEvaluationSummary,
@@ -247,13 +248,13 @@ export const useBatchEvaluationState = ({
     if (!selectedRun) {
       return false;
     }
-    return getFinishedAt(selectedRun.timestamps, new Date().getTime()) !== undefined;
+    return getFinishedAt(selectedRun.timestamps, nowInstant().epochMilliseconds) !== undefined;
   }, [selectedRun]);
 
   useEffect(() => {
     if (
       batchEvaluationRuns.data?.runs.some(
-        (r: any) => getFinishedAt(r.timestamps, new Date().getTime()) === undefined,
+        (r: any) => getFinishedAt(r.timestamps, nowInstant().epochMilliseconds) === undefined,
       )
     ) {
       setIsSomeRunning(true);
@@ -406,7 +407,8 @@ export function BatchEvaluationV2RunList({
                     wordBreak="break-all"
                   >
                     {runName}
-                    {getFinishedAt(run.timestamps, new Date().getTime()) === undefined && (
+                    {getFinishedAt(run.timestamps, nowInstant().epochMilliseconds) ===
+                      undefined && (
                       <Spinner
                         size="xs"
                         display="inline-block"

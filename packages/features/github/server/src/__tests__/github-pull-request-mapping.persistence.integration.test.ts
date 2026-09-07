@@ -20,6 +20,7 @@ import {
   TestOrganizationService,
   TestProjectService,
 } from "../services/__tests__/fixtures/github-services.fixture.ts";
+import { fromDate } from "@langwatch/time";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -1005,7 +1006,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     expect(stored).toMatchObject({ state: "closed", prMergedAt: new Date(mergedAt) });
     expect(
       GithubPullRequestStatusService.deriveStatus({
-        mergedAt: stored?.prMergedAt ?? null,
+        mergedAt: stored?.prMergedAt ? fromDate(stored.prMergedAt) : null,
         state: stored?.state ?? "",
         draft: false,
       }),

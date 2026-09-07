@@ -6,12 +6,14 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { nowInstant, toEpochMs } from "@langwatch/time";
+import { readableDate } from "../../model/display-formatters.ts";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
 type IngestionKeyRow = WireOf<ApiKeyListEntry>;
 
 function isExpired(key: IngestionKeyRow): boolean {
-  return Boolean(key.expiresAt && new Date(key.expiresAt) < new Date());
+  return Boolean(key.expiresAt && toEpochMs(key.expiresAt) < nowInstant().epochMilliseconds);
 }
 
 /**
@@ -90,7 +92,7 @@ export function IngestionKeysSection({
                     </Text>
                   </Table.Cell>
                   <Table.Cell>
-                    {new Date(apiKey.createdAt).toLocaleDateString("en-US", {
+                    {readableDate(apiKey.createdAt).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                       year: "numeric",
@@ -98,13 +100,13 @@ export function IngestionKeysSection({
                   </Table.Cell>
                   <Table.Cell>
                     {apiKey.lastUsedAt ? (
-                      <Tooltip content={new Date(apiKey.lastUsedAt).toISOString()}>
+                      <Tooltip content={readableDate(apiKey.lastUsedAt).toISOString()}>
                         <Text
                           cursor="help"
                           tabIndex={0}
-                          aria-label={`Last used at ${new Date(apiKey.lastUsedAt).toISOString()}`}
+                          aria-label={`Last used at ${readableDate(apiKey.lastUsedAt).toISOString()}`}
                         >
-                          {formatTimeAgo(new Date(apiKey.lastUsedAt).getTime()) ?? ""}
+                          {formatTimeAgo(toEpochMs(apiKey.lastUsedAt)) ?? ""}
                         </Text>
                       </Tooltip>
                     ) : (

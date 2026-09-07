@@ -9,6 +9,7 @@ import {
   parseModelProviderWireValue,
   readStoredSkipList,
   resolveSkipList,
+  type ModelProvider,
 } from "@langwatch/model-provider-contract";
 
 /**
@@ -20,7 +21,7 @@ export interface SkipPermissionsProviderRow {
   id: string;
   provider: string;
   routingHandle: string | null;
-  createdAt: Date;
+  createdAt: ModelProvider["createdAt"];
   langySkipPermissionsModels: unknown;
 }
 

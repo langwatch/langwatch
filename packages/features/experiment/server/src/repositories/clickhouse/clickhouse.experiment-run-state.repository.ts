@@ -22,6 +22,18 @@ import {
   parseExperimentRunKey,
 } from "../../processes/experiment-run-key.process.ts";
 import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";
+import { Temporal, toDate } from "@langwatch/time";
+
+/**
+ * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an
+ * instant serialises to `{}`, so the conversion happens here and nowhere above.
+ */
+type ClickHouseDateTime = ReturnType<typeof toDate>;
+
+/** Epoch millis as the `Date` the ClickHouse client binds to a `DateTime64(3)`. */
+function clickHouseDateTime(epochMs: number): ClickHouseDateTime {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
+}
 
 const TABLE_NAME = "experiment_runs" as const;
 
@@ -30,9 +42,9 @@ const logger = createLogger("langwatch:experiment-run-processing:run-state-repos
 type WithDateWrites<T, K extends keyof T> = {
   [P in keyof T]: P extends K
     ? T[P] extends number
-      ? Date
+      ? ClickHouseDateTime
       : T[P] extends number | null
-        ? Date | null
+        ? ClickHouseDateTime | null
         : T[P]
     : T[P];
 };
@@ -144,19 +156,17 @@ export class ClickHouseExperimentRunStateRepository<
       AvgScoreBps: data.AvgScoreBps,
       PassRateBps: data.PassRateBps,
       Targets: data.Targets,
-      CreatedAt: new Date(data.CreatedAt),
-      UpdatedAt: new Date(data.UpdatedAt),
-      StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
-      FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
-      StoppedAt: data.StoppedAt != null ? new Date(data.StoppedAt) : null,
+      CreatedAt: clickHouseDateTime(data.CreatedAt),
+      UpdatedAt: clickHouseDateTime(data.UpdatedAt),
+      StartedAt: clickHouseDateTime(data.StartedAt ?? data.CreatedAt),
+      FinishedAt: data.FinishedAt != null ? clickHouseDateTime(data.FinishedAt) : null,
+      StoppedAt: data.StoppedAt != null ? clickHouseDateTime(data.StoppedAt) : null,
       LastProcessedEventId: lastProcessedEventId,
       TotalScoreSum: data.TotalScoreSum,
       ScoreCount: data.ScoreCount,
       PassedCount: data.PassedCount,
       GradedCount: data.GradedCount,
-      LastEventOccurredAt: data.LastEventOccurredAt
-        ? new Date(data.LastEventOccurredAt)
-        : new Date(0),
+      LastEventOccurredAt: clickHouseDateTime(data.LastEventOccurredAt ?? 0),
       // Placeholder; storeProjection / storeProjectionBatch overwrite this with
       // the resolved retention (platform default when the tenant has none).
       _retention_days: this.defaultRetentionDays,

@@ -13,9 +13,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRepository } from "../../repositories/api-key.repository.ts";
 import { AgentSandboxKeyReapService } from "../agent-sandbox-key-reap.service.ts";
+import { Temporal, nowInstant, type Instant } from "@langwatch/time";
 
 function repositoryDouble(count = 0) {
-  const revokeExpiredByName = vi.fn(async (_input: { name: string; now: Date }) => count);
+  const revokeExpiredByName = vi.fn(async (_input: { name: string; now: Instant }) => count);
   const repository = { revokeExpiredByName } as unknown as ApiKeyRepository;
   return { repository, revokeExpiredByName };
 }
@@ -26,7 +27,7 @@ describe("the agent sandbox key sweep", () => {
       /** @scenario "The sandbox sweep revokes only elapsed sandbox keys" */
       it("asks for the reserved sandbox name and nothing else", async () => {
         const { repository, revokeExpiredByName } = repositoryDouble(1);
-        const now = new Date("2026-01-01T00:00:00.000Z");
+        const now = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
         await AgentSandboxKeyReapService.create({ repository, now: () => now }).reap();
 
@@ -42,7 +43,10 @@ describe("the agent sandbox key sweep", () => {
       /** @scenario "The sandbox sweep revokes only elapsed sandbox keys" */
       it("compares against the same instant it stamps", async () => {
         const { repository, revokeExpiredByName } = repositoryDouble(1);
-        const ticks = [new Date("2026-01-01T00:00:00.000Z"), new Date("2026-01-01T00:00:05.000Z")];
+        const ticks = [
+          Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
+          Temporal.Instant.from("2026-01-01T00:00:05.000Z"),
+        ];
         let tick = 0;
 
         await AgentSandboxKeyReapService.create({
@@ -57,7 +61,7 @@ describe("the agent sandbox key sweep", () => {
       /** @scenario "A key whose lifetime has passed is retired" */
       it("retires a key only once its lifetime has elapsed", async () => {
         const { repository, revokeExpiredByName } = repositoryDouble(3);
-        const now = new Date("2026-01-01T00:00:00.000Z");
+        const now = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
         const count = await AgentSandboxKeyReapService.create({
           repository,
@@ -84,13 +88,13 @@ describe("the agent sandbox key sweep", () => {
     describe("when the sweep runs", () => {
       it("reads the wall clock at the moment it sweeps", async () => {
         const { repository, revokeExpiredByName } = repositoryDouble();
-        const before = Date.now();
+        const before = nowInstant().epochMilliseconds;
 
         await AgentSandboxKeyReapService.create({ repository }).reap();
 
         const { now } = revokeExpiredByName.mock.calls[0]![0];
-        expect(now.getTime()).toBeGreaterThanOrEqual(before);
-        expect(now.getTime()).toBeLessThanOrEqual(Date.now());
+        expect(now.epochMilliseconds).toBeGreaterThanOrEqual(before);
+        expect(now.epochMilliseconds).toBeLessThanOrEqual(nowInstant().epochMilliseconds);
       });
     });
   });

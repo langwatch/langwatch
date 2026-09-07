@@ -16,6 +16,7 @@ import { GithubHostPort } from "../../ports/github-host.port.ts";
 import type { BranchMappingTarget } from "../github-branch-mapping.service.ts";
 import { GithubBranchDemandService } from "../github-branch-demand.service.ts";
 import { TestProjectService } from "./fixtures/github-services.fixture.ts";
+import { Temporal } from "@langwatch/time";
 
 const REQUEST = {
   tenantId: "project-1",
@@ -89,7 +90,7 @@ describe("GitHub branch demand", () => {
       await service.request(REQUEST);
 
       expect(project.pullRequestActivity).toEqual([
-        { projectId: "project-1", at: new Date(Date.UTC(2026, 7, 2)) },
+        { projectId: "project-1", at: Temporal.Instant.from("2026-08-02T00:00:00Z") },
       ]);
     });
 

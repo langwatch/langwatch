@@ -15,10 +15,15 @@
  * with these signatures, which is what keeps `PostgresGithubAdapter` and the
  * App's own composition compiling.
  */
+import type { Instant } from "@langwatch/time";
+
 export abstract class GithubProjectActivityPort {
   /** The organization an active project belongs to; throws when there is none. */
   abstract getOrganizationId(projectId: string): Promise<string>;
 
   /** Stamps a project as having just had a coding-agent pull request mapped. */
-  abstract touchCodingAgentPullRequestSeen(input: { projectId: string; at: Date }): Promise<void>;
+  abstract touchCodingAgentPullRequestSeen(input: {
+    projectId: string;
+    at: Instant;
+  }): Promise<void>;
 }

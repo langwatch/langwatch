@@ -6,6 +6,8 @@
  * ClickHouse can prune partitions without treating reused run ids as matches.
  */
 
+import { Temporal, toEpochMs } from "@langwatch/time";
+
 export const OCCURRED_AT_BUFFER_MS = 24 * 60 * 60 * 1000;
 export const WARN_OLD_RUN_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -57,9 +59,12 @@ export function computeOccurredAtRangeForRuns(
 }
 
 function formatClickHouseDateTime(milliseconds: number): string {
-  return new Date(milliseconds).toISOString().replace("T", " ").replace("Z", "");
+  return Temporal.Instant.fromEpochMilliseconds(milliseconds)
+    .toString({ fractionalSecondDigits: 3 })
+    .replace("T", " ")
+    .replace("Z", "");
 }
 
 function parseClickHouseDateTime(value: string): number {
-  return new Date(`${value.replace(" ", "T")}Z`).getTime();
+  return toEpochMs(`${value.replace(" ", "T")}Z`);
 }

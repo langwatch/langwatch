@@ -1,4 +1,5 @@
 import type { ApiKey, ApiKeyRevocationCause, ApiKeyScope } from "@langwatch/api-key-contract";
+import type { Instant } from "@langwatch/time";
 
 export type StoredApiKey = ApiKey & { hashedSecret: string };
 export type ApiKeyCreateRecord = {
@@ -11,7 +12,7 @@ export type ApiKeyCreateRecord = {
   createdByUserId: string | null;
   createdByDeviceLabel?: string | null;
   organizationId: string;
-  expiresAt: Date | null;
+  expiresAt: Instant | null;
   ingestSourceType: string | null;
   ingestionTemplateId: string | null;
   startsDisabled: boolean;
@@ -23,8 +24,8 @@ export type ApiKeyUpdateRecord = {
   description?: string | null;
   permissionMode?: string;
   roleBindings?: ApiKeyScope[];
-  revokedAt?: Date | null;
-  lastUsedAt?: Date;
+  revokedAt?: Instant | null;
+  lastUsedAt?: Instant;
   hashedSecret?: string;
 };
 
@@ -70,7 +71,7 @@ export abstract class ApiKeyRepository {
    * constant here because deciding WHICH reserved name may be swept is policy,
    * and policy belongs above persistence.
    */
-  abstract revokeExpiredByName(input: { name: string; now: Date }): Promise<number>;
+  abstract revokeExpiredByName(input: { name: string; now: Instant }): Promise<number>;
   /** Resolves personal team/project ownership without leaking foreign persistence to the service. */
   abstract tryFindPersonalWorkspaceOwner(input: {
     organizationId: string;

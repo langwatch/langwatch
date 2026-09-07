@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { HIDDEN_SYSTEM_KEY_NAMES, type ApiKeyRevocationCause } from "@langwatch/api-key-contract";
 import {
   ApiKeyRepository,
@@ -19,10 +20,11 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
   }
 
   create(input: ApiKeyCreateRecord): Promise<StoredApiKey> {
-    const { roleBindings: _roleBindings, startsDisabled, ...data } = input;
+    const { roleBindings: _roleBindings, startsDisabled, expiresAt, ...data } = input;
     return this.database.apiKey.create({
       data: {
         ...data,
+        expiresAt: expiresAt ? toDate(expiresAt) : null,
         ...(startsDisabled ? { revokedAt: new Date() } : {}),
       },
       include: { roleBindings: true },
@@ -83,10 +85,14 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
     });
   }
   update(input: ApiKeyUpdateRecord): Promise<StoredApiKey> {
-    const { id, roleBindings: _roleBindings, ...data } = input;
+    const { id, roleBindings: _roleBindings, revokedAt, lastUsedAt, ...data } = input;
     return this.database.apiKey.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        ...(revokedAt === void 0 ? {} : { revokedAt: revokedAt && toDate(revokedAt) }),
+        ...(lastUsedAt === void 0 ? {} : { lastUsedAt: toDate(lastUsedAt) }),
+      },
       include: { roleBindings: true },
     });
   }
@@ -104,7 +110,7 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
     });
   }
   async updateLastUsedAt(input: { id: string }): Promise<void> {
-    await this.update({ id: input.id, lastUsedAt: new Date() });
+    await this.update({ id: input.id, lastUsedAt: nowInstant() });
   }
   async upgradeHash(input: { id: string; hashedSecret: string }): Promise<void> {
     await this.update({ id: input.id, hashedSecret: input.hashedSecret });
@@ -162,14 +168,15 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
    * that a later Prisma or Postgres comparison treated as "before now" would
    * revoke every key of this name in the product at once.
    */
-  async revokeExpiredByName(input: { name: string; now: Date }): Promise<number> {
+  async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
+    const now = toDate(input.now);
     const { count } = await this.database.apiKey.updateMany({
       where: {
         name: input.name,
         revokedAt: null,
-        expiresAt: { not: null, lte: input.now },
+        expiresAt: { not: null, lte: now },
       },
-      data: { revokedAt: input.now },
+      data: { revokedAt: now },
     });
     return count;
   }

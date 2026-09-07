@@ -50,6 +50,7 @@ import { CustomModelInputSection } from "./model-provider-custom-model-input.tsx
 import { ExtraHeadersSection } from "./model-provider-extra-headers-section.tsx";
 import { ModelProviderRoutingSection } from "./model-provider-routing-section.tsx";
 import { ProviderScopeSection } from "./model-provider-scope-section.tsx";
+import type { TimeInput } from "@langwatch/time";
 
 /**
  * The message the server attached to the skip-permissions field, or null when
@@ -449,9 +450,9 @@ function ProviderAdvancedArea({
   const row = provider as {
     id?: string;
     healthStatus?: string | null;
-    circuitOpenedAt?: Date | string | null;
-    lastHealthCheckAt?: Date | string | null;
-    disabledAt?: Date | string | null;
+    circuitOpenedAt?: TimeInput | null;
+    lastHealthCheckAt?: TimeInput | null;
+    disabledAt?: TimeInput | null;
   };
 
   return (

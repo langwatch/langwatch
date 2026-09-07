@@ -20,6 +20,8 @@ import type { BatchEvaluation } from "../../../model/prisma-types.ts";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatMoney } from "@langwatch/design-system/format-money";
+import { toEpochMs } from "@langwatch/time";
+import { readableDate } from "../../../model/display-formatters.ts";
 
 export default function BatchEvaluation({
   project,
@@ -85,7 +87,7 @@ export default function BatchEvaluation({
         evaluation.score,
         evaluation.label ?? "",
         evaluation.cost,
-        new Date(evaluation.createdAt).toLocaleString(),
+        readableDate(evaluation.createdAt).toLocaleString(),
       ]);
     });
 
@@ -98,15 +100,14 @@ export default function BatchEvaluation({
 
   const totalCost = evaluations.data?.reduce((acc, curr) => acc + curr.cost, 0);
   const earliestEvaluation = evaluations.data?.reduce((acc: BatchEvaluation | undefined, curr) => {
-    return !acc || new Date(curr.createdAt) < new Date(acc.createdAt) ? curr : acc;
+    return !acc || toEpochMs(curr.createdAt) < toEpochMs(acc.createdAt) ? curr : acc;
   }, undefined);
   const latestEvaluation = evaluations.data?.reduce((acc: BatchEvaluation | undefined, curr) => {
-    return !acc || new Date(curr.createdAt) > new Date(acc.createdAt) ? curr : acc;
+    return !acc || toEpochMs(curr.createdAt) > toEpochMs(acc.createdAt) ? curr : acc;
   }, undefined);
   const runtime =
     latestEvaluation && earliestEvaluation
-      ? new Date(latestEvaluation.createdAt).getTime() -
-        new Date(earliestEvaluation.createdAt).getTime()
+      ? toEpochMs(latestEvaluation.createdAt) - toEpochMs(earliestEvaluation.createdAt)
       : 0;
 
   const groupedByEvaluation = evaluations.data?.reduce(
@@ -429,7 +430,7 @@ export default function BatchEvaluation({
                                   : "-"}
                               </Table.Cell>
                               <Table.Cell>
-                                {new Date(evaluation.createdAt).toLocaleString()}
+                                {readableDate(evaluation.createdAt).toLocaleString()}
                               </Table.Cell>
                             </Table.Row>
                           );

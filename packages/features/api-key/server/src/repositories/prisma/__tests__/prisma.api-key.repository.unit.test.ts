@@ -12,6 +12,7 @@
 import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
 import { PrismaApiKeyRepository, type PrismaApiKeyDatabase } from "../prisma.api-key.repository.ts";
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 
 function repositoryWithSpy() {
   const findMany = vi.fn(async () => []);
@@ -67,7 +68,7 @@ describe("PrismaApiKeyRepository", () => {
     /** @scenario "The sandbox sweep revokes only elapsed sandbox keys" */
     it("stamps the elapsed, unrevoked keys of that name as of the sweep's instant", async () => {
       const { repository, updateMany } = repositoryWithUpdateSpy();
-      const now = new Date("2026-01-01T00:00:00.000Z");
+      const now = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
       await repository.revokeExpiredByName({ name: "Agent sandbox run", now });
 
@@ -75,9 +76,9 @@ describe("PrismaApiKeyRepository", () => {
         where: {
           name: "Agent sandbox run",
           revokedAt: null,
-          expiresAt: { not: null, lte: now },
+          expiresAt: { not: null, lte: toDate(now) },
         },
-        data: { revokedAt: now },
+        data: { revokedAt: toDate(now) },
       });
     });
 
@@ -85,7 +86,7 @@ describe("PrismaApiKeyRepository", () => {
     it("requires an expiry to exist before comparing it", async () => {
       const { repository, updateMany } = repositoryWithUpdateSpy();
 
-      await repository.revokeExpiredByName({ name: "Agent sandbox run", now: new Date() });
+      await repository.revokeExpiredByName({ name: "Agent sandbox run", now: nowInstant() });
 
       const where = updateMany.mock.calls[0]![0].where;
       expect(where.expiresAt).toMatchObject({ not: null });
@@ -95,7 +96,7 @@ describe("PrismaApiKeyRepository", () => {
     it("never reconsiders a key it has already revoked", async () => {
       const { repository, updateMany } = repositoryWithUpdateSpy();
 
-      await repository.revokeExpiredByName({ name: "Agent sandbox run", now: new Date() });
+      await repository.revokeExpiredByName({ name: "Agent sandbox run", now: nowInstant() });
 
       expect(updateMany.mock.calls[0]![0].where.revokedAt).toBeNull();
     });
@@ -105,7 +106,7 @@ describe("PrismaApiKeyRepository", () => {
       const { repository } = repositoryWithUpdateSpy(3);
 
       await expect(
-        repository.revokeExpiredByName({ name: "Agent sandbox run", now: new Date() }),
+        repository.revokeExpiredByName({ name: "Agent sandbox run", now: nowInstant() }),
       ).resolves.toBe(3);
     });
   });

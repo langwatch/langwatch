@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import {
   GithubPullRequestsRepository,
@@ -107,10 +108,10 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       state: pullRequest.state,
       isDraft: pullRequest.isDraft,
       authorLogin: pullRequest.authorLogin,
-      prCreatedAt: pullRequest.prCreatedAt,
-      prClosedAt: pullRequest.prClosedAt,
-      prMergedAt: pullRequest.prMergedAt,
-      prUpdatedAt: pullRequest.prUpdatedAt,
+      prCreatedAt: toDate(pullRequest.prCreatedAt),
+      prClosedAt: pullRequest.prClosedAt && toDate(pullRequest.prClosedAt),
+      prMergedAt: pullRequest.prMergedAt && toDate(pullRequest.prMergedAt),
+      prUpdatedAt: pullRequest.prUpdatedAt && toDate(pullRequest.prUpdatedAt),
       lastCheckedAt: new Date(),
     };
     const guard = PrismaGithubPullRequestsRepository.freshnessGuard(pullRequest.prUpdatedAt);
@@ -237,9 +238,9 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
         title: input.title,
         state: input.state,
         isDraft: input.isDraft,
-        prClosedAt: input.prClosedAt,
-        prMergedAt: input.prMergedAt,
-        prUpdatedAt: input.prUpdatedAt,
+        prClosedAt: input.prClosedAt && toDate(input.prClosedAt),
+        prMergedAt: input.prMergedAt && toDate(input.prMergedAt),
+        prUpdatedAt: toDate(input.prUpdatedAt),
         lastCheckedAt: new Date(),
       },
     });
@@ -285,10 +286,10 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       input.repositoryFullName,
     );
     const bookkeeping = {
-      lastCheckedAt: input.lastCheckedAt,
+      lastCheckedAt: toDate(input.lastCheckedAt),
       prCount: input.prCount,
-      notFoundAt: input.notFoundAt,
-      recheckAfter: input.recheckAfter,
+      notFoundAt: input.notFoundAt && toDate(input.notFoundAt),
+      recheckAfter: input.recheckAfter && toDate(input.recheckAfter),
       attempts: input.attempts,
     };
     await this.prisma.githubBranchPullRequestCheck.upsert({
@@ -306,10 +307,10 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
         repositoryFullName,
         headBranch: input.headBranch,
         ...bookkeeping,
-        lastRequestedAt: input.lastRequestedAt ?? input.lastCheckedAt,
+        lastRequestedAt: toDate(input.lastRequestedAt ?? input.lastCheckedAt),
       },
       update: input.lastRequestedAt
-        ? { ...bookkeeping, lastRequestedAt: input.lastRequestedAt }
+        ? { ...bookkeeping, lastRequestedAt: toDate(input.lastRequestedAt) }
         : bookkeeping,
     });
   }
@@ -347,7 +348,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     repositoryHost: string;
     repositoryFullName: string;
     headBranch: string;
-    now: Date;
+    now: Instant;
     freshMappingMs: number;
     leaseMs: number;
     shouldRecordDemand: boolean;
@@ -358,12 +359,12 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     // and the comparison then runs through the session timezone, which on a
     // developer's machine makes a fifteen-minute backoff look already elapsed
     // and lets every racer claim. See `toPgTimestampUtc`.
-    const at = PrismaGithubPullRequestsRepository.toPgTimestampUtc(now);
+    const at = PrismaGithubPullRequestsRepository.toPgTimestampUtc(toDate(now));
     const leaseUntil = PrismaGithubPullRequestsRepository.toPgTimestampUtc(
-      new Date(now.getTime() + leaseMs),
+      toDate(now.add({ milliseconds: leaseMs })),
     );
     const freshSince = PrismaGithubPullRequestsRepository.toPgTimestampUtc(
-      new Date(now.getTime() - freshMappingMs),
+      toDate(now.subtract({ milliseconds: freshMappingMs })),
     );
     const claimed = await this.prisma.$executeRaw`
       INSERT INTO "GithubBranchPullRequestCheck" (
@@ -407,8 +408,8 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     repositoryHost: string;
     repositoryFullName: string;
     headBranch: string;
-    lastRequestedAt: Date;
-    staleBefore: Date;
+    lastRequestedAt: Instant;
+    staleBefore: Instant;
   }): Promise<void> {
     await this.prisma.githubBranchPullRequestCheck.updateMany({
       where: {
@@ -417,9 +418,9 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
         repositoryFullName:
           PrismaGithubPullRequestsRepository.normalizeFullName(repositoryFullName),
         headBranch,
-        lastRequestedAt: { lte: staleBefore },
+        lastRequestedAt: { lte: toDate(staleBefore) },
       },
-      data: { lastRequestedAt },
+      data: { lastRequestedAt: toDate(lastRequestedAt) },
     });
   }
 
@@ -434,7 +435,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     repositoryHost: string;
     repositoryFullName: string;
     headBranch: string;
-    dueAt: Date;
+    dueAt: Instant;
   }): Promise<void> {
     await this.prisma.githubBranchPullRequestCheck.updateMany({
       where: {
@@ -446,9 +447,9 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
         // Only a branch waiting longer than this. A row already due sooner is
         // left alone, which is also what keeps a live lookup claim, whose lease
         // sits seconds away, from being extended by a concurrent fold.
-        recheckAfter: { gt: dueAt },
+        recheckAfter: { gt: toDate(dueAt) },
       },
-      data: { recheckAfter: dueAt, attempts: 0 },
+      data: { recheckAfter: toDate(dueAt), attempts: 0 },
     });
   }
 
@@ -464,15 +465,15 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     activeWithinMs,
     limit,
   }: {
-    now: Date;
+    now: Instant;
     activeWithinMs: number;
     limit: number;
   }): Promise<GithubBranchCheckRow[]> {
     const records = await this.prisma.githubBranchPullRequestCheck.findMany({
       where: {
         notFoundAt: { not: null },
-        recheckAfter: { lte: now },
-        lastRequestedAt: { gt: new Date(now.getTime() - activeWithinMs) },
+        recheckAfter: { lte: toDate(now) },
+        lastRequestedAt: { gt: toDate(now.subtract({ milliseconds: activeWithinMs })) },
       },
       orderBy: { recheckAfter: "asc" },
       take: limit,
@@ -497,10 +498,10 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
    * would be paid on every write to a table that takes a row per agent branch.
    * Measured on 200k rows: 254 ms.
    */
-  async deleteStaleBefore({ before }: { before: Date }): Promise<{
+  async deleteStaleBefore({ before }: { before: Instant }): Promise<{
     branchChecks: number;
   }> {
-    const cutoff = PrismaGithubPullRequestsRepository.toPgTimestampUtc(before);
+    const cutoff = PrismaGithubPullRequestsRepository.toPgTimestampUtc(toDate(before));
     const branchChecks = await this.prisma.$executeRaw`
       DELETE FROM "GithubBranchPullRequestCheck"
       WHERE "lastRequestedAt" < ${cutoff}::timestamp
@@ -552,12 +553,12 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       state: record.state,
       isDraft: record.isDraft,
       authorLogin: record.authorLogin,
-      prCreatedAt: record.prCreatedAt,
-      prClosedAt: record.prClosedAt,
-      prMergedAt: record.prMergedAt,
-      prUpdatedAt: record.prUpdatedAt,
-      mappedAt: record.mappedAt,
-      lastCheckedAt: record.lastCheckedAt,
+      prCreatedAt: fromDate(record.prCreatedAt),
+      prClosedAt: record.prClosedAt && fromDate(record.prClosedAt),
+      prMergedAt: record.prMergedAt && fromDate(record.prMergedAt),
+      prUpdatedAt: record.prUpdatedAt && fromDate(record.prUpdatedAt),
+      mappedAt: fromDate(record.mappedAt),
+      lastCheckedAt: fromDate(record.lastCheckedAt),
     };
   }
 
@@ -571,9 +572,12 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
    * refusing an equal timestamp would make the winner depend on which delivery
    * arrived first.
    */
-  private static freshnessGuard(prUpdatedAt: Date) {
+  private static freshnessGuard(prUpdatedAt: Instant | null) {
     return {
-      OR: [{ prUpdatedAt: null }, { prUpdatedAt: { lte: prUpdatedAt } }],
+      OR: [
+        { prUpdatedAt: null },
+        ...(prUpdatedAt ? [{ prUpdatedAt: { lte: toDate(prUpdatedAt) } }] : []),
+      ],
     };
   }
 
@@ -587,12 +591,12 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       repositoryHost: record.repositoryHost,
       repositoryFullName: record.repositoryFullName,
       headBranch: record.headBranch,
-      lastCheckedAt: record.lastCheckedAt,
+      lastCheckedAt: fromDate(record.lastCheckedAt),
       prCount: record.prCount,
-      notFoundAt: record.notFoundAt,
-      recheckAfter: record.recheckAfter,
+      notFoundAt: record.notFoundAt && fromDate(record.notFoundAt),
+      recheckAfter: record.recheckAfter && fromDate(record.recheckAfter),
       attempts: record.attempts,
-      lastRequestedAt: record.lastRequestedAt,
+      lastRequestedAt: fromDate(record.lastRequestedAt),
     };
   }
 }

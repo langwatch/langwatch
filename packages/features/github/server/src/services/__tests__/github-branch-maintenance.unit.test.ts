@@ -10,22 +10,23 @@ import {
 import { GithubInstallationAccessService } from "../github-installation-access.service.ts";
 import { GithubBranchMappingService } from "../github-branch-mapping.service.ts";
 import { GithubBranchMaintenanceService } from "../github-branch-maintenance.service.ts";
+import { Temporal, type Instant } from "@langwatch/time";
 
 const NOW = Date.UTC(2026, 5, 1);
 const DAY = 24 * 60 * 60 * 1000;
 
 class MaintenanceRepository extends NullGithubPullRequestsRepository {
   findRecheckInput: {
-    now: Date;
+    now: Instant;
     activeWithinMs: number;
     limit: number;
   } | null = null;
-  deleteBefore: Date | null = null;
+  deleteBefore: Instant | null = null;
   due: GithubBranchCheckRow[] = [];
   deleted = { branchChecks: 0 };
 
   async findRecheckDue(input: {
-    now: Date;
+    now: Instant;
     activeWithinMs: number;
     limit: number;
   }): Promise<GithubBranchCheckRow[]> {
@@ -33,7 +34,7 @@ class MaintenanceRepository extends NullGithubPullRequestsRepository {
     return this.due;
   }
 
-  async deleteStaleBefore(input: { before: Date }): Promise<{ branchChecks: number }> {
+  async deleteStaleBefore(input: { before: Instant }): Promise<{ branchChecks: number }> {
     this.deleteBefore = input.before;
     return this.deleted;
   }
@@ -72,7 +73,7 @@ describe("GitHub branch maintenance", () => {
     await service(repository).recheckDueBranches();
 
     expect(repository.findRecheckInput).toEqual({
-      now: new Date(NOW),
+      now: Temporal.Instant.fromEpochMilliseconds(NOW),
       activeWithinMs: 7 * DAY,
       limit: 50,
     });
@@ -87,6 +88,6 @@ describe("GitHub branch maintenance", () => {
     await expect(service(repository).pruneStaleBranchLinkage()).resolves.toEqual({
       branchChecks: 7,
     });
-    expect(repository.deleteBefore).toEqual(new Date(NOW - 7 * DAY));
+    expect(repository.deleteBefore).toEqual(Temporal.Instant.fromEpochMilliseconds(NOW - 7 * DAY));
   });
 });

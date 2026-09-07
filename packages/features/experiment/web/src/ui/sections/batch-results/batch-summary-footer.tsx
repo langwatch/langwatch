@@ -10,6 +10,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { formatCost } from "./presentation.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { BatchRunSummary } from "./batch-runs-sidebar.tsx";
+import { nowInstant } from "@langwatch/time";
 
 type BatchSummaryFooterProps = {
   /** Run summary data */
@@ -66,7 +67,7 @@ export function BatchSummaryFooter({
   onStop,
   actions,
 }: BatchSummaryFooterProps) {
-  const [currentTimestamp, setCurrentTimestamp] = useState(Date.now());
+  const [currentTimestamp, setCurrentTimestamp] = useState(nowInstant().epochMilliseconds);
 
   const finishedAt = useMemo(() => getFinishedAt(run.timestamps), [run.timestamps]);
 
@@ -80,7 +81,7 @@ export function BatchSummaryFooter({
     if (finishedAt) return;
 
     const interval = setInterval(() => {
-      setCurrentTimestamp(Date.now());
+      setCurrentTimestamp(nowInstant().epochMilliseconds);
     }, 1000);
 
     return () => clearInterval(interval);

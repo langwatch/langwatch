@@ -15,6 +15,7 @@ import {
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
+import { Temporal, fromDate, nowInstant } from "@langwatch/time";
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
@@ -71,7 +72,9 @@ export class ApiKeyTokenResolutionService {
     }
 
     const row = await this.repository.tryFindByLookupId({ lookupId: split.lookupId });
-    if (!row || row.revokedAt || (row.expiresAt !== null && row.expiresAt < new Date())) {
+    const expired =
+      row?.expiresAt != null && Temporal.Instant.compare(fromDate(row.expiresAt), nowInstant()) < 0;
+    if (!row || row.revokedAt || expired) {
       return null;
     }
 

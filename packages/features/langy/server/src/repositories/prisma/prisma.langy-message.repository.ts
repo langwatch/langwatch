@@ -2,6 +2,7 @@ import { langyMessagePartSchema } from "@langwatch/langy-contract";
 import type { LangyDatabase } from "./langy-database.mapper.ts";
 import { LangyMessageRepository } from "../langy-message.repository.ts";
 import type { LangyMessageRow, MessageRole } from "../langy-message.repository.ts";
+import { Temporal, toEpochMs } from "@langwatch/time";
 
 export class PrismaLangyMessageRepository extends LangyMessageRepository {
   constructor(private readonly prisma: LangyDatabase) {
@@ -28,7 +29,7 @@ export class PrismaLangyMessageRepository extends LangyMessageRepository {
         id: row.MessageId,
         role: row.Role as MessageRole,
         parts: langyMessagePartSchema.array().parse(row.Parts),
-        createdAt: new Date(row.CreatedAt),
+        createdAt: Temporal.Instant.fromEpochMilliseconds(toEpochMs(row.CreatedAt)),
       }),
     );
   }

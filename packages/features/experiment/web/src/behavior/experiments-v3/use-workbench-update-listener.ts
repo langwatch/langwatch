@@ -8,6 +8,7 @@ import {
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type { EvaluationsV3Actions } from "../../model/experiments-v3/types.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Tab switches within this window share one staleness probe. */
 const VISIBILITY_PROBE_MIN_INTERVAL_MS = 5_000;
@@ -293,7 +294,7 @@ const useVisibilityVersionProbe = ({
     if (!enabled || !projectId || !experimentSlug) return;
     const probe = () => {
       if (document.visibilityState !== "visible") return;
-      const now = Date.now();
+      const now = nowInstant().epochMilliseconds;
       if (now - lastProbeAtRef.current < VISIBILITY_PROBE_MIN_INTERVAL_MS) {
         return;
       }

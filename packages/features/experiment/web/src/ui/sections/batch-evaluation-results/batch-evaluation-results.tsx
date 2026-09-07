@@ -52,6 +52,7 @@ import {
 import { useResultDisplayPreferences } from "../../../behavior/use-result-display-preferences.ts";
 import { useResultsGrouping } from "../use-results-grouping.ts";
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
+import { nowInstant } from "@langwatch/time";
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -183,7 +184,7 @@ export function BatchEvaluationResults({
   useEffect(() => {
     if (isFinished && finishedAt === null) {
       // Run just finished, record the time
-      setFinishedAt(Date.now());
+      setFinishedAt(nowInstant().epochMilliseconds);
     } else if (!isFinished) {
       // Run is not finished (new run or restarted), reset
       setFinishedAt(null);
@@ -199,7 +200,8 @@ export function BatchEvaluationResults({
   useEffect(() => {
     if (finishedAt === null) return;
 
-    const timeUntilGraceExpires = REFETCH_GRACE_PERIOD_MS - (Date.now() - finishedAt);
+    const timeUntilGraceExpires =
+      REFETCH_GRACE_PERIOD_MS - (nowInstant().epochMilliseconds - finishedAt);
     if (timeUntilGraceExpires <= 0) return;
 
     const timer = setTimeout(() => {
@@ -217,7 +219,7 @@ export function BatchEvaluationResults({
     isFinished &&
     finishedAt !== null &&
     finishedAt > 0 &&
-    Date.now() - finishedAt < REFETCH_GRACE_PERIOD_MS;
+    nowInstant().epochMilliseconds - finishedAt < REFETCH_GRACE_PERIOD_MS;
 
   // Update isSomeRunning state
   useEffect(() => {

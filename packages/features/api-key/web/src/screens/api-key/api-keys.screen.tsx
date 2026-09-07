@@ -43,6 +43,8 @@ import {
 import { EditApiKeyDrawer } from "../../ui/sections/edit-api-key-drawer.tsx";
 import { RegenerateApiKeyDialog } from "../../ui/sections/regenerate-api-key-dialog.tsx";
 import { TokenCreatedDialog } from "../../ui/sections/token-created-dialog.tsx";
+import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
+import { readableDate } from "../../model/display-formatters.ts";
 
 /** The `?scope=` parameter this page's filter is written to. */
 export const API_KEY_SCOPE_QUERY_KEY = "scope";
@@ -234,7 +236,7 @@ export default function ApiKeysScreen() {
         organizationId,
         name: input.name,
         description: input.description.trim() ? input.description.trim() : undefined,
-        expiresAt: input.expiresAt,
+        expiresAt: input.expiresAt && toDate(input.expiresAt),
         permissionMode: input.permissionMode,
         keyType: input.keyType,
         assignedToUserId: input.assignedToUserId,
@@ -343,7 +345,8 @@ export default function ApiKeysScreen() {
   }, [projectApiKey, scope.projectId, scope.teamId, scopeFilter, hierarchy]);
 
   const getStatus = (key: ApiKeyRow) => {
-    if (key.expiresAt && new Date(key.expiresAt) < new Date()) return "Expired";
+    if (key.expiresAt && toEpochMs(key.expiresAt) < nowInstant().epochMilliseconds)
+      return "Expired";
     return "Active";
   };
 
@@ -523,7 +526,7 @@ export default function ApiKeysScreen() {
                         </Text>
                       </Table.Cell>
                       <Table.Cell>
-                        {new Date(apiKey.createdAt).toLocaleDateString("en-US", {
+                        {readableDate(apiKey.createdAt).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
@@ -531,13 +534,13 @@ export default function ApiKeysScreen() {
                       </Table.Cell>
                       <Table.Cell>
                         {apiKey.lastUsedAt ? (
-                          <Tooltip content={new Date(apiKey.lastUsedAt).toISOString()}>
+                          <Tooltip content={readableDate(apiKey.lastUsedAt).toISOString()}>
                             <Text
                               cursor="help"
                               tabIndex={0}
-                              aria-label={`Last used at ${new Date(apiKey.lastUsedAt).toISOString()}`}
+                              aria-label={`Last used at ${readableDate(apiKey.lastUsedAt).toISOString()}`}
                             >
-                              {formatTimeAgo(new Date(apiKey.lastUsedAt).getTime()) ?? ""}
+                              {formatTimeAgo(toEpochMs(apiKey.lastUsedAt)) ?? ""}
                             </Text>
                           </Tooltip>
                         ) : (

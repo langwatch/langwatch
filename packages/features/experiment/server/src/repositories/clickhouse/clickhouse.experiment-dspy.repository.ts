@@ -8,6 +8,16 @@ import type {
 } from "@langwatch/experiment-contract";
 import type { ExperimentDspyRetentionPort } from "../../ports/experiment-dspy-retention.port.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
+import { Temporal, toDate } from "@langwatch/time";
+
+/**
+ * Epoch millis as the value the ClickHouse client binds to a `DateTime64(3)`.
+ * The client serialises a `Date`; an instant serialises to `{}`, so the
+ * conversion happens here and nowhere above.
+ */
+function clickHouseDateTime(epochMs: number): ReturnType<typeof toDate> {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
+}
 
 const TABLE_NAME = "dspy_steps";
 
@@ -153,9 +163,9 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
             LlmCallsTotal: summary.total,
             LlmCallsTotalTokens: summary.tokens,
             LlmCallsTotalCost: summary.cost,
-            CreatedAt: new Date(existing?.createdAt ?? input.createdAt),
-            InsertedAt: new Date(existing?.insertedAt ?? input.insertedAt),
-            UpdatedAt: new Date(input.updatedAt),
+            CreatedAt: clickHouseDateTime(existing?.createdAt ?? input.createdAt),
+            InsertedAt: clickHouseDateTime(existing?.insertedAt ?? input.insertedAt),
+            UpdatedAt: clickHouseDateTime(input.updatedAt),
             _retention_days: retentionDays,
           },
         ],

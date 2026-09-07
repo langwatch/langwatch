@@ -5,12 +5,17 @@
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { GithubInstallationsService } from "./github-installations.service.ts";
-import type { GithubAppTokenPort, GithubPullRequestSummary } from "../ports/github-app-token.port.ts";
+import type {
+  GithubAppTokenPort,
+  GithubPullRequestSummary,
+} from "../ports/github-app-token.port.ts";
 import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,
 } from "../repositories/github-pull-requests.repository.ts";
 import type { GithubPullRequestStatusCacheService } from "./github-pull-request-status-cache.service.ts";
+import { Temporal, toDate, toEpochMs, type Instant } from "@langwatch/time";
+import type { GithubPullRequestLiveStatus as ContractLiveStatus } from "@langwatch/github-contract";
 
 const logger = createLogger("langwatch:github:pull-request-status");
 
@@ -30,7 +35,7 @@ export interface GithubPullRequestLiveStatus extends GithubPullRequestRef {
   /** "live" when GitHub answered (or answered recently), "snapshot" otherwise. */
   source: "live" | "snapshot";
   /** When the mapping first stored this pull request; null when unmapped. */
-  mappedAt: Date | null;
+  mappedAt: ContractLiveStatus["mappedAt"];
 }
 
 export interface GithubPullRequestStatusServiceDeps {
@@ -45,9 +50,14 @@ export interface GithubPullRequestStatusServiceDeps {
  * because GitHub reports a merged pull request as closed, and "closed" for
  * something that shipped would read as abandoned.
  */
+/** A timestamp as GitHub's REST answer spells it, read through the same lenient parse. */
+function instantOf(value: string): Instant {
+  return Temporal.Instant.fromEpochMilliseconds(toEpochMs(value));
+}
+
 export class GithubPullRequestStatusService {
   static deriveStatus(input: {
-    mergedAt: string | Date | null;
+    mergedAt: string | Instant | null;
     state: string;
     draft: boolean;
   }): GithubPullRequestStatus {
@@ -121,7 +131,7 @@ export class GithubPullRequestStatusService {
         ...ref,
         status: cached,
         source: "live",
-        mappedAt: stored.mappedAt,
+        mappedAt: toDate(stored.mappedAt),
       };
     }
 
@@ -141,7 +151,7 @@ export class GithubPullRequestStatusService {
         this.refreshSnapshot({ organizationId, ref, live });
       }
 
-      return { ...ref, status, source: "live", mappedAt: stored.mappedAt };
+      return { ...ref, status, source: "live", mappedAt: toDate(stored.mappedAt) };
     } catch (error) {
       // Rate limited, uninstalled, network: the reader still gets a label,
       // and `source` tells them how old it may be.
@@ -162,7 +172,7 @@ export class GithubPullRequestStatusService {
       ...ref,
       status: this.statusFromRow(stored),
       source: "snapshot",
-      mappedAt: stored.mappedAt,
+      mappedAt: toDate(stored.mappedAt),
     };
   }
 
@@ -226,9 +236,9 @@ export class GithubPullRequestStatusService {
         title: live.title,
         state: live.state,
         isDraft: live.draft,
-        prClosedAt: live.closedAt ? new Date(live.closedAt) : null,
-        prMergedAt: live.mergedAt ? new Date(live.mergedAt) : null,
-        prUpdatedAt: new Date(live.updatedAt),
+        prClosedAt: live.closedAt ? instantOf(live.closedAt) : null,
+        prMergedAt: live.mergedAt ? instantOf(live.mergedAt) : null,
+        prUpdatedAt: instantOf(live.updatedAt),
       })
       .catch((error: unknown) => {
         logger.warn(

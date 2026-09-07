@@ -18,6 +18,7 @@ import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 type ModelDefaultConfigSnapshot = WireOf<StoredModelDefaultConfigSnapshot>;
 import type { ScopeHierarchy } from "./provider-scope-filter.ts";
 import { scopeBreadthRank } from "./scope-breadth.ts";
+import { toEpochMs } from "@langwatch/time";
 
 /** The four role columns, in the order the table reads them. */
 export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const;
@@ -128,7 +129,7 @@ export function resolveAtScope({
         config.scopes.some((scope) => scope.type === tier.type && scope.id === tier.id),
       )
       .filter((config) => config.config[key])
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt));
     const winner = matching[0];
     if (winner) {
       return {

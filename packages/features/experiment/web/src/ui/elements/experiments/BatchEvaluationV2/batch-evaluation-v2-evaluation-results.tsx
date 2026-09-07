@@ -10,6 +10,8 @@ import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { BatchEvaluationV2EvaluationResult } from "./batch-evaluation-v2-evaluation-result.tsx";
 import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
 import { downloadCsv } from "@langwatch/csv/download";
+import { nowInstant } from "@langwatch/time";
+import { readableDate } from "../../../../model/display-formatters.ts";
 
 export const useBatchEvaluationResults = ({
   project,
@@ -24,9 +26,9 @@ export const useBatchEvaluationResults = ({
 }) => {
   const [keepRefetching, setKeepRefetching] = useState(true);
 
-  const refetchingStartedAtRef = useRef<number>(Date.now());
+  const refetchingStartedAtRef = useRef<number>(nowInstant().epochMilliseconds);
   useEffect(() => {
-    refetchingStartedAtRef.current = Date.now();
+    refetchingStartedAtRef.current = nowInstant().epochMilliseconds;
   }, [project.id, experiment.id, runId]);
 
   const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
@@ -133,7 +135,7 @@ export const useBatchEvaluationResults = ({
 
   return {
     run:
-      run.error && refetchingStartedAtRef.current > Date.now() - 5_000
+      run.error && refetchingStartedAtRef.current > nowInstant().epochMilliseconds - 5_000
         ? { ...run, data: undefined, error: undefined, isLoading: true }
         : run,
     datasetByIndex,
@@ -279,7 +281,7 @@ export const useBatchEvaluationDownloadCSV = ({
     // get here). `getRun` returns `ExperimentRunWithItems | null` since
     // PR #3483 to handle the cold-start window where the row hasn't
     // been folded into ClickHouse yet — see service comment.
-    const formattedDate = new Date(run.data!.timestamps.createdAt).toISOString().split("T")[0];
+    const formattedDate = readableDate(run.data!.timestamps.createdAt).toISOString().split("T")[0];
 
     downloadCsv({
       fields: csvHeaders,

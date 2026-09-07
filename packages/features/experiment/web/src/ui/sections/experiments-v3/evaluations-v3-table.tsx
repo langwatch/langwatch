@@ -93,6 +93,7 @@ import {
   TargetHeaderFromMeta,
 } from "./table-meta-wrappers.tsx";
 import { TargetSuperHeader } from "../../elements/experiments-v3/target-super-header.tsx";
+import { nowInstant } from "@langwatch/time";
 
 // Max rows for expanded mode (disable virtualization above this)
 const MAX_ROWS_FOR_FIT_MODE = 100;
@@ -619,7 +620,7 @@ export function EvaluationsV3Table({
       // Create a new EvaluatorConfig from the evaluator
       // Note: settings are NOT stored in workbench state - always fetched fresh from DB
       const evaluatorConfig: EvaluatorConfig = {
-        id: `evaluator_${Date.now()}`,
+        id: `evaluator_${nowInstant().epochMilliseconds}`,
         evaluatorType: (config?.evaluatorType ??
           "custom/unknown") as EvaluatorConfig["evaluatorType"],
         inputs: evaluator.fields.map((field) => ({

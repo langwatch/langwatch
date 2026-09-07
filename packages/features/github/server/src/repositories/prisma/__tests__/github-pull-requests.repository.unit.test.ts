@@ -7,6 +7,7 @@ import {
   PrismaGithubPullRequestsRepository,
   type PrismaGithubPullRequestsDatabase,
 } from "../github-pull-requests.repository.ts";
+import { Temporal, toDate } from "@langwatch/time";
 
 type Call = { method: string; args: Record<string, unknown> };
 
@@ -120,7 +121,9 @@ describe("PrismaGithubPullRequestsRepository", () => {
       const { calls, repository } = recordingDatabase();
 
       await repository.upsertPullRequests({
-        pullRequests: [pullRequest({ prUpdatedAt: new Date("2026-08-02T00:00:00.000Z") })],
+        pullRequests: [
+          pullRequest({ prUpdatedAt: Temporal.Instant.from("2026-08-02T00:00:00.000Z") }),
+        ],
       } as never);
 
       expect(whereOf(calls, "githubPullRequest.updateMany")).toMatchObject({
@@ -150,7 +153,7 @@ describe("PrismaGithubPullRequestsRepository", () => {
     /** @scenario "Rechecks stop for branches with no recent session activity" */
     it("asks only for unmapped branches that are due and recently demanded", async () => {
       const { calls, repository } = recordingDatabase();
-      const now = new Date("2026-08-08T00:00:00.000Z");
+      const now = Temporal.Instant.from("2026-08-08T00:00:00.000Z");
 
       await repository.findRecheckDue({ now, activeWithinMs: 7 * 24 * 60 * 60 * 1000, limit: 50 });
 
@@ -158,7 +161,7 @@ describe("PrismaGithubPullRequestsRepository", () => {
       expect(call?.args).toEqual({
         where: {
           notFoundAt: { not: null },
-          recheckAfter: { lte: now },
+          recheckAfter: { lte: toDate(now) },
           lastRequestedAt: { gt: new Date("2026-08-01T00:00:00.000Z") },
         },
         orderBy: { recheckAfter: "asc" },

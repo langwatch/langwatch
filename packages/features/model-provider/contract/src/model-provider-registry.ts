@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Temporal, type Instant } from "@langwatch/time";
 import { CODEX_ALLOWED_FEATURE_KEYS } from "./catalog/codex-restrictions.ts";
 import { codexTokenKeysSchema } from "./codex-account.ts";
 import type { CustomModelEntry } from "./custom-model.ts";
@@ -18,7 +19,7 @@ export type ModelProviderDefinition = {
   apiKey: string;
   endpointKey?: string;
   keysSchema: z.ZodType;
-  enabledSince: Date;
+  enabledSince: Instant;
   blurb?: string;
   parameterConstraints?: ParameterConstraints;
   optionalKeys?: string[];
@@ -126,7 +127,7 @@ export const modelProviders = {
       CUSTOM_BASE_URL: z.string().nullable().optional(),
     }),
     optionalKeys: ["CUSTOM_API_KEY"],
-    enabledSince: new Date("2023-01-01"),
+    enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
     blurb:
       "Use this option for LiteLLM proxy, self-hosted vLLM or any other model providers that supports the /chat/completions endpoint.",
   },
@@ -138,7 +139,7 @@ export const modelProviders = {
     keysSchema: codexTokenKeysSchema,
     authFlow: "oauth-device",
     restrictedToFeatureKeys: CODEX_ALLOWED_FEATURE_KEYS,
-    enabledSince: new Date("2026-07-20"),
+    enabledSince: Temporal.Instant.from("2026-07-20T00:00:00Z"),
     blurb:
       "Sign in with your OpenAI account and Langy runs on your ChatGPT plan. Serves the coding-assistant surfaces only.",
   },
@@ -164,7 +165,7 @@ export const modelProviders = {
         }
       }),
     optionalKeys: ["OPENAI_BASE_URL"],
-    enabledSince: new Date("2023-01-01"),
+    enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
   },
   anthropic: {
     name: "Anthropic",
@@ -188,7 +189,7 @@ export const modelProviders = {
         }
       }),
     optionalKeys: ["ANTHROPIC_BASE_URL"],
-    enabledSince: new Date("2023-01-01"),
+    enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
     parameterConstraints: { temperature: { min: 0, max: 1 } },
   },
   gemini: {
@@ -215,7 +216,7 @@ export const modelProviders = {
         });
       }),
     optionalKeys: ["GEMINI_PROJECT", "GEMINI_LOCATION"],
-    enabledSince: new Date("2023-01-01"),
+    enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
   },
   google_agent_platform: {
     name: "Google Agent Platform",
@@ -227,7 +228,7 @@ export const modelProviders = {
       GOOGLE_AGENT_PLATFORM_PROJECT: z.string().min(1),
       GOOGLE_AGENT_PLATFORM_LOCATION: z.string().min(1),
     }),
-    enabledSince: new Date("2026-07-29"),
+    enabledSince: Temporal.Instant.from("2026-07-29T00:00:00Z"),
     deprecated: { replacedBy: "gemini" },
   },
   elevenlabs: {
@@ -245,7 +246,7 @@ export const modelProviders = {
       }),
     }),
     optionalKeys: ["ELEVENLABS_WEBHOOK_SECRET", "ELEVENLABS_BASE_URL"],
-    enabledSince: new Date("2026-07-25"),
+    enabledSince: Temporal.Instant.from("2026-07-25T00:00:00Z"),
     blurb: "Voice models for lifelike text to speech and accurate transcription.",
   },
   azure: {
@@ -264,7 +265,7 @@ export const modelProviders = {
       })
       .passthrough(),
     optionalKeys: ["AZURE_OPENAI_API_VERSION", "AZURE_API_GATEWAY_VERSION"],
-    enabledSince: new Date("2023-01-01"),
+    enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
   },
   bedrock: {
     name: "Bedrock",
@@ -277,7 +278,7 @@ export const modelProviders = {
       AWS_REGION_NAME: z.string().nullable().optional(),
     }),
     optionalKeys: [],
-    enabledSince: new Date("2023-01-01"),
+    enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
   },
   vertex_ai: {
     name: "Vertex AI",
@@ -289,7 +290,7 @@ export const modelProviders = {
       VERTEXAI_PROJECT: z.string().min(1),
       VERTEXAI_LOCATION: z.string().min(1),
     }),
-    enabledSince: new Date("2023-01-01"),
+    enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
   },
   deepseek: {
     name: "DeepSeek",
@@ -297,7 +298,7 @@ export const modelProviders = {
     langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "DEEPSEEK_API_KEY",
     keysSchema: z.object({ DEEPSEEK_API_KEY: z.string().min(1) }),
-    enabledSince: new Date("2023-01-01"),
+    enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
   },
   xai: {
     name: "xAI",
@@ -305,7 +306,7 @@ export const modelProviders = {
     langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "XAI_API_KEY",
     keysSchema: z.object({ XAI_API_KEY: z.string().min(1) }),
-    enabledSince: new Date("2024-11-01"),
+    enabledSince: Temporal.Instant.from("2024-11-01T00:00:00Z"),
   },
   cerebras: {
     name: "Cerebras",
@@ -313,7 +314,7 @@ export const modelProviders = {
     langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "CEREBRAS_API_KEY",
     keysSchema: z.object({ CEREBRAS_API_KEY: z.string().min(1) }),
-    enabledSince: new Date("2024-06-01"),
+    enabledSince: Temporal.Instant.from("2024-06-01T00:00:00Z"),
   },
   groq: {
     name: "Groq",
@@ -321,7 +322,7 @@ export const modelProviders = {
     langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "GROQ_API_KEY",
     keysSchema: z.object({ GROQ_API_KEY: z.string().min(1) }),
-    enabledSince: new Date("2023-01-01"),
+    enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
   },
   voyage: {
     name: "Voyage AI",
@@ -329,7 +330,7 @@ export const modelProviders = {
     langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
     apiKey: "VOYAGE_API_KEY",
     keysSchema: z.object({ VOYAGE_API_KEY: z.string().min(1) }),
-    enabledSince: new Date("2026-05-18"),
+    enabledSince: Temporal.Instant.from("2026-05-18T00:00:00Z"),
   },
   azure_safety: {
     name: "Azure Safety",
@@ -341,7 +342,7 @@ export const modelProviders = {
       AZURE_CONTENT_SAFETY_ENDPOINT: z.string().url(),
       AZURE_CONTENT_SAFETY_KEY: z.string().min(1),
     }),
-    enabledSince: new Date("2026-04-10"),
+    enabledSince: Temporal.Instant.from("2026-04-10T00:00:00Z"),
     blurb:
       "Azure Content Safety for content moderation, prompt injection, and jailbreak detection. Your subscription is billed directly by Microsoft.",
   },

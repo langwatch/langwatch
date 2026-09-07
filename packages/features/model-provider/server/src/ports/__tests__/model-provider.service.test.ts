@@ -14,6 +14,7 @@ import {
 import { ProjectService, projectWithTeamSchema } from "@langwatch/project-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { AuthzService } from "@langwatch/authz-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 import { ModelProviderService } from "../../services/model-provider.service.ts";
 import {
   ModelCostRepository,
@@ -28,7 +29,7 @@ import {
   type ModelDefaultConfigSaveInput,
 } from "../model-provider.port.ts";
 
-const now = new Date();
+const now = toDate(nowInstant());
 function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {
   return {
     id: "mp_1",
@@ -620,8 +621,8 @@ class Defaults extends ModelDefaultRepository {
   save(input: ModelDefaultConfigSaveInput): Promise<ModelDefaultConfig> {
     const saved = {
       ...input,
-      createdAt: input.createdAt ?? now,
-      updatedAt: input.createdAt ?? now,
+      createdAt: input.createdAt ? toDate(input.createdAt) : now,
+      updatedAt: input.createdAt ? toDate(input.createdAt) : now,
     };
     this.configs.push(saved);
     return Promise.resolve(saved);

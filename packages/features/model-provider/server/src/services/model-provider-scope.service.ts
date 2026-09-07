@@ -1,6 +1,7 @@
 import type { OrganizationService, OrganizationTeam } from "@langwatch/organization-contract";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
 import type { ProjectService } from "@langwatch/project-contract";
+import { fromDate, type Instant } from "@langwatch/time";
 import {
   ModelProviderProjectScopeService,
   type ModelProviderProjectSystemContext,
@@ -65,7 +66,7 @@ export class ModelProviderScopeService {
     return this.projectScopeFacts.getProjectSystemContext(projectId);
   }
 
-  async tryGetOrganizationSystemReference(organizationId: string): Promise<Date | null> {
+  async tryGetOrganizationSystemReference(organizationId: string): Promise<Instant | null> {
     const firstPage = await this.projects.listByOrganization({
       organizationId,
       page: 1,
@@ -76,7 +77,9 @@ export class ModelProviderScopeService {
     }
 
     if (firstPage.pagination.total === 1) {
-      return firstPage.data[0]?.createdAt ?? null;
+      const only = firstPage.data[0]?.createdAt;
+
+      return only ? fromDate(only) : null;
     }
 
     const lastPage = await this.projects.listByOrganization({
@@ -85,7 +88,9 @@ export class ModelProviderScopeService {
       limit: 1,
     });
 
-    return lastPage.data[0]?.createdAt ?? null;
+    const last = lastPage.data[0]?.createdAt;
+
+    return last ? fromDate(last) : null;
   }
 
   tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null> {

@@ -2,6 +2,7 @@ import { AGENT_SANDBOX_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api-key:agent-sandbox");
 
@@ -13,14 +14,14 @@ const logger = createLogger("langwatch:api-key:agent-sandbox");
 export class AgentSandboxKeyReapService {
   static create(options: {
     repository: ApiKeyRepository;
-    now?: () => Date;
+    now?: () => Instant;
   }): AgentSandboxKeyReapService {
-    return new AgentSandboxKeyReapService(options.repository, options.now ?? (() => new Date()));
+    return new AgentSandboxKeyReapService(options.repository, options.now ?? nowInstant);
   }
 
   private constructor(
     private readonly repository: ApiKeyRepository,
-    private readonly now: () => Date,
+    private readonly now: () => Instant,
   ) {}
 
   /**

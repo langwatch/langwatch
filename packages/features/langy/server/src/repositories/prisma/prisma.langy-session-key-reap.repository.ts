@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { LangySessionKeyReapRepository } from "../langy-session-key-reap.repository.ts";
+import { toDate, type Instant } from "@langwatch/time";
 
 /**
  * The one model the sweep touches, and nothing else in the client.
@@ -27,14 +28,15 @@ export class PrismaLangySessionKeyReapRepository extends LangySessionKeyReapRepo
    * excluded by SQL anyway — stating it keeps the predicate readable as the
    * three conditions the tenancy guard is written against.
    */
-  async revokeExpiredByName(input: { name: string; now: Date }): Promise<number> {
+  async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
+    const now = toDate(input.now);
     const result = await this.database.apiKey.updateMany({
       where: {
         name: input.name,
         revokedAt: null,
-        expiresAt: { not: null, lte: input.now },
+        expiresAt: { not: null, lte: now },
       },
-      data: { revokedAt: input.now },
+      data: { revokedAt: now },
     });
     return result.count;
   }

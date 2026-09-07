@@ -34,6 +34,7 @@ import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
 import { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
 import { ApiKeyVisibilityService } from "./api-key-visibility.service.ts";
 import type { LegacyApiKeyGrantService } from "./legacy-api-key-grant.service.ts";
+import type { Instant } from "@langwatch/time";
 
 export type ApiKeyDependencies = {
   authz: AuthzService;
@@ -232,7 +233,7 @@ export class ApiKeyService extends ApiKeyCapability {
     organizationId: string;
     deviceLabel: string;
     exceptApiKeyId?: string;
-    createdBefore?: Date;
+    createdBefore?: Instant;
   }): Promise<void> {
     return this.cli.revokeCliLoginKeysForDevice(input);
   }

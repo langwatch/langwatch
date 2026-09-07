@@ -11,6 +11,7 @@ import {
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
 } from "../langy-turn.service.ts";
+import { Temporal, nowInstant } from "@langwatch/time";
 
 function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const dispatch = vi.fn(async () => "accepted" as const);
@@ -113,7 +114,7 @@ const scenarioCreated: LangyMessageRow = {
     },
     { type: "text", text: "", role: "assistant" },
   ] as LangyMessageRow["parts"],
-  createdAt: new Date(),
+  createdAt: nowInstant(),
 };
 
 describe("LangyTurnService.startConversationTurn conversation memory", () => {
@@ -173,13 +174,13 @@ describe("LangyTurnService.startConversationTurn conversation memory", () => {
         id: "t1",
         role: "user",
         parts: [{ type: "text", text: "my name is rogerio" }] as LangyMessageRow["parts"],
-        createdAt: new Date(),
+        createdAt: nowInstant(),
       },
       {
         id: "t2",
         role: "assistant",
         parts: [{ type: "text", text: "Nice to meet you, Rogerio!" }] as LangyMessageRow["parts"],
-        createdAt: new Date(),
+        createdAt: nowInstant(),
       },
     ]);
     // The model switch recycled the worker: the probe misses and this turn
@@ -226,7 +227,7 @@ describe("LangyTurnService.startConversationTurn conversation memory", () => {
         id: "m2",
         role: "assistant",
         parts: [{ type: "text", text: "Ran it: all passed." }] as LangyMessageRow["parts"],
-        createdAt: new Date(),
+        createdAt: nowInstant(),
       },
     ]);
     await LangyTurnService.create(second.deps).startConversationTurn(

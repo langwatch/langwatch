@@ -4,6 +4,7 @@ import {
   LangySessionKeyRepository,
   type LangySessionKeyRecord,
 } from "../langy-session-key.repository.ts";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
   private constructor(
@@ -58,25 +59,25 @@ export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
     return {
       id: key.id,
       name: key.name,
-      revokedAt: key.revokedAt,
+      revokedAt: key.revokedAt && fromDate(key.revokedAt),
       isScopedToProject: key.roleBindings.length > 0,
     };
   }
 
-  async revoke(apiKeyId: string, revokedAt: Date): Promise<void> {
+  async revoke(apiKeyId: string, revokedAt: Instant): Promise<void> {
     await this.database.apiKey.update({
       where: { id: apiKeyId },
-      data: { revokedAt },
+      data: { revokedAt: toDate(revokedAt) },
     });
   }
 
   /** Delegated so the App's repository and a worker's narrow one run the identical UPDATE. */
-  revokeExpiredByName(input: { name: string; now: Date }): Promise<number> {
+  revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
     return this.reap.revokeExpiredByName(input);
   }
 
   /** Same sweep, positional args, for the App's tenancy-guard suite call shape. */
   reapExpired(revokedAt: Date, name: string): Promise<number> {
-    return this.revokeExpiredByName({ name, now: revokedAt });
+    return this.revokeExpiredByName({ name, now: fromDate(revokedAt) });
   }
 }

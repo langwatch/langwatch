@@ -39,6 +39,7 @@ import {
   propagateMappingsToNewDataset,
 } from "@langwatch/experiment-contract";
 import { normalizeEvaluators, normalizeTargets } from "@langwatch/experiment-contract";
+import { nowInstant } from "@langwatch/time";
 
 // ============================================================================
 // Helper Functions
@@ -482,7 +483,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       // If record doesn't exist, create a new one
       if (!record) {
         // Generate a temporary ID for the new record (will be replaced when synced to DB)
-        const newRecordId = `new_${Date.now()}_${rowIndex}`;
+        const newRecordId = `new_${nowInstant().epochMilliseconds}_${rowIndex}`;
         const newRecord = {
           id: newRecordId,
           // Initialize all columns with empty values
@@ -494,7 +495,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         // Ensure array is long enough
         while (updatedRecords.length < rowIndex) {
           updatedRecords.push({
-            id: `new_${Date.now()}_${updatedRecords.length}`,
+            id: `new_${nowInstant().epochMilliseconds}_${updatedRecords.length}`,
             ...Object.fromEntries(dataset.columns.map((c) => [c.name, ""])),
           });
         }

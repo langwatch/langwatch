@@ -9,6 +9,7 @@ import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { toEpochMs, type TimeInput } from "@langwatch/time";
 
 interface VersionEntry {
   version: number;
@@ -18,13 +19,13 @@ interface VersionEntry {
   authorLabel: string;
   authorId: string | null;
   authorName: string | null;
-  createdAt: Date | string;
+  createdAt: TimeInput;
   /**
    * When the row was last written. The autosave row is rewritten in place, so
    * its `createdAt` is the start of the session and only this says how old
    * what it holds is.
    */
-  updatedAt: Date | string;
+  updatedAt: TimeInput;
 }
 
 /**
@@ -155,7 +156,7 @@ function VersionRow({
         </HStack>
         <Text color="fg.muted" fontSize="xs" lineClamp={2}>
           {entry.commitMessage ? `${entry.commitMessage} · ` : ""}
-          {formatTimeAgo(new Date(entry.updatedAt).getTime())}
+          {formatTimeAgo(toEpochMs(entry.updatedAt))}
         </Text>
       </VStack>
 

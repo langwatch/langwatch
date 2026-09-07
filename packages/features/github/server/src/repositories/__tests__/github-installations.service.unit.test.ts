@@ -24,6 +24,7 @@ import type {
 import { GithubInstallationsService } from "../../services/github-installations.service.ts";
 import { GithubInstallationAccessService } from "../../services/github-installation-access.service.ts";
 import { TestOrganizationService } from "../../services/__tests__/fixtures/github-services.fixture.ts";
+import { Temporal, nowInstant } from "@langwatch/time";
 
 function makeRepo(rows: GithubInstallationRow[] = []): GithubInstallationsRepository & {
   upsert: ReturnType<typeof vi.fn>;
@@ -50,8 +51,8 @@ function makeRepo(rows: GithubInstallationRow[] = []): GithubInstallationsReposi
       const created: GithubInstallationRow = {
         ...input,
         suspendedAt: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: nowInstant(),
+        updatedAt: nowInstant(),
       };
       byId.set(input.installationId, created);
       return { wasInserted: true, row: created };
@@ -72,8 +73,8 @@ function row(over: Partial<GithubInstallationRow> = {}): GithubInstallationRow {
     repositorySelection: "all",
     repositories: null,
     suspendedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: nowInstant(),
+    updatedAt: nowInstant(),
     ...over,
   };
 }
@@ -366,7 +367,7 @@ describe("recordInstallation", () => {
 describe("listRepositoriesForOrganization", () => {
   describe("when every installation the org has is suspended", () => {
     it("names the suspension instead of answering with an empty list", async () => {
-      const repo = makeRepo([row({ suspendedAt: new Date() })]);
+      const repo = makeRepo([row({ suspendedAt: nowInstant() })]);
       const svc = service(repo, makeAppTokens());
 
       await expect(svc.listRepositoriesForOrganization("org-1")).rejects.toMatchObject({
@@ -569,7 +570,7 @@ describe("mintTurnToken", () => {
 
   describe("when the only installation is suspended", () => {
     it("returns null", async () => {
-      const repo = makeRepo([row({ suspendedAt: new Date() })]);
+      const repo = makeRepo([row({ suspendedAt: nowInstant() })]);
       const svc = service(repo, makeAppTokens());
       expect(await svc.tryMintTurnToken({ organizationId: "org-1" })).toBeNull();
     });
@@ -578,8 +579,14 @@ describe("mintTurnToken", () => {
   describe("when the oldest installation is a zombie (GitHub 404s it) but a newer one is live", () => {
     it("self-heals: removes the dead row and mints via the live installation", async () => {
       const repo = makeRepo([
-        row({ installationId: "inst-dead", createdAt: new Date("2020-01-01") }),
-        row({ installationId: "inst-live", createdAt: new Date("2020-01-02") }),
+        row({
+          installationId: "inst-dead",
+          createdAt: Temporal.Instant.from("2020-01-01T00:00:00Z"),
+        }),
+        row({
+          installationId: "inst-live",
+          createdAt: Temporal.Instant.from("2020-01-02T00:00:00Z"),
+        }),
       ]);
       const mint = vi.fn(async ({ installationId }: { installationId: string }) => {
         if (installationId === "inst-dead") {
@@ -631,13 +638,13 @@ describe("mintTurnToken", () => {
       const repo = makeRepo([
         row({
           installationId: "inst-dead",
-          createdAt: new Date("2020-01-01"),
+          createdAt: Temporal.Instant.from("2020-01-01T00:00:00Z"),
           repositorySelection: "selected",
           repositories: [{ id: "77", fullName: "acme/service-x" }],
         }),
         row({
           installationId: "inst-live",
-          createdAt: new Date("2020-01-02"),
+          createdAt: Temporal.Instant.from("2020-01-02T00:00:00Z"),
           repositorySelection: "selected",
           repositories: [{ id: "77", fullName: "acme/service-x" }],
         }),
@@ -665,13 +672,13 @@ describe("mintTurnToken", () => {
       const repo = makeRepo([
         row({
           installationId: "inst-dead",
-          createdAt: new Date("2020-01-01"),
+          createdAt: Temporal.Instant.from("2020-01-01T00:00:00Z"),
           repositorySelection: "all",
           repositories: null,
         }),
         row({
           installationId: "inst-live",
-          createdAt: new Date("2020-01-02"),
+          createdAt: Temporal.Instant.from("2020-01-02T00:00:00Z"),
           repositorySelection: "selected",
           repositories: [{ id: "77", fullName: "acme/service-x" }],
         }),

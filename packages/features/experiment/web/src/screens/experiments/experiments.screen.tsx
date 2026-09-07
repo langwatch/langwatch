@@ -41,6 +41,9 @@ import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
+import { nowInstant } from "@langwatch/time";
+import type { TimeInput } from "@langwatch/time";
+import { readableDate } from "../../model/display-formatters.ts";
 
 /** One row of the experiments list, as this table renders it. */
 type ExperimentListRow = {
@@ -48,8 +51,8 @@ type ExperimentListRow = {
   slug: string;
   name: string | null;
   type: ExperimentType;
-  createdAt: string | Date;
-  updatedAt: string | Date;
+  createdAt: TimeInput;
+  updatedAt: TimeInput;
   workflowId: string | null;
   workbenchState?: { task?: keyof typeof LEGACY_EXPERIMENT_TASK_TYPES } | null;
   dataset?: { name: string } | null;
@@ -324,7 +327,7 @@ export function ExperimentsPage() {
                                       <Text fontSize="sm">Stopped</Text>
                                     </>
                                   ) : experiment.runsSummary.latestRun?.timestamps?.updatedAt &&
-                                    Date.now() -
+                                    nowInstant().epochMilliseconds -
                                       experiment.runsSummary.latestRun.timestamps.updatedAt <
                                       5 * 60 * 1000 ? (
                                     <>
@@ -347,7 +350,7 @@ export function ExperimentsPage() {
                                 </HStack>
                               </Table.Cell>
                               <Table.Cell whiteSpace="nowrap">
-                                {new Date(experiment.updatedAt).toLocaleString()}
+                                {readableDate(experiment.updatedAt).toLocaleString()}
                               </Table.Cell>
                               <Table.Cell>
                                 <Box width="full" height="full" display="flex" justifyContent="end">

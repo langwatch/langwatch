@@ -1,14 +1,15 @@
 /**
  * One API key row, as the Settings > API Keys table reads it.
  *
- * This is the answer of `apiKey.list`, declared rather than inferred. Before
+ * This is the answer of `apiKey.list`, written down here as the schema the
+ * transport validates against and the type inferred from it. Before
  * the family moved out of `platform/app`, the page typed its rows as
  * `RouterOutputs["apiKey"]["list"][number]` — the whole shape derived from an
  * `AppRouter` a browser package may not name. The producer is PACKAGED
  * (`@langwatch/api-key-server`'s `ApiKeyApp.listKeys`), so the ruling on
  * contract moves allows the real fix rather than a restatement: the app method
  * is ANNOTATED with this type, and both halves are now checked against one
- * declaration.
+ * declaration — the same one the tRPC output schema enforces at runtime.
  *
  * ## NO KEY MATERIAL IS ON THIS SHAPE, and that is the point of writing it down
  *
@@ -22,7 +23,8 @@
  * satisfy it today.
  */
 
-import type { ApiKeyBinding } from "./api-key.ts";
+import { z } from "zod";
+import { apiKeyBindingSchema, type ApiKeyBinding } from "./api-key.ts";
 
 /**
  * One of the CALLER's own bindings, with the scope named rather than only
@@ -34,52 +36,68 @@ import type { ApiKeyBinding } from "./api-key.ts";
  * package may not import a server one, and this is a DTO rather than anything
  * the server owns.
  */
-export type NamedApiKeyBinding = ApiKeyBinding & {
-  scopeName: string | null;
-  customRoleName: string | null;
-};
+export const namedApiKeyBindingSchema = apiKeyBindingSchema
+  .extend({
+    customRoleId: z.string().nullable(),
+    scopeName: z.string().nullable(),
+    customRoleName: z.string().nullable(),
+  })
+  .strict();
+export type NamedApiKeyBinding = ApiKeyBinding & z.infer<typeof namedApiKeyBindingSchema>;
 
 /** One role binding on a key, with the names its row renders. */
-export interface ApiKeyListRoleBinding {
-  id: string;
-  role: string;
-  customRoleId: string | null;
-  /** The custom role's display name, when the binding names one. */
-  customRoleName: string | null;
-  /** The custom role's permission list, which the edit drawer reads back. */
-  customRolePermissions: string[] | null;
-  scopeType: string;
-  scopeId: string;
-  /** The organization, team or project name the scope id resolves to. */
-  scopeName: string | null;
-}
+export const apiKeyListRoleBindingSchema = z
+  .object({
+    id: z.string(),
+    role: z.string(),
+    customRoleId: z.string().nullable(),
+    /** The custom role's display name, when the binding names one. */
+    customRoleName: z.string().nullable(),
+    /** The custom role's permission list, which the edit drawer reads back. */
+    customRolePermissions: z.array(z.string()).nullable(),
+    scopeType: z.string(),
+    scopeId: z.string(),
+    /** The organization, team or project name the scope id resolves to. */
+    scopeName: z.string().nullable(),
+  })
+  .strict();
+export type ApiKeyListRoleBinding = z.infer<typeof apiKeyListRoleBindingSchema>;
 
-/** One API key, as every read of the feature answers it. */
-export interface ApiKeyListEntry {
-  id: string;
-  /** Five characters of the PUBLIC lookup id. Never any part of the secret. */
-  lookupIdPrefix: string;
-  name: string;
-  description: string | null;
-  permissionMode: string;
-  userId: string | null;
-  userName: string | null;
-  userEmail: string | null;
-  createdByUserId: string | null;
-  createdByUserName: string | null;
-  createdAt: Date;
-  expiresAt: Date | null;
-  lastUsedAt: Date | null;
-  revokedAt: Date | null;
-  /**
-   * Non-null marks this as an ingestion key: a project-scoped, ingest-only
-   * write credential the `langwatch <tool>` CLI mints. `null` is a regular
-   * personal or service key. The API Keys page renders the two in separate
-   * sections on this field alone.
-   */
-  ingestSourceType: string | null;
-  ingestionTemplateId: string | null;
-  /** Human label of the CLI device session that minted an ingestion key. */
-  createdByDeviceLabel: string | null;
-  roleBindings: ApiKeyListRoleBinding[];
-}
+/**
+ * One API key, as every read of the feature answers it.
+ *
+ * The four timestamps are `z.date()` because this is the shape tRPC serialises:
+ * the browser receives them as ISO strings through `WireOf<ApiKeyListEntry>`,
+ * and the server still constructs real dates at the Prisma seam.
+ */
+export const apiKeyListEntrySchema = z
+  .object({
+    id: z.string(),
+    /** Five characters of the PUBLIC lookup id. Never any part of the secret. */
+    lookupIdPrefix: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    permissionMode: z.string(),
+    userId: z.string().nullable(),
+    userName: z.string().nullable(),
+    userEmail: z.string().nullable(),
+    createdByUserId: z.string().nullable(),
+    createdByUserName: z.string().nullable(),
+    createdAt: z.date(),
+    expiresAt: z.date().nullable(),
+    lastUsedAt: z.date().nullable(),
+    revokedAt: z.date().nullable(),
+    /**
+     * Non-null marks this as an ingestion key: a project-scoped, ingest-only
+     * write credential the `langwatch <tool>` CLI mints. `null` is a regular
+     * personal or service key. The API Keys page renders the two in separate
+     * sections on this field alone.
+     */
+    ingestSourceType: z.string().nullable(),
+    ingestionTemplateId: z.string().nullable(),
+    /** Human label of the CLI device session that minted an ingestion key. */
+    createdByDeviceLabel: z.string().nullable(),
+    roleBindings: z.array(apiKeyListRoleBindingSchema),
+  })
+  .strict();
+export type ApiKeyListEntry = z.infer<typeof apiKeyListEntrySchema>;

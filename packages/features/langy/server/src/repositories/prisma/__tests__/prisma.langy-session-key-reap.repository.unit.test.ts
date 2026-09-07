@@ -18,6 +18,7 @@ import {
   type PrismaLangySessionKeyReapDatabase,
 } from "../prisma.langy-session-key-reap.repository.ts";
 import { PrismaLangySessionKeyRepository } from "../prisma.langy-session-key.repository.ts";
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 
 type SweepUpdate = {
   where: { name: string; revokedAt: Date | null; expiresAt: { not: null; lte: Date } };
@@ -40,7 +41,7 @@ describe("PrismaLangySessionKeyReapRepository", () => {
       /** @scenario "The session-key sweep revokes only elapsed Langy session keys" */
       it("stamps the elapsed, unrevoked keys of that name as of the sweep's instant", async () => {
         const updateMany = updateSpy();
-        const now = new Date("2026-01-01T00:00:00.000Z");
+        const now = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
         await repositoryWith(updateMany).revokeExpiredByName({ name: "Langy session", now });
 
@@ -48,9 +49,9 @@ describe("PrismaLangySessionKeyReapRepository", () => {
           where: {
             name: "Langy session",
             revokedAt: null,
-            expiresAt: { not: null, lte: now },
+            expiresAt: { not: null, lte: toDate(now) },
           },
-          data: { revokedAt: now },
+          data: { revokedAt: toDate(now) },
         });
       });
 
@@ -60,7 +61,7 @@ describe("PrismaLangySessionKeyReapRepository", () => {
 
         await repositoryWith(updateMany).revokeExpiredByName({
           name: "Langy session",
-          now: new Date(),
+          now: nowInstant(),
         });
 
         expect(updateMany.mock.calls[0]![0].where.expiresAt).toMatchObject({ not: null });
@@ -72,7 +73,7 @@ describe("PrismaLangySessionKeyReapRepository", () => {
 
         await repositoryWith(updateMany).revokeExpiredByName({
           name: "Langy session",
-          now: new Date(),
+          now: nowInstant(),
         });
 
         expect(updateMany.mock.calls[0]![0].where.revokedAt).toBeNull();
@@ -85,7 +86,7 @@ describe("PrismaLangySessionKeyReapRepository", () => {
         await expect(
           repositoryWith(updateMany).revokeExpiredByName({
             name: "Langy session",
-            now: new Date(),
+            now: nowInstant(),
           }),
         ).resolves.toBe(3);
       });

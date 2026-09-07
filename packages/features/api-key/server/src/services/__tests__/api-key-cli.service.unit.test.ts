@@ -8,6 +8,7 @@ import type { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
 import type { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
 import { ApiKeyCliService } from "../api-key-cli.service.ts";
+import { fromDate } from "@langwatch/time";
 
 const OLD_KEY = {
   id: "apikey-old",
@@ -130,7 +131,7 @@ describe("given a CLI login key mint", () => {
         organizationId: "org-1",
         deviceLabel: "laptop",
         exceptApiKeyId: firstKey.id,
-        createdBefore: firstKey.createdAt,
+        createdBefore: fromDate(firstKey.createdAt),
       });
 
       expect(revoke).toHaveBeenCalledTimes(1);

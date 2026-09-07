@@ -1,5 +1,5 @@
 import type { GithubPullRequestsRepository } from "../repositories/github-pull-requests.repository.ts";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant } from "@langwatch/time";
 import type {
   BranchMappingTarget,
   GithubBranchMappingService,
@@ -23,7 +23,7 @@ export class GithubBranchMaintenanceService {
   async recheckDueBranches(): Promise<number> {
     const now = this.deps.now?.() ?? nowInstant().epochMilliseconds;
     const due = await this.deps.repository.findRecheckDue({
-      now: new Date(now),
+      now: Temporal.Instant.fromEpochMilliseconds(now),
       activeWithinMs: ACTIVE_WINDOW_MS,
       limit: 50,
     });
@@ -42,7 +42,7 @@ export class GithubBranchMaintenanceService {
     const now = this.deps.now?.() ?? nowInstant().epochMilliseconds;
 
     return this.deps.repository.deleteStaleBefore({
-      before: new Date(now - ACTIVE_WINDOW_MS),
+      before: Temporal.Instant.fromEpochMilliseconds(now - ACTIVE_WINDOW_MS),
     });
   }
 

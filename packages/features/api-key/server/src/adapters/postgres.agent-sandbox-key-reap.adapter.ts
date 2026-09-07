@@ -3,6 +3,7 @@ import {
   type PrismaApiKeyDatabase,
 } from "../repositories/prisma/prisma.api-key.repository.ts";
 import { AgentSandboxKeyReapService } from "../services/agent-sandbox-key-reap.service.ts";
+import type { Instant } from "@langwatch/time";
 
 /**
  * The process's Prisma client, as the sweep receives it.
@@ -24,7 +25,7 @@ export type AgentSandboxKeyReapDatabase = PrismaApiKeyDatabase;
 export class PostgresAgentSandboxKeyReapAdapter {
   static create(options: {
     database: AgentSandboxKeyReapDatabase;
-    now?: () => Date;
+    now?: () => Instant;
   }): PostgresAgentSandboxKeyReapAdapter {
     return new PostgresAgentSandboxKeyReapAdapter(options);
   }
@@ -32,7 +33,7 @@ export class PostgresAgentSandboxKeyReapAdapter {
   private constructor(
     private readonly options: {
       database: AgentSandboxKeyReapDatabase;
-      now?: () => Date;
+      now?: () => Instant;
     },
   ) {}
 

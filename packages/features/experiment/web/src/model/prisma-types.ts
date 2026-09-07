@@ -6,6 +6,7 @@ import {
   EXPERIMENT_TYPES,
   type ExperimentType as ExperimentTypeName,
 } from "@langwatch/experiment-contract";
+import type { Instant } from "@langwatch/time";
 
 export const ExperimentType = Object.fromEntries(EXPERIMENT_TYPES.map((name) => [name, name])) as {
   readonly [K in ExperimentTypeName]: K;
@@ -31,6 +32,6 @@ export type BatchEvaluation = {
   datasetSlug: string;
   datasetId: string;
   evaluation: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 };

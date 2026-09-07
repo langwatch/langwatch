@@ -1,5 +1,6 @@
 import { OrganizationService } from "@langwatch/organization-contract";
 import { ProjectService } from "@langwatch/project-contract";
+import type { Instant } from "@langwatch/time";
 
 function unsupported(): never {
   throw new Error("not used by this GitHub test");
@@ -166,7 +167,7 @@ export class TestOrganizationService extends OrganizationService {
 }
 
 export class TestProjectService extends ProjectService {
-  readonly pullRequestActivity: Array<{ projectId: string; at: Date }> = [];
+  readonly pullRequestActivity: Array<{ projectId: string; at: Date | Instant }> = [];
   pullRequestActivityError: Error | null = null;
 
   constructor(private readonly organizationId: string) {
@@ -181,9 +182,12 @@ export class TestProjectService extends ProjectService {
     return unsupported();
   }
 
+  // Widened so one double satisfies both bases: `ProjectService` still states
+  // the stamp as a `Date`, while `GithubProjectActivityPort` now states it as
+  // the instant the demand path passes.
   touchCodingAgentPullRequestSeen(input: {
     projectId: string;
-    at: Date;
+    at: Date | Instant;
   }): Promise<void> {
     if (this.pullRequestActivityError) {
       return Promise.reject(this.pullRequestActivityError);

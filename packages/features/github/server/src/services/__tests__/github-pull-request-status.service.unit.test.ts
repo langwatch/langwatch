@@ -27,6 +27,7 @@ import { GithubInstallationAccessService } from "../github-installation-access.s
 import { GithubInstallationsService } from "../github-installations.service.ts";
 import { GithubPullRequestStatusCacheService } from "../github-pull-request-status-cache.service.ts";
 import { TestOrganizationService } from "./fixtures/github-services.fixture.ts";
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 
 const REF = {
   repositoryHost: "github.com",
@@ -34,7 +35,7 @@ const REF = {
   prNumber: 7,
 };
 
-const MAPPED_AT = new Date(Date.UTC(2026, 4, 1));
+const MAPPED_AT = Temporal.Instant.from("2026-05-01T00:00:00Z");
 const deriveStatus = GithubPullRequestStatusService.deriveStatus;
 type GetPullRequestInput = {
   installationId: string;
@@ -94,7 +95,7 @@ class TestPullRequestRepository extends NullGithubPullRequestsRepository {
 
 class TestInstallationRepository extends NullGithubInstallationsRepository {
   findAllForOrganization(organizationId: string) {
-    const now = new Date();
+    const now = nowInstant();
     return Promise.resolve([
       {
         installationId: "555",
@@ -256,7 +257,7 @@ describe("GithubPullRequestStatusService", () => {
         ...REF,
         status: "merged",
         source: "snapshot",
-        mappedAt: MAPPED_AT,
+        mappedAt: toDate(MAPPED_AT),
       });
     });
   });
@@ -292,7 +293,7 @@ describe("GithubPullRequestStatusService", () => {
           state: "closed",
           // Carried so the store can refuse this write if a webhook has
           // already stored something newer.
-          prUpdatedAt: new Date("2026-05-03T00:00:00Z"),
+          prUpdatedAt: Temporal.Instant.from("2026-05-03T00:00:00Z"),
         }),
       );
     });

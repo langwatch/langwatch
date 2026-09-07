@@ -6,6 +6,7 @@ import type {
   WorkbenchStateView,
   WorkbenchVersionSummary,
 } from "@langwatch/experiment-contract";
+import type { Instant } from "@langwatch/time";
 
 export type ExperimentRowState = {
   slug: string;
@@ -78,7 +79,7 @@ export abstract class ExperimentRepository {
     projectId: string;
     id: string;
     archivedSlug: string;
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<boolean>;
   abstract getWorkbenchState(input: {
     projectId: string;

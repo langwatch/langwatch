@@ -69,6 +69,7 @@ import {
   ExperimentWorkbenchReferencesService,
   type ExperimentWorkbenchReferenceServices,
 } from "./experiment-workbench-references.service.ts";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
@@ -77,7 +78,7 @@ export type ExperimentServiceOptions = {
   execution: ExperimentExecutionPort;
   slugify: (value: string) => string;
   newId: () => string;
-  now?: () => Date;
+  now?: () => Instant;
   references: ExperimentWorkbenchReferenceServices;
   updates: ExperimentWorkbenchUpdatesPort;
 };
@@ -287,7 +288,7 @@ export class ExperimentService extends ExperimentServiceContract {
     await this.options.repository.archiveActive({
       ...command,
       archivedSlug: `${state.slug}-archived-${this.options.newId()}`,
-      archivedAt: this.options.now?.() ?? new Date(),
+      archivedAt: this.options.now?.() ?? nowInstant(),
     });
 
     return { success: true };

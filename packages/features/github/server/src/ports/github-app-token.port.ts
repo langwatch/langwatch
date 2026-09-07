@@ -1,4 +1,5 @@
 import type { GithubRepository } from "@langwatch/github-contract";
+import type { Instant } from "@langwatch/time";
 
 export const GITHUB_WRITE_PERMISSIONS: Record<string, string> = {
   contents: "write",
@@ -95,9 +96,9 @@ export class GithubInstallationNotFoundError extends Error {
 
 export class GithubRateLimitedError extends Error {
   readonly retryAfterSec: number | null;
-  readonly resetAt: Date | null;
+  readonly resetAt: Instant | null;
 
-  constructor(input: { retryAfterSec: number | null; resetAt: Date | null }) {
+  constructor(input: { retryAfterSec: number | null; resetAt: Instant | null }) {
     super("GitHub rate limit reached");
     this.name = "GithubRateLimitedError";
     this.retryAfterSec = input.retryAfterSec;

@@ -10,7 +10,7 @@ import {
 } from "../ports/github-app-token.port.ts";
 import type { GithubBranchInstallationsPort } from "../ports/github-branch-installations.port.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 import type {
   GithubPullRequestsRepository,
   UpsertGithubPullRequestInput,
@@ -52,6 +52,11 @@ type BranchMappingDeps = {
   host: GithubHostPort;
   now?: () => number;
 };
+
+/** A timestamp as GitHub's REST answer spells it, read through the same lenient parse. */
+function instantOf(value: string): Instant {
+  return Temporal.Instant.fromEpochMilliseconds(toEpochMs(value));
+}
 
 function nowMs(deps: { now?: () => number }): number {
   return deps.now?.() ?? nowInstant().epochMilliseconds;
@@ -165,7 +170,9 @@ export class GithubBranchMappingService {
 
     await this.deps.repository.bringBranchRecheckForward({
       ...scope,
-      dueAt: new Date(nowMs(this.deps) + ACTIVE_BRANCH_MAX_BACKOFF_MS),
+      dueAt: Temporal.Instant.fromEpochMilliseconds(
+        nowMs(this.deps) + ACTIVE_BRANCH_MAX_BACKOFF_MS,
+      ),
     });
   }
 
@@ -191,7 +198,7 @@ export class GithubBranchMappingService {
     const now = nowMs(this.deps);
     const claimed = await this.deps.repository.claimBranchLookup({
       ...scope,
-      now: new Date(now),
+      now: Temporal.Instant.fromEpochMilliseconds(now),
       freshMappingMs: FRESH_MAPPING_MS,
       leaseMs: LOOKUP_CLAIM_LEASE_MS,
       shouldRecordDemand: origin === "demand",
@@ -202,8 +209,8 @@ export class GithubBranchMappingService {
 
     await this.deps.repository.touchBranchCheckRequestedAt({
       ...scope,
-      lastRequestedAt: new Date(now),
-      staleBefore: new Date(now - REQUEST_TOUCH_MS),
+      lastRequestedAt: Temporal.Instant.fromEpochMilliseconds(now),
+      staleBefore: Temporal.Instant.fromEpochMilliseconds(now - REQUEST_TOUCH_MS),
     });
 
     return false;
@@ -215,7 +222,7 @@ export class GithubBranchMappingService {
     isExhaustive: boolean;
     origin: BranchMappingOrigin;
   }): Promise<void> {
-    const now = new Date(nowMs(this.deps));
+    const now = Temporal.Instant.fromEpochMilliseconds(nowMs(this.deps));
     if (input.pullRequests.length > 0) {
       await this.deps.repository.upsertPullRequests({
         pullRequests: input.pullRequests.map((pull) => this.toUpsertInput(input.scope, pull)),
@@ -232,7 +239,7 @@ export class GithubBranchMappingService {
         ? input.pullRequests.length
         : Math.max(existing?.prCount ?? 0, input.pullRequests.length),
       notFoundAt: hasPullRequests ? null : (existing?.notFoundAt ?? now),
-      recheckAfter: hasPullRequests ? null : new Date(now.getTime() + backoffMsFor(attempts)),
+      recheckAfter: hasPullRequests ? null : now.add({ milliseconds: backoffMsFor(attempts) }),
       attempts,
       lastRequestedAt: input.origin === "demand" ? now : null,
     });
@@ -249,7 +256,7 @@ export class GithubBranchMappingService {
       return;
     }
 
-    const now = new Date(nowMs(this.deps));
+    const now = Temporal.Instant.fromEpochMilliseconds(nowMs(this.deps));
     const existing = await this.deps.repository.tryFindBranchCheck(scope);
     const attempts = (existing?.attempts ?? 0) + 1;
     await this.deps.repository.upsertBranchCheck({
@@ -257,7 +264,7 @@ export class GithubBranchMappingService {
       lastCheckedAt: existing?.lastCheckedAt ?? now,
       prCount: existing?.prCount ?? 0,
       notFoundAt: existing?.notFoundAt ?? null,
-      recheckAfter: new Date(now.getTime() + backoffMsFor(attempts)),
+      recheckAfter: now.add({ milliseconds: backoffMsFor(attempts) }),
       attempts,
       lastRequestedAt: origin === "demand" ? now : null,
     });
@@ -275,10 +282,10 @@ export class GithubBranchMappingService {
       state: pull.state,
       isDraft: pull.draft,
       authorLogin: pull.authorLogin,
-      prCreatedAt: new Date(pull.createdAt),
-      prClosedAt: pull.closedAt ? new Date(pull.closedAt) : null,
-      prMergedAt: pull.mergedAt ? new Date(pull.mergedAt) : null,
-      prUpdatedAt: new Date(pull.updatedAt),
+      prCreatedAt: instantOf(pull.createdAt),
+      prClosedAt: pull.closedAt ? instantOf(pull.closedAt) : null,
+      prMergedAt: pull.mergedAt ? instantOf(pull.mergedAt) : null,
+      prUpdatedAt: instantOf(pull.updatedAt),
     };
   }
 }

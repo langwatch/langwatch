@@ -8,7 +8,12 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant } from "@langwatch/time";
+
+/** The stored epoch millis as the ISO string the wire has always carried. */
+function isoOf(epochMs: number): string {
+  return Temporal.Instant.fromEpochMilliseconds(epochMs).toString({ fractionalSecondDigits: 3 });
+}
 import {
   CONTROL_REQUEST_TTL_MS,
   SHARE_CONTROL_COMMAND,
@@ -102,9 +107,9 @@ export class ControlRequestService {
   /**
    * The wire shape of one request, as the command line lists it.
    *
-   * A static method (not a `rules/` function) because it constructs a
-   * `Date` to format the stored epoch millis as ISO strings — a rules
-   * module may not construct one even for a pure formatting use.
+   * A static method (not a `rules/` function) because it reads the clock's
+   * own instant to format the stored epoch millis as ISO strings — a rules
+   * module may not do that even for a pure formatting use.
    */
   static toWire(request: StoredControlRequest): ControlRequest {
     return {
@@ -114,8 +119,8 @@ export class ControlRequestService {
       conversationUrl: request.conversationUrl,
       projectId: request.projectId,
       projectName: request.projectName,
-      createdAt: new Date(request.createdAt).toISOString(),
-      expiresAt: new Date(request.expiresAt).toISOString(),
+      createdAt: isoOf(request.createdAt),
+      expiresAt: isoOf(request.expiresAt),
     };
   }
 

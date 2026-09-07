@@ -14,7 +14,9 @@
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 
-/** A stored pull-request snapshot. Times are Dates; `null` means "not yet". */
+import type { Instant } from "@langwatch/time";
+
+/** A stored pull-request snapshot. Times are instants; `null` means "not yet". */
 export interface GithubPullRequestRow {
   organizationId: string;
   repositoryHost: string;
@@ -27,17 +29,17 @@ export interface GithubPullRequestRow {
   state: string;
   isDraft: boolean;
   authorLogin: string | null;
-  prCreatedAt: Date;
-  prClosedAt: Date | null;
-  prMergedAt: Date | null;
+  prCreatedAt: Instant;
+  prClosedAt: Instant | null;
+  prMergedAt: Instant | null;
   /**
    * GitHub's own `updated_at` for the snapshot in this row. Null for a row
    * written before the column existed, which reads as "unknown" and accepts
    * the next write.
    */
-  prUpdatedAt: Date | null;
-  mappedAt: Date;
-  lastCheckedAt: Date;
+  prUpdatedAt: Instant | null;
+  mappedAt: Instant;
+  lastCheckedAt: Instant;
 }
 
 /** Everything a mapping run knows about one pull request. */
@@ -52,11 +54,11 @@ export interface UpsertGithubPullRequestInput {
   state: string;
   isDraft: boolean;
   authorLogin: string | null;
-  prCreatedAt: Date;
-  prClosedAt: Date | null;
-  prMergedAt: Date | null;
+  prCreatedAt: Instant;
+  prClosedAt: Instant | null;
+  prMergedAt: Instant | null;
   /** When GitHub last changed this snapshot. The write's ordering key. */
-  prUpdatedAt: Date;
+  prUpdatedAt: Instant;
 }
 
 /** The columns a live read refreshes when the stored snapshot has drifted. */
@@ -68,10 +70,10 @@ export interface RefreshGithubPullRequestSnapshotInput {
   title: string;
   state: string;
   isDraft: boolean;
-  prClosedAt: Date | null;
-  prMergedAt: Date | null;
+  prClosedAt: Instant | null;
+  prMergedAt: Instant | null;
   /** When GitHub last changed this snapshot. The write's ordering key. */
-  prUpdatedAt: Date;
+  prUpdatedAt: Instant;
 }
 
 /** One branch's lookup bookkeeping. */
@@ -80,12 +82,12 @@ export interface GithubBranchCheckRow {
   repositoryHost: string;
   repositoryFullName: string;
   headBranch: string;
-  lastCheckedAt: Date;
+  lastCheckedAt: Instant;
   prCount: number;
-  notFoundAt: Date | null;
-  recheckAfter: Date | null;
+  notFoundAt: Instant | null;
+  recheckAfter: Instant | null;
   attempts: number;
-  lastRequestedAt: Date;
+  lastRequestedAt: Instant;
 }
 
 export interface UpsertGithubBranchCheckInput {
@@ -93,10 +95,10 @@ export interface UpsertGithubBranchCheckInput {
   repositoryHost: string;
   repositoryFullName: string;
   headBranch: string;
-  lastCheckedAt: Date;
+  lastCheckedAt: Instant;
   prCount: number;
-  notFoundAt: Date | null;
-  recheckAfter: Date | null;
+  notFoundAt: Instant | null;
+  recheckAfter: Instant | null;
   attempts: number;
   /**
    * When demand for this branch was last recorded, or null to keep whatever is
@@ -107,7 +109,7 @@ export interface UpsertGithubBranchCheckInput {
    * leaves it: an unmapped branch would be asked about once a day for as long
    * as the connection existed.
    */
-  lastRequestedAt: Date | null;
+  lastRequestedAt: Instant | null;
 }
 
 export abstract class GithubPullRequestsRepository {
@@ -204,7 +206,7 @@ export abstract class GithubPullRequestsRepository {
     repositoryHost: string;
     repositoryFullName: string;
     headBranch: string;
-    now: Date;
+    now: Instant;
     /** How long a branch that already resolved to a pull request is trusted. */
     freshMappingMs: number;
     /** How long the claim holds if the lookup never records an answer. */
@@ -229,8 +231,8 @@ export abstract class GithubPullRequestsRepository {
     repositoryHost: string;
     repositoryFullName: string;
     headBranch: string;
-    lastRequestedAt: Date;
-    staleBefore: Date;
+    lastRequestedAt: Instant;
+    staleBefore: Instant;
   }): Promise<void>;
 
   /**
@@ -249,7 +251,7 @@ export abstract class GithubPullRequestsRepository {
     repositoryHost: string;
     repositoryFullName: string;
     headBranch: string;
-    dueAt: Date;
+    dueAt: Instant;
   }): Promise<void>;
 
   /**
@@ -267,7 +269,7 @@ export abstract class GithubPullRequestsRepository {
    * branch name and the timestamps, never a title, a body or a diff.
    */
   abstract findRecheckDue(params: {
-    now: Date;
+    now: Instant;
     /** How long since a reader last asked before a branch stops being swept. */
     activeWithinMs: number;
     limit: number;
@@ -298,7 +300,7 @@ export abstract class GithubPullRequestsRepository {
    * maintenance, so it takes the raw-SQL opt-out the platform's other retention
    * sweeps take.
    */
-  abstract deleteStaleBefore(params: { before: Date }): Promise<{
+  abstract deleteStaleBefore(params: { before: Instant }): Promise<{
     branchChecks: number;
   }>;
 }
@@ -330,13 +332,13 @@ export class NullGithubPullRequestsRepository extends GithubPullRequestsReposito
   async touchBranchCheckRequestedAt(): Promise<void> {}
   async bringBranchRecheckForward(): Promise<void> {}
   async findRecheckDue(_params: {
-    now: Date;
+    now: Instant;
     activeWithinMs: number;
     limit: number;
   }): Promise<GithubBranchCheckRow[]> {
     return [];
   }
-  async deleteStaleBefore(_params: { before: Date }): Promise<{ branchChecks: number }> {
+  async deleteStaleBefore(_params: { before: Instant }): Promise<{ branchChecks: number }> {
     return { branchChecks: 0 };
   }
 }

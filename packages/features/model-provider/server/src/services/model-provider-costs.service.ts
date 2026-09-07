@@ -17,6 +17,7 @@ import type {
 import { ModelCostCatalogService } from "./model-cost-catalog.service.ts";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 type ModelProviderCostsOptions = {
   costs: ModelCostRepository;
@@ -69,7 +70,7 @@ export class ModelProviderCostsService {
       targetScope,
     });
 
-    const now = new Date();
+    const now = toDate(nowInstant());
 
     return this.options.costs.save({
       id: existing?.id ?? parsed.id ?? this.options.ids.generate({ type: "cost" }),

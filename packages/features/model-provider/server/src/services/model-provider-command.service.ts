@@ -33,6 +33,7 @@ import type {
 import { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
 import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 type ModelProviderCommandOptions = {
   repository: ModelProviderRepository;
@@ -309,7 +310,7 @@ export class ModelProviderCommandService {
     const extraHeaders = this.headersForWrite(parsed, existing);
     const models = this.modelsForWrite(parsed, existing);
     const rateLimits = this.rateLimitsForWrite(parsed, existing);
-    const now = new Date();
+    const now = toDate(nowInstant());
 
     return modelProviderSchema.parse({
       id: existing?.id ?? parsed.id ?? this.options.ids.generate({ type: "provider" }),

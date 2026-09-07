@@ -18,6 +18,7 @@ import type {
   LangyConversationListCursor,
   LangyConversationRow,
 } from "../repositories/langy-conversation-projection.repository.ts";
+import { Temporal, type Instant } from "@langwatch/time";
 
 /**
  * Adoptable ids are the shape a caller may propose. Anything else is refused before it
@@ -31,7 +32,7 @@ export type ConversationListItem = {
   title: string | null;
   isShared: boolean;
   isOwn: boolean;
-  lastActivityAt: Date;
+  lastActivityAt: Instant;
   messageCount: number;
 };
 
@@ -183,7 +184,9 @@ export function toListItem(row: LangyConversationRow, userId: string): Conversat
     title: row.title,
     isShared: row.isShared,
     isOwn: row.userId === userId,
-    lastActivityAt: new Date(row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs),
+    lastActivityAt: Temporal.Instant.fromEpochMilliseconds(
+      row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs,
+    ),
     messageCount: row.messageCount,
   };
 }

@@ -1,4 +1,5 @@
 import type { LangyMessagePart } from "@langwatch/langy-contract";
+import type { Instant } from "@langwatch/time";
 
 export type MessageRole = "user" | "assistant" | "tool" | "system";
 
@@ -6,7 +7,7 @@ export interface LangyMessageRow {
   id: string;
   role: MessageRole;
   parts: LangyMessagePart[];
-  createdAt: Date;
+  createdAt: Instant;
 }
 
 export abstract class LangyMessageRepository {

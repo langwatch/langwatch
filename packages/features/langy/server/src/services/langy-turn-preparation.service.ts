@@ -24,6 +24,7 @@ import {
 } from "./langy-turn-shared.service.ts";
 import { LangyTurnSharedService } from "./langy-turn-shared.service.ts";
 import { mintRunToken } from "../ports/langy-frame-auth.port.ts";
+import { Temporal } from "@langwatch/time";
 
 /** The shared turn helpers. Stateless: one instance for the module. */
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();
@@ -207,7 +208,9 @@ export class LangyTurnPreparationService {
           "GitHub pull requests via Langy today.",
           "If the user asks you to open a PR, refuse politely, say the daily cap",
           "is reached, and that it resets at",
-          new Date(permit.resetAt).toISOString(),
+          Temporal.Instant.fromEpochMilliseconds(permit.resetAt).toString({
+            fractionalSecondDigits: 3,
+          }),
           "UTC.",
           "Do not call any tool that opens a PR.",
         ].join(" ");

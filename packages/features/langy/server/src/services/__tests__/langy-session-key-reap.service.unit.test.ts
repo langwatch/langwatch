@@ -15,15 +15,16 @@ import { describe, expect, it, vi } from "vitest";
 import { LangySessionKeyMetricsPort } from "../../ports/langy-session-key-metrics.port.ts";
 import { LangySessionKeyReapRepository } from "../../repositories/langy-session-key-reap.repository.ts";
 import { LangySessionKeyReapService } from "../langy-session-key-reap.service.ts";
+import { Temporal, type Instant } from "@langwatch/time";
 
 class ReapRepository extends LangySessionKeyReapRepository {
-  readonly calls: Array<{ name: string; now: Date }> = [];
+  readonly calls: Array<{ name: string; now: Instant }> = [];
 
   constructor(private readonly count = 0) {
     super();
   }
 
-  async revokeExpiredByName(input: { name: string; now: Date }): Promise<number> {
+  async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
     this.calls.push(input);
     return this.count;
   }
@@ -33,7 +34,7 @@ class Metrics extends LangySessionKeyMetricsPort {
   readonly record = vi.fn();
 }
 
-function sweepWith(input: { count?: number; now?: () => Date }) {
+function sweepWith(input: { count?: number; now?: () => Instant }) {
   const repository = new ReapRepository(input.count ?? 0);
   const metrics = new Metrics();
   const service = LangySessionKeyReapService.create({
@@ -59,17 +60,17 @@ describe("the Langy session-key sweep", () => {
       /** @scenario "The session-key sweep revokes only elapsed Langy session keys" */
       it("stamps the keys as of the one instant it read the clock", async () => {
         const instants = [
-          new Date("2026-01-01T00:00:00.000Z"),
-          new Date("2026-01-01T00:05:00.000Z"),
+          Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
+          Temporal.Instant.from("2026-01-01T00:05:00.000Z"),
         ];
         const { repository, service } = sweepWith({
           count: 1,
-          now: () => instants.shift() ?? new Date("2026-01-01T01:00:00.000Z"),
+          now: () => instants.shift() ?? Temporal.Instant.from("2026-01-01T01:00:00.000Z"),
         });
 
         await service.reap();
 
-        expect(repository.calls[0]!.now).toEqual(new Date("2026-01-01T00:00:00.000Z"));
+        expect(repository.calls[0]!.now).toEqual(Temporal.Instant.from("2026-01-01T00:00:00.000Z"));
         expect(instants).toHaveLength(1);
       });
 

@@ -1,9 +1,10 @@
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
+import { fromDate, type Instant } from "@langwatch/time";
 import type { ModelCostProjectPort } from "../ports/model-provider.port.ts";
 
 export type ModelProviderProjectSystemContext = {
   scopes: ModelDefaultScope[];
-  referenceCreatedAt: Date;
+  referenceCreatedAt: Instant;
 };
 
 /**
@@ -33,7 +34,7 @@ export class ModelProviderProjectScopeService {
 
     return {
       scopes: projectScopes(project.id, project.teamId, project.team.organizationId),
-      referenceCreatedAt: project.createdAt,
+      referenceCreatedAt: fromDate(project.createdAt),
     };
   }
 

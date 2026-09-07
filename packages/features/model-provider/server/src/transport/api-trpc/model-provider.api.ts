@@ -31,7 +31,7 @@ import {
   type ModelDefaultResolvedTrpcOutput,
   type ModelProviderListAllForProjectTrpcOutput,
   type ModelProviderListEntry,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -107,7 +107,7 @@ export type ModelProviderTrpcPorts<
     projectId: string;
     provider: string;
     customBaseUrl: string | undefined;
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
   }): Promise<TStoredKeyValidation>;
   /** Codex sign-in step 1: ask the issuer for a device code. */
   startCodexDeviceSignIn(): Promise<{
@@ -147,7 +147,7 @@ type CanonicalProvider = {
   name: string;
   enabled: boolean;
   /** Set when withdrawn; `isRoutable` fails closed on it, so pickers must see it. */
-  disabledAt?: Date | null;
+  disabledAt?: ModelProviderListEntry["disabledAt"];
   /** Last known reachability, rendered by the routing-policy credential picker. */
   healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
   customKeys: Record<string, unknown> | null;
@@ -532,7 +532,7 @@ export class ModelProviderTrpcApi {
                 // The probe is written against the service, so the application hands
                 // over the one it was composed with rather than this transport
                 // holding a second.
-                modelProviders: ctx.app.modelProviders.providerService,
+                modelProviders: ctx.app.modelProviders,
               });
             }),
         )

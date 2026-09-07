@@ -5,6 +5,8 @@ import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { parseSkipListInput, skipListToInput } from "@langwatch/model-provider-contract";
 
 import { SmallLabel } from "../elements/small-label.tsx";
+import { toEpochMs, type TimeInput } from "@langwatch/time";
+import { readableDate } from "../../model/display-formatters.ts";
 
 /**
  * The accordion item the Advanced section renders into. Exported so the parent
@@ -159,9 +161,9 @@ export function ModelProviderAdvancedSection({
   showSkipPermissionsField: boolean;
   initial: {
     healthStatus?: string | null;
-    circuitOpenedAt?: Date | string | null;
-    lastHealthCheckAt?: Date | string | null;
-    disabledAt?: Date | string | null;
+    circuitOpenedAt?: TimeInput | null;
+    lastHealthCheckAt?: TimeInput | null;
+    disabledAt?: TimeInput | null;
   };
   /**
    * Controlled accordion expansion. Lifted so the parent form can
@@ -177,12 +179,12 @@ export function ModelProviderAdvancedSection({
     (value: ModelProviderAdvancedDraft[K]) =>
       onDraftChange({ ...draft, [key]: value });
 
-  const formatDate = (d: Date | string | null | undefined): string => {
+  const formatDate = (d: TimeInput | null | undefined): string => {
     if (!d) return "—";
-    const date = typeof d === "string" ? new Date(d) : d;
-    const isRealDate = Number.isFinite(date.getTime());
+    const epochMs = toEpochMs(d);
+    if (!Number.isFinite(epochMs)) return String(d);
 
-    return isRealDate ? date.toLocaleString() : String(d);
+    return readableDate(epochMs).toLocaleString();
   };
 
   return (

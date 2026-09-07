@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { format, formatDistanceToNow } from "@langwatch/time";
+import { format, formatDistanceToNow, nowInstant } from "@langwatch/time";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
@@ -9,6 +9,7 @@ import type {
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluation-results.types.ts";
+import { readableDate } from "../../../model/display-formatters.ts";
 
 export type BatchCellFailure = {
   title: string;
@@ -61,9 +62,9 @@ export const formatTimeAgo = (
 ): string | undefined => {
   if (!timestamp) return undefined;
 
-  const date = new Date(timestamp);
-  const now = new Date();
-  const hoursDiff = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+  const date = readableDate(timestamp);
+  const now = nowInstant();
+  const hoursDiff = (now.epochMilliseconds - date.getTime()) / (1000 * 60 * 60);
 
   if (hoursDiff < maxHours) {
     return formatDistanceToNow(date, { addSuffix: true });

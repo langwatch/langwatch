@@ -61,6 +61,7 @@ import {
   PermissionCounter,
   type PermissionSelection,
 } from "../blocks/permission-category-list.tsx";
+import type { Instant } from "@langwatch/time";
 
 type MyBindings = {
   data: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;
@@ -73,7 +74,7 @@ type OrgTeam = { id: string; name: string };
 export type CreateApiKeyInput = {
   name: string;
   description: string;
-  expiresAt: Date | undefined;
+  expiresAt: Instant | undefined;
   permissionMode: PermissionMode;
   keyType: "personal" | "service";
   assignedToUserId?: string;

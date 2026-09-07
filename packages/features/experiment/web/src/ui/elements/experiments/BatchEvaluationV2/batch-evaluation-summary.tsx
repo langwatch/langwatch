@@ -14,6 +14,8 @@ import { formatMilliseconds } from "@langwatch/trace-web/surfaces/format-millise
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { HoverableBigText } from "@langwatch/workflow-web/surfaces/hoverable-big-text";
 import { EvaluationProgressBar } from "./evaluation-progress-bar.tsx";
+import { nowInstant } from "@langwatch/time";
+import { toEpochMs } from "@langwatch/time";
 
 export function BatchEvaluationV2EvaluationSummary({
   run,
@@ -36,7 +38,7 @@ export function BatchEvaluationV2EvaluationSummary({
 
   const runtime = Math.max(
     run.timestamps.createdAt
-      ? (finishedAt ?? currentTimestamp) - new Date(run.timestamps.createdAt).getTime()
+      ? (finishedAt ?? currentTimestamp) - toEpochMs(run.timestamps.createdAt)
       : 0,
     0,
   );
@@ -45,7 +47,7 @@ export function BatchEvaluationV2EvaluationSummary({
     if (finishedAt) return;
 
     const interval = setInterval(() => {
-      setCurrentTimestamp(new Date().getTime());
+      setCurrentTimestamp(nowInstant().epochMilliseconds);
     }, 1000);
 
     return () => clearInterval(interval);
@@ -253,8 +255,8 @@ export const getFinishedAt = (
   if (timestamps.finishedAt) {
     return timestamps.finishedAt;
   }
-  if (currentTimestamp - new Date(timestamps.updatedAt).getTime() > 2 * 60 * 1000) {
-    return new Date(timestamps.updatedAt).getTime();
+  if (currentTimestamp - toEpochMs(timestamps.updatedAt) > 2 * 60 * 1000) {
+    return toEpochMs(timestamps.updatedAt);
   }
   return undefined;
 };

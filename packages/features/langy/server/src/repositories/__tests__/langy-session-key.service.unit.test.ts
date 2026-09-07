@@ -14,12 +14,13 @@ import {
   LangySessionKeyRepository,
   type LangySessionKeyRecord,
 } from "../langy-session-key.repository.ts";
+import { Temporal, type Instant } from "@langwatch/time";
 
 class SessionKeyRepository extends LangySessionKeyRepository {
   key: LangySessionKeyRecord | null = null;
   reapedCount = 0;
-  readonly revocations: Array<{ apiKeyId: string; revokedAt: Date }> = [];
-  readonly reaperCalls: Array<{ revokedAt: Date; name: string }> = [];
+  readonly revocations: Array<{ apiKeyId: string; revokedAt: Instant }> = [];
+  readonly reaperCalls: Array<{ revokedAt: Instant; name: string }> = [];
 
   async tryFindProjectScope() {
     return { teamId: "team-1", organizationId: "organization-1" };
@@ -29,11 +30,11 @@ class SessionKeyRepository extends LangySessionKeyRepository {
     return this.key;
   }
 
-  async revoke(apiKeyId: string, revokedAt: Date): Promise<void> {
+  async revoke(apiKeyId: string, revokedAt: Instant): Promise<void> {
     this.revocations.push({ apiKeyId, revokedAt });
   }
 
-  async revokeExpiredByName(input: { name: string; now: Date }): Promise<number> {
+  async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
     this.reaperCalls.push({ revokedAt: input.now, name: input.name });
     return this.reapedCount;
   }
@@ -242,10 +243,12 @@ describe("LangySessionKeyService", () => {
     await expect(
       service.revokeManaged({ apiKeyId: "key-1", projectId: "project-1" }),
     ).resolves.toBe("refused");
-    await expect(service.reapExpired(new Date("2026-08-26T00:00:00Z"))).resolves.toBe(2);
+    await expect(service.reapExpired(Temporal.Instant.from("2026-08-26T00:00:00Z"))).resolves.toBe(
+      2,
+    );
     expect(repository.reaperCalls).toEqual([
       {
-        revokedAt: new Date("2026-08-26T00:00:00Z"),
+        revokedAt: Temporal.Instant.from("2026-08-26T00:00:00Z"),
         name: expect.any(String),
       },
     ]);

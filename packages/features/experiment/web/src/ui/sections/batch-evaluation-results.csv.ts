@@ -13,6 +13,7 @@ import type {
   BatchEvaluationData,
   BatchResultRow,
 } from "./batch-evaluation-results.types.ts";
+import { readableDate } from "../../model/display-formatters.ts";
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
 
@@ -332,7 +333,7 @@ export const downloadCsv = (data: BatchEvaluationData, experimentName: string): 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = window.URL.createObjectURL(blob);
 
-  const formattedDate = new Date(data.createdAt).toISOString().split("T")[0];
+  const formattedDate = readableDate(data.createdAt).toISOString().split("T")[0];
   const fileName = `${formattedDate}_${experimentName}_${data.runId}.csv`;
 
   const link = document.createElement("a");

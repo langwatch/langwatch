@@ -20,6 +20,7 @@ import { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PromptService } from "@langwatch/prompt-contract";
 import { WorkflowService } from "@langwatch/workflow-contract";
 import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter.ts";
+import type { Instant } from "@langwatch/time";
 
 const prompts: PromptService = Object.create(PromptService.prototype);
 prompts.getAllPrompts = async () => [];
@@ -153,7 +154,7 @@ class MemoryExperimentRepository implements ExperimentRepository {
     projectId: string;
     id: string;
     archivedSlug: string;
-    archivedAt: Date;
+    archivedAt: Instant;
   }) {
     const state = await this.tryGetRowState(input);
     if (!state || state.archived) return false;

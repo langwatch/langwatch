@@ -25,6 +25,7 @@ import {
   createExperimentResponseSchema,
   handledErrorEnvelopeSchema,
 } from "../../rules/experiment-schemas.rules.ts";
+import { Temporal, toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api:experiments");
 
@@ -85,7 +86,11 @@ const toExperimentSummary = ({
   createdAt: experiment.createdAt.toISOString(),
   updatedAt: experiment.updatedAt.toISOString(),
   runsCount,
-  lastRunAt: lastRunAt ? new Date(lastRunAt).toISOString() : null,
+  lastRunAt: lastRunAt
+    ? Temporal.Instant.fromEpochMilliseconds(toEpochMs(lastRunAt)).toString({
+        fractionalSecondDigits: 3,
+      })
+    : null,
 });
 
 /**

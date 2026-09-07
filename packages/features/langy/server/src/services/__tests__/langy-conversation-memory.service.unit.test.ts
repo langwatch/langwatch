@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import type { LangyMessageRow } from "@langwatch/langy-contract";
 import { LangyConversationMemoryService } from "../langy-conversation-memory.service.ts";
+import { Temporal, nowInstant } from "@langwatch/time";
 
 type Digest = {
   resource: string;
@@ -39,14 +40,14 @@ const assistantTurn = (
     ...(part.state ? { state: part.state } : {}),
     ...(part.digest ? { digest: { strategy: "id-ref", ...part.digest } } : {}),
   })),
-  createdAt: new Date(0),
+  createdAt: Temporal.Instant.fromEpochMilliseconds(0),
 });
 
 const userTurn = (id = "user-1"): LangyMessageRow => ({
   id,
   role: "user",
   parts: [],
-  createdAt: new Date(0),
+  createdAt: Temporal.Instant.fromEpochMilliseconds(0),
 });
 
 const extract = (messages: LangyMessageRow[], limit?: number) =>
@@ -212,7 +213,7 @@ describe("LangyConversationMemoryService — ported scenarios", () => {
       id,
       role: "assistant",
       parts: parts as LangyMessageRow["parts"],
-      createdAt: new Date(),
+      createdAt: nowInstant(),
     };
   }
 
@@ -254,7 +255,7 @@ describe("LangyConversationMemoryService — ported scenarios", () => {
     id: "u1",
     role: "user",
     parts: [{ type: "text", text: "make me a scenario" }],
-    createdAt: new Date(),
+    createdAt: nowInstant(),
   };
 
   const render = (messages: LangyMessageRow[]) =>
@@ -474,7 +475,7 @@ describe("LangyConversationMemoryService — ported scenarios", () => {
       id,
       role,
       parts: [{ type: "text", text }] as LangyMessageRow["parts"],
-      createdAt: new Date(),
+      createdAt: nowInstant(),
     });
 
     describe("given a conversation with earlier exchanges", () => {
@@ -515,7 +516,7 @@ describe("LangyConversationMemoryService — ported scenarios", () => {
                 id: "m1",
                 role: "assistant",
                 parts: [{ type: "tool-x", toolCallId: "c1" }] as LangyMessageRow["parts"],
-                createdAt: new Date(),
+                createdAt: nowInstant(),
               },
             ],
           }),

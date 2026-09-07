@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 import {
   getProviderModelOptions,
   modelProviders,
@@ -64,16 +65,16 @@ export class RegistryModelProviderCatalogAdapter extends ModelProviderCatalog {
   systemProviders(input: {
     projectId?: string;
     organizationId?: string;
-    referenceCreatedAt: Date;
+    referenceCreatedAt: Instant;
   }): Promise<ModelProviderSummary[]> {
-    const now = new Date(0);
+    const now = toDate(Temporal.Instant.fromEpochMilliseconds(0));
     const organizationId = input.organizationId ?? `system:${input.projectId ?? "global"}`;
     return Promise.resolve(
       Object.entries(modelProviders)
         .filter(([, definition]) => definition.enabledSince)
         .map(([provider, definition]) => {
           const enabled =
-            definition.enabledSince < input.referenceCreatedAt &&
+            Temporal.Instant.compare(definition.enabledSince, input.referenceCreatedAt) < 0 &&
             this.isSystemProviderEnabled(provider, definition.apiKey);
           const models = getProviderModelOptions(provider, "chat").map((model) => model.value);
           const embeddingsModels = getProviderModelOptions(provider, "embedding").map(

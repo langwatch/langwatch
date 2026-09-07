@@ -17,6 +17,7 @@ import {
 } from "../api-key.repository.ts";
 import { ApiKeyTokenAdapter } from "../../adapters/api-key-token.api-key-token.adapter.ts";
 import { ApiKeyBindingIdPort } from "../../ports/api-key-binding-id.port.ts";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
 class TestApiKeyBindingIdPort extends ApiKeyBindingIdPort {
   static create(): TestApiKeyBindingIdPort {
@@ -38,9 +39,10 @@ class MemoryApiKeys extends ApiKeyRepository {
   legacyProjectRotationSucceeds = true;
   regeneratedLegacyProject: { projectId: string; token: string } | null = null;
   create(input: ApiKeyCreateRecord): Promise<StoredApiKey> {
-    const now = new Date();
+    const now = toDate(nowInstant());
     const row = {
       ...input,
+      expiresAt: input.expiresAt ? toDate(input.expiresAt) : null,
       id: `key-${this.rows.length + 1}`,
       revokedAt: input.startsDisabled ? now : null,
       lastUsedAt: null,
@@ -57,15 +59,15 @@ class MemoryApiKeys extends ApiKeyRepository {
   activate({ id }: { id: string }): Promise<StoredApiKey> {
     return this.update({ id, revokedAt: null });
   }
-  revokeExpiredByName({ name, now }: { name: string; now: Date }): Promise<number> {
+  revokeExpiredByName({ name, now }: { name: string; now: Instant }): Promise<number> {
     const matched = this.rows.filter(
       (row) =>
         row.name === name &&
         row.revokedAt === null &&
         row.expiresAt !== null &&
-        row.expiresAt.getTime() <= now.getTime(),
+        row.expiresAt.getTime() <= now.epochMilliseconds,
     );
-    for (const row of matched) row.revokedAt = now;
+    for (const row of matched) row.revokedAt = toDate(now);
     return Promise.resolve(matched.length);
   }
   tryFindByLookupId({ lookupId }: { lookupId: string }): Promise<StoredApiKey | null> {
@@ -109,7 +111,13 @@ class MemoryApiKeys extends ApiKeyRepository {
   update(input: ApiKeyUpdateRecord): Promise<StoredApiKey> {
     const row = this.rows.find((candidate) => candidate.id === input.id);
     if (!row) throw new Error("missing");
-    Object.assign(row, input, { updatedAt: new Date() });
+    Object.assign(row, input, {
+      updatedAt: toDate(nowInstant()),
+      ...(input.revokedAt === void 0
+        ? {}
+        : { revokedAt: input.revokedAt && toDate(input.revokedAt) }),
+      ...(input.lastUsedAt === void 0 ? {} : { lastUsedAt: toDate(input.lastUsedAt) }),
+    });
     if (input.roleBindings)
       row.roleBindings = input.roleBindings.map((binding, index) => ({
         ...binding,
@@ -118,10 +126,10 @@ class MemoryApiKeys extends ApiKeyRepository {
     return Promise.resolve(row);
   }
   revoke({ id }: { id: string }): Promise<StoredApiKey> {
-    return this.update({ id, revokedAt: new Date() });
+    return this.update({ id, revokedAt: nowInstant() });
   }
   async updateLastUsedAt({ id }: { id: string }): Promise<void> {
-    await this.update({ id, lastUsedAt: new Date() });
+    await this.update({ id, lastUsedAt: nowInstant() });
   }
   async upgradeHash({ id, hashedSecret }: { id: string; hashedSecret: string }): Promise<void> {
     await this.update({ id, hashedSecret });

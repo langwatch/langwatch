@@ -53,8 +53,8 @@ export type LegacyModelProviderExecution = {
   fallbackPriorityGlobal: number | null;
   providerConfig: Record<string, unknown> | null;
   deploymentMapping?: Record<string, string> | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: ModelProviderExecution["createdAt"];
+  updatedAt: ModelProviderExecution["updatedAt"];
   models?: string[] | null;
   embeddingsModels?: string[] | null;
   disabledByDefault?: boolean;

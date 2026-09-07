@@ -10,6 +10,7 @@ import {
   type LangyConversationCommands,
 } from "../langy-conversation.service.ts";
 import type { LangyConversationRepository } from "../../repositories/langy-conversation-projection.repository.ts";
+import { Temporal } from "@langwatch/time";
 
 /** Latest-version fold row the read repository returns. */
 type Row = {
@@ -469,7 +470,7 @@ describe("LangyConversationService", () => {
       expect(result[0]).toMatchObject({
         id: "c1",
         isOwn: true,
-        lastActivityAt: new Date(lastActivityAtMs),
+        lastActivityAt: Temporal.Instant.fromEpochMilliseconds(lastActivityAtMs),
         messageCount: 3,
       });
       expect(result[0]).not.toHaveProperty("status");
@@ -482,7 +483,9 @@ describe("LangyConversationService", () => {
       });
       const svc = LangyConversationService.create(makeCommands(), repo);
       const result = await svc.getAll({ projectId: "p1", userId: "alice" });
-      expect(result[0]?.lastActivityAt).toEqual(new Date(createdAtMs));
+      expect(result[0]?.lastActivityAt).toEqual(
+        Temporal.Instant.fromEpochMilliseconds(createdAtMs),
+      );
     });
   });
 

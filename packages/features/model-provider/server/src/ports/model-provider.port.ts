@@ -28,6 +28,7 @@ import {
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
+import type { Instant } from "@langwatch/time";
 import type { LanguageModel } from "ai";
 export type ModelProviderRecord = ModelProvider;
 export type ModelDefaultConfigSaveInput = {
@@ -36,7 +37,7 @@ export type ModelDefaultConfigSaveInput = {
   config: Record<string, string>;
   scopes: ModelDefaultScope[];
   authorId: string | null;
-  createdAt?: Date;
+  createdAt?: Instant;
 };
 export type ModelCostRecord = ModelCost;
 
@@ -145,7 +146,7 @@ export abstract class ModelProviderCatalog {
   abstract systemProviders(input: {
     projectId?: string;
     organizationId?: string;
-    referenceCreatedAt: Date;
+    referenceCreatedAt: Instant;
   }): Promise<ModelProviderSummary[]>;
   abstract validateApiKey(
     provider: string,

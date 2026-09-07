@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /** Time in milliseconds after which a run without updates is considered interrupted */
 export const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -18,7 +19,7 @@ export const isRunFinished = (timestamps: {
 
   // Consider interrupted if no updates for 5 minutes
   if (timestamps.updatedAt) {
-    const timeSinceUpdate = Date.now() - timestamps.updatedAt;
+    const timeSinceUpdate = nowInstant().epochMilliseconds - timestamps.updatedAt;
     if (timeSinceUpdate > INTERRUPTED_THRESHOLD_MS) {
       return true;
     }

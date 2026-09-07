@@ -7,6 +7,7 @@ import {
   type GithubRepositoryRef,
   type UpsertGithubInstallationInput,
 } from "../github-installations.repository.ts";
+import { fromDate } from "@langwatch/time";
 
 function parseRepositories(value: Prisma.JsonValue | null): GithubRepositoryRef[] | null {
   if (!Array.isArray(value)) {
@@ -44,9 +45,9 @@ function toRow(record: InstallationRecord): GithubInstallationRow {
     accountId: record.accountId,
     repositorySelection: record.repositorySelection,
     repositories: parseRepositories(record.repositories),
-    suspendedAt: record.suspendedAt,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
+    suspendedAt: record.suspendedAt && fromDate(record.suspendedAt),
+    createdAt: fromDate(record.createdAt),
+    updatedAt: fromDate(record.updatedAt),
   };
 }
 
