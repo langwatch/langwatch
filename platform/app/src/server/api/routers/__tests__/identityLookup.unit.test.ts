@@ -4,12 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 import { identityLookupRouter } from "../identityLookup";
 
-const { mockAuditLog, mockLookup } = vi.hoisted(() => ({
+const { activityRows, mockAuditLog, mockLookup } = vi.hoisted(() => ({
+  activityRows: [] as Array<Record<string, unknown>>,
   mockAuditLog: vi.fn<(...args: unknown[]) => Promise<void>>(),
   mockLookup: {
     resolve: vi.fn(),
     person: vi.fn(),
     recentActivity: vi.fn(),
+    resendInvitation: vi.fn(),
+    extendInvitation: vi.fn(),
   },
 }));
 
@@ -27,13 +30,25 @@ function callerFor({ id, email }: { id: string; email: string }) {
   );
 }
 
+function anonymousCaller() {
+  return identityLookupRouter.createCaller(
+    createInnerTRPCContext({ session: null, permissionChecked: true }),
+  );
+}
+
 describe("platform operator identity lookup authorization", () => {
   const originalAdminEmails = process.env.ADMIN_EMAILS;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    activityRows.length = 0;
     process.env.ADMIN_EMAILS = "olive@langwatch.ai";
-    mockAuditLog.mockResolvedValue(void 0);
+    mockAuditLog.mockImplementation(async (...args: unknown[]) => {
+      const [entry] = args;
+      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        activityRows.push(entry as Record<string, unknown>);
+      }
+    });
     mockLookup.resolve.mockResolvedValue({
       typed: "sam@acme.com",
       resolved: "sam@acme.com",
@@ -47,14 +62,13 @@ describe("platform operator identity lookup authorization", () => {
       },
       people: [{ userId: "user_sam", name: "Sam", organizations: [] }],
     });
-    mockLookup.recentActivity.mockResolvedValue([
-      {
-        action: "identityLookup.resolve",
-        userId: "user_olive",
-        args: { address: "sam@acme.com" },
-        occurredAtMs: 1_700_000_000_000,
-      },
-    ]);
+    mockLookup.recentActivity.mockImplementation(async () => activityRows);
+    mockLookup.resendInvitation.mockResolvedValue({
+      expiresAtMs: 1_700_000_000_000,
+    });
+    mockLookup.extendInvitation.mockResolvedValue({
+      expiresAtMs: 1_700_000_000_000,
+    });
   });
 
   afterEach(() => {
@@ -164,22 +178,38 @@ describe("platform operator identity lookup authorization", () => {
         message: "Not found",
       });
     });
+
+    it("refuses an anonymous caller before the operator audit boundary", async () => {
+      await expect(
+        anonymousCaller().resolve({ address: "sam@acme.com" }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      expect(mockAuditLog).not.toHaveBeenCalled();
+      expect(mockLookup.resolve).not.toHaveBeenCalled();
+    });
   });
 
   describe("when recent operator activity is opened", () => {
     /** @scenario "Who looked somebody up is readable by an operator, on this surface" */
     it("returns lookup records from the same activity reader", async () => {
+      await callerFor({
+        id: "user_olive",
+        email: "olive@langwatch.ai",
+      }).resolve({ address: "sam@acme.com" });
+
       const activity = await callerFor({
         id: "user_olive",
         email: "olive@langwatch.ai",
       }).recentActivity({});
 
-      expect(activity).toEqual([
-        expect.objectContaining({
-          action: "identityLookup.resolve",
-          userId: "user_olive",
-        }),
-      ]);
+      expect(activity).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: "identityLookup.resolve",
+            userId: "user_olive",
+            args: { address: "sam@acme.com" },
+          }),
+        ]),
+      );
       expect(mockLookup.recentActivity).toHaveBeenCalledWith();
     });
   });
@@ -198,6 +228,72 @@ describe("platform operator identity lookup authorization", () => {
         args: { address: "sam@acme.com" },
       });
       expect(JSON.stringify(entry)).not.toMatch(/password|token|session/i);
+    });
+  });
+
+  describe("when an invitation is repaired", () => {
+    /** @scenario "Resending an invitation from here does what resending does anywhere" */
+    it("records the operator before delegating resend to the invitation boundary", async () => {
+      await expect(
+        callerFor({
+          id: "user_olive",
+          email: "olive@langwatch.ai",
+        }).resendInvitation({
+          organizationId: "org_acme",
+          inviteId: "invite_1",
+        }),
+      ).resolves.toEqual({ expiresAtMs: 1_700_000_000_000 });
+
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user_olive",
+          action: "identityLookup.resendInvitation",
+          args: { organizationId: "org_acme", inviteId: "invite_1" },
+          targetId: "invite_1",
+        }),
+      );
+      expect(mockLookup.resendInvitation).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        inviteId: "invite_1",
+      });
+      const auditCall = mockAuditLog.mock.invocationCallOrder[0];
+      const resendCall = mockLookup.resendInvitation.mock.invocationCallOrder[0];
+      if (typeof auditCall !== "number" || typeof resendCall !== "number") {
+        throw new Error("expected audit and resend calls");
+      }
+      expect(auditCall).toBeLessThan(resendCall);
+    });
+
+    /** @scenario "Extending an invitation moves its expiry and says by how much" */
+    it("records the operator before delegating extension to the invitation boundary", async () => {
+      await expect(
+        callerFor({
+          id: "user_olive",
+          email: "olive@langwatch.ai",
+        }).extendInvitation({
+          organizationId: "org_acme",
+          inviteId: "invite_1",
+        }),
+      ).resolves.toEqual({ expiresAtMs: 1_700_000_000_000 });
+
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user_olive",
+          action: "identityLookup.extendInvitation",
+          args: { organizationId: "org_acme", inviteId: "invite_1" },
+          targetId: "invite_1",
+        }),
+      );
+      expect(mockLookup.extendInvitation).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        inviteId: "invite_1",
+      });
+      const auditCall = mockAuditLog.mock.invocationCallOrder[0];
+      const extendCall = mockLookup.extendInvitation.mock.invocationCallOrder[0];
+      if (typeof auditCall !== "number" || typeof extendCall !== "number") {
+        throw new Error("expected audit and extension calls");
+      }
+      expect(auditCall).toBeLessThan(extendCall);
     });
   });
 });

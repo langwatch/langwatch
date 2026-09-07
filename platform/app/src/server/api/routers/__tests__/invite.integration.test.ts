@@ -504,6 +504,7 @@ describe("Invite router integration", () => {
 
     describe("when an admin resends an expired invitation", () => {
       /** @scenario "One click resends an expired invitation" */
+      /** @scenario "Resending an invitation from here does what resending does anywhere" */
       it("mints a fresh code with a fresh fourteen-day expiry and sends a new email", async () => {
         const invite = await createExpiredInvite(
           `invitee-${testNamespace}-resend@acme.com`,
@@ -529,6 +530,7 @@ describe("Invite router integration", () => {
         expect(row?.status).toBe("PENDING");
       });
 
+      /** @scenario "Resending an invitation from here does what resending does anywhere" */
       it("kills the old link", async () => {
         const invite = await createExpiredInvite(
           `invitee-${testNamespace}-stale@acme.com`,
@@ -554,6 +556,31 @@ describe("Invite router integration", () => {
             .createCaller(ctx)
             .invite.acceptInvite({ inviteCode: invite.inviteCode }),
         ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      });
+
+      /** @scenario "Extending an invitation moves its expiry and says by how much" */
+      it("moves expiry without rotating the code or sending another email", async () => {
+        const invite = await createExpiredInvite(
+          `invitee-${testNamespace}-extend@acme.com`,
+        );
+
+        const result = await InviteService.create(prisma).extendInvite({
+          inviteId: invite.id,
+          organizationId,
+        });
+
+        expect(result.invite.inviteCode).toBe(invite.inviteCode);
+        expect(result.invite.expiration!.getTime()).toBeGreaterThan(
+          Date.now() + 13 * 24 * 60 * 60 * 1000,
+        );
+        expect(mockSendInviteEmail).not.toHaveBeenCalled();
+        const row = await prisma.organizationInvite.findUnique({
+          where: { id: invite.id },
+        });
+        expect(row?.inviteCode).toBe(invite.inviteCode);
+        expect(row?.expiration?.getTime()).toBe(
+          result.invite.expiration!.getTime(),
+        );
       });
     });
 
