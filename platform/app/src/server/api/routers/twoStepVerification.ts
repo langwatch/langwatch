@@ -75,6 +75,10 @@ export const twoStepVerificationRouter = createTRPCRouter({
       allow: {
         organizationId: "the organization the caller is trying to reach",
       },
+      mfaRecovery: {
+        reason:
+          "the caller must read their own standing before the enrollment gate can tell them how to satisfy it",
+      },
     })
     .query(async ({ ctx, input }) => {
       return organizationMfa().standingForSession({

@@ -289,12 +289,14 @@ const SENSITIVE_SCOPE_FIELDS = Object.values(
 export const declaredNoPermission = ({
   reason,
   allow,
+  mfaRecovery,
 }: {
   reason: string;
   allow?: Record<string, string>;
+  mfaRecovery?: { reason: string };
 }): DeclaredMiddleware =>
   declareAuthzMiddleware(
-    { kind: "no-permission", reason, allow },
+    { kind: "no-permission", reason, allow, mfaRecovery },
     async ({ ctx, input, next }: MiddlewareParams) => {
       const allowedKeys = Object.keys(allow ?? {});
       // A procedure that declares no `.input()` arrives here with `undefined`,
@@ -306,11 +308,15 @@ export const declaredNoPermission = ({
         typeof input === "object" && input !== null ? input : {};
 
       refuseUndeclaredScopeFields({ declaredInput, allowedKeys });
-      await assertSecondFactorOnAllowedScopes({
-        ctx,
-        declaredInput,
-        allowedKeys,
-      });
+      // A held member needs this one answer to render the recovery screen.
+      // Every ordinary no-permission route still enforces the condition.
+      if (!mfaRecovery) {
+        await assertSecondFactorOnAllowedScopes({
+          ctx,
+          declaredInput,
+          allowedKeys,
+        });
+      }
 
       ctx.permissionChecked = true;
       return next();

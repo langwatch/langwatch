@@ -1,0 +1,118 @@
+/** @vitest-environment node */
+
+/**
+ * The recovery read through the real tRPC procedure. A member held by the MFA
+ * condition must be able to read the standing that paints their setup screen,
+ * without weakening the procedure's session or membership boundaries.
+ */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationMfaService } from "~/server/app-layer/identity/organization-mfa.service";
+import { createInnerTRPCContext } from "../../trpc";
+import { twoStepVerificationRouter } from "../twoStepVerification";
+
+const { organizationMfaMock } = vi.hoisted(() => ({
+  organizationMfaMock: vi.fn(),
+}));
+
+vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/identity/runtime")
+  >()),
+  organizationMfa: () => organizationMfaMock(),
+  twoStepVerification: () => ({}),
+}));
+
+const members = {
+  membersOf: vi.fn(async () => []),
+  accountFactorFor: vi.fn(async () => ({
+    accountEnrollmentEnabled: false,
+    passkeyCount: 0,
+  })),
+  isMember: vi.fn(
+    async ({ userId, organizationId }: { userId: string; organizationId: string }) =>
+      userId === "sam" && organizationId === "org-acme",
+  ),
+};
+
+const service = new OrganizationMfaService({
+  settings: {
+    read: vi.fn(async () => ({
+      mfaRequired: true,
+      name: "Acme",
+      slug: "acme",
+    })),
+    write: vi.fn(async () => undefined),
+  },
+  sessions: { amrFor: vi.fn(async () => null) },
+  members,
+  connections: { assertedFactorsFor: vi.fn(async () => null) },
+  notifier: { requirementTurnedOn: vi.fn(async () => undefined) },
+  offered: () => true,
+  entitled: vi.fn(async () => true),
+});
+
+const callerFor = (userId: string | null) => {
+  const session = userId
+    ? {
+        user: { id: userId, email: `${userId}@example.com` },
+        sessionId: `session-${userId}`,
+        expires: "2099-01-01",
+      }
+    : null;
+  return twoStepVerificationRouter.createCaller(
+    createInnerTRPCContext({
+      session,
+      // If the recovery exemption regresses, this real unsatisfied standing
+      // is evaluated in the middleware first and the call is refused.
+      mfaGate: { offered: () => true, organizationMfa: () => service },
+    }),
+  );
+};
+
+describe("twoStepVerification.standing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    organizationMfaMock.mockReturnValue(service);
+  });
+
+  describe("given a required member who has not enrolled", () => {
+    /** @scenario Someone joining an organization that requires it meets the gate on the way in */
+    it("returns the unsatisfied standing that paints the setup screen", async () => {
+      await expect(callerFor("sam").standing({ organizationId: "org-acme" })).resolves.toEqual({
+        organizationId: "org-acme",
+        organizationName: "Acme",
+        required: true,
+        satisfaction: { satisfied: false, by: "none" },
+        holdsPasskey: false,
+      });
+
+      expect(members.isMember).toHaveBeenCalledWith({
+        userId: "sam",
+        organizationId: "org-acme",
+      });
+    });
+  });
+
+  describe("given no authenticated person", () => {
+    it("still refuses before reading any organization standing", async () => {
+      await expect(callerFor(null).standing({ organizationId: "org-acme" })).rejects.toMatchObject({
+        code: "UNAUTHORIZED",
+      });
+      expect(members.isMember).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an authenticated stranger", () => {
+    it("keeps the organization's identity and requirement private", async () => {
+      await expect(
+        callerFor("mallory").standing({ organizationId: "org-acme" }),
+      ).resolves.toMatchObject({
+        organizationName: null,
+        required: false,
+        satisfaction: { satisfied: true },
+      });
+
+      expect(members.accountFactorFor).not.toHaveBeenCalled();
+    });
+  });
+});

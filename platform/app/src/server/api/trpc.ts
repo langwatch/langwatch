@@ -1438,7 +1438,7 @@ type PermissionAnyArgs<
       ];
 
 type DeclaredNoPermissionOptions<I> = UnsetMarker extends I
-  ? { reason: string; allow?: undefined }
+  ? { reason: string; allow?: undefined; mfaRecovery?: never }
   : NoPermissionOptions<I>;
 
 const permissionProcedureBuilder = <
@@ -1524,6 +1524,7 @@ const permissionProcedureBuilder = <
     noPermission: ((options: {
       reason: string;
       allow?: Record<string, string>;
+      mfaRecovery?: { reason: string };
     }) =>
       withPermissionCheck(
         declaredNoPermission(options),
