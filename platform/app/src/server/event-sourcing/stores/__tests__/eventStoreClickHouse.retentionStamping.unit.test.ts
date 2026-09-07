@@ -32,7 +32,11 @@ describe("EventStoreClickHouse retention stamping", () => {
     ["SCIM", "scim_sync", "lw.identity.scim_token_issued"],
     ["authorization", "authz_grant", "lw.authz.grant.attached"],
     ["authorization role", "authz_role", "lw.authz.role.defined"],
-    ["virtual-key lifecycle", "governance_subject", "lw.governance.vk_lifecycle"],
+    [
+      "virtual-key lifecycle",
+      "governance_subject",
+      "lw.governance.vk_lifecycle",
+    ],
   ] as const;
 
   const categoryEventCases = [
@@ -40,19 +44,44 @@ describe("EventStoreClickHouse retention stamping", () => {
     ["simulation set", "simulation_set", "lw.simulation_set.archived", 63],
     ["suite run", "suite_run", "lw.suite_run.started", 63],
     ["experiment run", "experiment_run", "lw.experiment_run.started", 91],
-    ["Langy conversation", "langy_conversation", "lw.langy_conversation.message_recorded", 49],
-    ["topic model", "topic_clustering", "lw.obs.topic_clustering.topics_recorded", 49],
+    [
+      "Langy conversation",
+      "langy_conversation",
+      "lw.langy_conversation.message_recorded",
+      49,
+    ],
+    [
+      "topic model",
+      "topic_clustering",
+      "lw.obs.topic_clustering.topics_recorded",
+      49,
+    ],
     ["gateway spend", "gateway_request", "lw.gateway.spend.confirmed", 49],
     ["pulled usage", "pulled_usage", "lw.obs.pulled_usage.observed", 49],
-    ["ingestion pull", "ingestion_pull", "lw.obs.ingestion_pull.run_completed", 49],
-    ["automation trigger", "trigger", "lw.automation.trigger.match_recorded", 49],
+    [
+      "ingestion pull",
+      "ingestion_pull",
+      "lw.obs.ingestion_pull.run_completed",
+      49,
+    ],
+    [
+      "automation trigger",
+      "trigger",
+      "lw.automation.trigger.match_recorded",
+      49,
+    ],
     [
       "coding agent session",
       "coding_agent_session",
       "lw.obs.coding_agent_session.span_facts_contributed",
       49,
     ],
-    ["governance budget crossing", "governance_subject", "lw.governance.budget_crossing", 49],
+    [
+      "governance budget crossing",
+      "governance_subject",
+      "lw.governance.budget_crossing",
+      49,
+    ],
   ] as const;
 
   let mockClient: ClickHouseClient;
@@ -78,70 +107,68 @@ describe("EventStoreClickHouse retention stamping", () => {
     data: { foo: "bar" },
   });
 
-  describe.each(indefiniteEventCases)(
-    "when storing a %s security event",
-    (_name, authAggregateType, authEventType) => {
-      it("stamps indefinite retention without consulting tenant policy", async () => {
-        const resolver: RetentionPolicyResolver = {
-          resolve: vi.fn().mockResolvedValue({
-            traces: 30,
-            scenarios: null,
-            experiments: null,
-          }),
-        };
-        const store = new EventStoreClickHouse(
-          new EventRepositoryClickHouse(async () => mockClient),
-          resolver,
-        );
-        const event = {
-          ...makeEvent(),
-          aggregateId: "auth_123",
-          aggregateType: authAggregateType,
-          type: authEventType,
-        };
+  describe.each(
+    indefiniteEventCases,
+  )("when storing a %s security event", (_name, authAggregateType, authEventType) => {
+    it("stamps indefinite retention without consulting tenant policy", async () => {
+      const resolver: RetentionPolicyResolver = {
+        resolve: vi.fn().mockResolvedValue({
+          traces: 30,
+          scenarios: null,
+          experiments: null,
+        }),
+      };
+      const store = new EventStoreClickHouse(
+        new EventRepositoryClickHouse(async () => mockClient),
+        resolver,
+      );
+      const event = {
+        ...makeEvent(),
+        aggregateId: "auth_123",
+        aggregateType: authAggregateType,
+        type: authEventType,
+      };
 
-        await store.storeEvents([event], { tenantId }, authAggregateType);
+      await store.storeEvents([event], { tenantId }, authAggregateType);
 
-        expect(resolver.resolve).not.toHaveBeenCalled();
-        const values = insertSpy.mock.calls[0]![0]!.values as Array<{
-          _retention_days: number;
-        }>;
-        expect(values[0]!._retention_days).toBe(INDEFINITE_RETENTION_DAYS);
-      });
-    },
-  );
+      expect(resolver.resolve).not.toHaveBeenCalled();
+      const values = insertSpy.mock.calls[0]![0]!.values as Array<{
+        _retention_days: number;
+      }>;
+      expect(values[0]!._retention_days).toBe(INDEFINITE_RETENTION_DAYS);
+    });
+  });
 
-  describe.each(categoryEventCases)(
-    "when storing a %s event",
-    (_name, eventAggregateType, eventType, expectedRetentionDays) => {
-      it("stamps retention from the aggregate's category", async () => {
-        const resolver: RetentionPolicyResolver = {
-          resolve: vi.fn().mockResolvedValue({
-            traces: 49,
-            scenarios: 63,
-            experiments: 91,
-          }),
-        };
-        const store = new EventStoreClickHouse(
-          new EventRepositoryClickHouse(async () => mockClient),
-          resolver,
-        );
-        const event = {
-          ...makeEvent(),
-          aggregateId: "workload_123",
-          aggregateType: eventAggregateType,
-          type: eventType,
-        };
+  describe.each(
+    categoryEventCases,
+  )("when storing a %s event", (_name, eventAggregateType, eventType, expectedRetentionDays) => {
+    it("stamps retention from the aggregate's category", async () => {
+      const resolver: RetentionPolicyResolver = {
+        resolve: vi.fn().mockResolvedValue({
+          traces: 49,
+          scenarios: 63,
+          experiments: 91,
+        }),
+      };
+      const store = new EventStoreClickHouse(
+        new EventRepositoryClickHouse(async () => mockClient),
+        resolver,
+      );
+      const event = {
+        ...makeEvent(),
+        aggregateId: "workload_123",
+        aggregateType: eventAggregateType,
+        type: eventType,
+      };
 
-        await store.storeEvents([event], { tenantId }, eventAggregateType);
+      await store.storeEvents([event], { tenantId }, eventAggregateType);
 
-        const values = insertSpy.mock.calls[0]![0]!.values as Array<{
-          _retention_days: number;
-        }>;
-        expect(values[0]!._retention_days).toBe(expectedRetentionDays);
-      });
-    },
-  );
+      const values = insertSpy.mock.calls[0]![0]!.values as Array<{
+        _retention_days: number;
+      }>;
+      expect(values[0]!._retention_days).toBe(expectedRetentionDays);
+    });
+  });
 
   describe("when retention resolver returns a policy with traces=30", () => {
     it("stamps every event_log record with _retention_days = 30", async () => {
@@ -176,7 +203,9 @@ describe("EventStoreClickHouse retention stamping", () => {
 
   describe("when no resolver is wired (e.g. tests)", () => {
     it("falls back to the platform default", async () => {
-      const store = new EventStoreClickHouse(new EventRepositoryClickHouse(async () => mockClient));
+      const store = new EventStoreClickHouse(
+        new EventRepositoryClickHouse(async () => mockClient),
+      );
 
       await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
 

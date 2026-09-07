@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { VerifiedCallbackProviderAssertions } from "../session-adapters";
-import { type SessionIdentifierPort, SessionClaimsService } from "../session-claims.service";
+import {
+  SessionClaimsService,
+  type SessionIdentifierPort,
+} from "../session-claims.service";
 
 const identifiers = ({
   answer,
@@ -29,9 +32,9 @@ const identifiers = ({
 };
 
 const deferred = () => {
-  let resolve = () => undefined;
+  let resolve = () => {};
   const promise = new Promise<void>((done) => {
-    resolve = done;
+    resolve = () => done();
   });
   return { promise, resolve };
 };
@@ -43,37 +46,36 @@ describe("session claims from an identity-provider callback", () => {
   it.each([
     ["auth0", "auth0|sam", "identifier_auth0"],
     ["okta", "okta-user-sam", "identifier_okta"],
-  ])(
-    "attributes a %s session to the exact authenticated account",
-    async (providerId, providerAccountId, identifierId) => {
-      const assertions = new VerifiedCallbackProviderAssertions();
-      const identifierPort = identifiers({ answer: identifierId });
-      const claims = new SessionClaimsService({
-        identifiers: identifierPort,
-        assertions,
-      });
+  ])("attributes a %s session to the exact authenticated account", async (providerId, providerAccountId, identifierId) => {
+    const assertions = new VerifiedCallbackProviderAssertions();
+    const identifierPort = identifiers({ answer: identifierId });
+    const claims = new SessionClaimsService({
+      identifiers: identifierPort,
+      assertions,
+    });
 
-      const result = await assertions.runWithScope(async () => {
-        assertions.recordVerifiedCallbackToken({
-          providerId,
-          path: `/callback/${providerId}`,
-          verifiedIdToken: verifiedIdToken({ sub: providerAccountId }),
-        });
-        assertions.recordAuthenticatedCallbackAccount({
-          providerId,
-          providerAccountId,
-          path: `/callback/${providerId}`,
-        });
-        return claims.claimsForMint({
-          userId: "user_sam",
-          path: `/callback/${providerId}`,
-        });
+    const result = await assertions.runWithScope(async () => {
+      assertions.recordVerifiedCallbackToken({
+        providerId,
+        path: `/callback/${providerId}`,
+        verifiedIdToken: verifiedIdToken({ sub: providerAccountId }),
       });
+      assertions.recordAuthenticatedCallbackAccount({
+        providerId,
+        providerAccountId,
+        path: `/callback/${providerId}`,
+      });
+      return claims.claimsForMint({
+        userId: "user_sam",
+        path: `/callback/${providerId}`,
+      });
+    });
 
-      expect(result.identifierId).toBe(identifierId);
-      expect(identifierPort.calls).toEqual([{ userId: "user_sam", providerId, providerAccountId }]);
-    },
-  );
+    expect(result.identifierId).toBe(identifierId);
+    expect(identifierPort.calls).toEqual([
+      { userId: "user_sam", providerId, providerAccountId },
+    ]);
+  });
 
   it("carries the current verified profile's AMR into the new session", async () => {
     const assertions = new VerifiedCallbackProviderAssertions();
@@ -221,7 +223,9 @@ describe("session claims from an identity-provider callback", () => {
         path: "/callback/auth0",
       });
 
-      await expect(assertions.authenticatedAccountFor({ providerId: "okta" })).resolves.toBeNull();
+      await expect(
+        assertions.authenticatedAccountFor({ providerId: "okta" }),
+      ).resolves.toBeNull();
     });
   });
 

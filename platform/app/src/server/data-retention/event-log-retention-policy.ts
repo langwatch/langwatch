@@ -1,5 +1,8 @@
 import type { AggregateType } from "../event-sourcing/domain/aggregateType";
-import { RETENTION_CATEGORIES, type RetentionCategory } from "./retentionPolicy.schema";
+import {
+  RETENTION_CATEGORIES,
+  type RetentionCategory,
+} from "./retentionPolicy.schema";
 
 export type EventLogRetentionClass = RetentionCategory | "indefinite";
 
@@ -54,7 +57,11 @@ export function classifyEventLogRowRetention(row: {
   AggregateType: string;
   EventType: string;
 }): EventLogRetentionClass {
-  if (INDEFINITE_EVENT_TYPE_PREFIXES.some((prefix) => row.EventType.startsWith(prefix))) {
+  if (
+    INDEFINITE_EVENT_TYPE_PREFIXES.some((prefix) =>
+      row.EventType.startsWith(prefix),
+    )
+  ) {
     return "indefinite";
   }
 
@@ -62,7 +69,12 @@ export function classifyEventLogRowRetention(row: {
     return "indefinite";
   }
 
-  if (!Object.prototype.hasOwnProperty.call(RETENTION_CLASS_BY_AGGREGATE_TYPE, row.AggregateType)) {
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      RETENTION_CLASS_BY_AGGREGATE_TYPE,
+      row.AggregateType,
+    )
+  ) {
     return "traces";
   }
 
@@ -88,9 +100,13 @@ const eventTypePrefixSql = INDEFINITE_EVENT_TYPE_PREFIXES.map(
   (prefix) => `startsWith(EventType, ${sqlStringLiteral(prefix)})`,
 ).join(" OR ");
 
-const indefiniteEventTypesSql = aggregateTypeListSql([...INDEFINITE_EVENT_TYPES]);
+const indefiniteEventTypesSql = aggregateTypeListSql([
+  ...INDEFINITE_EVENT_TYPES,
+]);
 
-const indefiniteAggregateTypesSql = aggregateTypeListSql(aggregateTypesFor("indefinite"));
+const indefiniteAggregateTypesSql = aggregateTypeListSql(
+  aggregateTypesFor("indefinite"),
+);
 
 /** Exact ClickHouse predicate for rows that must never expire. */
 export const EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE =
@@ -104,7 +120,9 @@ export const EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE =
  * ingestion, so retroactive updates cannot overwrite indefinite rows or move
  * scenario and experiment events onto the traces policy.
  */
-export function eventLogRetentionCategorySqlPredicate(category: RetentionCategory): string {
+export function eventLogRetentionCategorySqlPredicate(
+  category: RetentionCategory,
+): string {
   const finiteGuard = `NOT ${EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE}`;
 
   if (category === "traces") {
@@ -124,9 +142,12 @@ export function eventLogRetentionCategorySqlPredicate(category: RetentionCategor
   );
 }
 
-const EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX = "langwatch:event-log-retention-category:";
+const EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX =
+  "langwatch:event-log-retention-category:";
 
-export function eventLogRetentionCategoryMutationMarkerSql(category: RetentionCategory): string {
+export function eventLogRetentionCategoryMutationMarkerSql(
+  category: RetentionCategory,
+): string {
   const marker = `${EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX}${category}`;
   return `length(${sqlStringLiteral(marker)}) > 0`;
 }

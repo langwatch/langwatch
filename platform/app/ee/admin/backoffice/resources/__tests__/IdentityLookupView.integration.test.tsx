@@ -192,7 +192,6 @@ describe("given an operator who has resolved an address", () => {
       expect(screen.getByText("email (DETACHED)")).toBeInTheDocument();
     });
   });
-
 });
 
 describe("given an operator who may look but may not repair", () => {

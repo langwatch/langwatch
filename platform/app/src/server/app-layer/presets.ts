@@ -978,11 +978,13 @@ export function initializeDefaultApp(options?: {
     identityLinkProposals: new EventLogIdentityRepository(),
     mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
     mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
-    ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(prisma),
+    ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
+      prisma,
+    ),
     ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
     ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
     ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
-    ssoPlatformOperators: new AdminEmailPlatformOperators(prisma),
+    ssoPlatformOperators: new AdminEmailPlatformOperators(identityUsers),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
     // One repository, two roles (D08): the fold's store and the guards' read
     // are the same `ScimSyncState` rows, so composing them separately would

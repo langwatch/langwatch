@@ -302,7 +302,7 @@ describe("QueueManager migration preflight targets", () => {
     const queue = createMockSharedQueue();
     queue.registerPreflightGroups = vi.fn(async (resolveGroups) => {
       const groups = resolveGroups();
-      if (groups.some((groupId) => !groupId)) {
+      if (groups.some((groupId: string | undefined) => !groupId)) {
         throw new Error("custom routing cannot be pre-registered");
       }
     });

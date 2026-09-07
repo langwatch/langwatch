@@ -1,6 +1,6 @@
-import { buildSocialProviders } from "@ee/sso/providers";
 import { fireActivityTrackingNurturing } from "@ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "@ee/billing/nurturing/hooks/userSync";
+import { buildSocialProviders } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { betterAuth } from "better-auth";
 import { env } from "~/env.mjs";
@@ -78,14 +78,12 @@ const legacyDatabaseHooks = () => ({
       string,
       unknown
     >;
-  }) =>
-    beforeUserCreate({ prisma, user }),
+  }) => beforeUserCreate({ prisma, user }),
   afterUserCreate: ({
     user,
   }: {
     user: { id: string; email: string; name: string };
-  }) =>
-    afterUserCreate({ prisma, user }),
+  }) => afterUserCreate({ prisma, user }),
   beforeAccountCreate: ({ account }: { account: AccountHookRow }) =>
     beforeAccountCreate({ prisma, account }),
   afterAccountCreate: ({ account }: { account: AccountHookRow }) =>
