@@ -54,11 +54,10 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # better-auth 1.7 keys an account by (issuer, accountId) and sends the
   # issuer — synthesised from the provider id for providers that declare
-  # none — in its account queries and writes. The legacy Account table has
-  # no issuer column, so the clause reached Prisma as an unknown argument
-  # and every issuer-keyed operation on an unlatched user threw. The one
-  # customers met first was /two-factor/enable, which read as "two-step
-  # verification wouldn't start".
+  # none — in its account queries and writes. Account now persists that
+  # issuer and indexes the pair. The adapter still translates a synthetic
+  # issuer beside the provider it was derived from, because those two clauses
+  # state the same fact; a real issuer is preserved and queried exactly.
 
   @unit
   Scenario: An issuer-keyed account read on the legacy branch drops the synthetic issuer
@@ -68,11 +67,11 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the credential account row is returned
 
   @unit
-  Scenario: An issuer the legacy table cannot answer returns no rows instead of throwing
+  Scenario: A provider is never matched under another issuer
     Given a user "olga" whose identifier backfill has not finalized
     When better-auth reads an account by an issuer that contradicts the provider beside it
     Then the read answers no rows
-    And the legacy engine is never queried with the issuer column
+    And the lookup is never widened to the provider alone
 
   # A CONNECTION'S ISSUER IS NOT A CONTRADICTION. Refusing every issuer we
   # did not mint refused the ordinary shape of single sign-on, where the
@@ -103,10 +102,11 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the legacy engine is queried with that exact issuer, never a widened key
 
   @unit
-  Scenario: A legacy account write never carries the issuer column
+  Scenario: Legacy account writes persist synthetic and real issuers
     Given a user "olga" whose identifier backfill has not finalized
-    When better-auth signs "olga" up and links a provider account
-    Then every account row lands through the legacy engine without an issuer column
+    When better-auth signs "olga" up and links a provider account and a single sign-on connection
+    Then the provider account stores its synthetic issuer
+    And the connection account stores its real issuer unchanged
 
   @unit
   Scenario: A latched user's account create states the fact instead of owning the row

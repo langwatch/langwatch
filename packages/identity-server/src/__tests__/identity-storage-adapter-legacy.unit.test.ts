@@ -196,11 +196,10 @@ describe("better-auth over the identity storage adapter", () => {
   });
 
   /**
-   * The legacy engine here holds the Prisma schema's line: no `issuer`
-   * column on `account`, and naming one is refused the way
-   * `PrismaClientValidationError` refuses it. The stock memory engine
-   * absorbs any field, which is how this regression stayed green here
-   * while `/two-factor/enable` threw in production.
+   * The legacy engine here follows the current Prisma account shape, including
+   * the issuer column added for better-auth 1.7's account key. These tests pin
+   * both halves: synthetic issuers may be translated when they merely repeat
+   * the provider, while real connection issuers are persisted and matched.
    */
   describe("given the legacy engine is bound to the Prisma account schema", () => {
     let identity: IdentityStack;
@@ -209,26 +208,39 @@ describe("better-auth over the identity storage adapter", () => {
       identity = identityStack({ inert: true, schemaBoundLegacy: true });
     });
 
-    /** @scenario "A legacy account write never carries the issuer column" */
-    it("signs up and links a provider without handing the engine an issuer", async () => {
-      const cookie = await signUp(identity.auth, EMAIL);
+    /** @scenario "Legacy account writes persist synthetic and real issuers" */
+    it("persists the issuer chosen for provider and connection accounts", async () => {
+      await signUp(identity.auth, EMAIL);
       const context = await identity.auth.$context;
       const userId = identity.db.user?.[0]?.id as string;
 
       await context.internalAdapter.linkAccount({
         userId,
-        providerId: "google",
-        issuer: "local:oauth:google",
-        accountId: "sub-google-1",
+        providerId: "github",
+        issuer: "local:oauth:github",
+        accountId: "sub-github-1",
+      });
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: "connection-acme",
+        issuer: "https://login.acme.example",
+        accountId: "subject-olga",
       });
 
-      const listed = await identity.auth.api.listUserAccounts({
-        headers: new Headers({ cookie }),
-      });
-      expect(listed.map((row) => row.providerId).sort()).toEqual([
-        "credential",
-        "google",
-      ]);
+      expect(identity.db.account).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            providerId: "github",
+            accountId: "sub-github-1",
+            issuer: "local:oauth:github",
+          }),
+          expect.objectContaining({
+            providerId: "connection-acme",
+            accountId: "subject-olga",
+            issuer: "https://login.acme.example",
+          }),
+        ]),
+      );
     });
 
     /** @scenario "A connection is found by its own issuer, not refused for it" */
@@ -298,7 +310,7 @@ describe("better-auth over the identity storage adapter", () => {
       expect(row).not.toBeNull();
     });
 
-    /** @scenario "An issuer the legacy table cannot answer returns no rows instead of throwing" */
+    /** @scenario "A provider is never matched under another issuer" */
     it("answers no rows for an issuer that contradicts the provider beside it", async () => {
       await signUp(identity.auth, EMAIL);
       const context = await identity.auth.$context;
