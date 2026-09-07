@@ -21,8 +21,8 @@
  * @see ../../api/routers/dashboardWidgets.ts — the UI's tRPC twin
  */
 
-import { HandledError } from "@langwatch/handled-error";
-import { nanoid } from "nanoid";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
+import { z } from "zod";
 
 import type {
   CustomGraph,
@@ -33,8 +33,11 @@ import {
   CHART_GRID_DEFAULT_COL_SPAN,
   CHART_GRID_DEFAULT_ROW_SPAN,
   chartGridBottomRow,
+  chartGridPlacementSchema,
+  fitsChartGridWidth,
 } from "~/server/analytics/chartGrid";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
+import { generateCustomGraphId } from "~/server/analytics/customGraphId";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
@@ -42,6 +45,25 @@ import {
   type DashboardWidgetQuery,
   dashboardWidgetDefinitionSchema,
 } from "~/server/analytics/dashboardWidgetDefinition";
+
+/**
+ * Grid bounds a widget may be placed with — the twin of
+ * `SavedWorkbenchChartService`'s own `placementSchema`, same refinement
+ * against the grid's right edge.
+ */
+const placementSchema = z
+  .object({
+    dashboardId: z.string().min(1),
+    ...chartGridPlacementSchema.partial().shape,
+  })
+  .refine(
+    ({ gridColumn = 0, colSpan = CHART_GRID_DEFAULT_COL_SPAN }) =>
+      fitsChartGridWidth({ gridColumn, colSpan }),
+    {
+      message: "gridColumn + colSpan must not exceed the grid's columns",
+      path: ["colSpan"],
+    },
+  );
 
 /**
  * No dashboard widget with that id in this project.
@@ -211,7 +233,7 @@ export class DashboardWidgetService {
 
       return await tx.customGraph.create({
         data: {
-          id: nanoid(),
+          id: generateCustomGraphId(),
           projectId,
           name: input.name,
           kind: DASHBOARD_SRCDOC_CHART_KIND,
@@ -357,6 +379,92 @@ export class DashboardWidgetService {
       if (result.count === 0) throw new DashboardWidgetNotFoundError();
     });
     return this.getById({ id, projectId });
+  }
+
+  /**
+   * Places a widget on a dashboard at the grid position supplied — or, when
+   * no grid row is given, at the next row free on that dashboard, counting
+   * cards of every kind. The twin of `SavedWorkbenchChartService.placeChart`,
+   * unlike {@link assignToDashboard} (which always auto-places and keeps the
+   * widget's existing size).
+   *
+   * @throws {DashboardWidgetNotFoundError} when the target dashboard is not
+   *   in this project (including one in another project, indistinguishable
+   *   from missing — IDOR), or when the update touches no widget row.
+   */
+  async placeWidget({
+    id,
+    projectId,
+    input,
+  }: {
+    id: string;
+    projectId: string;
+    input: {
+      dashboardId: string;
+      gridColumn?: number;
+      gridRow?: number;
+      colSpan?: number;
+      rowSpan?: number;
+    };
+  }): Promise<DashboardWidget> {
+    const parsed = placementSchema.safeParse(input);
+    if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (
+        !(await dashboardBelongsToProject(
+          tx,
+          parsed.data.dashboardId,
+          projectId,
+        ))
+      ) {
+        throw new DashboardWidgetNotFoundError();
+      }
+      const onDashboard = await tx.customGraph.findMany({
+        where: { projectId, dashboardId: parsed.data.dashboardId },
+        select: { gridRow: true, rowSpan: true },
+      });
+      const result = await tx.customGraph.updateMany({
+        where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+        data: {
+          dashboardId: parsed.data.dashboardId,
+          gridColumn: parsed.data.gridColumn ?? 0,
+          gridRow: parsed.data.gridRow ?? chartGridBottomRow(onDashboard),
+          colSpan: parsed.data.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
+          rowSpan: parsed.data.rowSpan ?? CHART_GRID_DEFAULT_ROW_SPAN,
+        },
+      });
+      if (result.count === 0) throw new DashboardWidgetNotFoundError();
+    });
+    return this.getById({ id, projectId });
+  }
+
+  /**
+   * Removes a widget from whatever dashboard it is on, resetting its grid
+   * position along with the dashboard id. Idempotent: unplacing a widget
+   * that is not placed succeeds all the same.
+   *
+   * @throws {DashboardWidgetNotFoundError} when the update touches no
+   *   widget row.
+   */
+  async unplaceWidget({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<void> {
+    const result = await this.prisma.customGraph.updateMany({
+      where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+      data: {
+        dashboardId: null,
+        gridColumn: 0,
+        gridRow: 0,
+        colSpan: 1,
+        rowSpan: 1,
+      },
+    });
+    if (result.count === 0) throw new DashboardWidgetNotFoundError();
   }
 
   /** Parses a row's `graph` against the versioned schema, loud on a bad row. */

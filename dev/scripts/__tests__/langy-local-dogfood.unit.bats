@@ -62,7 +62,7 @@ EOF
 }
 
 run_doctor() {
-  PATH="$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" run "$DOCTOR" "$@"
+  PATH="$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" run "$DOCTOR" "$@"
 }
 
 # @scenario "A fully wired setup passes every check"
@@ -117,7 +117,7 @@ run_doctor() {
   chmod +x "$OUTSIDE_DIR/langwatch"
 
   PATH="$OUTSIDE_DIR:$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" \
-    LANGY_AGENT_PORT="$AGENT_PORT" run "$DOCTOR"
+    run "$DOCTOR"
   rm -rf "$OUTSIDE_DIR"
 
   [ "$status" -ne 0 ]
@@ -161,7 +161,7 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
     sleep 0.1
   done
 
-  PATH="$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
+  PATH="$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" \
     LANGY_DOCTOR_OPENAI_URL="http://127.0.0.1:${REJECT_PORT}/v1/models" \
     run "$DOCTOR"
   [ "$status" -eq 0 ]
@@ -180,10 +180,47 @@ cat >/dev/null
 printf '000'
 STUB
   chmod +x "$TEST_DIR/curlstub/curl"
-  PATH="$TEST_DIR/curlstub:$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
+  PATH="$TEST_DIR/curlstub:$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" \
     LANGY_DOCTOR_OPENAI_URL="http://localhost:${REJECT_PORT}@attacker.example/v1/models" \
     run "$DOCTOR"
   [[ "$output" == *"ignoring non-loopback endpoint override"* ]]
   grep -q "https://api.openai.com/v1/models" "$TEST_DIR/curl-args"
   ! grep -q "attacker.example" "$TEST_DIR/curl-args"
+}
+
+# @scenario "AGENT_PORT derives from PORT+4 when LANGY_AGENT_URL names no port"
+@test "with no LANGY_AGENT_URL, the doctor checks langyagent on PORT+4, not a hard-coded port" {
+  mkdir -p "$TEST_DIR/sessions" "$TEST_DIR/workspace"
+  cat >"$ENV_FILE" <<EOF
+LANGY_INTERNAL_SECRET="test-secret"
+LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
+SESSIONS_ROOT="$TEST_DIR/sessions"
+LANGY_WORKSPACE_ROOT="$TEST_DIR/workspace"
+FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled
+EOF
+  DERIVED_PORT=$((BASE_PORT + 4))
+  listen_on "$BASE_PORT"
+  listen_on $((BASE_PORT + 3))
+  listen_on "$DERIVED_PORT"
+
+  run_doctor
+  [[ "$output" == *"LANGY_AGENT_URL missing"* ]]
+  [[ "$output" == *"langyagent on :${DERIVED_PORT}"* ]]
+}
+
+# @scenario "OPENCODE_AGENT_URL is not read by the app"
+@test "OPENCODE_AGENT_URL set instead of LANGY_AGENT_URL is flagged, not silently ignored" {
+  mkdir -p "$TEST_DIR/sessions" "$TEST_DIR/workspace"
+  cat >"$ENV_FILE" <<EOF
+OPENCODE_AGENT_URL="http://localhost:${AGENT_PORT}"
+LANGY_INTERNAL_SECRET="test-secret"
+LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
+SESSIONS_ROOT="$TEST_DIR/sessions"
+LANGY_WORKSPACE_ROOT="$TEST_DIR/workspace"
+FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled
+EOF
+
+  run_doctor
+  [[ "$output" == *"OPENCODE_AGENT_URL is set but the app reads LANGY_AGENT_URL"* ]]
+  [[ "$output" == *"LANGY_AGENT_URL missing"* ]]
 }

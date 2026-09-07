@@ -81,7 +81,7 @@ function colorAt(colors: string[], index: number): string {
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-type MetricFormat = "number" | "currency" | "percent" | "duration";
+export type MetricFormat = "number" | "currency" | "percent" | "duration";
 
 /** True when a value is missing or not a usable number (null/undefined/NaN). */
 function isMissingNumber(value: unknown): boolean {
@@ -108,7 +108,7 @@ function formatDuration(ms: number | null | undefined): string {
   return `${((ms as number) / 60000).toFixed(1)}m`;
 }
 
-function formatValue(
+export function formatValue(
   value: number | string | null | undefined,
   format?: MetricFormat,
 ): string {
@@ -191,6 +191,30 @@ function compactNumber(value: unknown): string {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value as number);
+}
+
+/**
+ * A YAxis tick, honoring the same `format` a tooltip or `MetricStat` gets —
+ * compact like `compactNumber` (an axis has no room for `formatValue`'s
+ * full-precision `toLocaleString`), but with the right unit: `$` prefixed,
+ * `%` suffixed and multiplied for a 0-1 fraction, or duration-shortened.
+ * Without this, a chart declaring `format="percent"` or `"currency"` drew a
+ * bare axis number with no unit at all.
+ */
+export function formatAxisValue(value: unknown, format?: MetricFormat): string {
+  if (isMissingNumber(value)) return "";
+  const num = value as number;
+  switch (format) {
+    case "currency":
+      return `$${compactNumber(num)}`;
+    case "percent":
+      return `${compactNumber(num * 100)}%`;
+    case "duration":
+      return formatDuration(num);
+    case "number":
+    default:
+      return compactNumber(num);
+  }
 }
 
 function numericColumns(data: Row[], exclude: string[]): string[] {
@@ -405,6 +429,7 @@ export interface AreaTimeseriesProps {
   projectionFrom?: string | number;
   colors?: string[];
   height?: number;
+  format?: MetricFormat;
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: one component computing series geometry and rendering the SVG chart together.
@@ -416,6 +441,7 @@ export function AreaTimeseries({
   projectionFrom,
   colors,
   height = DEFAULT_HEIGHT,
+  format,
 }: AreaTimeseriesProps) {
   const R = recharts();
   const c = chrome();
@@ -498,7 +524,7 @@ export function AreaTimeseries({
             tickLine: false,
             width: 48,
             tick: { fill: c.axis, fontSize: 11 },
-            tickFormatter: compactNumber,
+            tickFormatter: (value: unknown) => formatAxisValue(value, format),
           }),
           h(R.Tooltip, {
             contentStyle: {
@@ -506,6 +532,7 @@ export function AreaTimeseries({
               border: `1px solid ${c.tooltipBorder}`,
             },
             labelStyle: { color: c.text },
+            formatter: (value: unknown) => formatValue(value as number, format),
           }),
           ...areas,
         ),
@@ -557,6 +584,7 @@ export interface StackedBarsProps {
   projectionFrom?: string | number;
   colors?: string[];
   height?: number;
+  format?: MetricFormat;
 }
 
 export function StackedBars({
@@ -566,6 +594,7 @@ export function StackedBars({
   projectionFrom,
   colors,
   height = DEFAULT_HEIGHT,
+  format,
 }: StackedBarsProps) {
   const R = recharts();
   const c = chrome();
@@ -599,7 +628,7 @@ export function StackedBars({
             tickLine: false,
             width: 48,
             tick: { fill: c.axis, fontSize: 11 },
-            tickFormatter: compactNumber,
+            tickFormatter: (value: unknown) => formatAxisValue(value, format),
           }),
           h(R.Tooltip, {
             contentStyle: {
@@ -607,6 +636,7 @@ export function StackedBars({
               border: `1px solid ${c.tooltipBorder}`,
             },
             labelStyle: { color: c.text },
+            formatter: (value: unknown) => formatValue(value as number, format),
           }),
           ...series.map((key, index) =>
             projectedBar(R, {
@@ -630,6 +660,7 @@ export interface GroupedBarsProps {
   series: string[];
   colors?: string[];
   height?: number;
+  format?: MetricFormat;
 }
 
 export function GroupedBars({
@@ -638,6 +669,7 @@ export function GroupedBars({
   series,
   colors,
   height = DEFAULT_HEIGHT,
+  format,
 }: GroupedBarsProps) {
   const R = recharts();
   const c = chrome();
@@ -670,7 +702,7 @@ export function GroupedBars({
             tickLine: false,
             width: 48,
             tick: { fill: c.axis, fontSize: 11 },
-            tickFormatter: compactNumber,
+            tickFormatter: (value: unknown) => formatAxisValue(value, format),
           }),
           h(R.Tooltip, {
             contentStyle: {
@@ -678,6 +710,7 @@ export function GroupedBars({
               border: `1px solid ${c.tooltipBorder}`,
             },
             labelStyle: { color: c.text },
+            formatter: (value: unknown) => formatValue(value as number, format),
           }),
           ...series.map((key, index) =>
             h(R.Bar, {
@@ -1028,6 +1061,32 @@ export function interpolateColor(from: string, to: string, t: number): string {
   return `rgb(${mix(r1, r2)}, ${mix(g1, g2)}, ${mix(b1, b2)})`;
 }
 
+/** A label cell shared by the corner gutter, the column header and the row gutter. */
+function heatmapLabelCell(opts: {
+  key: string;
+  label: string;
+  align: "center" | "right";
+  color: string;
+}) {
+  const { key, label, align, color } = opts;
+  return h(
+    "div",
+    {
+      key,
+      style: {
+        fontSize: 10.5,
+        color,
+        textAlign: align,
+        padding: align === "right" ? "0 6px 0 0" : 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      },
+    },
+    label,
+  );
+}
+
 export function Heatmap({
   data,
   xKey,
@@ -1038,6 +1097,7 @@ export function Heatmap({
   colorScale,
   height = DEFAULT_HEIGHT,
 }: HeatmapProps) {
+  const c = chrome();
   const cols = xLabels ?? (xKey === "hour" ? DEFAULT_HOUR_LABELS : undefined);
   const rows =
     yLabels ?? (yKey === "weekday" ? DEFAULT_WEEKDAY_LABELS : undefined);
@@ -1057,20 +1117,39 @@ export function Heatmap({
     );
   });
 
+  // A leading gutter column for the row labels, on top of the one column per
+  // x value the data grid already had — the corner cell above the gutter
+  // stays blank rather than growing a third row template.
+  const gridTemplateColumns = `minmax(28px, auto) repeat(${xValues.length}, minmax(16px, 1fr))`;
+
   return h(
     "div",
     { style: { height, overflow: "auto" } },
     h(
       "div",
-      {
-        style: {
-          display: "grid",
-          gridTemplateColumns: `repeat(${xValues.length}, minmax(16px, 1fr))`,
-          gap: 2,
-        },
-      },
-      ...yValues.flatMap((yValue, yIndex) =>
-        xValues.map((xValue, xIndex) => {
+      { style: { display: "grid", gridTemplateColumns, gap: 2 } },
+      heatmapLabelCell({
+        key: "corner",
+        label: "",
+        align: "center",
+        color: c.axis,
+      }),
+      ...xValues.map((xValue, xIndex) =>
+        heatmapLabelCell({
+          key: `col-${xIndex}`,
+          label: xValue,
+          align: "center",
+          color: c.axis,
+        }),
+      ),
+      ...yValues.flatMap((yValue, yIndex) => [
+        heatmapLabelCell({
+          key: `row-${yIndex}`,
+          label: yValue,
+          align: "right",
+          color: c.axis,
+        }),
+        ...xValues.map((xValue, xIndex) => {
           const raw = lookup.get(`${xValue}\u0000${yValue}`) ?? 0;
           const t = maxValue > 0 ? raw / maxValue : 0;
           return h("div", {
@@ -1083,7 +1162,7 @@ export function Heatmap({
             },
           });
         }),
-      ),
+      ]),
     ),
   );
 }
