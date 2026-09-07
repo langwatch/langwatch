@@ -186,17 +186,37 @@ export function postgresApprovedViewStatement({
   view,
   baseRelation,
   columns,
+  body,
 }: {
   schema: string;
   /** Name of the view to create. */
   view: string;
-  /** Table in the application's schema it reads. */
-  baseRelation: string;
-  /** Exposed name and the base relation's column behind it, in catalog order. */
-  columns: readonly { exposed: string; source: string }[];
+  /** Table in the application's schema it reads. Unused when {@link body} is given. */
+  baseRelation?: string;
+  /**
+   * Exposed name and the base relation's column behind it, in catalog order.
+   * Required unless {@link body} supplies the whole `SELECT … FROM …`.
+   */
+  columns?: readonly { exposed: string; source: string }[];
+  /**
+   * The `SELECT … FROM …` body, for a dataset whose approved view is not a
+   * single-relation rename (a fan-out join — see
+   * {@link LangWatchQLPostgresMapping.approvedViewSql}). The `CREATE OR REPLACE
+   * VIEW` wrapper stays here, so every approved view is created under the same
+   * name shape the reader's grants match.
+   */
+  body?: string;
 }): string {
   const quotedSchema = postgresQuoted(schema);
   const quotedView = postgresQuoted(view);
+  if (body !== undefined) {
+    return `CREATE OR REPLACE VIEW ${quotedSchema}.${quotedView} AS\n${body}`;
+  }
+  if (baseRelation === undefined || columns === undefined) {
+    throw new Error(
+      `lwql provisioning: approved view "${view}" needs either a body or a base relation and columns`,
+    );
+  }
   if (columns.length === 0) {
     throw new Error(
       `lwql provisioning: approved view "${view}" needs at least one column`,

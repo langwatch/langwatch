@@ -47,7 +47,11 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import type { LangWatchQLViewDefinition } from "./types";
+import { postgresQuoted } from "../sqlText";
+import type {
+  LangWatchQLViewColumn,
+  LangWatchQLViewDefinition,
+} from "./types";
 
 /**
  * How far behind the application's writes these datasets can be.
@@ -391,6 +395,174 @@ const EXPERIMENTS: LangWatchQLViewDefinition = {
 };
 
 /**
+ * Pull requests: one row per (project, pull request).
+ *
+ * The one mapping whose base relation is not project-scoped. `GithubPullRequest`
+ * belongs to an *organization*, but the LangWatchQL tenant is a project, so the
+ * approved view fans each organization's pull requests out across every project
+ * in it — `Project.teamId → Team.id`, `Team.organizationId → the row's org` —
+ * and each project's caller then sees, through the row policy, exactly the pull
+ * requests of the organizations it belongs to. That fan-out is a join the
+ * single-relation derivation cannot express, so this mapping supplies the
+ * approved view's body itself (see {@link LangWatchQLPostgresMapping.approvedViewSql}).
+ */
+const PULL_REQUEST_BASE_ALIAS = "pr";
+const PULL_REQUEST_TEAM_ALIAS = "t";
+const PULL_REQUEST_PROJECT_ALIAS = "prj";
+
+const PULL_REQUEST_COLUMNS: readonly LangWatchQLViewColumn[] = [
+  {
+    name: TENANT_COLUMN,
+    type: "String",
+    description:
+      "Project the pull request is attributed to — one row per project in the owning organization.",
+    gates: [],
+    sourceColumns: ["id"],
+  },
+  {
+    name: "PrNumber",
+    type: "UInt32",
+    description: "Pull request number within its repository.",
+    gates: [],
+    sourceColumns: ["prNumber"],
+  },
+  {
+    name: "Title",
+    type: "String",
+    description: "Title of the pull request.",
+    gates: [],
+    sourceColumns: ["title"],
+  },
+  {
+    name: "RepositoryHost",
+    type: "String",
+    description: "Host the repository lives on, for example github.com.",
+    gates: [],
+    sourceColumns: ["repositoryHost"],
+  },
+  {
+    name: "RepositoryFullName",
+    type: "String",
+    description: "Repository the pull request belongs to, as owner/repo.",
+    gates: [],
+    sourceColumns: ["repositoryFullName"],
+  },
+  {
+    name: "HeadBranch",
+    type: "String",
+    description: "Branch the pull request was opened from.",
+    gates: [],
+    sourceColumns: ["headBranch"],
+  },
+  {
+    name: "State",
+    type: "String",
+    description: "GitHub's own state string: open or closed.",
+    gates: [],
+    sourceColumns: ["state"],
+  },
+  {
+    name: "IsDraft",
+    type: "Bool",
+    description: "Whether the pull request is a draft.",
+    gates: [],
+    sourceColumns: ["isDraft"],
+  },
+  {
+    name: "AuthorLogin",
+    type: "Nullable(String)",
+    description: "GitHub login of the author, null when GitHub reported none.",
+    gates: [],
+    sourceColumns: ["authorLogin"],
+  },
+  {
+    name: "HtmlUrl",
+    type: "String",
+    description: "Link to the pull request on its host.",
+    gates: [],
+    sourceColumns: ["htmlUrl"],
+  },
+  {
+    name: "PrCreatedAt",
+    type: "DateTime64(3)",
+    description:
+      "When the pull request was opened. Filter on this to prune partitions.",
+    gates: [],
+    sourceColumns: ["prCreatedAt"],
+  },
+  {
+    name: "PrClosedAt",
+    type: "Nullable(DateTime64(3))",
+    description: "When the pull request was closed, null while it is open.",
+    gates: [],
+    sourceColumns: ["prClosedAt"],
+  },
+  {
+    name: "PrMergedAt",
+    type: "Nullable(DateTime64(3))",
+    description: "When the pull request was merged, null when it was not.",
+    gates: [],
+    sourceColumns: ["prMergedAt"],
+  },
+  {
+    name: "UpdatedAt",
+    type: "DateTime64(3)",
+    description: "When this snapshot of the pull request was last refreshed.",
+    gates: [],
+    sourceColumns: ["updatedAt"],
+  },
+];
+
+/** The approved view's body: each org's pull requests, one row per project in it. */
+function pullRequestApprovedViewSql({ schema }: { schema: string }): string {
+  const s = postgresQuoted(schema);
+  const base = postgresQuoted(PULL_REQUEST_BASE_ALIAS);
+  const team = postgresQuoted(PULL_REQUEST_TEAM_ALIAS);
+  const project = postgresQuoted(PULL_REQUEST_PROJECT_ALIAS);
+  const projection = PULL_REQUEST_COLUMNS.map((column) => {
+    const [source] = column.sourceColumns;
+    const alias = column.name === TENANT_COLUMN ? project : base;
+    return `  ${alias}.${postgresQuoted(source!)} AS ${postgresQuoted(column.name)}`;
+  }).join(",\n");
+  return (
+    `SELECT\n${projection}\n` +
+    `FROM ${s}.${postgresQuoted("GithubPullRequest")} AS ${base}\n` +
+    `JOIN ${s}.${postgresQuoted("Team")} AS ${team} ` +
+    `ON ${team}.${postgresQuoted("organizationId")} = ${base}.${postgresQuoted("organizationId")}\n` +
+    `JOIN ${s}.${postgresQuoted("Project")} AS ${project} ` +
+    `ON ${project}.${postgresQuoted("teamId")} = ${team}.${postgresQuoted("id")}`
+  );
+}
+
+const PULL_REQUESTS: LangWatchQLViewDefinition = {
+  name: "pull_requests",
+  sourceTable: "pull_requests_pg",
+  postgres: {
+    baseRelation: "GithubPullRequest",
+    approvedView: "lwql_pull_requests",
+    tenantSourceColumn: "id",
+    approvedViewSql: pullRequestApprovedViewSql,
+  },
+  description:
+    "One row per project per pull request opened by a coding agent in the project's organization.",
+  gates: [],
+  grain:
+    "one row per (TenantId, RepositoryHost, RepositoryFullName, PrNumber)",
+  joinKeys: ["TenantId", "RepositoryHost", "RepositoryFullName"],
+  timeColumn: "PrCreatedAt",
+  freshness: LIVE_FRESHNESS,
+  dedup: {
+    keyColumns: [
+      TENANT_COLUMN,
+      "RepositoryHost",
+      "RepositoryFullName",
+      "PrNumber",
+    ],
+  },
+  columns: PULL_REQUEST_COLUMNS,
+};
+
+/**
  * The PostgreSQL-resident datasets, in the order the schema endpoint lists
  * them: the entity a question is about, then the dimensions that name it.
  */
@@ -400,4 +572,5 @@ export const LWQL_POSTGRES_CATALOG: readonly LangWatchQLViewDefinition[] = [
   PROJECTS,
   PROMPTS,
   PROMPT_VERSIONS,
+  PULL_REQUESTS,
 ];

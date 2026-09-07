@@ -586,20 +586,28 @@ export function lwqlPostgresApprovedViewStatements({
   views?: readonly LangWatchQLViewDefinition[];
 }): string[] {
   return lwqlPostgresViews(views).map((view) =>
-    postgresApprovedViewStatement({
-      schema,
-      view: view.postgres.approvedView,
-      baseRelation: view.postgres.baseRelation,
-      columns: view.columns.map((column) => ({
-        exposed: column.name,
-        // The tenant column is the one rename every mapping performs; the rest
-        // are the base relation's own names, taken from the catalog.
-        source:
-          column.name === TENANT_COLUMN
-            ? view.postgres.tenantSourceColumn
-            : singleSourceColumn(view, column.name),
-      })),
-    }),
+    // A dataset whose approved view is a fan-out join supplies its own body —
+    // the derivation below is a single-relation rename and cannot express it.
+    view.postgres.approvedViewSql
+      ? postgresApprovedViewStatement({
+          schema,
+          view: view.postgres.approvedView,
+          body: view.postgres.approvedViewSql({ schema }),
+        })
+      : postgresApprovedViewStatement({
+          schema,
+          view: view.postgres.approvedView,
+          baseRelation: view.postgres.baseRelation,
+          columns: view.columns.map((column) => ({
+            exposed: column.name,
+            // The tenant column is the one rename every mapping performs; the
+            // rest are the base relation's own names, taken from the catalog.
+            source:
+              column.name === TENANT_COLUMN
+                ? view.postgres.tenantSourceColumn
+                : singleSourceColumn(view, column.name),
+          })),
+        }),
   );
 }
 

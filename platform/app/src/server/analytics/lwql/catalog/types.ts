@@ -236,8 +236,32 @@ export interface LangWatchQLPostgresMapping {
    * Named separately from the exposed `TenantId` because the application's
    * schema calls it something else on every table, and the approved view is
    * what reconciles the two.
+   *
+   * When {@link approvedViewSql} is set the base relation is not itself
+   * project-scoped, and this names the column the *fan-out* resolves the tenant
+   * to (e.g. `Project.id`) — for documentation and for the source-column
+   * derivation, since the SQL is then supplied whole.
    */
   readonly tenantSourceColumn: string;
+  /**
+   * The approved view's `SELECT … FROM …` body, for a dataset whose approved
+   * view is not a single-relation rename.
+   *
+   * Almost every mapping is a projection over one base relation, so the
+   * provisioner derives the whole approved view from {@link baseRelation} and
+   * the catalog's column list — a rename, never a computation. One dataset is
+   * not that shape: `GithubPullRequest` is organization-scoped, but the
+   * LangWatchQL tenant is a *project*, so its approved view fans each
+   * organization's rows out across every project in it (one row per project per
+   * pull request). That needs a join the derivation cannot express, so the
+   * mapping supplies the body directly, given the PostgreSQL schema. The
+   * `CREATE OR REPLACE VIEW` wrapper, the exposed-column names, and the
+   * `TenantId` contract are still the provisioner's — the body must alias every
+   * column to the catalog's exposed name and expose `TenantId`.
+   *
+   * Absent for every dataset whose approved view is a plain projection.
+   */
+  readonly approvedViewSql?: (args: { schema: string }) => string;
 }
 
 /**
