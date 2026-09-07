@@ -36,7 +36,9 @@ const noop = () => {
 
 /** Everything the human form printed, joined. */
 function printed(log: ReturnType<typeof vi.spyOn>): string {
-  return log.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+  return log.mock.calls
+    .map((call: unknown[]) => call.map(String).join(" "))
+    .join("\n");
 }
 
 describe("langwatch virtual-keys create", () => {
