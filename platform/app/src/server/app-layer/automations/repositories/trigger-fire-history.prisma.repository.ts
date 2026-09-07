@@ -76,6 +76,27 @@ export class PrismaTriggerFireHistoryRepository
     });
   }
 
+  async findLatestByTriggerId({
+    projectId,
+    triggerId,
+  }: {
+    projectId: string;
+    triggerId: string;
+  }): Promise<TriggerFire | null> {
+    return this.prisma.triggerSent.findFirst({
+      where: { projectId, triggerId },
+      orderBy: { createdAt: "desc" },
+      // Metadata only, for the same reason as the list reads above.
+      select: {
+        id: true,
+        triggerId: true,
+        customGraphId: true,
+        createdAt: true,
+        resolvedAt: true,
+      },
+    });
+  }
+
   async findAllRecentForProject({
     projectId,
     limit,

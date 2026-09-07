@@ -51,6 +51,15 @@ export interface TriggerFireHistoryRepository {
   }): Promise<TriggerFire[]>;
 
   /**
+   * The single newest fire for one trigger, or null when it never fired.
+   * Backs the `/api/health/triggers` probe. Same metadata-only contract.
+   */
+  findLatestByTriggerId(params: {
+    projectId: string;
+    triggerId: string;
+  }): Promise<TriggerFire | null>;
+
+  /**
    * Every trigger's recent fires across the project, newest first — the feed
    * behind "what have my automations actually been doing?". Same metadata-only
    * contract as `findAllRecentByTriggerId`: no trace ids, no trace content.
