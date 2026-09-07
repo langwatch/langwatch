@@ -29,7 +29,11 @@ import {
   LICENSE_LIMIT_ERRORS,
 } from "../../license-enforcement/license-limit-guard";
 import { getRoleChangeType } from "../../license-enforcement/member-classification";
-import { isCustomRole } from "../enterprise";
+import {
+  assertEnterprisePlan,
+  ENTERPRISE_FEATURE_ERRORS,
+  isCustomRole,
+} from "../enterprise";
 import {
   batchScopePermissions,
   checkOrganizationPermission,

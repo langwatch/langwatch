@@ -24,6 +24,12 @@ import { z } from "zod";
 
 type MemoryDb = Record<string, Record<string, unknown>[]>;
 
+type PublicJwk = JsonWebKey & {
+  alg: string;
+  kid: string;
+  use: string;
+};
+
 type TokenVariant =
   | "valid"
   | "wrong-signature"
@@ -41,7 +47,7 @@ let idp: Server;
 let issuer: string;
 let signingKey: KeyObject;
 let wrongSigningKey: KeyObject;
-let publicJwk: JsonWebKey;
+let publicJwk: PublicJwk;
 
 const json = (response: import("node:http").ServerResponse, value: unknown) => {
   response.writeHead(200, { "content-type": "application/json" });
@@ -178,7 +184,10 @@ const applyResponseCookies = (
   }
 
   for (const setCookie of response.headers.getSetCookie()) {
-    const pair = setCookie.split(";", 1)[0];
+    const [pair] = setCookie.split(";", 1);
+    if (!pair) {
+      continue;
+    }
     const separator = pair.indexOf("=");
     if (separator < 1) {
       continue;
