@@ -140,18 +140,29 @@ const blankComposer = (): ComposerState => ({
   traceProjectId: null,
 });
 
-function fmtRelative(date: Date | string | null): string {
+/**
+ * How long ago, in words.
+ *
+ * Units are spelled out. "23m ago" saves a few pixels and costs the reader a
+ * guess — minutes or months — on a line whose whole job is to say whether
+ * anything is still coming in.
+ */
+export function fmtRelative(date: Date | string | null): string {
   if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
   const diffMs = Date.now() - d.getTime();
   const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 60) return `${plural(sec, "second")} ago`;
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return `${plural(min, "minute")} ago`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return `${plural(hr, "hour")} ago`;
   const days = Math.floor(hr / 24);
-  return `${days}d ago`;
+  return `${plural(days, "day")} ago`;
+}
+
+function plural(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? "" : "s"}`;
 }
 
 /**
@@ -892,7 +903,13 @@ function AddSourceControl({
   );
 }
 
-function SourceRow({
+/**
+ * One source in the list. Exported so a test can read the line it renders
+ * about arrival times against the source page's own tile — the two used to say
+ * "last event" and mean different things, and only rendering both catches them
+ * drifting back together.
+ */
+export function SourceRow({
   source,
   isPendingRotate,
   isPendingArchive,
@@ -966,8 +983,15 @@ function SourceRow({
               {status.label}
             </Text>
           </HStack>
+          {/* "Data last arrived", not "last event". `lastEventAt` is stamped
+              when a pull DELIVERED something, so this answers "is anything
+              still coming in" — the question a list of sources is read for.
+              The source's own page shows the other number, the time written on
+              the newest event, and the two are routinely hours apart because a
+              daily report is stamped at the start of its day. One label for
+              both was the whole confusion. */}
           <Text fontSize="xs" color="fg.muted">
-            · last event {fmtRelative(source.lastEventAt ?? null)}
+            · data last arrived {fmtRelative(source.lastEventAt ?? null)}
           </Text>
         </HStack>
       </VStack>

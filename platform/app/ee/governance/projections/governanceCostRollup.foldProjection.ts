@@ -17,6 +17,7 @@ import {
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
+import { actorIdForRollupWrite } from "../services/logic/erasedActorId";
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_ROLLUP_PROJECTION_NAME,
@@ -263,7 +264,11 @@ function dimensionsOf(event: {
       ingestionSourceId: d.ingestionSourceId,
       provider: d.source,
       model: d.model,
-      agentId: "",
+      // The agent/application within the source, when the provider named one
+      // (#7881): today the Genie space; `""` for providers that name none and
+      // for every event written before the field existed. Same `??` fallback
+      // rationale as the currency and actor below.
+      agentId: d.agentId ?? "",
       // The currency the PROVIDER billed in, carried from the event. A cell is
       // keyed by it, so a day billed in two currencies is two rows and nothing
       // can sum across them (ADR-128 §3).
@@ -273,7 +278,20 @@ function dimensionsOf(event: {
       // otherwise put `undefined` in the key, and a rebuild would address
       // every historical cell under a key the stored row does not have.
       currencyCode: readPulledUsageMoney(d).currencyCode,
-      rawActorId: "",
+      // The provider's raw spender id, `""` for every event written before
+      // ADR-129 and for every day its named-or-blank line keeps blank. Read
+      // with a fallback for the same reason as the currency above: nothing
+      // parses these events on the way in, so a legacy event would otherwise
+      // put `undefined` in the key.
+      //
+      // Routed through the erasure substitution exactly like the gateway
+      // branch below, and for the same reason: this tuple is the row's key,
+      // and a replay that re-derived an erased original would write it back
+      // beside the pseudonymized row and double the amount.
+      rawActorId: actorIdForRollupWrite({
+        tenantId: event.tenantId,
+        rawActorId: d.rawActorId ?? "",
+      }),
     };
   }
   const d = event.data as unknown as GatewaySpendConfirmedEvent["data"];
@@ -284,13 +302,24 @@ function dimensionsOf(event: {
     ingestionSourceId: "",
     provider: d.model_provider_id,
     model: d.model,
+    // Honestly blank, not a stub (#7881): the gateway spend event carries no
+    // agent field, so this lane has nothing to report until it does.
     agentId: "",
     // The gateway prices every outcome off its own dollar-denominated rate
     // table, so this lane has one currency and it is not read off the event.
     currencyCode: GOVERNANCE_COST_CURRENCY_USD,
     // The spender is the key's principal; the caller's own end user is the
     // fallback for a key with no resolved principal.
-    rawActorId: d.principal_user_id || d.end_user_id,
+    //
+    // Substituted for a pseudonym when this identifier has been erased
+    // (ADR-128 §9 step 5). It has to happen HERE rather than at the store,
+    // because this tuple is also the row's key: erasure removes the old rows
+    // and replays the days, and a replay that re-derived the original would
+    // write it back beside the pseudonymized row and double the amount.
+    rawActorId: actorIdForRollupWrite({
+      tenantId: event.tenantId,
+      rawActorId: d.principal_user_id || d.end_user_id,
+    }),
   };
 }
 

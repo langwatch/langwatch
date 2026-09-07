@@ -2614,6 +2614,11 @@ export class DatabricksGeniePuller
           costStatus: "estimate",
           costUsd: "0",
           dimensions,
+          // The space IS the agent here — the configured thing people talk to
+          // (#7881). Same value as `dimensions.spaceId`, deliberately: the
+          // record seam keeps the agent out of the restatement key, and the
+          // rollup's AgentId column gets it from this field alone.
+          agentId: space.space_id,
           model: GENIE_MODEL,
         },
       },

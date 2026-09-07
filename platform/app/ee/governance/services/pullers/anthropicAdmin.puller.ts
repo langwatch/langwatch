@@ -742,6 +742,12 @@ export class AnthropicAdminPuller
     return {
       source_event_id: `usage:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
+      // Empty on purpose, not an oversight. The usage report groups by model,
+      // workspace, key, tier and context window — there is no person dimension
+      // to ask for, so no row here names one. Person discovery skips a blank
+      // actor, which is the right answer: inventing one would attribute the
+      // whole workspace's tokens to a made-up name. Attribution for Anthropic
+      // has to come from the key, elsewhere.
       actor: "",
       action: "usage_report",
       target: dimension(result.model),
@@ -810,6 +816,11 @@ export class AnthropicAdminPuller
     return {
       source_event_id: `cost:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
+      // Empty on purpose, not an oversight — and unlike the OpenAI sibling,
+      // which does name a person and fills this in. `COST_GROUP_BY` above is
+      // the endpoint's whole set: workspace and description. The report carries
+      // no user dimension at all, so there is nobody on the row to name and
+      // person discovery correctly discovers nobody from Anthropic spend.
       actor: "",
       action: "cost_report",
       target: dimension(result.model),

@@ -43,6 +43,7 @@ import {
 } from "~/components/ui/dialog";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import {
@@ -242,7 +243,7 @@ function NoDataSinceCallout({ source }: { source: Source }) {
  * source, and the first thing an admin does about a silent source is go
  * rebuild an integration that was never broken. The alert takes their place.
  */
-function SourceHealthCards({
+export function SourceHealthCards({
   health,
   error,
   isLoading,
@@ -276,9 +277,15 @@ function SourceHealthCards({
         value={numeral(health?.events30d ?? 0).format("0,0")}
         isLoading={isLoading}
       />
+      {/* Not "last event": the source list says that, and means something
+          else — the moment data last arrived here. This is the time written
+          ON the newest event, which for a report covering a whole day is that
+          day's opening minute. The two numbers are both right and routinely
+          hours apart, so they get names a reader can tell apart. */}
       <MetricCard
-        title="Last event"
+        title="Newest event time"
         value={fmtRelative(health?.lastSuccessIso ?? null)}
+        hint="The time carried on the event itself, not the time we collected it. A report covering a whole day is stamped at the start of that day."
         isLoading={isLoading}
       />
     </SimpleGrid>
@@ -821,12 +828,36 @@ function EmptyEventsHint({ source }: { source: Source }) {
 function MetricCard({
   title,
   value,
+  hint,
   isLoading,
 }: {
   title: string;
   value: string;
+  /**
+   * The sentence a reader needs to know what the number means, when the title
+   * alone cannot carry it. On the title rather than the value: the question is
+   * always "what is this", never "what is this particular figure".
+   */
+  hint?: string;
   isLoading?: boolean;
 }) {
+  const label = (
+    <Text
+      fontSize="xs"
+      fontWeight="semibold"
+      color="fg.muted"
+      textTransform="uppercase"
+      letterSpacing="wider"
+      // Only when there is a hint, so a card without one is not decorated with
+      // a dotted underline promising an explanation that never appears.
+      textDecoration={hint ? "underline dotted" : undefined}
+      textUnderlineOffset={hint ? "3px" : undefined}
+      cursor={hint ? "help" : undefined}
+      width="fit-content"
+    >
+      {title}
+    </Text>
+  );
   return (
     <Box
       borderWidth="1px"
@@ -834,15 +865,7 @@ function MetricCard({
       borderRadius="md"
       padding={4}
     >
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        textTransform="uppercase"
-        letterSpacing="wider"
-      >
-        {title}
-      </Text>
+      {hint ? <Tooltip content={hint}>{label}</Tooltip> : label}
       {isLoading ? (
         <Spinner size="xs" marginTop={2} />
       ) : (

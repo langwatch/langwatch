@@ -356,14 +356,17 @@ production. Wave 1 ships with, not after:
   `IngestionSource` status so a day with no rows renders "no data since
   [last successful pull]" — distinct from a genuine $0 day.
   **Unhealthy = 3 consecutive failed runs** (ruled by Sergio
-  2026-08-29); a single flake never flips status, a third strike always
-  does. Prerequisite named in §20, and it is *two* fixes, not one: the
-  puller worker today never flips source status on repeated failure
+  2026-08-29); a single flake never reads as unhealthy, a third strike always
+  does. **[Implementation note: health is *derived at read* from recent run
+  history (`pullers/sourceHealth.ts`) and is never written to the source row —
+  `IngestionSource.status` says what an admin configured, and a broken provider
+  must not rewrite it.]** Prerequisite named in §20, and it is *two* fixes, not
+  one: the puller worker today records no consecutive-failure count
   (`pullerWorker.ts` `assertRunMadeProgress` raises and stops), the
   model's error counter has **no production writer**, and no
   last-successful-pull timestamp exists at all (`lastEventAt` records
   any event's time, not pull success) — the render needs a **new
-  field** plus the status flip.
+  field** plus the failure count the derivation reads.
 
 The variance line (§2) already gives bill-vs-metering drift a first-class
 UI; these three give the pipeline itself the same honesty.
@@ -395,6 +398,8 @@ added when a lane actually ships, never reserved ahead of one.
 
 ### §6. Seat counts are durable events; seat money never is
 
+> **[REVERSED — see revision v3.11]** Seats ship as counts only; no price list was built.
+
 Each day the roster puller writes an event: *"provider reported N seats of
 type X."* Like every other pulled event it lands on the log and is folded
 into a projection the screen can read — `governance_seat_count_1d`
@@ -421,6 +426,8 @@ pure compute-at-read with no events (loses roster history — the count on
 a past date becomes unknowable).
 
 ### §7. Every dollar has one home; the exclusion filter and key-to-bill mapping ship in wave 2
+
+> **[DELETED in 63be0964c2 — see revision v3.11]** The coverage feature described below was removed on 2026-09-04. The exclusion constraint and 23P01 mapping below were never implemented in any version.
 
 Gateway, provider-bill, and seat channels are separately labeled and never
 double-count. **In wave 1 this invariant is structural**: the lanes are
@@ -460,7 +467,7 @@ than letting the last admin to hit Save win. The rule then reads:
   is still shown alongside.
 
   "No conversion held" is **NULL, never 0**. The USD column is
-  `Nullable(Int64)` defaulting to NULL (migration 00089), because zero is
+  `Nullable(Int64)` defaulting to NULL (migration 00092), because zero is
   a legal cost — free-tier and zero-rated rows really do cost nothing —
   so a 0 sentinel cannot tell "we hold no USD figure" apart from "this
   cost nothing", and a reader charting it would draw the unpriced rows as
@@ -524,15 +531,18 @@ Making midnight the only legal effective time is what keeps "May stays
 under Bill 1" true on the one day people actually check it. Admin UI
 therefore offers a date, not a timestamp.
 
-**Deployment: `btree_gist` is the repo's first extension.** No
-`CREATE EXTENSION` exists in the 297 migrations shipped so far. The
-migration must check the extension is available and fail with an
-actionable message rather than half-applying; the self-host
-documentation and the Helm chart must state the requirement; and
-availability must be verified per managed-Postgres provider before the
-migration ships (Azure Database for PostgreSQL in particular is
-unverified). This applies equally to `IdentityMatch` and `SeatPrice`,
-which use the same guard.
+**Deployment: no extensions.** An earlier revision made `btree_gist`
+the repo's first `CREATE EXTENSION`, for `IdentityMatch`'s overlap
+constraint — with an availability guard in the migration, a stated
+requirement in the self-host documentation and the Helm chart, and
+per-provider verification before shipping. That was reversed before
+anything shipped: nothing in wave 2 ever closes a link (no writer sets
+`validTo`), so the overlap rule degenerates to "at most one OPEN link
+per person", which a plain partial unique index holds with no extension
+at all. `SeatPrice` must make its own call when it ships — its dated
+price ranges do close, so if it wants the general overlap rule held in
+the database it re-opens this deployment question, guard and docs and
+provider verification included.
 
 The mapping is edited beside the source config (small admin list,
 audited, read at query time like every overlap rule). The exclusion filter
@@ -626,7 +636,7 @@ email address), GDPR erasure:
    what we erased. The list stores hashes, never the identifier, so it
    is not itself a copy of the data it exists to keep out. The stored
    `identifierHash` and the pseudonym written in step 5 are **the same
-   function of the same input** — `SHA-256(secret ‖ original)` — so a
+   function of the same input** — `HMAC-SHA256(secret, original)` — so a
    write path computes that digest once and uses it twice: as the
    membership test against this list, and, on a hit, as the value it
    writes in place of the original.
@@ -671,7 +681,7 @@ email address), GDPR erasure:
    identifier sitting in the table. `TenantId` leads the ORDER BY and is
    never empty, and the history table is what makes the scope survive an
    org that has been renamed or re-tenanted. The pseudonym is deterministic (e.g.
-   `SHA-256(secret ‖ original)`) so every replay lands on one stable key
+   `HMAC-SHA256(secret, original)`) so every replay lands on one stable key
    rather than minting a new one per run.
 
    Bounded by the replay horizon, and honestly: for days older than
@@ -698,7 +708,7 @@ email address), GDPR erasure:
    `ErasedIdentifierSuppression` for this `(organizationId, provider)`,
    and on a hit write that same digest in place of the original — the
    suppression list's `identifierHash` and the pseudonym are one
-   `SHA-256(secret ‖ original)`, computed once per write and used for
+   `HMAC-SHA256(secret, original)`, computed once per write and used for
    both the lookup and the replacement (step 1). Because the
    pseudonym is deterministic in the original, every replay of every day
    lands on the same key without anything ever having been stored.
@@ -707,6 +717,9 @@ email address), GDPR erasure:
    for the same reason it does on the suppression list: the same raw
    actor id string can be a different person under a different provider
    or tenant.
+
+   **[Implementation note: the fold's check is organization-wide by design —
+   see `suppressionSnapshot.ts` — wider than stated here.]**
 
    Tests, against the ClickHouse version we deploy rather than a mock:
    erase, replay, assert the rollup contains only the pseudonymized key
@@ -895,9 +908,13 @@ The match policy for `IdentityMatch`:
   before any edit distance is computed — a length band plus a
   shared-token requirement — and only surviving pairs are scored. The
   job runs when its inputs change (new or updated discovered people, org
-  membership changes), never per page view. Suggestion rows are
-  invalidated and recomputed by the same job, so the lifecycle v3.8
-  wanted to avoid is a job's, not a screen's.
+  membership changes), never per page view, and **never on a timer**:
+  nothing writes a discovered person yet, so a standing appointment
+  would read an empty table on every organization for ever. The engine
+  is built and runs when something asks it to; the caller arrives with
+  the feed that discovers people, and it is a call site rather than a
+  redesign. Suggestion rows are invalidated and recomputed by the same
+  job, so the lifecycle v3.8 wanted to avoid is a job's, not a screen's.
 
   Accepted cost: a suggestion can be a few minutes stale after a
   discovery, and dismissals are now storable but stay out of v1 (a maybe
@@ -1074,7 +1091,7 @@ shipping the widening without the containment:
   TTL at all, so today its rows are kept forever. It gets a **fixed
   13-month `TTL … DELETE`** written into the migration, and stays
   **absent from `RETENTION_TABLE_CATEGORY_MAP` and `TABLE_TTL_CONFIG`** —
-  which is the actual precedent migration 00087 set for the rollup, for
+  which is the actual precedent migration 00092 set for the rollup, for
   the same reason that applies here: the identifier is personal data, so
   its holding period must be a fixed bound rather than a customer
   setting. Enrolling the table in the retention map is ruled out, not
@@ -1167,13 +1184,16 @@ then.
 - **Audit single-copy** — the 9 adapters' direct-insert audit path
   becomes journal-backed on a separate infra track; not an ADR
   risk.
-- **Puller success/failure must persist onto the source** — today
-  `assertRunMadeProgress` (`pullerWorker.ts:261-289`) raises but never
-  marks the `IngestionSource` unhealthy, the error counter has no
+- **Puller success/failure must be recorded per run** — today
+  `assertRunMadeProgress` (`pullerWorker.ts:261-289`) raises but records
+  no consecutive-failure count, the error counter has no
   production writer, and no last-successful-pull field exists
   (`lastEventAt` is not pull success), so a silently-failing puller is
-  indistinguishable from a $0 day. The fix is a status flip on repeated
-  failure **plus a new last-successful-pull timestamp**; §4a's "no data
+  indistinguishable from a $0 day. **[Implementation note: the fix is not a
+  status flip — health is derived at read from recent run history
+  (`pullers/sourceHealth.ts`), and `IngestionSource.status` is never written by
+  a puller.]** The fix is a consecutive-failure count **plus a new
+  last-successful-pull timestamp**; §4a's "no data
   since [date]" render depends on both; ships with wave 1.
 - The broken `openai_compliance` / `claude_compliance` sources are
   replaced/retired per ADR-122's diagnosis, outside this document.
@@ -1352,7 +1372,8 @@ copy is of the shape, not the semantics.** The seat union
 the panel switches copy on*. It is **not** precedent for reporting a
 provider refusal (corrected by the red-team, v3.4): its `read_failed`
 arm fires only when **our own** ClickHouse query throws
-(`governanceCost.service.ts:275-295`); a provider-side Graph 403 writes
+(`governanceCost.service.ts:129-131` for the lane DTO,
+`:545-555` for the `read_failed` emission); a provider-side Graph 403 writes
 no rows and renders as `awaiting_data` — the exact collapse §21.3
 forbids for spend. Spend copies the union shape and must do better than
 its semantics; the seat lane's own gap is recorded as an open question
@@ -1454,8 +1475,8 @@ drift apart).
 
 | Path | Reversible? | Blast radius | Gate |
 |---|---|---|---|
-| ClickHouse migration `ALTER`ing `governance_cost_rollup_1d` (the table itself shipped in wave 1 as 00087; wave 2 adds exactly two columns, `RevisedAt` and `LastObservedAt` — the prior-amount column `PreviousAmountNanoUsd` is already there) | no (schema) | large | human review + a written manual rollback (`DROP COLUMN` per added column — the down path is narrower than wave 1's `DROP TABLE` precisely because the table is not ours to drop any more) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
-| Prisma migration adding the identity tables, seat price list, coverage, tenant history, suppression list and suggestion index | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration); the migration is also the repo's first `CREATE EXTENSION` (`btree_gist`, §7) — it must check availability and fail actionably, and the self-host docs and Helm chart must state the requirement |
+| ClickHouse migration `ALTER`ing `governance_cost_rollup_1d` (the table itself shipped in wave 1 as 00092; wave 2 adds exactly two columns, `RevisedAt` and `LastObservedAt`, as migration 00093 — the prior-amount column `PreviousAmountNanoUsd` is already there) | no (schema) | large | human review + a written manual rollback (`DROP COLUMN` per added column — the down path is narrower than wave 1's `DROP TABLE` precisely because the table is not ours to drop any more) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
+| Prisma migration adding the identity tables, [seat price list — reversed v3.11], [coverage — deleted v3.11], tenant history, suppression list and suggestion index | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration); the identity migration needs no extensions (§7 — the one-open-link rule is a plain partial unique index); if `SeatPrice` re-opens the `btree_gist` question, that PR re-inherits the availability-guard, docs and Helm gates |
 | Rollup fold projection | yes (replayable) | large | automated: replay-equality test; feature flags gate the screens (no §7 dependency in wave 1 — lanes never summed) |
 | Exclusion filter + key-to-bill mapping (wave 2) | yes | large (money correctness) | automated: one-dollar-one-home test suite is a merge blocker for the first lane-merging screen |
 | Auto-link on deterministic evidence | yes (links are dated; closing reverses) | medium | automated: conflict-rule tests (two candidates → suspend + flag); fuzzy scoring runs **only** in §12's background suggestion job, never inline in a request — test: no request path computes an edit distance |
@@ -1471,11 +1492,12 @@ drift apart).
 Sketches, not DDL — the exact shipped statement is the migration.
 
 `governance_cost_rollup_1d` **already exists**: it shipped with wave 1 as
-migration `00087`, and the `CREATE TABLE` below is shown whole only
+migration `00092`, and the `CREATE TABLE` below is shown whole only
 because a column list is the readable way to say what the table means.
 Wave 2 does not create it, and adds **two** columns, not three:
-`RevisedAt` and `LastObservedAt`, by **`ALTER TABLE … ADD COLUMN`**. The
-prior-amount column is *not* one of them — 00087 already ships
+`RevisedAt` and `LastObservedAt`, by **`ALTER TABLE … ADD COLUMN`** in
+migration `00093`. The
+prior-amount column is *not* one of them — 00092 already ships
 `PreviousAmountNanoUsd Nullable(Int64)` alongside `RevisionCount`, so
 adding a `PreviousAmountNano` would put a second prior-amount money
 column on the table and leave a reader to guess which one is authoritative.
@@ -1490,7 +1512,7 @@ was ever going to touch again.
 
 ```sql
 -- ClickHouse: the one summed table (fed by fold projection, NOT an MV).
--- As shipped in migration 00089 — read that file, not this block, when
+-- As shipped in migration 00092 — read that file, not this block, when
 -- the two ever disagree. Wave 2 ALTERs it, it does not create.
 CREATE TABLE governance_cost_rollup_1d (
     -- ---- the sort key: the fold's group key, exactly ----
@@ -1516,7 +1538,7 @@ CREATE TABLE governance_cost_rollup_1d (
     RequestCount       UInt64 DEFAULT 0,
     RevisionCount      UInt32 DEFAULT 0,        -- §15 restatement history
     PreviousAmountNanoUsd Nullable(Int64) DEFAULT NULL,  -- §15 "was $X"
-                                      -- shipped in 00087, not added by wave 2
+                                      -- shipped in 00092, not added by wave 2
     RevisedAt          Nullable(DateTime) DEFAULT NULL,  -- §15 marker, wave 2 ADDs it
                                       -- (latest revision only)
     LastObservedAt     DateTime DEFAULT 0,      -- §15: when a pull last TOUCHED this day.
@@ -1618,15 +1640,14 @@ model IdentityMatch {
   validTo            DateTime? // open link = null; offboarding/correction closes, never rewrites
   createdAt          DateTime  @default(now())
   // at most one OPEN link per discovered person — enforced with a partial unique index
-  // (raw SQL in the migration: UNIQUE (discoveredPersonId) WHERE validTo IS NULL)
-  // Overlap guard: no two rows for the same discoveredPersonId may have overlapping
-  // validity ranges. Enforced by an exclusion constraint (raw SQL in the migration:
-  // CREATE EXTENSION IF NOT EXISTS btree_gist;
-  // EXCLUDE USING gist ("discoveredPersonId" WITH =,
-  //   tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&)).
-  // tsrange treats NULL validTo as unbounded via COALESCE, so both open and closed
-  // rows participate. Without it, a read-time join on validFrom <= spendDate < validTo
-  // could match multiple rows.
+  // (raw SQL in the migration: UNIQUE (discoveredPersonId) WHERE validTo IS NULL,
+  // SQLSTATE 23505; Prisma wraps it as P2002 and the app maps both to one sentence).
+  // An earlier revision held the general overlap rule instead (btree_gist EXCLUDE,
+  // both open and closed rows participating) so a read-time join on
+  // validFrom <= spendDate < validTo could never match two rows. Reversed before
+  // shipping: nothing in wave 2 writes validTo, so closed rows cannot exist and the
+  // general rule guarded an unreachable case at the price of an extension
+  // requirement on every Postgres. Revisit when closing links ships.
 }
 
 model SeatPrice {
@@ -1654,10 +1675,13 @@ model IngestionSourceKeyCoverage {
   virtualKeyId      String              // the gateway key that bill pays for
   validFrom         DateTime            // §7: UTC midnight only — a day is the finest grain a bill can own
   validTo           DateTime?           // open coverage = null; re-pointing closes, never rewrites
-  // Overlap guard, and the ONLY uniqueness rule here: same btree_gist
-  // exclusion pattern as IdentityMatch —
+  // Overlap guard, and the ONLY uniqueness rule here — unlike IdentityMatch,
+  // coverage rows really do close (re-pointing writes validTo), so this table
+  // still needs the general overlap rule, which is a btree_gist exclusion:
   // EXCLUDE USING gist ("virtualKeyId" WITH =,
   //   tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&).
+  // That makes this table (with SeatPrice) the one that re-opens the
+  // CREATE EXTENSION deployment question §7's identity reversal closed.
   // It already rejects a second open row for a key (SQLSTATE 23P01), so
   // NO partial unique index is added on top: the redundant index would only
   // make the common race surface as 23505 instead, two codes for one rule
@@ -1847,13 +1871,13 @@ money tables, only the identity tables and read paths.
 | Cross-tenant billing: does any real customer bill the subscription from a different tenant than the Copilot environment? If yes, `billingTenantId` becomes a third billing key (§21.1 assumption) | deferred until one appears |
 | Should the connection form stop asking for the subscription id at all? The billing identity **finds the subscription by itself** (measured, `configuration.md`: "the form does not need to ask for it, and should not"). Removing the field would also dissolve #7738's uniqueness race, which is a race on that very field | Sergio — sequence against #7738 |
 | Does a failed billing read count toward the source's `errorCount`? §21.5 fixes the *health colour*; the error counter is a separate mechanism — the cost read already refuses to feed it by contract (`azureCostManagement.ts:200`) | resolved v3.4 — it does not, verified |
-| The seat lane's `read_failed` fires only when our own store query throws (`governanceCost.service.ts:275-295`); a provider-side Graph 403 writes no rows and renders as `awaiting_data`. Same collapse §21.3 forbids for spend — does the seat lane get the same honesty pass? | Sergio — follow-up issue |
+| The seat lane's `read_failed` fires only when our own store query throws (`governanceCost.service.ts:129-131` for the lane DTO, `:545-555` for the emission); a provider-side Graph 403 writes no rows and renders as `awaiting_data`. Same collapse §21.3 forbids for spend — does the seat lane get the same honesty pass? | Sergio — follow-up issue |
 | A reason surviving the puller: 403 vs 429 die at the same `return null` (`copilotStudioDataverse.puller.ts:1128`), so `billing_read_failed` cannot yet say *refused* vs *throttled*. Worth threading a reason through the cursor? | implementation PR or follow-up |
 | ~~The rollup's `costSource` is the LANE (`pulled`), not the provider, and the Azure billing note reads pulled-lane content as Azure content~~ | resolved in the implementation PR — the premise ("Azure is the only pulled producer") was already false: the OpenAI, Anthropic and Databricks admin pullers feed the same lane today, so a mixed org's note fell permanently silent, including the failed-read warning. The note's spend check now asks the rollup for the CLAIMING SOURCE's own rows (`hasRowsForSource`, keyed on `IngestionSourceId`), never the lane's |
 | Two sources may claim two DIFFERENT subscriptions (the ownership guard refuses only a duplicate), and the spend panel carries one note — the oldest claim speaks (`createdAt` order, deterministic). One note for two bills is unresolved | before a second claiming source is a real shape |
 | Azure and Databricks restatement windows are unmeasured; `SETTLING_WINDOW_DAYS` stays provisional for those sources until probed (§15) | Sergio / puller implementer |
 | Payload-level redaction for `governance_ocsf_events` — the raw OCSF JSON holds names and email addresses that a single-column pseudonym cannot reach; wave 2 answers with delete-and-suppress (§16), a redacting read path or structured columns is owed | identity implementer |
-| `btree_gist` availability per managed-Postgres provider (Azure Database for PostgreSQL unverified) — the repo's first `CREATE EXTENSION` (§7) | Sergio |
+| `btree_gist` availability per managed-Postgres provider (Azure Database for PostgreSQL unverified) — no longer needed by the identity tables (§7 reversal), but still ahead of `SeatPrice` and `IngestionSourceKeyCoverage` if their overlap rules stay database-held | Sergio |
 | LWQL org-wide cost surface (§17) — own design pass, wave 2+ | deferred |
 | Registry-final permission verb names (§18) | implementation PR |
 
@@ -1877,6 +1901,55 @@ money tables, only the identity tables and read paths.
     it could not be the rollup, and the §4 diagram did not show roster
     events entering anything. The diagram now carries that lane, and the
     thin service still never reads the event log at request time.
+- **v3.11 (2026-09-06, captain: Sergio Esteban).** Documentation caught up with
+  what actually shipped. No decision is taken here; five statements the ADR made
+  are corrected or marked as reversed, and the prose they correct is left
+  standing so the record of the decision survives.
+  - **§7's coverage feature was deleted outright** (commit `63be0964c2`,
+    2026-09-04): the migration, the Prisma model, the service, the repository,
+    the logic module, three test files, a fifteen-scenario feature spec and five
+    error codes all went with it. §7 now describes a feature that no longer
+    exists in the codebase, and carries a marker saying so.
+  - **§6's seat pricing is REVERSED by owner ruling.** Seats ship as counts
+    only. There is no `SeatPrice` model, and the seat DTO deliberately carries no
+    amount field: a seat figure derived from a price list would be counted a
+    second time on top of the provider's own invoice.
+  - **Correction: §7's exclusion constraint and its 23P01 error mapping never
+    shipped in any commit.** The implementation that has since been deleted used
+    a plain partial unique index and mapped 23505.
+  - **Correction: the erasure digest is `HMAC-SHA256(secret, identifier)`**, not
+    a SHA-256 of the secret concatenated with the identifier. The code
+    (`services/logic/erasureDigest.ts`) deliberately rejects the
+    length-extendable construction the ADR had written. Corrected at every spot
+    the formula appeared (§9 steps 1 and 5, the v3.9 revision entry, and the
+    Prisma schema comment).
+  - **Correction: source health never flips `IngestionSource.status`.** Health is
+    derived at read time from recent run history
+    (`services/pullers/sourceHealth.ts`), unhealthy after three consecutive
+    failures. `status` records what an admin configured, and a failing provider
+    must not be able to rewrite it. §4a and §20 are amended.
+  - *Also in this pass: the rollup's migration numbers are corrected throughout —
+    the table shipped as `00092`, and wave 2's `RevisedAt` / `LastObservedAt`
+    columns as `00093`; the stale `governanceCost.service.ts:275-295` citation is
+    replaced with the real anchors; and a note records that the fold's suppression
+    check is organization-wide, wider than §9 states.*
+- **v3.10 (2026-09-03, captain: Sergio Esteban).** `IdentityMatch`'s
+  overlap rule is narrowed to "at most one OPEN link per person", held by
+  a plain partial unique index (`UNIQUE (discoveredPersonId) WHERE
+  "validTo" IS NULL`, SQLSTATE 23505 / Prisma P2002) — the `btree_gist`
+  exclusion constraint, and with it the repo's first `CREATE EXTENSION`,
+  is dropped before shipping (§7 deployment note, Schema, Gates, open
+  questions). The general rule guarded a case wave 2 cannot produce:
+  nothing writes `validTo`, so no closed row exists to overlap anything —
+  at the price of an extension requirement on every self-hosted and
+  managed Postgres, with per-provider availability unverified. Consequences
+  folded in: the app maps 23505/P2002 (not 23P01) to the same
+  already-linked sentence; a closed link overlapping an open one is no
+  longer database-refused (unreachable today, revisit when closing
+  ships); Helm chart and self-host docs drop the extension requirement.
+  `SeatPrice` and `IngestionSourceKeyCoverage` are untouched — their rows
+  really close, so their exclusion constraints stand and re-open the
+  extension question when they ship. Status unchanged (Proposed).
 - **v3.9 (2026-09-02, captain: Sergio Esteban).** Red-team panel on the
   wave-2 lock: five independent refuters attacked the claim that the six
   v3.8 lock decisions could be implemented without violating a hard
@@ -1928,7 +2001,7 @@ money tables, only the identity tables and read paths.
     the same section. None is needed, because the pseudonym is
     deterministic — at replay the fold already holds the original value,
     tests its hash for membership, and on a hit recomputes
-    `SHA-256(secret ‖ original)` — one digest, computed once per write and
+    `HMAC-SHA256(secret, original)` — one digest, computed once per write and
     used both as the membership key and as the replacement value, since
     the suppression list's `identifierHash` and the pseudonym are the same
     function of the same input. Scope is `(organizationId, provider)`
@@ -1976,13 +2049,13 @@ money tables, only the identity tables and read paths.
     (`IngestionSourceId = ''`) are exempt: metered in real time, never
     restated. Azure and Databricks windows are recorded as unmeasured.
     §15's restatement mechanics (`RevisedAt`, and the prior amount, which
-    is 00087's already-shipped `PreviousAmountNanoUsd`) were not refuted
+    is 00092's already-shipped `PreviousAmountNanoUsd`) were not refuted
     and are unchanged.
   - **Seat events carry PII obligations, inside the same PR** (§16, §20a):
     `governance_ocsf_events` gets a **fixed 13-month `TTL … DELETE`
     declared in its migration** and stays **out** of
     `RETENTION_TABLE_CATEGORY_MAP` and `TABLE_TTL_CONFIG` — which is what
-    migration 00087 actually did for the rollup, and the two halves are not
+    migration 00092 actually did for the rollup, and the two halves are not
     interchangeable: the reconciler's `MODIFY TTL` replaces the whole TTL
     expression atomically (`ttlReconciler.ts:463`), so enrolling the table
     would overwrite the fixed bound with a customer-settable one and let a
@@ -1998,7 +2071,7 @@ money tables, only the identity tables and read paths.
   - **The rollup sketch is corrected to the shipped table, and the table
     counts to the schema** (Schema, Invariants, §11): the sketch had no
     `TenantId` column and led its ORDER BY with `OrganizationId`, while
-    the shipped migration 00087 leads with `TenantId` and carries
+    the shipped migration 00092 leads with `TenantId` and carries
     `OrganizationId` as a payload column defaulting to `''` — ownership is
     an attribute of the row, its address is the tenant. §11 and the new
     `GovernanceTenantHistory` design already assumed the shipped shape, so
@@ -2010,9 +2083,9 @@ money tables, only the identity tables and read paths.
     sketch — it omits `RevisionCount`, `PulledItemsJson`,
     `AppliedEventIds`, `CreatedAt` and `LastEventOccurredAt` entirely.
     **The exact DDL is
-    00087**, and the Schema section now says so rather than reading like
+    00092**, and the Schema section now says so rather than reading like
     a specification of a table wave 2 is about to create. The same pass
-    fixed the sketch's `Version UInt64` replacement column: shipped 00087
+    fixed the sketch's `Version UInt64` replacement column: shipped 00092
     replaces on `EventTimestamp UInt64` and keeps `Version` as a
     `LowCardinality(String)` schema-snapshot stamp — payload, not the
     dedup version — so every `argMax`-on-`Version` instruction in §4, the
@@ -2022,7 +2095,7 @@ money tables, only the identity tables and read paths.
     implies is stated for the first time: the rollup **shipped in wave 1**,
     so wave 2's new columns land by `ALTER TABLE … ADD COLUMN`, not a
     create — and there are **two** of them, `RevisedAt` and
-    `LastObservedAt`, not three: 00087 already carries
+    `LastObservedAt`, not three: 00092 already carries
     `PreviousAmountNanoUsd`, so the ADR's `PreviousAmountNano` would have
     added a *second* prior-amount money column to the same table, with
     nothing to tell a reader which one the restatement markers meant. The
@@ -2060,7 +2133,7 @@ money tables, only the identity tables and read paths.
     questions): `IngestionSourceKeyCoverage`, with a partial unique index
     holding one-home in the database. Dates keep a June re-point from
     re-filing May; a list column on the source is rejected. Resolves the
-    open question of that name.
+    open question of that name. [superseded — deleted 2026-09-04, see v3.11]
   - **Erasure blanks matches through a listener** (§11, Schema): a
     governance subscriber to the existing `lw.identity.user_erased` event,
     not a step appended to the erasure service — so a future second erasure

@@ -20,6 +20,8 @@ import type { GovernanceCostRollupClickHouseRepository } from "../../../ee/gover
 import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
+import type { IdentityErasureService } from "../../../ee/governance/services/identityErasure.service";
+import type { IdentityMatchService } from "../../../ee/governance/services/identityMatch.service";
 import type { PersonalUsageClickHouseRepository } from "../../../ee/governance/services/personalUsage.clickhouse.repository";
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
@@ -296,6 +298,18 @@ export interface AppDependencies {
     /** ADR-128's daily cost rollup — the fold's write side and the read both
      *  the screen and the drift comparator go through. */
     costRollup: GovernanceCostRollupClickHouseRepository | undefined;
+    /** ADR-128 §9: erasing a discovered person from the governance data —
+     *  the suppression list, the account links, the person row and the
+     *  money rows. Undefined on a deployment without ClickHouse, which has
+     *  no money rows to erase from. */
+    identityErasure: IdentityErasureService | undefined;
+    /** ADR-128 §12: linking provider-named people to accounts on proof, and
+     *  the review queue for everything proof cannot settle. Always present —
+     *  its evidence is confirmed addresses and directory identifiers, so it
+     *  has work to do on a deployment with no ClickHouse. The half that SCORES
+     *  names is deliberately not here: it is composed only on the worker role,
+     *  so no request path can reach it. */
+    identityMatch: IdentityMatchService;
   };
   /** Billing-month usage rollups (billable_events + trace_summaries) behind
    *  `billableEventsQuery.ts`'s exported query functions. */
