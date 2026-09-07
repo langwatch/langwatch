@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   createListCollection,
+  Field,
   Heading,
   HStack,
   Tabs,
@@ -258,37 +259,36 @@ function ControlSelect({
     [options],
   );
   return (
-    <Select.Root
-      collection={collection}
-      size="sm"
-      width="auto"
-      flexDirection="row"
-      alignItems="center"
-      gap={2}
-      value={[value]}
-      onValueChange={({ value: next }) => {
-        if (next[0]) onChange(next[0]);
-      }}
-    >
-      <Select.Label
+    <Field.Root orientation="horizontal" width="auto" gap={2}>
+      <Field.Label
         fontSize="sm"
         color="fg.muted"
         fontWeight="normal"
         whiteSpace="nowrap"
       >
         {label}
-      </Select.Label>
-      <Select.Trigger width="150px" fontWeight="medium">
-        <Select.ValueText />
-      </Select.Trigger>
-      <Select.Content>
-        {options.map((option) => (
-          <Select.Item key={option.value} item={option}>
-            {option.label}
-          </Select.Item>
-        ))}
-      </Select.Content>
-    </Select.Root>
+      </Field.Label>
+      <Select.Root
+        collection={collection}
+        size="sm"
+        width="150px"
+        value={[value]}
+        onValueChange={({ value: next }) => {
+          if (next[0]) onChange(next[0]);
+        }}
+      >
+        <Select.Trigger fontWeight="medium">
+          <Select.ValueText />
+        </Select.Trigger>
+        <Select.Content>
+          {options.map((option) => (
+            <Select.Item key={option.value} item={option}>
+              {option.label}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+    </Field.Root>
   );
 }
 
