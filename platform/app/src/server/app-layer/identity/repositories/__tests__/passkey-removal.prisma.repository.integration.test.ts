@@ -2,6 +2,8 @@
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
+import { LastWayInService } from "../../last-way-in.service";
+import { PrismaLastWayInRepository } from "../last-way-in.prisma.repository";
 import { PrismaPasskeyRemovalRepository } from "../passkey-removal.prisma.repository";
 
 const namespace = `passkey-removal-${nanoid(8)}`;
@@ -195,5 +197,53 @@ describe("PrismaPasskeyRemovalRepository", () => {
         passkeyId: `${namespace}-absent`,
       }),
     ).resolves.toBe("not_found");
+  });
+});
+
+describe("PrismaLastWayInRepository", () => {
+  it.each([
+    {
+      label: "sees the canonical password while the identity gate is open",
+      gate: true,
+      legacyPassword: void 0,
+      identityPassword: "identity-hash",
+      strands: false,
+    },
+    {
+      label: "sees the compatibility password while the identity gate is closed",
+      gate: false,
+      legacyPassword: "legacy-hash",
+      identityPassword: void 0,
+      strands: false,
+    },
+    {
+      label: "ignores a stale compatibility password after the gate opens",
+      gate: true,
+      legacyPassword: "stale-legacy-hash",
+      identityPassword: null,
+      strands: true,
+    },
+    {
+      label: "ignores a canonical password before the gate opens",
+      gate: false,
+      legacyPassword: null,
+      identityPassword: "not-yet-authoritative",
+      strands: true,
+    },
+  ])("$label", async ({ gate, legacyPassword, identityPassword, strands }) => {
+    const { userId, passkeyIds } = await seedUser({
+      suffix: `preflight-${gate}-${strands}-${nanoid(5)}`,
+      legacyPassword,
+      identityPassword,
+    });
+    const passkeyId = passkeyIds[0];
+    if (passkeyId === undefined) {
+      throw new Error("fixture created no passkey");
+    }
+    const preflight = new LastWayInService({
+      records: new PrismaLastWayInRepository(prisma, async () => gate),
+    });
+
+    await expect(preflight.passkeyRemovalStrandsUser({ userId, passkeyId })).resolves.toBe(strands);
   });
 });
