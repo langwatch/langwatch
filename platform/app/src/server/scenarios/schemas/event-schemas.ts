@@ -148,6 +148,31 @@ export const langwatchMetadataSchema = z.object({
   agentInstance: z
     .object({ hostname: z.string(), label: z.string().nullable() })
     .optional(),
+  /**
+   * Who phoned a voice agent: "simulated" for a pool run's simulated caller,
+   * "human" for a panel run someone spoke on themselves (slice 3). Absent for
+   * every non-voice run, which the Caller column reads as no caller.
+   *
+   * @see specs/features/agents/voice-agents-v1.feature (AC24)
+   */
+  callerKind: z.enum(["simulated", "human"]).optional(),
+  /**
+   * The effective caller voice a simulated run spoke with: the resolved voice
+   * model, the interrupt probability and the effect. Recorded so a finished run
+   * reads back the caller settings it ran under (AC20). Absent for non-voice.
+   */
+  caller: z
+    .object({
+      voice: z.string(),
+      interruptProbability: z.number(),
+      effects: z.string(),
+    })
+    .optional(),
+  /**
+   * True when LangWatch ended a voice call at VOICE_CALL_MAX_SECONDS; the run
+   * header shows "Cut at the call limit" (AC28). Absent otherwise.
+   */
+  cutAtLimit: z.boolean().optional(),
 });
 
 /**

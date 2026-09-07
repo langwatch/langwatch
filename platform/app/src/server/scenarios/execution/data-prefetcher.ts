@@ -68,6 +68,11 @@ import {
 } from "../../prompt-config/prompt.service";
 import { type FieldMapping, FieldMappingSchema } from "../field-mapping";
 import { ScenarioService } from "../scenario.service";
+import {
+  type CallerVoiceConfig,
+  parseCallerVoiceConfig,
+} from "../voice/caller-voice.config";
+import { voiceCallMaxSeconds } from "../voice/voice-limits";
 import { resolveTraceWaitTimeoutMs } from "./ingest-lag.service";
 import {
   AuthConfigSchema,
@@ -106,6 +111,8 @@ export interface ScenarioFetcher {
     /** Turn config (ADR-015); null = SDK default. */
     maxTurns?: number | null;
     minTurns?: number | null;
+    /** The scenario's caller-voice JSON, for a voice target. Parsed tolerantly. */
+    callerVoice?: unknown;
   } | null>;
 }
 
@@ -732,6 +739,12 @@ export async function prefetchScenarioData({
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       target,
       ...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
+      // The simulated caller's voice, carried to the child for a voice target
+      // only. The child builds the voice user simulator from it and records the
+      // effective values on the run (AC20).
+      ...(target.type === "voice"
+        ? { callerVoice: scenarioResult.callerVoice }
+        : {}),
     },
     telemetry: {
       endpoint: env.LANGWATCH_ENDPOINT,
@@ -760,6 +773,7 @@ async function fetchScenario({
   parameters: RunParameterValues;
   simulatorModel: string | null;
   judgeModel: string | null;
+  callerVoice: CallerVoiceConfig;
 } | null> {
   const scenario = await fetcher.getById({ projectId, id: scenarioId });
   if (!scenario) return null;
@@ -807,6 +821,7 @@ async function fetchScenario({
     parameters,
     simulatorModel: scenario.simulatorModel ?? null,
     judgeModel: scenario.judgeModel ?? null,
+    callerVoice: parseCallerVoiceConfig(scenario.callerVoice),
   };
 }
 
@@ -1045,6 +1060,10 @@ async function fetchVoiceAgentData({
       agentId: config.agentId,
       credential,
     },
+    // The whole-call budget the child enforces and the transport clamps a turn
+    // to. Read here (not in the child) so a run records the limit it started
+    // under even if the env changes mid-flight.
+    maxCallSeconds: voiceCallMaxSeconds(),
   };
 }
 

@@ -10,3 +10,4 @@ export { SerializedConnectedAgentAdapter } from "./connected-agent.adapter";
 export { SerializedHttpAgentAdapter } from "./http-agent.adapter";
 export { SerializedPromptConfigAdapter } from "./prompt-config.adapter";
 export { SerializedWorkflowAgentAdapter } from "./workflow-agent.adapter";
+export { createSerializedVoiceAgentAdapter } from "./voice-agent.adapter";

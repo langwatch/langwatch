@@ -13,12 +13,18 @@ interface ScenarioRunHeaderProps {
   status?: ScenarioRunStatus;
   name?: string | null;
   copyableIds: CopyableId[];
+  /** "Simulated" or "You" for a voice run; absent hides the caller line (AC24). */
+  caller?: "Simulated" | "You" | null;
+  /** True when LangWatch ended the call at the limit; shows a marker (AC28). */
+  cutAtLimit?: boolean;
 }
 
 export function ScenarioRunHeader({
   status,
   name,
   copyableIds,
+  caller,
+  cutAtLimit,
 }: ScenarioRunHeaderProps) {
   return (
     <Box p={5} borderBottom="1px" borderColor="border" w="100%">
@@ -30,7 +36,26 @@ export function ScenarioRunHeader({
               <Text fontSize="lg" fontWeight="semibold">
                 {name}
               </Text>
+              {cutAtLimit ? (
+                <Text
+                  fontSize="xs"
+                  fontWeight="medium"
+                  color="fg.muted"
+                  borderWidth="1px"
+                  borderColor="border"
+                  borderRadius="md"
+                  px={2}
+                  py={0.5}
+                >
+                  Cut at the call limit
+                </Text>
+              ) : null}
             </HStack>
+            {caller ? (
+              <Text fontSize="xs" color="fg.muted" mb={1}>
+                Caller: {caller}
+              </Text>
+            ) : null}
             <VStack align="start" gap={0} ml={0}>
               {copyableIds.map((id) => (
                 <HStack key={id.label} gap={1}>

@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { FieldMappingSchema } from "../field-mapping";
 import { runParameterValuesSchema } from "../parameters";
+import { callerVoiceConfigSchema } from "../voice/caller-voice.config";
 
 // ============================================================================
 // Field Mapping Types
@@ -273,6 +274,13 @@ export const VoiceAgentDataSchema = z.object({
   type: z.literal("voice"),
   agentId: z.string(),
   voiceTarget: VoiceTargetSchema,
+  /**
+   * The whole-call budget in seconds (VOICE_CALL_MAX_SECONDS). The transport
+   * clamps a single turn's wait to it, and the child arms a timer that ends the
+   * call at it so the judge still runs on what was said. Defaulted so a job
+   * queued before the limit existed still parses.
+   */
+  maxCallSeconds: z.number().int().positive().default(300),
 });
 export type VoiceAgentData = z.infer<typeof VoiceAgentDataSchema>;
 
@@ -377,6 +385,8 @@ export const ScenarioExecutionResultSchema = z.object({
   cancelled: z.boolean().optional(),
   /** The connected agent instance that answered the run, when one did. */
   agentInstance: ScenarioAgentInstanceSchema.optional(),
+  /** A voice run LangWatch ended at VOICE_CALL_MAX_SECONDS (AC28). */
+  cutAtLimit: z.boolean().optional(),
 });
 export type ScenarioExecutionResult = z.infer<
   typeof ScenarioExecutionResultSchema
@@ -463,6 +473,13 @@ export const ChildProcessJobDataSchema = z
      * no judge decides, so the run needs no model at all.
      */
     script: ScriptedRunSchema.optional(),
+    /**
+     * The simulated caller's voice, interrupt probability and effects — carried
+     * from the scenario for a voice target only. The child builds the voice
+     * user simulator from it and records the effective values on the run.
+     * Absent for every non-voice run and for a job queued before it existed.
+     */
+    callerVoice: callerVoiceConfigSchema.optional(),
   })
   .superRefine((data, ctx) => {
     if (data.script) return;

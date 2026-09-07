@@ -11,11 +11,30 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Controller, type UseFormReturn, useForm } from "react-hook-form";
+import {
+  type Control,
+  Controller,
+  type UseFormReturn,
+  useForm,
+} from "react-hook-form";
 import { z } from "zod";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
+import {
+  CALLER_VOICE_EFFECTS,
+  type CallerVoiceEffect,
+  callerVoiceConfigSchema,
+  DEFAULT_CALLER_VOICE,
+} from "~/server/scenarios/voice/caller-voice.config";
+import { CallerVoiceModelSelect } from "./CallerVoiceModelSelect";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { SectionHeader } from "./ui/SectionHeader";
+
+/** The words a person reads for each caller-voice effect. */
+const EFFECT_LABELS: Record<CallerVoiceEffect, string> = {
+  none: "None",
+  phone_line: "Phone line",
+  background_noise: "Background noise",
+};
 
 /**
  * Zod schema for scenario form validation.
@@ -32,6 +51,9 @@ export const scenarioFormSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema,
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  // The simulated caller's voice. Only shown (and only meaningful) for a voice
+  // target; kept at defaults otherwise.
+  callerVoice: callerVoiceConfigSchema.default(DEFAULT_CALLER_VOICE),
   // The test suite the scenario is filed in. Absent keeps the suite the scenario has,
   // null files it nowhere. Only the Agent Testing editor offers the field.
   testSuiteId: z.string().nullish(),
@@ -61,6 +83,12 @@ type ScenarioFormProps = {
    * is what every surface outside Agent Testing does.
    */
   testSuiteOptions?: ScenarioTestSuiteOption[];
+  /**
+   * The type of the currently selected target agent. The Caller voice group is
+   * shown only when it is "voice"; the target itself lives outside this form
+   * (in the drawer), so its type is lifted in as a prop.
+   */
+  targetType?: string;
 };
 
 /**
@@ -72,6 +100,7 @@ export function ScenarioForm({
   defaultValues,
   formRef,
   testSuiteOptions,
+  targetType,
 }: ScenarioFormProps) {
   const form = useForm<ScenarioFormData>({
     defaultValues: {
@@ -80,6 +109,7 @@ export function ScenarioForm({
       criteria: [],
       labels: [],
       parameters: [],
+      callerVoice: DEFAULT_CALLER_VOICE,
       ...defaultValues,
     },
     resolver: zodResolver(scenarioFormSchema),
@@ -190,8 +220,115 @@ export function ScenarioForm({
         />
       </VStack>
 
+      {targetType === "voice" && <CallerVoiceSection control={control} />}
+
       <AdvancedSection register={register} errors={errors} />
     </VStack>
+  );
+}
+
+/**
+ * The collapsed "Caller voice" group, shown only for a voice target. Offers the
+ * caller's Voice (an audio-model picker), Interrupts (0-100 %, step 5) and
+ * Effects. Values persist on the scenario's `callerVoice` (AC17).
+ */
+function CallerVoiceSection({
+  control,
+}: {
+  control: Control<ScenarioFormData>;
+}) {
+  const [open, setOpen] = useState(false);
+  const ChevronIcon = open ? ChevronDown : ChevronRight;
+
+  return (
+    <Collapsible.Root
+      open={open}
+      onOpenChange={({ open }) => setOpen(open)}
+      data-testid="caller-voice-group"
+    >
+      <Collapsible.Trigger asChild>
+        <HStack
+          cursor="pointer"
+          userSelect="none"
+          _hover={{ color: "fg.emphasized" }}
+        >
+          <ChevronIcon size={14} />
+          <SectionHeader>Caller voice</SectionHeader>
+        </HStack>
+      </Collapsible.Trigger>
+      <Collapsible.Content>
+        <VStack align="stretch" gap={4} pt={3}>
+          <Field.Root>
+            <Text fontSize="13px" fontWeight="medium">
+              Voice
+            </Text>
+            <Controller
+              name="callerVoice.voiceModel"
+              control={control}
+              render={({ field }) => (
+                <CallerVoiceModelSelect
+                  value={field.value ?? null}
+                  onChange={field.onChange}
+                  size="full"
+                />
+              )}
+            />
+          </Field.Root>
+
+          <Controller
+            name="callerVoice.interruptProbability"
+            control={control}
+            render={({ field }) => {
+              const percent = Math.round((field.value ?? 0) * 100);
+              return (
+                <Field.Root>
+                  <Text fontSize="13px" fontWeight="medium">
+                    Interrupts: {percent}%
+                  </Text>
+                  <Input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    aria-label="Interrupts"
+                    value={percent}
+                    onChange={(event) =>
+                      field.onChange(Number(event.target.value) / 100)
+                    }
+                  />
+                </Field.Root>
+              );
+            }}
+          />
+
+          <Field.Root>
+            <Text fontSize="13px" fontWeight="medium">
+              Effects
+            </Text>
+            <Controller
+              name="callerVoice.effects"
+              control={control}
+              render={({ field }) => (
+                <NativeSelect.Root size="sm">
+                  <NativeSelect.Field
+                    aria-label="Effects"
+                    value={field.value ?? "none"}
+                    onChange={(event) => field.onChange(event.target.value)}
+                  >
+                    {CALLER_VOICE_EFFECTS.map((effect) => (
+                      <option key={effect} value={effect}>
+                        {EFFECT_LABELS[effect]}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              )}
+            />
+          </Field.Root>
+        </VStack>
+      </Collapsible.Content>
+    </Collapsible.Root>
   );
 }
 
@@ -221,6 +358,7 @@ function useResetOnDefaultsChange({
           defaultValues.maxTurns,
           defaultValues.minTurns,
           defaultValues.testSuiteId,
+          defaultValues.callerVoice,
         ])
       : null;
     if (currentDefaults !== prevDefaultsRef.current) {
@@ -232,6 +370,7 @@ function useResetOnDefaultsChange({
           criteria: [],
           labels: [],
           parameters: [],
+          callerVoice: DEFAULT_CALLER_VOICE,
           testSuiteId: null,
           ...defaultValues,
         });

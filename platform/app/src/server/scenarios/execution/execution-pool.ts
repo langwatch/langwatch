@@ -15,6 +15,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ChildProcess } from "child_process";
 import type { RunParameterValues } from "../parameters";
 import type { RunSecretCiphertext } from "../run-secret-values";
+import type { VoiceConcurrencyGate } from "./voice-concurrency-gate";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");
 
@@ -62,11 +63,26 @@ export class ScenarioExecutionPool {
   private readonly _pending: ExecutionJobData[] = [];
   private readonly _cancelled = new Set<string>();
   private readonly _concurrency: number;
+  /**
+   * Per-project cap for voice runs. When set, a voice job is admitted only
+   * while its project is under the cap; otherwise it waits in `_pending` like
+   * any full-pool job. Absent = no voice-specific cap (voice runs compete for
+   * the global slots like every other run), which keeps the existing pool tests
+   * unchanged.
+   */
+  private readonly _voiceGate: VoiceConcurrencyGate | null;
   private _spawnFn: SpawnFunction | null = null;
   private _onSkipCancelled: OnSkipCancelledFn | null = null;
 
-  constructor({ concurrency }: { concurrency: number }) {
+  constructor({
+    concurrency,
+    voiceGate,
+  }: {
+    concurrency: number;
+    voiceGate?: VoiceConcurrencyGate;
+  }) {
     this._concurrency = concurrency;
+    this._voiceGate = voiceGate ?? null;
   }
 
   /** Set the spawn function. Called once during wiring (after deps are available). */
@@ -132,8 +148,27 @@ export class ScenarioExecutionPool {
    */
   deregisterChild(scenarioRunId: string): void {
     this._running.delete(scenarioRunId);
+    // Release the voice slot BEFORE dequeue, so a queued voice run for the same
+    // project can take the freed slot in the very next dequeue pass.
+    const finished = this._runningJobs.get(scenarioRunId);
+    if (finished && this._voiceGate && finished.target.type === "voice") {
+      this._voiceGate.release(finished.projectId);
+    }
     this._runningJobs.delete(scenarioRunId);
     this.dequeueNext();
+  }
+
+  /**
+   * Whether a job may start now: a global slot is free AND, for a voice job, the
+   * project is under its voice cap. The voice cap holds extra voice runs in the
+   * queue without blocking a text run behind them.
+   */
+  private canStart(jobData: ExecutionJobData): boolean {
+    if (this._running.size >= this._concurrency) return false;
+    if (this._voiceGate && jobData.target.type === "voice") {
+      return this._voiceGate.canAcquire(jobData.projectId);
+    }
+    return true;
   }
 
   /**
@@ -150,7 +185,7 @@ export class ScenarioExecutionPool {
       this._onSkipCancelled?.(jobData);
       return;
     }
-    if (this._running.size < this._concurrency) {
+    if (this.canStart(jobData)) {
       this.startJob(jobData);
     } else {
       logger.info(
@@ -158,8 +193,9 @@ export class ScenarioExecutionPool {
           scenarioRunId: jobData.scenarioRunId,
           pendingCount: this._pending.length + 1,
           activeCount: this._running.size,
+          targetType: jobData.target.type,
         },
-        "Execution pool full, buffering job",
+        "Execution pool full or voice cap reached, buffering job",
       );
       this._pending.push(jobData);
     }
@@ -180,11 +216,18 @@ export class ScenarioExecutionPool {
     // in the spawn window (child exists but not yet in `_running`).
     this._runningJobs.set(jobData.scenarioRunId, jobData);
 
+    // Reserve the project's voice slot at the same moment, so the cap is exact
+    // across the spawn window. Released in deregisterChild / the failure path.
+    if (this._voiceGate && jobData.target.type === "voice") {
+      this._voiceGate.acquire(jobData.projectId);
+    }
+
     if (!this._spawnFn) {
       logger.error(
         { scenarioRunId: jobData.scenarioRunId },
         "Spawn function not set on execution pool",
       );
+      this.releaseVoiceSlot(jobData);
       this._runningJobs.delete(jobData.scenarioRunId);
       return;
     }
@@ -209,25 +252,44 @@ export class ScenarioExecutionPool {
       );
       // Ensure we deregister even on unexpected errors
       this._running.delete(jobData.scenarioRunId);
+      this.releaseVoiceSlot(jobData);
       this._runningJobs.delete(jobData.scenarioRunId);
       this.dequeueNext();
     });
   }
 
+  /** Release a voice job's reserved slot; a no-op for text jobs or no gate. */
+  private releaseVoiceSlot(jobData: ExecutionJobData): void {
+    if (this._voiceGate && jobData.target.type === "voice") {
+      this._voiceGate.release(jobData.projectId);
+    }
+  }
+
   private dequeueNext(): void {
     while (this._pending.length > 0 && this._running.size < this._concurrency) {
-      const next = this._pending.shift()!;
-
-      // Skip cancelled jobs in the pending queue
-      if (this._cancelled.has(next.scenarioRunId)) {
+      // A cancelled pending job is skipped wherever it sits in the queue.
+      const cancelledIdx = this._pending.findIndex((job) =>
+        this._cancelled.has(job.scenarioRunId),
+      );
+      if (cancelledIdx !== -1) {
+        const cancelled = this._pending.splice(cancelledIdx, 1)[0];
+        if (!cancelled) continue;
         logger.info(
-          { scenarioRunId: next.scenarioRunId },
+          { scenarioRunId: cancelled.scenarioRunId },
           "Skipping cancelled pending job, dispatching finished(CANCELLED)",
         );
-        this._onSkipCancelled?.(next);
+        this._onSkipCancelled?.(cancelled);
         continue;
       }
 
+      // Start the first job that may start now. A voice job blocked by its
+      // project's cap is left in place so a runnable job behind it is not
+      // starved; the blocked job starts on a later dequeue once a slot frees.
+      const startIdx = this._pending.findIndex((job) => this.canStart(job));
+      if (startIdx === -1) return; // Nothing admissible right now.
+
+      const next = this._pending.splice(startIdx, 1)[0];
+      if (!next) return;
       logger.debug(
         {
           scenarioRunId: next.scenarioRunId,
@@ -236,7 +298,10 @@ export class ScenarioExecutionPool {
         "Dequeuing pending job",
       );
       this.startJob(next);
-      return; // One at a time — next dequeue happens when this job completes
+      // One real start per dequeue: `_running.size` only rises once the child
+      // registers (after an async prefetch), so starting more here would
+      // over-admit the global cap. The next completion drives the next dequeue.
+      return;
     }
   }
 }

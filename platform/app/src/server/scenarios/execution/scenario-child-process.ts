@@ -26,6 +26,12 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
+import { createCallLimitTimer } from "../voice/call-limit-timer";
+import {
+  type CallerVoiceConfig,
+  DEFAULT_CALLER_VOICE,
+} from "../voice/caller-voice.config";
+import { buildCallerVoiceSimulatorConfig } from "../voice/caller-voice.simulator";
 import { buildAgentTestRun } from "./agent-test-script";
 import { createChildProcessLogger } from "./child-logger";
 import { selectRoleModelParams } from "./job-model-params";
@@ -147,6 +153,40 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
 
+  // For a voice target, record the effective caller config on the run (AC20,
+  // AC24) and arm the whole-call timer that ends the call at the limit so the
+  // judge still runs on what was said (AC28).
+  const isVoiceRun = target.type === "voice" && adapterData.type === "voice";
+  const callerVoice: CallerVoiceConfig =
+    jobData.callerVoice ?? DEFAULT_CALLER_VOICE;
+  const effectiveCaller = buildCallerVoiceSimulatorConfig(callerVoice);
+  const voiceMetadata = isVoiceRun
+    ? {
+        callerKind: "simulated" as const,
+        caller: {
+          voice: effectiveCaller.voice,
+          interruptProbability: callerVoice.interruptProbability,
+          effects: callerVoice.effects,
+        },
+      }
+    : {};
+
+  const callLimitTimer =
+    isVoiceRun && adapterData.type === "voice"
+      ? createCallLimitTimer({
+          maxCallSeconds: adapterData.maxCallSeconds,
+          onLimit: () => {
+            logger.warn("voice call reached the max duration; ending the call");
+            // End the transport gracefully so the drained transcript is judged.
+            void (adapter as { disconnect?: () => Promise<void> })
+              .disconnect?.()
+              ?.catch(() => {
+                // Cleanup failure must not mask the run result.
+              });
+          },
+        })
+      : null;
+
   const result = await ScenarioRunner.run(
     {
       id: scenario.id,
@@ -172,6 +212,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
         langwatch: {
           targetReferenceId: target.referenceId,
           targetType: target.type,
+          ...voiceMetadata,
         },
         ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
       },
@@ -185,6 +226,10 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       },
     },
   );
+
+  // The call finished on its own (or the run returned) — stop the limit timer
+  // so it cannot fire after the fact.
+  callLimitTimer?.clear();
 
   // A failed test is still a successful execution — results are reported via SDK.
   if (result.success) {
@@ -205,11 +250,17 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     reasoning?: string;
     error?: string;
     agentInstance?: { hostname: string; label: string | null };
+    cutAtLimit?: boolean;
   } = {
     success: result.success,
   };
   if (result.reasoning) {
     outputResult.reasoning = result.reasoning;
+  }
+  // The run was ended by LangWatch at the max call duration (AC28); the parent
+  // records the marker so the run header can show "Cut at the call limit".
+  if (callLimitTimer?.wasCut()) {
+    outputResult.cutAtLimit = true;
   }
   // The connected agent instance that answered the run's turns, for the
   // parent's record of which process served the run.
@@ -261,10 +312,24 @@ function buildRunCast({
     litellmParams: roleModelParams.judge,
     nlpServiceUrl,
   });
+
+  // A voice target's user simulator speaks: the scenario's caller voice, its
+  // interrupt probability and audio effects ride on the simulator so the caller
+  // turns are voiced. The judge and adapter are unchanged from a text run.
+  const voiceSimConfig =
+    jobData.target.type === "voice"
+      ? buildCallerVoiceSimulatorConfig(
+          jobData.callerVoice ?? DEFAULT_CALLER_VOICE,
+        )
+      : null;
+
   return {
     agents: [
       adapter,
-      ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
+      ScenarioRunner.userSimulatorAgent({
+        model: simulatorModel,
+        ...(voiceSimConfig ?? {}),
+      }),
       ScenarioRunner.judgeAgent({
         criteria: scenario.criteria,
         model: judgeModel,

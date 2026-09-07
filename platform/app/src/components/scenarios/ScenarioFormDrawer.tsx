@@ -42,6 +42,7 @@ import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import type { TypedAgent } from "../../server/agents/agent.repository";
 import { parseScenarioParameterDefinitions } from "../../server/scenarios/parameters";
+import { parseCallerVoiceConfig } from "../../server/scenarios/voice/caller-voice.config";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
@@ -633,6 +634,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       return {
         ...scenario,
         parameters: parseScenarioParameterDefinitions(scenario.parameters),
+        // Stored as JSON (null on a scenario that never set one); read through
+        // the tolerant parser so the form always has a full config to bind.
+        callerVoice: parseCallerVoiceConfig(
+          (scenario as { callerVoice?: unknown }).callerVoice,
+        ),
       };
     }
     // A new scenario made from inside a test suite starts filed in it.
@@ -710,12 +716,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                       key={`${scenarioId ?? "new"}-${reloadNonce}`}
                       defaultValues={defaultValues}
                       formRef={setFormRef}
+                      targetType={selectedTarget?.type}
                     />
                   ) : (
                     <ScenarioForm
                       key={`${scenarioId ?? "new"}-${reloadNonce}`}
                       defaultValues={defaultValues}
                       formRef={setFormRef}
+                      targetType={selectedTarget?.type}
                     />
                   )}
                 </>
@@ -866,9 +874,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 function ScenarioFormWithSuites({
   defaultValues,
   formRef,
+  targetType,
 }: {
   defaultValues?: Partial<ScenarioFormData>;
   formRef: (form: UseFormReturn<ScenarioFormData> | null) => void;
+  targetType?: string;
 }) {
   const { project } = useOrganizationTeamProject();
   const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
@@ -889,6 +899,7 @@ function ScenarioFormWithSuites({
       defaultValues={defaultValues}
       formRef={formRef}
       testSuiteOptions={testSuiteOptions}
+      targetType={targetType}
     />
   );
 }
