@@ -84,6 +84,7 @@ function legacyAccount(
     methods: {
       hasPassword: false,
       hasPasskey: false,
+      providerIds: [],
       connectionIds: [],
       ...overrides,
     },
@@ -116,9 +117,17 @@ async function routeLegacyAccount({
   account: LegacySignInAccount | null;
   methods: readonly SignInMethod[];
 }) {
-  const methodsForAccount = await build({ account }).findAccountMethods({
-    normalizedValue: EMAIL,
-  });
+  return await routeAccount({ lookup: build({ account }), methods });
+}
+
+async function routeAccount({
+  lookup,
+  methods,
+}: {
+  lookup: ProjectionSignInAccountLookup;
+  methods: readonly SignInMethod[];
+}) {
+  const methodsForAccount = await lookup.findAccountMethods({ normalizedValue: EMAIL });
 
   return routeSignIn({
     identifier: routingIdentifierOf(EMAIL),
@@ -150,16 +159,69 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
     });
   });
 
-  it("keeps an unlatched Auth0 account on the configured provider without an SSO domain", async () => {
+  it("keeps Auth0 alongside a passkey for an unlatched account without an SSO domain", async () => {
     const decision = await routeLegacyAccount({
-      account: legacyAccount(),
+      account: legacyAccount({ hasPasskey: true, providerIds: ["auth0"] }),
       methods: [AUTH0, PASSKEY],
     });
 
     expect(decision).toMatchObject({
       outcome: "method_picker",
-      methodSet: [AUTH0, PASSKEY],
-      reasonCode: "no_domain_match",
+      methodSet: [PASSKEY, AUTH0],
+      reasonCode: "account_methods",
+    });
+  });
+
+  it("keeps Auth0 alongside a passkey after the account latches", async () => {
+    const auth0: IdentifierFact = {
+      identifierId: "identifier_auth0",
+      userId: USER_ID,
+      provider: "oidc",
+      value: EMAIL,
+      domain: "home.net",
+      identifierHash: null,
+      accountId: "account_auth0",
+      providerId: "auth0",
+      issuer: "auth0",
+      providerAccountId: "auth0_subject",
+      connectionId: null,
+      state: "VERIFIED",
+      verifiedAtMs: 1_690_000_000_000,
+      attachedAtMs: 1_690_000_000_000,
+      detachedAtMs: null,
+    };
+    const passkey: IdentifierFact = {
+      identifierId: "identifier_passkey",
+      userId: USER_ID,
+      provider: "passkey",
+      value: "credential_abc",
+      domain: null,
+      identifierHash: null,
+      accountId: "account_passkey",
+      providerId: "passkey",
+      issuer: "local:passkey",
+      providerAccountId: "credential_abc",
+      connectionId: null,
+      state: "VERIFIED",
+      verifiedAtMs: 1_690_000_000_000,
+      attachedAtMs: 1_690_000_000_000,
+      detachedAtMs: null,
+    };
+    const lookup = build({
+      latched: true,
+      projectedHolder: { userId: USER_ID, identifierId: auth0.identifierId },
+      identifiers: {
+        [auth0.identifierId]: auth0,
+        [passkey.identifierId]: passkey,
+      },
+    });
+
+    const decision = await routeAccount({ lookup, methods: [AUTH0, PASSKEY] });
+
+    expect(decision).toMatchObject({
+      outcome: "method_picker",
+      methodSet: [PASSKEY, AUTH0],
+      reasonCode: "account_methods",
     });
   });
 
@@ -228,6 +290,7 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
     await expect(lookup.findAccountMethods({ normalizedValue: EMAIL })).resolves.toEqual({
       hasPassword: false,
       hasPasskey: true,
+      providerIds: [],
       connectionIds: [],
     });
   });

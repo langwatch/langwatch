@@ -190,6 +190,8 @@ export interface RoutingDecision {
 export interface AccountSignInMethods {
   hasPassword: boolean;
   hasPasskey: boolean;
+  /** Legacy instance provider ids this account holds, such as auth0 or okta. */
+  providerIds: readonly string[];
   /** Connections this account already signs in through, by connection id. */
   connectionIds: readonly string[];
 }
@@ -245,10 +247,9 @@ export function rankAccountMethods({
   const held = (method: SignInMethod): boolean => {
     if (method.kind === "passkey") return account.hasPasskey;
     if (method.kind === "password") return account.hasPassword;
-    return (
-      method.connectionId !== null &&
-      account.connectionIds.includes(method.connectionId)
-    );
+    return method.connectionId === null
+      ? account.providerIds.includes(method.id)
+      : account.connectionIds.includes(method.connectionId);
   };
 
   const rankOf = (method: SignInMethod): number => {

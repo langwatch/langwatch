@@ -64,6 +64,13 @@ export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
         (identifier) => identifier.provider === "credential",
       ),
       hasPasskey: live.some((identifier) => identifier.provider === "passkey"),
+      providerIds: [
+        ...new Set(
+          live
+            .map((identifier) => identifier.providerId)
+            .filter((id): id is string => id !== null),
+        ),
+      ],
       // Deduplicated, because one connection can back several identifiers for
       // the same person — a work address and an alias on the same provider —
       // and the router ranks connections, not rows.
