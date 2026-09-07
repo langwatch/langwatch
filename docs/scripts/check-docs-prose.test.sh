@@ -212,6 +212,33 @@ else
   echo "Output: $TABLE_OUTPUT"
 fi
 
+# A fence indented four spaces inside a JSX component is still a code fence.
+# MDX nests fences under <Tab> and friends, where the indentation is
+# formatting rather than the CommonMark indented-code-block it would be in
+# plain Markdown, so the code inside must never count as a paragraph.
+rm -f "$TABLE_PAGE"
+INDENTED_PAGE="$WORK/docs/indented.mdx"
+{
+  printf -- '---\ntitle: Indented\n---\n\n'
+  printf '<Tabs>\n  <Tab title="Python">\n'
+  printf '    ```python\n'
+  printf '    # one two three four five six seven eight nine ten eleven twelve\n'
+  printf '    ```\n'
+  printf '  </Tab>\n</Tabs>\n\n'
+  printf 'one two three\n'
+} > "$INDENTED_PAGE"
+
+INDENTED_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+INDENTED_STATUS=$?
+
+if [[ $INDENTED_STATUS -eq 0 ]] && ! printf '%s\n' "$INDENTED_OUTPUT" | grep -q 'indented.mdx,line='; then
+  check "a fence indented four spaces inside a JSX component stays a code block" yes
+else
+  check "a fence indented four spaces inside a JSX component stays a code block" no
+  echo "Status: $INDENTED_STATUS"
+  echo "Output: $INDENTED_OUTPUT"
+fi
+
 if [[ $FAILURES -gt 0 ]]; then
   echo ""
   echo "Annotation: $ANNOTATION"

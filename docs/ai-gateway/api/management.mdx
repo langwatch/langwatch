@@ -303,7 +303,7 @@ POST /virtual-keys/:id/revoke
 
 **Revoke** is one-way. It also archives the key's own budgets and discards any rotation grace.
 
-All four are idempotent, audit-logged, propagate to the gateway in seconds, and emit a [webhook event](/features/webhooks#family-gateway). See [Virtual Keys](/ai-gateway/virtual-keys#disable-and-enable-the-reversible-stop).
+All four are idempotent, audit-logged, propagate to the gateway in seconds, and emit a [webhook event](/features/webhooks#family-gateway). See [Virtual Keys](/ai-gateway/virtual-keys#rotate-disable-expire-and-revoke).
 
 ## Budgets
 
@@ -391,7 +391,7 @@ Body:
 
 `group` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`. `attributed_user` budgets are per-end-user **templates** on an anchor key or project (each distinct end user: this limit per window) and are service-guarded the same way. `manual` windows accrue until an explicit [reset](#reset-period).
 
-`cycle_anchor_at` moves the period boundary off the calendar and onto your own date, which is how a budget lines up with a billing anniversary. It is rejected on `total` and `manual` with `error.code = "gateway_budget_cycle_anchor_invalid"`, because those windows do not cycle, and it is fixed at creation. See [Budgets](/ai-gateway/budgets#anchoring-a-cycle-to-your-own-date) for the clamping rules.
+`cycle_anchor_at` moves the period boundary off the calendar and onto your own date, which is how a budget lines up with a billing anniversary. It is rejected on `total` and `manual` with `error.code = "gateway_budget_cycle_anchor_invalid"`, because those windows do not cycle, and it is fixed at creation. See [Budgets](/ai-gateway/budgets#windows-and-cycles) for the clamping rules.
 
 ### Get
 
@@ -422,7 +422,7 @@ On calendar windows this truncates the running period and the next boundary stay
 
 ### End-user spend
 
-Per-end-user usage and the caps that apply to it are served on the billing surface with an **organization** API key rather than here: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#per-end-user-spend), permission `gatewaySpend:view`. It returns a rolling-window rollup plus every applicable attributed-user template at its current-period spend.
+Per-end-user usage and the caps that apply to it are served on the billing surface with an **organization** API key rather than here: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#read-events-over-rest), permission `gatewaySpend:view`. It returns a rolling-window rollup plus every applicable attributed-user template at its current-period spend.
 
 ### Archive
 
@@ -477,7 +477,7 @@ All responses follow the OpenAI-compatible envelope, with `type` as the status c
 }
 ```
 
-Every code this API answers with, and what to do about each, is on [API: Errors](/ai-gateway/api/errors#control-plane-codes).
+Every code this API answers with, and what to do about each, is on [API: Errors](/ai-gateway/api/errors#error-codes).
 
 ## Audit
 
@@ -485,7 +485,7 @@ Every write emits a row in the platform-wide `AuditLog` (gateway shape, `targetK
 
 ## Rate limits
 
-Management endpoints are rate-limited to 100 req/min/token. For bulk operations, use the `--format json` CLI with `xargs -P4` (the CLI sleeps 250 ms between retries on 429).
+Management endpoints are rate-limited to 100 requests per minute per token. For bulk operations, use the `--format json` CLI with `xargs -P4` (the CLI sleeps 250 ms between retries on 429).
 
 ## Shared service layer
 

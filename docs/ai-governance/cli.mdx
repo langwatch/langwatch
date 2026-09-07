@@ -80,7 +80,7 @@ Use `--json` in scripts and CI; the human table is for interactive exploration.
 
 ## Resource × verb matrix (v1 preview)
 
-The first preview ships with the two governance resources Sergey wired through Hono REST + service-layer + repository (Ask B-1 through B-7). Additional resources fold into the same `langwatch governance <resource> <verb>` namespace as the umbrella spec's coverage extends.
+The first preview ships with the two governance resources wired through Hono REST + service-layer + repository (Ask B-1 through B-7). Additional resources fold into the same `langwatch governance <resource> <verb>` namespace as the umbrella spec's coverage extends.
 
 | Resource | Verbs (shipped in preview) | RBAC |
 |---|---|---|
@@ -92,7 +92,9 @@ Resources expected to fold into the same namespace as their REST surfaces ship: 
 
 ## Audit emission
 
-Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"`. The CLI is a REST shell, it calls `/api/governance/*` and sends the `X-LangWatch-Surface: cli` request header. The Hono backend's `resolveSurfaceFromRequest` helper reads the header, validates it against the `GovernanceCallSurface` enum (in-process spoofing of `trpc`, `mcp` is rejected at the enum filter), and threads the value into the service-layer `surface` parameter Sergey wired at `fc6d54100`. The payload shape is identical to a Hono REST audit row apart from the surface field.
+Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"`. The CLI is a REST shell: it calls `/api/governance/*` and sends the `X-LangWatch-Surface: cli` request header.
+
+The Hono backend's `resolveSurfaceFromRequest` helper reads the header, validates it against the `GovernanceCallSurface` enum, which rejects in-process spoofing of `trpc` and `mcp`, and threads the value into the service-layer `surface` parameter added at `fc6d54100`. The payload shape is identical to a Hono REST audit row apart from the surface field.
 
 The header-validating Hono helper + the 7 mutation call-sites switching from hardcoded `'hono'` to `resolveSurfaceFromRequest(req)` ship in Lane-B's CLI scaffold at `ed51b0ea1`. The `X-LangWatch-Surface: cli` constant lives at `sdks/typescript/src/cli/utils/governance/surface.ts`.
 
@@ -129,6 +131,6 @@ The same script runs against SaaS or self-hosted deployments, the CLI's `~/.lang
 - [Governance REST API](/ai-governance/api): the API the CLI shells over
 - [Governance MCP server](/ai-governance/mcp): same surface for agent, MCP-client invocation
 - [`langwatch ingest …`](/ai-governance/cli-debug): separate namespace for ingestion-source debugging
-- [Roles and permissions](/ai-governance/roles-and-permissions): RBAC scopes the CLI enforces
-- [Audit log](/ai-governance/audit-log): where state-change rows land
+- [Access Control (RBAC)](/platform/rbac): RBAC scopes the CLI enforces
+- [Audit log](/platform/audit-log): where state-change rows land
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`

@@ -89,7 +89,7 @@ Once invited, point them at the [developer walkthrough](/ai-governance/getting-s
 After your colleague runs `langwatch login` and makes one Claude Code request, two surfaces should update within seconds:
 
 - **`/governance`**, the [governance home](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) shows org-wide spend, anomalies, ingestion-source health, per-user breakdown.
-- **`/settings/audit-log`**, the [audit log](/ai-governance/audit-log) records every governance mutation (member invited, routing policy published, ingestion source created, virtual key minted, budget created…) with timestamp, actor, target kind, target ID, and IP.
+- **`/settings/audit-log`**, the [audit log](/platform/audit-log) records every governance mutation (member invited, routing policy published, ingestion source created, virtual key minted, budget created…) with timestamp, actor, target kind, target ID, and IP.
 
 If you don't see the request, the [CLI debug commands](/ai-governance/cli-debug) take 30 seconds to localise the problem:
 
@@ -157,6 +157,6 @@ The detector starts evaluating from the next ingest event. When today's 24h spen
 |---|---|---|
 | Developer sees `409 no_default_routing_policy` on `langwatch login` | Step 2 skipped or no policy marked default | [Routing Policies](/ai-gateway/governance/routing-policies): pick one, tick **Mark as default**. |
 | `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/governance/inventory?tab=catalog` → **Import starter pack**. |
-| Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver--at-a-glance): three rows are setup-contract-only as of this release. |
-| `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing--the-setup-state-signal) hasn't tripped yet | Need any 3 of 5: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2–7 above, you'll have 4. |
+| Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver-at-a-glance): three rows are setup-contract-only as of this release. |
+| `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing-the-setup-state-signal) hasn't tripped yet | Need any 3 of 5: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2-7 above, you'll have 4. |
 | Member colleague got an `Access Restricted` page on `/settings/audit-log` | Working as designed, audit log is admin-only | Either elevate them to `Admin` or grant a custom role with `organization:manage` (delegable via the `CustomRolePermissions` JSON column). |
