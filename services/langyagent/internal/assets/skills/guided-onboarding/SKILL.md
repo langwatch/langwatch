@@ -207,19 +207,21 @@ langwatch onboarding complete-path coding
 
 ## gateway: Gateway
 
-The tour may already have minted the key. Check first, and never mint a second one:
+Three cases, checked in this order. The first that matches is the whole path; the ones after it never run. Read the `Virtual key:` line of the brief before any tool call.
 
-```bash
-langwatch virtual-keys list --format json
-```
-
-If no row is named `production-app`:
+1. **The brief carries a reveal id.** The tour minted the key, and the reveal id in hand is what shows its secret: the `Virtual key:` line of the brief carries its name, its preview and its reveal id, and that is where they come from. Say nothing about the key having existed; open with the line below as if it were just made. No list, no question, no minting: go straight to "Show the key" with the brief's reveal id and preview.
+2. **No reveal id in the brief, and the key exists.** Run `langwatch virtual-keys list --format json`. When a row is named `production-app`, its secret was shown once, at creation, and cannot be shown again: go to "No reveal id in hand: ask first".
+3. **No reveal id in the brief, and no key.** No row is named `production-app`: mint it.
 
 ```bash
 langwatch virtual-keys create --name production-app --reveal-once --format json
 ```
 
-The output carries `reveal_id` and `preview`, never the secret. When the key already existed, the tour minted it: the `Virtual key:` line of the brief carries its name, its preview and its reveal id, and that is where they come from. Say nothing about the key having existed; open with the line below as if it were just made.
+The output carries `reveal_id` and `preview`, never the secret. Go to "Show the key" with them.
+
+Never mint a second key while the brief carries a reveal id, and never mint while a `production-app` row exists without asking first.
+
+### Show the key
 
 You never see the secret, and you never print it: never write a value that starts with `vk-lw-` in a message, and never write the snippet yourself. The `secret_snippet` card shows it to the user, once, and masks it afterwards.
 
@@ -238,11 +240,13 @@ export OPENAI_BASE_URL=the address after Gateway: in the brief, in double quotes
 export OPENAI_API_KEY="{{secret}}"
 ```
 
-When the brief says no gateway is configured, skip the snippet and say in one line that the gateway is not set up on this instance yet, then close with the last line below.
+When the brief says no gateway is configured, skip the snippet and say in one line that the gateway is not set up on this instance yet.
 
-### When the key exists but the brief carries no reveal id
+Then go to "Close the path".
 
-Its secret was shown once, at creation, and cannot be shown again. Do not open with the live line. Say, verbatim, then ask with the `question` tool:
+### No reveal id in hand: ask first
+
+Reached only from case 2: the brief carries no reveal id and a `production-app` row exists. Do not open with the live line. Say, verbatim, then ask with the `question` tool:
 
 Your production-app key was created earlier and its secret was shown once, at creation. Do you still have it?
 
@@ -255,7 +259,9 @@ On "Create a new key": mint one with `--reveal-once` as above, using the next fr
 
 On "I saved it": there is no card to show, so describe the two lines instead of writing a snippet. Say that the app needs two environment variables: `OPENAI_BASE_URL` set to the gateway address (write the address itself, from the brief), and `OPENAI_API_KEY` set to the production-app key they saved. Write the address in full and the key line in words; never put a value in angle brackets or a stand-in where the key goes.
 
-Then, either way:
+Then go to "Close the path".
+
+### Close the path
 
 Say, verbatim, as the last line:
 

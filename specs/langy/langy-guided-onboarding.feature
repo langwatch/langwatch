@@ -98,6 +98,20 @@ Feature: Langy guides the first setup after sign-up
       Then the gateway path opens on the live line as if the key were just made
       And the reveal id, the name and the preview come from the brief's Virtual key line
 
+    # The brief carried the reveal id, yet the skill's prose let the "key
+    # exists" branch read as the first match: a list showed the row, the
+    # question was asked, a second key was minted and the tour's key was
+    # left behind. The cases are numbered, the reveal in hand is case one,
+    # and case one ends the path before any list, question or mint.
+    @unit
+    Scenario: The reveal id in the brief is used before any list, question or mint
+      Given the brief's Virtual key line carries a name, a preview and a reveal id
+      When the compiled guided-onboarding skill is read
+      Then the gateway path's cases are numbered and checked in order, the reveal in hand first
+      And case one says the live line and shows the card with the brief's reveal id, with no list, no question and no mint
+      And the list, the question and the create all come after case one
+      And no section title reads as "the key exists" alone
+
     # A snippet with a placeholder where the key goes is one the person cannot
     # paste, and a value in angle brackets reads as the key itself to someone
     # skimming. When the key exists but its secret cannot be shown again, the

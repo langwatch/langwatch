@@ -149,8 +149,31 @@ describe("the guided-onboarding skill", () => {
       expect(card).toBeGreaterThan(line);
     });
 
+    /** @scenario "The reveal id in the brief is used before any list, question or mint" */
+    it("tries the reveal id in hand first, and only lists or asks when the brief carries none", () => {
+      expect(rendered).toContain("Three cases, checked in this order. The first that matches is the whole path; the ones after it never run.");
+      const inHand = rendered.indexOf("1. **The brief carries a reveal id.**");
+      const noIdKeyExists = rendered.indexOf("2. **No reveal id in the brief, and the key exists.**");
+      const noIdNoKey = rendered.indexOf("3. **No reveal id in the brief, and no key.**");
+      const list = rendered.indexOf("langwatch virtual-keys list --format json");
+      const create = rendered.indexOf("langwatch virtual-keys create --name production-app --reveal-once --format json");
+      const question = rendered.indexOf("Do you still have it?");
+      expect(inHand).toBeGreaterThan(-1);
+      expect(noIdKeyExists).toBeGreaterThan(inHand);
+      expect(noIdNoKey).toBeGreaterThan(noIdKeyExists);
+      expect(list).toBeGreaterThan(inHand);
+      expect(list).toBeLessThan(noIdNoKey);
+      expect(create).toBeGreaterThan(noIdNoKey);
+      expect(question).toBeGreaterThan(create);
+      expect(rendered).toContain("No list, no question, no minting: go straight to \"Show the key\" with the brief's reveal id and preview.");
+      expect(rendered).toContain("Never mint a second key while the brief carries a reveal id");
+      expect(rendered).toContain("### No reveal id in hand: ask first");
+      expect(rendered).toContain("Reached only from case 2: the brief carries no reveal id and a `production-app` row exists.");
+      expect(rendered).not.toContain("When the key exists but the brief carries no reveal id");
+    });
+
     /** @scenario "A key that exists with no reveal gets a question, never a placeholder" */
-    it("asks before it does anything when the key exists with no reveal id, and never writes a placeholder", () => {
+    it("asks when the brief carries no reveal id and the key exists, and never writes a placeholder", () => {
       expect(rendered).toContain(
         "Your production-app key was created earlier and its secret was shown once, at creation. Do you still have it?",
       );
