@@ -22,10 +22,13 @@ import { Drawer } from "~/components/ui/drawer";
  * closes and drops the edits. There is no toast and no "saved" wording on
  * purpose: a confirmation here would claim a write that never happened.
  *
- * A drawer, not a modal, on the same shell the governance settings forms
- * use (DepartmentEditDrawer, RoutingPolicyDrawer): a right-hand sheet the
- * page stays visible behind, so the reader keeps the inbox in view while
- * they tune what fills it.
+ * A drawer, not a modal, on the same shell DepartmentEditDrawer uses: a
+ * right-hand sheet the page stays visible behind, so the reader keeps the
+ * inbox in view while they tune what fills it. Like that drawer it is
+ * page-owned rather than registered in drawerRegistry: the registry can
+ * only pass URL params, and this one needs the page's settings and its
+ * onSave callback. The known cost is that Langy's drawer dodge keys on the
+ * registry, so a floating Langy can sit over this sheet.
  *
  * Spec: specs/governance/governance-platform-placeholders.feature
  */
