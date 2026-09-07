@@ -190,7 +190,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
     it("refuses email sign-up, email sign-in, and password reset (v5 BLOCKER)", async () => {
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-up/email")),
-      ).rejects.toMatchObject({ statusCode: 400 });
+      ).rejects.toMatchObject({ statusCode: 404 });
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-in/email")),
       ).rejects.toMatchObject({ statusCode: 400 });
@@ -228,7 +228,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
     it("refuses trailing-slash variants — the router resolves them to the same handler", async () => {
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-up/email/")),
-      ).rejects.toMatchObject({ statusCode: 400 });
+      ).rejects.toMatchObject({ statusCode: 404 });
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-in/email//")),
       ).rejects.toMatchObject({ statusCode: 400 });
@@ -263,7 +263,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
       ).resolves.toBeUndefined();
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-up/email")),
-      ).resolves.toBeUndefined();
+      ).rejects.toMatchObject({ statusCode: 404 });
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/request-password-reset")),
       ).resolves.toBeUndefined();
