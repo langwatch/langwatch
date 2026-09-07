@@ -179,6 +179,16 @@ describe("<ApiKeysSection /> project base key rotation", () => {
         expect(
           screen.getByRole("button", { name: ROTATE_LABEL }),
         ).toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", {
+            name: /Edit API key Project API Key/,
+          }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", {
+            name: /Revoke API key Project API Key/,
+          }),
+        ).not.toBeInTheDocument();
       });
     });
 
