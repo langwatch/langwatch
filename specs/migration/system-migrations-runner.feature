@@ -127,6 +127,18 @@ Feature: Running system migrations across organizations
     And runtime processes do not start
     And the next start retries the pass
 
+  # PR1 keeps the staff-configured Auth0 route as the compatibility path. Its
+  # stored domain is not proof that the customer controls that domain, so D04
+  # stays outside the shared registry until PR2 can register the proof-aware
+  # migration. The registry is shared by prestart, ordinary, targeted and
+  # enrollment paths, which keeps the unproved migration out of all four.
+  @unit
+  Scenario: PR1 does not run the unproved SSO grandfather migration
+    Given an organization has a staff-configured legacy SSO domain
+    When any system migration entry point reads the PR1 registry
+    Then the D04 connection grandfather migration is not declared or run
+    And the legacy SSO route remains unchanged
+
   # ═══ Automatic enrollment ═════════════════════════════════════════════
   # Enrollment paces a rollout while it is happening. A finished rollout has
   # the opposite problem: every organization created since must migrate too,
