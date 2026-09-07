@@ -32850,7 +32850,8 @@ langwatch scenario create "Open cases count" \
   --situation "The user is a support lead who wants to know how many support cases are open." \
   --criteria "Gives a number of open cases" \
   --test-suite "Case lookups" \
-  --field golden_sql="SELECT COUNT(*) FROM cases WHERE status = 'open'"
+  --field golden_sql="SELECT COUNT(*) FROM cases WHERE status = 'open'" \
+  --field table_schema="CREATE TABLE cases (id INT, status TEXT, created_at TIMESTAMP)"
 
 langwatch test-suite update "Case lookups" --evaluators-json evaluators.json
 
@@ -32874,7 +32875,7 @@ langwatch simulation-run get <scenarioRunId> --format json   # results.evaluatio
 }]
 ```
 
-The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api/v1/test-suites/{id}` and `config.evaluators` on `POST /api/v1/run-plans/run`, and `GET /api/simulation-runs/{scenarioRunId}` answers with `results.evaluations`. See the [Test Suites API reference](/api-reference/test-suites/overview) and the [Run Plans API reference](/api-reference/run-plans/overview). The Python and TypeScript SDKs take `fields` and `evaluators` on `test_suites.create`, `test_suites.update` and `run_plans.run`, and the MCP tools `platform_create_test_suite`, `platform_update_test_suite` and `platform_run_plan` take the same.
+The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api/v1/test-suites/{id}` and `config.evaluators` on `POST /api/v1/run-plans/run`, and `GET /api/simulation-runs/{scenarioRunId}` answers with `results.evaluations`. See the [Test Suites API reference](/api-reference/test-suites/overview) and the [Run Plans API reference](/api-reference/run-plans/overview). The Python SDK takes `fields` and `evaluators` on `test_suites.create`, `test_suites.update` and `run_plans.run`; the TypeScript SDK takes them on `testSuites.create`, `testSuites.update` and, under `config`, on `runPlans.run`. The MCP tools `platform_create_test_suite`, `platform_update_test_suite` and `platform_run_plan` take the same.
 
 ## From code
 
@@ -33441,7 +33442,7 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
     Group scenarios, run a group, and where scenarios written in code appear.
   </Card>
   <Card title="Evaluators" icon="clipboard-check" href="/agent-testing/evaluators">
-    Grade every run with a faithfulness check, a score or a golden answer, and fail the run when a required check fails.
+    Grade every run with a faithfulness check, a score or a golden answer, and fail the scenario when a required check fails.
   </Card>
   <Card title="Run plans" icon="play" href="/agent-testing/run-plans">
     What happens when you press Run, and how runs join one history.
@@ -33700,7 +33701,7 @@ The header shows one pill per evaluator, and the **Evaluators** column shows one
 
 | Status | Meaning |
 |---|---|
-| `passed`, `failed` | The evaluator's verdict, and what a required input the trace never delivered is recorded as: no such tool call, no retrieved contexts, or no spans in the trace. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
+| `passed`, `failed` | The evaluator's verdict. When the trace never delivered a required input, the result is `failed` with the reason `no <tool> call in the trace`, `no retrieved contexts in the trace` or `no spans in the trace`. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
 | `scored` | The score of an evaluator with no pass or fail verdict. A score never fails a scenario. |
 | `skipped` | The scenario has no value for a field the mapping reads. The reason names the field. |
 | `error` | The evaluator itself failed to run. The reason says why. |

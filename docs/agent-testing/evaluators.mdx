@@ -134,7 +134,8 @@ langwatch scenario create "Open cases count" \
   --situation "The user is a support lead who wants to know how many support cases are open." \
   --criteria "Gives a number of open cases" \
   --test-suite "Case lookups" \
-  --field golden_sql="SELECT COUNT(*) FROM cases WHERE status = 'open'"
+  --field golden_sql="SELECT COUNT(*) FROM cases WHERE status = 'open'" \
+  --field table_schema="CREATE TABLE cases (id INT, status TEXT, created_at TIMESTAMP)"
 
 langwatch test-suite update "Case lookups" --evaluators-json evaluators.json
 
@@ -158,7 +159,7 @@ langwatch simulation-run get <scenarioRunId> --format json   # results.evaluatio
 }]
 ```
 
-The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api/v1/test-suites/{id}` and `config.evaluators` on `POST /api/v1/run-plans/run`, and `GET /api/simulation-runs/{scenarioRunId}` answers with `results.evaluations`. See the [Test Suites API reference](/api-reference/test-suites/overview) and the [Run Plans API reference](/api-reference/run-plans/overview). The Python and TypeScript SDKs take `fields` and `evaluators` on `test_suites.create`, `test_suites.update` and `run_plans.run`, and the MCP tools `platform_create_test_suite`, `platform_update_test_suite` and `platform_run_plan` take the same.
+The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api/v1/test-suites/{id}` and `config.evaluators` on `POST /api/v1/run-plans/run`, and `GET /api/simulation-runs/{scenarioRunId}` answers with `results.evaluations`. See the [Test Suites API reference](/api-reference/test-suites/overview) and the [Run Plans API reference](/api-reference/run-plans/overview). The Python SDK takes `fields` and `evaluators` on `test_suites.create`, `test_suites.update` and `run_plans.run`; the TypeScript SDK takes them on `testSuites.create`, `testSuites.update` and, under `config`, on `runPlans.run`. The MCP tools `platform_create_test_suite`, `platform_update_test_suite` and `platform_run_plan` take the same.
 
 ## From code
 

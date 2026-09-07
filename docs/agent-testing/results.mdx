@@ -74,7 +74,7 @@ The header shows one pill per evaluator, and the **Evaluators** column shows one
 
 | Status | Meaning |
 |---|---|
-| `passed`, `failed` | The evaluator's verdict, and what a required input the trace never delivered is recorded as: no such tool call, no retrieved contexts, or no spans in the trace. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
+| `passed`, `failed` | The evaluator's verdict. When the trace never delivered a required input, the result is `failed` with the reason `no <tool> call in the trace`, `no retrieved contexts in the trace` or `no spans in the trace`. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
 | `scored` | The score of an evaluator with no pass or fail verdict. A score never fails a scenario. |
 | `skipped` | The scenario has no value for a field the mapping reads. The reason names the field. |
 | `error` | The evaluator itself failed to run. The reason says why. |
