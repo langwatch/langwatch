@@ -89,14 +89,20 @@ describe("GET /api/health/scenarios", () => {
   });
 
   describe("given the request carries a project API key that matches no project", () => {
-    /** @scenario "A request with an unknown project API key is refused before any run is queued" */
-    it.each<{ label: string; headers: Record<string, string> }>([
+    // Typed on the rows, not as `it.each<T>(`: the parity checker only binds
+    // `@scenario` to a bare `it.each(` call.
+    const wrongKeyRows: { label: string; headers: Record<string, string> }[] = [
       { label: "X-Auth-Token", headers: { "x-auth-token": "wrong-key" } },
       {
         label: "Authorization: Bearer",
         headers: { authorization: "Bearer wrong-key" },
       },
-    ])("responds 401 via $label and queues no scenario run", async ({
+    ];
+
+    /** @scenario "A request with an unknown project API key is refused before any run is queued" */
+    it.each(
+      wrongKeyRows,
+    )("responds 401 via $label and queues no scenario run", async ({
       headers,
     }) => {
       const app = await getApp();
