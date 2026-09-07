@@ -23,9 +23,9 @@
 	{
 		"id": "connect-agent",
 		"label": "Connect agent",
-		"description": "Connect the codebase's AI agent to LangWatch agent testing over HTTP, so test suites run against it from the platform. Finds or adds the agent's chat endpoint, wires authentication for scenario traffic, makes the server adopt the W3C traceparent header so the judge reads the agent's own traces, registers the agent with the `langwatch` CLI, and runs the first test suite. Use when the user wants platform scenarios to test their real, deployed agent.",
+		"description": "Connect the codebase's AI agent to LangWatch agent simulations, so test suites run against the real agent process. Adds a small connect function beside the service startup that calls the agent already in the codebase, which opens an outbound connection and registers the agent with its environment and its run parameters, confirms the agent is Online, and runs the first test suite. Falls back to an HTTP registration when the agent cannot import the SDK. Use when the user wants platform scenarios to test their real agent.",
 		"category": "skill",
-		"userPrompt": "Connect my agent to LangWatch agent testing"
+		"userPrompt": "Connect my agent to LangWatch simulations"
 	},
 	{
 		"id": "context-sweet-spot",
@@ -140,7 +140,7 @@
 	{
 		"id": "scenarios",
 		"label": "Scenarios",
-		"description": "Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios via the `langwatch` CLI, and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.",
+		"description": "Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios via the `langwatch` CLI against a connected agent, reading the run parameters that agent declares so the scenarios and comparison runs turn its real levers, and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.",
 		"category": "skill",
 		"userPrompt": "Add scenario tests for my agent"
 	},

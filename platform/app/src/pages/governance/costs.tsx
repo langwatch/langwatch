@@ -10,6 +10,7 @@ import {
 import type {
   GovernanceCostStaleSourcesDto,
   GovernanceCostSummaryDto,
+  GovernanceCostUnpricedWindowDto,
 } from "@ee/governance/services/governanceCost.service";
 import numeral from "numeral";
 import {
@@ -41,7 +42,13 @@ import {
   CostSampleToggle,
 } from "~/components/governance/costs/CostSampleControls";
 import {
+  CostSpenderError,
+  CostSpenderList,
+  type SpenderRow,
+} from "~/components/governance/costs/CostSpenderPanel";
+import {
   sampleModeActive,
+  summaryAsRead,
   useSettledRealDataState,
 } from "~/components/governance/costs/costSampleMode";
 import {
@@ -147,6 +154,69 @@ function useDepartmentSelectionReset({
   }, [selected, departmentRows, departments, setFilters]);
 }
 
+/**
+ * The pulled lane's spender breakdown. Split-grant rule as the breakdowns
+ * above: the spender labels are the People screen's data, so the read is
+ * gated on that screen's permission — the server refuses it anyway, this
+ * just spares the failed query.
+ */
+function useSpenderRows({
+  organizationId,
+  windowDays,
+  enabled,
+}: {
+  organizationId: string;
+  windowDays: number;
+  enabled: boolean;
+}) {
+  const spenders = api.governanceCost.spenders.useQuery(
+    { organizationId, windowDays },
+    { enabled, refetchOnWindowFocus: false },
+  );
+  return {
+    rows: spenders.data?.rows ?? null,
+    // Carried out separately instead of collapsed into null: null is this
+    // screen's word for "unanswered or absent", and a failed read is neither
+    // — hiding the panel on an outage would claim nobody spent anything.
+    isError: spenders.isError,
+    retry: () => void spenders.refetch(),
+  };
+}
+
+/**
+ * Whether the invented sample panels are on. `optIn` stays `null` until the
+ * reader picks a side, which is what lets the default follow the data.
+ * Deliberately not persisted: the same rule the trace explorer applies to its
+ * sample traces — opting in is a decision about this sitting, not a
+ * preference that follows you back tomorrow.
+ *
+ * Adoption counts as real data even with no spend behind it yet: showing a
+ * measured headcount beside invented money is the confusion this toggle
+ * exists to prevent. So does the headline summary: a pulled bill with no
+ * activity behind it is still real money, and must keep the invented panels
+ * off the screen it heads.
+ */
+function useSampleMode(
+  breakdowns: ReturnType<typeof useBreakdownQueries>,
+  summaryData: GovernanceCostSummaryDto | undefined,
+) {
+  const [optIn, setOptIn] = useState<boolean | null>(null);
+  const showSample = sampleModeActive({
+    optIn,
+    realData: useSettledRealDataState([
+      summaryAsRead(summaryData),
+      breakdowns.departmentRows,
+      breakdowns.userRows,
+      breakdowns.overTime,
+      breakdowns.modelOverTime,
+      breakdowns.activeUsers === null
+        ? null
+        : { length: breakdowns.activeUsers },
+    ]),
+  });
+  return { showSample, toggleSample: () => setOptIn(!showSample) };
+}
+
 function CostsPage() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -176,39 +246,22 @@ function CostsPage() {
     // the other gets the lanes and no failed queries underneath them.
     enabled: !!organizationId && hasAnyPermission("activityMonitor:view"),
   });
+  const spenders = useSpenderRows({
+    organizationId,
+    windowDays: filters.windowDays,
+    enabled: !!organizationId && hasAnyPermission("governance:view"),
+  });
 
   useDepartmentSelectionReset({ filters, breakdowns, setFilters });
 
-  // `null` until the reader picks a side, which is what lets the default below
-  // follow the data. Deliberately not persisted: the same rule the trace
-  // explorer applies to its sample traces — opting in is a decision about this
-  // sitting, not a preference that follows you back tomorrow.
-  const [sampleOptIn, setSampleOptIn] = useState<boolean | null>(null);
-  // Adoption counts as real data even with no spend behind it yet: showing a
-  // measured headcount beside invented money is the confusion this toggle
-  // exists to prevent.
-  const showSample = sampleModeActive({
-    optIn: sampleOptIn,
-    realData: useSettledRealDataState([
-      breakdowns.departmentRows,
-      breakdowns.userRows,
-      breakdowns.overTime,
-      breakdowns.modelOverTime,
-      breakdowns.activeUsers === null
-        ? null
-        : { length: breakdowns.activeUsers },
-    ]),
-  });
+  const { showSample, toggleSample } = useSampleMode(breakdowns, summary.data);
 
   return (
     <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
       <VStack align="stretch" gap={5} width="full">
         <HStack justify="space-between" align="center">
           <Heading size="md">Costs</Heading>
-          <CostSampleToggle
-            active={showSample}
-            onToggle={() => setSampleOptIn(!showSample)}
-          />
+          <CostSampleToggle active={showSample} onToggle={toggleSample} />
         </HStack>
         {showSample && <CostSampleBanner />}
         <CostFilterBar
@@ -235,6 +288,7 @@ function CostsPage() {
           filters={filters}
           breakdowns={breakdowns}
           showSample={showSample}
+          spenders={spenders}
         />
       </VStack>
     </GovernanceLayout>
@@ -299,6 +353,7 @@ function CostsBody({
   return (
     <VStack align="stretch" gap={6}>
       <StaleSourcesNotice staleSources={data.staleSources} />
+      <UnpricedWindowNotice unpricedWindow={data.unpricedWindow} />
       <HStack align="stretch" gap={4} flexWrap="wrap">
         <CostLanePanel
           testId="cost-lane-billed"
@@ -368,6 +423,53 @@ function StaleSourcesNotice({
           {staleSources.sourceNames.join(", ")}{" "}
           {staleSources.sourceNames.length === 1 ? "is" : "are"} failing to
           pull, so spend after that point is unknown rather than zero.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+/**
+ * Days that were read but never priced, because pulled cost recording was off.
+ *
+ * The sibling of the notice above, for a gap nothing broke to cause. Those days
+ * have their audit rows; only the money was dropped, and a dropped figure draws
+ * as zero. Turning the setting on stops the loss from growing but does not undo
+ * it — the pull cursor moved past those days and will not revisit them on its
+ * own — so the line has to say both, or a reader fixes the setting and believes
+ * the history is now correct.
+ *
+ * Dates rather than "since": this gap is bounded at both ends, and a gap that
+ * closed last month should not read as an open wound.
+ */
+function UnpricedWindowNotice({
+  unpricedWindow,
+}: {
+  unpricedWindow: GovernanceCostUnpricedWindowDto | null;
+}) {
+  if (!unpricedWindow) return null;
+
+  const asDay = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  const since = asDay(unpricedWindow.sinceIso);
+  const through = asDay(unpricedWindow.throughIso);
+  const span = since === through ? since : `${since} to ${through}`;
+
+  return (
+    <Alert.Root status="warning" data-testid="cost-unpriced-window">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Spend not recorded for {span}</Alert.Title>
+        <Alert.Description>
+          {unpricedWindow.sourceNames.join(", ")} read those days while this
+          organization was not recording pulled cost, so their spend is unknown
+          rather than zero. Switching recording on stops the loss but leaves
+          these days empty — move a source&apos;s start date back across them to
+          read them again.
         </Alert.Description>
       </Alert.Content>
     </Alert.Root>
@@ -493,14 +595,57 @@ function totalPerSeries(buckets: DailyBucket[]): RankRow[] {
   return [...totals.values()];
 }
 
+/**
+ * The billed-spend-by-person panel's slot in the grid.
+ *
+ * Different money from "Cost by user" on purpose: that panel is the cost
+ * recorded on traces, this one is what the provider's BILL said each person
+ * spent (the pulled lane). They disagree legitimately and are never
+ * reconciled — each is labeled for its lane. Absent, not zero-filled, when
+ * the breakdown holds no rows or the viewer lacks the People screen's
+ * permission. A failed read is neither empty nor refused, so it says so
+ * instead of vanishing.
+ */
+function SpenderPanelSlot({
+  spenders,
+}: {
+  spenders: { rows: SpenderRow[] | null; isError: boolean; retry: () => void };
+}) {
+  if (spenders.isError) {
+    return (
+      <CostPanel title="Billed spend by person">
+        <CostSpenderError onRetry={spenders.retry} />
+      </CostPanel>
+    );
+  }
+  if (spenders.rows === null || spenders.rows.length === 0) return null;
+  return (
+    <CostPanel title="Billed spend by person">
+      <CostSpenderList rows={spenders.rows} />
+    </CostPanel>
+  );
+}
+
 function CostBreakdowns({
   filters,
   breakdowns,
   showSample,
+  spenders,
 }: {
   filters: CostFilters;
   breakdowns: Breakdowns;
   showSample: boolean;
+  /**
+   * The pulled lane's spender breakdown. Rows are null while unanswered — the
+   * read is refused without the People screen's permission, and the panel is
+   * then simply absent. Null and empty both render nothing: an absent panel,
+   * never a zero-filled one. A failed read renders as a failure instead.
+   */
+  spenders: {
+    rows: SpenderRow[] | null;
+    isError: boolean;
+    retry: () => void;
+  };
 }) {
   const days = useMemo(
     () => recentDays(filters.windowDays),
@@ -591,6 +736,7 @@ function CostBreakdowns({
         <CostPanel title="Cost by user">
           <CostRankList rows={userRows} />
         </CostPanel>
+        <SpenderPanelSlot spenders={spenders} />
 
         {showSample && (
           <>

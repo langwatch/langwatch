@@ -36,12 +36,18 @@ import {
 } from "~/utils/posthogErrorCapture";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
 import type { SourceType } from "../activity-monitor/ingestionSource.service";
+import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
+import {
+  loadErasureSuppression,
+  partitionSuppressedEvents,
+} from "../erasureSuppression.service";
 import {
   type GovernanceOcsfEventInput,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
+import { PersonDiscoveryService } from "../personDiscovery.service";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,
@@ -136,6 +142,22 @@ export interface PulledUsageDispatcher {
       occurredAt: number;
     },
   ): Promise<void>;
+}
+
+/**
+ * The identity-match engine, as the pull run is allowed to know it (ADR-128
+ * §12). A port rather than an import: the suggestion half scores names —
+ * quadratic, gated off every request path by the import-graph guard next to
+ * the engine — and this worker is statically reachable from the ops router
+ * through the pipeline registry. The composition root builds the
+ * implementation on the worker role and hands it in; this file never names
+ * the scorer.
+ *
+ * Optional. Without it discovery still records people; the review queue just
+ * waits for a process that composes the engine.
+ */
+export interface DiscoveredPeopleMatcher {
+  runFor(args: { organizationId: string }): Promise<void>;
 }
 
 /**
@@ -292,6 +314,7 @@ export async function runIngestionPull(params: {
   sourceId: string;
   cursor: string | null;
   pulledUsage?: PulledUsageDispatcher;
+  identityMatch?: DiscoveredPeopleMatcher;
 }): Promise<{
   nextCursor: string | null;
   eventCount: number;
@@ -351,6 +374,7 @@ export async function runIngestionPull(params: {
       events: result.events,
       source,
       pulledUsage: params.pulledUsage,
+      identityMatch: params.identityMatch,
     });
     logger.info(
       {
@@ -386,8 +410,13 @@ type PullingSource = {
   sourceType: string;
   organizationId: string;
   teamId: string | null;
+  /** ADR-129: the named-or-blank line compares against this, no stored field. */
+  createdAt: Date;
   /** ADR-088 v7: trace destination for conversation routing. Null = don't route. */
   traceProjectId: string | null;
+  /** ADR-088: the window already read without pricing. See `recordUnpricedUsageWindow`. */
+  unpricedUsageSince: Date | null;
+  unpricedUsageThrough: Date | null;
 };
 
 /**
@@ -410,10 +439,12 @@ async function writePulledEvents({
   events,
   source,
   pulledUsage,
+  identityMatch,
 }: {
   events: NormalizedPullEvent[];
   source: PullingSource;
   pulledUsage?: PulledUsageDispatcher;
+  identityMatch?: DiscoveredPeopleMatcher;
 }): Promise<void> {
   const govProject = await ensureHiddenGovernanceProject(
     prisma,
@@ -441,24 +472,168 @@ async function writePulledEvents({
   // from the same pull disagreeing about when they were observed could order a
   // corrected figure behind the one it corrects.
   const observedAt = new Date();
-  for (const event of events) {
+  // The do-not-reimport list, resolved once per run for the same reason the
+  // cost flag above is. Without this check the pullers undo every erasure on
+  // their next pass: each re-reads a window behind its own watermark so a
+  // restated figure is not missed, so an actor erased today is re-read and
+  // re-written on the next run (ADR-128 §9 step 1). `event.actor` is what
+  // becomes `ActorEmail` and rides inside the raw OCSF payload, and it is the
+  // actor id the cost record carries — one check covers both writes because a
+  // suppressed event is not written at all rather than written and erased
+  // again later.
+  const suppression = await loadErasureSuppression({
+    prisma,
+    organizationId: source.organizationId,
+    provider: source.sourceType,
+  });
+  const { kept, suppressedCount } = partitionSuppressedEvents({
+    events,
+    actorOf: (event) => event.actor,
+    suppression,
+  });
+  const { droppedPeriodsMs, recordedPeriodsMs } = await writeAuditAndUsageRows({
+    kept,
+    source,
+    govProjectId: govProject.id,
+    observedAt,
+    ocsfRepo,
+    pulledUsage,
+    costRecordingEnabled,
+  });
+  await recordUnpricedUsageWindow({
+    source,
+    droppedPeriodsMs,
+    recordedPeriodsMs,
+  });
+  if (suppressedCount > 0) {
+    // Worth a line: these are real provider rows this run deliberately did not
+    // store, so a total that looks short has an explanation here rather than
+    // looking like a pull that lost data.
+    logger.info(
+      { ingestionSourceId: source.id, suppressedCount },
+      "skipped pulled events naming an erased identifier",
+    );
+  }
+  const { discovered } = await syncPeopleFactsFromPull({
+    source,
+    events: kept,
+  });
+  // `kept`, not `events`. This is the export that leaves our storage entirely
+  // — it writes the conversation into the customer's own trace project, with
+  // the provider's user id on it and the question and answer in the spans. A
+  // suppressed person is suppressed here most of all.
+  await routeConversationsToTraceDestination({ events: kept, source });
+  // ADR-128 §12: the feed that discovers people is the engine's trigger.
+  // After routing, so a slow or failing pass never delays the export above.
+  if (discovered > 0 && identityMatch) {
+    try {
+      await identityMatch.runFor({ organizationId: source.organizationId });
+    } catch (error) {
+      logger.error(
+        { error: toError(error), ingestionSourceId: source.id },
+        "identity match pass failed; the discovered people are kept and the next pull retries",
+      );
+    }
+  }
+}
+
+/**
+ * The per-event writes of one run: each kept event's OCSF audit row, and its
+ * usage record beside it. Returns the priced periods split by whether the
+ * cost flag let them be stored — the dropped ones become the source's
+ * unpriced window, and the recorded ones are what later closes that window.
+ */
+async function writeAuditAndUsageRows({
+  kept,
+  source,
+  govProjectId,
+  observedAt,
+  ocsfRepo,
+  pulledUsage,
+  costRecordingEnabled,
+}: {
+  kept: NormalizedPullEvent[];
+  source: PullingSource;
+  govProjectId: string;
+  observedAt: Date;
+  ocsfRepo: NonNullable<ReturnType<typeof getApp>["governance"]["ocsfEvents"]>;
+  pulledUsage?: PulledUsageDispatcher;
+  costRecordingEnabled: boolean;
+}): Promise<{ droppedPeriodsMs: number[]; recordedPeriodsMs: number[] }> {
+  const droppedPeriodsMs: number[] = [];
+  const recordedPeriodsMs: number[] = [];
+  for (const event of kept) {
     await ocsfRepo.insertEvent(
       mapToOcsfRow({
         event,
-        tenantId: govProject.id,
+        tenantId: govProjectId,
         ingestionSourceId: source.id,
         sourceType: source.sourceType,
       }),
     );
-    await recordPulledUsageFor({
+    const { pricedPeriodMs } = await recordPulledUsageFor({
       event,
       source,
-      govProjectId: govProject.id,
+      govProjectId,
       observedAt,
-      pulledUsage: costRecordingEnabled ? pulledUsage : undefined,
+      pulledUsage,
+      costRecordingEnabled,
     });
+    if (pricedPeriodMs !== null) {
+      (costRecordingEnabled ? recordedPeriodsMs : droppedPeriodsMs).push(
+        pricedPeriodMs,
+      );
+    }
   }
-  await routeConversationsToTraceDestination({ events, source });
+  return { droppedPeriodsMs, recordedPeriodsMs };
+}
+
+/**
+ * People and department facts, off one delivery's events.
+ *
+ * `events` must be the post-partition list — the caller's `kept`, never the
+ * raw pull: discovery running on the pre-partition list would re-create a
+ * plaintext person row for an erased identifier on the next re-read of the
+ * puller's lookback window (ADR-128 §9 step 1). And a discovery failure never costs the run
+ * its events — the next run sees the same actors again, while audit rows
+ * missed would be gone for good. Department facts ride the same directory
+ * events, behind the same partition, with the same isolation: the directory
+ * read runs again tomorrow, so a failed sync costs a day, never the run.
+ */
+async function syncPeopleFactsFromPull({
+  source,
+  events,
+}: {
+  source: PullingSource;
+  events: NormalizedPullEvent[];
+}): Promise<{ discovered: number }> {
+  let discovered = 0;
+  try {
+    ({ discovered } = await PersonDiscoveryService.create(
+      prisma,
+    ).recordFromPulledEvents({
+      organizationId: source.organizationId,
+      provider: source.sourceType,
+      events,
+    }));
+  } catch (error) {
+    logger.error(
+      { error: toError(error), ingestionSourceId: source.id },
+      "could not record discovered people; the pulled events are still delivered",
+    );
+  }
+  try {
+    await DirectoryDepartmentSyncService.create(prisma).applyDirectoryEvents({
+      organizationId: source.organizationId,
+      events,
+    });
+  } catch (error) {
+    logger.error(
+      { error: toError(error), ingestionSourceId: source.id },
+      "could not apply directory departments; the pulled events are still delivered",
+    );
+  }
+  return { discovered };
 }
 
 /**
@@ -705,14 +880,29 @@ async function recordPulledUsageFor({
   govProjectId,
   observedAt,
   pulledUsage,
+  costRecordingEnabled,
 }: {
   event: NormalizedPullEvent;
   source: PullingSource;
   govProjectId: string;
   observedAt: Date;
   pulledUsage?: PulledUsageDispatcher;
-}): Promise<void> {
-  if (!pulledUsage) return;
+  /**
+   * Whether the organization's pulled cost is allowed to be stored. False
+   * still maps the event: the caller has to know a price WAS on the table to
+   * record that this run dropped it, and the mapping is pure — the only cost
+   * of doing it anyway is arithmetic the run was about to skip.
+   */
+  costRecordingEnabled: boolean;
+}): Promise<{
+  /**
+   * The bucket instant of the price this event carried, or null when it
+   * carried none. Reported whether or not the price was stored — a dropped
+   * price is exactly what the caller needs to hear about.
+   */
+  pricedPeriodMs: number | null;
+}> {
+  if (!pulledUsage) return { pricedPeriodMs: null };
 
   let record: ReturnType<typeof buildPulledUsageRecord>;
   try {
@@ -723,6 +913,7 @@ async function recordPulledUsageFor({
         sourceType: source.sourceType,
         organizationId: source.organizationId,
         teamId: source.teamId,
+        createdAt: source.createdAt,
       },
       governanceProjectId: govProjectId,
       observedAt,
@@ -741,17 +932,103 @@ async function recordPulledUsageFor({
       scope.setExtra?.("ingestionSourceId", source.id);
       captureException(toError(error));
     });
-    return;
+    return { pricedPeriodMs: null };
   }
 
   // Not a usage item — an ordinary audit event, and there was never a cost.
-  if (!record) return;
+  if (!record) return { pricedPeriodMs: null };
+
+  // The price existed either way; only storing it is gated.
+  if (!costRecordingEnabled) {
+    return { pricedPeriodMs: record.occurredAtMs };
+  }
 
   await pulledUsage.recordPulledUsage({
     ...record,
     tenantId: govProjectId,
     occurredAt: record.occurredAtMs,
   });
+  return { pricedPeriodMs: record.occurredAtMs };
+}
+
+/**
+ * Remembers the window this source read but was not allowed to price, and
+ * forgets it once a later run has read back across the whole of it.
+ *
+ * The pull cursor advances whether or not the money path is live, because
+ * audit-only is a supported mode — a source whose organization leaves
+ * `release_pulled_usage_cost_enabled` off is working as configured, and
+ * holding its cursor still would re-read one window forever instead of
+ * following the provider. The consequence is that turning the flag on later
+ * recovers nothing by itself: every day already pulled has an audit row, no
+ * price, and no way to tell the two apart from a day that genuinely cost
+ * nothing. Recording the window is what makes that difference sayable — the
+ * cost screen reads it and reports those days as unknown rather than zero.
+ *
+ * Widen-only while the flag is off: a run that drops a price can only ever
+ * extend the window, never shrink it, so a short run in the middle of a gap
+ * cannot make the gap look smaller than it is.
+ *
+ * Clearing is deliberately all-or-nothing. The cost adapters re-read a whole
+ * trailing window from the source's start date rather than resuming from a
+ * high-water mark, so a run that prices a period at or before the start of
+ * the gap has necessarily re-read every later day in it too. A partial
+ * re-read leaves the window alone: half a repair is not a repair, and
+ * narrowing it would claim days that were never re-priced.
+ */
+async function recordUnpricedUsageWindow({
+  source,
+  droppedPeriodsMs,
+  recordedPeriodsMs,
+}: {
+  source: PullingSource;
+  droppedPeriodsMs: number[];
+  recordedPeriodsMs: number[];
+}): Promise<void> {
+  if (droppedPeriodsMs.length > 0) {
+    const since = new Date(Math.min(...droppedPeriodsMs));
+    const through = new Date(Math.max(...droppedPeriodsMs));
+    const widened = {
+      unpricedUsageSince: earliest(source.unpricedUsageSince, since),
+      unpricedUsageThrough: latest(source.unpricedUsageThrough, through),
+    };
+    logger.warn(
+      {
+        ingestionSourceId: source.id,
+        organizationId: source.organizationId,
+        droppedCount: droppedPeriodsMs.length,
+        unpricedSince: widened.unpricedUsageSince.toISOString(),
+        unpricedThrough: widened.unpricedUsageThrough.toISOString(),
+      },
+      "pulled cost recording is off for this organization — audit rows landed but this run's spend was not priced",
+    );
+    await prisma.ingestionSource.update({
+      where: { id: source.id },
+      data: widened,
+    });
+    return;
+  }
+
+  const gapStart = source.unpricedUsageSince;
+  if (!gapStart || recordedPeriodsMs.length === 0) return;
+  if (Math.min(...recordedPeriodsMs) > gapStart.getTime()) return;
+
+  logger.info(
+    { ingestionSourceId: source.id },
+    "a re-read reached back across the unpriced window; its spend is priced again",
+  );
+  await prisma.ingestionSource.update({
+    where: { id: source.id },
+    data: { unpricedUsageSince: null, unpricedUsageThrough: null },
+  });
+}
+
+function earliest(existing: Date | null, candidate: Date): Date {
+  return existing && existing < candidate ? existing : candidate;
+}
+
+function latest(existing: Date | null, candidate: Date): Date {
+  return existing && existing > candidate ? existing : candidate;
 }
 
 /**

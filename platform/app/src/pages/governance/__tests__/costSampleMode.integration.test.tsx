@@ -25,6 +25,9 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
+  // The headline summary is part of the decision under test: a pulled bill
+  // with no activity behind it must keep the invented panels off.
+  costSummary: undefined as unknown,
   activity: {
     summary: undefined as unknown,
     spendByDepartment: undefined as unknown,
@@ -64,18 +67,12 @@ vi.mock("~/components/LoadingScreen", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     governanceCost: {
+      // The spender panel is its own read with its own tests; here it
+      // answers nothing so these tests stay about their own subject.
+      spenders: { useQuery: () => ({ data: undefined }) },
       summary: {
         useQuery: () => ({
-          data: {
-            unavailableReason: null,
-            billed: { amountUsd: 123.45, cellsWithoutAmount: 0 },
-            gateway: { amountUsd: 67.89, cellsWithoutAmount: 0 },
-            seats: { status: "awaiting_data" },
-            series: [
-              { day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 },
-            ],
-            windowDays: 30,
-          },
+          data: harness.costSummary,
           isLoading: false,
           isError: false,
         }),
@@ -124,8 +121,22 @@ const withReadsBackInFlight = (rerender: (ui: React.ReactElement) => void) => {
   rerender(screenTree());
 };
 
+/** A headline summary whose lanes hold the given money, or nothing. */
+const costSummary = ({ billedUsd }: { billedUsd: number | null }) => ({
+  unavailableReason: null,
+  billed: { amountUsd: billedUsd, cellsWithoutAmount: 0 },
+  gateway: { amountUsd: null, cellsWithoutAmount: 0 },
+  seats: { status: "awaiting_data" },
+  series:
+    billedUsd === null
+      ? []
+      : [{ day: "2026-08-01", billedUsd, gatewayUsd: null }],
+  windowDays: 30,
+});
+
 /** Every real read answers, and one of them holds a row. */
 const withRealFigures = () => {
+  harness.costSummary = costSummary({ billedUsd: 123.45 });
   harness.activity.summary = {
     activeUsersThisWindow: 42,
     newUsersThisWindow: 3,
@@ -144,6 +155,7 @@ const withRealFigures = () => {
 
 /** Every real read answers, and all of them are empty. */
 const withNothingMeasured = () => {
+  harness.costSummary = costSummary({ billedUsd: null });
   harness.activity.summary = {
     activeUsersThisWindow: 0,
     newUsersThisWindow: 0,
@@ -155,6 +167,7 @@ const withNothingMeasured = () => {
 };
 
 beforeEach(() => {
+  harness.costSummary = undefined;
   harness.activity = {
     summary: undefined,
     spendByDepartment: undefined,
@@ -193,6 +206,19 @@ describe("the sample panels on the cost screen", () => {
       const { rerender } = renderScreen();
 
       withReadsBackInFlight(rerender);
+
+      expect(screen.queryByText(A_SAMPLE_PANEL)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a pulled bill and no measured activity", () => {
+    beforeEach(() => {
+      withNothingMeasured();
+      harness.costSummary = costSummary({ billedUsd: 123.45 });
+    });
+
+    it("keeps the invented panels off — a real bill is real data", () => {
+      renderScreen();
 
       expect(screen.queryByText(A_SAMPLE_PANEL)).not.toBeInTheDocument();
     });

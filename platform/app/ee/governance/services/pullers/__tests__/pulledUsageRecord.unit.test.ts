@@ -18,6 +18,10 @@ const SOURCE: PulledUsageSourceAttribution = {
   sourceType: "anthropic_admin",
   organizationId: "org_acme",
   teamId: "team_platform",
+  // Before ADR-129's naming line, so every fixture day here predates it too:
+  // the suite's standing records are blank-actor records, like the history
+  // this seam was built on.
+  createdAt: new Date("2026-07-01T00:00:00.000Z"),
 };
 
 /** The org's hidden governance project — where the row is stored (ADR-128). */
@@ -307,6 +311,143 @@ describe("building one pulled usage record", () => {
       });
 
       expect(b?.restatementKey).toBe(a?.restatementKey);
+    });
+  });
+
+  describe("who the money belongs to (ADR-129)", () => {
+    // The line is PULLED_ACTOR_NAMING_STARTS_AT = "2026-10-01"; days and
+    // source ages below are chosen around it.
+    const NAMED_DAY = "2026-10-05T00:00:00.000Z";
+    const BLANK_DAY = "2026-08-01T00:00:00.000Z";
+    const newSource: PulledUsageSourceAttribution = {
+      ...SOURCE,
+      createdAt: new Date("2026-10-02T00:00:00.000Z"),
+    };
+
+    it("threads the adapter's actor onto a post-line day", () => {
+      const record = buildPulledUsageRecord({
+        event: usageEvent({
+          overrides: { actor: "user-abc", event_timestamp: NAMED_DAY },
+        }),
+        source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+
+      expect(record?.rawActorId).toBe("user-abc");
+    });
+
+    it("keeps a pre-line day blank on a pre-line source, even when the provider names somebody", () => {
+      const record = buildPulledUsageRecord({
+        event: usageEvent({
+          overrides: { actor: "user-abc", event_timestamp: BLANK_DAY },
+        }),
+        source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+
+      // The twice-guard: that day's money is already in a blank-actor cell,
+      // and naming it on a re-read would open a second cell beside it.
+      expect(record?.rawActorId).toBe("");
+    });
+
+    it("names all of history for a source created after the line", () => {
+      const record = buildPulledUsageRecord({
+        event: usageEvent({
+          overrides: { actor: "user-abc", event_timestamp: BLANK_DAY },
+        }),
+        source: newSource,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+
+      // A fresh source has no blank history to collide with, so its backfill
+      // is named too.
+      expect(record?.rawActorId).toBe("user-abc");
+    });
+
+    it("keeps blank blank — a provider that names nobody stays nameless", () => {
+      const record = buildPulledUsageRecord({
+        event: usageEvent({
+          overrides: { actor: "", event_timestamp: NAMED_DAY },
+        }),
+        source: newSource,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+
+      expect(record?.rawActorId).toBe("");
+    });
+
+    // Which providers report an agent on money rows, pinned (#7881):
+    // Databricks Genie names its space; OpenAI, Anthropic and Azure cost rows
+    // have no agent concept and stay ""; Copilot Studio emits no money rows at
+    // all (its billing is per seat). The agent rides the hint, and it walks
+    // the same named-or-blank line as the actor because the rollup cell is
+    // keyed by it the same way.
+    it("threads the hint's agent onto a post-line day and keeps it out of the key", () => {
+      const withoutAgent = buildPulledUsageRecord({
+        event: usageEvent({
+          overrides: { event_timestamp: NAMED_DAY },
+        }),
+        source: newSource,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+      const withAgent = buildPulledUsageRecord({
+        event: usageEvent({
+          overrides: { event_timestamp: NAMED_DAY },
+          hint: { agentId: "space_1" },
+        }),
+        source: newSource,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+
+      expect(withoutAgent?.agentId).toBe("");
+      expect(withAgent?.agentId).toBe("space_1");
+      expect(withAgent?.restatementKey).toBe(withoutAgent?.restatementKey);
+    });
+
+    it("keeps a pre-line day agent-less on a pre-line source", () => {
+      const record = buildPulledUsageRecord({
+        event: usageEvent({
+          overrides: { event_timestamp: BLANK_DAY },
+          hint: { agentId: "space_1" },
+        }),
+        source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+
+      expect(record?.agentId).toBe("");
+    });
+
+    it("never lets the actor move the restatement key", () => {
+      const unnamed = buildPulledUsageRecord({
+        event: usageEvent({
+          overrides: { actor: "", event_timestamp: NAMED_DAY },
+        }),
+        source: newSource,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+      const named = buildPulledUsageRecord({
+        event: usageEvent({
+          overrides: { actor: "user-abc", event_timestamp: NAMED_DAY },
+        }),
+        source: newSource,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: new Date("2026-10-06T09:00:00.000Z"),
+      });
+
+      // ADR-129 Decision 4: identity can change between pulls, and an actor
+      // in the key would mint a second record for a bucket that has not
+      // changed. The restatement that starts naming must land ON the record
+      // it corrects.
+      expect(named?.restatementKey).toBe(unnamed?.restatementKey);
+      expect(named?.rawActorId).toBe("user-abc");
     });
   });
 
