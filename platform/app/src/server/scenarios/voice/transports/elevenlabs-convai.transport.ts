@@ -9,7 +9,11 @@
 
 import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
-import type { VoiceTransportRunner } from "../voice-transport.registry";
+import type { CallRecord, CallTurn } from "../call-record";
+import type {
+  VoiceTransportCredential,
+  VoiceTransportRunner,
+} from "../voice-transport.registry";
 
 /**
  * How long to wait for the socket to open before failing the run. ElevenLabs
@@ -74,8 +78,127 @@ export function wrapConnectRejection<
   return adapter;
 }
 
+/**
+ * The signed-URL mint and the conversation read talk to ElevenLabs directly
+ * from the control plane, not through the AI Gateway data plane. Two reasons:
+ * the gateway terminates virtual-key *traffic* (chat/completions), it has no
+ * signed-URL door for the control plane to call with a project key; and "Talk
+ * to it" is explicitly outside the gateway's guardrails (the panel says so),
+ * so routing it through the gateway would misrepresent what it is. The key is
+ * read server-side and only the short-lived signed URL is handed to the
+ * browser — the credential never crosses the boundary either way.
+ */
+const SIGNED_URL_PATH = "/v1/convai/conversation/get-signed-url";
+const CONVERSATION_PATH = "/v1/convai/conversations";
+const API_KEY_HEADER = "xi-api-key";
+
+interface ElevenLabsTranscriptEntry {
+  role?: string;
+  message?: string | null;
+  time_in_call_secs?: number;
+}
+
+interface ElevenLabsConversationResponse {
+  conversation_id?: string;
+  status?: string;
+  transcript?: ElevenLabsTranscriptEntry[];
+  metadata?: {
+    start_time_unix_secs?: number;
+    call_duration_secs?: number;
+  };
+  has_audio?: boolean;
+}
+
+function authHeaders(credential: VoiceTransportCredential): HeadersInit {
+  return { [API_KEY_HEADER]: credential.apiKey, accept: "application/json" };
+}
+
+/** Map an ElevenLabs transcript entry to a neutral turn. `agent` → agent,
+ *  anything else (`user`) → the human caller. */
+function toTurn(entry: ElevenLabsTranscriptEntry): CallTurn {
+  return {
+    role: entry.role === "agent" ? "agent" : "caller",
+    text: (entry.message ?? "").trim(),
+    startMs:
+      typeof entry.time_in_call_secs === "number"
+        ? entry.time_in_call_secs * 1000
+        : undefined,
+  };
+}
+
 export const elevenLabsConvaiTransport: VoiceTransportRunner = {
   missingKeyMessage: NO_ELEVENLABS_KEY_MESSAGE,
+
+  async mintSession({ agentId, credential }) {
+    const url = `${credential.baseUrl}${SIGNED_URL_PATH}?agent_id=${encodeURIComponent(
+      agentId,
+    )}`;
+    let response: Response;
+    try {
+      response = await fetch(url, { headers: authHeaders(credential) });
+    } catch (error) {
+      throw new Error(
+        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`,
+      );
+    }
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => "")).slice(0, 200);
+      throw new Error(
+        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${response.status} ${
+          detail || response.statusText
+        }`.trim(),
+      );
+    }
+    const body = (await response.json()) as { signed_url?: string };
+    if (!body.signed_url) {
+      throw new Error(
+        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: no signed URL returned`,
+      );
+    }
+    return { signedUrl: body.signed_url };
+  },
+
+  async fetchCallRecord({ conversationId, credential, audioProxyUrl }) {
+    const url = `${credential.baseUrl}${CONVERSATION_PATH}/${encodeURIComponent(
+      conversationId,
+    )}`;
+    const response = await fetch(url, { headers: authHeaders(credential) });
+    // Not ready yet: the record does not exist for this conversation. The
+    // caller falls back to the live transcript rather than treating it as a
+    // fetch failure.
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => "")).slice(0, 200);
+      throw new Error(
+        `ElevenLabs conversation fetch failed: ${response.status} ${
+          detail || response.statusText
+        }`.trim(),
+      );
+    }
+    const body = (await response.json()) as ElevenLabsConversationResponse;
+    const startedAt = body.metadata?.start_time_unix_secs
+      ? body.metadata.start_time_unix_secs * 1000
+      : Date.now();
+    const durationMs = (body.metadata?.call_duration_secs ?? 0) * 1000;
+    const record: CallRecord = {
+      conversationId,
+      transport: "elevenlabs_convai",
+      startedAt,
+      endedAt: startedAt + durationMs,
+      durationMs,
+      turns: (body.transcript ?? [])
+        .filter((entry) => (entry.message ?? "").trim().length > 0)
+        .map(toTurn),
+      cutAtLimit: false,
+      source: "provider",
+    };
+    // Audio bytes carry the key to fetch, so they are streamed through the app
+    // proxy rather than exposed as an ElevenLabs URL. No audio → no Play
+    // control, no error (AC15).
+    if (body.has_audio) record.audioUrl = audioProxyUrl;
+    return record;
+  },
+
   createAgentAdapter({ agentId, credential, maxCallSeconds }): AgentAdapter {
     // No prompt/first-message overrides: passing them drops the agent's own
     // tool ids server-side (scenario#838). The key rides only into the SDK

@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * The Caller voice group shows only for a voice target, and reloads the saved
- * caller values into the form.
+ * The Caller voice group lives under Customize scenario for every scenario
+ * (there is no target field in the scenario form itself), and reloads the
+ * saved caller values into the form.
  *
  * @see specs/features/agents/voice-agents-v1.feature
  */
@@ -21,11 +22,10 @@ import { ScenarioForm } from "../ScenarioForm";
 
 afterEach(cleanup);
 
-function renderForm(targetType: string) {
+function renderForm() {
   return render(
     <ChakraProvider value={defaultSystem}>
       <ScenarioForm
-        targetType={targetType}
         defaultValues={{
           name: "Angry cancellation",
           callerVoice: {
@@ -40,28 +40,24 @@ function renderForm(targetType: string) {
 }
 
 describe("Caller voice group", () => {
-  describe("when the target is a voice agent", () => {
-    /** @scenario Caller voice group appears only for a voice target and its values persist */
-    it("shows the group and reloads the saved caller values", async () => {
-      renderForm("voice");
+  describe("when Customize scenario is opened", () => {
+    /** @scenario The Caller voice group lives under Customize scenario and applies only to voice runs */
+    it("shows the Caller voice group and reloads the saved caller values", async () => {
+      renderForm();
+
+      // Customize scenario is collapsed by default; the Caller voice group is
+      // rendered but not yet visible until both are expanded.
+      expect(screen.queryByText("Voice")).not.toBeVisible();
+
+      await userEvent.click(screen.getByText("Customize scenario"));
 
       const group = screen.getByTestId("caller-voice-group");
       expect(group).toBeInTheDocument();
 
-      // Open the collapsed group and read back the saved values.
       await userEvent.click(screen.getByText("Caller voice"));
 
       expect(screen.getByText("Interrupts: 20%")).toBeInTheDocument();
       expect(screen.getByLabelText("Effects")).toHaveValue("phone_line");
-    });
-  });
-
-  describe("when the target is an HTTP agent", () => {
-    it("does not show the group", () => {
-      renderForm("http");
-      expect(
-        screen.queryByTestId("caller-voice-group"),
-      ).not.toBeInTheDocument();
     });
   });
 });

@@ -716,14 +716,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                       key={`${scenarioId ?? "new"}-${reloadNonce}`}
                       defaultValues={defaultValues}
                       formRef={setFormRef}
-                      targetType={selectedTarget?.type}
                     />
                   ) : (
                     <ScenarioForm
                       key={`${scenarioId ?? "new"}-${reloadNonce}`}
                       defaultValues={defaultValues}
                       formRef={setFormRef}
-                      targetType={selectedTarget?.type}
                     />
                   )}
                 </>
@@ -874,11 +872,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 function ScenarioFormWithSuites({
   defaultValues,
   formRef,
-  targetType,
 }: {
   defaultValues?: Partial<ScenarioFormData>;
   formRef: (form: UseFormReturn<ScenarioFormData> | null) => void;
-  targetType?: string;
 }) {
   const { project } = useOrganizationTeamProject();
   const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
@@ -899,7 +895,6 @@ function ScenarioFormWithSuites({
       defaultValues={defaultValues}
       formRef={formRef}
       testSuiteOptions={testSuiteOptions}
-      targetType={targetType}
     />
   );
 }

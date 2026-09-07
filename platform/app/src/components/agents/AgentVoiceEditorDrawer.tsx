@@ -31,6 +31,7 @@ import {
   type VoiceTransport,
 } from "~/server/agents/voice/voice-agent.config";
 import { api } from "~/utils/api";
+import { TalkToItPanel } from "./voice/TalkToItPanel";
 
 // ============================================================================
 // Constants
@@ -140,6 +141,13 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
   const [name, setName] = useState("");
   const [transport, setTransport] = useState<VoiceTransport>(DEFAULT_TRANSPORT);
   const [voiceAgentId, setVoiceAgentId] = useState("");
+
+  // Talk-to-it panel state. The agent need not be saved first: the call mints
+  // from the form values, and the row is created on hang-up if it has none yet.
+  const [talkOpen, setTalkOpen] = useState(false);
+  const [createdAgentRowId, setCreatedAgentRowId] = useState<
+    string | undefined
+  >(undefined);
 
   // Load existing agent when editing.
   const agentQuery = api.agents.getById.useQuery(
@@ -277,12 +285,17 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
     return `${MODEL_PROVIDERS_ROUTE}?returnTo=${returnTo}`;
   })();
 
-  // "Talk to it" is wired in a later slice; here it only says why it is off.
-  const talkTooltip = isCreating
-    ? "Save the agent first"
-    : !hasElevenLabsKey
-      ? "Add an ElevenLabs key first"
-      : "Coming soon";
+  // Talk to it is enabled as soon as the transport's agent id is filled and the
+  // project has a key — no save-first. The tooltip names whichever is missing.
+  const canTalk = voiceAgentId.trim().length > 0 && hasElevenLabsKey;
+  const talkTooltip =
+    voiceAgentId.trim().length === 0
+      ? "Enter the agent id first"
+      : !hasElevenLabsKey
+        ? "Add an ElevenLabs key first"
+        : undefined;
+
+  const talkAgentRowId = agentId ?? createdAgentRowId;
 
   const transportOptionsDisabled = VOICE_TRANSPORTS.length <= 1;
 
@@ -322,7 +335,38 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
           overflow="hidden"
           padding={0}
         >
-          {agentId && agentQuery.isLoading ? (
+          {talkOpen ? (
+            <VStack
+              gap={4}
+              align="stretch"
+              flex={1}
+              overflowY="auto"
+              paddingX={6}
+              paddingY={4}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                alignSelf="flex-start"
+                onClick={() => setTalkOpen(false)}
+                data-testid="voice-agent-talk-back"
+              >
+                <LuArrowLeft size={16} /> Back
+              </Button>
+              <TalkToItPanel
+                projectId={projectId}
+                projectSlug={project?.slug ?? ""}
+                transport={transport}
+                agentId={voiceAgentId.trim()}
+                agentRowId={talkAgentRowId}
+                name={name.trim() || undefined}
+                onAgentCreated={(rowId) => {
+                  setCreatedAgentRowId(rowId);
+                  void utils.agents.getAll.invalidate({ projectId });
+                }}
+              />
+            </VStack>
+          ) : agentId && agentQuery.isLoading ? (
             <HStack justify="center" paddingY={8}>
               <Spinner size="md" />
             </HStack>
@@ -404,12 +448,20 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
             <Button variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Tooltip content={talkTooltip} positioning={{ placement: "top" }}>
+            {/* No `disabled` prop here: Tooltip already no-ops on empty
+                content, and toggling `disabled` would swap it between
+                returning `children` bare and wrapping them in
+                ChakraTooltip.Root, remounting the Button underneath. */}
+            <Tooltip
+              content={talkTooltip ?? ""}
+              positioning={{ placement: "top" }}
+            >
               <Box>
                 <Button
                   variant="outline"
-                  disabled
+                  disabled={!canTalk}
                   title={talkTooltip}
+                  onClick={() => setTalkOpen(true)}
                   data-testid="voice-agent-talk"
                 >
                   Talk to it

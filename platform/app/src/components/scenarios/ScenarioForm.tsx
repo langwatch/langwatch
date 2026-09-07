@@ -51,8 +51,8 @@ export const scenarioFormSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema,
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
-  // The simulated caller's voice. Only shown (and only meaningful) for a voice
-  // target; kept at defaults otherwise.
+  // The simulated caller's voice. Editable on every scenario; only meaningful
+  // when the scenario is later run against a voice target.
   callerVoice: callerVoiceConfigSchema.default(DEFAULT_CALLER_VOICE),
   // The test suite the scenario is filed in. Absent keeps the suite the scenario has,
   // null files it nowhere. Only the Agent Testing editor offers the field.
@@ -83,12 +83,6 @@ type ScenarioFormProps = {
    * is what every surface outside Agent Testing does.
    */
   testSuiteOptions?: ScenarioTestSuiteOption[];
-  /**
-   * The type of the currently selected target agent. The Caller voice group is
-   * shown only when it is "voice"; the target itself lives outside this form
-   * (in the drawer), so its type is lifted in as a prop.
-   */
-  targetType?: string;
 };
 
 /**
@@ -100,7 +94,6 @@ export function ScenarioForm({
   defaultValues,
   formRef,
   testSuiteOptions,
-  targetType,
 }: ScenarioFormProps) {
   const form = useForm<ScenarioFormData>({
     defaultValues: {
@@ -220,17 +213,16 @@ export function ScenarioForm({
         />
       </VStack>
 
-      {targetType === "voice" && <CallerVoiceSection control={control} />}
-
-      <AdvancedSection register={register} errors={errors} />
+      <AdvancedSection register={register} errors={errors} control={control} />
     </VStack>
   );
 }
 
 /**
- * The collapsed "Caller voice" group, shown only for a voice target. Offers the
- * caller's Voice (an audio-model picker), Interrupts (0-100 %, step 5) and
- * Effects. Values persist on the scenario's `callerVoice` (AC17).
+ * The collapsed "Caller voice" group, nested under Customize scenario. Offers
+ * the caller's Voice (an audio-model picker), Interrupts (0-100 %, step 5) and
+ * Effects. Values persist on the scenario's `callerVoice` and take effect only
+ * when the scenario is later run against a voice target (AC17).
  */
 function CallerVoiceSection({
   control,
@@ -258,6 +250,9 @@ function CallerVoiceSection({
       </Collapsible.Trigger>
       <Collapsible.Content>
         <VStack align="stretch" gap={4} pt={3}>
+          <Text fontSize="12px" color="fg.muted">
+            Used when this scenario runs against a voice agent.
+          </Text>
           <Field.Root>
             <Text fontSize="13px" fontWeight="medium">
               Voice
@@ -382,9 +377,11 @@ function useResetOnDefaultsChange({
 function AdvancedSection({
   register,
   errors,
+  control,
 }: {
   register: ReturnType<typeof useForm<ScenarioFormData>>["register"];
   errors: ReturnType<typeof useForm<ScenarioFormData>>["formState"]["errors"];
+  control: Control<ScenarioFormData>;
 }) {
   const [open, setOpen] = useState(false);
   const ChevronIcon = open ? ChevronDown : ChevronRight;
@@ -398,7 +395,7 @@ function AdvancedSection({
           _hover={{ color: "fg.emphasized" }}
         >
           <ChevronIcon size={14} />
-          <SectionHeader>Advanced</SectionHeader>
+          <SectionHeader>Customize scenario</SectionHeader>
         </HStack>
       </Collapsible.Trigger>
       <Collapsible.Content>
@@ -445,6 +442,7 @@ function AdvancedSection({
             Max Turns caps the conversation length. Min Turns prevents the judge
             from ending the test early.
           </Text>
+          <CallerVoiceSection control={control} />
         </VStack>
       </Collapsible.Content>
     </Collapsible.Root>

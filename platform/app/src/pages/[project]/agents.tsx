@@ -227,9 +227,14 @@ function Page() {
                 onEdit={() => handleEditAgent(agent)}
                 onDelete={() => handleDeleteAgent(agent)}
                 onTest={
-                  agent.type === "signature"
+                  agent.type === "signature" || agent.type === "voice"
                     ? undefined
                     : () => testAgent(agent.id)
+                }
+                onTalkToIt={
+                  agent.type === "voice"
+                    ? () => handleEditAgent(agent)
+                    : undefined
                 }
                 onOpenWorkflow={
                   agent.type === "workflow"

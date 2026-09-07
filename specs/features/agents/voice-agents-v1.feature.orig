@@ -169,15 +169,14 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
 
   # AC17
   @integration
-  Scenario: The Caller voice group lives under Customize scenario and applies only to voice runs
-    Given a scenario editor for any scenario
+  Scenario: Caller voice group appears only for a voice target and its values persist
+    Given a scenario editor with "Support line" chosen as the target
     When the editor is drawn
-    Then the "Customize scenario" section is collapsed
-    When "Customize scenario" is expanded
     Then a collapsed "Caller voice" group offers Voice, Interrupts and Effects with their defaults
+    When the target is changed to an HTTP agent
+    Then the "Caller voice" group is absent
     When Voice, Interrupts and Effects are set and the scenario is saved and reloaded
     Then the reloaded editor shows the saved values
-    And the caller voice only takes effect when the scenario is later run against a voice target
 
   # AC18
   @integration
