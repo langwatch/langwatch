@@ -235,9 +235,15 @@ const buildHarness = () => {
 const beginCallback = async ({
   auth,
   variant,
+  assertStarted,
 }: {
   auth: ReturnType<typeof buildHarness>["auth"];
   variant: TokenVariant;
+  assertStarted: (input: {
+    status: number;
+    state: string | null;
+    nonce: string | null;
+  }) => void;
 }) => {
   const started = await auth.handler(
     new Request(`${BASE_URL}/api/auth/sign-in/social`, {
@@ -246,13 +252,11 @@ const beginCallback = async ({
       body: JSON.stringify({ provider: PROVIDER_ID, disableRedirect: true }),
     }),
   );
-  expect(started.status).toBe(200);
   const body = authorizationResponseSchema.parse(await started.json());
   const authorizationUrl = new URL(body.url);
   const state = authorizationUrl.searchParams.get("state");
   const nonce = authorizationUrl.searchParams.get("nonce");
-  expect(state).toBeTruthy();
-  expect(nonce).toBeTruthy();
+  assertStarted({ status: started.status, state, nonce });
 
   const code = `code-${variant}-${randomUUID()}`;
   codes.set(code, { nonce: nonce ?? "", variant });
@@ -298,7 +302,15 @@ describe("generic OAuth's verified ID-token boundary", () => {
   /** @scenario A valid signed Auth0 callback reaches account and session creation */
   it("lets a valid signed callback reach Account and Session writes", async () => {
     const { auth, db } = buildHarness();
-    const flow = await beginCallback({ auth, variant: "valid" });
+    const flow = await beginCallback({
+      auth,
+      variant: "valid",
+      assertStarted: ({ status, state, nonce }) => {
+        expect(status).toBe(200);
+        expect(state).toBeTruthy();
+        expect(nonce).toBeTruthy();
+      },
+    });
 
     const response = await flow.callback();
 
@@ -315,7 +327,15 @@ describe("generic OAuth's verified ID-token boundary", () => {
     "wrong-nonce",
   ])("rejects %s before any Account or Session write", async (variant) => {
     const { auth, db } = buildHarness();
-    const flow = await beginCallback({ auth, variant });
+    const flow = await beginCallback({
+      auth,
+      variant,
+      assertStarted: ({ status, state, nonce }) => {
+        expect(status).toBe(200);
+        expect(state).toBeTruthy();
+        expect(nonce).toBeTruthy();
+      },
+    });
 
     const response = await flow.callback();
 
@@ -333,7 +353,15 @@ describe("generic OAuth's verified ID-token boundary", () => {
     ["mismatched", { stateOverride: "attacker-state" }],
   ])("rejects %s callback state before any Account or Session write", async (_name, request) => {
     const { auth, db } = buildHarness();
-    const flow = await beginCallback({ auth, variant: "valid" });
+    const flow = await beginCallback({
+      auth,
+      variant: "valid",
+      assertStarted: ({ status, state, nonce }) => {
+        expect(status).toBe(200);
+        expect(state).toBeTruthy();
+        expect(nonce).toBeTruthy();
+      },
+    });
 
     const response = await flow.callback(request);
 
@@ -346,7 +374,15 @@ describe("generic OAuth's verified ID-token boundary", () => {
   /** @scenario Replaying an accepted callback creates no additional account or session */
   it("rejects a replay after applying the callback response cookies", async () => {
     const { auth, db } = buildHarness();
-    const flow = await beginCallback({ auth, variant: "valid" });
+    const flow = await beginCallback({
+      auth,
+      variant: "valid",
+      assertStarted: ({ status, state, nonce }) => {
+        expect(status).toBe(200);
+        expect(state).toBeTruthy();
+        expect(nonce).toBeTruthy();
+      },
+    });
     const accepted = await flow.callback();
     expect(db.account).toHaveLength(1);
     expect(db.session).toHaveLength(1);
