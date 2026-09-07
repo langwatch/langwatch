@@ -70,6 +70,7 @@ import {
 } from "./session-context-hooks";
 import {
 	extractLookupIdFromToken,
+	isExpiredSession,
 	listIngestionKeys,
 	mintIngestionKey,
 } from "./cli-api";
@@ -131,6 +132,17 @@ export interface IngestionKeyResolution {
 	endpoint: string;
 	/** True when a fresh key was minted (vs a cached one reused). */
 	minted: boolean;
+	/**
+	 * True when the platform rejected this device's session, so the cached
+	 * key was reused without anything confirming it is still live.
+	 *
+	 * A device that cannot authenticate can neither check its key nor mint a
+	 * replacement, and the key it holds may have been revoked weeks ago. The
+	 * resolution still carries that key, because wiring the tool with a key
+	 * that may work beats wiring it with nothing, but the caller must say so
+	 * instead of reporting a working setup.
+	 */
+	sessionExpired?: boolean;
 }
 
 /**
@@ -191,6 +203,7 @@ export async function resolveLiveIngestionKey({
 			};
 		}
 		let cacheIsLive = true; // assume live; falsified when server confirms otherwise
+		let sessionExpired = false;
 		try {
 			const liveKeys = await listIngestionKeys(cfg);
 			// Server resolved - verify the cached lookupId is still present
@@ -202,12 +215,17 @@ export async function resolveLiveIngestionKey({
 				// Key was revoked or rotated on the platform - treat as no cache.
 				cacheIsLive = false;
 			}
-		} catch {
+		} catch (error) {
 			// Network error / older server without the endpoint: reuse cache
-			// as-is (offline-first fallback - hard-cut rotation is a
-			// re-mint-kills-old invariant, so a genuinely revoked key will
-			// self-correct next time the device is online) - unless the
-			// caller disabled that fallback.
+			// as-is (offline-first fallback - a device that is merely offline
+			// keeps exporting with the key it has) - unless the caller
+			// disabled that fallback.
+			//
+			// A session the platform rejected is not that case. Nothing about
+			// the cached key was confirmed and nothing can replace it, so the
+			// fallback still hands the key back but marks the resolution: the
+			// key may have been dead for weeks and only the caller can say so.
+			sessionExpired = isExpiredSession(error);
 			cacheIsLive = allowOfflineFallback;
 		}
 		if (cacheIsLive) {
@@ -216,6 +234,7 @@ export async function resolveLiveIngestionKey({
 				prefix: cached.prefix,
 				endpoint: otlpEndpointFor(cfg.control_plane_url),
 				minted: false,
+				...(sessionExpired ? { sessionExpired: true } : {}),
 			};
 		}
 	}

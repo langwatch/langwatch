@@ -14,7 +14,7 @@ const apiKeys = vi.hoisted(() => ({
   revoke: vi.fn(),
 }));
 const apiKeyRepo = vi.hoisted(() => ({
-  findIngestKey: vi.fn(),
+  findIngestKeysForProject: vi.fn(),
 }));
 
 vi.mock("~/server/api-key/api-key.service", () => ({
@@ -37,6 +37,12 @@ const MINT_PARAMS = {
   sourceType: "claude_code",
 } as const;
 
+const priorKey = (id: string, sourceType = "claude_code") => ({
+  id,
+  ingestSourceType: sourceType,
+  ingestionTemplateId: null,
+});
+
 describe("IngestionKeyService.ensureForProject", () => {
   let service: IngestionKeyService;
 
@@ -52,7 +58,9 @@ describe("IngestionKeyService.ensureForProject", () => {
   describe("when a prior key exists for the project and source type", () => {
     /** @scenario "Rotating a key answers without waiting on the old key's cleanup" */
     it("revokes it without a projection hold of its own", async () => {
-      apiKeyRepo.findIngestKey.mockResolvedValue({ id: "ak_prior" });
+      apiKeyRepo.findIngestKeysForProject.mockResolvedValue([
+        priorKey("ak_prior"),
+      ]);
 
       await service.ensureForProject(MINT_PARAMS);
 
@@ -66,7 +74,9 @@ describe("IngestionKeyService.ensureForProject", () => {
 
     /** @scenario "A hard-cut rotation names itself as the cause" */
     it("names the rotation as the cause of the revoke", async () => {
-      apiKeyRepo.findIngestKey.mockResolvedValue({ id: "ak_prior" });
+      apiKeyRepo.findIngestKeysForProject.mockResolvedValue([
+        priorKey("ak_prior"),
+      ]);
 
       await service.ensureForProject(MINT_PARAMS);
 
@@ -76,9 +86,58 @@ describe("IngestionKeyService.ensureForProject", () => {
     });
   });
 
+  describe("when several machines hold live keys for the same tool", () => {
+    /** @scenario "An explicit rotation from the personal tile revokes every prior key" */
+    it("revokes all of them, not just the first", async () => {
+      apiKeyRepo.findIngestKeysForProject.mockResolvedValue([
+        priorKey("ak_laptop"),
+        priorKey("ak_desktop"),
+        priorKey("ak_vm"),
+        // Another tool's key, which this rotation is not about.
+        priorKey("ak_codex", "codex"),
+      ]);
+
+      await service.ensureForProject(MINT_PARAMS);
+
+      expect(apiKeys.revoke.mock.calls.map(([args]) => args.id)).toEqual([
+        "ak_laptop",
+        "ak_desktop",
+        "ak_vm",
+      ]);
+    });
+  });
+
+  describe("when one of the prior keys cannot be revoked", () => {
+    /** @scenario "A rotation that cannot kill every prior key mints nothing" */
+    it("still tries the rest, then fails without minting", async () => {
+      apiKeyRepo.findIngestKeysForProject.mockResolvedValue([
+        priorKey("ak_laptop"),
+        priorKey("ak_desktop"),
+        priorKey("ak_vm"),
+      ]);
+      apiKeys.revoke.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "ak_desktop") throw new Error("postgres is down");
+      });
+
+      await expect(service.ensureForProject(MINT_PARAMS)).rejects.toThrow(
+        /prior ingestion key/,
+      );
+
+      // Handing back a fresh token while a machine keeps writing with an old
+      // one is the outcome rotation exists to prevent. Every key still gets
+      // its attempt, so the retry has less left to do.
+      expect(apiKeys.revoke.mock.calls.map(([args]) => args.id)).toEqual([
+        "ak_laptop",
+        "ak_desktop",
+        "ak_vm",
+      ]);
+      expect(apiKeys.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when no prior key exists", () => {
     it("mints without revoking anything", async () => {
-      apiKeyRepo.findIngestKey.mockResolvedValue(null);
+      apiKeyRepo.findIngestKeysForProject.mockResolvedValue([]);
 
       const issued = await service.ensureForProject(MINT_PARAMS);
 

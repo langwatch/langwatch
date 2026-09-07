@@ -297,6 +297,12 @@ async function runHook({
       // repair is to say so.
       debug({ message: "ingest key was revoked by a person; not re-minted", env });
       if (agent === "claude_code") notifyClaude(REVOKED_NOTICE);
+    } else if (outcome.status === "expired") {
+      // The platform refused the device's session, so nothing here can mint.
+      // Without this line the session ends with telemetry silently going
+      // nowhere and no sign of why.
+      debug({ message: "device session is signed out; not re-minted", env });
+      if (agent === "claude_code") notifyClaude(SIGNED_OUT_NOTICE);
     }
   }
 
@@ -319,6 +325,10 @@ const HEAL_NOTICE =
 /** What the user reads when the key was revoked on purpose and stays dead. */
 const REVOKED_NOTICE =
   "LangWatch: the ingest key this machine exports with was revoked and was not replaced. Run `langwatch instrument claude` to set this machine up again.";
+
+/** What the user reads when the device is signed out of LangWatch. */
+const SIGNED_OUT_NOTICE =
+  "LangWatch: this machine is signed out, so its ingest key could not be checked or replaced and telemetry is not being recorded. Run `langwatch login --device` and then `langwatch instrument claude`.";
 
 /** How long one heal attempt stands before the hook tries again. */
 const HEAL_THROTTLE_MS = 10 * 60 * 1000;
