@@ -45,8 +45,8 @@ vi.mock("~/server/auth/rate-limit-client-ip", () => ({
 const { resolveAuthProviderMock } = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
 }));
-const { requestVerificationMock } = vi.hoisted(() => ({
-  requestVerificationMock: vi.fn(),
+const { claimAddressProofMock } = vi.hoisted(() => ({
+  claimAddressProofMock: vi.fn(),
 }));
 const { registerMock } = vi.hoisted(() => ({
   registerMock: vi.fn(),
@@ -62,9 +62,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   >()),
   credentialAccounts: () => ({ register: registerMock }),
   signUpVerification: () => ({
-    claimAddressProof: vi.fn().mockResolvedValue(null),
-    markAddressConfirmed: vi.fn().mockResolvedValue(undefined),
-    requestVerification: requestVerificationMock,
+    claimAddressProof: claimAddressProofMock,
   }),
 }));
 
@@ -90,7 +88,7 @@ describe("userRouter.register()", () => {
     // Most cases here are the coerced/email-mode deployment; the licensed-SSO
     // case overrides this.
     resolveAuthProviderMock.mockResolvedValue("email");
-    requestVerificationMock.mockResolvedValue(undefined);
+    claimAddressProofMock.mockResolvedValue(true);
   });
 
   const createCaller = () =>
@@ -103,6 +101,7 @@ describe("userRouter.register()", () => {
           name: "Alice",
           email: "a@x.com",
           password: "supersecret",
+          addressProof: "proof-1",
         }),
       ).resolves.toEqual({ id: "user-1" });
 
@@ -131,6 +130,7 @@ describe("userRouter.register()", () => {
         name: "Joel",
         email: "Joel.During@example.com",
         password: "supersecret",
+        addressProof: "proof-1",
       });
 
       expect(registerMock).toHaveBeenCalledWith(
@@ -151,10 +151,11 @@ describe("userRouter.register()", () => {
           name: "Alice",
           email: "a@x.com",
           password: "supersecret",
+          addressProof: "proof-1",
         }),
       ).rejects.toMatchObject({ code: "CONFLICT" });
 
-      expect(requestVerificationMock).not.toHaveBeenCalled();
+      expect(claimAddressProofMock).toHaveBeenCalled();
     });
   });
 
@@ -168,6 +169,7 @@ describe("userRouter.register()", () => {
           name: "Operator",
           email: "operator@example.com",
           password: "password-123",
+          addressProof: "proof-1",
         }),
       ).resolves.toMatchObject({ id: "user-1" });
       expect(registerMock).toHaveBeenCalled();
@@ -184,46 +186,26 @@ describe("userRouter.register()", () => {
           name: "Attacker",
           email: "attacker@example.com",
           password: "password-123",
+          addressProof: "proof-1",
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
       expect(registerMock).not.toHaveBeenCalled();
     });
   });
 
-  describe("when the account has just been created", () => {
-    /** @scenario "The confirmation link is sent by the call that creates the account" */
-    it("sends the link to the address the account was created for", async () => {
-      const caller = createCaller();
+  describe("when no matching mailbox proof is presented", () => {
+    it("refuses before the credential writer runs", async () => {
+      claimAddressProofMock.mockResolvedValue(false);
 
-      await caller.register({
-        email: "sam@acme.com",
-        password: "correct horse battery staple",
-        name: "Sam",
-      });
-
-      // Not from the screen, which holds no session to send from, and not
-      // from a public "mail this address" endpoint, which would be a mailer
-      // pointed at anything anybody types.
-      expect(requestVerificationMock).toHaveBeenCalledWith({
-        email: "sam@acme.com",
-      });
-    });
-
-    /** @scenario "The confirmation link is sent by the call that creates the account" */
-    it("keeps the account when the mailer is down", async () => {
-      requestVerificationMock.mockRejectedValue(new Error("smtp unreachable"));
-      const caller = createCaller();
-
-      // The account exists and the way on is the "send it again" the next
-      // screen offers; losing the registration over a mail failure would cost
-      // somebody the account they just made.
       await expect(
-        caller.register({
+        createCaller().register({
           email: "sam@acme.com",
           password: "correct horse battery staple",
           name: "Sam",
+          addressProof: "spent-or-borrowed",
         }),
-      ).resolves.toEqual({ id: "user-1" });
+      ).rejects.toMatchObject({ code: "GONE" });
+      expect(registerMock).not.toHaveBeenCalled();
     });
   });
 });

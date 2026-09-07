@@ -46,9 +46,7 @@ export function passkeySignUpClaimMatches({
  * middleware's exemption, so these queries carry no `projectId` — the models
  * have none, and a person is not scoped to a project.
  */
-export class PrismaCredentialAccountRepository
-  implements CredentialAccountRecordsPort
-{
+export class PrismaCredentialAccountRepository implements CredentialAccountRecordsPort {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findLinkedAccounts({
@@ -204,7 +202,12 @@ export class PrismaCredentialAccountRepository
   }): Promise<CreatedCredentialUser> {
     const created = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { name, email, signupConfirmationPending: true },
+        data: {
+          name,
+          email,
+          emailVerified: true,
+          signupConfirmationPending: false,
+        },
       });
       const account = await tx.account.create({
         data: {
@@ -340,7 +343,8 @@ export class PrismaCredentialAccountRepository
         data: {
           name: email,
           email,
-          signupConfirmationPending: true,
+          emailVerified: true,
+          signupConfirmationPending: false,
           passkeySignupClaimHash: claimHash,
         },
       });
