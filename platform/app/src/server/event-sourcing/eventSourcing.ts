@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
@@ -7,7 +8,6 @@ import {
   type ProcessRole,
   roleConsumesEventQueue,
   roleRunsWorkers,
-  roleUsesMigrationEventQueue,
 } from "~/server/app-layer/config";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
@@ -49,12 +49,9 @@ import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemo
 
 const logger = createLogger("langwatch:event-sourcing");
 
-/** Keeps preflight traffic durable without exposing the application queue. */
-function eventQueueNameForRole(role: ProcessRole | undefined): string {
-  const name = roleUsesMigrationEventQueue(role)
-    ? "event-sourcing/migration-jobs"
-    : "event-sourcing/jobs";
-  return makeQueueName(name);
+/** Every consumer shares the aggregate-serialisation namespace. */
+function eventQueueNameForRole(_role: ProcessRole | undefined): string {
+  return makeQueueName("event-sourcing/jobs");
 }
 
 /**
@@ -667,6 +664,10 @@ export class EventSourcing {
     if (this._redis) {
       this._globalQueue = new GroupQueueProcessor(definition, this._redis, {
         consumerEnabled: roleConsumesEventQueue(this._processRole),
+        dispatchGroupAllowListKey:
+          this._processRole === "migration"
+            ? `${queueName}:gq:preflight:${randomUUID()}`
+            : undefined,
         objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
         resolveStorageDestination: resolveProjectStorageDestination,
       });

@@ -317,4 +317,6 @@ export interface EventSourcedQueueProcessor<
    * For memory queues, this resolves immediately.
    */
   waitUntilReady(): Promise<void>;
+  /** Migration-preflight only: prove its allow-listed groups have settled. */
+  waitUntilPreflightIdle?(): Promise<void>;
 }
