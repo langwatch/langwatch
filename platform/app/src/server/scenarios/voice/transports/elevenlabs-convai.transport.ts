@@ -35,6 +35,45 @@ function reasonOf(error: unknown): string {
   return String(error);
 }
 
+/** The subset of ElevenLabs' error envelope this helper can read a message
+ *  from. `detail` is a string, an object with `message`, or an array of
+ *  `{ msg }` (FastAPI validation-error shape) depending on the endpoint. */
+interface ElevenLabsErrorBody {
+  detail?: string | { message?: string } | Array<{ msg?: string }>;
+}
+
+/**
+ * Turn a non-2xx ElevenLabs response into a customer-facing reason: the
+ * provider's own message when the body carries one, else a bare status-code
+ * fallback. Never reads or echoes the API key.
+ */
+export function readElevenLabsErrorReason(
+  status: number,
+  bodyText: string,
+): string {
+  const fallback = `Status code: ${status}`;
+  if (!bodyText) return fallback;
+  let body: ElevenLabsErrorBody;
+  try {
+    body = JSON.parse(bodyText) as ElevenLabsErrorBody;
+  } catch {
+    return fallback;
+  }
+  const { detail } = body;
+  if (typeof detail === "string" && detail.length > 0) return detail;
+  if (Array.isArray(detail)) {
+    const message = detail.find((entry) => typeof entry?.msg === "string")?.msg;
+    if (message) return message;
+  } else if (
+    detail &&
+    typeof detail.message === "string" &&
+    detail.message.length > 0
+  ) {
+    return detail.message;
+  }
+  return fallback;
+}
+
 /** Reject `promise` if it has not settled within `timeoutMs`. */
 async function withTimeout<T>(
   promise: Promise<T>,
@@ -142,11 +181,12 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
       );
     }
     if (!response.ok) {
-      const detail = (await response.text().catch(() => "")).slice(0, 200);
+      const bodyText = await response.text().catch(() => "");
       throw new Error(
-        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${response.status} ${
-          detail || response.statusText
-        }`.trim(),
+        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${readElevenLabsErrorReason(
+          response.status,
+          bodyText,
+        )}`,
       );
     }
     const body = (await response.json()) as { signed_url?: string };
@@ -168,11 +208,12 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     // fetch failure.
     if (response.status === 404) return null;
     if (!response.ok) {
-      const detail = (await response.text().catch(() => "")).slice(0, 200);
+      const bodyText = await response.text().catch(() => "");
       throw new Error(
-        `ElevenLabs conversation fetch failed: ${response.status} ${
-          detail || response.statusText
-        }`.trim(),
+        `ElevenLabs conversation fetch failed: ${readElevenLabsErrorReason(
+          response.status,
+          bodyText,
+        )}`,
       );
     }
     const body = (await response.json()) as ElevenLabsConversationResponse;

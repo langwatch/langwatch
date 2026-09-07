@@ -2,10 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ELEVENLABS_CONNECT_REJECTED_PREFIX,
   elevenLabsConvaiTransport,
+  readElevenLabsErrorReason,
   wrapConnectRejection,
 } from "../elevenlabs-convai.transport";
 
-const CREDENTIAL = { apiKey: "sk-secret", baseUrl: "https://api.elevenlabs.io" };
+const CREDENTIAL = {
+  apiKey: "sk-secret",
+  baseUrl: "https://api.elevenlabs.io",
+};
 
 function mockFetchOnce(response: Partial<Response> & { json?: () => unknown }) {
   vi.stubGlobal(
@@ -64,6 +68,63 @@ describe("wrapConnectRejection", () => {
   });
 });
 
+describe("readElevenLabsErrorReason", () => {
+  describe("when the body carries a detail object with a message", () => {
+    /** @scenario "A run with a wrong agent id or a removed key fails without hanging the pool" */
+    it("returns the provider's message", () => {
+      const body = JSON.stringify({
+        detail: {
+          type: "authentication_error",
+          code: "unauthorized",
+          message:
+            "The API key you used is missing the permission convai_write to execute this operation.",
+          status: "missing_permissions",
+        },
+      });
+
+      expect(readElevenLabsErrorReason(401, body)).toBe(
+        "The API key you used is missing the permission convai_write to execute this operation.",
+      );
+    });
+  });
+
+  describe("when the body carries a plain string detail", () => {
+    /** @scenario "A run with a wrong agent id or a removed key fails without hanging the pool" */
+    it("returns the string", () => {
+      const body = JSON.stringify({ detail: "agent not found" });
+
+      expect(readElevenLabsErrorReason(404, body)).toBe("agent not found");
+    });
+  });
+
+  describe("when the body carries a detail array of validation errors", () => {
+    /** @scenario "A run with a wrong agent id or a removed key fails without hanging the pool" */
+    it("returns the first message", () => {
+      const body = JSON.stringify({
+        detail: [{ msg: "field required" }, { msg: "second error" }],
+      });
+
+      expect(readElevenLabsErrorReason(422, body)).toBe("field required");
+    });
+  });
+
+  describe("when the body is not JSON", () => {
+    /** @scenario "A run with a wrong agent id or a removed key fails without hanging the pool" */
+    it("falls back to the status code", () => {
+      expect(readElevenLabsErrorReason(500, "<html>Bad Gateway</html>")).toBe(
+        "Status code: 500",
+      );
+    });
+  });
+
+  describe("when the body is empty", () => {
+    /** @scenario "A run with a wrong agent id or a removed key fails without hanging the pool" */
+    it("falls back to the status code", () => {
+      expect(readElevenLabsErrorReason(401, "")).toBe("Status code: 401");
+    });
+  });
+});
+
 describe("elevenLabsConvaiTransport.mintSession", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -111,6 +172,40 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
       ).rejects.toThrow(ELEVENLABS_CONNECT_REJECTED_PREFIX);
     });
   });
+
+  describe("when ElevenLabs refuses the mint with a missing-permission body", () => {
+    /** @scenario "A run with a wrong agent id or a removed key fails without hanging the pool" */
+    it("surfaces the provider's message instead of the bare status code", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: false,
+          status: 401,
+          statusText: "Unauthorized",
+          text: async () =>
+            JSON.stringify({
+              detail: {
+                type: "authentication_error",
+                code: "unauthorized",
+                message:
+                  "The API key you used is missing the permission convai_write to execute this operation.",
+                status: "missing_permissions",
+              },
+            }),
+          json: async () => ({}),
+        })),
+      );
+
+      await expect(
+        elevenLabsConvaiTransport.mintSession({
+          agentId: "agent_1",
+          credential: CREDENTIAL,
+        }),
+      ).rejects.toThrow(
+        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: The API key you used is missing the permission convai_write to execute this operation.`,
+      );
+    });
+  });
 });
 
 describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
@@ -149,7 +244,11 @@ describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
   describe("when the conversation has audio", () => {
     it("points audioUrl at the app proxy, never at ElevenLabs", async () => {
       mockFetchOnce({
-        json: () => ({ conversation_id: "conv_1", has_audio: true, transcript: [] }),
+        json: () => ({
+          conversation_id: "conv_1",
+          has_audio: true,
+          transcript: [],
+        }),
       });
 
       const record = await elevenLabsConvaiTransport.fetchCallRecord({
