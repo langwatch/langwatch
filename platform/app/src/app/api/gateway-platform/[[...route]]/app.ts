@@ -1020,6 +1020,67 @@ async function preflightVirtualKeyCreate({
   );
 }
 
+type CreateVirtualKeyResponse = {
+  virtual_key: VirtualKeySnakeDto;
+  secret?: string;
+  reveal_id?: string;
+  preview?: string;
+};
+
+/**
+ * The idempotent half of the create: everything a replay has to answer
+ * identically, and nothing that a replay should re-check.
+ */
+async function mintVirtualKey({
+  service,
+  input,
+  organizationId,
+  projectId,
+  revealOnce,
+}: {
+  service: ReturnType<typeof VirtualKeyService.create>;
+  input: CreateVirtualKeyInput;
+  organizationId: string;
+  projectId: string;
+  revealOnce: boolean;
+}): Promise<{ status: 201; body: CreateVirtualKeyResponse }> {
+  const { virtualKey, secret } = await service.create(input);
+  logger.info(
+    { projectId, vkId: virtualKey.id },
+    "Created virtual key via REST",
+  );
+  // With reveal_once the secret goes to the one-time store and the response
+  // carries the id that reads it; the receipt then holds no secret either,
+  // and a replay answers with the same reveal id.
+  if (revealOnce) {
+    const { revealId } = await OneTimeRevealService.create().stash({
+      organizationId,
+      kind: "virtual_key",
+      keyId: virtualKey.id,
+      preview: virtualKey.displayPrefix,
+      secret,
+    });
+    return {
+      status: 201,
+      body: {
+        virtual_key: await toVkDto(virtualKey),
+        reveal_id: revealId,
+        preview: virtualKey.displayPrefix,
+      },
+    };
+  }
+  // The secret is minted once and stored only as a hash, so a caller that
+  // loses this response has no second way to read it. That is the whole
+  // reason this route takes an idempotency key, and the reason the receipt
+  // holding this response is encrypted at rest: a replay that withheld the
+  // secret would hand back a key nobody can ever use, so the secret has to
+  // transit the receipt.
+  return {
+    status: 201,
+    body: { virtual_key: await toVkDto(virtualKey), secret },
+  };
+}
+
 secured.access(apiKeyPermission("virtualKeys:create")).post(
   "/virtual-keys",
   describeRoute({
@@ -1115,54 +1176,20 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
       // Only the create is inside the idempotent section. The pre-flight
       // above is read-only, so leaving it out means a replay still re-checks
       // the caller's scopes rather than trusting a grant it held yesterday.
-      const outcome = await withIdempotency<{
-        virtual_key: VirtualKeySnakeDto;
-        secret?: string;
-        reveal_id?: string;
-        preview?: string;
-      }>({
+      const outcome = await withIdempotency<CreateVirtualKeyResponse>({
         prisma,
         operation: "gateway.v1.virtual-keys.create",
         scopeId: project.id,
         key: idempotencyKey,
         validatedBody: body.data,
-        handler: async () => {
-          const { virtualKey, secret } = await service.create(input);
-          logger.info(
-            { projectId: project.id, vkId: virtualKey.id },
-            "Created virtual key via REST",
-          );
-          // With reveal_once the secret goes to the one-time store and the
-          // response carries the id that reads it; the receipt then holds no
-          // secret either, and a replay answers with the same reveal id.
-          if (body.data.reveal_once) {
-            const { revealId } = await OneTimeRevealService.create().stash({
-              organizationId,
-              kind: "virtual_key",
-              keyId: virtualKey.id,
-              preview: virtualKey.displayPrefix,
-              secret,
-            });
-            return {
-              status: 201,
-              body: {
-                virtual_key: await toVkDto(virtualKey),
-                reveal_id: revealId,
-                preview: virtualKey.displayPrefix,
-              },
-            };
-          }
-          // The secret is minted once and stored only as a hash, so a caller
-          // that loses this response has no second way to read it. That is the
-          // whole reason this route takes an idempotency key, and the reason
-          // the receipt holding this response is encrypted at rest: a replay
-          // that withheld the secret would hand back a key nobody can ever
-          // use, so the secret has to transit the receipt.
-          return {
-            status: 201,
-            body: { virtual_key: await toVkDto(virtualKey), secret },
-          };
-        },
+        handler: () =>
+          mintVirtualKey({
+            service,
+            input,
+            organizationId,
+            projectId: project.id,
+            revealOnce: body.data.reveal_once === true,
+          }),
       });
       return idempotentJson({ c, outcome });
     } catch (error) {

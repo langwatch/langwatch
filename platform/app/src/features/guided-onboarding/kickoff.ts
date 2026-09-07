@@ -138,6 +138,30 @@ function describePath(path: GuidedPath): string {
 export const GUIDED_KICKOFF_BRIEF_OPENER = "Guided onboarding kickoff.";
 
 /**
+ * The provider line, with the model named when the provider screen settled on
+ * one, so the skill does not have to ask what the user already chose.
+ */
+function providerLine(input: GuidedKickoffInput): string {
+  if (!input.provider) return "Provider: none connected yet";
+  const model = input.providerModel ? `, model ${input.providerModel}` : "";
+  return `Provider: ${input.provider}${model}`;
+}
+
+/**
+ * The virtual key line. When the tour minted a key, the line carries the
+ * reveal id and the instruction that goes with it, because the skill's prose
+ * alone was not enough to keep a model from listing and minting over a reveal
+ * it already held.
+ */
+function virtualKeyLine(input: GuidedKickoffInput): string {
+  if (!input.virtualKeyName || !input.virtualKeyRevealId) {
+    return "Virtual key: none minted by the tour";
+  }
+  const preview = input.virtualKeyPreview ?? "vk-lw-";
+  return `Virtual key: ${input.virtualKeyName} is live (preview ${preview}, reveal id ${input.virtualKeyRevealId}). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.`;
+}
+
+/**
  * The text the model reads: the opener, then one line per fact so the skill
  * can pick the path, the picks and the provider out without guessing.
  */
@@ -166,11 +190,7 @@ export function buildGuidedKickoffBrief({
       .map(describePath)
       .join(", ")}`,
   );
-  lines.push(
-    input.provider
-      ? `Provider: ${input.provider}${input.providerModel ? `, model ${input.providerModel}` : ""}`
-      : "Provider: none connected yet",
-  );
+  lines.push(providerLine(input));
   lines.push(`Organization: ${input.orgName ?? "unknown"}`);
   lines.push(`First name: ${input.firstName ?? "unknown"}`);
   lines.push(`Tour: ${input.tourStatus}`);
@@ -179,11 +199,7 @@ export function buildGuidedKickoffBrief({
       ? `Gateway: ${input.gatewayUrl}`
       : "Gateway: none configured on this instance",
   );
-  lines.push(
-    input.virtualKeyName && input.virtualKeyRevealId
-      ? `Virtual key: ${input.virtualKeyName} is live (preview ${input.virtualKeyPreview ?? "vk-lw-"}, reveal id ${input.virtualKeyRevealId}). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.`
-      : "Virtual key: none minted by the tour",
-  );
+  lines.push(virtualKeyLine(input));
   return lines.join("\n");
 }
 
