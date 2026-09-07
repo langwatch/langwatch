@@ -19,6 +19,7 @@ const { activityRows, mockAuditLog, mockLookup } = vi.hoisted(() => ({
 vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: mockAuditLog }));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   identityLookup: () => mockLookup,
+  secondaryStorage: () => ({ configured: false, connection: () => null }),
 }));
 
 function callerFor({ id, email }: { id: string; email: string }) {
@@ -152,7 +153,9 @@ describe("platform operator identity lookup authorization", () => {
         email: "mallory@acme.com",
       });
 
-      await expect(caller.resolve({ address: "sam@acme.com" })).rejects.toMatchObject({
+      await expect(
+        caller.resolve({ address: "sam@acme.com" }),
+      ).rejects.toMatchObject({
         code: "NOT_FOUND",
         message: "Not found",
       });
@@ -257,7 +260,8 @@ describe("platform operator identity lookup authorization", () => {
         inviteId: "invite_1",
       });
       const auditCall = mockAuditLog.mock.invocationCallOrder[0];
-      const resendCall = mockLookup.resendInvitation.mock.invocationCallOrder[0];
+      const resendCall =
+        mockLookup.resendInvitation.mock.invocationCallOrder[0];
       if (typeof auditCall !== "number" || typeof resendCall !== "number") {
         throw new Error("expected audit and resend calls");
       }
@@ -289,7 +293,8 @@ describe("platform operator identity lookup authorization", () => {
         inviteId: "invite_1",
       });
       const auditCall = mockAuditLog.mock.invocationCallOrder[0];
-      const extendCall = mockLookup.extendInvitation.mock.invocationCallOrder[0];
+      const extendCall =
+        mockLookup.extendInvitation.mock.invocationCallOrder[0];
       if (typeof auditCall !== "number" || typeof extendCall !== "number") {
         throw new Error("expected audit and extension calls");
       }
