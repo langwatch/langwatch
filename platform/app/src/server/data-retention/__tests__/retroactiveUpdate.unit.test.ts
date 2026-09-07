@@ -66,8 +66,11 @@ describe("RetroactiveUpdateService", () => {
         );
         expect(eventLogCall).toBeDefined();
         expect(eventLogCall!.query).toContain("startsWith(EventType, 'lw.identity.')");
-        expect(eventLogCall!.query).toContain("'governance_subject'");
-        expect(eventLogCall!.query).toContain("'coding_agent_session'");
+        expect(eventLogCall!.query).toContain("startsWith(EventType, 'lw.authz.')");
+        expect(eventLogCall!.query).toContain("EventType IN ('lw.governance.vk_lifecycle')");
+        expect(eventLogCall!.query).not.toContain("'governance_subject'");
+        expect(eventLogCall!.query).not.toContain("'coding_agent_session'");
+        expect(eventLogCall!.query).not.toContain("'gateway_request'");
         expect(eventLogCall!.query).toContain(
           "AggregateType NOT IN ('experiment_run', 'simulation_run', 'simulation_set', 'suite_run')",
         );

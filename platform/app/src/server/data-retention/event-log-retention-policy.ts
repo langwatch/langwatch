@@ -4,11 +4,15 @@ import { RETENTION_CATEGORIES, type RetentionCategory } from "./retentionPolicy.
 export type EventLogRetentionClass = RetentionCategory | "indefinite";
 
 /**
- * Event-type prefixes that must remain durable even if an old or malformed
- * row carries an unexpected aggregate type. Aggregate classification remains
- * the normal path; these prefixes are the safety net for control-plane logs.
+ * Security event-type prefixes that must remain durable even if an old or
+ * malformed row carries an unexpected aggregate type. Aggregate
+ * classification remains the normal path; these prefixes are the safety net
+ * for identity and authorisation history.
  */
-const INDEFINITE_EVENT_TYPE_PREFIXES = ["lw.identity.", "lw.authz.", "lw.governance."] as const;
+const INDEFINITE_EVENT_TYPE_PREFIXES = ["lw.identity.", "lw.authz."] as const;
+
+/** Security events that share an aggregate with policy-bound operational events. */
+const INDEFINITE_EVENT_TYPES = ["lw.governance.vk_lifecycle"] as const;
 
 /**
  * Every aggregate type registered with the event-sourcing runtime is assigned
@@ -25,11 +29,11 @@ const RETENTION_CLASS_BY_AGGREGATE_TYPE = {
   sso_connection: "indefinite",
   join_request: "indefinite",
   scim_sync: "indefinite",
-  trigger: "indefinite",
+  trigger: "traces",
   trace: "traces",
   metric: "traces",
   log: "traces",
-  coding_agent_session: "indefinite",
+  coding_agent_session: "traces",
   evaluation: "traces",
   experiment_run: "experiments",
   simulation_run: "scenarios",
@@ -37,11 +41,11 @@ const RETENTION_CLASS_BY_AGGREGATE_TYPE = {
   suite_run: "scenarios",
   langy_conversation: "traces",
   topic_clustering: "traces",
-  ingestion_pull: "indefinite",
-  pulled_usage: "indefinite",
+  ingestion_pull: "traces",
+  pulled_usage: "traces",
   billing_report: "traces",
-  gateway_request: "indefinite",
-  governance_subject: "indefinite",
+  gateway_request: "traces",
+  governance_subject: "traces",
   global: "traces",
   test_aggregate: "traces",
 } as const satisfies Record<AggregateType, EventLogRetentionClass>;
@@ -51,6 +55,10 @@ export function classifyEventLogRowRetention(row: {
   EventType: string;
 }): EventLogRetentionClass {
   if (INDEFINITE_EVENT_TYPE_PREFIXES.some((prefix) => row.EventType.startsWith(prefix))) {
+    return "indefinite";
+  }
+
+  if (INDEFINITE_EVENT_TYPES.some((eventType) => row.EventType === eventType)) {
     return "indefinite";
   }
 
@@ -80,11 +88,15 @@ const eventTypePrefixSql = INDEFINITE_EVENT_TYPE_PREFIXES.map(
   (prefix) => `startsWith(EventType, ${sqlStringLiteral(prefix)})`,
 ).join(" OR ");
 
+const indefiniteEventTypesSql = aggregateTypeListSql([...INDEFINITE_EVENT_TYPES]);
+
 const indefiniteAggregateTypesSql = aggregateTypeListSql(aggregateTypesFor("indefinite"));
 
 /** Exact ClickHouse predicate for rows that must never expire. */
 export const EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE =
-  `(${eventTypePrefixSql} OR ` + `AggregateType IN (${indefiniteAggregateTypesSql}))`;
+  `(${eventTypePrefixSql} OR ` +
+  `EventType IN (${indefiniteEventTypesSql}) OR ` +
+  `AggregateType IN (${indefiniteAggregateTypesSql}))`;
 
 /**
  * ClickHouse predicate selecting the finite-policy rows for one customer

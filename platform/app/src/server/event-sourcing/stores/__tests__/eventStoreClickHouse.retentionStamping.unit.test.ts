@@ -32,16 +32,7 @@ describe("EventStoreClickHouse retention stamping", () => {
     ["SCIM", "scim_sync", "lw.identity.scim_token_issued"],
     ["authorization", "authz_grant", "lw.authz.grant.attached"],
     ["authorization role", "authz_role", "lw.authz.role.defined"],
-    ["governance", "governance_subject", "lw.governance.vk_lifecycle"],
-    ["gateway spend", "gateway_request", "lw.gateway.spend.confirmed"],
-    ["pulled usage", "pulled_usage", "lw.obs.pulled_usage.observed"],
-    ["ingestion pull", "ingestion_pull", "lw.obs.ingestion_pull.run_completed"],
-    ["automation trigger", "trigger", "lw.automation.trigger.match_recorded"],
-    [
-      "coding agent session",
-      "coding_agent_session",
-      "lw.obs.coding_agent_session.span_facts_contributed",
-    ],
+    ["virtual-key lifecycle", "governance_subject", "lw.governance.vk_lifecycle"],
   ] as const;
 
   const categoryEventCases = [
@@ -51,6 +42,17 @@ describe("EventStoreClickHouse retention stamping", () => {
     ["experiment run", "experiment_run", "lw.experiment_run.started", 91],
     ["Langy conversation", "langy_conversation", "lw.langy_conversation.message_recorded", 49],
     ["topic model", "topic_clustering", "lw.obs.topic_clustering.topics_recorded", 49],
+    ["gateway spend", "gateway_request", "lw.gateway.spend.confirmed", 49],
+    ["pulled usage", "pulled_usage", "lw.obs.pulled_usage.observed", 49],
+    ["ingestion pull", "ingestion_pull", "lw.obs.ingestion_pull.run_completed", 49],
+    ["automation trigger", "trigger", "lw.automation.trigger.match_recorded", 49],
+    [
+      "coding agent session",
+      "coding_agent_session",
+      "lw.obs.coding_agent_session.span_facts_contributed",
+      49,
+    ],
+    ["governance budget crossing", "governance_subject", "lw.governance.budget_crossing", 49],
   ] as const;
 
   let mockClient: ClickHouseClient;
@@ -77,7 +79,7 @@ describe("EventStoreClickHouse retention stamping", () => {
   });
 
   describe.each(indefiniteEventCases)(
-    "when storing a %s durable event",
+    "when storing a %s security event",
     (_name, authAggregateType, authEventType) => {
       it("stamps indefinite retention without consulting tenant policy", async () => {
         const resolver: RetentionPolicyResolver = {
