@@ -16,12 +16,12 @@
  * changes no decision anywhere; the contract PR later rewires only the
  * repository — one file, not four hundred call sites.
  *
- * What IS deliberately new here is the denial shape: every tier's refusal now
- * carries the engine's one handled code (`permission_denied`, with the
- * permission and tier in `meta`) where the legacy team/organization
+ * What IS deliberately new here is the ordinary denial shape: every tier's
+ * refusal carries the engine's one handled code (`permission_denied`, with
+ * the permission and tier in `meta`) where the legacy team/organization
  * middlewares shipped bare prose the client could only render as "unknown
- * error". Lite-member denials keep their dedicated cause — the client modal
- * keys on it.
+ * error". A declaration may explicitly conceal a foreign project as absent;
+ * lite-member denials keep their dedicated cause for the client modal.
  *
  * Every middleware built here carries an `AUTHZ_DECLARATION` descriptor, the
  * machine-readable half of the declaration: the sweep test walks the router
@@ -121,7 +121,7 @@ type DeclaredMiddleware = DeclaredAuthzMiddleware<
 >;
 
 /**
- * `.permission(p)` / `.permission(p, { via })`. The type layer
+ * `.permission(p)` and its explicit policy options. The type layer
  * (`@langwatch/authz` declaration.ts + the builder in `api/trpc.ts`)
  * guarantees the input carries a usable id; the runtime re-derives the same
  * answer and still fails loudly if the two ever disagree.
@@ -129,12 +129,14 @@ type DeclaredMiddleware = DeclaredAuthzMiddleware<
 export const checkDeclaredPermission = ({
   permission,
   via,
+  nondisclosure,
 }: {
   permission: AuthzPermission;
   via?: ScopeTierField;
+  nondisclosure?: "not-found-outside-organization";
 }): DeclaredMiddleware =>
   declareAuthzMiddleware(
-    { kind: "permission", permission, via },
+    { kind: "permission", permission, via, nondisclosure },
     async ({ ctx, input, next }: MiddlewareParams) => {
       // `publicProcedure` exposes `.permission()` too, so a session is not a
       // given. Answering "unauthenticated" before any id is looked at keeps
@@ -172,6 +174,7 @@ export const checkDeclaredPermission = ({
           scope,
           organizationRole,
           denialReason,
+          nondisclosure,
         });
       }
 
@@ -459,23 +462,25 @@ function wiringBug({
 }
 
 /**
- * The one denial shape for every tier. An id that resolves to nothing
- * answers exactly like an id the caller may not touch — the resolvers
- * already fold both into `permitted: false`, so no probe can learn whether a
- * scope EXISTS. The lite-member cause drives the client's restriction modal;
- * the `PermissionDeniedError` cause carries the stable code and meta for
- * everything else.
+ * The one denial mapper for every tier. Ordinarily an id that resolves to
+ * nothing answers exactly like an id the caller may not touch. The narrow
+ * project-key policy may instead conceal a project outside the caller's
+ * organization as NOT_FOUND; a member without the grant still receives the
+ * ordinary denial. The lite-member cause drives the client's restriction
+ * modal.
  */
 function deniedError({
   permission,
   scope,
   organizationRole,
   denialReason,
+  nondisclosure,
 }: {
   permission: AuthzPermission;
   scope: DeclaredScopeId;
   organizationRole: OrganizationUserRole | null;
   denialReason?: AuthzDenialReason;
+  nondisclosure?: "not-found-outside-organization";
 }): TRPCError {
   // Checked before the role, because a disabled member HAS a role and the
   // role-shaped answers would all be wrong for them: the lite-member modal
@@ -487,6 +492,16 @@ function deniedError({
       code: "UNAUTHORIZED",
       message: disabled.message,
       cause: disabled,
+    });
+  }
+  if (
+    nondisclosure === "not-found-outside-organization" &&
+    scope.tier === "project" &&
+    organizationRole === null
+  ) {
+    return new TRPCError({
+      code: "NOT_FOUND",
+      message: "Project not found",
     });
   }
   // String comparison on purpose: a VALUE import of the Prisma enum would put

@@ -333,6 +333,49 @@ describe("checkDeclaredPermission", () => {
       expect(denied.message).not.toContain("does-not-exist");
     });
 
+    it("can conceal a project outside the caller's organization as not found", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: null,
+        denialReason: "no-membership",
+      });
+      const middleware = checkDeclaredPermission({
+        permission: "project:manage",
+        nondisclosure: "not-found-outside-organization",
+      });
+
+      const error = await rejection(() =>
+        middleware(paramsFor({ projectId: "project-foreign" }) as any),
+      );
+
+      expect(error).toMatchObject({
+        code: "NOT_FOUND",
+        message: "Project not found",
+      });
+      expect(authzDeclarationOf(middleware)).toMatchObject({
+        kind: "permission",
+        permission: "project:manage",
+        nondisclosure: "not-found-outside-organization",
+      });
+    });
+
+    it("does not conceal a same-organization permission denial", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "MEMBER",
+        denialReason: "no-binding",
+      });
+
+      const error = await rejection(() =>
+        checkDeclaredPermission({
+          permission: "project:manage",
+          nondisclosure: "not-found-outside-organization",
+        })(paramsFor({ projectId: "project-own" }) as any),
+      );
+
+      expect(error.cause).toBeInstanceOf(PermissionDeniedError);
+    });
+
     /** @scenario "A lite member's denial is distinguishable from a missing grant" */
     it("carries the lite-member restriction for an EXTERNAL caller", async () => {
       resolveTeamPermission.mockResolvedValue({

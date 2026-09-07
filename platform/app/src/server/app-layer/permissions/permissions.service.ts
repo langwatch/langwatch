@@ -97,47 +97,6 @@ export class PermissionsService {
   }
 
   /**
-   * Authorizes a user-session project operation without disclosing projects
-   * outside the user's organization membership. A null answer deliberately
-   * covers both an absent project and a project in another organization;
-   * callers may report either case as not found. A member whose role lacks
-   * the permission still receives the ordinary permission denial.
-   */
-  async tryAuthorizeMemberProjectPermission({
-    userId,
-    projectId,
-    permission,
-  }: {
-    userId: string;
-    projectId: string;
-    permission: AuthzPermission;
-  }): Promise<Authorized<"project"> | null> {
-    const { permitted, organizationRole, denialReason } =
-      await this.repository.findProjectDecision({
-        userId,
-        projectId,
-        permission,
-      });
-
-    if (permitted) {
-      return mintWitness({ tier: "project", id: projectId, permission });
-    }
-    if (organizationRole === null && denialReason !== "membership-disabled") {
-      return null;
-    }
-    if (organizationRole === "EXTERNAL") {
-      throw new LiteMemberRestrictedError(
-        permission.split(":")[0] ?? "unknown",
-      );
-    }
-    throw new PermissionDeniedError({
-      permission,
-      scope: { type: "project", id: projectId },
-      denialReason: denialReason ?? "no-binding",
-    });
-  }
-
-  /**
    * ADR-092 decision 25 — the typed imperative check. The scope argument is
    * derived from the permission's registry tiers: exactly one id, at a tier
    * the permission can be granted at, or the call does not compile. Decides

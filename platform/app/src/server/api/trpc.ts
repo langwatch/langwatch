@@ -1351,6 +1351,25 @@ interface PendingPermissionProcedureBuilder<
     TCaller
   >;
   /**
+   * A project credential or similarly sensitive project value may conceal a
+   * project outside the caller's organization while preserving the ordinary
+   * denial for a member who merely lacks the permission. The standard
+   * permission decision, audit record and MFA gate still run.
+   */
+  permission<P extends AuthzPermission>(
+    permission: P & ValidateDeclaredPermission<P, TInputOut>,
+    options: { nondisclosure: "not-found-outside-organization" },
+  ): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
    * Any one of the permissions is enough, checked at the input's project
    * scope. List the primary surface's permission first — the denial names
    * it, so granting it resolves the refusal whichever feature the caller
@@ -1512,10 +1531,17 @@ const permissionProcedureBuilder = <
     use: (middleware) => withPermissionCheck(middleware),
     permission: ((
       permission: AuthzPermission,
-      options?: { via?: ScopeTierField },
+      options?: {
+        via?: ScopeTierField;
+        nondisclosure?: "not-found-outside-organization";
+      },
     ) =>
       withPermissionCheck(
-        checkDeclaredPermission({ permission, via: options?.via }),
+        checkDeclaredPermission({
+          permission,
+          via: options?.via,
+          nondisclosure: options?.nondisclosure,
+        }),
       )) as Pending["permission"],
     permissionAny: ((...permissions: [AuthzPermission, ...AuthzPermission[]]) =>
       withPermissionCheck(
