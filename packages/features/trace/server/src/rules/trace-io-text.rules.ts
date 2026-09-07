@@ -71,6 +71,51 @@ export const COMMON_TEXT_KEYS = [
  */
 export const MAX_PLAIN_JSON_RECURSION_DEPTH = 32;
 
+/** The text one known key carries directly, or nothing when it carries none. */
+function scalarText(val: unknown): string | null {
+  if (typeof val === "string") return val.length > 0 ? val : null;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+
+  return null;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+/** The first of the known text keys that carries text, directly or one level down. */
+function textFromCommonKeys(obj: Record<string, unknown>, depth: number): string | null {
+  for (const key of COMMON_TEXT_KEYS) {
+    const val = obj[key];
+    if (val === undefined) continue;
+
+    const scalar = scalarText(val);
+    if (scalar !== null) return scalar;
+
+    // Nested object with a known key (e.g. { inputs: { input: "hello" } })
+    if (!isPlainObject(val)) continue;
+    const nested = extractTextFromPlainJson(val, depth + 1);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+/**
+ * The single-key wrapper fallback: many frameworks emit the real payload under an arbitrary
+ * wrapper key like `{ data: {…} }`, `{ result: {…} }`, `{ response: {…} }`. Recursing into the
+ * inner object gives the known-key scan a chance to find `content`/`answer`/`text`/… inside.
+ */
+function textFromSingleKeyWrapper(obj: Record<string, unknown>, depth: number): string | null {
+  const entries = Object.entries(obj);
+  if (entries.length !== 1) return null;
+
+  const [, only] = entries[0]!;
+  if (!isPlainObject(only)) return null;
+
+  return extractTextFromPlainJson(only, depth + 1);
+}
+
 /**
  * Extracts a human-readable text representation from a plain JSON object that is NOT
  * message-shaped (no role/content structure). Handles common wrapper patterns like `{ input:
@@ -81,54 +126,17 @@ export function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0
     return null;
   }
 
-  for (const key of COMMON_TEXT_KEYS) {
-    const val = obj[key];
-    if (val === undefined) {
-      continue;
-    }
-
-    if (typeof val === "string" && val.length > 0) {
-      return val;
-    }
-
-    if (typeof val === "number" || typeof val === "boolean") {
-      return String(val);
-    }
-
-    // Nested object with a known key (e.g. { inputs: { input: "hello" } })
-    if (val && typeof val === "object" && !Array.isArray(val)) {
-      const nested = extractTextFromPlainJson(val as Record<string, unknown>, depth + 1);
-      if (nested) {
-        return nested;
-      }
-    }
-  }
+  const known = textFromCommonKeys(obj, depth);
+  if (known) return known;
 
   // LangChain: { inputs: { input: ... } } / { outputs: { output: ... } }
   const wrapper = obj.inputs ?? obj.outputs;
-  if (wrapper && typeof wrapper === "object" && !Array.isArray(wrapper)) {
-    const nested = extractTextFromPlainJson(wrapper as Record<string, unknown>, depth + 1);
-    if (nested) {
-      return nested;
-    }
+  if (isPlainObject(wrapper)) {
+    const nested = extractTextFromPlainJson(wrapper, depth + 1);
+    if (nested) return nested;
   }
 
-  // Single-key wrapper fallback: many frameworks emit the real payload under an
-  // arbitrary wrapper key like `{ data: {...} }`, `{ result: {...} }`,
-  // `{ response: {...} }`. Recurse into the inner object so the COMMON_TEXT_KEYS
-  // loop above gets a chance to find `content`/`answer`/`text`/... inside.
-  const entries = Object.entries(obj);
-  if (entries.length === 1) {
-    const [, only] = entries[0]!;
-    if (only && typeof only === "object" && !Array.isArray(only)) {
-      const nested = extractTextFromPlainJson(only as Record<string, unknown>, depth + 1);
-      if (nested) {
-        return nested;
-      }
-    }
-  }
-
-  return null;
+  return textFromSingleKeyWrapper(obj, depth);
 }
 
 /**
@@ -209,30 +217,60 @@ export function tryUnwrapJsonTextBlock(
   }
 }
 
+/** A JSON-looking string is re-parsed and normalized; anything else is left verbatim. */
+function normalizeChatString(value: string, seen: WeakSet<object>): unknown {
+  const trimmed = value.trim();
+  const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+  if (!looksLikeJson) return value;
+
+  try {
+    return normalizeChatPayload(JSON.parse(trimmed), seen);
+  } catch {
+    // not parseable JSON — leave the raw string alone
+    return value;
+  }
+}
+
+/**
+ * A content block whose `text` is a JSON-encoded typed block (with a non-text inner `type`) is
+ * replaced by the unwrapped block. A text block that was not unwrapped keeps its `text`
+ * verbatim, so user-pasted JSON-looking content stays the original string.
+ */
+function normalizeTextBlock(obj: Record<string, unknown>, seen: WeakSet<object>): unknown {
+  const t = (obj.text as string).trim();
+  const looksLikeTypedBlock = t.startsWith("{") && t.endsWith("}") && t.includes('"type":"');
+  if (!looksLikeTypedBlock) return obj;
+
+  const result = tryUnwrapJsonTextBlock(t, seen);
+
+  return result.unwrapped ? result.value : obj;
+}
+
+/** Walks every property, normalizing in place. */
+function normalizeChatObject(obj: Record<string, unknown>, seen: WeakSet<object>): unknown {
+  const out: Record<string, unknown> = {};
+  const isChatMessage = typeof obj.role === "string";
+  for (const [k, v] of Object.entries(obj)) {
+    // A chat message's content is user/model text, so a JSON-looking string
+    // must stay text. Structured AI responses commonly use this shape and
+    // are intentionally displayed as JSON in the trace output.
+    const keepVerbatim = isChatMessage && k === "content" && typeof v === "string";
+    out[k] = keepVerbatim ? v : normalizeChatPayload(v, seen);
+  }
+
+  return out;
+}
+
 export function normalizeChatPayload(
   value: unknown,
   seen: WeakSet<object> = new WeakSet(),
 ): unknown {
   if (typeof value === "string") {
-    const trimmed = value.trim();
-    const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[");
-    if (looksLikeJson) {
-      try {
-        const parsed = JSON.parse(trimmed);
-
-        return normalizeChatPayload(parsed, seen);
-      } catch {
-        // not parseable JSON — leave the raw string alone
-      }
-    }
-
-    return value;
+    return normalizeChatString(value, seen);
   }
 
   if (Array.isArray(value)) {
-    if (seen.has(value)) {
-      return null;
-    }
+    if (seen.has(value)) return null;
 
     seen.add(value);
 
@@ -240,44 +278,15 @@ export function normalizeChatPayload(
   }
 
   if (value && typeof value === "object") {
-    if (seen.has(value as object)) {
-      return null;
-    }
+    if (seen.has(value as object)) return null;
 
     seen.add(value as object);
     const obj = value as Record<string, unknown>;
-    // If this object IS a content block whose `text` is a JSON-encoded
-    // typed block (with a non-text inner `type`), replace it with the
-    // unwrapped block.
     if (obj.type === "text" && typeof obj.text === "string") {
-      const t = obj.text.trim();
-      const looksLikeTypedBlock = t.startsWith("{") && t.endsWith("}") && t.includes('"type":"');
-      if (looksLikeTypedBlock) {
-        const result = tryUnwrapJsonTextBlock(t, seen);
-        if (result.unwrapped) {
-          return result.value;
-        }
-      }
-
-      // Text block that wasn't unwrapped: preserve `text` verbatim so
-      // user-pasted JSON-looking content stays as the original string.
-      return obj;
+      return normalizeTextBlock(obj, seen);
     }
 
-    // Otherwise: walk every property, normalizing in place.
-    const out: Record<string, unknown> = {};
-    const isChatMessage = typeof obj.role === "string";
-    for (const [k, v] of Object.entries(obj)) {
-      // A chat message's content is user/model text, so a JSON-looking string
-      // must stay text. Structured AI responses commonly use this shape and
-      // are intentionally displayed as JSON in the trace output.
-      out[k] =
-        isChatMessage && k === "content" && typeof v === "string"
-          ? v
-          : normalizeChatPayload(v, seen);
-    }
-
-    return out;
+    return normalizeChatObject(obj, seen);
   }
 
   return value;

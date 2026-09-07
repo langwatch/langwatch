@@ -396,6 +396,37 @@ function hiddenCategoryAttributeRules(
 /**
  * Recursively remove hidden chat turns from any attribute value: drop messages whose role is hidden, strip assistant `tool_calls` when tool calls are hidden, and apply the same to JSON-string-encoded conversations. Covers raw chat-array attributes (`gen_ai.input.messages`, `langwatch.input`, …) the attributes table can expand — they are input/output-category keys, so the placeholder rules above don't touch them, yet they still carry system/tool turns. Returns a new value; the input is not mutated.
  */
+function stripHiddenChatTurnsFromArray(
+  node: unknown[],
+  roles: ReadonlySet<string>,
+  stripToolCalls: boolean,
+  contentPrivacy: TraceContentPrivacyPort,
+): unknown[] {
+  const out: unknown[] = [];
+  for (const item of node) {
+    const role = item && typeof item === "object" ? (item as { role?: unknown }).role : undefined;
+    if (typeof role === "string" && roles.has(role)) continue;
+    out.push(stripHiddenChatTurnsDeep(item, roles, stripToolCalls, contentPrivacy));
+  }
+
+  return out;
+}
+
+function stripHiddenChatTurnsFromObject(
+  node: object,
+  roles: ReadonlySet<string>,
+  stripToolCalls: boolean,
+  contentPrivacy: TraceContentPrivacyPort,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (stripToolCalls && key === "tool_calls") continue;
+    out[key] = stripHiddenChatTurnsDeep(value, roles, stripToolCalls, contentPrivacy);
+  }
+
+  return out;
+}
+
 function stripHiddenChatTurnsDeep(
   node: unknown,
   roles: ReadonlySet<string>,
@@ -403,43 +434,121 @@ function stripHiddenChatTurnsDeep(
   contentPrivacy: TraceContentPrivacyPort,
 ): unknown {
   if (Array.isArray(node)) {
-    const out: unknown[] = [];
-    for (const item of node) {
-      const role = item && typeof item === "object" ? (item as { role?: unknown }).role : undefined;
-      if (typeof role === "string" && roles.has(role)) continue;
-      out.push(stripHiddenChatTurnsDeep(item, roles, stripToolCalls, contentPrivacy));
-    }
-    return out;
+    return stripHiddenChatTurnsFromArray(node, roles, stripToolCalls, contentPrivacy);
   }
   if (node && typeof node === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(node)) {
-      if (stripToolCalls && key === "tool_calls") continue;
-      out[key] = stripHiddenChatTurnsDeep(value, roles, stripToolCalls, contentPrivacy);
-    }
-    return out;
+    return stripHiddenChatTurnsFromObject(node, roles, stripToolCalls, contentPrivacy);
   }
   if (typeof node === "string") {
     const result = contentPrivacy.stripRolesFromChatArrayJson(node, roles, stripToolCalls);
     return result ? result.json : node;
   }
+
   return node;
 }
 
-export function redactV2Content<
-  T extends {
-    input?: string | null;
-    output?: string | null;
-    inputRedacted?: boolean | null;
-    outputRedacted?: boolean | null;
-    inputVisibleTo?: string | null;
-    outputVisibleTo?: string | null;
-    inputMediaRefs?: unknown;
-    outputMediaRefs?: unknown;
-    attributes?: Record<string, string>;
-    params?: Record<string, unknown> | null;
-  },
->(
+/** The shape `redactV2Content` narrows to; every field is optional on the DTOs it serves. */
+type RedactableV2Dto = {
+  input?: string | null;
+  output?: string | null;
+  inputRedacted?: boolean | null;
+  outputRedacted?: boolean | null;
+  inputVisibleTo?: string | null;
+  outputVisibleTo?: string | null;
+  inputMediaRefs?: unknown;
+  outputMediaRefs?: unknown;
+  attributes?: Record<string, string>;
+  params?: Record<string, unknown> | null;
+};
+
+/**
+ * Media refs point at the exact content that was just redacted, and the /api/files URLs they
+ * carry are fetchable on their own — so the parsed ref fields AND their reserved-attribute
+ * copies must be dropped alongside the text, never just hidden by the UI.
+ */
+function dropRedactedMediaRefs<T extends RedactableV2Dto>(
+  redacted: T & V2RedactionFlags,
+  flags: Readonly<{ inputRedacted: boolean; outputRedacted: boolean }>,
+): void {
+  const { inputRedacted, outputRedacted } = flags;
+  if (inputRedacted) delete redacted.inputMediaRefs;
+  if (outputRedacted) delete redacted.outputMediaRefs;
+  if (!inputRedacted && !outputRedacted) return;
+  if (!redacted.attributes) return;
+
+  const attributes = { ...redacted.attributes };
+  if (inputRedacted) delete attributes[RESERVED_INPUT_MEDIA_REFS];
+  if (outputRedacted) delete attributes[RESERVED_OUTPUT_MEDIA_REFS];
+  redacted.attributes = attributes;
+}
+
+/**
+ * Custom attribute rules with a restrict disposition, plus the standalone system/tools attribute
+ * keys when those categories are hidden: replace the matched attribute values (header
+ * attributes, span params, span-event attributes) with the placeholder naming who can see them.
+ */
+function redactHiddenAttributes<T extends RedactableV2Dto>(
+  redacted: T & V2RedactionFlags,
+  dto: T,
+  protections: V2Protections,
+  contentPrivacy: TraceContentPrivacyPort,
+): void {
+  const hidden = [
+    ...(protections.hiddenAttributes ?? []),
+    ...hiddenCategoryAttributeRules(protections, contentPrivacy),
+  ];
+  if (hidden.length === 0) return;
+
+  const redactor = TraceAttributeRedactionService.create(hidden);
+  if (dto.attributes) {
+    redacted.attributes = redactor.redact(dto.attributes);
+  }
+  if (dto.params) {
+    redacted.params = redactor.redact(dto.params);
+  }
+
+  // Span-detail events carry their own attribute records (list-item events
+  // do not, hence the localized cast instead of a constraint field).
+  const events = (dto as { events?: Array<{ attributes?: Record<string, unknown> }> }).events;
+  if (!events?.some((event) => event.attributes)) return;
+
+  (redacted as Record<string, unknown>).events = events.map((event) =>
+    event.attributes ? { ...event, attributes: redactor.redact(event.attributes) } : event,
+  );
+}
+
+/**
+ * The raw chat-array attributes still carry the hidden system/tool turns (they are
+ * input/output-category keys, untouched by the attribute rules), so an expanded attribute could
+ * reveal them. Strips those turns from params and attributes too.
+ */
+function stripHiddenTurnsFromCarriers<T extends RedactableV2Dto>(
+  redacted: T & V2RedactionFlags,
+  roles: ReadonlySet<string>,
+  stripToolCalls: boolean,
+  contentPrivacy: TraceContentPrivacyPort,
+): void {
+  if (roles.size === 0 && !stripToolCalls) return;
+
+  if (redacted.params) {
+    redacted.params = stripHiddenChatTurnsDeep(
+      redacted.params,
+      roles,
+      stripToolCalls,
+      contentPrivacy,
+    ) as T["params"];
+  }
+  if (redacted.attributes) {
+    redacted.attributes = stripHiddenChatTurnsDeep(
+      redacted.attributes,
+      roles,
+      stripToolCalls,
+      contentPrivacy,
+    ) as T["attributes"];
+  }
+}
+
+export function redactV2Content<T extends RedactableV2Dto>(
   dto: T,
   protections: V2Protections,
   contentPrivacy: TraceContentPrivacyPort,
@@ -469,70 +578,11 @@ export function redactV2Content<
     inputVisibleTo: inputRedacted ? (protections.capturedInputVisibleTo ?? null) : null,
     outputVisibleTo: outputRedacted ? (protections.capturedOutputVisibleTo ?? null) : null,
   };
-  // Media refs point at the exact content that was just redacted, and the
-  // /api/files URLs they carry are fetchable on their own — so the parsed ref
-  // fields AND their reserved-attribute copies must be dropped alongside the
-  // text, never just hidden by the UI.
-  if (inputRedacted) delete redacted.inputMediaRefs;
-  if (outputRedacted) delete redacted.outputMediaRefs;
-  if ((inputRedacted || outputRedacted) && redacted.attributes) {
-    const attributes = { ...redacted.attributes };
-    if (inputRedacted) delete attributes[RESERVED_INPUT_MEDIA_REFS];
-    if (outputRedacted) delete attributes[RESERVED_OUTPUT_MEDIA_REFS];
-    redacted.attributes = attributes;
-  }
-  // Custom attribute rules with a restrict disposition, plus the standalone
-  // system/tools attribute keys when those categories are hidden: replace the
-  // matched attribute values (header attributes, span params, span-event
-  // attributes) with the placeholder naming who can see them.
-  const hidden = [
-    ...(protections.hiddenAttributes ?? []),
-    ...hiddenCategoryAttributeRules(protections, contentPrivacy),
-  ];
-  if (hidden.length > 0) {
-    const redactor = TraceAttributeRedactionService.create(hidden);
-    if (dto.attributes) {
-      redacted.attributes = redactor.redact(dto.attributes);
-    }
-    if (dto.params) {
-      redacted.params = redactor.redact(dto.params);
-    }
-    // Span-detail events carry their own attribute records (list-item events
-    // do not, hence the localized cast instead of a constraint field).
-    const events = (dto as { events?: Array<{ attributes?: Record<string, unknown> }> }).events;
-    if (events?.some((event) => event.attributes)) {
-      (redacted as Record<string, unknown>).events = events.map((event) =>
-        event.attributes
-          ? {
-              ...event,
-              attributes: redactor.redact(event.attributes),
-            }
-          : event,
-      );
-    }
-  }
-  // The raw chat-array attributes still carry the hidden system/tool turns
-  // (they are input/output-category keys, untouched by the rules above), so an
-  // expanded attribute could reveal them. Strip those turns from params and
-  // attributes too, when any are hidden.
-  if (roles.size > 0 || stripToolCalls) {
-    if (redacted.params) {
-      redacted.params = stripHiddenChatTurnsDeep(
-        redacted.params,
-        roles,
-        stripToolCalls,
-        contentPrivacy,
-      ) as T["params"];
-    }
-    if (redacted.attributes) {
-      redacted.attributes = stripHiddenChatTurnsDeep(
-        redacted.attributes,
-        roles,
-        stripToolCalls,
-        contentPrivacy,
-      ) as T["attributes"];
-    }
-  }
+
+  dropRedactedMediaRefs(redacted, { inputRedacted, outputRedacted });
+  redactHiddenAttributes(redacted, dto, protections, contentPrivacy);
+  stripHiddenTurnsFromCarriers(redacted, roles, stripToolCalls, contentPrivacy);
+
   return redacted;
 }
 
@@ -670,47 +720,106 @@ export type TraceDerivedAttrPrefixes = Readonly<{
   output: string;
 }>;
 
+type LogVisibility = Readonly<{
+  canSeeCapturedInput?: boolean | null;
+  canSeeCapturedOutput?: boolean | null;
+  capturedInputVisibleTo?: string | null;
+  capturedOutputVisibleTo?: string | null;
+}>;
+
+/** Whether one content category is visible. An unknown category fails closed and needs both. */
+function canSeeCategory(category: LogContentCategory, protections: LogVisibility): boolean {
+  const canSeeInput = protections.canSeeCapturedInput === true;
+  const canSeeOutput = protections.canSeeCapturedOutput === true;
+  if (category === "input") return canSeeInput;
+  if (category === "output") return canSeeOutput;
+
+  return canSeeInput && canSeeOutput;
+}
+
+/** Ingest-stamped derived content, stripped behind the category it was computed from. */
+function findHiddenDerivedKeys(
+  attributes: Record<string, string>,
+  protections: LogVisibility,
+  derivedAttrPrefixes: TraceDerivedAttrPrefixes,
+): string[] {
+  return Object.keys(attributes).filter((key) => {
+    if (key.startsWith(derivedAttrPrefixes.input)) return protections.canSeeCapturedInput !== true;
+    if (key.startsWith(derivedAttrPrefixes.output)) {
+      return protections.canSeeCapturedOutput !== true;
+    }
+
+    return false;
+  });
+}
+
+/**
+ * The audience label only means something when ONE category was withheld: a record that shed
+ * both sides has no single audience to name.
+ */
+function onlyHiddenCategory(
+  input: Readonly<{
+    hiddenKeys: readonly { category: LogContentCategory }[];
+    hiddenDerivedKeys: readonly string[];
+    shouldHideBody: boolean;
+    bodyCategory: LogContentCategory;
+    derivedAttrPrefixes: TraceDerivedAttrPrefixes;
+  }>,
+): LogContentCategory | null {
+  const { hiddenDerivedKeys, derivedAttrPrefixes } = input;
+  const hidesDerivedInput = hiddenDerivedKeys.some((key) =>
+    key.startsWith(derivedAttrPrefixes.input),
+  );
+  const hidesDerivedOutput = hiddenDerivedKeys.some((key) =>
+    key.startsWith(derivedAttrPrefixes.output),
+  );
+  const hiddenCategories = new Set<LogContentCategory>([
+    ...input.hiddenKeys.map((entry) => entry.category),
+    ...(input.shouldHideBody ? [input.bodyCategory] : []),
+    ...(hidesDerivedInput ? (["input"] as const) : []),
+    ...(hidesDerivedOutput ? (["output"] as const) : []),
+  ]);
+
+  return hiddenCategories.size === 1 ? ([...hiddenCategories][0] ?? null) : null;
+}
+
+function visibleToLabel(
+  onlyHidden: LogContentCategory | null,
+  protections: LogVisibility,
+): string | null {
+  if (onlyHidden === "input") return protections.capturedInputVisibleTo ?? null;
+  if (onlyHidden === "output") return protections.capturedOutputVisibleTo ?? null;
+
+  return null;
+}
+
 /**
  * Enforce captured-content visibility on one trace-correlated log record before it leaves the API. Raw log records carry content under PER-EVENT attribute keys (`prompt`, `response`/`response_text`, `arguments`/`tool_input`, `output`) plus the top-level OTLP body; every key is withheld behind the SAME `canSeeCapturedInput`/`canSeeCapturedOutput` visibility the sibling span endpoints enforce, from `logContentKeys` — a key surfaced by one and missed by the other is a policy bypass. Gating is per KEY, not per record: a codex `tool_result` carries both `arguments` (input) and `output` (output), so one verdict for the whole record could only ever be right in one direction. Ingest also stamps DERIVED content onto the attributes (the same captured content re-shaped), each stripped behind the category it was computed from. A key whose category the table does not know fails closed and needs BOTH visibilities; only content is withheld — metadata (event name, request_id, cost_usd, query_source, and cost, governed separately) passes through untouched.
  */
 export function redactTraceLogContent(
   row: TraceLogRecordDto,
-  protections: {
-    canSeeCapturedInput?: boolean | null;
-    canSeeCapturedOutput?: boolean | null;
-    capturedInputVisibleTo?: string | null;
-    capturedOutputVisibleTo?: string | null;
-  },
-  codingAgents: CodingAgentService,
+  protections: LogVisibility,
+  codingAgents: Pick<CodingAgentService, "logContentKeys">,
   derivedAttrPrefixes: TraceDerivedAttrPrefixes,
 ): TraceLogRecordDto {
   const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
-  const canSeeInput = protections.canSeeCapturedInput === true;
-  const canSeeOutput = protections.canSeeCapturedOutput === true;
-  const canSee = (category: LogContentCategory): boolean =>
-    category === "input"
-      ? canSeeInput
-      : category === "output"
-        ? canSeeOutput
-        : canSeeInput && canSeeOutput;
 
   const contentKeys = codingAgents.logContentKeys(eventName);
   const hiddenKeys = contentKeys.filter((entry) => {
     const value = row.attributes[entry.key];
-    return typeof value === "string" && value.length > 0 && !canSee(entry.category);
+    return (
+      typeof value === "string" && value.length > 0 && !canSeeCategory(entry.category, protections)
+    );
   });
-  const hiddenDerivedKeys = Object.keys(row.attributes).filter((key) => {
-    if (key.startsWith(derivedAttrPrefixes.input)) return !canSeeInput;
-    if (key.startsWith(derivedAttrPrefixes.output)) return !canSeeOutput;
-    return false;
-  });
+  const hiddenDerivedKeys = findHiddenDerivedKeys(row.attributes, protections, derivedAttrPrefixes);
   // The top-level OTLP body is content only when it is NOT merely echoing the
   // event-name marker (claude_code stamps the marker there; a generic
   // content-of-record emitter puts the record's content there). It follows the
   // event's own `body` category, or fails closed when the event is unknown.
   const bodyCategory: LogContentCategory =
     contentKeys.find((entry) => entry.key === "body")?.category ?? "both";
-  const shouldHideBody = row.body.length > 0 && row.body !== eventName && !canSee(bodyCategory);
+  const shouldHideBody =
+    row.body.length > 0 && row.body !== eventName && !canSeeCategory(bodyCategory, protections);
 
   if (hiddenKeys.length === 0 && hiddenDerivedKeys.length === 0 && !shouldHideBody) {
     return row;
@@ -720,33 +829,20 @@ export function redactTraceLogContent(
   for (const entry of hiddenKeys) delete attributes[entry.key];
   for (const key of hiddenDerivedKeys) delete attributes[key];
 
-  // The audience label only means something when ONE category was withheld:
-  // a record that shed both sides has no single audience to name.
-  const hidesDerivedInput = hiddenDerivedKeys.some((key) =>
-    key.startsWith(derivedAttrPrefixes.input),
-  );
-  const hidesDerivedOutput = hiddenDerivedKeys.some((key) =>
-    key.startsWith(derivedAttrPrefixes.output),
-  );
-  const hiddenCategories = new Set<LogContentCategory>([
-    ...hiddenKeys.map((entry) => entry.category),
-    ...(shouldHideBody ? [bodyCategory] : []),
-    ...(hidesDerivedInput ? (["input"] as const) : []),
-    ...(hidesDerivedOutput ? (["output"] as const) : []),
-  ]);
-  const onlyHidden = hiddenCategories.size === 1 ? [...hiddenCategories][0] : null;
+  const onlyHidden = onlyHiddenCategory({
+    hiddenKeys,
+    hiddenDerivedKeys,
+    shouldHideBody,
+    bodyCategory,
+    derivedAttrPrefixes,
+  });
 
   return {
     ...row,
     body: shouldHideBody ? "" : row.body,
     attributes,
     bodyRedacted: true,
-    bodyVisibleTo:
-      onlyHidden === "input"
-        ? (protections.capturedInputVisibleTo ?? null)
-        : onlyHidden === "output"
-          ? (protections.capturedOutputVisibleTo ?? null)
-          : null,
+    bodyVisibleTo: visibleToLabel(onlyHidden, protections),
   };
 }
 
@@ -762,7 +858,7 @@ export function gateTraceLogVisibility(
     capturedOutputVisibleTo?: string | null;
   },
   visibilityCutoffMs: number | null,
-  codingAgents: CodingAgentService,
+  codingAgents: Pick<CodingAgentService, "logContentKeys">,
   derivedAttrPrefixes: TraceDerivedAttrPrefixes,
 ): TraceLogRecordDto {
   const isBeforeCutoff = visibilityCutoffMs !== null && row.timeUnixMs < visibilityCutoffMs;

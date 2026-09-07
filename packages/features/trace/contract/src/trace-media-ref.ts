@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { collectAnnotatedMediaParts } from "./trace-media-part.collector.ts";
+import {
+  collectAnnotatedMediaParts,
+  type CollectedMediaPart,
+} from "./trace-media-part.collector.ts";
 import { isMediaPartRole, MEDIA_PART_ROLES, type MediaPartRole } from "./trace-media-role.ts";
 
 /**
@@ -65,31 +68,50 @@ function isStoredObjectRefUrl(url: string): boolean {
   return url.startsWith("/api/files/") && !url.includes("..");
 }
 
+/** The ref one binary part yields, or none when it does not point at our own stored objects. */
+function binaryMediaRef(
+  media: Extract<CollectedMediaPart["media"], { type: "binary" }>,
+  withRole: { role?: MediaPartRole },
+): TraceMediaRef | null {
+  if (!media.url || !isStoredObjectRefUrl(media.url)) return null;
+
+  const kind = kindFromMime(media.mimeType);
+
+  return {
+    kind,
+    url: media.url,
+    ...(media.filename ? { filename: media.filename } : {}),
+    ...(kind === "file" ? { mimeType: media.mimeType } : {}),
+    ...withRole,
+  };
+}
+
+/** The ref one collected part yields, or none when it points outside stored objects. */
+function mediaRefOf(part: CollectedMediaPart): TraceMediaRef | null {
+  const { media, role } = part;
+  const withRole = role ? { role } : {};
+  if (media.type === "binary") return binaryMediaRef(media, withRole);
+  if (media.source.type === "url" && isStoredObjectRefUrl(media.source.value)) {
+    return { kind: media.type, url: media.source.value, ...withRole };
+  }
+
+  return null;
+}
+
 /** Walks a span IO value and returns the compact reference list — the fold-side consumer of `collectMediaParts`. */
 export function collectMediaRefs(value: unknown): TraceMediaRef[] {
   const refs: TraceMediaRef[] = [];
   const seen = new Set<string>();
-  for (const { media, role } of collectAnnotatedMediaParts(value)) {
+  for (const part of collectAnnotatedMediaParts(value)) {
     if (refs.length >= MAX_TRACE_MEDIA_REFS) break;
-    const withRole = role ? { role } : {};
-    let ref: TraceMediaRef | null = null;
-    if (media.type === "binary") {
-      if (!media.url || !isStoredObjectRefUrl(media.url)) continue;
-      const kind = kindFromMime(media.mimeType);
-      ref = {
-        kind,
-        url: media.url,
-        ...(media.filename ? { filename: media.filename } : {}),
-        ...(kind === "file" ? { mimeType: media.mimeType } : {}),
-        ...withRole,
-      };
-    } else if (media.source.type === "url" && isStoredObjectRefUrl(media.source.value)) {
-      ref = { kind: media.type, url: media.source.value, ...withRole };
-    }
+
+    const ref = mediaRefOf(part);
     if (!ref || seen.has(ref.url)) continue;
+
     seen.add(ref.url);
     refs.push(ref);
   }
+
   return refs;
 }
 

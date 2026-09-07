@@ -7,7 +7,7 @@ import { ClaudeCodeSpanEnrichmentService } from "./claude-code-span-enrichment.s
 import type { Logger } from "@langwatch/observability";
 import { contentAttrKeys, type CodingAgentService } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { capPayloadString, type TraceApp } from "@langwatch/trace-server";
+import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
 import type { Span } from "@langwatch/trace-contract";
 import {
   type ClaudeContentLog,
@@ -37,7 +37,24 @@ import {
  * application rather than this process's storage service, because that is what both read paths
  * hand in. The storage service still satisfies it, its row being this one plus a traceId.
  */
-export type TraceLogRecordReader = TraceApp["logRecords"];
+export type TraceLogRecordReader = Readonly<{
+  getLogsByTraceId(
+    tenantId: string,
+    traceId: string,
+    occurredAtMs?: number,
+    limit?: number,
+  ): Promise<
+    Array<{
+      spanId: string;
+      timeUnixMs: number;
+      body: string;
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+      scopeName: string;
+      scopeVersion: string | null;
+    }>
+  >;
+}>;
 type TraceLogRecordReadRow = Awaited<ReturnType<TraceLogRecordReader["getLogsByTraceId"]>>[number];
 
 /**
@@ -396,6 +413,46 @@ export class ClaudeCodeLogEnrichmentService {
   }
 
   /**
+   * The full-refs model-call join: positional input pairing needs the whole trace's call order,
+   * so a one-span array cannot produce it. Never overwrites a non-null field.
+   */
+  static #applyModelCallEnrichment({
+    span,
+    next,
+    modelCallRefs,
+    logRows,
+    traceCanonicalisation,
+    codingAgents,
+  }: {
+    span: Span;
+    next: Span;
+    modelCallRefs: ClaudeSpanRef[];
+    logRows: TraceLogRecordReadRow[];
+    traceCanonicalisation: TraceCanonicalisationService;
+    codingAgents?: CodingAgentService;
+  }): Span {
+    const enrichment = ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment({
+      spans: modelCallRefs,
+      logs: ClaudeCodeLogEnrichmentService.mapLogRowsToClaudeContentLogs(logRows, codingAgents),
+      traceCanonicalisation,
+    }).get(span.span_id);
+    if (!enrichment) {
+      return next;
+    }
+
+    const clone: Span = { ...next };
+    if (enrichment.input !== null && span.input == null) {
+      clone.input = enrichment.input;
+    }
+
+    if (enrichment.output !== null && clone.output == null) {
+      clone.output = enrichment.output;
+    }
+
+    return clone;
+  }
+
+  /**
    * The single-span join: enriches one fetched span using the trace's logs plus, for model-call
    * spans, the light summary refs that give positional pairing its sibling order. Pure — the
    * caller owns the reads — and it never overwrites a non-null field.
@@ -423,38 +480,29 @@ export class ClaudeCodeLogEnrichmentService {
       codingAgents,
     });
     let next = enriched!;
-
-    // The bulk pass's tool join (exact, by tool_use_id) and interaction joins
-    // are single-span safe. Its model-call INPUT is not: positional pairing
-    // needs the whole trace's call order, and a one-span array degenerates
-    // to "this is the group's first call" — discarded for model calls, the
-    // full-refs join below is the only input source. Output is exact either way.
-    if (isModelCall) {
-      if (next !== span && next.input !== span.input) {
-        next = { ...next, input: span.input };
-      }
-
-      if (modelCallRefs.length > 0 && logRows.length > 0) {
-        const enrichment = ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment({
-          spans: modelCallRefs,
-          logs: ClaudeCodeLogEnrichmentService.mapLogRowsToClaudeContentLogs(logRows, codingAgents),
-          traceCanonicalisation,
-        }).get(span.span_id);
-        if (enrichment) {
-          const clone: Span = { ...next };
-          if (enrichment.input !== null && span.input == null) {
-            clone.input = enrichment.input;
-          }
-
-          if (enrichment.output !== null && clone.output == null) {
-            clone.output = enrichment.output;
-          }
-
-          next = clone;
-        }
-      }
+    if (!isModelCall) {
+      return next;
     }
 
-    return next;
+    // The bulk pass's tool join (exact, by tool_use_id) and interaction joins
+    // are single-span safe. Its model-call INPUT is not: a one-span array
+    // degenerates to "this is the group's first call" — discarded here, so the
+    // full-refs join below is the only input source. Output is exact either way.
+    if (next !== span && next.input !== span.input) {
+      next = { ...next, input: span.input };
+    }
+
+    if (modelCallRefs.length === 0 || logRows.length === 0) {
+      return next;
+    }
+
+    return ClaudeCodeLogEnrichmentService.#applyModelCallEnrichment({
+      span,
+      next,
+      modelCallRefs,
+      logRows,
+      traceCanonicalisation,
+      codingAgents,
+    });
   }
 }

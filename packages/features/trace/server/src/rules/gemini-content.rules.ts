@@ -34,6 +34,69 @@ const geminiRoleToChatRole = ({
  * parts become separate tool-role messages, matching chat semantics —
  * ADK wraps tool results in a user-role content.
  */
+const toolCallFromFunctionCall = (fc: Record<string, unknown>): unknown => ({
+  ...(isNonEmptyString(fc.id) ? { id: fc.id } : {}),
+  type: "function",
+  function: {
+    name: isNonEmptyString(fc.name) ? fc.name : "",
+    arguments: safeStringify(fc.args ?? {}) ?? "{}",
+  },
+});
+
+const toolMessageFromFunctionResponse = (fr: Record<string, unknown>): unknown => ({
+  role: "tool",
+  ...(isNonEmptyString(fr.id) ? { tool_call_id: fr.id } : {}),
+  ...(isNonEmptyString(fr.name) ? { name: fr.name } : {}),
+  content: safeStringify(fr.response ?? {}) ?? "{}",
+});
+
+/** The text and tool calls of one turn, held until a function response or the end flushes them. */
+type GeminiTurn = { texts: string[]; toolCalls: unknown[] };
+
+/** Emits the buffered turn as one message — a turn can carry both text and tool calls. */
+const flushGeminiTurn = (turn: GeminiTurn, role: string, messages: unknown[]): void => {
+  if (turn.texts.length === 0 && turn.toolCalls.length === 0) return;
+
+  messages.push({
+    role,
+    ...(turn.texts.length > 0 ? { content: turn.texts.join("\n") } : {}),
+    ...(turn.toolCalls.length > 0 ? { tool_calls: turn.toolCalls } : {}),
+  });
+  turn.texts = [];
+  turn.toolCalls = [];
+};
+
+const foldGeminiPart = (
+  part: unknown,
+  turn: GeminiTurn,
+  role: string,
+  messages: unknown[],
+): void => {
+  if (!isRecord(part)) return;
+
+  if (typeof part.text === "string") {
+    if (isReplyTextPart(part)) turn.texts.push(part.text);
+    return;
+  }
+
+  if (isRecord(part.function_call)) {
+    turn.toolCalls.push(toolCallFromFunctionCall(part.function_call));
+    return;
+  }
+
+  if (isRecord(part.function_response)) {
+    flushGeminiTurn(turn, role, messages);
+    messages.push(toolMessageFromFunctionResponse(part.function_response));
+  }
+};
+
+/**
+ * Converts a single Gemini content object ({ role, parts }) into chat
+ * messages. Text and function_call parts fold into one message (an
+ * assistant turn can carry both text and tool calls); function_response
+ * parts become separate tool-role messages, matching chat semantics —
+ * ADK wraps tool results in a user-role content.
+ */
 export const convertGeminiContent = ({
   content,
   defaultRole,
@@ -49,61 +112,11 @@ export const convertGeminiContent = ({
   const parts = Array.isArray(content.parts) ? content.parts : [];
 
   const messages: unknown[] = [];
-  let texts: string[] = [];
-  let toolCalls: unknown[] = [];
-
-  const flush = () => {
-    if (texts.length === 0 && toolCalls.length === 0) {
-      return;
-    }
-    messages.push({
-      role,
-      ...(texts.length > 0 ? { content: texts.join("\n") } : {}),
-      ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-    });
-    texts = [];
-    toolCalls = [];
-  };
-
+  const turn: GeminiTurn = { texts: [], toolCalls: [] };
   for (const part of parts) {
-    if (!isRecord(part)) {
-      continue;
-    }
-
-    if (typeof part.text === "string") {
-      if (!isReplyTextPart(part)) {
-        continue;
-      }
-      texts.push(part.text);
-      continue;
-    }
-
-    if (isRecord(part.function_call)) {
-      const fc = part.function_call;
-      toolCalls.push({
-        ...(isNonEmptyString(fc.id) ? { id: fc.id } : {}),
-        type: "function",
-        function: {
-          name: isNonEmptyString(fc.name) ? fc.name : "",
-          arguments: safeStringify(fc.args ?? {}) ?? "{}",
-        },
-      });
-      continue;
-    }
-
-    if (isRecord(part.function_response)) {
-      flush();
-      const fr = part.function_response;
-      messages.push({
-        role: "tool",
-        ...(isNonEmptyString(fr.id) ? { tool_call_id: fr.id } : {}),
-        ...(isNonEmptyString(fr.name) ? { name: fr.name } : {}),
-        content: safeStringify(fr.response ?? {}) ?? "{}",
-      });
-      continue;
-    }
+    foldGeminiPart(part, turn, role, messages);
   }
-  flush();
+  flushGeminiTurn(turn, role, messages);
 
   return messages;
 };

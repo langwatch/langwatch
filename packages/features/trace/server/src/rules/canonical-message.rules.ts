@@ -60,6 +60,21 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
   return parts.flatMap(extractTextsFromPart);
 };
 
+/** A tool call's input, stringified, or nothing when it will not serialise. */
+const toolInputTexts = (input: unknown): string[] => {
+  const text = safeStringify(input);
+
+  return text === null ? [] : [text];
+};
+
+/** The Bedrock-shaped `toolResult.content` blocks, or nothing when the part carries none. */
+const bedrockToolResultTexts = (part: Record<string, unknown>): string[] => {
+  const toolResultContent = isRecord(part.toolResult) ? part.toolResult.content : undefined;
+  if (!isUnknownArray(toolResultContent)) return [];
+
+  return joinExtractedTexts(extractBedrockToolResult(toolResultContent));
+};
+
 const extractTextsFromPart = (part: unknown): string[] => {
   if (typeof part === "string") {
     return [part];
@@ -78,22 +93,16 @@ const extractTextsFromPart = (part: unknown): string[] => {
     return [part.thinking];
   }
   if (part.type === "tool_use" && part.input != null) {
-    const input = safeStringify(part.input);
-    return input === null ? [] : [input];
+    return toolInputTexts(part.input);
   }
   if (part.type === "tool_result" && isUnknownArray(part.content)) {
     return joinExtractedTexts(extractTextsFromParts(part.content));
   }
   if (isRecord(part.toolUse) && part.toolUse.input != null) {
-    const input = safeStringify(part.toolUse.input);
-    return input === null ? [] : [input];
-  }
-  const toolResultContent = isRecord(part.toolResult) ? part.toolResult.content : undefined;
-  if (isUnknownArray(toolResultContent)) {
-    return joinExtractedTexts(extractBedrockToolResult(toolResultContent));
+    return toolInputTexts(part.toolUse.input);
   }
 
-  return [];
+  return bedrockToolResultTexts(part);
 };
 
 const joinExtractedTexts = (texts: string[]): string[] => {

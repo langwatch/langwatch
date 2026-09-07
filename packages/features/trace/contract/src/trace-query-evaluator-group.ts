@@ -122,49 +122,51 @@ function groupContainsEvaluator(node: LiqeQuery, evaluatorId: string): boolean {
   return false;
 }
 
+/** The score bound a `score:[a TO b]` / `score:>n` sub-condition names, or none. */
+function readScoreBound(
+  tag: Extract<LiqeQuery, { type: "Tag" }>,
+): { from?: number; to?: number } | null {
+  if (tag.expression.type === "RangeExpression") {
+    return { from: tag.expression.range.min, to: tag.expression.range.max };
+  }
+  if (tag.expression.type !== "LiteralExpression") return null;
+
+  const op = tag.operator.operator;
+  const raw = tag.expression.value;
+  const num = typeof raw === "number" ? raw : parseFloat(String(raw));
+  if (!Number.isFinite(num)) return null;
+
+  if (op === ":>" || op === ":>=") return { from: num };
+  if (op === ":<" || op === ":<=") return { to: num };
+
+  return null;
+}
+
+function readSubCondition(
+  tag: Extract<LiqeQuery, { type: "Tag" }>,
+  negated: boolean,
+  group: EvaluatorGroup,
+): void {
+  const field = tagFieldName(tag);
+  if (!field) return;
+
+  if (CATEGORICAL_SUB_FIELDS.has(field)) {
+    if (tag.expression.type !== "LiteralExpression") return;
+    group.categorical.push({ field, value: String(tag.expression.value), negated });
+    return;
+  }
+
+  if (field !== EVALUATOR_SCORE_FIELD || negated) return;
+
+  const score = readScoreBound(tag);
+  if (score) group.score = score;
+}
+
 /** Collect verdict/label/score sub-conditions out of a located group's AND-chain. */
 function readSubConditions(node: LiqeQuery, group: EvaluatorGroup): void {
   walkAST(node, (tag, negated) => {
-    if (tag.type !== "Tag") {
-      return;
-    }
-    const field = tagFieldName(tag);
-    if (!field) {
-      return;
-    }
-    if (CATEGORICAL_SUB_FIELDS.has(field)) {
-      if (tag.expression.type !== "LiteralExpression") {
-        return;
-      }
-      group.categorical.push({
-        field,
-        value: String(tag.expression.value),
-        negated,
-      });
-      return;
-    }
-    if (field === EVALUATOR_SCORE_FIELD && !negated) {
-      if (tag.expression.type === "RangeExpression") {
-        group.score = {
-          from: tag.expression.range.min,
-          to: tag.expression.range.max,
-        };
-        return;
-      }
-      if (tag.expression.type === "LiteralExpression") {
-        const op = tag.operator.operator;
-        const raw = tag.expression.value;
-        const num = typeof raw === "number" ? raw : parseFloat(String(raw));
-        if (!Number.isFinite(num)) {
-          return;
-        }
-        if (op === ":>" || op === ":>=") {
-          group.score = { from: num };
-        } else if (op === ":<" || op === ":<=") {
-          group.score = { to: num };
-        }
-      }
-    }
+    if (tag.type !== "Tag") return;
+    readSubCondition(tag, negated, group);
   });
 }
 

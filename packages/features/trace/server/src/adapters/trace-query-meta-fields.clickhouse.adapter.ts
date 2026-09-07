@@ -379,13 +379,59 @@ export class TraceQueryMetaFieldsAdapter {
     }
   }
 
+  /**
+   * What each `has:`/`none:` value probes, keyed by the value. A Map, not an object, because
+   * the key is user-supplied and a prototype key (`constructor`, `toString`) must not resolve.
+   */
+  static readonly #EXISTENCE_PROBES: ReadonlyMap<
+    string,
+    (trace: InMemoryTrace) => boolean | Unsupported
+  > = new Map([
+    ["error", (trace: InMemoryTrace) => trace.summary.containsErrorStatus],
+    [
+      "eval",
+      (trace: InMemoryTrace) =>
+        trace.evaluations == null ? UNSUPPORTED : trace.evaluations.length > 0,
+    ],
+    [
+      "feedback",
+      (trace: InMemoryTrace) =>
+        trace.events == null ? UNSUPPORTED : trace.events.some((e) => e.name === "user_feedback"),
+    ],
+    ["annotation", (trace: InMemoryTrace) => trace.summary.annotationIds.length > 0],
+    [
+      "conversation",
+      (trace: InMemoryTrace) => (trace.summary.attributes["gen_ai.conversation.id"] ?? "") !== "",
+    ],
+    [
+      "user",
+      (trace: InMemoryTrace) => (trace.summary.attributes["langwatch.user_id"] ?? "") !== "",
+    ],
+    [
+      "customer",
+      (trace: InMemoryTrace) => (trace.summary.attributes["langwatch.customer_id"] ?? "") !== "",
+    ],
+    ["topic", (trace: InMemoryTrace) => (trace.summary.topicId ?? "") !== ""],
+    ["subtopic", (trace: InMemoryTrace) => (trace.summary.subTopicId ?? "") !== ""],
+    [
+      "label",
+      (trace: InMemoryTrace) => {
+        const raw = trace.summary.attributes["langwatch.labels"] ?? "";
+        return raw !== "" && raw !== "[]";
+      },
+    ],
+    ["model", (trace: InMemoryTrace) => trace.summary.models.length > 0],
+    ["service", (trace: InMemoryTrace) => (trace.summary.attributes["service.name"] ?? "") !== ""],
+    ["traceName", (trace: InMemoryTrace) => (trace.summary.traceName ?? "") !== ""],
+    ["rootSpanType", (trace: InMemoryTrace) => (trace.summary.rootSpanType ?? "") !== ""],
+  ]);
+
   static evaluateExistence(
     tag: TagToken,
     negated: boolean,
     trace: InMemoryTrace,
   ): boolean | Unsupported {
     const value = TraceQueryValuesAdapter.extractStringValue(tag);
-    const attrs = trace.summary.attributes;
     const polarise = (present: boolean) => (negated ? !present : present);
 
     const traceAttrKey = TraceQueryMetaFieldsAdapter.stripTraceAttributePrefix(value);
@@ -396,46 +442,18 @@ export class TraceQueryMetaFieldsAdapter {
       // `has:attribute.constructor` truthy on *every* trace (inherited
       // `Object.prototype.constructor`) while the compiled
       // `Attributes['constructor'] != ''` matched none of them.
-      return polarise(TraceQueryValuesAdapter.readAttribute(attrs, traceAttrKey) !== "");
+      return polarise(
+        TraceQueryValuesAdapter.readAttribute(trace.summary.attributes, traceAttrKey) !== "",
+      );
     }
 
-    switch (value) {
-      case "error":
-        return polarise(trace.summary.containsErrorStatus);
-      case "eval":
-        if (trace.evaluations == null) return UNSUPPORTED;
-        return polarise(trace.evaluations.length > 0);
-      case "feedback":
-        if (trace.events == null) return UNSUPPORTED;
-        return polarise(trace.events.some((e) => e.name === "user_feedback"));
-      case "annotation":
-        return polarise(trace.summary.annotationIds.length > 0);
-      case "conversation":
-        return polarise((attrs["gen_ai.conversation.id"] ?? "") !== "");
-      case "user":
-        return polarise((attrs["langwatch.user_id"] ?? "") !== "");
-      case "customer":
-        return polarise((attrs["langwatch.customer_id"] ?? "") !== "");
-      case "topic":
-        return polarise((trace.summary.topicId ?? "") !== "");
-      case "subtopic":
-        return polarise((trace.summary.subTopicId ?? "") !== "");
-      case "label": {
-        const raw = attrs["langwatch.labels"] ?? "";
-        return polarise(raw !== "" && raw !== "[]");
-      }
-      case "model":
-        return polarise(trace.summary.models.length > 0);
-      case "service":
-        return polarise((attrs["service.name"] ?? "") !== "");
-      case "traceName":
-        return polarise((trace.summary.traceName ?? "") !== "");
-      case "rootSpanType":
-        return polarise((trace.summary.rootSpanType ?? "") !== "");
-      default:
-        // Unknown value throws on the SQL side — fail closed here.
-        return UNSUPPORTED;
-    }
+    const probe = TraceQueryMetaFieldsAdapter.#EXISTENCE_PROBES.get(value);
+    // Unknown value throws on the SQL side — fail closed here.
+    if (!probe) return UNSUPPORTED;
+
+    const present = probe(trace);
+
+    return present === UNSUPPORTED ? UNSUPPORTED : polarise(present);
   }
 
   static scenarioColumnDef(column: string): FieldDef {

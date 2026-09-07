@@ -1,8 +1,6 @@
 /**
  * The REST collector: `POST /api/collector`. Was `platform/app/src/server/routes/collector.ts`.
  */
-import crypto from "node:crypto";
-
 import { bodyLimit, type AppRestSecurity, type SecuredApp } from "@langwatch/api/rest";
 import { handlerManagedAuth } from "@langwatch/api";
 import { createLogger, validationMeta } from "@langwatch/observability";
@@ -13,22 +11,28 @@ import { fromZodError } from "zod-validation-error";
 
 import {
   collectorRESTParamsValidatorSchema,
-  customMetadataSchema,
   DEFAULT_PII_REDACTION_LEVEL,
-  langWatchSpanSchema,
-  maybeAddIdsToContextList,
-  reservedTraceMetadataSchema,
-  spanMetricsSchema,
-  spanValidatorSchema,
-  SPAN_MAX_PAST_MS,
   type CollectorRESTParamsValidator,
-  type CustomMetadata,
-  type ReservedTraceMetadata,
   type Span,
 } from "@langwatch/trace-contract";
 
-import { TraceCollectorSpanService } from "#services/trace-collector-span.service";
-import { nowInstant } from "@langwatch/time";
+import type { TraceCollectorSpanService } from "#services/trace-collector-span.service";
+
+import {
+  applyLegacyMetadataFields,
+  applyLegacySpanFields,
+  COLLECTOR_MAX_BODY_BYTES,
+  findEvaluationRejection,
+  findEvaluationsCapRejection,
+  findSpanRejection,
+  findSpansShapeRejection,
+  isCollectorRejection,
+  parseCollectorMetadata,
+  resolveTraceId,
+  type CollectorMetadata,
+  type CollectorRejection,
+} from "./collector-body.api";
+import { dispatchEvaluations, dispatchSpans, partitionFreshSpans } from "./collector-dispatch.api";
 
 const logger = createLogger("langwatch.collector");
 
@@ -112,16 +116,175 @@ export type CollectorRestPorts = Readonly<{
   reportError?: CollectorErrorReportPort | undefined;
 }>;
 
-/** The largest body this door reads before refusing it unread. */
-const COLLECTOR_MAX_BODY_BYTES = 10 * 1024 * 1024;
+/** The request body as a JSON object, or the refusal reading it earned. */
+async function readCollectorBody(
+  request: Readonly<{ header: (name: string) => string | undefined; json: () => Promise<unknown> }>,
+): Promise<Record<string, any> | CollectorRejection> {
+  // warn, not error: a malformed body is the caller's mistake and we answer
+  // it with a 400. These three sites return rather than throw, so they never
+  // reach the boundary that would classify them as customer fault, and at
+  // error level they were about a fifth of this service's error stream.
+  const contentType = request.header("content-type");
+  if (!contentType?.includes("application/json")) {
+    logger.warn("collector request body is not json");
+
+    return { rejected: true, body: { message: "Invalid body, expecting json" }, status: 400 };
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    logger.warn("collector request body is not valid json");
+
+    return { rejected: true, body: { message: "Invalid body, expecting json" }, status: 400 };
+  }
+
+  // `typeof null` is "object" and an array is one too, so both walk past a
+  // bare typeof check and reach `"metadata" in body` below — which throws on
+  // null. That is the same customer mistake as the two guards above, so it
+  // belongs on the same 400 rather than in the error stream as a 500.
+  if (body === null || Array.isArray(body) || typeof body !== "object") {
+    logger.warn("collector request body is not a json object");
+
+    return { rejected: true, body: { message: "Invalid body, expecting json" }, status: 400 };
+  }
+
+  return body as Record<string, any>;
+}
+
+/** The legacy rewrites, the evaluation refusals, and the schema the whole body must satisfy. */
+function parseCollectorParams(
+  body: Record<string, any>,
+  input: Readonly<{ projectId: string; reportError?: CollectorErrorReportPort | undefined }>,
+): CollectorRESTParamsValidator | CollectorRejection {
+  applyLegacyMetadataFields(body);
+
+  const refusedEvaluation = findEvaluationRejection(body, input.projectId);
+  if (refusedEvaluation) return refusedEvaluation;
+
+  try {
+    return collectorRESTParamsValidatorSchema.parse(body);
+  } catch (error) {
+    const validation = validationMeta(error);
+
+    input.reportError?.(new Error("ZodError on parsing body"), { projectId: input.projectId });
+
+    const validationError = fromZodError(error as ZodError);
+
+    // Shape, never the body. The rendered `validationError.message` quotes
+    // the offending values, so it answers the sender and stays out of the
+    // log; `validation` is the schema's own vocabulary and is what tells us
+    // whether the rule, rather than the payload, is the thing that is wrong.
+    logger.warn({ projectId: input.projectId, ...validation }, "invalid trace received");
+
+    return { rejected: true, body: { error: validationError.message }, status: 400 };
+  }
+}
+
+/** A validated body's spans, the one trace they belong to, and the metadata they carry. */
+type PreparedCollectorBody = Readonly<{
+  spans: Span[];
+  traceId: string;
+  metadata: CollectorMetadata;
+}>;
+
+function prepareCollectorBody(
+  body: Record<string, any>,
+  params: CollectorRESTParamsValidator,
+  input: Readonly<{ projectId: string; reportError?: CollectorErrorReportPort | undefined }>,
+): PreparedCollectorBody | CollectorRejection {
+  const { projectId } = input;
+  const nullableTraceId = params.trace_id;
+
+  const refusedShape = findSpansShapeRejection(body, { projectId, traceId: nullableTraceId });
+  if (refusedShape) return refusedShape;
+
+  const refusedCap = findEvaluationsCapRejection(params, { projectId, traceId: nullableTraceId });
+  if (refusedCap) return refusedCap;
+
+  const metadata = parseCollectorMetadata(params, input);
+  if (isCollectorRejection(metadata)) return metadata;
+
+  const spans = (body.spans ?? []) as Span[];
+  applyLegacySpanFields(spans, nullableTraceId);
+
+  const traceId = resolveTraceId(spans, { projectId, nullableTraceId });
+  if (isCollectorRejection(traceId)) return traceId;
+
+  const refusedSpan = findSpanRejection(spans, { ...input, traceId });
+  if (refusedSpan) return refusedSpan;
+
+  return { spans, traceId, metadata };
+}
 
 /**
- * What `partialSuccess.errorMessage` says about a span or an evaluation the pipeline refused.
- * The pipeline's own strings name the datastore and its address, and this body reaches any
- * project key, so the count and the action travel and the diagnosis stays on the log line.
+ * Total ingestion failure: every dispatched span failed (e.g. Redis / group-queue outage). There
+ * is no fallback stack, so a 200 here would tell the SDK the trace landed and it would never
+ * retry — permanent trace loss. Return 500 so clients retry; the dedup gate releases failed spans
+ * via releaseOnFailure, so a retry is safe. Partial success stays 2xx for SDK back-compat.
  */
-const SPAN_INGESTION_FAILED = "span ingestion failed, please retry";
-const EVALUATION_INGESTION_FAILED = "evaluation ingestion failed, please retry";
+async function ingestCollectorBody(
+  context: Readonly<{ json: (body: object, status?: ContentfulStatusCode) => Response }>,
+  input: Readonly<{
+    project: CollectorProject;
+    ports: CollectorRestPorts;
+    params: CollectorRESTParamsValidator;
+    prepared: PreparedCollectorBody;
+  }>,
+): Promise<Response> {
+  const { project, ports, params, prepared } = input;
+  const { spans, traceId, metadata } = prepared;
+
+  const { freshSpans, droppedOldSpans } = partitionFreshSpans(spans, {
+    projectId: project.id,
+    traceId,
+  });
+
+  const spanOutcome = await dispatchSpans(freshSpans, {
+    projectId: project.id,
+    traceId,
+    droppedOldSpans,
+    metadata,
+    expectedOutput: params.expected_output,
+    ingestSpan: ports.ingestSpan,
+  });
+
+  if (freshSpans.length > 0 && spanOutcome.dispatchFailures === freshSpans.length) {
+    return context.json(
+      {
+        message: `Failed to ingest all ${spanOutcome.dispatchFailures} spans, please retry`,
+        partialSuccess: {
+          rejectedSpans: spanOutcome.rejectedSpans,
+          errorMessage: spanOutcome.rejectionErrors.join("; "),
+        },
+      },
+      500,
+    );
+  }
+
+  const evaluations = params.evaluations ?? [];
+  const evaluationOutcome =
+    evaluations.length > 0
+      ? await dispatchEvaluations(evaluations, {
+          projectId: project.id,
+          traceId,
+          deriveEvaluatorId: ports.deriveEvaluatorId,
+          reportEvaluation: ports.reportEvaluation,
+        })
+      : { rejectedEvaluations: 0, evaluationErrors: [] };
+
+  return context.json({
+    message: "Trace received successfully.",
+    partialSuccess: {
+      rejectedSpans: spanOutcome.rejectedSpans,
+      rejectedEvaluations: evaluationOutcome.rejectedEvaluations,
+      errorMessage: [...spanOutcome.rejectionErrors, ...evaluationOutcome.evaluationErrors].join(
+        "; ",
+      ),
+    },
+  });
+}
 
 /**
  * The REST collector, built against one process's security. `/api/collector` is a literal path
@@ -158,33 +321,8 @@ export function createCollectorRestApp(options: {
         return c.json({ error: "Unauthorized", message: "Invalid credentials" }, 401);
       }
 
-      // warn, not error: a malformed body is the caller's mistake and we answer
-      // it with a 400. These three sites return rather than throw, so they never
-      // reach the boundary that would classify them as customer fault, and at
-      // error level they were about a fifth of this service's error stream.
-      const contentType = c.req.header("content-type");
-      if (!contentType?.includes("application/json")) {
-        logger.warn("collector request body is not json");
-
-        return c.json({ message: "Invalid body, expecting json" }, 400);
-      }
-
-      let body: Record<string, any>;
-      try {
-        body = await c.req.json();
-      } catch {
-        logger.warn("collector request body is not valid json");
-        return c.json({ message: "Invalid body, expecting json" }, 400);
-      }
-
-      // `typeof null` is "object" and an array is one too, so both walk past a
-      // bare typeof check and reach `"metadata" in body` below — which throws on
-      // null. That is the same customer mistake as the two guards above, so it
-      // belongs on the same 400 rather than in the error stream as a 500.
-      if (body === null || Array.isArray(body) || typeof body !== "object") {
-        logger.warn("collector request body is not a json object");
-        return c.json({ message: "Invalid body, expecting json" }, 400);
-      }
+      const body = await readCollectorBody(c.req);
+      if (isCollectorRejection(body)) return c.json(body.body, body.status);
 
       const project = auth.project;
 
@@ -194,522 +332,23 @@ export function createCollectorRestApp(options: {
       // lookup that failed inside the port — lets the batch through.
       await ports.usageLimit?.({ project });
 
-      // We migrated those keys to inside metadata, but we still want to support them for retrocompatibility for a while
-      if (!("metadata" in body) || !body.metadata) {
-        body.metadata = {};
-        if ("thread_id" in body) {
-          body.metadata.thread_id = body.thread_id;
-        }
-        if ("user_id" in body) {
-          body.metadata.user_id = body.user_id;
-        }
-        if ("customer_id" in body) {
-          body.metadata.customer_id = body.customer_id;
-        }
-        if ("labels" in body && body.labels) {
-          body.metadata.labels = body.labels;
-        }
-      }
-
-      // Allow objects and simple strings to be sent as labels as well
-      if (body.metadata?.labels) {
-        const labels = body.metadata.labels;
-        if (typeof labels === "string") {
-          body.metadata.labels = [labels];
-        } else if (Array.isArray(labels)) {
-          body.metadata.labels = labels;
-        } else {
-          body.metadata.labels = Object.entries(labels).map(
-            ([key, value]) => `${key}: ${value as string}`,
-          );
-        }
-      }
-
-      for (const evaluation of body.evaluations ?? []) {
-        const hasNoVerdict =
-          evaluation.status !== "error" &&
-          evaluation.status !== "skipped" &&
-          (evaluation.passed === undefined || evaluation.passed === null) &&
-          (evaluation.score === undefined || evaluation.score === null) &&
-          (evaluation.label === undefined || evaluation.label === null);
-        if (hasNoVerdict) {
-          logger.error(
-            { projectId: project.id, evaluationId: evaluation.id },
-            "evaluation has no passed, score or label",
-          );
-
-          return c.json(
-            {
-              error: "Either `passed`, `score` or `label` field must be defined for evaluations",
-            },
-            400,
-          );
-        }
-
-        if (evaluation.error) {
-          evaluation.error.has_error = true;
-        }
-
-        const evaluationTimestampsNotMilliseconds =
-          (evaluation.timestamps?.started_at &&
-            evaluation.timestamps.started_at.toString().length !== 13) ||
-          (evaluation.timestamps?.finished_at &&
-            evaluation.timestamps.finished_at.toString().length !== 13);
-        if (evaluationTimestampsNotMilliseconds) {
-          logger.error(
-            { projectId: project.id, evaluationId: evaluation.id },
-            "evaluation timestamps not in milliseconds",
-          );
-
-          return c.json(
-            {
-              error:
-                "Evaluation timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-            },
-            400,
-          );
-        }
-      }
-
-      let params: CollectorRESTParamsValidator;
-      try {
-        params = collectorRESTParamsValidatorSchema.parse(body);
-      } catch (error) {
-        const validation = validationMeta(error);
-
-        ports.reportError?.(new Error("ZodError on parsing body"), {
-          projectId: project.id,
-        });
-
-        const validationError = fromZodError(error as ZodError);
-
-        // Shape, never the body. The rendered `validationError.message` quotes
-        // the offending values, so it answers the sender and stays out of the
-        // log; `validation` is the schema's own vocabulary and is what tells us
-        // whether the rule, rather than the payload, is the thing that is wrong.
-        logger.warn({ projectId: project.id, ...validation }, "invalid trace received");
-
-        return c.json({ error: validationError.message }, 400);
-      }
+      const params = parseCollectorParams(body, {
+        projectId: project.id,
+        reportError: ports.reportError,
+      });
+      if (isCollectorRejection(params)) return c.json(params.body, params.status);
 
       // Body successfully validated — mark the API key as used if this request was
       // authenticated via API key
       auth.markUsed();
 
-      const { trace_id: nullableTraceId, expected_output: expectedOutput } = params;
-
-      if (body.spans && !Array.isArray(body.spans)) {
-        // The type, not the value: whatever arrived in place of the array is
-        // still the sender's content, and the type is the whole diagnosis.
-        logger.warn(
-          {
-            projectId: project.id,
-            receivedType: typeof body.spans,
-            traceId: nullableTraceId,
-          },
-          "invalid spans field, expecting array",
-        );
-
-        return c.json({ message: "Invalid 'spans' field, expecting array" }, 400);
-      }
-
-      if (body.spans?.length > 200) {
-        logger.info(
-          {
-            projectId: project.id,
-            spansCount: body.spans?.length,
-            traceId: nullableTraceId,
-          },
-          "[429] Too many spans",
-        );
-        return c.json(
-          {
-            message: "Too many spans, maximum of 200 per trace",
-          },
-          429,
-        );
-      }
-
-      // Mirror the span cap for evaluations: without it, a 10MB body of minimal
-      // evaluation objects yields tens of thousands of sequential event-sourcing
-      // dispatches per request (evaluations have no dedup gate, unlike spans).
-      if ((params.evaluations?.length ?? 0) > 200) {
-        logger.info(
-          {
-            projectId: project.id,
-            evaluationsCount: params.evaluations?.length,
-            traceId: nullableTraceId,
-          },
-          "[429] Too many evaluations",
-        );
-        return c.json(
-          {
-            message: "Too many evaluations, maximum of 200 per trace",
-          },
-          429,
-        );
-      }
-
-      let reservedTraceMetadata: ReservedTraceMetadata = {};
-      let customMetadata: CustomMetadata = {};
-      try {
-        if (params.metadata) {
-          reservedTraceMetadata = Object.fromEntries(
-            Object.entries(reservedTraceMetadataSchema.parse(params.metadata)).filter(
-              ([_key, value]) => value !== null && value !== undefined,
-            ),
-          );
-          const remainingMetadata = Object.fromEntries(
-            Object.entries(params.metadata).filter(
-              ([key]) => !(key in reservedTraceMetadataSchema.shape),
-            ),
-          );
-          customMetadata = customMetadataSchema.parse(remainingMetadata);
-        }
-      } catch (error) {
-        const validationError = fromZodError(error as ZodError);
-        const validation = validationMeta(error);
-
-        ports.reportError?.(new Error("ZodError on parsing metadata"), {
-          projectId: project.id,
-        });
-
-        // Metadata is customer-authored key/value content, so the values stay
-        // out. The rejected KEY names do not: a key refused across many
-        // projects is how we learn our reserved-metadata list is too narrow.
-        logger.warn({ projectId: project.id, ...validation }, "invalid metadata received");
-
-        return c.json({ error: validationError.message }, 400);
-      }
-
-      const spanFields = langWatchSpanSchema.options.flatMap((option) => Object.keys(option.shape));
-      const spans = ((body as Record<string, any>).spans ?? []) as Span[];
-      spans.forEach((span) => {
-        // We changed "id" to "span_id", but we still want to support "id" for retrocompatibility for a while
-        if ("id" in span) {
-          span.span_id = span.id as string;
-        }
-        if (nullableTraceId && !span.trace_id) {
-          span.trace_id = nullableTraceId;
-        }
-        // We changes "outputs" list to "output" single item, so here we keep supporting the old "outputs" for retrocompaibility
-        if (
-          typeof span.output === "undefined" &&
-          "outputs" in span &&
-          typeof span.outputs !== "undefined"
-        ) {
-          //@ts-expect-error: `outputs` is the retired field, absent from the current span type
-          if (span.outputs.length === 0) {
-            span.output = null;
-            //@ts-expect-error: `outputs` is the retired field, absent from the current span type
-          } else if (span.outputs.length === 1) {
-            //@ts-expect-error: `outputs` is the retired field, absent from the current span type
-            span.output = span.outputs[0];
-            //@ts-expect-error: `outputs` is the retired field, absent from the current span type
-          } else if (span.outputs.length > 1) {
-            span.output = {
-              type: "list",
-              //@ts-expect-error: `outputs` is the retired field, absent from the current span type
-              value: span.outputs,
-            };
-          }
-        }
-        if ("contexts" in span) {
-          // Keep retrocompatibility of RAG as a simple string list
-          span.contexts = maybeAddIdsToContextList(span.contexts);
-          // Allow number ids
-          span.contexts = span.contexts.map((context) => ({
-            ...context,
-            ...(typeof context.document_id === "number"
-              ? { document_id: `${context.document_id as number}` }
-              : {}),
-            ...(typeof context.chunk_id === "number"
-              ? { chunk_id: `${context.chunk_id as number}` }
-              : {}),
-            content:
-              typeof context.content === "string"
-                ? context.content
-                : JSON.stringify(context.content),
-          }));
-        }
-        if (span.error) {
-          span.error.has_error = true;
-        }
-
-        for (const key of Object.keys(span)) {
-          if (!spanFields.includes(key)) {
-            delete (span as any)[key];
-          }
-        }
+      const prepared = prepareCollectorBody(body, params, {
+        projectId: project.id,
+        reportError: ports.reportError,
       });
+      if (isCollectorRejection(prepared)) return c.json(prepared.body, prepared.status);
 
-      const traceId = nullableTraceId ?? spans[0]?.trace_id;
-      if (!traceId) {
-        logger.error(
-          {
-            projectId: project.id,
-            traceId: nullableTraceId,
-            spanCount: spans.length,
-            spanIds: spans.map((span) => span.span_id),
-          },
-          "trace id not defined",
-        );
-
-        return c.json({ message: "Trace ID not defined" }, 400);
-      }
-
-      const traceIds = Array.from(
-        new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id)),
-      );
-      if (traceIds[0] && (traceIds.length > 1 || traceIds[0] !== traceId)) {
-        logger.error({ projectId: project.id, traceId, traceIds }, "trace ids are not the same");
-
-        return c.json({ message: "All spans must have the same trace id" }, 400);
-      }
-
-      for (const [index, span] of spans.entries()) {
-        // Move extrataneous metrics to params for retrocompatibility
-        if (span.metrics) {
-          const validMetrics = spanMetricsSchema.safeParse(span.metrics);
-          if (validMetrics.success) {
-            const extrataneousMetrics = Object.fromEntries(
-              Object.entries(span.metrics).filter(([key]) => !(key in validMetrics.data)),
-            );
-            span.params = {
-              ...span.params,
-              ...extrataneousMetrics,
-            };
-            span.metrics = validMetrics.data;
-          }
-        }
-        try {
-          spans[index] = spanValidatorSchema.parse(span);
-        } catch (error) {
-          const validation = validationMeta(error);
-
-          ports.reportError?.(new Error("ZodError on parsing spans"), {
-            projectId: project.id,
-            traceId,
-          });
-
-          const validationError = fromZodError(error as ZodError);
-
-          logger.warn({ projectId: project.id, index, ...validation }, "invalid span received");
-
-          return c.json(
-            {
-              error: validationError.message + ` at "spans[${index}]"`,
-            },
-            400,
-          );
-        }
-
-        const spanTimestampsNotMilliseconds =
-          (span.timestamps.started_at && span.timestamps.started_at.toString().length !== 13) ||
-          (span.timestamps.finished_at && span.timestamps.finished_at.toString().length !== 13) ||
-          (span.timestamps.first_token_at &&
-            span.timestamps.first_token_at.toString().length !== 13);
-        if (spanTimestampsNotMilliseconds) {
-          logger.error(
-            { traceId, projectId: project.id },
-            "timestamps not in milliseconds for span",
-          );
-          return c.json(
-            {
-              error:
-                "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-            },
-            400,
-          );
-        }
-      }
-
-      // OTLP parity: processSpan drops spans older than SPAN_MAX_PAST_MS before
-      // the dedup gate, so apply the same age cutoff here — otherwise the REST
-      // path alone would write arbitrarily old timestamps into cold ClickHouse
-      // partitions, undermining partition pruning.
-      const startedAtCutoff = nowInstant().epochMilliseconds - SPAN_MAX_PAST_MS;
-      const freshSpans: Span[] = [];
-      let droppedOldSpans = 0;
-      for (const span of spans) {
-        if (span.timestamps.started_at && span.timestamps.started_at < startedAtCutoff) {
-          droppedOldSpans++;
-          continue;
-        }
-        freshSpans.push(span);
-      }
-      if (droppedOldSpans > 0) {
-        logger.info(
-          { projectId: project.id, traceId, droppedOldSpans },
-          "dropped spans with start time more than 31 days in the past",
-        );
-      }
-
-      let rejectedSpans = droppedOldSpans;
-      let dispatchFailures: number;
-      let rejectionErrors: string[] =
-        droppedOldSpans > 0
-          ? [`${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`]
-          : [];
-      try {
-        const resource = TraceCollectorSpanService.buildResource({
-          reservedTraceMetadata,
-          customMetadata,
-          expectedOutput,
-        });
-
-        const results = await Promise.allSettled(
-          freshSpans.map((span) =>
-            // Route through the ingestion pipeline (not the command sender
-            // directly) so the REST collector shares the (tenant, trace, span)
-            // dedup gate + ADR-022 spool hook with the OTLP path — a retry storm
-            // here must not bypass dedup. occurredAt is stamped inside it.
-            ports.ingestSpan({
-              tenantId: project.id,
-              span: TraceCollectorSpanService.convertSpanToOtlp(span),
-              resource,
-              instrumentationScope: { name: "langwatch.rest.collector" },
-              piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-            }),
-          ),
-        );
-
-        // `ingestNormalizedSpan` catches its own errors and RESOLVES with `{ status: "failed",
-        // error }` (it never rejects), so inspect the resolved status — checking the allSettled
-        // "rejected" wrapper would count every failure as a success. An unexpected rejection is
-        // still treated as a failure defensively. "deduped" is a success, not an error.
-        const failureDetails = results
-          .map((r) => {
-            if (r.status === "rejected") {
-              return r.reason instanceof Error ? r.reason.message : String(r.reason);
-            }
-            return r.value.status === "failed" ? (r.value.error ?? "span ingestion failed") : null;
-          })
-          .filter((e): e is string => e !== null);
-        const failureErrors = failureDetails.map(() => SPAN_INGESTION_FAILED);
-        dispatchFailures = failureErrors.length;
-        rejectedSpans += failureErrors.length;
-        rejectionErrors = [...rejectionErrors, ...failureErrors];
-        if (failureErrors.length > 0) {
-          logger.error(
-            {
-              projectId: project.id,
-              traceId,
-              failureCount: failureDetails.length,
-              errors: failureDetails,
-            },
-            "Error dispatching collector spans to event sourcing",
-          );
-        }
-      } catch (error) {
-        // Catch synchronous errors (e.g., from buildResource)
-        dispatchFailures = freshSpans.length;
-        rejectedSpans += freshSpans.length;
-        rejectionErrors.push(SPAN_INGESTION_FAILED);
-        logger.error(
-          { error, projectId: project.id, traceId },
-          "Error initializing event sourcing dispatch",
-        );
-      }
-
-      // Total ingestion failure: every dispatched span failed (e.g. Redis / group-queue
-      // outage). There is no fallback stack, so a 200 here would tell the SDK the trace landed
-      // and it would never retry — permanent trace loss. Return 500 so clients retry; the dedup
-      // gate releases failed spans via releaseOnFailure, so a retry is safe. Partial success
-      // stays 2xx for SDK back-compat.
-      if (freshSpans.length > 0 && dispatchFailures === freshSpans.length) {
-        return c.json(
-          {
-            message: `Failed to ingest all ${dispatchFailures} spans, please retry`,
-            partialSuccess: {
-              rejectedSpans,
-              errorMessage: rejectionErrors.join("; "),
-            },
-          },
-          500,
-        );
-      }
-
-      // Dispatch custom SDK evaluations to the event-sourcing evaluation pipeline.
-      // The REST collector receives evaluations as a separate field (not as span events),
-      // so they must be dispatched independently from the spans above.
-      let rejectedEvaluations = 0;
-      const evaluationErrors: string[] = [];
-      if (params.evaluations && params.evaluations.length > 0 && traceId) {
-        const reportEvaluation = ports.reportEvaluation;
-        if (!reportEvaluation) {
-          rejectedEvaluations = params.evaluations.length;
-          evaluationErrors.push(
-            "This deployment records no evaluations, so the evaluations on this trace were not stored.",
-          );
-          logger.warn(
-            { projectId: project.id, traceId, count: params.evaluations.length },
-            "no evaluation pipeline on this process; collector evaluations rejected by name",
-          );
-        } else {
-          const occurredAt = nowInstant().epochMilliseconds;
-
-          for (const evaluation of params.evaluations) {
-            // try/catch per evaluation so one failing dispatch does not silently
-            // drop the remaining evaluations; failures are surfaced to the client
-            // via partialSuccess.rejectedEvaluations below.
-            try {
-              const evaluationMD5 = crypto
-                .createHash("md5")
-                .update(JSON.stringify({ traceId, evaluation }))
-                .digest("hex");
-              const evaluationId = evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`;
-              const evaluatorId =
-                evaluation.evaluator_id ?? ports.deriveEvaluatorId(evaluation.name);
-              const status = evaluation.status ?? (evaluation.error ? "error" : "processed");
-              // A verdict is only real when the evaluator ran to completion —
-              // an errored/skipped run's stray passed/score/label must not
-              // reach analytics or triggers as a real result (#6833). Same
-              // gate as the shared verdictGate helpers applied at the
-              // executeEvaluation command boundary.
-              const hasVerdict = status === "processed";
-
-              await reportEvaluation({
-                tenantId: project.id,
-                evaluationId,
-                evaluatorId,
-                evaluatorType: "custom",
-                evaluatorName: evaluation.name,
-                traceId,
-                isGuardrail: evaluation.is_guardrail ?? undefined,
-                status,
-                score: hasVerdict ? (evaluation.score ?? null) : null,
-                passed: hasVerdict ? (evaluation.passed ?? null) : null,
-                label: hasVerdict ? (evaluation.label ?? null) : null,
-                details: evaluation.details ?? null,
-                error: evaluation.error?.message ?? null,
-                occurredAt,
-              });
-            } catch (error) {
-              rejectedEvaluations++;
-              evaluationErrors.push(EVALUATION_INGESTION_FAILED);
-              logger.error(
-                {
-                  error,
-                  projectId: project.id,
-                  traceId,
-                  evaluationName: evaluation.name,
-                },
-                "Error dispatching REST evaluation to event sourcing",
-              );
-            }
-          }
-        }
-      }
-
-      return c.json({
-        message: "Trace received successfully.",
-        partialSuccess: {
-          rejectedSpans,
-          rejectedEvaluations,
-          errorMessage: [...rejectionErrors, ...evaluationErrors].join("; "),
-        },
-      });
+      return await ingestCollectorBody(c, { project, ports, params, prepared });
     });
 
   return secured;

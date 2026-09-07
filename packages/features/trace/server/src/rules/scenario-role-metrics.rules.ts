@@ -38,51 +38,64 @@ export interface ScenarioRoleMetrics {
  * retroactive propagation the fold needed for out-of-order arrival — keeping
  * the fold state O(1) per event instead of growing with span count.
  */
+type RoleResolution = Readonly<{
+  bySpanId: Record<string, ScenarioRoleSpanInput>;
+  cache: Record<string, string | null>;
+}>;
+
+/**
+ * The role a span inherits from the nearest ancestor that declares one. The cache is seeded to
+ * a sentinel for the chain in progress so a parent cycle (customer-emitted bad parent links)
+ * terminates instead of recursing forever.
+ */
+function effectiveRole(resolution: RoleResolution, spanId: string): string | null {
+  const cached = resolution.cache[spanId];
+  if (cached !== undefined) return cached;
+
+  resolution.cache[spanId] = null;
+
+  const span = resolution.bySpanId[spanId];
+  if (!span) return null;
+
+  const resolved = declaredRole(span) ?? inheritedRole(resolution, span);
+  resolution.cache[spanId] = resolved;
+
+  return resolved;
+}
+
+/** The role a span declares itself, or none when it declares nothing. */
+function declaredRole(span: ScenarioRoleSpanInput): string | null {
+  return span.role !== undefined && span.role !== "" ? span.role : null;
+}
+
+function inheritedRole(resolution: RoleResolution, span: ScenarioRoleSpanInput): string | null {
+  if (!span.parentSpanId) return null;
+  if (resolution.bySpanId[span.parentSpanId] === undefined) return null;
+
+  return effectiveRole(resolution, span.parentSpanId);
+}
+
 export function aggregateScenarioRoleMetrics(spans: ScenarioRoleSpanInput[]): ScenarioRoleMetrics {
   const bySpanId: Record<string, ScenarioRoleSpanInput> = Object.create(null);
   for (const span of spans) {
     bySpanId[span.spanId] = span;
   }
-
-  const effectiveRoleCache: Record<string, string | null> = Object.create(null);
-
-  function effectiveRole(spanId: string): string | null {
-    const cached = effectiveRoleCache[spanId];
-    if (cached !== undefined) return cached;
-
-    // Seed the cache for the current chain to a sentinel so a parent cycle
-    // (customer-emitted bad parent links) terminates instead of recursing
-    // forever; resolved below.
-    effectiveRoleCache[spanId] = null;
-
-    const span = bySpanId[spanId];
-    if (!span) return null;
-
-    let resolved: string | null;
-    if (span.role !== undefined && span.role !== "") {
-      resolved = span.role;
-    } else if (span.parentSpanId && bySpanId[span.parentSpanId] !== undefined) {
-      resolved = effectiveRole(span.parentSpanId);
-    } else {
-      resolved = null;
-    }
-
-    effectiveRoleCache[spanId] = resolved;
-    return resolved;
-  }
+  const resolution: RoleResolution = { bySpanId, cache: Object.create(null) };
 
   const scenarioRoleCosts: Record<string, number> = {};
   const scenarioRoleLatencies: Record<string, number> = {};
 
   for (const span of spans) {
     if (span.cost > 0) {
-      const role = effectiveRole(span.spanId);
+      const role = effectiveRole(resolution, span.spanId);
       if (role) {
         scenarioRoleCosts[role] = (scenarioRoleCosts[role] ?? 0) + span.cost;
       }
     }
-    if (span.role !== undefined && span.role !== "") {
-      scenarioRoleLatencies[span.role] = (scenarioRoleLatencies[span.role] ?? 0) + span.durationMs;
+
+    const declared = declaredRole(span);
+    if (declared) {
+      scenarioRoleLatencies[declared] = (scenarioRoleLatencies[declared] ?? 0) + span.durationMs;
     }
   }
 

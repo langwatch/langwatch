@@ -136,6 +136,75 @@ export class TraceLegacySummaryMappingService {
     }
   }
 
+  /** The finite numbers under `event.metrics`, keyed as they arrived. */
+  static #eventMetrics(rawMetrics: unknown): Record<string, number> {
+    const metrics: Record<string, number> = {};
+    if (typeof rawMetrics !== "object" || rawMetrics === null) {
+      return metrics;
+    }
+
+    for (const [key, value] of Object.entries(rawMetrics as Record<string, unknown>)) {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        metrics[key] = num;
+      }
+    }
+
+    return metrics;
+  }
+
+  /** The string values under `event.details`, keyed as they arrived. */
+  static #eventDetails(rawDetails: unknown): Record<string, string> {
+    const details: Record<string, string> = {};
+    if (typeof rawDetails !== "object" || rawDetails === null) {
+      return details;
+    }
+
+    for (const [key, value] of Object.entries(rawDetails as Record<string, unknown>)) {
+      if (typeof value === "string") {
+        details[key] = value;
+      }
+    }
+
+    return details;
+  }
+
+  /** One span's event, or none when the span carries no typed `event` object. */
+  static #eventOfSpan({
+    span,
+    projectId,
+    traceId,
+  }: {
+    span: Span;
+    projectId: string;
+    traceId: string;
+  }): Event | null {
+    const eventObj = span.params?.event;
+    if (typeof eventObj !== "object" || eventObj === null) {
+      return null;
+    }
+
+    const eventRecord = eventObj as Record<string, unknown>;
+    const eventType = eventRecord.type;
+    if (typeof eventType !== "string" || !eventType) {
+      return null;
+    }
+
+    return {
+      event_id: span.span_id,
+      event_type: eventType,
+      project_id: projectId,
+      metrics: TraceLegacySummaryMappingService.#eventMetrics(eventRecord.metrics),
+      event_details: TraceLegacySummaryMappingService.#eventDetails(eventRecord.details),
+      trace_id: traceId,
+      timestamps: {
+        started_at: span.timestamps.started_at,
+        inserted_at: span.timestamps.started_at,
+        updated_at: span.timestamps.finished_at,
+      },
+    };
+  }
+
   /**
    * Extracts Event objects from spans that have event.type in their attributes.
    * Events are stored in ClickHouse as spans with event.* span attributes.
@@ -153,51 +222,10 @@ export class TraceLegacySummaryMappingService {
     const events: Event[] = [];
 
     for (const span of spans) {
-      const eventObj = span.params?.event;
-      if (typeof eventObj !== "object" || eventObj === null) {
-        continue;
+      const event = TraceLegacySummaryMappingService.#eventOfSpan({ span, projectId, traceId });
+      if (event) {
+        events.push(event);
       }
-
-      const eventRecord = eventObj as Record<string, unknown>;
-      const eventType = eventRecord.type;
-      if (typeof eventType !== "string" || !eventType) {
-        continue;
-      }
-
-      const metrics: Record<string, number> = {};
-      const rawMetrics = eventRecord.metrics;
-      if (typeof rawMetrics === "object" && rawMetrics !== null) {
-        for (const [key, value] of Object.entries(rawMetrics as Record<string, unknown>)) {
-          const num = Number(value);
-          if (Number.isFinite(num)) {
-            metrics[key] = num;
-          }
-        }
-      }
-
-      const eventDetails: Record<string, string> = {};
-      const rawDetails = eventRecord.details;
-      if (typeof rawDetails === "object" && rawDetails !== null) {
-        for (const [key, value] of Object.entries(rawDetails as Record<string, unknown>)) {
-          if (typeof value === "string") {
-            eventDetails[key] = value;
-          }
-        }
-      }
-
-      events.push({
-        event_id: span.span_id,
-        event_type: eventType,
-        project_id: projectId,
-        metrics,
-        event_details: eventDetails,
-        trace_id: traceId,
-        timestamps: {
-          started_at: span.timestamps.started_at,
-          inserted_at: span.timestamps.started_at,
-          updated_at: span.timestamps.finished_at,
-        },
-      });
     }
 
     return events;

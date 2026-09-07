@@ -191,26 +191,11 @@ function buildFullHeaders({ evaluatorNames }: { evaluatorNames: string[] }): str
   return headers;
 }
 
-function buildFullRow({
-  trace,
-  span,
-  evaluatorNames,
-}: {
-  trace: Trace;
-  span: Span;
-  evaluatorNames: string[];
-}): string[] {
+/** The trace half of one full-export row. */
+function traceColumns(trace: Trace): string[] {
   const customMetadata = extractCustomMetadata(trace);
-  const duration = span.timestamps.finished_at - span.timestamps.started_at;
-  const firstTokenMs = span.timestamps.first_token_at
-    ? span.timestamps.first_token_at - span.timestamps.started_at
-    : null;
 
-  const llmSpan = span.type === "llm" ? (span as LLMSpan) : null;
-  const ragSpan = span.type === "rag" ? (span as RAGSpan) : null;
-
-  const row: string[] = [
-    // Trace columns
+  return [
     trace.trace_id,
     String(trace.timestamps.started_at),
     trace.input?.value ?? "",
@@ -225,7 +210,20 @@ function buildFullRow({
     trace.metadata.topic_id ?? "",
     trace.metadata.subtopic_id ?? "",
     serializeError(trace.error),
-    // Span columns
+  ];
+}
+
+/** The span half of one full-export row. */
+function spanColumns(span: Span): string[] {
+  const duration = span.timestamps.finished_at - span.timestamps.started_at;
+  const firstTokenMs = span.timestamps.first_token_at
+    ? span.timestamps.first_token_at - span.timestamps.started_at
+    : null;
+
+  const llmSpan = span.type === "llm" ? (span as LLMSpan) : null;
+  const ragSpan = span.type === "rag" ? (span as RAGSpan) : null;
+
+  return [
     span.span_id,
     span.parent_id ?? "",
     span.type,
@@ -245,14 +243,27 @@ function buildFullRow({
     span.params ? JSON.stringify(span.params) : "",
     ragSpan?.contexts ? JSON.stringify(ragSpan.contexts) : "",
   ];
+}
 
+function buildFullRow({
+  trace,
+  span,
+  evaluatorNames,
+}: {
+  trace: Trace;
+  span: Span;
+  evaluatorNames: string[];
+}): string[] {
   // Include trace-level evaluations (no span_id) and span-specific evaluations
   const spanEvaluations = (trace.evaluations ?? []).filter(
     (e) => !e.span_id || e.span_id === span.span_id,
   );
-  row.push(...buildEvaluationColumns({ evaluations: spanEvaluations, evaluatorNames }));
 
-  return row;
+  return [
+    ...traceColumns(trace),
+    ...spanColumns(span),
+    ...buildEvaluationColumns({ evaluations: spanEvaluations, evaluatorNames }),
+  ];
 }
 
 // ---------------------------------------------------------------------------

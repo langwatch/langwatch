@@ -554,36 +554,16 @@ export class TraceSummaryFoldProjection
     attributes[RESERVED_CONTEXT_SIZE_AT_MS] = String(span.startTimeUnixMs);
   }
 
-  /**
-   * Fold one log contribution into the summary: bump the reserved log
-   * count, apply the input/output override semantics, merge the lifted
-   * canonical langwatch.* attributes, and mirror them onto the top-level
-   * TraceSummary columns the v2 drawer + /traces list read directly
-   * (Models / TotalCost / TotalPromptTokenCount /
-   * TotalCompletionTokenCount). Without this mirror a Path B log-only
-   * trace ends up with the right strings on state.attributes but
-   * trace.totalCost still NULL, so the drawer chip and the cost column
-   * on /traces both render empty even though the data is sitting in CH.
-   *
-   * Each api_request event is its OWN turn. Cost + tokens are additive
-   * across turns; models are a deduped set. Reading from
-   * contribution.liftedAttributes (this event's contribution) rather
-   * than mergedAttributes (the cumulative latest snapshot) is critical
-   * for cost so we don't double-count across replays.
-   */
-  private static applyLogContribution({
+  /** The input and output this turn contributes, and the attribute keys that record them. */
+  private static applyLogIO({
     state,
     contribution,
-    runtime,
+    mergedAttributes,
   }: {
     state: TraceSummaryData;
     contribution: LogContribution;
-    runtime: TraceProjectionRuntimeService;
-  }): TraceSummaryData {
-    const mergedAttributes = { ...state.attributes };
-    const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
-    mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
-
+    mergedAttributes: Record<string, string>;
+  }): Pick<TraceSummaryData, "computedInput" | "computedOutput" | "outputSpanEndTimeMs"> {
     let computedInput = state.computedInput;
     let computedOutput = state.computedOutput;
     let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
@@ -618,51 +598,65 @@ export class TraceSummaryFoldProjection
       }
     }
 
-    // The per-TTL cache-creation lift is a PER-CALL value that must accumulate,
-    // not overwrite: sum it into the reserved running totals and keep the
-    // per-call keys out of the generic last-write-wins merge below.
-    const cacheCreation5m = Number(
-      contribution.liftedAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS],
-    );
-    if (Number.isFinite(cacheCreation5m)) {
-      TraceSummaryFoldProjection.addReservedTokenSum(
-        mergedAttributes,
-        RESERVED_CACHE_CREATION_5M_TOKENS,
-        cacheCreation5m,
-      );
-    }
-    const cacheCreation1h = Number(
-      contribution.liftedAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS],
-    );
-    if (Number.isFinite(cacheCreation1h)) {
-      TraceSummaryFoldProjection.addReservedTokenSum(
-        mergedAttributes,
-        RESERVED_CACHE_CREATION_1H_TOKENS,
-        cacheCreation1h,
-      );
+    return { computedInput, computedOutput, outputSpanEndTimeMs };
+  }
+
+  /**
+   * The per-TTL cache-creation lift is a PER-CALL value that must accumulate, not overwrite: it
+   * is summed into the reserved running totals and its per-call keys are kept out of the generic
+   * last-write-wins merge that follows. The lifts are merged after, so the reserved and
+   * log_count keys already set remain intact.
+   */
+  private static mergeLiftedAttributes({
+    contribution,
+    mergedAttributes,
+  }: {
+    contribution: LogContribution;
+    mergedAttributes: Record<string, string>;
+  }): void {
+    const perCallSums: [string, string][] = [
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS, RESERVED_CACHE_CREATION_5M_TOKENS],
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS, RESERVED_CACHE_CREATION_1H_TOKENS],
+    ];
+    for (const [source, reservedKey] of perCallSums) {
+      const value = Number(contribution.liftedAttributes[source]);
+      if (Number.isFinite(value)) {
+        TraceSummaryFoldProjection.addReservedTokenSum(mergedAttributes, reservedKey, value);
+      }
     }
 
-    // The lifts are merged into mergedAttributes here so the reserved +
-    // log_count keys set above remain intact.
+    const perCallKeys = new Set(perCallSums.map(([source]) => source));
     for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
-      if (
-        key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS ||
-        key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS
-      ) {
+      if (perCallKeys.has(key)) {
         continue;
       }
+
       mergedAttributes[key] = String(value);
     }
+  }
 
+  /** The models, cost and token totals this turn adds to the running trace summary. */
+  private static applyLogTotals({
+    state,
+    contribution,
+  }: {
+    state: TraceSummaryData;
+    contribution: LogContribution;
+  }): Pick<
+    TraceSummaryData,
+    "models" | "totalCost" | "nonBilledCost" | "totalPromptTokenCount" | "totalCompletionTokenCount"
+  > {
     let models = state.models;
     let totalCost = state.totalCost;
     let nonBilledCost = state.nonBilledCost;
     let totalPromptTokenCount = state.totalPromptTokenCount;
     let totalCompletionTokenCount = state.totalCompletionTokenCount;
+
     const model = contribution.liftedAttributes["langwatch.model"];
     if (typeof model === "string" && model.length > 0) {
       models = TraceSummaryFoldProjection.mergeModelsMostRecentFirst(models, [model]);
     }
+
     const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
     if (Number.isFinite(cost) && cost > 0) {
       totalCost = (totalCost ?? 0) + cost;
@@ -670,34 +664,73 @@ export class TraceSummaryFoldProjection
         nonBilledCost = (nonBilledCost ?? 0) + cost;
       }
     }
+
     const inputTokens = Number(contribution.liftedAttributes["langwatch.input_tokens"]);
     if (Number.isFinite(inputTokens) && inputTokens > 0) {
       totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
     }
+
     const outputTokens = Number(contribution.liftedAttributes["langwatch.output_tokens"]);
     if (Number.isFinite(outputTokens) && outputTokens > 0) {
       totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
     }
 
-    // Same trace-level model metadata stamp the span path applies, so
-    // log-only (Path B) traces also surface `metadata.model`.
-    runtime.traceAttributes.stampModelMetadata({
-      attributes: mergedAttributes,
-      models,
-    });
-
     return {
-      ...state,
-      traceId: state.traceId || contribution.traceId,
-      computedInput,
-      computedOutput,
-      outputSpanEndTimeMs,
-      attributes: mergedAttributes,
       models,
       totalCost,
       nonBilledCost,
       totalPromptTokenCount,
       totalCompletionTokenCount,
+    };
+  }
+
+  /**
+   * Fold one log contribution into the summary: bump the reserved log
+   * count, apply the input/output override semantics, merge the lifted
+   * canonical langwatch.* attributes, and mirror them onto the top-level
+   * TraceSummary columns the v2 drawer + /traces list read directly
+   * (Models / TotalCost / TotalPromptTokenCount /
+   * TotalCompletionTokenCount). Without this mirror a Path B log-only
+   * trace ends up with the right strings on state.attributes but
+   * trace.totalCost still NULL, so the drawer chip and the cost column
+   * on /traces both render empty even though the data is sitting in CH.
+   *
+   * Each api_request event is its OWN turn. Cost + tokens are additive
+   * across turns; models are a deduped set. Reading from
+   * contribution.liftedAttributes (this event's contribution) rather
+   * than mergedAttributes (the cumulative latest snapshot) is critical
+   * for cost so we don't double-count across replays.
+   */
+  private static applyLogContribution({
+    state,
+    contribution,
+    runtime,
+  }: {
+    state: TraceSummaryData;
+    contribution: LogContribution;
+    runtime: TraceProjectionRuntimeService;
+  }): TraceSummaryData {
+    const mergedAttributes = { ...state.attributes };
+    const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
+    mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
+
+    const io = TraceSummaryFoldProjection.applyLogIO({ state, contribution, mergedAttributes });
+    TraceSummaryFoldProjection.mergeLiftedAttributes({ contribution, mergedAttributes });
+    const totals = TraceSummaryFoldProjection.applyLogTotals({ state, contribution });
+
+    // Same trace-level model metadata stamp the span path applies, so
+    // log-only (Path B) traces also surface `metadata.model`.
+    runtime.traceAttributes.stampModelMetadata({
+      attributes: mergedAttributes,
+      models: totals.models,
+    });
+
+    return {
+      ...state,
+      traceId: state.traceId || contribution.traceId,
+      ...io,
+      attributes: mergedAttributes,
+      ...totals,
     };
   }
 

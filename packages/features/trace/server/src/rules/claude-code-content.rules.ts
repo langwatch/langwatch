@@ -1,6 +1,20 @@
 import { capPayloadString } from "./trace-payload-cap.rules.ts";
 import { isRecord } from "./canonical-guard.rules.ts";
 
+/** The display text one content block contributes, or "" when it contributes none. */
+function contentBlockToText(block: unknown): string {
+  if (typeof block === "string") return block;
+  if (!isRecord(block)) return "";
+
+  if (block.type === "text") return typeof block.text === "string" ? block.text : "";
+  if (block.type === "tool_result") return contentToText(block.content);
+  if (block.type === "tool_use" && typeof block.name === "string") {
+    return `[tool_use: ${block.name}]`;
+  }
+
+  return "";
+}
+
 /**
  * Flatten one Anthropic message `content` (string OR array of content blocks)
  * to display text. Text + tool_result blocks contribute their text; tool_use
@@ -15,31 +29,13 @@ export function contentToText(content: unknown): string {
   if (!Array.isArray(content)) {
     return "";
   }
+
   const parts: string[] = [];
   for (const block of content) {
-    if (typeof block === "string") {
-      if (block.length > 0) {
-        parts.push(block);
-      }
-      continue;
-    }
-    if (!isRecord(block)) {
-      continue;
-    }
-    const b = block;
-    if (b.type === "text" && typeof b.text === "string") {
-      if (b.text.length > 0) {
-        parts.push(b.text);
-      }
-    } else if (b.type === "tool_result") {
-      const nested = contentToText(b.content);
-      if (nested.length > 0) {
-        parts.push(nested);
-      }
-    } else if (b.type === "tool_use" && typeof b.name === "string") {
-      parts.push(`[tool_use: ${b.name}]`);
-    }
+    const text = contentBlockToText(block);
+    if (text.length > 0) parts.push(text);
   }
+
   return parts.join("\n\n");
 }
 

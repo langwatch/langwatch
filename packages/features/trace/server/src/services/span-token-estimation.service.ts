@@ -74,6 +74,35 @@ export class OtlpSpanTokenEstimationService {
    *
    * @param tenantId - Project ID used for per-project kill switch evaluation
    */
+  /** One direction's estimated token-count attribute, or none when there is no text to count. */
+  async #estimateDirection({
+    span,
+    model,
+    direction,
+  }: {
+    span: OtlpSpan;
+    model: string;
+    direction: "input" | "output";
+  }): Promise<OtlpSpan["attributes"][number] | null> {
+    const text = direction === "input" ? this.extractInputText(span) : this.extractOutputText(span);
+    if (!text) {
+      return null;
+    }
+
+    const tokens = await this.deps.tokenizer.tryCountTokens(model, text);
+    if (tokens === undefined) {
+      return null;
+    }
+
+    return { key: `gen_ai.usage.${direction}_tokens`, value: { intValue: tokens } };
+  }
+
+  /**
+   * Estimates token counts for the span if it's an LLM span with input/output
+   * but missing token counts. Mutates the span in place (pushes new attributes).
+   *
+   * @param tenantId - Project ID used for per-project kill switch evaluation
+   */
   async estimateSpanTokens({
     span,
     tenantId,
@@ -94,56 +123,24 @@ export class OtlpSpanTokenEstimationService {
       return;
     }
 
-    const hasInputTokens = this.hasTokenCountAttribute({
-      span,
-      direction: "input",
-    });
-    const hasOutputTokens = this.hasTokenCountAttribute({
-      span,
-      direction: "output",
-    });
-
+    const missing = (["input", "output"] as const).filter(
+      (direction) => !this.hasTokenCountAttribute({ span, direction }),
+    );
     // If both token counts are already present, nothing to estimate
-    if (hasInputTokens && hasOutputTokens) {
+    if (missing.length === 0) {
       return;
     }
 
     const pendingAttributes: OtlpSpan["attributes"] = [];
-    let estimated = false;
-
-    if (!hasInputTokens) {
-      const inputText = this.extractInputText(span);
-      if (inputText) {
-        const inputTokens = await this.deps.tokenizer.tryCountTokens(model, inputText);
-        if (inputTokens !== undefined) {
-          pendingAttributes.push({
-            key: "gen_ai.usage.input_tokens",
-            value: { intValue: inputTokens },
-          });
-          estimated = true;
-        }
+    for (const direction of missing) {
+      const attribute = await this.#estimateDirection({ span, model, direction });
+      if (attribute) {
+        pendingAttributes.push(attribute);
       }
     }
 
-    if (!hasOutputTokens) {
-      const outputText = this.extractOutputText(span);
-      if (outputText) {
-        const outputTokens = await this.deps.tokenizer.tryCountTokens(model, outputText);
-        if (outputTokens !== undefined) {
-          pendingAttributes.push({
-            key: "gen_ai.usage.output_tokens",
-            value: { intValue: outputTokens },
-          });
-          estimated = true;
-        }
-      }
-    }
-
-    if (estimated) {
-      pendingAttributes.push({
-        key: "langwatch.tokens.estimated",
-        value: { boolValue: true },
-      });
+    if (pendingAttributes.length > 0) {
+      pendingAttributes.push({ key: "langwatch.tokens.estimated", value: { boolValue: true } });
     }
 
     // Atomic: push all attributes at once so the span is never partially mutated

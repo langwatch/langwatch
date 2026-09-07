@@ -65,6 +65,30 @@ export class ClaudeCodeSpanEnrichmentService {
     return result;
   }
 
+  /** First log per (event, tool_use_id) wins, mirroring buildOutputIndex. */
+  static #indexToolLogsByUseId(
+    toolLogs: ClaudeToolLog[],
+  ): Readonly<{
+    resultByUseId: Map<string, ClaudeToolLog>;
+    decisionByUseId: Map<string, ClaudeToolLog>;
+  }> {
+    const resultByUseId = new Map<string, ClaudeToolLog>();
+    const decisionByUseId = new Map<string, ClaudeToolLog>();
+    for (const log of toolLogs) {
+      if (log.toolUseId === null) {
+        continue;
+      }
+
+      if (log.eventName === TOOL_RESULT_EVENT && !resultByUseId.has(log.toolUseId)) {
+        resultByUseId.set(log.toolUseId, log);
+      } else if (log.eventName === TOOL_DECISION_EVENT && !decisionByUseId.has(log.toolUseId)) {
+        decisionByUseId.set(log.toolUseId, log);
+      }
+    }
+
+    return { resultByUseId, decisionByUseId };
+  }
+
   /**
    * Computes input and output for the trace's tool spans from tool event logs, joined exactly by
    * tool_use_id. Input is the tool_result's own arguments, then the derived parameters, then the
@@ -86,21 +110,8 @@ export class ClaudeCodeSpanEnrichmentService {
       return result;
     }
 
-    // First log per (event, tool_use_id) wins, mirroring buildOutputIndex.
-    const resultByUseId = new Map<string, ClaudeToolLog>();
-    const decisionByUseId = new Map<string, ClaudeToolLog>();
-    for (const log of toolLogs) {
-      if (log.toolUseId === null) {
-        continue;
-      }
-
-      if (log.eventName === TOOL_RESULT_EVENT && !resultByUseId.has(log.toolUseId)) {
-        resultByUseId.set(log.toolUseId, log);
-      } else if (log.eventName === TOOL_DECISION_EVENT && !decisionByUseId.has(log.toolUseId)) {
-        decisionByUseId.set(log.toolUseId, log);
-      }
-    }
-
+    const { resultByUseId, decisionByUseId } =
+      ClaudeCodeSpanEnrichmentService.#indexToolLogsByUseId(toolLogs);
     if (resultByUseId.size === 0 && decisionByUseId.size === 0) {
       return result;
     }
@@ -128,6 +139,49 @@ export class ClaudeCodeSpanEnrichmentService {
     return result;
   }
 
+  /** Whether this log falls inside the turn's window, with slack for a late exporter flush. */
+  static #isInWindow(
+    log: ClaudeContentLog,
+    window: Readonly<{ startMs: number; endMs: number; slackMs: number }>,
+  ): boolean {
+    if (log.timeUnixMs < window.startMs) {
+      return false;
+    }
+
+    return log.timeUnixMs <= window.endMs + window.slackMs;
+  }
+
+  /**
+   * The reply text one log carries and how strongly it ranks: a parsed response body (1) beats
+   * raw assistant text (0). Any other event carries no reply.
+   */
+  static #replyCandidate(
+    log: ClaudeContentLog,
+    traceCanonicalisation: TraceCanonicalisationService,
+  ): Readonly<{ rank: number; text: string }> | null {
+    if (log.eventName === OUTPUT_BODY_EVENT) {
+      const derived =
+        log.derivedOutputText != null && (log.derivedToolCallCount ?? 0) === 0
+          ? log.derivedOutputText
+          : null;
+      const text =
+        derived ??
+        traceCanonicalisation.deriveClaudeResponseContent({ body: log.body }).assistantOutput;
+
+      return text === null ? null : { rank: 1, text };
+    }
+
+    if (log.eventName !== ASSISTANT_RESPONSE_EVENT) {
+      return null;
+    }
+
+    if (log.body === null || log.body.length === 0) {
+      return null;
+    }
+
+    return { rank: 0, text: capPayloadString(log.body, undefined, "assistant_output") };
+  }
+
   /**
    * The interaction span's output: the last conversational assistant reply inside the turn's
    * window, with slack for an exporter flushing just after close. A parsed response body beats raw
@@ -146,57 +200,32 @@ export class ClaudeCodeSpanEnrichmentService {
     slackMs?: number;
     traceCanonicalisation: TraceCanonicalisationService;
   }): SpanInputOutput | null {
+    const window = { startMs: windowStartMs, endMs: windowEndMs, slackMs };
     let best: { timeUnixMs: number; rank: number; text: string } | null = null;
+
     for (const log of logs) {
-      if (
-        !traceCanonicalisation.classifyClaudeCall({
-          querySource: log.querySource,
-        }).conversational
-      ) {
+      const conversational = traceCanonicalisation.classifyClaudeCall({
+        querySource: log.querySource,
+      }).conversational;
+      if (!conversational) {
         continue;
       }
 
-      if (log.timeUnixMs < windowStartMs) {
+      if (!ClaudeCodeSpanEnrichmentService.#isInWindow(log, window)) {
         continue;
       }
 
-      if (log.timeUnixMs > windowEndMs + slackMs) {
-        continue;
-      }
-
-      let text: string | null;
-      let rank: number;
-      if (log.eventName === OUTPUT_BODY_EVENT) {
-        const derived =
-          log.derivedOutputText != null && (log.derivedToolCallCount ?? 0) === 0
-            ? log.derivedOutputText
-            : null;
-        text =
-          derived ??
-          traceCanonicalisation.deriveClaudeResponseContent({
-            body: log.body,
-          }).assistantOutput;
-        rank = 1;
-      } else if (log.eventName === ASSISTANT_RESPONSE_EVENT) {
-        text =
-          log.body !== null && log.body.length > 0
-            ? capPayloadString(log.body, undefined, "assistant_output")
-            : null;
-        rank = 0;
-      } else {
-        continue;
-      }
-
-      if (text === null) {
+      const candidate = ClaudeCodeSpanEnrichmentService.#replyCandidate(log, traceCanonicalisation);
+      if (candidate === null) {
         continue;
       }
 
       const isBetterCandidate =
         best === null ||
         log.timeUnixMs > best.timeUnixMs ||
-        (log.timeUnixMs === best.timeUnixMs && rank > best.rank);
+        (log.timeUnixMs === best.timeUnixMs && candidate.rank > best.rank);
       if (isBetterCandidate) {
-        best = { timeUnixMs: log.timeUnixMs, rank, text };
+        best = { timeUnixMs: log.timeUnixMs, rank: candidate.rank, text: candidate.text };
       }
     }
 

@@ -35,6 +35,44 @@ export class TraceIOExtractionService {
    * traversal to find the topmost input, filtering out evaluation and guardrail spans.
    * @returns ExtractedIO with both raw JSON and text representation, or null if not found
    */
+  /** The first span, outside-in, whose input the semantic extractor recognises. */
+  #findSemanticInput(
+    orderedSpans: NormalizedSpan[],
+  ): Readonly<{ span: NormalizedSpan; input: ExtractedIO }> | null {
+    for (const span of orderedSpans) {
+      if (shouldExcludeSpan(span)) {
+        continue;
+      }
+
+      const input = this.tryExtractRichIOFromSpan(span, "input");
+      if (input !== null) {
+        return { span, input };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * The stringified-payload fallback against the topmost span that HAS an input attribute, so
+   * `ComputedInput` is non-null when the trace genuinely carries data. Applied only after every
+   * semantic candidate is exhausted, so it can never shadow a real match.
+   */
+  #findFallbackInput(orderedSpans: NormalizedSpan[]): ExtractedIO | null {
+    for (const span of orderedSpans) {
+      if (shouldExcludeSpan(span)) {
+        continue;
+      }
+
+      const fb = this.tryExtractFallbackIOFromSpan(span, "input");
+      if (fb) {
+        return fb;
+      }
+    }
+
+    return null;
+  }
+
   tryExtractFirstInput(spans: NormalizedSpan[]): ExtractedIO | null {
     return this.tracer.withActiveSpan(
       "TraceIOExtractionService.tryExtractFirstInput",
@@ -52,50 +90,26 @@ export class TraceIOExtractionService {
         const tree = this.organizeSpansIntoTree(spans);
         const orderedSpans = this.flattenSpanTree(tree, "outside-in");
 
-        // Filter to spans with valid inputs
-        const spansWithInput = orderedSpans.filter((span) => {
-          if (shouldExcludeSpan(span)) {
-            return false;
-          }
-
-          const input = this.tryExtractRichIOFromSpan(span, "input");
-
-          return input !== null;
-        });
-
-        const firstSpan = spansWithInput[0];
-
-        if (firstSpan) {
-          const input = this.tryExtractRichIOFromSpan(firstSpan, "input");
+        const semantic = this.#findSemanticInput(orderedSpans);
+        if (semantic) {
           otelSpan.setAttributes({
             "input.found": true,
-            "span.type": getSpanType(firstSpan),
-            "input.length": input?.text.length ?? 0,
+            "span.type": getSpanType(semantic.span),
+            "input.length": semantic.input.text.length,
           });
 
-          return input;
+          return semantic.input;
         }
 
-        // No semantic match — try stringified-payload fallback against the
-        // topmost span that HAS an input attribute, so `ComputedInput` is
-        // non-null when the trace genuinely carries data. Fallback is
-        // applied only after every semantic candidate has been exhausted,
-        // so it can never shadow a real match.
-        for (const span of orderedSpans) {
-          if (shouldExcludeSpan(span)) {
-            continue;
-          }
+        const fallback = this.#findFallbackInput(orderedSpans);
+        if (fallback) {
+          otelSpan.setAttributes({
+            "input.found": true,
+            "input.source": "stringified_fallback",
+            "input.length": fallback.text.length,
+          });
 
-          const fb = this.tryExtractFallbackIOFromSpan(span, "input");
-          if (fb) {
-            otelSpan.setAttributes({
-              "input.found": true,
-              "input.source": "stringified_fallback",
-              "input.length": fb.text.length,
-            });
-
-            return fb;
-          }
+          return fallback;
         }
 
         otelSpan.setAttributes({

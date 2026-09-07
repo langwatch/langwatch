@@ -252,6 +252,95 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     }
   }
 
+  /**
+   * Fold read-back path (ADR-066): an explicit window is applied verbatim with NO internal
+   * fallback — the caller (the fold executor) owns the miss retry, so a second recovery ladder
+   * here would re-run the resolve seek on results the executor is about to re-read unwindowed
+   * anyway. Mapped onto queryWindowed with `fallback: "none"` so the read still lands on
+   * `clickhouse_windowed_read_total` exactly once. The centre/half-width round-trip is exact:
+   * fromMs/toMs are integers, so their mean and half-difference are exactly representable.
+   */
+  async #findInExplicitWindow({
+    tenantId,
+    traceId,
+    window: { fromMs, toMs },
+  }: {
+    tenantId: string;
+    traceId: string;
+    window: { fromMs: number; toMs: number };
+  }): Promise<TraceSummaryData | null> {
+    try {
+      return await queryWindowed<TraceSummaryData | null>({
+        table: TABLE_NAME,
+        metrics: this.options.windowedReadMetrics,
+        hintMs: (fromMs + toMs) / 2,
+        windowMs: (toMs - fromMs) / 2,
+        fallback: "none",
+        isEmpty: (result) => result === null,
+        run: async (window) =>
+          // With a hint and `fallback: "none"` the fragment is always
+          // present; the null arm exists only to satisfy the contract.
+          window
+            ? await this.queryByTraceId(tenantId, traceId, {
+                fromMs: window.fromMs,
+                toMs: window.toMs,
+              })
+            : null,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.warn(
+        { tenantId, traceId, error: errorMessage },
+        "Failed to get trace summary from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * The fallback stage: the hint window missed, or there was no hint. Resolves the trace's
+   * OccurredAt from a cheap sort-key seek and bounds the heavy read, instead of scanning every
+   * weekly partition (incl. cold S3). OccurredAt is stable across versions (it is the
+   * `PARTITION BY toYearWeek(OccurredAt)` key), so the ±2-day window always contains the row. A
+   * trace genuinely absent returns null without ever issuing the heavy read; historical sentinel
+   * rows still use the legacy unbounded fallback to preserve correctness.
+   */
+  async #findByResolvedOccurredAt({
+    tenantId,
+    traceId,
+    hasHint,
+    options,
+  }: {
+    tenantId: string;
+    traceId: string;
+    hasHint: boolean;
+    options?: FindByTraceIdOptions;
+  }): Promise<TraceSummaryData | null> {
+    if (hasHint) {
+      logger.debug(
+        { tenantId, traceId, occurredAtMs: options!.occurredAtMs },
+        "Trace summary not found in hint window — resolving OccurredAt to bound the retry",
+      );
+    }
+
+    const resolved = await this.resolveOccurredAtMs({ tenantId, traceId });
+    if (!resolved.found) return null;
+
+    if (resolved.occurredAtMs === undefined) {
+      logger.debug(
+        { tenantId, traceId },
+        "Trace summary resolved with sentinel OccurredAt — falling back to unbounded read",
+      );
+
+      return await this.queryByTraceId(tenantId, traceId);
+    }
+
+    return await this.queryByTraceId(tenantId, traceId, {
+      fromMs: resolved.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
+      toMs: resolved.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
+    });
+  }
+
   async tryFindByTraceId(
     { tenantId, traceId }: { tenantId: string; traceId: string },
     options?: FindByTraceIdOptions,
@@ -267,33 +356,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     // round-trip is exact: fromMs/toMs are integers, so their mean and
     // half-difference are exactly representable and reconstruct the bounds.
     if (options?.window) {
-      const { fromMs, toMs } = options.window;
-      try {
-        return await queryWindowed<TraceSummaryData | null>({
-          table: TABLE_NAME,
-          metrics: this.options.windowedReadMetrics,
-          hintMs: (fromMs + toMs) / 2,
-          windowMs: (toMs - fromMs) / 2,
-          fallback: "none",
-          isEmpty: (result) => result === null,
-          run: async (window) =>
-            // With a hint and `fallback: "none"` the fragment is always
-            // present; the null arm exists only to satisfy the contract.
-            window
-              ? await this.queryByTraceId(tenantId, traceId, {
-                  fromMs: window.fromMs,
-                  toMs: window.toMs,
-                })
-              : null,
-        });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.warn(
-          { tenantId, traceId, error: errorMessage },
-          "Failed to get trace summary from ClickHouse",
-        );
-        throw error;
-      }
+      return await this.#findInExplicitWindow({ tenantId, traceId, window: options.window });
     }
 
     // One logical read with two stages, mapped onto queryWindowed so the
@@ -333,38 +396,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
               toMs: window.toMs,
             });
           }
-          // Fallback stage: the hint window missed, or there was no hint.
-          if (hasHint) {
-            logger.debug(
-              { tenantId, traceId, occurredAtMs: options!.occurredAtMs },
-              "Trace summary not found in hint window — resolving OccurredAt to bound the retry",
-            );
-          }
-          // Resolve the trace's OccurredAt from a cheap sort-key seek and bound
-          // the heavy read, instead of scanning every weekly partition (incl.
-          // cold S3). OccurredAt is the trace's occurrence time and is stable
-          // across versions (it's the `PARTITION BY toYearWeek(OccurredAt)`
-          // key), so the ±2-day window always contains the row — no unbounded
-          // fallback is needed for normal rows. A trace genuinely absent returns
-          // null from the light scan without ever issuing the heavy read;
-          // historical sentinel rows still use the legacy unbounded fallback to
-          // preserve correctness.
-          const resolved = await this.resolveOccurredAtMs({
-            tenantId,
-            traceId,
-          });
-          if (!resolved.found) return null;
-          if (resolved.occurredAtMs === undefined) {
-            logger.debug(
-              { tenantId, traceId },
-              "Trace summary resolved with sentinel OccurredAt — falling back to unbounded read",
-            );
-            return await this.queryByTraceId(tenantId, traceId);
-          }
-          return await this.queryByTraceId(tenantId, traceId, {
-            fromMs: resolved.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
-            toMs: resolved.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
-          });
+
+          return await this.#findByResolvedOccurredAt({ tenantId, traceId, hasHint, options });
         },
       });
     } catch (error) {

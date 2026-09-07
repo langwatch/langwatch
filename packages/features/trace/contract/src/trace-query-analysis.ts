@@ -15,24 +15,27 @@ import type { FacetState } from "./trace-query-metadata.ts";
  * 422. Returning the error here lets the SearchBar surface red-border feedback
  * and prevents the doomed query from being committed and re-fired by polling.
  */
+function missingValueMessage(ast: Extract<LiqeQuery, { type: "Tag" }>): string | null {
+  if (ast.expression.type !== "EmptyExpression") return null;
+
+  const fieldName = ast.field.type === "ImplicitField" ? "" : ast.field.name;
+
+  return fieldName ? `Missing value after \`${fieldName}:\`` : "Missing value after `:`";
+}
+
 export function validateAst(ast: LiqeQuery): string | null {
-  if (ast.type === "Tag") {
-    if (ast.expression.type === "EmptyExpression") {
-      const fieldName = ast.field.type === "ImplicitField" ? "" : ast.field.name;
-      return fieldName ? `Missing value after \`${fieldName}:\`` : "Missing value after `:`";
-    }
-    return null;
+  switch (ast.type) {
+    case "Tag":
+      return missingValueMessage(ast);
+    case "UnaryOperator":
+      return validateAst(ast.operand);
+    case "LogicalExpression":
+      return validateAst(ast.left) ?? validateAst(ast.right);
+    case "ParenthesizedExpression":
+      return validateAst(ast.expression);
+    default:
+      return null;
   }
-  if (ast.type === "UnaryOperator") {
-    return validateAst(ast.operand);
-  }
-  if (ast.type === "LogicalExpression") {
-    return validateAst(ast.left) ?? validateAst(ast.right);
-  }
-  if (ast.type === "ParenthesizedExpression") {
-    return validateAst(ast.expression);
-  }
-  return null;
 }
 
 /**
@@ -108,6 +111,46 @@ export function buildFacetStateLookup(ast: LiqeQuery): ReadonlyMap<string, Facet
   return map;
 }
 
+/** The explicit `field:[a TO b]` range on one Tag, or none when it is not one. */
+function explicitRange(
+  node: Extract<LiqeQuery, { type: "Tag" }>,
+): { from?: number; to?: number } | null {
+  if (node.expression.type !== "RangeExpression") return null;
+
+  return { from: node.expression.range.min, to: node.expression.range.max };
+}
+
+/** The open-ended range a `field:>n` / `field:<n` comparison stands for. */
+function comparisonRange(
+  node: Extract<LiqeQuery, { type: "Tag" }>,
+): { from?: number; to?: number } | null {
+  if (node.expression.type !== "LiteralExpression") return null;
+
+  const op = node.operator.operator;
+  if (op === ":") return null;
+
+  const raw = node.expression.value;
+  const num = typeof raw === "number" ? raw : parseFloat(String(raw));
+  if (!Number.isFinite(num)) return null;
+
+  if (op === ":>" || op === ":>=") return { from: num };
+  if (op === ":<" || op === ":<=") return { to: num };
+
+  return null;
+}
+
+/** Whether this node is an un-negated `Tag` naming `fieldName`. */
+function isRangeCandidate(
+  node: LiqeQuery,
+  negated: boolean,
+  fieldName: string,
+): node is Extract<LiqeQuery, { type: "Tag" }> {
+  if (negated || node.type !== "Tag") return false;
+  if (node.field.type === "ImplicitField") return false;
+
+  return node.field.name === fieldName;
+}
+
 /**
  * Get a range value for a field. Last matching node wins — the AST is
  * expected to hold a single range/comparison per field after a setRange call.
@@ -119,44 +162,10 @@ export function getRangeValue(
   let result: { from?: number; to?: number } | null = null;
 
   walkAST(ast, (node, negated) => {
-    if (negated) {
-      return;
-    }
-    if (node.type !== "Tag") {
-      return;
-    }
-    if (node.field.type === "ImplicitField") {
-      return;
-    }
-    if (node.field.name !== fieldName) {
-      return;
-    }
+    if (!isRangeCandidate(node, negated, fieldName)) return;
 
-    if (node.expression.type === "RangeExpression") {
-      result = {
-        from: node.expression.range.min,
-        to: node.expression.range.max,
-      };
-      return;
-    }
-
-    if (node.expression.type !== "LiteralExpression") {
-      return;
-    }
-    const op = node.operator.operator;
-    if (op === ":") {
-      return;
-    }
-    const raw = node.expression.value;
-    const num = typeof raw === "number" ? raw : parseFloat(String(raw));
-    if (!Number.isFinite(num)) {
-      return;
-    }
-    if (op === ":>" || op === ":>=") {
-      result = { from: num };
-    } else if (op === ":<" || op === ":<=") {
-      result = { to: num };
-    }
+    const range = explicitRange(node) ?? comparisonRange(node);
+    if (range) result = range;
   });
 
   return result;
@@ -231,59 +240,65 @@ function memberKey(field: string, value: string): string {
  * flattened into the same group — the visual treatment doesn't
  * distinguish `(a OR b OR c)` from `((a OR b) OR c)`.
  */
+type OrGroupAccumulator = Readonly<{
+  groups: OrGroup[];
+  memberToGroupId: Map<string, string>;
+  fieldToGroupIds: Map<string, string[]>;
+}>;
+
+/** Records the group this OR node forms, or reports that it forms none. */
+function recordOrGroup(
+  acc: OrGroupAccumulator,
+  node: Extract<LiqeQuery, { type: "LogicalExpression" }>,
+): boolean {
+  const members = collectOrMembers(node);
+  if (members.length <= 1) return false;
+
+  const id = `or-${node.location.start}-${node.location.end}`;
+  const fields = new Set(members.map((m) => m.field));
+  acc.groups.push({ id, fields, members, start: node.location.start, end: node.location.end });
+  for (const m of members) {
+    acc.memberToGroupId.set(memberKey(m.field, m.value), id);
+  }
+  for (const f of fields) {
+    const existing = acc.fieldToGroupIds.get(f);
+    if (!existing) {
+      acc.fieldToGroupIds.set(f, [id]);
+      continue;
+    }
+    if (!existing.includes(id)) existing.push(id);
+  }
+
+  return true;
+}
+
+function visitOrGroups(acc: OrGroupAccumulator, node: LiqeQuery): void {
+  if (node.type === "LogicalExpression") {
+    if (node.operator.operator === "OR" && recordOrGroup(acc, node)) return;
+
+    visitOrGroups(acc, node.left);
+    visitOrGroups(acc, node.right);
+    return;
+  }
+  if (node.type === "UnaryOperator") {
+    visitOrGroups(acc, node.operand);
+    return;
+  }
+  if (node.type === "ParenthesizedExpression") {
+    visitOrGroups(acc, node.expression);
+  }
+}
+
 export function analyzeOrGroups(ast: LiqeQuery): OrGroupAnalysis {
-  const groups: OrGroup[] = [];
-  const memberToGroupId = new Map<string, string>();
-  const fieldToGroupIds = new Map<string, string[]>();
-
-  /** Records the group this OR node forms, or reports that it forms none. */
-  const recordOrGroup = (node: Extract<LiqeQuery, { type: "LogicalExpression" }>): boolean => {
-    const members = collectOrMembers(node);
-    if (members.length <= 1) return false;
-
-    const id = `or-${node.location.start}-${node.location.end}`;
-    const fields = new Set(members.map((m) => m.field));
-    groups.push({
-      id,
-      fields,
-      members,
-      start: node.location.start,
-      end: node.location.end,
-    });
-    for (const m of members) {
-      memberToGroupId.set(memberKey(m.field, m.value), id);
-    }
-    for (const f of fields) {
-      const existing = fieldToGroupIds.get(f);
-      if (!existing) {
-        fieldToGroupIds.set(f, [id]);
-        continue;
-      }
-      if (!existing.includes(id)) existing.push(id);
-    }
-
-    return true;
+  const acc: OrGroupAccumulator = {
+    groups: [],
+    memberToGroupId: new Map<string, string>(),
+    fieldToGroupIds: new Map<string, string[]>(),
   };
 
-  const visit = (node: LiqeQuery): void => {
-    if (node.type === "LogicalExpression") {
-      if (node.operator.operator === "OR" && recordOrGroup(node)) return;
+  visitOrGroups(acc, ast);
 
-      visit(node.left);
-      visit(node.right);
-      return;
-    }
-    if (node.type === "UnaryOperator") {
-      visit(node.operand);
-      return;
-    }
-    if (node.type === "ParenthesizedExpression") {
-      visit(node.expression);
-    }
-  };
-  visit(ast);
-
-  return { groups, memberToGroupId, fieldToGroupIds };
+  return acc;
 }
 
 function collectOrMembers(node: LiqeQuery, negated = false): OrGroupMember[] {

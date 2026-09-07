@@ -106,6 +106,28 @@ function buildPlan({
   };
 }
 
+/** One record's fields, each read (or nulled by RBAC) into its output path. */
+function projectFields({
+  fields,
+  source,
+  protections,
+}: {
+  fields: ResolvedField[];
+  source: ProjectionSource;
+  protections: Protections;
+}): ProjectedRow {
+  const row: ProjectedRow = {};
+  for (const f of fields) {
+    setPath({
+      target: row,
+      path: f.outPath,
+      value: isPermitted({ field: f, protections }) ? f.read(source) : null,
+    });
+  }
+
+  return row;
+}
+
 /**
  * The per-trace projector: shapes one trace into the requested nested row.
  * Exported for unit-testing the collection-path RBAC redaction with a synthetic
@@ -124,16 +146,11 @@ function buildProjector({
   ) as Record<ProjectionCollection, ResolvedField[]>;
 
   return (trace: ProjectableTrace): ProjectedRow => {
-    const row: ProjectedRow = {};
-    const source = trace as unknown as ProjectionSource;
-
-    for (const f of scalarFields) {
-      setPath({
-        target: row,
-        path: f.outPath,
-        value: isPermitted({ field: f, protections }) ? f.read(source) : null,
-      });
-    }
+    const row = projectFields({
+      fields: scalarFields,
+      source: trace as unknown as ProjectionSource,
+      protections,
+    });
 
     for (const collection of COLLECTIONS) {
       const collFields = collectionFields[collection];
@@ -141,21 +158,12 @@ function buildProjector({
         continue;
       }
 
-      row[collection] = collectionElements({ trace, collection }).map((element) => {
-        const projected: ProjectedRow = {};
-        for (const f of collFields) {
-          // Redact gated values on the collection path too — the catalog has
-          // no protected collection field today, but this keeps RBAC symmetric
-          // with the scalar path so a future protected field can't leak here.
-          setPath({
-            target: projected,
-            path: f.outPath,
-            value: isPermitted({ field: f, protections }) ? f.read(element) : null,
-          });
-        }
-
-        return projected;
-      });
+      // Redact gated values on the collection path too — the catalog has no
+      // protected collection field today, but this keeps RBAC symmetric with
+      // the scalar path so a future protected field can't leak here.
+      row[collection] = collectionElements({ trace, collection }).map((element) =>
+        projectFields({ fields: collFields, source: element, protections }),
+      );
     }
 
     return row;

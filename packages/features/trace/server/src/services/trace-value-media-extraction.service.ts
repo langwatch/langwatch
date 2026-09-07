@@ -74,6 +74,61 @@ function isBareDataUri(value: string): boolean {
   return value.startsWith("data:") && !/\s/.test(value) && parseBase64DataUri(value) !== null;
 }
 
+/** A string is a bare data URI leaf, or an envelope whose JSON may hold parts. */
+function collectFromString(
+  value: string,
+  depth: number,
+  path: PathSeg[],
+  sites: CandidateSite[],
+): void {
+  if (isBareDataUri(value)) {
+    sites.push({ path, node: value, kind: "bareDataUri" });
+
+    return;
+  }
+
+  const worthParsing =
+    value.length >= 2 && value.length <= MAX_NESTED_JSON_BYTES && containsMediaMarkers(value);
+  if (!worthParsing) {
+    return;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return;
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    return;
+  }
+
+  collectCandidates(parsed, depth + 1, [...path, { json: true }], sites);
+}
+
+/**
+ * Part-first: a media part is a leaf — the rewritten reference has nothing left to extract
+ * inside it, so the walk never descends into parts.
+ */
+function collectFromObject(
+  value: object,
+  depth: number,
+  path: PathSeg[],
+  sites: CandidateSite[],
+): void {
+  if (TraceValueMediaExtractionService.isExtractableMediaPart(value)) {
+    sites.push({ path, node: value, kind: "part" });
+
+    return;
+  }
+
+  const obj = value as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    collectCandidates(obj[key], depth + 1, [...path, { key }], sites);
+  }
+}
+
 function collectCandidates(
   value: unknown,
   depth: number,
@@ -85,28 +140,7 @@ function collectCandidates(
   }
 
   if (typeof value === "string") {
-    if (isBareDataUri(value)) {
-      sites.push({ path, node: value, kind: "bareDataUri" });
-
-      return;
-    }
-
-    if (value.length < 2 || value.length > MAX_NESTED_JSON_BYTES || !containsMediaMarkers(value)) {
-      return;
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      return;
-    }
-
-    if (typeof parsed !== "object" || parsed === null) {
-      return;
-    }
-
-    collectCandidates(parsed, depth + 1, [...path, { json: true }], sites);
+    collectFromString(value, depth, path, sites);
 
     return;
   }
@@ -120,18 +154,7 @@ function collectCandidates(
   }
 
   if (typeof value === "object") {
-    // Part-first: a media part is a leaf — the rewritten reference has
-    // nothing left to extract inside it, so we never descend into parts.
-    if (TraceValueMediaExtractionService.isExtractableMediaPart(value)) {
-      sites.push({ path, node: value, kind: "part" });
-
-      return;
-    }
-
-    const obj = value as Record<string, unknown>;
-    for (const key of Object.keys(obj)) {
-      collectCandidates(obj[key], depth + 1, [...path, { key }], sites);
-    }
+    collectFromObject(value, depth, path, sites);
   }
 }
 
@@ -253,6 +276,27 @@ async function storeCandidates(
 // Phase 3 — clone-on-write rebuild
 // ---------------------------------------------------------------------------
 
+/** Groups the sites still in play by the array index or object key they descend through. */
+function groupSitesBySegment<K extends number | string>(
+  sites: StoredSite[],
+  segIndex: number,
+  read: (seg: PathSeg) => K | undefined,
+): Map<K, StoredSite[]> {
+  const grouped = new Map<K, StoredSite[]>();
+  for (const site of sites) {
+    const key = read(site.path[segIndex]!);
+    if (key === undefined) {
+      continue;
+    }
+
+    const group = grouped.get(key) ?? [];
+    group.push(site);
+    grouped.set(key, group);
+  }
+
+  return grouped;
+}
+
 function rebuild(value: unknown, sites: StoredSite[], segIndex: number): unknown {
   const direct = sites.find((site) => site.path.length === segIndex);
   if (direct) {
@@ -272,44 +316,40 @@ function rebuild(value: unknown, sites: StoredSite[], segIndex: number): unknown
   }
 
   if (Array.isArray(value)) {
-    const out = [...value];
-    const byIndex = new Map<number, StoredSite[]>();
-    for (const site of sites) {
-      const seg = site.path[segIndex]!;
-      if ("index" in seg) {
-        const group = byIndex.get(seg.index) ?? [];
-        group.push(site);
-        byIndex.set(seg.index, group);
-      }
-    }
-
-    for (const [index, group] of byIndex) {
-      out[index] = rebuild(out[index], group, segIndex + 1);
-    }
-
-    return out;
+    return rebuildArray(value, sites, segIndex);
   }
 
   if (typeof value === "object" && value !== null) {
-    const out = { ...(value as Record<string, unknown>) };
-    const byKey = new Map<string, StoredSite[]>();
-    for (const site of sites) {
-      const seg = site.path[segIndex]!;
-      if ("key" in seg) {
-        const group = byKey.get(seg.key) ?? [];
-        group.push(site);
-        byKey.set(seg.key, group);
-      }
-    }
-
-    for (const [key, group] of byKey) {
-      out[key] = rebuild(out[key], group, segIndex + 1);
-    }
-
-    return out;
+    return rebuildObject(value as Record<string, unknown>, sites, segIndex);
   }
 
   return value;
+}
+
+function rebuildArray(value: unknown[], sites: StoredSite[], segIndex: number): unknown[] {
+  const out = [...value];
+  const byIndex = groupSitesBySegment(sites, segIndex, (seg) =>
+    "index" in seg ? seg.index : undefined,
+  );
+  for (const [index, group] of byIndex) {
+    out[index] = rebuild(out[index], group, segIndex + 1);
+  }
+
+  return out;
+}
+
+function rebuildObject(
+  value: Record<string, unknown>,
+  sites: StoredSite[],
+  segIndex: number,
+): Record<string, unknown> {
+  const out = { ...value };
+  const byKey = groupSitesBySegment(sites, segIndex, (seg) => ("key" in seg ? seg.key : undefined));
+  for (const [key, group] of byKey) {
+    out[key] = rebuild(out[key], group, segIndex + 1);
+  }
+
+  return out;
 }
 
 // ---------------------------------------------------------------------------

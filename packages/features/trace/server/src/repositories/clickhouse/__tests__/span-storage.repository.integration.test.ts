@@ -33,6 +33,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
+import { recordStoredSpansQueries } from "./fixtures/recording-clickhouse-client.ts";
 import { MAX_EVENT_NAMES_PER_TRACE } from "../../span-storage.repository.ts";
 import {
   startMigratedTraceClickHouse,
@@ -628,23 +629,8 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
         // issues. With the window resolved from trace_summaries, an empty
         // result is final: exactly one stored_spans read, all of them
         // partition-bounded (carry the StartTime predicate / fromMs param).
-        const storedSpansQueries: { query: string; params: unknown }[] = [];
-        const recordingClient = new Proxy(ch, {
-          get(target, prop, receiver) {
-            if (prop === "query") {
-              return (args: { query: string; query_params?: unknown }) => {
-                if (args.query.includes("stored_spans")) {
-                  storedSpansQueries.push({
-                    query: args.query,
-                    params: args.query_params,
-                  });
-                }
-                return (target as ClickHouseClient).query(args as never);
-              };
-            }
-            return Reflect.get(target, prop, receiver);
-          },
-        }) as ClickHouseClient;
+        const { client: recordingClient, queries: storedSpansQueries } =
+          recordStoredSpansQueries(ch);
         const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
         const events = await recordingRepo.getTraceEventsByTraceId({
@@ -737,23 +723,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
 
     it("returns no spans for a trace without any, via the bounded-then-unbounded fallback", async () => {
-      const storedSpansQueries: { query: string; params: unknown }[] = [];
-      const recordingClient = new Proxy(ch, {
-        get(target, prop, receiver) {
-          if (prop === "query") {
-            return (args: { query: string; query_params?: unknown }) => {
-              if (args.query.includes("stored_spans")) {
-                storedSpansQueries.push({
-                  query: args.query,
-                  params: args.query_params,
-                });
-              }
-              return (target as ClickHouseClient).query(args as never);
-            };
-          }
-          return Reflect.get(target, prop, receiver);
-        },
-      }) as ClickHouseClient;
+      const { client: recordingClient, queries: storedSpansQueries } = recordStoredSpansQueries(ch);
       const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
@@ -772,23 +742,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
 
     it("returns spans that fall outside the resolved ±2-day window via the unbounded fallback", async () => {
-      const storedSpansQueries: { query: string; params: unknown }[] = [];
-      const recordingClient = new Proxy(ch, {
-        get(target, prop, receiver) {
-          if (prop === "query") {
-            return (args: { query: string; query_params?: unknown }) => {
-              if (args.query.includes("stored_spans")) {
-                storedSpansQueries.push({
-                  query: args.query,
-                  params: args.query_params,
-                });
-              }
-              return (target as ClickHouseClient).query(args as never);
-            };
-          }
-          return Reflect.get(target, prop, receiver);
-        },
-      }) as ClickHouseClient;
+      const { client: recordingClient, queries: storedSpansQueries } = recordStoredSpansQueries(ch);
       const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
@@ -808,20 +762,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     it("stays unbounded for a trace that is not in trace_summaries", async () => {
       // No resolvable time: the reader keeps its previous behaviour and scans
       // unbounded rather than guessing a window.
-      const storedSpansQueries: string[] = [];
-      const recordingClient = new Proxy(ch, {
-        get(target, prop, receiver) {
-          if (prop === "query") {
-            return (args: { query: string; query_params?: unknown }) => {
-              if (args.query.includes("stored_spans")) {
-                storedSpansQueries.push(args.query);
-              }
-              return (target as ClickHouseClient).query(args as never);
-            };
-          }
-          return Reflect.get(target, prop, receiver);
-        },
-      }) as ClickHouseClient;
+      const { client: recordingClient, queries: storedSpansQueries } = recordStoredSpansQueries(ch);
       const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
@@ -831,7 +772,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
 
       expect(spans).toEqual([]);
       expect(storedSpansQueries).toHaveLength(1);
-      expect(storedSpansQueries[0]!).not.toContain("StartTime >=");
+      expect(storedSpansQueries[0]!.query).not.toContain("StartTime >=");
     });
   });
 });

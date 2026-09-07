@@ -7,42 +7,50 @@ import type {
   TypedValueJson,
 } from "./trace-format.schemas.ts";
 
+/** A span whose input is worth showing as the trace's first input. */
+const hasMeaningfulInput = (span: Span): boolean => {
+  if (!span.input?.value) return false;
+  if (span.type === "evaluation" || span.type === "guardrail") return false;
+  if (span.input.type === "json" && isEmptyJson(span.input.value)) return false;
+
+  // Agent inputs captured by openinference from agno are not really human redable, skip it
+  return !(
+    span.params?.scope?.name === "openinference.instrumentation.agno" && span.type === "agent"
+  );
+};
+
+/** Haystack wraps a pipeline's input in `{ data: { <component>: ... } }`. */
+const findHaystackInput = (span: Span | undefined): SpanInputOutput | undefined => {
+  if (span?.type !== "chain") return undefined;
+  if (!span.params?.scope?.name?.includes("haystack")) return undefined;
+  const data = (span.input?.value as any)?.data;
+  if (typeof data !== "object") return undefined;
+
+  return { type: "json", value: Object.values(data)[0] as any };
+};
+
+/** What a trace with no readable input is called: its request line, or the topmost span's name. */
+const describeInputlessTrace = (topmostSpans: Span[]): string => {
+  const topmostSpan = topmostSpans.filter((span) => !span.parent_id)[0];
+  if (topmostSpan?.params?.http?.method && topmostSpan?.params?.http?.target) {
+    return `${topmostSpan?.params?.http?.method} ${topmostSpan?.params?.http?.target}`;
+  }
+
+  return topmostSpan?.name ?? "";
+};
+
 export const getFirstInputAsText = (spans: Span[]): string => {
   const topmostSpans = flattenSpanTree(organizeSpansIntoTree(spans), "outside-in");
+  const topmostInputs = topmostSpans.filter(hasMeaningfulInput);
 
-  const topmostInputs = topmostSpans.filter(
-    (span) =>
-      span.input?.value &&
-      span.type !== "evaluation" &&
-      span.type !== "guardrail" &&
-      (span.input.type !== "json" || !isEmptyJson(span.input.value)) &&
-      // Agent inputs captured by openinference from agno are not really human redable, skip it
-      !(span.params?.scope?.name === "openinference.instrumentation.agno" && span.type === "agent"),
-  );
+  const input = findHaystackInput(topmostSpans[0]) ?? topmostInputs[0]?.input;
+  if (!input) return describeInputlessTrace(topmostSpans);
 
-  let input = topmostInputs[0]?.input;
-  // Haystack
-  if (
-    topmostSpans[0]?.type === "chain" &&
-    topmostSpans[0]?.params?.scope?.name?.includes("haystack") &&
-    typeof (topmostSpans[0]?.input?.value as any)?.data === "object"
-  ) {
-    input = {
-      type: "json",
-      value: Object.values((topmostSpans[0]?.input?.value as any)?.data)[0] as any,
-    };
-  }
-  if (!input) {
-    const topmostSpan = topmostSpans.filter((span) => !span.parent_id)[0];
-    if (topmostSpan?.params?.http?.method && topmostSpan?.params?.http?.target) {
-      return `${topmostSpan?.params?.http?.method} ${topmostSpan?.params?.http?.target}`;
-    }
-    return topmostSpan?.name ?? "";
-  }
   const text = typedValueToText(input, true, "user");
   if (!text && topmostInputs[0]?.name?.startsWith("RunnableSequence") && topmostInputs[1]?.input) {
     return typedValueToText(topmostInputs[1].input, true, "user");
   }
+
   return text;
 };
 
@@ -152,233 +160,257 @@ const extractLastMessageText = (json: any[], preferRole?: string): string => {
   return lastMessage ? JSON.stringify(lastMessage) : "";
 };
 
+const stringified = (value_: any) => {
+  if (typeof value_ === "string") {
+    return value_;
+  }
+  try {
+    return JSON.stringify(value_);
+  } catch {
+    return value_.toString();
+  }
+};
+
+/** One message's text: its string content, its content blocks joined, or the message itself. */
+const messageContentToText = (content: unknown, message: unknown): string => {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.map(textFromContentBlock).join("");
+
+  return JSON.stringify(message);
+};
+
+const chatMessagesToText = (messages: any[], last: boolean): string => {
+  if (last) {
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage) return "";
+
+    return messageContentToText(getMessageContent(lastMessage), lastMessage);
+  }
+
+  return messages
+    .map((message) => {
+      const content = getMessageContent(message);
+      return content ?? JSON.stringify(message);
+    })
+    .join("");
+};
+
+// A candidate value is "meaningful" when it's defined and not an empty string/array/object
+// — applied RECURSIVELY so a shell like `{ output: { content: "" } }` is treated as empty
+// at the top-level special-key check, letting the loop fall through to the next sibling key
+// (e.g. `answer`). Without recursion, any object with keys short- circuited
+// specialKeysMapping and the real payload on the next key was never seen.
+const hasNonEmptyValue = (value: unknown, seen: WeakSet<object> = new WeakSet()): boolean => {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string") return value.length > 0;
+  if (typeof value === "object") {
+    if (seen.has(value)) return false;
+    seen.add(value);
+    const values = Array.isArray(value) ? value : Object.values(value as Record<string, unknown>);
+    return values.some((item) => hasNonEmptyValue(item, seen));
+  }
+
+  return true;
+};
+
+/** The keys that carry a trace's text, in the order the first non-empty one wins. */
+const SPECIAL_TEXT_KEYS = [
+  "text",
+  "input",
+  "question",
+  "user_query",
+  "query",
+  "message",
+  // Langflow
+  "input_value",
+  "output",
+  "answer",
+  // Chainlit
+  "content",
+  // Haystack
+  "prompt",
+] as const;
+
+const readSpecialTextKey = (json: any): string | undefined => {
+  for (const key of SPECIAL_TEXT_KEYS) {
+    if (!hasNonEmptyValue(json[key])) continue;
+    // `message` is only taken when it is the text itself, not a message object.
+    if (key === "message" && typeof json.message !== "string") continue;
+
+    return json[key];
+  }
+
+  return undefined;
+};
+
+/** Langgraph on Flowise, and LangChain's agent return values. */
+const readFlowiseMessages = (json: any): string | undefined => {
+  if (
+    json.messages?.length > 0 &&
+    hasNonEmptyValue(json.messages?.[json.messages?.length - 1]?.content)
+  ) {
+    return json.messages[json.messages?.length - 1].content;
+  }
+  if (hasNonEmptyValue(json.return_values?.output)) {
+    return json.return_values.output;
+  }
+
+  return undefined;
+};
+
+const LANGCHAIN_INPUT_KEYS = ["input", "text", "query", "question"] as const;
+
+// LangChain
+// NOTE: we intentionally keep the old `!== undefined` check (not hasNonEmptyValue)
+// for the `inputs`/`outputs` wrapper paths. `RunnableSequence` legitimately produces
+// `{ inputs: { input: "" } }` and the caller (getFirstInputAsText) relies on the
+// returned "" to trigger a fallback to the next span in the sequence.
+const readLangChainWrapper = (json: any): string | undefined => {
+  if (typeof json.inputs === "object") {
+    for (const key of LANGCHAIN_INPUT_KEYS) {
+      if (json.inputs[key] !== undefined) return json.inputs[key];
+    }
+  }
+  if (typeof json.outputs === "object" && json.outputs.output !== undefined) {
+    return json.outputs.output;
+  }
+  if (typeof json.outputs === "string") {
+    return json.outputs;
+  }
+  if (typeof json.outputs === "object" && json.outputs.text !== undefined) {
+    return json.outputs.text;
+  }
+  if (Array.isArray(json.llm?.replies)) {
+    return json.llm.replies[0];
+  }
+
+  return undefined;
+};
+
+/** Langgraph.js keeps the answer on the last `AIMessage`'s kwargs. */
+const readLanggraphMessage = (json: any): string | undefined => {
+  if (
+    Array.isArray(json.messages) &&
+    Array.isArray(json.messages.at(-1)?.id) &&
+    json.messages.at(-1)?.id.includes("AIMessage") &&
+    json.messages.at(-1)?.kwargs?.content
+  ) {
+    return json.messages.at(-1)?.kwargs?.content;
+  }
+
+  return undefined;
+};
+
+const specialKeysMapping = (json: any): string | undefined => {
+  const direct = readSpecialTextKey(json);
+  if (direct !== undefined) return direct;
+
+  const flowise = readFlowiseMessages(json);
+  if (flowise !== undefined) return flowise;
+
+  const langchain = readLangChainWrapper(json);
+  if (langchain !== undefined) return langchain;
+
+  const langgraph = readLanggraphMessage(json);
+  if (langgraph !== undefined) return langgraph;
+
+  // Optimization Studio
+  if (json.end !== undefined) {
+    return specialKeysMapping(json.end) ?? json.end;
+  }
+
+  return undefined;
+};
+
+const firstAndOnlyKey = (json: any) => {
+  if (typeof json === "object" && !Array.isArray(json) && Object.keys(json).length === 1) {
+    const firstItem = json[Object.keys(json)[0]!];
+    const mapped = typeof firstItem === "object" ? specialKeysMapping(firstItem) : undefined;
+    if (mapped !== undefined) {
+      return stringified(mapped);
+    }
+
+    return stringified(firstItem);
+  }
+
+  return undefined;
+};
+
+// Handle arrays that look like chat messages (objects with "role" property)
+// This covers cases where validation doesn't match chat_messages due to
+// non-standard roles like "toolResult"
+const looksLikeChatMessages = (json: any): boolean =>
+  Array.isArray(json) &&
+  json.length > 0 &&
+  typeof json[0] === "object" &&
+  json[0] !== null &&
+  "role" in json[0];
+
+const roleArrayToText = (json: any[], last: boolean, preferRole: string | undefined): string => {
+  if (last) return extractLastMessageText(json, preferRole);
+
+  return json
+    .map((message: any) => messageContentToText(getMessageContent(message), message))
+    .join("");
+};
+
+const mapJsonValue = (json: any): string | undefined => {
+  if (Array.isArray(json) && json.length === 1) {
+    return typeof json[0] === "string" ? json[0] : specialKeysMapping(json[0]);
+  }
+
+  return specialKeysMapping(json);
+};
+
+const jsonToText = (value: unknown, last: boolean, preferRole: string | undefined): string => {
+  try {
+    const json = value as any;
+    if (looksLikeChatMessages(json)) return roleArrayToText(json, last, preferRole);
+
+    const mapped = mapJsonValue(json);
+    if (mapped !== undefined) {
+      return firstAndOnlyKey(mapped) ?? stringified(mapped);
+    }
+
+    return firstAndOnlyKey(json) ?? stringified(json);
+  } catch {
+    return (value as any)?.toString() ?? "";
+  }
+};
+
+const listToText = (value: unknown, last: boolean, preferRole: string | undefined): string => {
+  if (!Array.isArray(value) || value.length === 0) return "";
+
+  const item = last ? value[value.length - 1] : value[0];
+  // Only recurse into structured SpanInputOutput items (have "type" and "value").
+  // Non-structured list items (primitives, arbitrary objects) cannot be
+  // meaningfully represented as text and are intentionally ignored.
+  if (item && typeof item === "object" && "type" in item && "value" in item) {
+    return typedValueToText(item as SpanInputOutput, last, preferRole);
+  }
+
+  return "";
+};
+
 export const typedValueToText = (
   typed: SpanInputOutput,
   last = false,
   preferRole?: string,
 ): string => {
-  const stringified = (value_: any) => {
-    if (typeof value_ === "string") {
-      return value_;
-    }
-    try {
-      return JSON.stringify(value_);
-    } catch {
-      return value_.toString();
-    }
-  };
-
-  if (typed.type === "text") {
-    return typed.value;
-  } else if (typed.type === "chat_messages") {
-    if (last) {
-      const lastMessage = typed.value[typed.value.length - 1];
-      if (!lastMessage) return "";
-      const content = getMessageContent(lastMessage);
-      return typeof content === "string"
-        ? content
-        : Array.isArray(content)
-          ? content.map(textFromContentBlock).join("")
-          : JSON.stringify(lastMessage);
-    }
-    return typed.value
-      .map((message) => {
-        const content = getMessageContent(message);
-        return content ?? JSON.stringify(message);
-      })
-      .join("");
-  } else if (typed.type === "json") {
-    // A candidate value is "meaningful" when it's defined and not an empty string/array/object
-    // — applied RECURSIVELY so a shell like `{ output: { content: "" } }` is treated as empty
-    // at the top-level special-key check, letting the loop fall through to the next sibling key
-    // (e.g. `answer`). Without recursion, any object with keys short- circuited
-    // specialKeysMapping and the real payload on the next key was never seen.
-    const hasNonEmptyValue = (value: unknown, seen: WeakSet<object> = new WeakSet()): boolean => {
-      if (value === undefined || value === null) return false;
-      if (typeof value === "string") return value.length > 0;
-      if (typeof value === "object") {
-        if (seen.has(value)) return false;
-        seen.add(value);
-        const values = Array.isArray(value)
-          ? value
-          : Object.values(value as Record<string, unknown>);
-        return values.some((item) => hasNonEmptyValue(item, seen));
-      }
-      return true;
-    };
-
-    const specialKeysMapping = (json: any): string | undefined => {
-      if (hasNonEmptyValue(json.text)) {
-        return json.text;
-      }
-      if (hasNonEmptyValue(json.input)) {
-        return json.input;
-      }
-      if (hasNonEmptyValue(json.question)) {
-        return json.question;
-      }
-      if (hasNonEmptyValue(json.user_query)) {
-        return json.user_query;
-      }
-      if (hasNonEmptyValue(json.query)) {
-        return json.query;
-      }
-      if (hasNonEmptyValue(json.message) && typeof json.message === "string") {
-        return json.message;
-      }
-      // Langflow
-      if (hasNonEmptyValue(json.input_value)) {
-        return json.input_value;
-      }
-      if (hasNonEmptyValue(json.output)) {
-        return json.output;
-      }
-
-      if (hasNonEmptyValue(json.answer)) {
-        return json.answer;
-      }
-
-      // Chainlit
-      if (hasNonEmptyValue(json.content)) {
-        return json.content;
-      }
-
-      // Haystack
-      if (hasNonEmptyValue(json.prompt)) {
-        return json.prompt;
-      }
-
-      // Langgraph on Flowise
-      if (
-        json.messages?.length > 0 &&
-        hasNonEmptyValue(json.messages?.[json.messages?.length - 1]?.content)
-      ) {
-        return json.messages[json.messages?.length - 1].content;
-      }
-      if (hasNonEmptyValue(json.return_values?.output)) {
-        return json.return_values.output;
-      }
-
-      // LangChain
-      // NOTE: we intentionally keep the old `!== undefined` check (not hasNonEmptyValue)
-      // for the `inputs`/`outputs` wrapper paths. `RunnableSequence` legitimately produces
-      // `{ inputs: { input: "" } }` and the caller (getFirstInputAsText) relies on the
-      // returned "" to trigger a fallback to the next span in the sequence.
-      if (typeof json.inputs === "object" && json.inputs.input !== undefined) {
-        return json.inputs.input;
-      }
-      if (typeof json.inputs === "object" && json.inputs.text !== undefined) {
-        return json.inputs.text;
-      }
-      if (typeof json.inputs === "object" && json.inputs.query !== undefined) {
-        return json.inputs.query;
-      }
-      if (typeof json.inputs === "object" && json.inputs.question !== undefined) {
-        return json.inputs.question;
-      }
-      if (typeof json.outputs === "object" && json.outputs.output !== undefined) {
-        return json.outputs.output;
-      }
-      if (typeof json.outputs === "string") {
-        return json.outputs;
-      }
-      if (typeof json.outputs === "object" && json.outputs.text !== undefined) {
-        return json.outputs.text;
-      }
-      if (Array.isArray(json.llm?.replies)) {
-        return json.llm.replies[0];
-      }
-
-      // Langgraph.js
-
-      if (
-        Array.isArray(json.messages) &&
-        Array.isArray(json.messages.at(-1)?.id) &&
-        json.messages.at(-1)?.id.includes("AIMessage") &&
-        json.messages.at(-1)?.kwargs?.content
-      ) {
-        return json.messages.at(-1)?.kwargs?.content;
-      }
-
-      // Optimization Studio
-      if (json.end !== undefined) {
-        return specialKeysMapping(json.end) ?? json.end;
-      }
-
-      return undefined;
-    };
-
-    const firstAndOnlyKey = (json: any) => {
-      if (typeof json === "object" && !Array.isArray(json) && Object.keys(json).length === 1) {
-        const firstItem = json[Object.keys(json)[0]!];
-        const mapped = typeof firstItem === "object" ? specialKeysMapping(firstItem) : undefined;
-        if (mapped !== undefined) {
-          return stringified(mapped);
-        }
-        return stringified(firstItem);
-      }
-
-      return undefined;
-    };
-
-    try {
-      const json = typed.value as any;
-
-      // Handle arrays that look like chat messages (objects with "role" property)
-      // This covers cases where validation doesn't match chat_messages due to
-      // non-standard roles like "toolResult"
-      if (
-        Array.isArray(json) &&
-        json.length > 0 &&
-        typeof json[0] === "object" &&
-        json[0] !== null &&
-        "role" in json[0]
-      ) {
-        if (last) {
-          return extractLastMessageText(json, preferRole);
-        }
-        return json
-          .map((message: any) => {
-            const content = getMessageContent(message);
-            return typeof content === "string"
-              ? content
-              : Array.isArray(content)
-                ? content.map(textFromContentBlock).join("")
-                : JSON.stringify(message);
-          })
-          .join("");
-      }
-
-      const value =
-        Array.isArray(json) && json.length === 1
-          ? typeof json[0] === "string"
-            ? json[0]
-            : specialKeysMapping(json[0])
-          : specialKeysMapping(json);
-      if (value !== undefined) {
-        return firstAndOnlyKey(value) ?? stringified(value);
-      }
-
-      return firstAndOnlyKey(json) ?? stringified(json);
-    } catch {
-      return typed.value?.toString() ?? "";
-    }
-  } else if (typed.type === "list") {
-    if (Array.isArray(typed.value) && typed.value.length > 0) {
-      const item = last ? typed.value[typed.value.length - 1] : typed.value[0];
-      // Only recurse into structured SpanInputOutput items (have "type" and "value").
-      // Non-structured list items (primitives, arbitrary objects) cannot be
-      // meaningfully represented as text and are intentionally ignored.
-      if (item && typeof item === "object" && "type" in item && "value" in item) {
-        return typedValueToText(item as SpanInputOutput, last, preferRole);
-      }
-    }
-    return "";
-  } else if (typed.type === "raw") {
-    return stringified(typed.value);
+  switch (typed.type) {
+    case "text":
+      return typed.value;
+    case "chat_messages":
+      return chatMessagesToText(typed.value, last);
+    case "json":
+      return jsonToText(typed.value, last, preferRole);
+    case "list":
+      return listToText(typed.value, last, preferRole);
+    case "raw":
+      return stringified(typed.value);
+    default:
+      return "";
   }
-
-  return "";
 };
 
 interface BaseSpanWithChildren extends BaseSpan {

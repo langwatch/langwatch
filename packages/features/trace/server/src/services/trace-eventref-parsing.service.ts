@@ -41,36 +41,55 @@ export class TraceEventRefParsingService {
    * well-formed eventref pointers. A reserved key with no `eventId` is recorded in
    * `missingEventIdKeys` but never resolved; malformed JSON is dropped, the preview already there.
    */
+  /**
+   * One eventref attribute: its pointer, or `null` when it names no event id, or `undefined`
+   * when the JSON is malformed and the preview already in `cleanedAttrs` is all we have.
+   */
+  static #readEventRef(attrKey: string, value: unknown): EventRefEntry | null | undefined {
+    let decoded: unknown;
+    try {
+      decoded = typeof value === "string" ? JSON.parse(value) : value;
+    } catch {
+      // Malformed eventref JSON — skip; preview in cleanedAttrs is still shown.
+      return undefined;
+    }
+
+    if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) {
+      return undefined;
+    }
+
+    const ref = decoded as { field?: unknown; eventId?: unknown };
+    if (typeof ref.eventId !== "string" || ref.eventId.length === 0) {
+      return null;
+    }
+
+    return {
+      attrKey,
+      field: typeof ref.field === "string" && ref.field.length > 0 ? ref.field : attrKey,
+      eventId: ref.eventId,
+    };
+  }
+
   static parseSpanEventRefs(attrs: NormalizedAttributes): ParsedSpanEventRefs {
     const cleanedAttrs: NormalizedAttributes = {};
     const eventrefEntries: EventRefEntry[] = [];
     const missingEventIdKeys: string[] = [];
 
     for (const [key, value] of Object.entries(attrs)) {
-      if (key.startsWith(EVENTREF_ATTR_PREFIX)) {
-        const attrKey = key.slice(EVENTREF_ATTR_PREFIX.length);
-        try {
-          const decoded = typeof value === "string" ? JSON.parse(value) : value;
-          if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) {
-            continue;
-          }
-
-          const ref = decoded as { field?: unknown; eventId?: unknown };
-          if (typeof ref.eventId !== "string" || ref.eventId.length === 0) {
-            missingEventIdKeys.push(attrKey);
-            continue;
-          }
-
-          eventrefEntries.push({
-            attrKey,
-            field: typeof ref.field === "string" && ref.field.length > 0 ? ref.field : attrKey,
-            eventId: ref.eventId,
-          });
-        } catch {
-          // Malformed eventref JSON — skip; preview in cleanedAttrs is still shown.
-        }
-      } else {
+      if (!key.startsWith(EVENTREF_ATTR_PREFIX)) {
         cleanedAttrs[key] = value;
+        continue;
+      }
+
+      const attrKey = key.slice(EVENTREF_ATTR_PREFIX.length);
+      const entry = TraceEventRefParsingService.#readEventRef(attrKey, value);
+      if (entry === null) {
+        missingEventIdKeys.push(attrKey);
+        continue;
+      }
+
+      if (entry !== undefined) {
+        eventrefEntries.push(entry);
       }
     }
 

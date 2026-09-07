@@ -82,31 +82,43 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
 
 export const isPythonRepr = (input: string) => /^[A-Z][A-Za-z0-9_]*\(/.test(input);
 
+/** A one-key `{ arg0: … }` wrapper is the grammar's positional argument; unwrap it. */
+const unwrapSingleArg = (value: unknown): unknown => {
+  const isSingleArg =
+    typeof value === "object" &&
+    value !== null &&
+    "arg0" in (value as any) &&
+    Object.keys(value as any).length === 1;
+
+  return isSingleArg ? (value as any).arg0 : value;
+};
+
+/** The parsed value of one `ClassName(...)` repr, or none when the grammar refuses it. */
+const parsePythonRepr = (input: string): unknown | undefined => {
+  const match = grammar.match(input);
+  if (!match.succeeded()) return undefined;
+
+  const result = semantics(match).toJSON();
+  if (typeof result !== "object" || Array.isArray(result)) return result;
+
+  return Object.fromEntries(
+    Object.entries(result).map(([key, value]) => [key, unwrapSingleArg(value)]),
+  );
+};
+
 export const parsePythonInsideJson = <T extends object>(item: T): T => {
-  if (typeof item === "object" && Array.isArray(item)) {
+  if (Array.isArray(item)) {
     return item.map((element) => parsePythonInsideJson(element)) as T;
-  } else if (typeof item === "object" && item !== null) {
+  }
+  if (typeof item === "object" && item !== null) {
     return Object.fromEntries(
       Object.entries(item).map(([key, value]) => [key, parsePythonInsideJson(value)]),
     ) as T;
-  } else if (typeof item === "string" && isPythonRepr(item)) {
-    const match = grammar.match(item);
-    if (match.succeeded()) {
-      let result = semantics(match).toJSON();
-      if (typeof result === "object" && !Array.isArray(result)) {
-        result = Object.fromEntries(
-          Object.entries(result).map(([key, value]) => [
-            key,
-            typeof value === "object" &&
-            "arg0" in (value as any) &&
-            Object.keys(value as any).length === 1
-              ? (value as any).arg0
-              : value,
-          ]),
-        );
-      }
-      return result;
-    }
   }
+  if (typeof item === "string" && isPythonRepr(item)) {
+    const parsed = parsePythonRepr(item);
+    if (parsed !== undefined) return parsed as T;
+  }
+
   return item;
 };

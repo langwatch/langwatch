@@ -109,6 +109,28 @@ const unflattenObject = (flatMap: Map<string, unknown>): Record<string, unknown>
   return safeUnflatten(record);
 };
 
+/** An index map that is not a real array: its keys are copied back verbatim. */
+const copyBackInvalidPattern = (
+  result: NormalizedAttributes,
+  prefix: string,
+  indexMap: Map<number, Map<string, unknown>>,
+): void => {
+  for (const [index, relativeMap] of indexMap) {
+    for (const [relativePath, value] of relativeMap) {
+      result[`${prefix}${SEP}${index}${SEP}${relativePath}`] = value;
+    }
+  }
+};
+
+/** The items of one reconstructed array, in index order. */
+const buildArrayItems = (
+  indexMap: Map<number, Map<string, unknown>>,
+): Record<string, unknown>[] => {
+  const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
+
+  return indices.map((index) => unflattenObject(indexMap.get(index)!));
+};
+
 /**
  * Post-processes normalized attributes to reconstruct flattened arrays.
  *
@@ -129,7 +151,6 @@ const reconstructFlattenedArrays = (attrs: NormalizedAttributes): NormalizedAttr
   }
 
   const result: NormalizedAttributes = {};
-  const processedPrefixes = new Set<string>();
 
   // Copy over non-matched keys
   for (const [key, value] of Object.entries(attrs)) {
@@ -141,30 +162,12 @@ const reconstructFlattenedArrays = (attrs: NormalizedAttributes): NormalizedAttr
   // Process each detected array pattern
   for (const [prefix, indexMap] of patterns) {
     if (!isValidArrayPattern(indexMap)) {
-      // Invalid pattern - copy original keys back
-      for (const [index, relativeMap] of indexMap) {
-        for (const [relativePath, value] of relativeMap) {
-          result[`${prefix}${SEP}${index}${SEP}${relativePath}`] = value;
-        }
-      }
-
+      copyBackInvalidPattern(result, prefix, indexMap);
       continue;
     }
 
-    processedPrefixes.add(prefix);
-
-    // Build the array
-    const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
-    const arrayItems: Record<string, unknown>[] = [];
-
-    for (const index of indices) {
-      const relativeMap = indexMap.get(index)!;
-      const item = unflattenObject(relativeMap);
-      arrayItems.push(item);
-    }
-
     // Store as real array (not JSON string)
-    result[prefix] = arrayItems;
+    result[prefix] = buildArrayItems(indexMap);
   }
 
   return result;
@@ -201,47 +204,56 @@ const parseJsonStringValues = (attrs: NormalizedAttributes): NormalizedAttribute
   const result: NormalizedAttributes = {};
 
   for (const [key, value] of Object.entries(attrs)) {
-    if (typeof value !== "string") {
-      result[key] = value;
-      continue;
-    }
-
-    const trimmed = value.trim();
-    if (trimmed.length < 2 || trimmed.length > MAX_JSON_PARSE_SIZE) {
-      result[key] = value;
-      continue;
-    }
-
-    const looksJson =
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"));
-
-    if (!looksJson) {
-      result[key] = value;
-      continue;
-    }
-
-    try {
-      result[key] = JSON.parse(trimmed);
-    } catch {
-      // PII redaction can introduce invalid JSON escapes like \<US_DRIVER_LICENSE>
-      // because it replaces content with <PII_TYPE> tokens inside JSON strings.
-      // Try to fix known invalid escapes before giving up.
-      const sanitized = sanitizeInvalidJsonEscapes(trimmed);
-      if (sanitized !== trimmed) {
-        try {
-          result[key] = JSON.parse(sanitized);
-          continue;
-        } catch {
-          // still broken, fall through
-        }
-      }
-
-      result[key] = value;
-    }
+    result[key] = typeof value === "string" ? parseJsonStringValue(value) : value;
   }
 
   return result;
+};
+
+/** Whether a trimmed string is worth handing to `JSON.parse` at all. */
+const looksLikeJson = (trimmed: string): boolean => {
+  if (trimmed.length < 2 || trimmed.length > MAX_JSON_PARSE_SIZE) {
+    return false;
+  }
+
+  const isObjectLiteral = trimmed.startsWith("{") && trimmed.endsWith("}");
+  if (isObjectLiteral) {
+    return true;
+  }
+
+  const isArrayLiteral = trimmed.startsWith("[") && trimmed.endsWith("]");
+
+  return isArrayLiteral;
+};
+
+/**
+ * One string value, parsed when it is JSON. PII redaction can introduce invalid escapes like
+ * `\<US_DRIVER_LICENSE>` because it replaces content with `<PII_TYPE>` tokens inside JSON
+ * strings, so a failed parse is retried against the sanitized text before giving up.
+ */
+const parseJsonStringValue = (value: string): unknown => {
+  const trimmed = value.trim();
+  if (!looksLikeJson(trimmed)) {
+    return value;
+  }
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // fall through to the sanitized retry
+  }
+
+  const sanitized = sanitizeInvalidJsonEscapes(trimmed);
+  if (sanitized === trimmed) {
+    return value;
+  }
+
+  try {
+    return JSON.parse(sanitized);
+  } catch {
+    // still broken
+    return value;
+  }
 };
 
 /** OTLP attribute shaping: flattened-array reconstruction and JSON-string parsing. */

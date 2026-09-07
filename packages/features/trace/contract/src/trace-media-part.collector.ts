@@ -30,6 +30,7 @@
 import { containsMediaMarkers } from "./trace-media-markers.ts";
 import { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
 import { visitContentPart } from "./trace-content-part.dispatcher.ts";
+import type { ContentSource } from "./trace-content-part.types.ts";
 import { isMediaPartRole, type MediaPartRole } from "./trace-media-role.ts";
 
 /**
@@ -118,98 +119,87 @@ function isRawPcmFormat(format?: string, mimeType?: string): boolean {
   return m.includes("alaw") || m.includes("pcma");
 }
 
+/** A document renders as an attachment chip — the binary member. */
+function documentToMediaData(source: ContentSource): MediaPartData {
+  const mimeType = source.mimeType ?? "application/octet-stream";
+
+  return source.type === "url"
+    ? { type: "binary", mimeType, url: source.value }
+    : { type: "binary", mimeType, data: source.value };
+}
+
+/**
+ * MediaPartData's members split on source.type, so narrow before building each concrete
+ * variant — keeps this cast-free. Wire payloads often omit the media type, so an inline
+ * payload defaults it per category: a data: URI built from `undefined` (`data:undefined;…`)
+ * is a silently-broken element with no error badge.
+ */
+function providerMediaToMediaData(
+  p: Readonly<{ type: "image" | "audio" | "video" | "document"; source: ContentSource }>,
+): MediaPartData {
+  if (p.type === "document") return documentToMediaData(p.source);
+
+  if (p.source.type === "url") {
+    return {
+      type: p.type,
+      source: { type: "url", value: p.source.value, mimeType: p.source.mimeType },
+    };
+  }
+
+  return {
+    type: p.type,
+    source: {
+      type: "data",
+      value: p.source.value,
+      mimeType: p.source.mimeType ?? defaultDataMimeType(p.type),
+    },
+  };
+}
+
+/**
+ * THE ONE DELIBERATE DIFFERENCE FROM THE TWIN. The application wraps a raw, header-less
+ * realtime turn (`pcm16`, companded G.711) into a playable WAV before surfacing it, because a
+ * bare `data:audio/wav` carrying raw PCM is silently unplayable. That wrapper is byte work —
+ * `Buffer` on the server, `atob`/`btoa` in the browser — and this package is
+ * environment-neutral by construction: its tsconfig names `lib: ["es2022"]` and no runtime
+ * types.
+ *
+ * The difference cannot change what this walk is used for. Reference collection
+ * (`trace-media-ref.ts`) admits only `/api/files/` addresses; a wrapped WAV is an inline
+ * `data:` source, so BOTH copies contribute exactly no reference for a raw-PCM turn. What the
+ * application gets and this does not is a playable part for a RENDERER, and the renderer that
+ * wants one converts with the trace web surface, which keeps the wrapper. Pinned in
+ * `trace-media-ref.unit.test.ts`.
+ */
+function inputAudioToMediaData(
+  p: Readonly<{ data?: string; url?: string; format?: string; mimeType?: string }>,
+): MediaPartData | null {
+  if (p.data && isRawPcmFormat(p.format, p.mimeType)) return null;
+
+  const mimeType = p.mimeType ?? audioFormatToMimeType(p.format);
+  if (p.url) return { type: "audio", source: { type: "url", value: p.url, mimeType } };
+  if (p.data) return { type: "audio", source: { type: "data", value: p.data, mimeType } };
+
+  return null;
+}
+
 /** Map a single raw content part to `MediaPartData`, or null when it is not media. */
 export function mediaPartToMediaData(part: unknown): MediaPartData | null {
   const result = visitContentPart<MediaPartData | null>(part, {
     text: () => null,
-    // MediaPartData's members split on source.type, so narrow before
-    // building each concrete variant — keeps this cast-free.
-    media: (p) => {
-      if (p.type === "document") {
-        // Documents render as an attachment chip — the binary member.
-        if (p.source.type === "url") {
-          return {
-            type: "binary",
-            mimeType: p.source.mimeType ?? "application/octet-stream",
-            url: p.source.value,
-          };
-        }
-        return {
-          type: "binary",
-          mimeType: p.source.mimeType ?? "application/octet-stream",
-          data: p.source.value,
-        };
-      }
-      return p.source.type === "url"
-        ? {
-            type: p.type,
-            source: {
-              type: "url",
-              value: p.source.value,
-              mimeType: p.source.mimeType,
-            },
-          }
-        : {
-            type: p.type,
-            source: {
-              type: "data",
-              value: p.source.value,
-              // Wire payloads often omit the media type. Default it per
-              // category. A data: URI built from `undefined`
-              // (`data:undefined;…`) is a silently-broken element with no
-              // error badge.
-              mimeType: p.source.mimeType ?? defaultDataMimeType(p.type),
-            },
-          };
-    },
+    media: providerMediaToMediaData,
     // A binary part renders only with an actual payload: inline `data` or a
     // fetchable `url`. An id-only reference has nothing to mount — `src=""`
     // resolves to the current document URL and silently re-requests the page.
     binary: (p) => ((p.data ?? p.url) ? p : null),
     toolCall: () => null,
     toolResult: () => null,
-    imageUrl: (url) => ({
-      type: "image",
-      source: { type: "url", value: url },
-    }),
-    bareImage: (src) => ({
-      type: "image",
-      source: { type: "url", value: src },
-    }),
-    inputAudio: (p) => {
-      // THE ONE DELIBERATE DIFFERENCE FROM THE TWIN. The application wraps a
-      // raw, header-less realtime turn (`pcm16`, companded G.711) into a
-      // playable WAV before surfacing it, because a bare `data:audio/wav`
-      // carrying raw PCM is silently unplayable. That wrapper is byte work —
-      // `Buffer` on the server, `atob`/`btoa` in the browser — and this
-      // package is environment-neutral by construction: its tsconfig names
-      // `lib: ["es2022"]` and no runtime types, and not one of its sixty
-      // modules reaches for either. Adding them here to serve one branch would
-      // end that property for every consumer.
-      //
-      // The difference cannot change what this walk is used for. Reference
-      // collection (`trace-media-ref.ts`) admits only `/api/files/` addresses;
-      // a wrapped WAV is an inline `data:` source, so BOTH copies contribute
-      // exactly no reference for a raw-PCM turn. What the application gets and
-      // this does not is a playable part for a RENDERER, and the renderer that
-      // wants one converts with the trace web surface, which keeps the
-      // wrapper. Pinned in `trace-media-ref.unit.test.ts`.
-      if (p.data && isRawPcmFormat(p.format, p.mimeType)) return null;
-      const mimeType = p.mimeType ?? audioFormatToMimeType(p.format);
-      if (p.url)
-        return {
-          type: "audio",
-          source: { type: "url", value: p.url, mimeType },
-        };
-      if (p.data)
-        return {
-          type: "audio",
-          source: { type: "data", value: p.data, mimeType },
-        };
-      return null;
-    },
+    imageUrl: (url) => ({ type: "image", source: { type: "url", value: url } }),
+    bareImage: (src) => ({ type: "image", source: { type: "url", value: src } }),
+    inputAudio: inputAudioToMediaData,
     unknown: () => null,
   });
+
   return result ?? null;
 }
 
@@ -315,73 +305,79 @@ export function collectAnnotatedMediaParts(value: unknown, depth = 0): Collected
   return out;
 }
 
-function collectInto({
-  value,
-  depth,
-  out,
-  role,
-}: {
+type CollectWalk = Readonly<{
   value: unknown;
   depth: number;
   out: CollectedMediaPart[];
   /** Role of the nearest enclosing chat message, if the walk passed one. */
   role?: MediaPartRole;
-}): void {
+}>;
+
+function emitCollected(walk: CollectWalk, media: MediaPartData): void {
+  if (!isRenderableCollectedMedia(media)) return;
+  walk.out.push(walk.role ? { media, role: walk.role } : { media });
+}
+
+/** A string is either a bare media payload, or an envelope with media nested inside its JSON. */
+function collectFromString(walk: CollectWalk, value: string): void {
+  const bare = bareStringToMediaData(value);
+  if (bare) {
+    emitCollected(walk, bare);
+    return;
+  }
+  if (!containsRenderableMediaHints(value)) return;
+
+  const trimmed = value.trim();
+  const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+  if (!looksLikeJson) return;
+
+  try {
+    // The role carries across the nested-JSON hop: a message whose content
+    // is a stringified array of parts is still that message's content.
+    collectInto({ ...walk, value: JSON.parse(trimmed), depth: walk.depth + 1 });
+  } catch {
+    // not JSON — nothing to collect
+  }
+}
+
+/**
+ * Part-first: if this object IS a media part, surface it and stop — same rule as the extractor,
+ * which rewrites the part and never descends into it. Non-media objects (message envelopes,
+ * typed values, tool results) resolve to null and are walked generically.
+ */
+function collectFromObject(walk: CollectWalk, value: object): void {
+  const media = mediaPartToMediaData(value);
+  if (media) {
+    emitCollected(walk, media);
+    return;
+  }
+
+  const obj = value as Record<string, unknown>;
+  // A chat message envelope re-anchors the role for everything below it, so
+  // the innermost message wins for a nested transcript.
+  const nestedRole = isMediaPartRole(obj.role) ? obj.role : walk.role;
+  for (const key of Object.keys(obj)) {
+    collectInto({ value: obj[key], depth: walk.depth + 1, out: walk.out, role: nestedRole });
+  }
+}
+
+function collectInto(walk: CollectWalk): void {
+  const { value, depth } = walk;
   if (value == null || depth > MAX_MEDIA_WALK_DEPTH) return;
 
-  const emit = (media: MediaPartData) => {
-    if (!isRenderableCollectedMedia(media)) return;
-    out.push(role ? { media, role } : { media });
-  };
-
   if (typeof value === "string") {
-    const bare = bareStringToMediaData(value);
-    if (bare) {
-      emit(bare);
-      return;
-    }
-    if (!containsRenderableMediaHints(value)) return;
-    const trimmed = value.trim();
-    const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[");
-    if (!looksLikeJson) return;
-    try {
-      // The role carries across the nested-JSON hop: a message whose content
-      // is a stringified array of parts is still that message's content.
-      collectInto({ value: JSON.parse(trimmed), depth: depth + 1, out, role });
-    } catch {
-      // not JSON — nothing to collect
-    }
+    collectFromString(walk, value);
     return;
   }
 
   if (Array.isArray(value)) {
     for (const el of value) {
-      collectInto({ value: el, depth: depth + 1, out, role });
+      collectInto({ ...walk, value: el, depth: depth + 1 });
     }
     return;
   }
 
   if (typeof value === "object") {
-    // Part-first: if this object IS a media part, surface it and stop — same
-    // rule as the extractor, which rewrites the part and never descends into
-    // it. Non-media objects (message envelopes, typed values, tool results)
-    // resolve to null here and are walked generically below.
-    const media = mediaPartToMediaData(value);
-    if (media) {
-      emit(media);
-      return;
-    }
-    const obj = value as Record<string, unknown>;
-    // A chat message envelope re-anchors the role for everything below it, so
-    // the innermost message wins for a nested transcript.
-    const nestedRole = isMediaPartRole(obj.role) ? obj.role : role;
-    for (const key of Object.keys(obj)) {
-      collectInto({
-        value: obj[key],
-        depth: depth + 1,
-        out,
-        role: nestedRole,
-      });
-    }
+    collectFromObject(walk, value);
   }
 }

@@ -7,6 +7,7 @@ import {
 } from "./canonical-message.rules.ts";
 import {
   isLangWatchStructuredValue,
+  type LangWatchStructuredValue,
   safeStringify,
   stripTrailingAssistantMessages,
 } from "./langwatch-structured-value.rules.ts";
@@ -73,45 +74,60 @@ function canonicaliseInput(ctx: ExtractorContext, reservedTypes: string[]): void
   }
 }
 
-function canonicaliseOutput(ctx: ExtractorContext, reservedTypes: string[]): void {
-  const { attrs } = ctx.bag;
-  const rawOutput = attrs.take(ATTR_KEYS.LANGWATCH_OUTPUT);
-  if (rawOutput !== void 0) {
-    if (isLangWatchStructuredValue(rawOutput)) {
-      reservedTypes.push(`${ATTR_KEYS.LANGWATCH_OUTPUT}=${rawOutput.type}`);
-
-      if (rawOutput.type === "chat_messages" && Array.isArray(rawOutput.value)) {
-        const messages = normalizeToMessages(rawOutput.value, "assistant");
-
-        if (messages && messages.length > 0) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
-          ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output.chat_messages->gen_ai.output.messages`);
-        }
-
-        ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, rawOutput.value);
-        ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output`);
-      } else if (rawOutput.type === "json" && Array.isArray(rawOutput.value)) {
-        const content = rawOutput.value
-          .map((item) => (typeof item === "string" ? item : safeStringify(item)))
-          .join("\n");
-
-        const messages = normalizeToMessages(content, "assistant");
-        if (messages && messages.length > 0) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
-          ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output.json->gen_ai.output.messages`);
-        }
-
-        ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, rawOutput.value);
-        ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output`);
-      } else {
-        ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, rawOutput.value);
-        ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output`);
-      }
-    } else {
-      const normalizedOutput =
-        Array.isArray(rawOutput) && rawOutput.length === 1 ? rawOutput[0] : rawOutput;
-      ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, normalizedOutput);
-      ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output`);
-    }
+/** A chat-messages output: the canonical messages, and the raw value kept alongside. */
+function setChatMessagesOutput(ctx: ExtractorContext, value: unknown[]): void {
+  const messages = normalizeToMessages(value, "assistant");
+  if (messages && messages.length > 0) {
+    ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
+    ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output.chat_messages->gen_ai.output.messages`);
   }
+
+  ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, value);
+  ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output`);
+}
+
+/** A json-array output reads as one assistant turn: its items joined by newline. */
+function setJsonArrayOutput(ctx: ExtractorContext, value: unknown[]): void {
+  const content = value
+    .map((item) => (typeof item === "string" ? item : safeStringify(item)))
+    .join("\n");
+
+  const messages = normalizeToMessages(content, "assistant");
+  if (messages && messages.length > 0) {
+    ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
+    ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output.json->gen_ai.output.messages`);
+  }
+
+  ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, value);
+  ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output`);
+}
+
+function setStructuredOutput(ctx: ExtractorContext, rawOutput: LangWatchStructuredValue): void {
+  if (rawOutput.type === "chat_messages" && Array.isArray(rawOutput.value)) {
+    setChatMessagesOutput(ctx, rawOutput.value);
+    return;
+  }
+  if (rawOutput.type === "json" && Array.isArray(rawOutput.value)) {
+    setJsonArrayOutput(ctx, rawOutput.value);
+    return;
+  }
+
+  ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, rawOutput.value);
+  ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output`);
+}
+
+function canonicaliseOutput(ctx: ExtractorContext, reservedTypes: string[]): void {
+  const rawOutput = ctx.bag.attrs.take(ATTR_KEYS.LANGWATCH_OUTPUT);
+  if (rawOutput === void 0) return;
+
+  if (isLangWatchStructuredValue(rawOutput)) {
+    reservedTypes.push(`${ATTR_KEYS.LANGWATCH_OUTPUT}=${rawOutput.type}`);
+    setStructuredOutput(ctx, rawOutput);
+    return;
+  }
+
+  const normalizedOutput =
+    Array.isArray(rawOutput) && rawOutput.length === 1 ? rawOutput[0] : rawOutput;
+  ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, normalizedOutput);
+  ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:output`);
 }

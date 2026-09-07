@@ -100,31 +100,15 @@ export type TraceLegacySearchFields = Readonly<{
   llmMode: boolean;
 }>;
 
-/**
- * The deprecated trace family, built against one process's security. Split by grain in the ACCESS declaration rather than by handler: reads and the share pair are different powers, and `traces:share` creates PUBLIC links — exactly the sort of thing that must be legible in the route-policy registry rather than buried in a handler.
- */
-export function createTraceLegacyRestApp<
-  TSearchBody extends TraceLegacySearchFields,
-  TSearchBodyRaw,
->(options: {
-  security: AppRestSecurity;
-  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>;
-}): SecuredApp<Env> {
-  const { security, ports } = options;
+/** The app the deprecated trace routes register on. */
+type TraceLegacySecuredApp = ReturnType<AppRestSecurity["createServiceApp"]>;
 
-  const tracesViewAuth = handlerManagedAuth({
-    reason: AUTH_REASON,
-    permissions: ["traces:view"],
-    credential: "apiKey",
-  });
-  const tracesShareAuth = handlerManagedAuth({
-    reason: AUTH_REASON,
-    permissions: ["traces:share"],
-    credential: "apiKey",
-  });
-
-  const secured = security.createServiceApp({ basePath: "/api" });
-
+/** GET /api/trace/:id — the deprecated single-trace read. */
+function registerLegacyTraceRead<TSearchBody extends TraceLegacySearchFields, TSearchBodyRaw>(
+  secured: TraceLegacySecuredApp,
+  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>,
+  tracesViewAuth: ReturnType<typeof handlerManagedAuth>,
+): void {
   // ---------- GET /api/trace/:id ----------
   secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
     const auth = await ports.credential({ request: c.req.raw, permission: "traces:view" });
@@ -184,7 +168,14 @@ export function createTraceLegacyRestApp<
       ascii_tree: asciiTree,
     });
   });
+}
 
+/** POST /api/trace/:id/share and /unshare — the public-link pair. */
+function registerLegacyShareRoutes<TSearchBody extends TraceLegacySearchFields, TSearchBodyRaw>(
+  secured: TraceLegacySecuredApp,
+  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>,
+  tracesShareAuth: ReturnType<typeof handlerManagedAuth>,
+): void {
   // ---------- POST /api/trace/:id/share ----------
   secured.access(tracesShareAuth).post("/trace/:id/share", async (c) => {
     const auth = await ports.credential({ request: c.req.raw, permission: "traces:share" });
@@ -224,7 +215,43 @@ export function createTraceLegacyRestApp<
     markUsed();
     return c.json({ status: "success" });
   });
+}
 
+/** The three shapes the deprecated search answers in: digest, LLM mode, or the traces as read. */
+function legacySearchTraces(
+  enrichedTraces: Trace[],
+  options: Readonly<{ format: string; llmMode: boolean }>,
+): unknown[] {
+  if (options.format === "digest") {
+    return enrichedTraces.map((trace) => ({
+      trace_id: trace.trace_id,
+      formatted_trace: TraceFormattingService.formatTraceSummaryDigest(trace),
+      input: trace.input,
+      output: trace.output,
+      timestamps: trace.timestamps,
+      metadata: trace.metadata,
+      error: trace.error,
+      evaluations: trace.evaluations,
+    }));
+  }
+
+  if (options.llmMode) {
+    return enrichedTraces.map((trace) => ({
+      ...TraceFormattingService.toLLMModeTrace(trace as Trace & { spans: Span[] }),
+      spans: [],
+      evaluations: trace.evaluations,
+    }));
+  }
+
+  return enrichedTraces;
+}
+
+/** POST /api/trace/search — the deprecated trace search. */
+function registerLegacySearch<TSearchBody extends TraceLegacySearchFields, TSearchBodyRaw>(
+  secured: TraceLegacySecuredApp,
+  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>,
+  tracesViewAuth: ReturnType<typeof handlerManagedAuth>,
+): void {
   // ---------- POST /api/trace/search ----------
   secured.access(tracesViewAuth).post("/trace/search", async (c) => {
     const auth = await ports.credential({ request: c.req.raw, permission: "traces:view" });
@@ -278,27 +305,10 @@ export function createTraceLegacyRestApp<
       traceChecks: results.traceChecks,
     });
 
-    let traces: unknown[];
-    if (format === "digest") {
-      traces = enrichedTraces.map((trace) => ({
-        trace_id: trace.trace_id,
-        formatted_trace: TraceFormattingService.formatTraceSummaryDigest(trace),
-        input: trace.input,
-        output: trace.output,
-        timestamps: trace.timestamps,
-        metadata: trace.metadata,
-        error: trace.error,
-        evaluations: trace.evaluations,
-      }));
-    } else if (params.llmMode) {
-      traces = enrichedTraces.map((trace) => ({
-        ...TraceFormattingService.toLLMModeTrace(trace as Trace & { spans: Span[] }),
-        spans: [],
-        evaluations: trace.evaluations,
-      }));
-    } else {
-      traces = enrichedTraces;
-    }
+    const traces = legacySearchTraces(enrichedTraces, {
+      format,
+      llmMode: params.llmMode ?? false,
+    });
 
     markUsed();
     return c.json({
@@ -309,7 +319,14 @@ export function createTraceLegacyRestApp<
       },
     });
   });
+}
 
+/** GET /api/thread/:id — the deprecated thread read. */
+function registerLegacyThreadRead<TSearchBody extends TraceLegacySearchFields, TSearchBodyRaw>(
+  secured: TraceLegacySecuredApp,
+  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>,
+  tracesViewAuth: ReturnType<typeof handlerManagedAuth>,
+): void {
   // ---------- GET /api/thread/:id ----------
   secured.access(tracesViewAuth).get("/thread/:id", async (c) => {
     const auth = await ports.credential({ request: c.req.raw, permission: "traces:view" });
@@ -331,6 +348,37 @@ export function createTraceLegacyRestApp<
     markUsed();
     return c.json({ traces });
   });
+}
+
+/**
+ * The deprecated trace family, built against one process's security. Split by grain in the ACCESS declaration rather than by handler: reads and the share pair are different powers, and `traces:share` creates PUBLIC links — exactly the sort of thing that must be legible in the route-policy registry rather than buried in a handler.
+ */
+export function createTraceLegacyRestApp<
+  TSearchBody extends TraceLegacySearchFields,
+  TSearchBodyRaw,
+>(options: {
+  security: AppRestSecurity;
+  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>;
+}): SecuredApp<Env> {
+  const { security, ports } = options;
+
+  const tracesViewAuth = handlerManagedAuth({
+    reason: AUTH_REASON,
+    permissions: ["traces:view"],
+    credential: "apiKey",
+  });
+  const tracesShareAuth = handlerManagedAuth({
+    reason: AUTH_REASON,
+    permissions: ["traces:share"],
+    credential: "apiKey",
+  });
+
+  const secured = security.createServiceApp({ basePath: "/api" });
+
+  registerLegacyTraceRead(secured, ports, tracesViewAuth);
+  registerLegacyShareRoutes(secured, ports, tracesShareAuth);
+  registerLegacySearch(secured, ports, tracesViewAuth);
+  registerLegacyThreadRead(secured, ports, tracesViewAuth);
 
   return secured;
 }

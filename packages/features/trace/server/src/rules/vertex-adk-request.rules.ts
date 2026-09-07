@@ -5,71 +5,44 @@ import { convertGeminiContent, systemInstructionText } from "./gemini-content.ru
 import { asNumber, isNonEmptyString, isRecord, safeJsonParse } from "./canonical-guard.rules.ts";
 import { setIfMissing, VERTEX_ADK_KEYS, VERTEX_ADK_RULE_PREFIX } from "./vertex-adk-core.rules.ts";
 
-export function canonicaliseVertexAdkRequest(ctx: ExtractorContext): void {
+/** The request's `contents` become the canonical input messages, when nothing set them first. */
+function recordInputMessages(ctx: ExtractorContext, contents: unknown): void {
   const { attrs } = ctx.bag;
+  if (attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) return;
+  if (ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== void 0) return;
+  if (!Array.isArray(contents)) return;
 
-  const request = safeJsonParse(attrs.get(VERTEX_ADK_KEYS.LLM_REQUEST));
-  if (!isRecord(request)) {
-    return;
-  }
-  attrs.take(VERTEX_ADK_KEYS.LLM_REQUEST);
+  const messages = contents.flatMap((content) =>
+    convertGeminiContent({ content, defaultRole: "user" }),
+  );
+  if (messages.length === 0) return;
 
-  const recordedRequestModel =
-    isNonEmptyString(request.model) &&
-    setIfMissing({
-      ctx,
-      key: ATTR_KEYS.GEN_AI_REQUEST_MODEL,
-      value: request.model,
-    });
-  if (recordedRequestModel) {
-    ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:llm_request.model->gen_ai.request.model`);
-  }
+  ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, messages);
+  ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:llm_request->gen_ai.input.messages`);
+  recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+}
 
-  const contents = request.contents;
-  const canRecordInputMessages =
-    !attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) &&
-    ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] === void 0 &&
-    Array.isArray(contents);
-  if (canRecordInputMessages) {
-    const messages = contents.flatMap((content) =>
-      convertGeminiContent({ content, defaultRole: "user" }),
-    );
-    if (messages.length > 0) {
-      ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, messages);
-      ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:llm_request->gen_ai.input.messages`);
-      recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
-    }
-  }
-
-  const config = isRecord(request.config) ? request.config : void 0;
-  if (config === void 0) {
-    return;
-  }
-
+function recordSystemInstruction(ctx: ExtractorContext, config: Record<string, unknown>): void {
   const sysInstruction = systemInstructionText(config.system_instruction);
-  if (
-    sysInstruction !== null &&
-    setIfMissing({
-      ctx,
-      key: ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-      value: sysInstruction,
-    })
-  ) {
-    ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:system_instruction`);
+  if (sysInstruction === null) return;
+  if (!setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, value: sysInstruction })) {
+    return;
   }
 
-  const recordedToolDefinitions =
+  ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:system_instruction`);
+}
+
+function recordToolDefinitions(ctx: ExtractorContext, config: Record<string, unknown>): void {
+  const recorded =
     Array.isArray(config.tools) &&
     config.tools.length > 0 &&
-    setIfMissing({
-      ctx,
-      key: ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS,
-      value: config.tools,
-    });
-  if (recordedToolDefinitions) {
-    ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:tools->gen_ai.tool.definitions`);
-  }
+    setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS, value: config.tools });
+  if (!recorded) return;
 
+  ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:tools->gen_ai.tool.definitions`);
+}
+
+function recordSamplingParams(ctx: ExtractorContext, config: Record<string, unknown>): void {
   const paramMap: [string, unknown][] = [
     [ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE, config.temperature],
     [ATTR_KEYS.GEN_AI_REQUEST_TOP_P, config.top_p],
@@ -86,4 +59,35 @@ export function canonicaliseVertexAdkRequest(ctx: ExtractorContext): void {
   if (hasExtractedParams) {
     ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:params`);
   }
+}
+
+function recordRequestModel(ctx: ExtractorContext, request: Record<string, unknown>): void {
+  const recorded =
+    isNonEmptyString(request.model) &&
+    setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_REQUEST_MODEL, value: request.model });
+  if (!recorded) return;
+
+  ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:llm_request.model->gen_ai.request.model`);
+}
+
+export function canonicaliseVertexAdkRequest(ctx: ExtractorContext): void {
+  const { attrs } = ctx.bag;
+
+  const request = safeJsonParse(attrs.get(VERTEX_ADK_KEYS.LLM_REQUEST));
+  if (!isRecord(request)) {
+    return;
+  }
+  attrs.take(VERTEX_ADK_KEYS.LLM_REQUEST);
+
+  recordRequestModel(ctx, request);
+  recordInputMessages(ctx, request.contents);
+
+  const config = isRecord(request.config) ? request.config : void 0;
+  if (config === void 0) {
+    return;
+  }
+
+  recordSystemInstruction(ctx, config);
+  recordToolDefinitions(ctx, config);
+  recordSamplingParams(ctx, config);
 }

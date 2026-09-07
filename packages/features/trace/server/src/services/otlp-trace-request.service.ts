@@ -50,6 +50,57 @@ const join = (prefix: string, key: string): string => (prefix ? `${prefix}${SEP}
 const indexKey = (prefix: string, i: number): string =>
   prefix ? `${prefix}${SEP}${i}` : String(i);
 
+/** An `intValue` sent as a protobuf long, split into its high and low halves. */
+const longToNumber = (intValue: unknown): number | undefined => {
+  const hasHighLowParts =
+    typeof intValue === "object" && intValue !== null && "high" in intValue && "low" in intValue;
+  if (!hasHighLowParts) {
+    return void 0;
+  }
+
+  const { high, low } = intValue as { high: number | string; low: number | string };
+
+  return Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
+};
+
+const bytesScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
+  if (!("bytesValue" in v) || !v.bytesValue) {
+    return void 0;
+  }
+
+  return typeof v.bytesValue === "string" ? Buffer.from(v.bytesValue, "base64") : v.bytesValue;
+};
+
+const boolScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
+  if (!("boolValue" in v) || v.boolValue === null) {
+    return void 0;
+  }
+
+  return typeof v.boolValue === "string"
+    ? (v.boolValue as string).toLowerCase() === "true"
+    : v.boolValue;
+};
+
+const intScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
+  if (!("intValue" in v) || !v.intValue) {
+    return void 0;
+  }
+
+  if (typeof v.intValue === "string") {
+    return parseInt(v.intValue, 10);
+  }
+
+  return longToNumber(v.intValue) ?? (v.intValue as AttributeScalar);
+};
+
+const doubleScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
+  if (!("doubleValue" in v) || !v.doubleValue) {
+    return void 0;
+  }
+
+  return typeof v.doubleValue === "string" ? parseFloat(v.doubleValue) : v.doubleValue;
+};
+
 const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   if ("stringValue" in v && typeof v.stringValue === "string") {
     return v.stringValue;
@@ -59,48 +110,7 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
     return JSON.stringify(v.arrayValue.values.map((item) => scalar(item) ?? item));
   }
 
-  if ("bytesValue" in v && v.bytesValue) {
-    if (typeof v.bytesValue === "string") {
-      return Buffer.from(v.bytesValue, "base64");
-    }
-
-    return v.bytesValue;
-  }
-
-  if ("boolValue" in v && v.boolValue !== null) {
-    if (typeof v.boolValue === "string") {
-      return (v.boolValue as string).toLowerCase() === "true";
-    }
-
-    return v.boolValue;
-  }
-
-  if ("intValue" in v && v.intValue) {
-    if (typeof v.intValue === "string") {
-      return parseInt(v.intValue, 10);
-    }
-
-    const intValue = v.intValue;
-    const hasHighLowParts =
-      typeof intValue === "object" && intValue !== null && "high" in intValue && "low" in intValue;
-    if (hasHighLowParts) {
-      const { high, low } = intValue;
-
-      return Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
-    }
-
-    return intValue;
-  }
-
-  if ("doubleValue" in v && v.doubleValue) {
-    if (typeof v.doubleValue === "string") {
-      return parseFloat(v.doubleValue);
-    }
-
-    return v.doubleValue;
-  }
-
-  return void 0;
+  return bytesScalar(v) ?? boolScalar(v) ?? intScalar(v) ?? doubleScalar(v);
 };
 
 const isScalar = (v: OtlpAnyValue): boolean => scalar(v) !== void 0;
@@ -190,67 +200,75 @@ const normalizeOtlpStatusCode = (
     .otherwise(() => NormalizedStatusCode.UNSET);
 };
 
+/** One key/value into the flat result; a missing key means the value has no home. */
+const setFlattened = (out: FlattenResult, k: string | undefined | null, v: AttributeValue) => {
+  if (!k) {
+    return;
+  }
+
+  out[k] = v; // last write wins
+};
+
+/** An `arrayValue`: a list of scalars becomes one attribute, anything else is indexed per item. */
+const walkArrayValue = (
+  out: FlattenResult,
+  values: OtlpAnyValue[] | undefined,
+  prefix: string,
+): void => {
+  const vs = (values ?? []).filter(Boolean);
+
+  if (vs.every(isScalar)) {
+    setFlattened(
+      out,
+      prefix,
+      vs.map((x) => scalar(x)!).filter((x): x is AttributeScalar => x !== void 0),
+    );
+
+    return;
+  }
+
+  for (const [i, child] of vs.entries()) {
+    walkOtlpValue(out, child, indexKey(prefix, i));
+  }
+};
+
+const walkOtlpValue = (out: FlattenResult, v: OtlpAnyValue, prefix: string): void => {
+  const s = scalar(v);
+  if (s !== void 0) {
+    setFlattened(out, prefix, s);
+
+    return;
+  }
+
+  if ("kvlistValue" in v && v.kvlistValue) {
+    for (const { key, value } of v.kvlistValue.values) {
+      walkOtlpValue(out, value, join(prefix, key));
+    }
+
+    return;
+  }
+
+  if ("arrayValue" in v && v.arrayValue) {
+    walkArrayValue(out, v.arrayValue.values, prefix);
+  }
+
+  // empty {} or unknown -> ignore
+};
+
 const normalizeOtlpAnyValue = (root: OtlpAnyValue, rootKey?: string): FlattenResult => {
   const out: FlattenResult = {};
-
-  const set = (k: string | undefined | null, v: AttributeValue) => {
-    if (!k) {
-      return;
-    }
-
-    out[k] = v; // last write wins
-  };
-
-  const walk = (v: OtlpAnyValue, prefix: string) => {
-    const s = scalar(v);
-    if (s !== void 0) {
-      set(prefix, s);
-
-      return;
-    }
-
-    if ("kvlistValue" in v && v.kvlistValue) {
-      for (const { key, value } of v.kvlistValue.values) {
-        walk(value, join(prefix, key));
-      }
-
-      return;
-    }
-
-    if ("arrayValue" in v && v.arrayValue) {
-      const vsRaw = v.arrayValue.values ?? [];
-      const vs = vsRaw.filter(Boolean);
-
-      if (vs.every(isScalar)) {
-        set(
-          prefix,
-          vs.map((x) => scalar(x)!).filter((x): x is AttributeScalar => x !== void 0),
-        );
-
-        return;
-      }
-
-      for (const [i, child] of vs.entries()) {
-        walk(child, indexKey(prefix, i));
-      }
-
-      return;
-    }
-
-    // empty {} or unknown -> ignore
-  };
 
   // Scalar root has no natural key, so only keep it if rootKey provided.
   const rootScalar = scalar(root);
   if (rootScalar !== void 0) {
     if (rootKey) {
-      set(rootKey, rootScalar);
+      setFlattened(out, rootKey, rootScalar);
     }
 
     return out;
   }
 
-  walk(root, rootKey ? rootKey : "");
+  walkOtlpValue(out, root, rootKey ? rootKey : "");
 
   return out;
 };

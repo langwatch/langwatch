@@ -15,19 +15,27 @@ export class OpenInferenceCanonicaliserService implements CanonicalAttributesPor
 
   readonly id = "openinference";
 
-  apply(ctx: ExtractorContext): void {
+  /** `openinference.span.kind` names the span type, unless one was declared explicitly. */
+  private applySpanType(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
-
     const explicitType = attrs.get(ATTR_KEYS.SPAN_TYPE);
-    if (!(typeof explicitType === "string" && ALLOWED_SPAN_TYPES[explicitType] === true)) {
-      const rawKind = attrs.take(ATTR_KEYS.OPENINFERENCE_SPAN_KIND);
-      const kind = typeof rawKind === "string" ? rawKind.toLowerCase() : null;
-
-      if (kind && ALLOWED_SPAN_TYPES[kind] === true) {
-        ctx.setAttr(ATTR_KEYS.SPAN_TYPE, kind);
-        ctx.recordRule(`${this.id}:openinference.span.kind->langwatch.span.type`);
-      }
+    const hasExplicitType =
+      typeof explicitType === "string" && ALLOWED_SPAN_TYPES[explicitType] === true;
+    if (hasExplicitType) {
+      return;
     }
+
+    const rawKind = attrs.take(ATTR_KEYS.OPENINFERENCE_SPAN_KIND);
+    const kind = typeof rawKind === "string" ? rawKind.toLowerCase() : null;
+    if (kind && ALLOWED_SPAN_TYPES[kind] === true) {
+      ctx.setAttr(ATTR_KEYS.SPAN_TYPE, kind);
+      ctx.recordRule(`${this.id}:openinference.span.kind->langwatch.span.type`);
+    }
+  }
+
+  /** The user, session and tag attributes, each under its canonical key. */
+  private applyIdentity(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
 
     const userId = attrs.take(ATTR_KEYS.OPENINFERENCE_USER_ID);
     if (typeof userId === "string" && userId.length > 0) {
@@ -47,50 +55,60 @@ export class OpenInferenceCanonicaliserService implements CanonicalAttributesPor
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_LABELS, labelsStr);
       ctx.recordRule(`${this.id}:tag.tags`);
     }
+  }
 
-    const prompt = asNumber(attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT));
-    if (prompt !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, prompt);
+  /**
+   * Every token count, under its canonical key. `total` is consumed (so it does not leak into
+   * params) but not stored — total tokens are always derived as prompt + completion downstream.
+   */
+  private applyTokenCounts(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    const counts: [string, string][] = [
+      [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT, ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS],
+      [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION, ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS],
+    ];
+
+    let recordedAnyTokenCount = false;
+    for (const [source, target] of counts) {
+      const value = asNumber(attrs.take(source));
+      if (value !== null) {
+        ctx.setAttrIfAbsent(target, value);
+        recordedAnyTokenCount = true;
+      }
     }
 
-    const completion = asNumber(attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION));
-    if (completion !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, completion);
-    }
-
-    // `total` is consumed (so it doesn't leak into params) but not stored —
-    // total tokens are always derived as prompt + completion downstream.
     attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_TOTAL);
 
-    const reasoning = asNumber(
-      attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING),
-    );
-    if (reasoning !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoning);
+    const detailCounts: [string, string][] = [
+      [
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING,
+        ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
+      ],
+      [
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ,
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+      ],
+      [
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE,
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+      ],
+    ];
+    for (const [source, target] of detailCounts) {
+      const value = asNumber(attrs.take(source));
+      if (value !== null) {
+        ctx.setAttrIfAbsent(target, value);
+        recordedAnyTokenCount = true;
+      }
     }
 
-    const cacheRead = asNumber(
-      attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ),
-    );
-    if (cacheRead !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cacheRead);
-    }
-
-    const cacheWrite = asNumber(
-      attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE),
-    );
-    if (cacheWrite !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cacheWrite);
-    }
-
-    const recordedAnyTokenCount =
-      prompt !== null ||
-      completion !== null ||
-      reasoning !== null ||
-      cacheRead !== null ||
-      cacheWrite !== null;
     if (recordedAnyTokenCount) {
       ctx.recordRule(`${this.id}:llm.token_count`);
     }
+  }
+
+  apply(ctx: ExtractorContext): void {
+    this.applySpanType(ctx);
+    this.applyIdentity(ctx);
+    this.applyTokenCounts(ctx);
   }
 }

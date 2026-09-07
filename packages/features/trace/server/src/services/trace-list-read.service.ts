@@ -19,6 +19,7 @@ import type {
   FacetValuesResult,
   TraceListCursor,
   TraceListFacetCounts,
+  TraceListItem,
   TraceListPage,
   TraceListReadPort,
 } from "@langwatch/trace-contract";
@@ -118,6 +119,35 @@ export class TraceListService {
     TraceDiscoverService.setDiscoverBroadcaster(fn);
   }
 
+  /**
+   * Teases input/output/error previews and user-authored labels of items beyond the caller's
+   * visibility window — existence and counts stay untouched. Labels are user-authored metadata
+   * strings, so they are gated alongside the content fields to avoid leaking through on old
+   * traces.
+   */
+  static #gateItems(
+    items: TraceListItem[],
+    visibilityCutoffMs: number | null | undefined,
+  ): TraceListItem[] {
+    if (visibilityCutoffMs === null || visibilityCutoffMs === undefined) {
+      return items;
+    }
+
+    return items.map((item) =>
+      item.timestamp < visibilityCutoffMs ? TraceListService.#teaseItem(item) : item,
+    );
+  }
+
+  static #teaseItem(item: TraceListItem): TraceListItem {
+    return {
+      ...item,
+      input: item.input ? VisibilityWindowService.teaserOf(item.input) : item.input,
+      output: item.output ? VisibilityWindowService.teaserOf(item.output) : item.output,
+      error: item.error ? VisibilityWindowService.teaserOf(item.error) : item.error,
+      labels: item.labels.map((label) => VisibilityWindowService.teaserOf(label)),
+    };
+  }
+
   async getList(params: ListParams): Promise<TraceListPage> {
     const sortColumn = SORT_COLUMN_MAP[params.sort.columnId] ?? "OccurredAt";
 
@@ -152,24 +182,7 @@ export class TraceListService {
       since: params.timeRange.from,
     });
 
-    // Tease input/output/error previews and user-authored labels of items
-    // beyond the caller's visibility window — existence and counts stay
-    // untouched. Labels are user-authored metadata strings, so they're gated
-    // alongside the content fields to avoid leaking through on old traces.
-    const gatedItems =
-      params.visibilityCutoffMs === null || params.visibilityCutoffMs === undefined
-        ? items
-        : items.map((item) =>
-            item.timestamp < params.visibilityCutoffMs!
-              ? {
-                  ...item,
-                  input: item.input ? VisibilityWindowService.teaserOf(item.input) : item.input,
-                  output: item.output ? VisibilityWindowService.teaserOf(item.output) : item.output,
-                  error: item.error ? VisibilityWindowService.teaserOf(item.error) : item.error,
-                  labels: item.labels.map((label) => VisibilityWindowService.teaserOf(label)),
-                }
-              : item,
-          );
+    const gatedItems = TraceListService.#gateItems(items, params.visibilityCutoffMs);
 
     return {
       items: gatedItems,

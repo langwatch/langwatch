@@ -14,6 +14,178 @@ function toolCallName(o: Record<string, unknown>): string {
   return "tool";
 }
 
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * What every shape falls back to: a bare `image` string, then the visitor's own `unknown`. A
+ * shape that recognises its `type` but not its payload lands here too.
+ */
+function unclaimedPart<R>(
+  o: Record<string, unknown>,
+  part: unknown,
+  visitor: AsyncContentPartVisitor<R>,
+): R | Promise<R> | undefined {
+  if (typeof o.image === "string" && o.image) {
+    const src = o.image;
+    return visitor.bareImage ? visitor.bareImage(src) : visitor.unknown?.(part);
+  }
+
+  return visitor.unknown?.(part);
+}
+
+function textPart<R>(
+  o: Record<string, unknown>,
+  visitor: AsyncContentPartVisitor<R>,
+): R | Promise<R> | undefined {
+  const contentText = typeof o.content === "string" ? o.content : "";
+
+  return visitor.text(typeof o.text === "string" ? o.text : contentText);
+}
+
+function inputAudioPart<R>(
+  o: Record<string, unknown>,
+  part: unknown,
+  visitor: AsyncContentPartVisitor<R>,
+): R | Promise<R> | undefined {
+  const ia = tryParseRecord(o.input_audio);
+  if (!ia) return visitor.unknown?.(part);
+
+  const data = asString(ia.data);
+  const url = asString(ia.url);
+  if (!data && !url) return unclaimedPart(o, part, visitor);
+  if (!visitor.inputAudio) return visitor.unknown?.(part);
+
+  return visitor.inputAudio({
+    data,
+    url,
+    format: asString(ia.format),
+    mimeType: asString(ia.mimeType),
+  });
+}
+
+/** A `file` part carrying its payload inline, under `mediaType` + `data`/`url`. */
+function inlineFilePart<R>(
+  o: Record<string, unknown>,
+  part: unknown,
+  visitor: AsyncContentPartVisitor<R>,
+  payload: Readonly<{ mimeType: string; data: string | undefined; url: string | undefined }>,
+): R | Promise<R> | undefined {
+  const { mimeType, data, url } = payload;
+  if (mimeType.startsWith("audio/")) {
+    if (!visitor.inputAudio) return visitor.unknown?.(part);
+
+    return visitor.inputAudio({ data, url, format: mediaTypeToAudioFormat(mimeType), mimeType });
+  }
+
+  return visitor.binary({
+    type: "binary",
+    mimeType,
+    data,
+    url,
+    id: asString(o.id),
+    filename: asString(o.filename),
+  });
+}
+
+/** OpenAI's own shape: the payload sits under `file`, base64 with a filename. */
+function openAiFilePart<R>(
+  o: Record<string, unknown>,
+  part: unknown,
+  visitor: AsyncContentPartVisitor<R>,
+): R | Promise<R> | undefined {
+  const file = tryParseRecord(o.file);
+  if (!file) return visitor.unknown?.(part);
+
+  const binPart = openAiFilePayloadToBinaryPart(file);
+  if (!binPart) return visitor.unknown?.(part);
+  if (!binPart.mimeType.startsWith("audio/")) return visitor.binary(binPart);
+  if (!visitor.inputAudio) return visitor.unknown?.(part);
+
+  return visitor.inputAudio({
+    data: binPart.data,
+    format: mediaTypeToAudioFormat(binPart.mimeType),
+    mimeType: binPart.mimeType,
+  });
+}
+
+function filePart<R>(
+  o: Record<string, unknown>,
+  part: unknown,
+  visitor: AsyncContentPartVisitor<R>,
+): R | Promise<R> | undefined {
+  if (typeof o.mediaType === "string") {
+    const data = asString(o.data);
+    const url = asString(o.url);
+    if (data || url) {
+      return inlineFilePart(o, part, visitor, { mimeType: o.mediaType.toLowerCase(), data, url });
+    }
+  }
+
+  return openAiFilePart(o, part, visitor);
+}
+
+function binaryPart<R>(
+  o: Record<string, unknown>,
+  part: unknown,
+  visitor: AsyncContentPartVisitor<R>,
+): R | Promise<R> | undefined {
+  if (typeof o.mimeType !== "string") return unclaimedPart(o, part, visitor);
+
+  return visitor.binary({
+    type: "binary",
+    mimeType: o.mimeType,
+    data: asString(o.data),
+    url: asString(o.url),
+    id: asString(o.id),
+    filename: asString(o.filename),
+  });
+}
+
+function imageUrlPart<R>(
+  o: Record<string, unknown>,
+  part: unknown,
+  visitor: AsyncContentPartVisitor<R>,
+): R | Promise<R> | undefined {
+  const url = imageUrlFromPart(o);
+  if (url === null) return unclaimedPart(o, part, visitor);
+
+  return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
+}
+
+function dispatchRecordPart<R>(
+  o: Record<string, unknown>,
+  part: unknown,
+  visitor: AsyncContentPartVisitor<R>,
+): R | Promise<R> | undefined {
+  if (o.type === "text" || (!o.type && o.text)) return textPart(o, visitor);
+
+  const mediaPart = toMediaPart(o);
+  if (mediaPart) return visitor.media(mediaPart);
+
+  switch (o.type) {
+    case "input_audio":
+      return inputAudioPart(o, part, visitor);
+    case "file":
+      return filePart(o, part, visitor);
+    case "binary":
+      return binaryPart(o, part, visitor);
+    case "tool_use":
+    case "tool_call":
+      return visitor.toolCall({
+        name: toolCallName(o),
+        arguments: o.arguments ?? o.input ?? o.args,
+      });
+    case "tool_result":
+      return visitor.toolResult({ result: o.content ?? o.result });
+    case "image_url":
+      return imageUrlPart(o, part, visitor);
+    default:
+      return unclaimedPart(o, part, visitor);
+  }
+}
+
 export function dispatchContentPart<R>(
   part: unknown,
   visitor: ContentPartVisitor<R>,
@@ -35,116 +207,7 @@ export function dispatchContentPart<R>(
     return visitor.unknown?.(part);
   }
 
-  if (o.type === "text" || (!o.type && o.text)) {
-    const contentText = typeof o.content === "string" ? o.content : "";
-    const text = typeof o.text === "string" ? o.text : contentText;
-    return visitor.text(text);
-  }
-
-  {
-    const mediaPart = toMediaPart(o);
-    if (mediaPart) return visitor.media(mediaPart);
-  }
-
-  if (o.type === "input_audio") {
-    const ia = tryParseRecord(o.input_audio);
-    if (!ia) return visitor.unknown?.(part);
-
-    const data = typeof ia.data === "string" ? ia.data : undefined;
-    const url = typeof ia.url === "string" ? ia.url : undefined;
-    if (data || url) {
-      return visitor.inputAudio
-        ? visitor.inputAudio({
-            data,
-            url,
-            format: typeof ia.format === "string" ? ia.format : undefined,
-            mimeType: typeof ia.mimeType === "string" ? ia.mimeType : undefined,
-          })
-        : visitor.unknown?.(part);
-    }
-  }
-
-  if (o.type === "file" && typeof o.mediaType === "string") {
-    const mimeType = o.mediaType.toLowerCase();
-    const data = typeof o.data === "string" ? o.data : undefined;
-    const url = typeof o.url === "string" ? o.url : undefined;
-    if (data || url) {
-      if (mimeType.startsWith("audio/")) {
-        return visitor.inputAudio
-          ? visitor.inputAudio({
-              data,
-              url,
-              format: mediaTypeToAudioFormat(mimeType),
-              mimeType,
-            })
-          : visitor.unknown?.(part);
-      }
-      return visitor.binary({
-        type: "binary",
-        mimeType,
-        data,
-        url,
-        id: typeof o.id === "string" ? o.id : undefined,
-        filename: typeof o.filename === "string" ? o.filename : undefined,
-      });
-    }
-  }
-
-  if (o.type === "file") {
-    const file = tryParseRecord(o.file);
-    if (!file) return visitor.unknown?.(part);
-
-    const binPart = openAiFilePayloadToBinaryPart(file);
-    if (binPart?.mimeType.startsWith("audio/")) {
-      return visitor.inputAudio
-        ? visitor.inputAudio({
-            data: binPart.data,
-            format: mediaTypeToAudioFormat(binPart.mimeType),
-            mimeType: binPart.mimeType,
-          })
-        : visitor.unknown?.(part);
-    }
-    if (binPart) {
-      return visitor.binary(binPart);
-    }
-    return visitor.unknown?.(part);
-  }
-
-  if (o.type === "binary" && typeof o.mimeType === "string") {
-    return visitor.binary({
-      type: "binary",
-      mimeType: o.mimeType,
-      data: typeof o.data === "string" ? o.data : undefined,
-      url: typeof o.url === "string" ? o.url : undefined,
-      id: typeof o.id === "string" ? o.id : undefined,
-      filename: typeof o.filename === "string" ? o.filename : undefined,
-    });
-  }
-
-  if (o.type === "tool_use" || o.type === "tool_call") {
-    return visitor.toolCall({
-      name: toolCallName(o),
-      arguments: o.arguments ?? o.input ?? o.args,
-    });
-  }
-
-  if (o.type === "tool_result") {
-    return visitor.toolResult({ result: o.content ?? o.result });
-  }
-
-  {
-    const url = imageUrlFromPart(o);
-    if (url !== null) {
-      return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
-    }
-  }
-
-  if (typeof o.image === "string" && o.image) {
-    const src = o.image;
-    return visitor.bareImage ? visitor.bareImage(src) : visitor.unknown?.(part);
-  }
-
-  return visitor.unknown?.(part);
+  return dispatchRecordPart(o, part, visitor);
 }
 
 export function visitContentPart<R>(part: unknown, visitor: ContentPartVisitor<R>): R | undefined {

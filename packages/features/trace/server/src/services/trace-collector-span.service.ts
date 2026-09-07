@@ -39,10 +39,35 @@ function msToNanoString(ms: number): string {
   return String(ms * 1_000_000);
 }
 
-function buildSpanAttributes(span: Span): OtlpKeyValue[] {
-  const attrs: OtlpKeyValue[] = [];
+/** Every numeric usage metric a span carries, under its canonical attribute key. */
+const SPAN_METRIC_ATTRIBUTES = [
+  ["prompt_tokens", ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS],
+  ["completion_tokens", ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS],
+  ["reasoning_tokens", ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS],
+  ["cache_read_input_tokens", ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
+  ["cache_creation_input_tokens", ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS],
+  ["cost", ATTR_KEYS.LANGWATCH_SPAN_COST],
+] as const;
 
-  attrs.push(stringAttr(ATTR_KEYS.SPAN_TYPE, span.type));
+function metricAttributes(metrics: NonNullable<Span["metrics"]>): OtlpKeyValue[] {
+  const attrs: OtlpKeyValue[] = [];
+  for (const [field, key] of SPAN_METRIC_ATTRIBUTES) {
+    const value = metrics[field];
+    if (value != null) {
+      attrs.push(doubleAttr(key, value));
+    }
+  }
+
+  if (metrics.tokens_estimated != null) {
+    attrs.push(boolAttr(ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED, metrics.tokens_estimated));
+  }
+
+  return attrs;
+}
+
+/** The optional string-valued span fields, in the order the collector has always written them. */
+function spanStringAttributes(span: Span): OtlpKeyValue[] {
+  const attrs: OtlpKeyValue[] = [];
 
   if (span.input) {
     attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_INPUT, JSON.stringify(span.input)));
@@ -64,46 +89,16 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
     attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_RAG_CONTEXTS, JSON.stringify(span.contexts)));
   }
 
+  return attrs;
+}
+
+function buildSpanAttributes(span: Span): OtlpKeyValue[] {
+  const attrs: OtlpKeyValue[] = [stringAttr(ATTR_KEYS.SPAN_TYPE, span.type)];
+
+  attrs.push(...spanStringAttributes(span));
+
   if (span.metrics) {
-    if (span.metrics.prompt_tokens != null) {
-      attrs.push(doubleAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, span.metrics.prompt_tokens));
-    }
-
-    if (span.metrics.completion_tokens != null) {
-      attrs.push(doubleAttr(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, span.metrics.completion_tokens));
-    }
-
-    if (span.metrics.reasoning_tokens != null) {
-      attrs.push(
-        doubleAttr(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, span.metrics.reasoning_tokens),
-      );
-    }
-
-    if (span.metrics.cache_read_input_tokens != null) {
-      attrs.push(
-        doubleAttr(
-          ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-          span.metrics.cache_read_input_tokens,
-        ),
-      );
-    }
-
-    if (span.metrics.cache_creation_input_tokens != null) {
-      attrs.push(
-        doubleAttr(
-          ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-          span.metrics.cache_creation_input_tokens,
-        ),
-      );
-    }
-
-    if (span.metrics.tokens_estimated != null) {
-      attrs.push(boolAttr(ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED, span.metrics.tokens_estimated));
-    }
-
-    if (span.metrics.cost != null) {
-      attrs.push(doubleAttr(ATTR_KEYS.LANGWATCH_SPAN_COST, span.metrics.cost));
-    }
+    attrs.push(...metricAttributes(span.metrics));
   }
 
   if (span.params) {
@@ -118,6 +113,53 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
   return attrs;
 }
 
+/** One custom metadata value, under the attribute type its JavaScript type implies. */
+function customMetadataAttribute(attrKey: string, value: unknown): OtlpKeyValue {
+  if (typeof value === "string") {
+    return stringAttr(attrKey, value);
+  }
+
+  if (typeof value === "number") {
+    return doubleAttr(attrKey, value);
+  }
+
+  if (typeof value === "boolean") {
+    return boolAttr(attrKey, value);
+  }
+
+  return stringAttr(attrKey, JSON.stringify(value));
+}
+
+/** The reserved trace metadata, each field under its canonical resource attribute. */
+function reservedMetadataAttributes(metadata: ReservedTraceMetadata): OtlpKeyValue[] {
+  const attrs: OtlpKeyValue[] = [];
+
+  const strings: [string | undefined | null, string][] = [
+    [metadata.thread_id, ATTR_KEYS.LANGWATCH_THREAD_ID],
+    [metadata.user_id, ATTR_KEYS.LANGWATCH_USER_ID],
+    [metadata.customer_id, ATTR_KEYS.LANGWATCH_CUSTOMER_ID],
+  ];
+  for (const [value, key] of strings) {
+    if (value) {
+      attrs.push(stringAttr(key, value));
+    }
+  }
+
+  if (metadata.labels && metadata.labels.length > 0) {
+    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_LABELS, JSON.stringify(metadata.labels)));
+  }
+
+  if (metadata.sdk_version) {
+    attrs.push(stringAttr("langwatch.sdk.version", metadata.sdk_version));
+  }
+
+  if (metadata.sdk_language) {
+    attrs.push(stringAttr("langwatch.sdk.language", metadata.sdk_language));
+  }
+
+  return attrs;
+}
+
 function buildResource({
   reservedTraceMetadata,
   customMetadata,
@@ -127,49 +169,14 @@ function buildResource({
   customMetadata: CustomMetadata;
   expectedOutput?: string | null;
 }): OtlpResource | null {
-  const attrs: OtlpKeyValue[] = [];
-
-  if (reservedTraceMetadata.thread_id) {
-    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, reservedTraceMetadata.thread_id));
-  }
-
-  if (reservedTraceMetadata.user_id) {
-    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_USER_ID, reservedTraceMetadata.user_id));
-  }
-
-  if (reservedTraceMetadata.customer_id) {
-    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_CUSTOMER_ID, reservedTraceMetadata.customer_id));
-  }
-
-  if (reservedTraceMetadata.labels && reservedTraceMetadata.labels.length > 0) {
-    attrs.push(
-      stringAttr(ATTR_KEYS.LANGWATCH_LABELS, JSON.stringify(reservedTraceMetadata.labels)),
-    );
-  }
-
-  if (reservedTraceMetadata.sdk_version) {
-    attrs.push(stringAttr("langwatch.sdk.version", reservedTraceMetadata.sdk_version));
-  }
-
-  if (reservedTraceMetadata.sdk_language) {
-    attrs.push(stringAttr("langwatch.sdk.language", reservedTraceMetadata.sdk_language));
-  }
+  const attrs: OtlpKeyValue[] = reservedMetadataAttributes(reservedTraceMetadata);
 
   for (const [key, value] of Object.entries(customMetadata)) {
     if (value == null) {
       continue;
     }
 
-    const attrKey = `langwatch.metadata.${key}`;
-    if (typeof value === "string") {
-      attrs.push(stringAttr(attrKey, value));
-    } else if (typeof value === "number") {
-      attrs.push(doubleAttr(attrKey, value));
-    } else if (typeof value === "boolean") {
-      attrs.push(boolAttr(attrKey, value));
-    } else {
-      attrs.push(stringAttr(attrKey, JSON.stringify(value)));
-    }
+    attrs.push(customMetadataAttribute(`langwatch.metadata.${key}`, value));
   }
 
   if (expectedOutput) {

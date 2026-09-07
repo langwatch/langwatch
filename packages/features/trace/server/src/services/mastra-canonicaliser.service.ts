@@ -75,68 +75,141 @@ export class MastraCanonicaliserService implements CanonicalAttributesPort {
     ctx.recordRule(`${this.id}:mastra.span.type->langwatch.span.type`);
   }
 
+  /** The model named on the request body, recorded when nothing has claimed the model yet. */
+  private applyBodyModel(
+    ctx: ExtractorContext,
+    modelStepBody: Record<string, unknown>,
+  ): string | null {
+    const { attrs } = ctx.bag;
+    if (typeof modelStepBody.model !== "string" || modelStepBody.model.length === 0) {
+      return null;
+    }
+
+    const modelName = modelStepBody.model;
+    const modelUnset =
+      !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) && !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL);
+    if (modelUnset) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
+      ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
+      ctx.recordRule(`${this.id}:model_step.input.body.model->gen_ai.model`);
+    }
+
+    return modelName;
+  }
+
+  /** The request body's messages, with system turns lifted to gen_ai.system_instructions. */
+  private applyBodyMessages(ctx: ExtractorContext, modelStepBody: Record<string, unknown>): void {
+    const { attrs } = ctx.bag;
+    const canRecordInputMessages =
+      Array.isArray(modelStepBody.messages) &&
+      !attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) &&
+      ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] === void 0;
+    if (!canRecordInputMessages) {
+      return;
+    }
+
+    const msgs = normalizeToMessages(modelStepBody.messages, "user");
+    if (!msgs || msgs.length === 0) {
+      return;
+    }
+
+    const systemInstruction = extractSystemInstructionFromMessages(msgs);
+    // Strip system messages — they go to gen_ai.system_instructions
+    const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
+    if (chatMsgs.length > 0) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+    }
+
+    if (systemInstruction !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, systemInstruction);
+    }
+
+    ctx.recordRule(`${this.id}:model_step.input.body.messages->gen_ai.input.messages`);
+  }
+
+  /** Fallback: mastra.metadata.modelMetadata names the model when the body did not. */
+  private applyMetadataModel(ctx: ExtractorContext): string | null {
+    const { attrs } = ctx.bag;
+    const modelName = mastraValuesService.tryExtractModelFromMetadata(attrs);
+    const canRecordMetadataModel =
+      Boolean(modelName) &&
+      !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
+      !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL) &&
+      ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL] === void 0;
+    if (canRecordMetadataModel) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
+      ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
+      ctx.recordRule(`${this.id}:metadata.modelMetadata->gen_ai.model`);
+    }
+
+    return modelName;
+  }
+
   /** Extract model name from body.model and metadata fallback; set gen_ai model attrs. */
   private extractModelInfo(
     ctx: ExtractorContext,
     modelStepBody: Record<string, unknown> | null,
   ): string | null {
-    const { attrs } = ctx.bag;
     let modelName: string | null = null;
 
     if (modelStepBody) {
-      // Extract model name from body.model
-      if (typeof modelStepBody.model === "string" && modelStepBody.model.length > 0) {
-        modelName = modelStepBody.model;
-        const modelUnset =
-          !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) && !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL);
-        if (modelUnset) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
-          ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
-          ctx.recordRule(`${this.id}:model_step.input.body.model->gen_ai.model`);
-        }
-      }
+      modelName = this.applyBodyModel(ctx, modelStepBody);
+      this.applyBodyMessages(ctx, modelStepBody);
+    }
 
-      // Extract input messages from body.messages
-      const canRecordInputMessages =
-        Array.isArray(modelStepBody.messages) &&
-        !attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) &&
-        ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] === void 0;
-      if (canRecordInputMessages) {
-        const msgs = normalizeToMessages(modelStepBody.messages, "user");
-        if (msgs && msgs.length > 0) {
-          const systemInstruction = extractSystemInstructionFromMessages(msgs);
-          // Strip system messages — they go to gen_ai.system_instructions
-          const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
-          if (chatMsgs.length > 0) {
-            ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
-            recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
-          }
+    if (modelName) {
+      return modelName;
+    }
 
-          if (systemInstruction !== null) {
-            ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, systemInstruction);
-          }
+    return this.applyMetadataModel(ctx);
+  }
 
-          ctx.recordRule(`${this.id}:model_step.input.body.messages->gen_ai.input.messages`);
-        }
+  /** An agent_run span's input and output: the last user message, and the reply text. */
+  private applyAgentRunIO(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+
+    const rawInput = attrs.has(ATTR_KEYS.LANGWATCH_INPUT)
+      ? void 0
+      : attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_INPUT);
+    if (rawInput !== void 0) {
+      const lastUserMessage = extractLastUserMessageText(rawInput);
+      if (lastUserMessage) {
+        ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, lastUserMessage);
+        ctx.recordRule(`${this.id}:mastra.agent_run.input->langwatch.input`);
       }
     }
 
-    // Fallback: try mastra.metadata.modelMetadata for model name
-    if (!modelName) {
-      modelName = mastraValuesService.tryExtractModelFromMetadata(attrs);
-      const canRecordMetadataModel =
-        Boolean(modelName) &&
-        !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
-        !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL) &&
-        ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL] === void 0;
-      if (canRecordMetadataModel) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
-        ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
-        ctx.recordRule(`${this.id}:metadata.modelMetadata->gen_ai.model`);
+    const rawOutput = attrs.has(ATTR_KEYS.LANGWATCH_OUTPUT)
+      ? void 0
+      : attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_OUTPUT);
+    if (rawOutput !== void 0) {
+      const text = mastraValuesService.tryExtractTextFromOutput(rawOutput);
+      if (text) {
+        ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
+        ctx.recordRule(`${this.id}:mastra.agent_run.output->langwatch.output`);
       }
     }
+  }
 
-    return modelName;
+  /** A model_step span's output: the structured eval result for an orphan, else the text. */
+  private applyModelStepOutput(
+    ctx: ExtractorContext,
+    isEvalModelStep: boolean,
+    rawOutput: unknown,
+  ): void {
+    if (!isEvalModelStep) {
+      this.applyModelStepTextOutput(ctx, rawOutput);
+
+      return;
+    }
+
+    // For orphan eval spans: prefer structured object, fall back to text
+    const evalOutput = mastraValuesService.extractEvalOutput(rawOutput);
+    if (evalOutput != null) {
+      ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, evalOutput);
+      ctx.recordRule(`${this.id}:orphan.model_step.output->langwatch.output`);
+    }
   }
 
   /** Map Mastra-specific I/O attributes to canonical langwatch.input/output. */
@@ -148,45 +221,14 @@ export class MastraCanonicaliserService implements CanonicalAttributesPort {
   ): void {
     const { attrs } = ctx.bag;
 
-    // For agent_run spans: extract I/O from mastra.agent_run.input/output
     if (mastraType === "agent_run") {
-      if (!attrs.has(ATTR_KEYS.LANGWATCH_INPUT)) {
-        const rawInput = attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_INPUT);
-        if (rawInput !== void 0) {
-          const lastUserMessage = extractLastUserMessageText(rawInput);
-          if (lastUserMessage) {
-            ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, lastUserMessage);
-            ctx.recordRule(`${this.id}:mastra.agent_run.input->langwatch.input`);
-          }
-        }
-      }
-
-      if (!attrs.has(ATTR_KEYS.LANGWATCH_OUTPUT)) {
-        const rawOutput = attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_OUTPUT);
-        if (rawOutput !== void 0) {
-          const text = mastraValuesService.tryExtractTextFromOutput(rawOutput);
-          if (text) {
-            ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
-            ctx.recordRule(`${this.id}:mastra.agent_run.output->langwatch.output`);
-          }
-        }
-      }
+      this.applyAgentRunIO(ctx);
     }
 
-    // For model_step spans: extract text from mastra.model_step.output
     if (mastraType === "model_step" && !attrs.has(ATTR_KEYS.LANGWATCH_OUTPUT)) {
       const rawOutput = attrs.get(ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT);
       if (rawOutput !== void 0) {
-        if (isEvalModelStep) {
-          // For orphan eval spans: prefer structured object, fall back to text
-          const evalOutput = mastraValuesService.extractEvalOutput(rawOutput);
-          if (evalOutput != null) {
-            ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, evalOutput);
-            ctx.recordRule(`${this.id}:orphan.model_step.output->langwatch.output`);
-          }
-        } else {
-          this.applyModelStepTextOutput(ctx, rawOutput);
-        }
+        this.applyModelStepOutput(ctx, isEvalModelStep, rawOutput);
       }
     }
 

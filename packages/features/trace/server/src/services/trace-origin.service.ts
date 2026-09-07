@@ -91,6 +91,83 @@ export class TraceOriginService {
     }
   }
 
+  /**
+   * Eval-chain detection: nlpgo's BaggageAttributeProcessor stamps
+   * langwatch.reserved.causality_depth on every span emitted during an evaluator workflow run
+   * (post-PR-#4048 loop prevention). A non-root span with depth >= 1 is by definition an eval
+   * child riding in on someone else's traceparent.
+   */
+  #isEvalChainChild(span: NormalizedSpan, isRootSpan: boolean): boolean {
+    const rawDepth = span.spanAttributes["langwatch.reserved.causality_depth"];
+    const numericDepth = typeof rawDepth === "number" ? rawDepth : 0;
+    const causalityDepth =
+      typeof rawDepth === "string" ? parseInt(rawDepth, 10) || 0 : numericDepth;
+
+    return !isRootSpan && causalityDepth >= 1;
+  }
+
+  /**
+   * Which origin survives when a span declares one. An eval child never flips the customer
+   * trace's origin (2026-05-14 prod regression: eval spans continue the parent trace via W3C
+   * traceparent and arrived with origin="evaluation"), and once a trace has resolved to "langy"
+   * a gateway span never displaces it — a Langy turn carries BOTH platform origins, and under
+   * "explicit always wins" whichever span folded last decided the summary. Otherwise explicit
+   * wins: it is a deliberate, high-confidence SDK or platform signal.
+   */
+  #resolveExplicitOrigin({
+    explicitOrigin,
+    existingOrigin,
+    isEvalChainChild,
+  }: {
+    explicitOrigin: string;
+    existingOrigin: string | undefined;
+    isEvalChainChild: boolean;
+  }): string {
+    if (isEvalChainChild && existingOrigin) {
+      return existingOrigin;
+    }
+
+    if (existingOrigin === "langy" && explicitOrigin === "gateway") {
+      return existingOrigin;
+    }
+
+    return explicitOrigin;
+  }
+
+  /**
+   * Which origin a span with no explicit one implies. A root span's legacy marker overrides a
+   * provisional origin an earlier child set; the sdk.name heuristic is root-only, because
+   * sdk.name is a resource attribute identical across ALL spans and inferring from it on a child
+   * races the platform span's arrival.
+   */
+  #resolveInferredOrigin({
+    state,
+    span,
+    mergedAttributes,
+    isRootSpan,
+  }: {
+    state: TraceSummaryData;
+    span: NormalizedSpan;
+    mergedAttributes: Record<string, string>;
+    isRootSpan: boolean;
+  }): string | undefined {
+    const inferred = this.tryInferOriginFromLegacyMarkers(span);
+    if (isRootSpan && inferred) {
+      return inferred;
+    }
+
+    const existingOrigin = state.attributes["langwatch.origin"];
+    if (inferred && !existingOrigin) {
+      return inferred;
+    }
+
+    if (existingOrigin) {
+      return existingOrigin;
+    }
+
+    return isRootSpan && mergedAttributes["sdk.name"] ? "application" : undefined;
+  }
+
   hoistOrigin({
     state,
     span,
@@ -104,73 +181,26 @@ export class TraceOriginService {
     // The ingest-key provenance stamp writes langwatch.origin onto the RESOURCE
     // attributes (so an upstream payload can't forge a different origin per
     // span) — e.g. Claude Code's log-derived spans carry `coding_agent` only on
-    // the resource, never on the span. Treat a resource-level origin as an
-    // explicit signal too, falling back to it when the span carries none, so
-    // these traces resolve their origin deterministically at fold time instead
-    // of decaying to the deferred "application" fallback when the fold is slow.
+    // the resource. A resource-level origin is an explicit signal too, so these
+    // traces resolve deterministically at fold time instead of decaying to the
+    // deferred "application" fallback when the fold is slow.
     const spanOrigin = span.spanAttributes["langwatch.origin"];
     const resourceOrigin = span.resourceAttributes["langwatch.origin"];
     const explicitOrigin = nonEmptyString(spanOrigin) ?? nonEmptyString(resourceOrigin);
-    const existingOrigin = state.attributes["langwatch.origin"];
-
-    // Eval-chain detection: nlpgo's BaggageAttributeProcessor stamps
-    // langwatch.reserved.causality_depth on every span emitted during
-    // an evaluator workflow run (set by post-PR-#4048 loop prevention).
-    // A non-root span with depth>=1 is by definition an eval child
-    // riding in on someone else's traceparent — its origin must NOT
-    // be allowed to flip the customer trace's resolved origin.
-    const rawDepth = span.spanAttributes["langwatch.reserved.causality_depth"];
-    const numericDepth = typeof rawDepth === "number" ? rawDepth : 0;
-    const causalityDepth =
-      typeof rawDepth === "string" ? parseInt(rawDepth, 10) || 0 : numericDepth;
-    const isEvalChainChild = !isRootSpan && causalityDepth >= 1;
 
     if (explicitOrigin) {
-      if (isEvalChainChild && existingOrigin) {
-        // 2026-05-14 prod regression: eval workflow spans now continue
-        // the parent trace via W3C traceparent (PR #4048). They land on
-        // the customer's trace as children with origin="evaluation" +
-        // causality_depth=1; the previous "explicit always wins" rule
-        // then flipped the trace summary's origin from playground /
-        // application to evaluation as the eval spans arrived.
-        mergedAttributes["langwatch.origin"] = existingOrigin;
-      } else if (existingOrigin === "langy" && explicitOrigin === "gateway") {
-        // A Langy turn's trace carries BOTH platform origins: the manager's
-        // relay stamps "langy" on the turn span + relayed worker spans, and
-        // the AI gateway stamps "gateway" on the gen_ai spans it retells into
-        // the SAME trace. Under "explicit always wins", whichever span folded
-        // last decided the summary — the same turn flipped between "langy"
-        // and "gateway" run to run. Langy outranks the gateway: once a trace
-        // has resolved to "langy", a gateway span never displaces it (while a
-        // langy span arriving after gateway spans still upgrades it, via the
-        // explicit-wins branch below).
-        mergedAttributes["langwatch.origin"] = existingOrigin;
-      } else {
-        // Explicit langwatch.origin on any other span wins — it's a
-        // deliberate, high-confidence signal (SDK or platform). This
-        // also covers the SDK-heuristic-application → explicit-platform
-        // upgrade path on distributed traces where the root span isn't
-        // the platform's root.
-        mergedAttributes["langwatch.origin"] = explicitOrigin;
-      }
-    } else {
-      // For root spans, always try legacy markers first — a root with a
-      // legacy marker should override a provisional origin (e.g. "application")
-      // set by an earlier-arriving child via the sdk.name heuristic.
-      const inferred = this.tryInferOriginFromLegacyMarkers(span);
-      if (isRootSpan && inferred) {
-        mergedAttributes["langwatch.origin"] = inferred;
-      } else if (inferred && !state.attributes["langwatch.origin"]) {
-        mergedAttributes["langwatch.origin"] = inferred;
-      } else if (state.attributes["langwatch.origin"]) {
-        mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
-      } else if (isRootSpan && mergedAttributes["sdk.name"]) {
-        // SDK heuristic: only on root spans. sdk.name is a resource
-        // attribute identical across ALL spans — inferring origin from it
-        // on child spans creates a race where origin flips from "application"
-        // to the real value when the platform span arrives.
-        mergedAttributes["langwatch.origin"] = "application";
-      }
+      mergedAttributes["langwatch.origin"] = this.#resolveExplicitOrigin({
+        explicitOrigin,
+        existingOrigin: state.attributes["langwatch.origin"],
+        isEvalChainChild: this.#isEvalChainChild(span, isRootSpan),
+      });
+
+      return;
+    }
+
+    const inferred = this.#resolveInferredOrigin({ state, span, mergedAttributes, isRootSpan });
+    if (inferred !== undefined) {
+      mergedAttributes["langwatch.origin"] = inferred;
     }
   }
 

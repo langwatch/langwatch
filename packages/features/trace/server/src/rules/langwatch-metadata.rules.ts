@@ -11,62 +11,78 @@ export function canonicaliseLangWatchMetadata(ctx: ExtractorContext): void {
   canonicaliseParams(ctx);
 }
 
+const RESERVED_METADATA_KEYS: Readonly<Record<string, true>> = {
+  labels: true,
+  user_id: true,
+  userId: true,
+  thread_id: true,
+  threadId: true,
+  customer_id: true,
+  customerId: true,
+};
+
+/** The reserved metadata keys, under both spellings, and the canonical attribute each becomes. */
+const RESERVED_METADATA_FIELDS = [
+  { attribute: ATTR_KEYS.LANGWATCH_USER_ID, keys: ["user_id", "userId"], rule: "metadata.user_id" },
+  {
+    attribute: ATTR_KEYS.GEN_AI_CONVERSATION_ID,
+    keys: ["thread_id", "threadId"],
+    rule: "metadata.thread_id",
+  },
+  {
+    attribute: ATTR_KEYS.LANGWATCH_CUSTOMER_ID,
+    keys: ["customer_id", "customerId"],
+    rule: "metadata.customer_id",
+  },
+] as const;
+
+function hoistReservedMetadata(ctx: ExtractorContext, metadata: Record<string, unknown>): void {
+  if (Array.isArray(metadata.labels)) {
+    ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_LABELS, [...metadata.labels]);
+    ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:metadata.labels`);
+  }
+
+  for (const field of RESERVED_METADATA_FIELDS) {
+    const value = metadata[field.keys[0]] ?? metadata[field.keys[1]];
+    if (typeof value !== "string" || value.length === 0) continue;
+
+    ctx.setAttrIfAbsent(field.attribute, value);
+    ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:${field.rule}`);
+  }
+}
+
+/** Every non-reserved metadata key travels as its own `metadata.<key>` attribute. */
+function hoistCustomMetadata(ctx: ExtractorContext, metadata: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(metadata)) {
+    if (RESERVED_METADATA_KEYS[key] === true) continue;
+    if (value === null || value === void 0) continue;
+
+    ctx.setAttrIfAbsent(
+      `metadata.${key}`,
+      typeof value === "string" ? value : safeStringify(value),
+    );
+  }
+  ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:metadata.hoisted`);
+}
+
 function canonicaliseMetadataBlob(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
   const metadata =
     attrs.take("metadata") ?? attrs.take("langwatch.metadata") ?? attrs.take("langwatch.trace");
+
   if (isRecord(metadata)) {
-    if (Array.isArray(metadata.labels)) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_LABELS, [...metadata.labels]);
-      ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:metadata.labels`);
-    }
-
-    const metaUserId = metadata.user_id ?? metadata.userId;
-    if (typeof metaUserId === "string" && metaUserId.length > 0) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_USER_ID, metaUserId);
-      ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:metadata.user_id`);
-    }
-
-    const metaThreadId = metadata.thread_id ?? metadata.threadId;
-    if (typeof metaThreadId === "string" && metaThreadId.length > 0) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, metaThreadId);
-      ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:metadata.thread_id`);
-    }
-
-    const metaCustomerId = metadata.customer_id ?? metadata.customerId;
-    if (typeof metaCustomerId === "string" && metaCustomerId.length > 0) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_CUSTOMER_ID, metaCustomerId);
-      ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:metadata.customer_id`);
-    }
-
-    const RESERVED_METADATA_KEYS: Readonly<Record<string, true>> = {
-      labels: true,
-      user_id: true,
-      userId: true,
-      thread_id: true,
-      threadId: true,
-      customer_id: true,
-      customerId: true,
-    };
-    for (const [key, value] of Object.entries(metadata)) {
-      if (RESERVED_METADATA_KEYS[key] === true) {
-        continue;
-      }
-      if (value !== null && value !== void 0) {
-        ctx.setAttrIfAbsent(
-          `metadata.${key}`,
-          typeof value === "string" ? value : safeStringify(value),
-        );
-      }
-    }
-    ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:metadata.hoisted`);
-  } else if (metadata !== void 0 && metadata !== null) {
-    ctx.setAttrIfAbsent(
-      "metadata._raw",
-      typeof metadata === "string" ? metadata : safeStringify(metadata),
-    );
-    ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:metadata._raw`);
+    hoistReservedMetadata(ctx, metadata);
+    hoistCustomMetadata(ctx, metadata);
+    return;
   }
+
+  if (metadata === void 0 || metadata === null) return;
+
+  ctx.setAttrIfAbsent(
+    "metadata._raw",
+    typeof metadata === "string" ? metadata : safeStringify(metadata),
+  );
+  ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:metadata._raw`);
 }
 
 function canonicaliseMetadataSubkeys(ctx: ExtractorContext): void {

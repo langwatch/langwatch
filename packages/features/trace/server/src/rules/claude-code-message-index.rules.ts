@@ -76,6 +76,38 @@ type ChatRole = (typeof CHAT_ROLES)[number];
 const CHAT_ROLE_SET: ReadonlySet<string> = new Set(CHAT_ROLES);
 
 /**
+ * Ingest parsed the raw body once and stamped the reply text on the record, so prefer that over
+ * re-parsing a 60 KB blob on every read. The parse stays as the fallback for records ingested
+ * before the derivation existed — and it keeps the `tool_use` markers, which the derived text
+ * does not, so the shortcut is only taken when the call asked for no tools.
+ */
+function outputBodyText(
+  log: ClaudeContentLog,
+  traceCanonicalisation: TraceCanonicalisationService,
+): string | null {
+  const hasToolFreeDerivedText =
+    log.derivedOutputText !== null &&
+    log.derivedOutputText !== undefined &&
+    (log.derivedToolCallCount ?? 0) === 0;
+  const derived = hasToolFreeDerivedText ? log.derivedOutputText : null;
+
+  return (
+    derived ?? traceCanonicalisation.deriveClaudeResponseContent({ body: log.body }).assistantOutput
+  );
+}
+
+/** Whether this log names a request id the index does not already answer, under `eventName`. */
+function isFirstLogOfKind(
+  log: ClaudeContentLog,
+  eventName: string,
+  byRequestId: Map<string, SpanInputOutput>,
+): log is ClaudeContentLog & { requestId: string } {
+  if (log.eventName !== eventName || log.requestId === null) return false;
+
+  return !byRequestId.has(log.requestId);
+}
+
+/**
  * Indexes output content by request_id. A parsed response body takes precedence over raw assistant
  * text for the same id, and the first log of each kind wins. Bodies are bounded: the response-body
  * extractor caps internally, and raw text is capped here.
@@ -87,42 +119,16 @@ export function buildOutputIndex(
   const byRequestId = new Map<string, SpanInputOutput>();
 
   for (const log of logs) {
-    if (log.eventName !== OUTPUT_BODY_EVENT || log.requestId === null) {
-      continue;
-    }
+    if (!isFirstLogOfKind(log, OUTPUT_BODY_EVENT, byRequestId)) continue;
 
-    if (byRequestId.has(log.requestId)) {
-      continue;
-    }
-
-    // Ingest parsed the raw body once and stamped the reply text on the record,
-    // so prefer that over re-parsing a 60 KB blob on every read. The parse stays
-    // as the fallback for records ingested before the derivation existed — and
-    // it keeps the `tool_use` markers, which the derived text does not, so we
-    // only take the shortcut when the call asked for no tools.
-    const hasToolFreeDerivedText =
-      log.derivedOutputText !== null &&
-      log.derivedOutputText !== undefined &&
-      (log.derivedToolCallCount ?? 0) === 0;
-    const derived = hasToolFreeDerivedText ? log.derivedOutputText : null;
-    const text =
-      derived ??
-      traceCanonicalisation.deriveClaudeResponseContent({
-        body: log.body,
-      }).assistantOutput;
+    const text = outputBodyText(log, traceCanonicalisation);
     if (text !== null) {
       byRequestId.set(log.requestId, { type: "text", value: text });
     }
   }
 
   for (const log of logs) {
-    if (log.eventName !== ASSISTANT_RESPONSE_EVENT || log.requestId === null) {
-      continue;
-    }
-
-    if (byRequestId.has(log.requestId)) {
-      continue;
-    }
+    if (!isFirstLogOfKind(log, ASSISTANT_RESPONSE_EVENT, byRequestId)) continue;
 
     if (log.body !== null && log.body.length > 0) {
       byRequestId.set(log.requestId, {

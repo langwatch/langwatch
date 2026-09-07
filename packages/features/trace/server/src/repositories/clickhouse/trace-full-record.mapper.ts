@@ -261,6 +261,22 @@ export class TraceFullRecordMapper {
     });
   }
 
+  /** Walks (creating as it goes) to the record that holds the last segment of `path`. */
+  private static containerForPath(
+    result: Record<string, TraceRecordValue>,
+    path: string[],
+  ): Record<string, TraceRecordValue> {
+    let current = result;
+    for (const part of path.slice(0, -1)) {
+      const child = current[part];
+      if (!TraceFullRecordMapper.isRecord(child)) current[part] = {};
+      const next = current[part];
+      if (TraceFullRecordMapper.isRecord(next)) current = next;
+    }
+
+    return current;
+  }
+
   private static unflatten(attributes: NormalizedAttributes): Record<string, TraceRecordValue> {
     const result: Record<string, TraceRecordValue> = {};
     for (const [key, raw] of Object.entries(attributes)) {
@@ -269,18 +285,11 @@ export class TraceFullRecordMapper {
       const path = key.split(".");
       const hasDangerousSegment = path.some((part) => dangerousPathKeys.has(part));
       if (hasDangerousSegment) continue;
-      let current = result;
-      for (const [index, part] of path.entries()) {
-        if (index === path.length - 1) {
-          current[part] = value;
-          continue;
-        }
-        const child = current[part];
-        if (!TraceFullRecordMapper.isRecord(child)) current[part] = {};
-        const next = current[part];
-        if (TraceFullRecordMapper.isRecord(next)) current = next;
-      }
+
+      const container = TraceFullRecordMapper.containerForPath(result, path);
+      container[path[path.length - 1]!] = value;
     }
+
     return result;
   }
 
@@ -448,6 +457,50 @@ export class TraceFullRecordMapper {
     return base;
   }
 
+  /** One span's event record, or none when the span carries no typed `event`. */
+  private static fullRecordEventOf({
+    span,
+    projectId,
+    traceId,
+  }: {
+    span: TraceFullRecordSpan;
+    projectId: string;
+    traceId: string;
+  }): TraceFullRecordEvent | null {
+    const event = TraceFullRecordMapper.recordAtPath(span.params, ["event"]);
+    if (!TraceFullRecordMapper.isRecord(event)) return null;
+    if (typeof event.type !== "string" || event.type.length === 0) return null;
+
+    const metrics: Record<string, number> = {};
+    if (TraceFullRecordMapper.isRecord(event.metrics)) {
+      for (const [key, value] of Object.entries(event.metrics)) {
+        const number = TraceFullRecordMapper.valueToNumber(value);
+        if (number !== null) metrics[key] = number;
+      }
+    }
+
+    const eventDetails: Record<string, string> = {};
+    if (TraceFullRecordMapper.isRecord(event.details)) {
+      for (const [key, value] of Object.entries(event.details)) {
+        if (typeof value === "string") eventDetails[key] = value;
+      }
+    }
+
+    return {
+      event_id: span.span_id,
+      event_type: event.type,
+      project_id: projectId,
+      trace_id: traceId,
+      metrics,
+      event_details: eventDetails,
+      timestamps: {
+        started_at: span.timestamps.started_at,
+        inserted_at: span.timestamps.started_at,
+        updated_at: span.timestamps.finished_at,
+      },
+    };
+  }
+
   static extractFullRecordEvents({
     spans,
     projectId,
@@ -459,65 +512,33 @@ export class TraceFullRecordMapper {
   }): TraceFullRecordEvent[] {
     const events: TraceFullRecordEvent[] = [];
     for (const span of spans) {
-      const event = TraceFullRecordMapper.recordAtPath(span.params, ["event"]);
-      if (
-        !TraceFullRecordMapper.isRecord(event) ||
-        typeof event.type !== "string" ||
-        event.type.length === 0
-      )
-        continue;
-      const metrics: Record<string, number> = {};
-      if (TraceFullRecordMapper.isRecord(event.metrics)) {
-        for (const [key, value] of Object.entries(event.metrics)) {
-          const number = TraceFullRecordMapper.valueToNumber(value);
-          if (number !== null) metrics[key] = number;
-        }
-      }
-      const eventDetails: Record<string, string> = {};
-      if (TraceFullRecordMapper.isRecord(event.details)) {
-        for (const [key, value] of Object.entries(event.details)) {
-          if (typeof value === "string") eventDetails[key] = value;
-        }
-      }
-      events.push({
-        event_id: span.span_id,
-        event_type: event.type,
-        project_id: projectId,
-        trace_id: traceId,
-        metrics,
-        event_details: eventDetails,
-        timestamps: {
-          started_at: span.timestamps.started_at,
-          inserted_at: span.timestamps.started_at,
-          updated_at: span.timestamps.finished_at,
-        },
-      });
+      const event = TraceFullRecordMapper.fullRecordEventOf({ span, projectId, traceId });
+      if (event) events.push(event);
     }
+
     return events;
   }
 
-  static mapTraceMetadata(attributes: Record<string, string>): Record<string, TraceRecordValue> {
-    const metadata: Record<string, TraceRecordValue> = {};
-    const primary: Record<string, string> = {
-      "gen_ai.conversation.id": "thread_id",
-      "langwatch.user_id": "user_id",
-      "langwatch.customer_id": "customer_id",
-      "sdk.name": "sdk_name",
-      "sdk.version": "sdk_version",
-      "sdk.language": "sdk_language",
-      "telemetry.sdk.name": "telemetry_sdk_name",
-      "telemetry.sdk.version": "telemetry_sdk_version",
-      "telemetry.sdk.language": "telemetry_sdk_language",
-    };
-    for (const [attribute, key] of Object.entries(primary)) {
-      const value = attributes[attribute];
-      if (value !== void 0) metadata[key] = TraceFullRecordMapper.deserializeStoredValue(value);
-    }
-    const fallbackThread = attributes["langgraph.thread_id"];
-    if (metadata.thread_id === void 0 && fallbackThread !== void 0)
-      metadata.thread_id = TraceFullRecordMapper.deserializeStoredValue(fallbackThread);
+  /** The attributes that map onto a named metadata key, in the order they are read. */
+  private static readonly PRIMARY_METADATA_KEYS: Readonly<Record<string, string>> = {
+    "gen_ai.conversation.id": "thread_id",
+    "langwatch.user_id": "user_id",
+    "langwatch.customer_id": "customer_id",
+    "sdk.name": "sdk_name",
+    "sdk.version": "sdk_version",
+    "sdk.language": "sdk_language",
+    "telemetry.sdk.name": "telemetry_sdk_name",
+    "telemetry.sdk.version": "telemetry_sdk_version",
+    "telemetry.sdk.language": "telemetry_sdk_language",
+  };
+
+  /** Every attribute that is not a named key travels as its own metadata entry. */
+  private static addRemainingMetadata(
+    metadata: Record<string, TraceRecordValue>,
+    attributes: Record<string, string>,
+  ): void {
     const skipped = new Set([
-      ...Object.keys(primary),
+      ...Object.keys(TraceFullRecordMapper.PRIMARY_METADATA_KEYS),
       "langgraph.thread_id",
       "langwatch.reserved.model_metadata_stamped",
     ]);
@@ -527,6 +548,13 @@ export class TraceFullRecordMapper {
       if (bare && metadata[bare] === void 0)
         metadata[bare] = TraceFullRecordMapper.deserializeStoredValue(value);
     }
+  }
+
+  /** The list-valued metadata: labels, prompt ids, models, and the log record count. */
+  private static addListMetadata(
+    metadata: Record<string, TraceRecordValue>,
+    attributes: Record<string, string>,
+  ): void {
     const labels = attributes["langwatch.labels"] ?? attributes.labels;
     if (labels !== void 0) metadata.labels = TraceFullRecordMapper.stringArrayOrSingle(labels);
     const promptIds = TraceFullRecordMapper.stringArray(attributes["langwatch.prompt_ids"]);
@@ -536,6 +564,22 @@ export class TraceFullRecordMapper {
     const logRecordCount = attributes["langwatch.reserved.log_record_count"];
     if (logRecordCount !== void 0 && metadata.otel_log_record_count === void 0)
       metadata.otel_log_record_count = TraceFullRecordMapper.deserializeStoredValue(logRecordCount);
+  }
+
+  static mapTraceMetadata(attributes: Record<string, string>): Record<string, TraceRecordValue> {
+    const metadata: Record<string, TraceRecordValue> = {};
+    for (const [attribute, key] of Object.entries(TraceFullRecordMapper.PRIMARY_METADATA_KEYS)) {
+      const value = attributes[attribute];
+      if (value !== void 0) metadata[key] = TraceFullRecordMapper.deserializeStoredValue(value);
+    }
+
+    const fallbackThread = attributes["langgraph.thread_id"];
+    if (metadata.thread_id === void 0 && fallbackThread !== void 0)
+      metadata.thread_id = TraceFullRecordMapper.deserializeStoredValue(fallbackThread);
+
+    TraceFullRecordMapper.addRemainingMetadata(metadata, attributes);
+    TraceFullRecordMapper.addListMetadata(metadata, attributes);
+
     return metadata;
   }
 

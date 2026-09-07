@@ -734,6 +734,136 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return { min: Number(row?.min_val ?? 0), max: Number(row?.max_val ?? 0) };
   }
 
+  /**
+   * Tuple-typed arrayJoin packs every facet into a single row stream. Each (key, expression)
+   * pair becomes one (key, value) tuple per row.
+   */
+  private async fetchCategoricalFacets({
+    client,
+    specs,
+    table,
+    whereClause,
+    dedupFilter,
+    queryParams,
+    topN,
+  }: {
+    client: Awaited<ReturnType<TraceListClickHouseRepository["resolveClient"]>>;
+    specs: { key: string; expression: string }[];
+    table: FacetTableName;
+    whereClause: string;
+    dedupFilter: string;
+    queryParams: Record<string, unknown>;
+    topN: number;
+  }): Promise<Record<string, CategoricalFacetResult>> {
+    const tupleArray = specs
+      .map((s) => `(${this.quoteIdentifier(s.key)}, toString(${s.expression}))`)
+      .join(", ");
+
+    const query = `
+              SELECT facet_key, facet_value, cnt, total_distinct FROM (
+                SELECT
+                  facet_key,
+                  facet_value,
+                  cnt,
+                  count() OVER (PARTITION BY facet_key) AS total_distinct
+                FROM (
+                  SELECT facet_key, facet_value, count() AS cnt FROM (
+                    SELECT
+                      arrayJoin([${tupleArray}]) AS kv,
+                      kv.1 AS facet_key,
+                      kv.2 AS facet_value
+                    FROM ${table}
+                    WHERE ${whereClause}
+                      ${dedupFilter}
+                  )
+                  WHERE facet_value != ''
+                  GROUP BY facet_key, facet_value
+                )
+              )
+              ORDER BY facet_key, cnt DESC
+              LIMIT {topN:UInt32} BY facet_key
+            `;
+
+    const result = await client.query({
+      query,
+      query_params: { ...queryParams, topN },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<{
+      facet_key: string;
+      facet_value: string;
+      cnt: number;
+      total_distinct: number;
+    }>();
+
+    const out: Record<string, CategoricalFacetResult> = {};
+    for (const spec of specs) {
+      out[spec.key] = { values: [], totalDistinct: 0 };
+    }
+    for (const row of rows) {
+      const bucket = out[row.facet_key];
+      if (!bucket) continue;
+      bucket.values.push({ value: row.facet_value, count: Number(row.cnt) });
+      bucket.totalDistinct = Number(row.total_distinct);
+    }
+
+    return out;
+  }
+
+  /**
+   * Indexed aliases, so arbitrary registry keys cannot collide with reserved SQL words or with
+   * each other after sanitisation.
+   */
+  private async fetchRangeFacets({
+    client,
+    specs,
+    table,
+    whereClause,
+    dedupFilter,
+    queryParams,
+  }: {
+    client: Awaited<ReturnType<TraceListClickHouseRepository["resolveClient"]>>;
+    specs: { key: string; expression: string }[];
+    table: FacetTableName;
+    whereClause: string;
+    dedupFilter: string;
+    queryParams: Record<string, unknown>;
+  }): Promise<Record<string, { min: number; max: number }>> {
+    const aggClauses = specs
+      .flatMap((s, i) => [
+        `min(${s.expression}) AS r_${i}_min`,
+        `max(${s.expression}) AS r_${i}_max`,
+      ])
+      .join(", ");
+
+    const query = `
+              SELECT ${aggClauses}
+              FROM ${table}
+              WHERE ${whereClause}
+                ${dedupFilter}
+            `;
+
+    const result = await client.query({
+      query,
+      query_params: queryParams,
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<Record<string, number | null>>();
+    const row = rows[0] ?? {};
+    const out: Record<string, { min: number; max: number }> = {};
+    for (let i = 0; i < specs.length; i += 1) {
+      const spec = specs[i]!;
+      out[spec.key] = {
+        min: Number(row[`r_${i}_min`] ?? 0),
+        max: Number(row[`r_${i}_max`] ?? 0),
+      };
+    }
+
+    return out;
+  }
+
   async findBatchedFacets(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
@@ -769,109 +899,21 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       : "";
 
     const client = await this.resolveClient(params.tenantId);
+    const shared = { client, table: params.table, whereClause, dedupFilter, queryParams };
 
-    const categoricalsPromise: Promise<Record<string, CategoricalFacetResult>> =
+    const categoricalsPromise =
       params.categoricalSpecs.length === 0
         ? Promise.resolve({})
-        : (async () => {
-            // Tuple-typed arrayJoin packs every facet into a single row stream.
-            // Each (key, expression) pair becomes one (key, value) tuple per row.
-            const tupleArray = params.categoricalSpecs
-              .map((s) => `(${this.quoteIdentifier(s.key)}, toString(${s.expression}))`)
-              .join(", ");
+        : this.fetchCategoricalFacets({
+            ...shared,
+            specs: params.categoricalSpecs,
+            topN: params.topN,
+          });
 
-            const query = `
-              SELECT facet_key, facet_value, cnt, total_distinct FROM (
-                SELECT
-                  facet_key,
-                  facet_value,
-                  cnt,
-                  count() OVER (PARTITION BY facet_key) AS total_distinct
-                FROM (
-                  SELECT facet_key, facet_value, count() AS cnt FROM (
-                    SELECT
-                      arrayJoin([${tupleArray}]) AS kv,
-                      kv.1 AS facet_key,
-                      kv.2 AS facet_value
-                    FROM ${params.table}
-                    WHERE ${whereClause}
-                      ${dedupFilter}
-                  )
-                  WHERE facet_value != ''
-                  GROUP BY facet_key, facet_value
-                )
-              )
-              ORDER BY facet_key, cnt DESC
-              LIMIT {topN:UInt32} BY facet_key
-            `;
-
-            const result = await client.query({
-              query,
-              query_params: { ...queryParams, topN: params.topN },
-              format: "JSONEachRow",
-            });
-
-            const rows = await result.json<{
-              facet_key: string;
-              facet_value: string;
-              cnt: number;
-              total_distinct: number;
-            }>();
-
-            const out: Record<string, CategoricalFacetResult> = {};
-            for (const spec of params.categoricalSpecs) {
-              out[spec.key] = { values: [], totalDistinct: 0 };
-            }
-            for (const row of rows) {
-              const bucket = out[row.facet_key];
-              if (!bucket) continue;
-              bucket.values.push({
-                value: row.facet_value,
-                count: Number(row.cnt),
-              });
-              bucket.totalDistinct = Number(row.total_distinct);
-            }
-            return out;
-          })();
-
-    const rangesPromise: Promise<Record<string, { min: number; max: number }>> =
+    const rangesPromise =
       params.rangeSpecs.length === 0
         ? Promise.resolve({})
-        : (async () => {
-            // Use indexed aliases so arbitrary registry keys can't collide
-            // with reserved SQL words or each other after sanitisation.
-            const aggClauses = params.rangeSpecs
-              .flatMap((s, i) => [
-                `min(${s.expression}) AS r_${i}_min`,
-                `max(${s.expression}) AS r_${i}_max`,
-              ])
-              .join(", ");
-
-            const query = `
-              SELECT ${aggClauses}
-              FROM ${params.table}
-              WHERE ${whereClause}
-                ${dedupFilter}
-            `;
-
-            const result = await client.query({
-              query,
-              query_params: queryParams,
-              format: "JSONEachRow",
-            });
-
-            const rows = await result.json<Record<string, number | null>>();
-            const row = rows[0] ?? {};
-            const out: Record<string, { min: number; max: number }> = {};
-            for (let i = 0; i < params.rangeSpecs.length; i += 1) {
-              const spec = params.rangeSpecs[i]!;
-              out[spec.key] = {
-                min: Number(row[`r_${i}_min`] ?? 0),
-                max: Number(row[`r_${i}_max`] ?? 0),
-              };
-            }
-            return out;
-          })();
+        : this.fetchRangeFacets({ ...shared, specs: params.rangeSpecs });
 
     const [categoricals, ranges] = await Promise.all([categoricalsPromise, rangesPromise]);
 

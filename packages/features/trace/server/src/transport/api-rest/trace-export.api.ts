@@ -97,6 +97,86 @@ export interface TraceExportRestPorts<
   exportFailedError(cause: unknown): Error;
 }
 
+/** The rows of one export, streamed out chunk by chunk with a progress event per chunk. */
+function exportStream<TRequest extends TraceExportRequestFields, TRequestRaw, TSession>({
+  request,
+  protections,
+  exportId,
+  exportService,
+  broadcast,
+}: {
+  request: TRequest;
+  protections: unknown;
+  exportId: string;
+  exportService: ReturnType<TraceExportRestPorts<TRequest, TRequestRaw, TSession>["exports"]>;
+  broadcast: ReturnType<TraceExportRestPorts<TRequest, TRequestRaw, TSession>["broadcast"]>;
+}): ReadableStream {
+  const encoder = new TextEncoder();
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const { chunk, progress } of exportService.exportTraces({
+          request,
+          protections,
+        })) {
+          controller.enqueue(encoder.encode(chunk));
+          void broadcast.broadcastToTenant(
+            request.projectId,
+            JSON.stringify({
+              exportId,
+              type: "progress",
+              exported: progress.exported,
+              total: progress.total,
+            }),
+            "export_progress",
+          );
+        }
+        void broadcast.broadcastToTenant(
+          request.projectId,
+          JSON.stringify({ exportId, type: "done" }),
+          "export_progress",
+        );
+        controller.close();
+      } catch (error) {
+        logger.error({ error, projectId: request.projectId }, "Export stream error");
+        void broadcast.broadcastToTenant(
+          request.projectId,
+          JSON.stringify({ exportId, type: "error", message: "Export failed" }),
+          "export_progress",
+        );
+        controller.error(error);
+      }
+    },
+  });
+}
+
+/** The download headers: the derived file name, the format's content type, and the export id. */
+function exportHeaders({
+  request,
+  exportId,
+  totalCount,
+}: {
+  request: TraceExportRequestFields;
+  exportId: string;
+  totalCount: number;
+}): Headers {
+  // Build file name: {project_id} - Traces - {YYYY-MM-DD} - {mode}.{ext}
+  const today = nowInstant().toString().slice(0, 10);
+  const extension = request.format === "csv" ? "csv" : "jsonl";
+  const fileName = `${request.projectId} - Traces - ${today} - ${request.mode}.${extension}`;
+  const contentType = request.format === "csv" ? "text/csv; charset=utf-8" : "application/x-ndjson";
+
+  return new Headers({
+    "Content-Type": contentType,
+    "Content-Disposition": `attachment; filename="${fileName}"`,
+    "Transfer-Encoding": "chunked",
+    "X-Export-Id": exportId,
+    "X-Total-Traces": String(totalCount),
+    "Access-Control-Expose-Headers": "X-Export-Id, X-Total-Traces, Content-Disposition",
+  });
+}
+
 /**
  * REST for the trace export download, built against one process's security.
  */
@@ -168,16 +248,8 @@ export function createExportTracesRestApp<
 
       const exportId = crypto.randomUUID();
       const broadcast = ports.broadcast();
-
-      // Build file name: {project_id} - Traces - {YYYY-MM-DD} - {mode}.{ext}
-      const today = nowInstant().toString().slice(0, 10);
-      const extension = request.format === "csv" ? "csv" : "jsonl";
-      const fileName = `${request.projectId} - Traces - ${today} - ${request.mode}.${extension}`;
-
-      const contentType =
-        request.format === "csv" ? "text/csv; charset=utf-8" : "application/x-ndjson";
-
       const exportService = ports.exports();
+
       let totalCount: number;
       try {
         totalCount = await exportService.getTotalCount({ request, protections });
@@ -191,58 +263,17 @@ export function createExportTracesRestApp<
         throw ports.exportFailedError(error);
       }
 
-      const headers = new Headers({
-        "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${fileName}"`,
-        "Transfer-Encoding": "chunked",
-        "X-Export-Id": exportId,
-        "X-Total-Traces": String(totalCount),
-        "Access-Control-Expose-Headers": "X-Export-Id, X-Total-Traces, Content-Disposition",
-      });
-      const encoder = new TextEncoder();
-
-      const stream = new ReadableStream({
-        async start(controller) {
-          try {
-            for await (const { chunk, progress } of exportService.exportTraces({
-              request,
-              protections,
-            })) {
-              controller.enqueue(encoder.encode(chunk));
-              void broadcast.broadcastToTenant(
-                request.projectId,
-                JSON.stringify({
-                  exportId,
-                  type: "progress",
-                  exported: progress.exported,
-                  total: progress.total,
-                }),
-                "export_progress",
-              );
-            }
-            void broadcast.broadcastToTenant(
-              request.projectId,
-              JSON.stringify({ exportId, type: "done" }),
-              "export_progress",
-            );
-            controller.close();
-          } catch (error) {
-            logger.error({ error, projectId: request.projectId }, "Export stream error");
-            void broadcast.broadcastToTenant(
-              request.projectId,
-              JSON.stringify({
-                exportId,
-                type: "error",
-                message: "Export failed",
-              }),
-              "export_progress",
-            );
-            controller.error(error);
-          }
-        },
+      const stream = exportStream({
+        request,
+        protections,
+        exportId,
+        exportService,
+        broadcast,
       });
 
-      return new Response(stream, { headers });
+      return new Response(stream, {
+        headers: exportHeaders({ request, exportId, totalCount }),
+      });
     });
 
   return secured;

@@ -72,6 +72,61 @@ export function ensureStringRecord(raw: Record<string, unknown>): Record<string,
   return result;
 }
 
+/** The parsed JSON value one attribute holds, or `undefined` when it is not JSON. */
+function parseJsonAttribute(trimmed: string): unknown {
+  const isJsonObject = trimmed.startsWith("{") && trimmed.endsWith("}");
+  const isJsonArray = trimmed.startsWith("[") && trimmed.endsWith("]");
+  if (!isJsonObject && !isJsonArray) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Not valid JSON, fall through
+    return undefined;
+  }
+}
+
+/**
+ * Intentionally lossy for string values that look like decimal numbers (e.g. zip codes "90210"
+ * → 90210). The ClickHouse round-trip for originally-numeric attributes is correct; pure string
+ * numerics may lose their string type. Integers beyond Number.MAX_SAFE_INTEGER stay strings, to
+ * avoid precision loss.
+ */
+function parseNumericAttribute(trimmed: string): number | undefined {
+  const isDecimalNumber =
+    trimmed !== "" && DECIMAL_NUMBER_RE.test(trimmed) && Number.isFinite(Number(trimmed));
+  if (!isDecimalNumber) {
+    return undefined;
+  }
+
+  const num = Number(trimmed);
+  const losesPrecision = Number.isInteger(num) && Math.abs(num) > Number.MAX_SAFE_INTEGER;
+
+  return losesPrecision ? undefined : num;
+}
+
+/** One attribute value, read back as the type it was written from. */
+function deserializeAttributeValue(value: string): unknown {
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  const trimmed = value.trim();
+
+  const json = parseJsonAttribute(trimmed);
+  if (json !== undefined) {
+    return json;
+  }
+
+  return parseNumericAttribute(trimmed) ?? value;
+}
+
 /**
  * Deserializes attribute values read from ClickHouse Map(String, String) columns.
  * Reverses serializeAttributes: parses JSON strings back to objects/arrays,
@@ -82,49 +137,9 @@ export function ensureStringRecord(raw: Record<string, unknown>): Record<string,
 export function deserializeAttributes(attrs: Record<string, string>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(attrs)) {
-    // Boolean strings
-    if (value === "true") {
-      result[key] = true;
-      continue;
-    }
-    if (value === "false") {
-      result[key] = false;
-      continue;
-    }
-
-    // JSON objects and arrays
-    const trimmed = value.trim();
-    const isJsonObject = trimmed.startsWith("{") && trimmed.endsWith("}");
-    const isJsonArray = trimmed.startsWith("[") && trimmed.endsWith("]");
-    if (isJsonObject || isJsonArray) {
-      try {
-        result[key] = JSON.parse(trimmed);
-        continue;
-      } catch {
-        // Not valid JSON, fall through
-      }
-    }
-
-    // NOTE: Intentionally lossy for string values that look like decimal numbers
-    // (e.g. zip codes "90210" → 90210). ClickHouse round-trip for originally-numeric
-    // attributes is correct; pure string numerics may lose their string type.
-    // Guard: skip conversion for integers beyond Number.MAX_SAFE_INTEGER to avoid precision loss.
-    const isDecimalNumber =
-      trimmed !== "" && DECIMAL_NUMBER_RE.test(trimmed) && Number.isFinite(Number(trimmed));
-    if (isDecimalNumber) {
-      const num = Number(trimmed);
-      const losesPrecision = Number.isInteger(num) && Math.abs(num) > Number.MAX_SAFE_INTEGER;
-      if (losesPrecision) {
-        result[key] = value;
-        continue;
-      }
-      result[key] = num;
-      continue;
-    }
-
-    // Keep as string
-    result[key] = value;
+    result[key] = deserializeAttributeValue(value);
   }
+
   return result;
 }
 

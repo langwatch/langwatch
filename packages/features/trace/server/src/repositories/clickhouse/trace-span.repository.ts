@@ -432,6 +432,45 @@ export class ClickHouseTraceSpanRepository extends TracePort {
     return Number(value) === 1 ? "ok" : "unset";
   }
 
+  /** An empty column reads as absent, so the pricing service never sees a zero or a "". */
+  private static presentOrUndefined<T>(value: T): T | undefined {
+    return value || void 0;
+  }
+
+  /** Each cost attribute, and the summary-row column it is read from. */
+  private static readonly COST_ATTRIBUTE_COLUMNS = [
+    ["gen_ai.response.model", "ResponseModel"],
+    ["gen_ai.request.model", "Model"],
+    ["gen_ai.usage.cache_read.input_tokens", "CacheReadTokens"],
+    ["gen_ai.usage.cache_creation.input_tokens", "CacheCreationTokens"],
+    ["gen_ai.usage.cache_creation_1h.input_tokens", "CacheCreation1hTokens"],
+    ["gen_ai.usage.input_chars", "InputChars"],
+    ["gen_ai.usage.audio_seconds", "AudioSeconds"],
+    ["gen_ai.usage.input_audio_tokens", "InputAudioTokens"],
+    ["gen_ai.usage.output_audio_tokens", "OutputAudioTokens"],
+    ["langwatch.model.inputCostPerToken", "CustomInputRate"],
+    ["langwatch.model.outputCostPerToken", "CustomOutputRate"],
+    ["langwatch.model.cacheReadCostPerToken", "CustomCacheReadRate"],
+    ["langwatch.model.cacheCreationCostPerToken", "CustomCacheCreationRate"],
+    ["langwatch.model.cacheCreation1hCostPerToken", "CustomCacheCreation1hRate"],
+    ["langwatch.span.cost", "LwSpanCost"],
+  ] as const satisfies readonly (readonly [string, keyof SpanSummaryRow])[];
+
+  /** The cost-model inputs one summary row carries, in the shape the pricing service reads. */
+  private static costInputOf(row: SpanSummaryRow) {
+    const attrs: Record<string, unknown> = {};
+    for (const [attribute, column] of ClickHouseTraceSpanRepository.COST_ATTRIBUTE_COLUMNS) {
+      attrs[attribute] = ClickHouseTraceSpanRepository.presentOrUndefined(row[column]);
+    }
+
+    return {
+      attrs,
+      model: ClickHouseTraceSpanRepository.presentOrUndefined(row.ResponseModel || row.Model),
+      promptTokens: ClickHouseTraceSpanRepository.numberOrNull(row.InputTokens),
+      completionTokens: ClickHouseTraceSpanRepository.numberOrNull(row.OutputTokens),
+    };
+  }
+
   private static mapSummary(row: SpanSummaryRow) {
     const explicitCost = ClickHouseTraceSpanRepository.numberOrNull(row.Cost);
     const cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
@@ -453,28 +492,7 @@ export class ClickHouseTraceSpanRepository extends TracePort {
       cacheReadTokens: ClickHouseTraceSpanRepository.numberOrNull(row.CacheReadTokens),
       cacheCreationTokens: ClickHouseTraceSpanRepository.numberOrNull(row.CacheCreationTokens),
       updatedAtMs: Number(row.UpdatedAtMs),
-      costInput: {
-        attrs: {
-          "gen_ai.response.model": row.ResponseModel || void 0,
-          "gen_ai.request.model": row.Model || void 0,
-          "gen_ai.usage.cache_read.input_tokens": row.CacheReadTokens || void 0,
-          "gen_ai.usage.cache_creation.input_tokens": row.CacheCreationTokens || void 0,
-          "gen_ai.usage.cache_creation_1h.input_tokens": row.CacheCreation1hTokens || void 0,
-          "gen_ai.usage.input_chars": row.InputChars || void 0,
-          "gen_ai.usage.audio_seconds": row.AudioSeconds || void 0,
-          "gen_ai.usage.input_audio_tokens": row.InputAudioTokens || void 0,
-          "gen_ai.usage.output_audio_tokens": row.OutputAudioTokens || void 0,
-          "langwatch.model.inputCostPerToken": row.CustomInputRate || void 0,
-          "langwatch.model.outputCostPerToken": row.CustomOutputRate || void 0,
-          "langwatch.model.cacheReadCostPerToken": row.CustomCacheReadRate || void 0,
-          "langwatch.model.cacheCreationCostPerToken": row.CustomCacheCreationRate || void 0,
-          "langwatch.model.cacheCreation1hCostPerToken": row.CustomCacheCreation1hRate || void 0,
-          "langwatch.span.cost": row.LwSpanCost || void 0,
-        },
-        model: row.ResponseModel || row.Model || void 0,
-        promptTokens: ClickHouseTraceSpanRepository.numberOrNull(row.InputTokens),
-        completionTokens: ClickHouseTraceSpanRepository.numberOrNull(row.OutputTokens),
-      },
+      costInput: ClickHouseTraceSpanRepository.costInputOf(row),
     };
   }
 

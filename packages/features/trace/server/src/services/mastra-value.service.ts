@@ -148,6 +148,29 @@ export class MastraValuesService {
     return null;
   }
 
+  /** The text a content-part record carries, under either the `text` or the `content` field. */
+  #recordText(part: unknown): string | null {
+    const parsed = contentPartSchema.safeParse(part);
+    if (!parsed.success) {
+      return null;
+    }
+
+    if (parsed.data.text) {
+      return parsed.data.text;
+    }
+
+    if (parsed.data.content) {
+      return parsed.data.content;
+    }
+
+    return null;
+  }
+
+  /** One element of a content array: a bare string, or a content-part record. */
+  #partText(part: unknown): string | null {
+    return typeof part === "string" ? part : this.#recordText(part);
+  }
+
   /**
    * Normalizes message content to a string.
    * Handles string, array of content parts, and object with text/content fields.
@@ -158,43 +181,15 @@ export class MastraValuesService {
     }
 
     if (Array.isArray(content)) {
-      const parts = content
-        .map((part) => {
-          if (typeof part === "string") {
-            return part;
-          }
-
-          const parsed = contentPartSchema.safeParse(part);
-          if (!parsed.success) {
-            return null;
-          }
-
-          if (parsed.data.text) {
-            return parsed.data.text;
-          }
-
-          if (parsed.data.content) {
-            return parsed.data.content;
-          }
-
-          return null;
-        })
-        .filter(Boolean);
-      const joined = parts.join("\n");
+      const joined = content
+        .map((part) => this.#partText(part))
+        .filter(Boolean)
+        .join("\n");
 
       return joined.length > 0 ? joined : null;
     }
 
-    const parsed = contentPartSchema.safeParse(content);
-    if (parsed.success && parsed.data.text) {
-      return parsed.data.text;
-    }
-
-    if (parsed.success && parsed.data.content) {
-      return parsed.data.content;
-    }
-
-    return null;
+    return this.#recordText(content);
   }
 
   /**

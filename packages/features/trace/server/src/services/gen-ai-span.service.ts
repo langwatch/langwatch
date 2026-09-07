@@ -208,6 +208,48 @@ export class GenAiSpanService {
     }
   }
 
+  /** The OpenInference invocation parameters, each under its canonical numeric attribute. */
+  private applyInvocationNumbers(
+    ctx: ExtractorContext,
+    invocationParams: Record<string, unknown>,
+  ): void {
+    const numbers: [string, unknown][] = [
+      [ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE, invocationParams.temperature],
+      [ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS, invocationParams.max_tokens],
+      [ATTR_KEYS.GEN_AI_REQUEST_TOP_P, invocationParams.top_p],
+      [ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY, invocationParams.frequency_penalty],
+      [ATTR_KEYS.GEN_AI_REQUEST_PRESENCE_PENALTY, invocationParams.presence_penalty],
+      [ATTR_KEYS.GEN_AI_REQUEST_SEED, invocationParams.seed],
+    ];
+    for (const [key, raw] of numbers) {
+      const value = asNumber(raw);
+      if (value !== null) {
+        ctx.setAttr(key, value);
+      }
+    }
+  }
+
+  /** The non-numeric invocation parameters: the error type, stop sequences, and choice count. */
+  private applyInvocationExtras(
+    ctx: ExtractorContext,
+    invocationParams: Record<string, unknown>,
+  ): void {
+    const errorType = invocationParams.error_type;
+    if (typeof errorType === "string") {
+      ctx.setAttr(ATTR_KEYS.ERROR_TYPE, errorType);
+    }
+
+    const stopSequences = coerceToStringArray(invocationParams.stop);
+    if (stopSequences) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_STOP_SEQUENCES, stopSequences);
+    }
+
+    const choiceCount = asNumber(invocationParams.n);
+    if (choiceCount !== null && choiceCount !== 1) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_CHOICE_COUNT, choiceCount);
+    }
+  }
+
   private canonicaliseRequest(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
     const stream = asBoolean(attrs.get(ATTR_KEYS.GEN_AI_REQUEST_STREAM));
@@ -226,57 +268,16 @@ export class GenAiSpanService {
       ATTR_KEYS.GEN_AI_REQUEST_SEED,
     ]);
 
-    const invocationParams = ctx.bag.attrs.get(ATTR_KEYS.LLM_INVOCATION_PARAMETERS);
-    if (isRecord(invocationParams)) {
-      const temperature = asNumber(invocationParams.temperature);
-      const maxTokens = asNumber(invocationParams.max_tokens);
-      const topP = asNumber(invocationParams.top_p);
-      const frequencyPenalty = asNumber(invocationParams.frequency_penalty);
-      const presencePenalty = asNumber(invocationParams.presence_penalty);
-      const seed = asNumber(invocationParams.seed);
-      const choiceCount = asNumber(invocationParams.n);
-      const errorType = invocationParams.error_type;
-
-      if (temperature !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE, temperature);
-      }
-
-      if (maxTokens !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS, maxTokens);
-      }
-
-      if (topP !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_TOP_P, topP);
-      }
-
-      if (frequencyPenalty !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequencyPenalty);
-      }
-
-      if (presencePenalty !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_PRESENCE_PENALTY, presencePenalty);
-      }
-
-      if (seed !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_SEED, seed);
-      }
-
-      if (typeof errorType === "string") {
-        ctx.setAttr(ATTR_KEYS.ERROR_TYPE, errorType);
-      }
-
-      const stopSequences = coerceToStringArray(invocationParams.stop);
-      if (stopSequences) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_STOP_SEQUENCES, stopSequences);
-      }
-
-      if (choiceCount !== null && choiceCount !== 1) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_CHOICE_COUNT, choiceCount);
-      }
-
-      ctx.recordRule(`${GEN_AI_RULE_PREFIX}:params`);
-      ctx.bag.attrs.delete(ATTR_KEYS.LLM_INVOCATION_PARAMETERS);
+    const invocationParams = attrs.get(ATTR_KEYS.LLM_INVOCATION_PARAMETERS);
+    if (!isRecord(invocationParams)) {
+      return;
     }
+
+    this.applyInvocationNumbers(ctx, invocationParams);
+    this.applyInvocationExtras(ctx, invocationParams);
+
+    ctx.recordRule(`${GEN_AI_RULE_PREFIX}:params`);
+    attrs.delete(ATTR_KEYS.LLM_INVOCATION_PARAMETERS);
   }
 
   canonicalise(ctx: ExtractorContext): void {

@@ -158,7 +158,8 @@ export class SpanCostService {
     );
   }
 
-  extractTokenTiming(span: NormalizedSpan): {
+  /** The earliest first-token and latest last-token stream events, as offsets from span start. */
+  #timingFromEvents(span: NormalizedSpan): {
     timeToFirstToken: number | null;
     timeToLastToken: number | null;
   } {
@@ -171,54 +172,64 @@ export class SpanCostService {
         continue;
       }
 
-      if (
+      const isEarlierFirst =
         FIRST_TOKEN_EVENTS.has(event.name) &&
-        (timeToFirstToken === null || delta < timeToFirstToken)
-      ) {
+        (timeToFirstToken === null || delta < timeToFirstToken);
+      if (isEarlierFirst) {
         timeToFirstToken = delta;
       }
 
-      if (
-        LAST_TOKEN_EVENTS.has(event.name) &&
-        (timeToLastToken === null || delta > timeToLastToken)
-      ) {
+      const isLaterLast =
+        LAST_TOKEN_EVENTS.has(event.name) && (timeToLastToken === null || delta > timeToLastToken);
+      if (isLaterLast) {
         timeToLastToken = delta;
       }
     }
 
-    if (timeToFirstToken === null) {
-      const attrTtft = SpanCostService.coerceToNumber(
-        span.spanAttributes[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN],
-      );
-      if (attrTtft !== null && attrTtft >= 0) {
-        timeToFirstToken = attrTtft;
-      }
-    }
-
-    if (timeToFirstToken === null) {
-      // Vercel AI SDK reports TTFT as a duration attribute and emits no
-      // stream event, so it needs its own fallback.
-      const msToFirstChunk = SpanCostService.coerceToNumber(
-        span.spanAttributes[ATTR_KEYS.AI_RESPONSE_MS_TO_FIRST_CHUNK],
-      );
-      if (msToFirstChunk !== null && msToFirstChunk >= 0) {
-        timeToFirstToken = msToFirstChunk;
-      }
-    }
-
-    if (timeToFirstToken === null) {
-      const firstTokenAt = SpanCostService.firstTokenAtFromLangWatchTimestamps(
-        span.spanAttributes[ATTR_KEYS.LANGWATCH_TIMESTAMPS],
-      );
-      if (firstTokenAt !== null) {
-        const delta = firstTokenAt - span.startTimeUnixMs;
-        if (delta >= 0) {
-          timeToFirstToken = delta;
-        }
-      }
-    }
-
     return { timeToFirstToken, timeToLastToken };
+  }
+
+  /**
+   * Time to first token when no stream event carried it: the semconv attribute, then the Vercel
+   * AI SDK's own duration attribute (it emits no stream event), then the LangWatch timestamps.
+   */
+  #timeToFirstTokenFromAttributes(span: NormalizedSpan): number | null {
+    const attrTtft = SpanCostService.coerceToNumber(
+      span.spanAttributes[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN],
+    );
+    if (attrTtft !== null && attrTtft >= 0) {
+      return attrTtft;
+    }
+
+    const msToFirstChunk = SpanCostService.coerceToNumber(
+      span.spanAttributes[ATTR_KEYS.AI_RESPONSE_MS_TO_FIRST_CHUNK],
+    );
+    if (msToFirstChunk !== null && msToFirstChunk >= 0) {
+      return msToFirstChunk;
+    }
+
+    const firstTokenAt = SpanCostService.firstTokenAtFromLangWatchTimestamps(
+      span.spanAttributes[ATTR_KEYS.LANGWATCH_TIMESTAMPS],
+    );
+    if (firstTokenAt === null) {
+      return null;
+    }
+
+    const delta = firstTokenAt - span.startTimeUnixMs;
+
+    return delta >= 0 ? delta : null;
+  }
+
+  extractTokenTiming(span: NormalizedSpan): {
+    timeToFirstToken: number | null;
+    timeToLastToken: number | null;
+  } {
+    const { timeToFirstToken, timeToLastToken } = this.#timingFromEvents(span);
+
+    return {
+      timeToFirstToken: timeToFirstToken ?? this.#timeToFirstTokenFromAttributes(span),
+      timeToLastToken,
+    };
   }
 
   accumulateTokens({

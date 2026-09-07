@@ -130,6 +130,54 @@ function getAnnotatedType(spanAttributes: NormalizedAttributes, attrKey: string)
   return null;
 }
 
+/** ClickHouse Map(String, String) stores objects as JSON strings; parse one back when it is. */
+function parseJsonObjectString(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    if (typeof parsed === "object" && parsed !== null) return parsed;
+  } catch {
+    // Not JSON — keep as string
+  }
+
+  return value;
+}
+
+/**
+ * A `langwatch.input` / `langwatch.output` value read under its annotated type: the wrapper
+ * unwrapped, chat messages and text kept as such, everything else json. ClickHouse's
+ * `deserializeAttributes()` may parse JSON-like strings back to objects, so a text value is
+ * re-stringified rather than reaching `String([object Object])`.
+ */
+function readAnnotatedValue(
+  value: unknown,
+  spanAttributes: NormalizedAttributes,
+  key: "langwatch.input" | "langwatch.output",
+): SpanInputOutput {
+  if (isLegacyWrapper(value)) {
+    return unwrapLegacyWrapper(value, spanAttributes, key);
+  }
+
+  const annotatedType = getAnnotatedType(spanAttributes, key);
+  if (annotatedType === "chat_messages" && Array.isArray(value)) {
+    return { type: "chat_messages", value: toJsonSerializable(value) as ChatMessage[] };
+  }
+
+  // Only an OUTPUT carries a verdict type; an input annotated with one falls through to json.
+  const isResultType =
+    annotatedType === "evaluation_result" || annotatedType === "guardrail_result";
+  if (key === "langwatch.output" && isResultType) {
+    return { type: annotatedType, value: toJsonSerializable(value) } as unknown as SpanInputOutput;
+  }
+
+  if (annotatedType === "text" || typeof value === "string") {
+    return { type: "text", value: typeof value === "string" ? value : JSON.stringify(value) };
+  }
+
+  return { type: "json", value: toJsonSerializable(value) };
+}
+
 /**
  * Extracts input from canonical span attributes only. After canonicalization, input is at:
  * gen_ai.input.messages, langwatch.input, or gen_ai.tool.call.arguments (semconv-native
@@ -146,46 +194,9 @@ export function extractInput(spanAttributes: NormalizedAttributes): SpanInputOut
   }
 
   // Priority 2: langwatch.input → use annotated type or infer
-  let lwInput = spanAttributes["langwatch.input"];
+  const lwInput = spanAttributes["langwatch.input"];
   if (lwInput !== undefined) {
-    // ClickHouse Map(String, String) stores objects as JSON strings
-    if (typeof lwInput === "string") {
-      try {
-        const parsed = JSON.parse(lwInput);
-        if (typeof parsed === "object" && parsed !== null) {
-          lwInput = parsed;
-        }
-      } catch {
-        // Not JSON — keep as string
-      }
-    }
-
-    // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
-    if (isLegacyWrapper(lwInput)) {
-      return unwrapLegacyWrapper(lwInput, spanAttributes, "langwatch.input");
-    }
-
-    const annotatedType = getAnnotatedType(spanAttributes, "langwatch.input");
-    if (annotatedType === "chat_messages" && Array.isArray(lwInput)) {
-      return {
-        type: "chat_messages",
-        value: toJsonSerializable(lwInput) as ChatMessage[],
-      };
-    }
-
-    if (annotatedType === "text" || typeof lwInput === "string") {
-      // ClickHouse deserializeAttributes() may parse JSON-like strings back to
-      // objects/arrays (e.g. "[{\"role\":...}]" → Array). Re-stringify to avoid
-      // String([object Object]).
-      const textValue = typeof lwInput === "string" ? lwInput : JSON.stringify(lwInput);
-
-      return { type: "text", value: textValue };
-    }
-
-    return {
-      type: "json",
-      value: toJsonSerializable(lwInput),
-    };
+    return readAnnotatedValue(parseJsonObjectString(lwInput), spanAttributes, "langwatch.input");
   }
 
   // Priority 3: gen_ai.tool.call.arguments — the tool-call semconv twin of
@@ -234,50 +245,9 @@ export function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOu
   }
 
   // Priority 2: langwatch.output → use annotated type or infer
-  let lwOutput = spanAttributes["langwatch.output"];
+  const lwOutput = spanAttributes["langwatch.output"];
   if (lwOutput !== undefined) {
-    // ClickHouse Map(String, String) stores objects as JSON strings
-    if (typeof lwOutput === "string") {
-      try {
-        const parsed = JSON.parse(lwOutput);
-        if (typeof parsed === "object" && parsed !== null) {
-          lwOutput = parsed;
-        }
-      } catch {
-        // Not JSON — keep as string
-      }
-    }
-
-    // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
-    if (isLegacyWrapper(lwOutput)) {
-      return unwrapLegacyWrapper(lwOutput, spanAttributes, "langwatch.output");
-    }
-
-    const annotatedType = getAnnotatedType(spanAttributes, "langwatch.output");
-    if (annotatedType === "chat_messages" && Array.isArray(lwOutput)) {
-      return {
-        type: "chat_messages",
-        value: toJsonSerializable(lwOutput) as ChatMessage[],
-      };
-    }
-
-    if (annotatedType === "evaluation_result" || annotatedType === "guardrail_result") {
-      return {
-        type: annotatedType,
-        value: toJsonSerializable(lwOutput),
-      } as unknown as SpanInputOutput;
-    }
-
-    if (annotatedType === "text" || typeof lwOutput === "string") {
-      const textValue = typeof lwOutput === "string" ? lwOutput : JSON.stringify(lwOutput);
-
-      return { type: "text", value: textValue };
-    }
-
-    return {
-      type: "json",
-      value: toJsonSerializable(lwOutput),
-    };
+    return readAnnotatedValue(parseJsonObjectString(lwOutput), spanAttributes, "langwatch.output");
   }
 
   // Priority 3: gen_ai.tool.call.result — see extractInput's tool-call twin.
@@ -309,6 +279,23 @@ export function extractVendor(spanAttributes: NormalizedAttributes): string | nu
   return typeof vendor === "string" ? vendor : null;
 }
 
+function toRagChunk(ctx: unknown): RAGChunk {
+  if (typeof ctx === "string") {
+    return { content: ctx };
+  }
+  if (typeof ctx !== "object" || ctx === null) {
+    return { content: String(ctx) };
+  }
+
+  const obj = ctx as Record<string, unknown>;
+
+  return {
+    document_id: typeof obj.document_id === "string" ? obj.document_id : null,
+    chunk_id: typeof obj.chunk_id === "string" ? obj.chunk_id : null,
+    content: obj.content ?? obj,
+  };
+}
+
 /**
  * Extracts RAG contexts from canonical span attributes only.
  * After canonicalization, RAG contexts are at langwatch.rag.contexts.
@@ -329,23 +316,7 @@ export function extractContexts(spanAttributes: NormalizedAttributes): RAGChunk[
     return undefined;
   }
 
-  return contexts.map((ctx: unknown) => {
-    if (typeof ctx === "string") {
-      return { content: ctx };
-    }
-
-    if (typeof ctx === "object" && ctx !== null) {
-      const obj = ctx as Record<string, unknown>;
-
-      return {
-        document_id: typeof obj.document_id === "string" ? obj.document_id : null,
-        chunk_id: typeof obj.chunk_id === "string" ? obj.chunk_id : null,
-        content: obj.content ?? obj,
-      };
-    }
-
-    return { content: String(ctx) };
-  });
+  return contexts.map(toRagChunk);
 }
 
 /**
