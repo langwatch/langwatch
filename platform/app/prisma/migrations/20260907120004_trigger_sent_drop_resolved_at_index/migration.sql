@@ -3,5 +3,5 @@
 -- which keeps its own index; production shows this one was never scanned.
 DROP INDEX CONCURRENTLY IF EXISTS "TriggerSent_resolvedAt_idx";
 
--- Down (manual rollback; uncomment and run):
+-- To roll back, uncomment and run manually.
 -- CREATE INDEX CONCURRENTLY "TriggerSent_resolvedAt_idx" ON "TriggerSent"("resolvedAt");

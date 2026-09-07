@@ -9,5 +9,5 @@
 -- migration name.
 CREATE INDEX CONCURRENTLY "TriggerSent_projectId_createdAt_idx" ON "TriggerSent"("projectId", "createdAt");
 
--- Down (manual rollback; uncomment and run):
+-- To roll back, uncomment and run manually.
 -- DROP INDEX CONCURRENTLY "TriggerSent_projectId_createdAt_idx";
