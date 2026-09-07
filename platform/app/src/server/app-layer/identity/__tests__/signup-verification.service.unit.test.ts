@@ -218,6 +218,7 @@ describe("given a sign-up address to confirm", () => {
       expect(harness.issued[0]?.identifier).toContain('"passwordHash":null');
     });
 
+    /** @scenario "Asking for verification creates no account" */
     it("leaves the account to be finished, never creating one itself", async () => {
       await harness.service.requestVerification({ email: "sam@acme.com" });
 
@@ -332,6 +333,15 @@ describe("given a confirmation link I have already opened", () => {
       ).rejects.toMatchObject({ code: "identity_verification_expired" });
     });
   });
+
+  it("refuses a fresh link for an account already awaiting confirmation", async () => {
+    const pending = makeService({ registered: true });
+    await pending.service.requestVerification({ email: "sam@acme.com" });
+
+    await expect(
+      pending.service.completeVerification({ token: "token-1" }),
+    ).rejects.toMatchObject({ code: "identity_verification_expired" });
+  });
 });
 
 describe("given a confirmation link nobody ever issued", () => {
@@ -353,6 +363,26 @@ describe("given a confirmation link nobody ever issued", () => {
  * the screen a usable proof, or somebody is stranded one step from the end.
  */
 describe("given a link that proved an address with no account yet", () => {
+  /** @scenario "Simultaneous confirmation-link consumers yield one proof" */
+  it("gives one simultaneous consumer a proof and the other status only", async () => {
+    const harness = makeService();
+    await harness.service.requestVerification({ email: "sam@acme.com" });
+
+    const results = await Promise.all([
+      harness.service.completeVerification({ token: "token-1" }),
+      harness.service.completeVerification({ token: "token-1" }),
+    ]);
+
+    expect(
+      results.filter((result) => result.addressProof !== null),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.addressProof === null),
+    ).toHaveLength(1);
+    expect(harness.created).toHaveLength(0);
+    expect(harness.confirmed).toHaveLength(0);
+  });
+
   describe("when I open it a second time", () => {
     it("hands over a fresh proof rather than the spent one", async () => {
       const harness = makeService();
