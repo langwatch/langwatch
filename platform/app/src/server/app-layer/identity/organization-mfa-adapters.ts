@@ -254,14 +254,16 @@ export class PrismaSessionFactors implements SessionFactorPort {
  * Delivery uses the same mail transport as the rest of the app. Every
  * recipient is attempted before a failure is reported, and the log names the
  * failed count rather than claiming the whole audience was reached. Identity
- * owns the destination once a user is latched; a null resolution deliberately
- * preserves the resolver's legacy User.email fallback policy.
+ * owns the destination once a user is latched. The injected resolver owns the
+ * latch-aware legacy fallback so a missing canonical address can never revive
+ * a detached mailbox here.
  */
 export class EmailOrganizationMfaNotifier implements OrganizationMfaNotifier {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly resolveIdentityEmail: (args: {
+    private readonly resolveDeliveryEmail: (args: {
       userId: string;
+      legacyEmail: string | null;
     }) => Promise<string | null>,
   ) {}
 
@@ -301,15 +303,23 @@ export class EmailOrganizationMfaNotifier implements OrganizationMfaNotifier {
     }
 
     const actorName = actor?.name ?? actor?.email ?? "An administrator";
-    const resolvedMembers = await Promise.all(
-      memberships.map(async ({ userId, user }) => ({
-        userId,
-        email: (await this.resolveIdentityEmail({ userId })) ?? user.email,
-      })),
-    );
     const destinations = new Map<string, string>();
     const failures: unknown[] = [];
-    for (const member of resolvedMembers) {
+    const resolutions = await Promise.allSettled(
+      memberships.map(async ({ userId, user }) => ({
+        userId,
+        email: await this.resolveDeliveryEmail({
+          userId,
+          legacyEmail: user.email,
+        }),
+      })),
+    );
+    for (const resolution of resolutions) {
+      if (resolution.status === "rejected") {
+        failures.push(resolution.reason);
+        continue;
+      }
+      const member = resolution.value;
       if (!member.email) {
         failures.push(
           new Error(
