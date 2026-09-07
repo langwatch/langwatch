@@ -1,6 +1,10 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { eventLogRetentionCategorySqlPredicate } from "../event-log-retention-policy";
+import {
+  eventLogRetentionCategoryFromMutationCommand,
+  eventLogRetentionCategoryMutationMarkerSql,
+  eventLogRetentionCategorySqlPredicate,
+} from "../event-log-retention-policy";
 import {
   RETENTION_TABLE_CATEGORY_MAP,
   type RetentionCategory,
@@ -23,6 +27,15 @@ interface TriggerRetroactiveUpdateParams {
   projectId: string;
   category: RetentionCategory;
   newRetentionDays: number;
+}
+
+interface MutationRow {
+  mutationId: string;
+  table: string;
+  isDone: number;
+  partsToDo: number;
+  createTime: string;
+  command?: string;
 }
 
 export class RetroactiveMutationInProgressError extends Error {
@@ -87,6 +100,7 @@ export class RetroactiveUpdateService {
       client,
       projectId,
       tables,
+      category,
     });
     if (activeMutations.length > 0) {
       throw new RetroactiveMutationInProgressError(activeMutations);
@@ -97,7 +111,10 @@ export class RetroactiveUpdateService {
     // don't reinvent string escaping for ClickHouse SQL.
     for (const table of tables) {
       const eventLogCategoryFilter =
-        table === "event_log" ? ` AND (${eventLogRetentionCategorySqlPredicate(category)})` : "";
+        table === "event_log"
+          ? ` AND (${eventLogRetentionCategorySqlPredicate(category)})` +
+            ` AND ${eventLogRetentionCategoryMutationMarkerSql(category)}`
+          : "";
       await client.command({
         query:
           `ALTER TABLE ${table} ` +
@@ -126,7 +143,8 @@ export class RetroactiveUpdateService {
           table AS table,
           is_done AS isDone,
           parts_to_do AS partsToDo,
-          formatDateTime(create_time, '%Y-%m-%dT%H:%i:%S') AS createTime
+          formatDateTime(create_time, '%Y-%m-%dT%H:%i:%S') AS createTime,
+          command AS command
         FROM system.mutations
         WHERE position(command, '_retention_days') > 0
           AND ${TENANT_FILTER_SQL}
@@ -137,13 +155,7 @@ export class RetroactiveUpdateService {
       format: "JSONEachRow",
     });
 
-    const rows = (await result.json()) as Array<{
-      mutationId: string;
-      table: string;
-      isDone: number;
-      partsToDo: number;
-      createTime: string;
-    }>;
+    const rows = (await result.json()) as MutationRow[];
 
     return rows.map(this.toMutationProgress);
   }
@@ -168,10 +180,12 @@ export class RetroactiveUpdateService {
     client,
     projectId,
     tables,
+    category,
   }: {
     client: ClickHouseClient;
     projectId: string;
     tables: string[];
+    category: RetentionCategory;
   }): Promise<MutationProgress[]> {
     const result = await client.query({
       query: `
@@ -180,7 +194,8 @@ export class RetroactiveUpdateService {
           table AS table,
           is_done AS isDone,
           parts_to_do AS partsToDo,
-          formatDateTime(create_time, '%Y-%m-%dT%H:%i:%S') AS createTime
+          formatDateTime(create_time, '%Y-%m-%dT%H:%i:%S') AS createTime,
+          command AS command
         FROM system.mutations
         WHERE table IN {tables:Array(String)}
           AND position(command, '_retention_days') > 0
@@ -191,29 +206,27 @@ export class RetroactiveUpdateService {
       format: "JSONEachRow",
     });
 
-    const rows = (await result.json()) as Array<{
-      mutationId: string;
-      table: string;
-      isDone: number;
-      partsToDo: number;
-      createTime: string;
-    }>;
+    const rows = (await result.json()) as MutationRow[];
 
-    return rows.map(this.toMutationProgress);
+    return rows
+      .filter((row) => {
+        if (row.table !== "event_log") return true;
+
+        const markedCategory = eventLogRetentionCategoryFromMutationCommand(row.command);
+        return markedCategory === null || markedCategory === category;
+      })
+      .map(this.toMutationProgress);
   }
 
-  private toMutationProgress = (r: {
-    mutationId: string;
-    table: string;
-    isDone: number;
-    partsToDo: number;
-    createTime: string;
-  }): MutationProgress => ({
+  private toMutationProgress = (r: MutationRow): MutationProgress => ({
     mutationId: r.mutationId,
     table: r.table,
     isDone: r.isDone === 1,
     partsToDo: r.partsToDo,
     createTime: r.createTime,
-    category: RETENTION_TABLE_CATEGORY_MAP[r.table as RetentionManagedTable] ?? null,
+    category:
+      (r.table === "event_log" ? eventLogRetentionCategoryFromMutationCommand(r.command) : null) ??
+      RETENTION_TABLE_CATEGORY_MAP[r.table as RetentionManagedTable] ??
+      null,
   });
 }

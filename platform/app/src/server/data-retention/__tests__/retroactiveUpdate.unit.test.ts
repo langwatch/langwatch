@@ -1,9 +1,29 @@
+import { createClient } from "@clickhouse/client";
 import { describe, expect, it, vi } from "vitest";
+import { eventLogRetentionCategoryMutationMarkerSql } from "../event-log-retention-policy";
 import { RETENTION_TABLE_CATEGORY_MAP } from "../retentionPolicy.schema";
 import {
   RetroactiveMutationInProgressError,
   RetroactiveUpdateService,
 } from "../retroactive/retroactiveUpdate.service";
+
+function createMockClickHouseClient({
+  command = vi.fn(),
+  query = vi.fn(),
+}: {
+  command?: ReturnType<typeof vi.fn>;
+  query?: ReturnType<typeof vi.fn>;
+}) {
+  const client = createClient({ url: "http://127.0.0.1:8123" });
+
+  return new Proxy(client, {
+    get(target, property, receiver) {
+      if (property === "command") return command;
+      if (property === "query") return query;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+}
 
 describe("RetroactiveUpdateService", () => {
   describe("triggerUpdate()", () => {
@@ -51,6 +71,7 @@ describe("RetroactiveUpdateService", () => {
         expect(eventLogCall!.query).toContain(
           "AggregateType NOT IN ('experiment_run', 'simulation_run', 'simulation_set', 'suite_run')",
         );
+        expect(eventLogCall!.query).toContain(eventLogRetentionCategoryMutationMarkerSql("traces"));
 
         expect(
           issuedCalls.some((call) =>
@@ -103,6 +124,9 @@ describe("RetroactiveUpdateService", () => {
           "AggregateType IN ('simulation_run', 'simulation_set', 'suite_run')",
         );
         expect(eventLogCall!.query).toContain("startsWith(EventType, 'lw.identity.')");
+        expect(eventLogCall!.query).toContain(
+          eventLogRetentionCategoryMutationMarkerSql("scenarios"),
+        );
       });
     });
 
@@ -143,6 +167,121 @@ describe("RetroactiveUpdateService", () => {
         );
         expect(eventLogCall).toBeDefined();
         expect(eventLogCall!.query).toContain("AggregateType IN ('experiment_run')");
+        expect(eventLogCall!.query).toContain(
+          eventLogRetentionCategoryMutationMarkerSql("experiments"),
+        );
+      });
+    });
+
+    describe("when event-log category mutations overlap", () => {
+      it("allows trace, scenario, and experiment mutations to coexist", async () => {
+        const activeEventLogMutations: Array<{
+          mutationId: string;
+          table: string;
+          isDone: number;
+          partsToDo: number;
+          createTime: string;
+          command: string;
+        }> = [];
+        const command = vi.fn().mockImplementation(async (request: { query: string }) => {
+          if (!request.query.includes("ALTER TABLE event_log")) return;
+
+          activeEventLogMutations.push({
+            mutationId: `event-log-${activeEventLogMutations.length + 1}`,
+            table: "event_log",
+            isDone: 0,
+            partsToDo: 1,
+            createTime: "2026-01-01T00:00:00",
+            command: request.query,
+          });
+        });
+        const query = vi.fn().mockImplementation(async () => ({
+          json: async () => activeEventLogMutations,
+        }));
+        const client = createMockClickHouseClient({ command, query });
+        const service = new RetroactiveUpdateService(async () => client);
+
+        await service.triggerUpdate({
+          projectId: "project-1",
+          category: "traces",
+          newRetentionDays: 49,
+        });
+        await service.triggerUpdate({
+          projectId: "project-1",
+          category: "scenarios",
+          newRetentionDays: 63,
+        });
+        await service.triggerUpdate({
+          projectId: "project-1",
+          category: "experiments",
+          newRetentionDays: 91,
+        });
+
+        expect(activeEventLogMutations).toHaveLength(3);
+        expect(
+          activeEventLogMutations.map(({ command }) =>
+            (["traces", "scenarios", "experiments"] as const).find((category) =>
+              command.includes(eventLogRetentionCategoryMutationMarkerSql(category)),
+            ),
+          ),
+        ).toEqual(["traces", "scenarios", "experiments"]);
+
+        const progress = await service.getMutationProgress({
+          projectId: "project-1",
+        });
+        expect(progress.map(({ category }) => category)).toEqual([
+          "traces",
+          "scenarios",
+          "experiments",
+        ]);
+
+        await expect(
+          service.triggerUpdate({
+            projectId: "project-1",
+            category: "scenarios",
+            newRetentionDays: 63,
+          }),
+        ).rejects.toMatchObject({
+          blocked: [
+            expect.objectContaining({
+              mutationId: "event-log-2",
+              category: "scenarios",
+            }),
+          ],
+        });
+      });
+
+      it("lets an unmarked legacy event-log mutation block every category", async () => {
+        const query = vi.fn().mockResolvedValue({
+          json: async () => [
+            {
+              mutationId: "legacy-event-log",
+              table: "event_log",
+              isDone: 0,
+              partsToDo: 1,
+              createTime: "2026-01-01T00:00:00",
+              command: "UPDATE _retention_days = 49 WHERE TenantId = 'project-1'",
+            },
+          ],
+        });
+        const client = createMockClickHouseClient({ query });
+        const service = new RetroactiveUpdateService(async () => client);
+
+        for (const category of ["traces", "scenarios", "experiments"] as const) {
+          await expect(
+            service.triggerUpdate({
+              projectId: "project-1",
+              category,
+              newRetentionDays: 49,
+            }),
+          ).rejects.toMatchObject({
+            blocked: [
+              expect.objectContaining({
+                mutationId: "legacy-event-log",
+              }),
+            ],
+          });
+        }
       });
     });
 
@@ -203,7 +342,7 @@ describe("RetroactiveUpdateService", () => {
 
   describe("getMutationProgress()", () => {
     describe("given retention-managed table mutations exist", () => {
-      it("returns category for each mutation derived from RETENTION_TABLE_CATEGORY_MAP", async () => {
+      it("uses explicit markers for mixed event-log mutation categories", async () => {
         const mockRows = [
           {
             mutationId: "mut-1",
@@ -218,6 +357,7 @@ describe("RetroactiveUpdateService", () => {
             isDone: 0,
             partsToDo: 3,
             createTime: "2026-01-01T00:01:00",
+            command: `UPDATE WHERE ${eventLogRetentionCategoryMutationMarkerSql("experiments")}`,
           },
           {
             mutationId: "mut-3",
@@ -242,7 +382,7 @@ describe("RetroactiveUpdateService", () => {
         const simRuns = progress.find((m) => m.table === "simulation_runs");
 
         expect(storedSpans?.category).toBe("traces");
-        expect(eventLog?.category).toBe("traces");
+        expect(eventLog?.category).toBe("experiments");
         expect(simRuns?.category).toBe("scenarios");
 
         // Tenant filter flows through query_params, not raw SQL.

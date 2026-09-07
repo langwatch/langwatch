@@ -1,5 +1,5 @@
 import type { AggregateType } from "../event-sourcing/domain/aggregateType";
-import type { RetentionCategory } from "./retentionPolicy.schema";
+import { RETENTION_CATEGORIES, type RetentionCategory } from "./retentionPolicy.schema";
 
 export type EventLogRetentionClass = RetentionCategory | "indefinite";
 
@@ -54,7 +54,11 @@ export function classifyEventLogRowRetention(row: {
     return "indefinite";
   }
 
-  return RETENTION_CLASS_BY_AGGREGATE_TYPE[row.AggregateType as AggregateType] ?? "traces";
+  if (!Object.prototype.hasOwnProperty.call(RETENTION_CLASS_BY_AGGREGATE_TYPE, row.AggregateType)) {
+    return "traces";
+  }
+
+  return RETENTION_CLASS_BY_AGGREGATE_TYPE[row.AggregateType as AggregateType];
 }
 
 function sqlStringLiteral(value: string): string {
@@ -106,4 +110,24 @@ export function eventLogRetentionCategorySqlPredicate(category: RetentionCategor
     `${finiteGuard} AND ` +
     `AggregateType IN (${aggregateTypeListSql(aggregateTypesFor(category))})`
   );
+}
+
+const EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX = "langwatch:event-log-retention-category:";
+
+export function eventLogRetentionCategoryMutationMarkerSql(category: RetentionCategory): string {
+  const marker = `${EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX}${category}`;
+  return `length(${sqlStringLiteral(marker)}) > 0`;
+}
+
+export function eventLogRetentionCategoryFromMutationCommand(
+  command: string | null | undefined,
+): RetentionCategory | null {
+  if (!command) return null;
+
+  const matchingCategories = RETENTION_CATEGORIES.filter((category) => {
+    const marker = `${EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX}${category}`;
+    return command.includes(sqlStringLiteral(marker));
+  });
+
+  return matchingCategories.length === 1 ? matchingCategories[0]! : null;
 }

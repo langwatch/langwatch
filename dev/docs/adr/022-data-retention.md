@@ -112,8 +112,11 @@ Tables map to three categories that cascade independently
 (`RETENTION_TABLE_CATEGORY_MAP`): `traces`, `scenarios`, and `experiments`.
 `event_log` is the exception to table-level classification: each row is
 classified by `event-log-retention-policy.ts`. Payload-bearing rows follow the
-matching customer category, while durable content-free and control-plane
-families use `_retention_days = 0` and never expire.
+matching customer category, while explicitly durable control-plane and
+operational families use `_retention_days = 0` and never expire. Indefinite here
+is a durability decision, not a claim that every event is content-free:
+`coding_agent_session` can carry a raw prompt-derived 120-character title
+fallback, and `ingestion_pull` failures carry raw provider error messages.
 
 PG carries `RetentionPolicy(scopeType, scopeId, category, retentionDays)`
 with a denormalized `organizationId` anchor for plan-gating and
@@ -161,9 +164,8 @@ when `CLICKHOUSE_COLD_STORAGE_ENABLED=true`.
 Every CH repository for the retention-managed tables takes a
 `RetentionPolicyResolver` and stamps `_retention_days` per row. `event_log`
 uses one exhaustive aggregate map, with event-type prefix fallbacks for
-identity, authorization, and governance history. Security and other explicitly
-durable content-free families are stamped 0; payload-bearing families resolve
-their category:
+identity, authorization, and governance history. Explicitly durable families
+are stamped 0; policy-bound families resolve their category:
 
 ```ts
 const retentionClass = classifyEventLogRowRetention(record);
@@ -175,7 +177,7 @@ const retentionDays = retentionClass === "indefinite"
 `_size_bytes` is `MATERIALIZED` — CH computes it server-side at insert
 from the payload columns; the app must never pass it (CH rejects the row).
 Floor is 49 in production for policy-bound rows. Zero is reserved for the
-explicit indefinite families and controlled test fixtures.
+explicitly indefinite production families.
 
 ### Retroactive (`retroactiveUpdate.service.ts`)
 
@@ -195,6 +197,13 @@ excludes all indefinite rows, selects simulation/suite aggregates for
 finite or unknown historical aggregate as `traces`. This prevents a customer
 retroactive change from shortening durable control-plane history or applying a
 trace policy to mixed scenario and experiment events.
+
+Each `event_log` mutation includes a constant category marker in its predicate.
+Conflict detection treats marked mutations from other categories as independent,
+so the settings page can launch trace, scenario, and experiment updates in
+parallel. Progress derives the event-log category from the same marker. An
+unmarked legacy mutation blocks every category and is labelled `traces`, which
+is conservative for commands created before markers existed.
 
 The `!= N` predicate skips parts already at target. Before issuing the
 ALTER, we query `system.mutations` with
@@ -314,10 +323,11 @@ silently keeps data alive past policy — the underlying CH rows don't
 expire. Mitigation: regression tests for the MODIFY-TTL re-emit
 invariant, plus a check on every deploy.
 
-A bug in ingestion stamping that floors to 0 instead of 49 silently makes
-data indefinite for new inserts. Mitigation: `_retention_days = 0` is
-only acceptable in test fixtures; production paths always fall back to
-`PLATFORM_DEFAULT_RETENTION_DAYS`.
+A bug in ingestion classification can still make policy-bound data indefinite
+or make durable data expire. Mitigation: the exhaustive aggregate map is shared
+by ingestion and retroactive SQL, unknown aggregates fall back to `traces`, and
+tests pin both the indefinite and policy-bound families. `_retention_days = 0`
+is a valid production stamp only for an explicitly indefinite family.
 
 **Neutral.** Pinning growth is unbounded — manual pins survive until
 explicitly unpinned. Since the orphan sweep was removed (ADR-025), a
