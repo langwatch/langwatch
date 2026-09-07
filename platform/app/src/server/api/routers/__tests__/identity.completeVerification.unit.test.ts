@@ -98,6 +98,7 @@ vi.mock(
     signInRouter: () => ({}),
     decideLocalSignUp: async () => ({}),
     localSignUpDecision: async () => ({}),
+    clearSignUpConfirmationPending: async () => void 0,
     signUpIdentifier: () => ({}),
     signUpVerification: () => ({}),
     ssoConnections: () => ({}),
