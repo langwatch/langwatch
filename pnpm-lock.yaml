@@ -2502,6 +2502,9 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../../plans
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../../runtime-composition
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -2533,6 +2536,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../prisma-client
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../../runtime-composition
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../time
@@ -2619,6 +2625,9 @@ importers:
 
   packages/enterprise/features/managed-provider/contract:
     dependencies:
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../../runtime-composition
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -2644,6 +2653,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../../../features/project/contract
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../../runtime-composition
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -3746,6 +3758,9 @@ importers:
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../runtime-composition
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       zod:
         specifier: ^4.4.3
         version: 4.4.3
