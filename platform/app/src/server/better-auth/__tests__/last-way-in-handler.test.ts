@@ -11,19 +11,29 @@ import type { RequiringOrganizations } from "../last-way-in";
 import { LastWayInGuard } from "../last-way-in";
 
 type MemoryDB = Record<string, Record<string, unknown>[]>;
+type AuthUnderTest = {
+  handler: (request: Request) => Promise<Response>;
+};
 
 const baseURL = "http://localhost:3000";
 const email = "last-way-in@example.com";
 const password = "test-password-1";
 const refusalSchema = z.object({ code: z.string(), message: z.string() });
-const signUpSchema = z.object({ user: z.object({ id: z.string() }) }).passthrough();
-const signInSchema = z.object({ user: z.object({ id: z.string() }) }).passthrough();
+const signUpSchema = z
+  .object({ user: z.object({ id: z.string() }) })
+  .passthrough();
+const signInSchema = z
+  .object({ user: z.object({ id: z.string() }) })
+  .passthrough();
 
 function rows(db: MemoryDB, model: string): Record<string, unknown>[] {
   return db[model] ?? [];
 }
 
-function stringField(row: Record<string, unknown>, field: string): string | null {
+function stringField(
+  row: Record<string, unknown>,
+  field: string,
+): string | null {
   const value = row[field];
   return typeof value === "string" ? value : null;
 }
@@ -45,7 +55,8 @@ function removeCredentialPassword(db: MemoryDB, userId: string): void {
   const account = rows(db, "account").find(
     (row) => stringField(row, "userId") === userId,
   );
-  if (!account) throw new Error("the signup did not create a credential account");
+  if (!account)
+    throw new Error("the signup did not create a credential account");
   account.password = null;
 }
 
@@ -125,7 +136,8 @@ function buildHarness() {
     }),
     signInAfterPasswordReset: async () => {},
   });
-  if (!configuredHooks.before) {
+  const beforeHook = configuredHooks.before;
+  if (!beforeHook) {
     throw new Error("the request hook did not configure a before handler");
   }
   const authOptions = {
@@ -141,7 +153,7 @@ function buildHarness() {
       }),
       twoFactor({ issuer: "LangWatch test", allowPasswordless: true }),
     ],
-    hooks: { before: configuredHooks.before },
+    hooks: { before: beforeHook },
   };
   const auth = betterAuth(authOptions);
   const setupAuth = betterAuth({ ...authOptions, hooks: void 0 });
@@ -162,13 +174,16 @@ async function signUpCookie(
 }
 
 async function signIn(
-  auth: ReturnType<typeof betterAuth>,
+  auth: AuthUnderTest,
 ): Promise<{ status: number; userId?: string }> {
   const response = await auth.handler(
     post("/sign-in/email", { email, password }),
   );
   if (response.status !== 200) return { status: response.status };
-  return { status: response.status, userId: signInSchema.parse(await response.json()).user.id };
+  return {
+    status: response.status,
+    userId: signInSchema.parse(await response.json()).user.id,
+  };
 }
 
 async function callRoute({
@@ -177,7 +192,7 @@ async function callRoute({
   cookie,
   body = {},
 }: {
-  auth: ReturnType<typeof betterAuth>;
+  auth: AuthUnderTest;
   path: string;
   cookie?: string;
   body?: Record<string, string>;
@@ -217,7 +232,9 @@ describe("BetterAuth last-way request hooks", () => {
     harness.db.organization = [
       { id: "org_required", slug: "required", mfaRequired: true },
     ];
-    harness.db.organizationMember = [{ userId, organizationId: "org_required" }];
+    harness.db.organizationMember = [
+      { userId, organizationId: "org_required" },
+    ];
     harness.db.twoFactor = [
       { id: "factor", userId, secret: "encrypted", verified: true },
     ];
@@ -273,6 +290,9 @@ describe("BetterAuth last-way request hooks", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: true });
     expect(rows(harness.db, "passkey")).toEqual([]);
-    await expect(signIn(harness.auth)).resolves.toEqual({ status: 200, userId });
+    await expect(signIn(harness.auth)).resolves.toEqual({
+      status: 200,
+      userId,
+    });
   });
 });

@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
+import type { Status } from "better-call";
 import { z } from "zod";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
 import type {
@@ -44,10 +45,10 @@ export interface SignUpConfirmationDirectoryPort {
  */
 export interface ConfirmSignUpAddressContext extends SessionMintingContext {
   body: { token: string };
-  setStatus: (status: number) => void;
+  setStatus: (status: Status) => void;
   json: (
     body: Record<string, unknown> | null,
-    init?: { status?: number },
+    init?: { status?: Status },
   ) => unknown;
 }
 
