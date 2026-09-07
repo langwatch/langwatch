@@ -152,7 +152,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
       ).resolves.toBeUndefined();
     });
 
-    /** @scenario Client session flags cannot bypass address confirmation */
+    /** @scenario Raw password sign-up cannot bypass confirmed registration */
     it("refuses BetterAuth's raw sign-up route in favor of the confirmed registration flow", async () => {
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-up/email")),
