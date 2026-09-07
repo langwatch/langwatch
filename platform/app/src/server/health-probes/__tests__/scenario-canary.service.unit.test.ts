@@ -21,7 +21,7 @@ import {
 import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
 
 const { logger } = vi.hoisted(() => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock("@langwatch/observability", () => ({
@@ -639,8 +639,8 @@ describe("parseRunPlanConfig", () => {
 });
 
 /**
- * A `SimulationSuite` row as the canary's lookup reads it, plus the two columns
- * the `findFirst` `where` filters on (`kind`, `archivedAt`).
+ * A `SimulationSuite` row as the canary's lookup reads it, plus `archivedAt`
+ * (filtered in the repository `where`) and `kind` (checked after the read).
  */
 type FakeSuiteRow = {
   id: string;
@@ -653,33 +653,28 @@ type FakeSuiteRow = {
 };
 
 /**
- * Drives `prisma.simulationSuite.findFirst` off an in-memory table that HONOURS
- * the `where` (id-or-slug + `projectId` + `archivedAt: null` + `kind: "run_plan"`).
- * Returning `null` unconditionally would make an "archived plan is rejected"
- * test pass even if the filter were dropped; making the fake obey the filter is
- * what proves each clause is load-bearing — a row that would match without one
- * clause is filtered out by it, including a plan queried under the wrong
- * projectId.
+ * Drives `prisma.simulationSuite.findFirst` — which `SuiteRepository.findById`
+ * and `findBySlug` both sit on — off an in-memory table that HONOURS the
+ * `where` (`id` or `slug` + `projectId` + `archivedAt: null`). Returning `null`
+ * unconditionally would make an "archived plan is rejected" test pass even if
+ * the filter were dropped; making the fake obey the filter is what proves each
+ * clause is load-bearing — a row that would match without one clause is
+ * filtered out by it, including a plan queried under the wrong projectId.
+ * `kind` is deliberately NOT filtered here: the repository finders are
+ * kind-agnostic, so the service must reject a non-`run_plan` row itself and
+ * the "test_suite is rejected" test proves it does.
  */
 function fakeSuiteTable(rows: FakeSuiteRow[]) {
   vi.mocked(prisma.simulationSuite.findFirst).mockImplementation((async (
     args: { where?: Record<string, unknown> } | undefined,
   ) => {
     const where = args?.where ?? {};
-    const or = where.OR as Array<{ id?: string; slug?: string }> | undefined;
     const match = rows.find(
       (row) =>
         (where.id === undefined || row.id === where.id) &&
-        (or === undefined ||
-          or.some((clause) =>
-            clause.id !== undefined
-              ? row.id === clause.id
-              : row.slug === clause.slug,
-          )) &&
+        (where.slug === undefined || row.slug === where.slug) &&
         (where.projectId === undefined || row.projectId === where.projectId) &&
-        (where.archivedAt === undefined ||
-          row.archivedAt === where.archivedAt) &&
-        (where.kind === undefined || row.kind === where.kind),
+        (where.archivedAt === undefined || row.archivedAt === where.archivedAt),
     );
     return match ?? null;
   }) as typeof prisma.simulationSuite.findFirst);
@@ -712,7 +707,7 @@ describe("runScenarioHealthCanary", () => {
 
   describe("given a runPlanId that resolves to no active run plan", () => {
     /** @scenario "A misconfigured run plan reports unhealthy without launching a run" */
-    it("looks the plan up by id, project, unarchived and kind run_plan, then reports run_failed", async () => {
+    it("looks the plan up by id then by slug, each scoped to the project and unarchived, then reports run_failed", async () => {
       fakeSuiteTable([]);
 
       const result = await runScenarioHealthCanary({
@@ -720,12 +715,19 @@ describe("runScenarioHealthCanary", () => {
         runPlanId: "missing-plan",
       });
 
-      expect(prisma.simulationSuite.findFirst).toHaveBeenCalledWith({
+      expect(prisma.simulationSuite.findFirst).toHaveBeenCalledTimes(2);
+      expect(prisma.simulationSuite.findFirst).toHaveBeenNthCalledWith(1, {
         where: {
+          id: "missing-plan",
           projectId: "canary-project",
-          OR: [{ id: "missing-plan" }, { slug: "missing-plan" }],
           archivedAt: null,
-          kind: "run_plan",
+        },
+      });
+      expect(prisma.simulationSuite.findFirst).toHaveBeenNthCalledWith(2, {
+        where: {
+          slug: "missing-plan",
+          projectId: "canary-project",
+          archivedAt: null,
         },
       });
       expect(result).toMatchObject({ healthy: false, reason: "run_failed" });

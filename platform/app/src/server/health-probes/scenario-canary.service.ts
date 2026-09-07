@@ -39,6 +39,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { launchScenarioRun } from "~/server/scenarios/launch-scenario-run.service";
@@ -50,6 +51,7 @@ import {
 } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
 import type { SimulationTarget } from "~/server/scenarios/simulation-target";
+import { SuiteRepository } from "~/server/suites/suite.repository";
 import { parseSuiteTargets } from "~/server/suites/types";
 
 const logger = createLogger("langwatch:scenario-canary");
@@ -355,6 +357,25 @@ export function parseRunPlanConfig(
 }
 
 /**
+ * Resolves `runPlanId` (id or slug) to a non-archived `run_plan` suite in
+ * `projectId`, or `null`. Tries the id first: ids are globally unique, so a
+ * hit needs no second read; a miss falls back to the per-project slug.
+ */
+async function findRunPlan({
+  projectId,
+  runPlanId,
+}: {
+  projectId: string;
+  runPlanId: string;
+}): Promise<SimulationSuite | null> {
+  const suites = new SuiteRepository(prisma);
+  const suite =
+    (await suites.findById({ id: runPlanId, projectId })) ??
+    (await suites.findBySlug({ slug: runPlanId, projectId }));
+  return suite?.kind === "run_plan" ? suite : null;
+}
+
+/**
  * Reads and validates the canary config off the named run plan's suite row,
  * scoped to `projectId`.
  *
@@ -372,7 +393,7 @@ export function parseRunPlanConfig(
  * documented 200/503/429 contract.
  *
  * The read is also raced against `raceDeadline` (defaulting to
- * {@link raceAgainstRealDeadline}) so a wedged `findFirst` cannot wedge the
+ * {@link raceAgainstRealDeadline}) so a wedged lookup cannot wedge the
  * endpoint forever. `remainingMs` is what is left of the ONE shared total
  * budget after the caller ({@link runScenarioHealthCanary}) computed its
  * `hardDeadline` — the lookup and the run phase that follows it share a single
@@ -403,21 +424,15 @@ async function resolveCanaryConfigFromRunPlan({
   try {
     const raced = await raceDeadline({
       ms: remainingMs,
-      // `projectId` scopes the read to a plan the caller's project owns and
-      // satisfies the multitenancy guard. `runPlanId` may be the plan's id or
-      // its slug (slugs are unique per project). `kind: "run_plan"` and
-      // `archivedAt: null` are load-bearing too: a 1×1 `test_suite` or an
-      // archived plan would otherwise launch a real run the operator meant to
-      // retire. Filtering in the query keeps every one of those decisions in a
-      // single place instead of re-checking them after the read.
-      work: prisma.simulationSuite.findFirst({
-        where: {
-          projectId,
-          OR: [{ id: runPlanId }, { slug: runPlanId }],
-          archivedAt: null,
-          kind: "run_plan",
-        },
-      }),
+      // `runPlanId` may be the plan's id or its slug (slugs are unique per
+      // project), resolved through the same repository every other suite read
+      // goes through: by id first, then by slug. Both lookups are scoped to
+      // `projectId` (satisfying the multitenancy guard and confining the canary
+      // to a plan the caller's project owns) and skip archived rows. `kind` is
+      // checked here because the repository has no kind-aware finder: a 1×1
+      // `test_suite` would otherwise launch a real run the operator never meant
+      // to schedule.
+      work: findRunPlan({ projectId, runPlanId }),
     });
     if ("timedOut" in raced) {
       logger.error(
