@@ -655,14 +655,16 @@ secured
 async function authenticateLangyActor(
   c: Context,
 ): Promise<
-  | { error: string; status: number }
+  | { error: string; status: 401 | 403 }
   | Awaited<ReturnType<typeof authorizeLangyApiKey>>
 > {
   try {
     return await authorizeLangyApiKey(c);
   } catch (error) {
     if (error instanceof HandledError) {
-      return { error: error.message, status: error.httpStatus };
+      // The chain refuses with 401 (no or unknown credential) or 403 (ceiling,
+      // cohort, actor); Hono's json init needs the literal union, not `number`.
+      return { error: error.message, status: error.httpStatus as 401 | 403 };
     }
     throw error;
   }
