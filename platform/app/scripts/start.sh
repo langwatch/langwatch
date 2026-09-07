@@ -225,6 +225,7 @@ if [[ "$NODE_ENV" = "development" ]]; then
 fi
 
 pnpm run start:prepare:db
+pnpm run task system-migrations
 
 COMMANDS=()
 NAMES=()

@@ -352,7 +352,6 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
-import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
@@ -415,6 +414,14 @@ export function initializeWebApp(): App {
 
 export function initializeWorkerApp(): App {
   return initializeDefaultApp({ processRole: "worker" });
+}
+
+/**
+ * One-shot system-migration role. It processes only migration event work on
+ * an isolated queue without starting shared consumers, schedulers, or workers.
+ */
+export function initializeMigrationApp(): App {
+  return initializeDefaultApp({ processRole: "migration" });
 }
 
 /**
@@ -1856,14 +1863,6 @@ export function initializeDefaultApp(options?: {
     gracefulCloseables.push({
       name: "scheduler",
       close: () => scheduler.stop(),
-    });
-  }
-  if (systemMigrations) {
-    // Aborts the pass between tenants; a truncated pass is harmless because
-    // every migration is idempotent and the next boot resumes the sweep.
-    gracefulCloseables.push({
-      name: "system-migrations",
-      close: () => systemMigrations.stop(),
     });
   }
   gracefulCloseables.push({

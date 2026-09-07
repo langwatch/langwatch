@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   type ProcessRole,
+  roleConsumesEventQueue,
   roleRunsWorkers,
   roleSatisfiesRunIn,
+  roleUsesMigrationEventQueue,
 } from "../config";
 
 describe("roleRunsWorkers", () => {
@@ -37,6 +39,31 @@ describe("roleRunsWorkers", () => {
       const hosting = roles.filter(roleRunsWorkers);
       expect(hosting).toEqual(["worker", "all"]);
     });
+  });
+});
+
+describe("event queue roles", () => {
+  it("lets migration consume its isolated queue without hosting workers", () => {
+    expect(roleConsumesEventQueue("migration")).toBe(true);
+    expect(roleUsesMigrationEventQueue("migration")).toBe(true);
+    expect(roleRunsWorkers("migration")).toBe(false);
+  });
+
+  it("keeps every other role on the shared queue", () => {
+    const roles: Array<ProcessRole | undefined> = [
+      "web",
+      "worker",
+      "migration",
+      "all",
+      undefined,
+    ];
+
+    expect(roles.filter(roleUsesMigrationEventQueue)).toEqual(["migration"]);
+    expect(roles.filter(roleConsumesEventQueue)).toEqual([
+      "worker",
+      "migration",
+      "all",
+    ]);
   });
 });
 
@@ -98,6 +125,12 @@ describe("roleSatisfiesRunIn", () => {
         roleSatisfiesRunIn({ runIn: ["web", "worker"], processRole: "web" }),
       ).toBe(true);
     });
+
+    it("runs durable worker subscribers for locally processed migration events", () => {
+      expect(
+        roleSatisfiesRunIn({ runIn: ["worker"], processRole: "migration" }),
+      ).toBe(true);
+    });
   });
 
   describe("given a dedicated role and a non-matching filter", () => {
@@ -113,9 +146,9 @@ describe("roleSatisfiesRunIn", () => {
       ).toBe(false);
     });
 
-    it("excludes a worker-only subscriber under the migration role", () => {
+    it("excludes a web-only subscriber under the migration role", () => {
       expect(
-        roleSatisfiesRunIn({ runIn: ["worker"], processRole: "migration" }),
+        roleSatisfiesRunIn({ runIn: ["web"], processRole: "migration" }),
       ).toBe(false);
     });
   });

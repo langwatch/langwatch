@@ -17,12 +17,26 @@ export function roleRunsWorkers(role: ProcessRole | undefined): boolean {
   return role === "worker" || role === "all";
 }
 
+/** Roles that consume the event queue selected for their process. */
+export function roleConsumesEventQueue(role: ProcessRole | undefined): boolean {
+  return role === "worker" || role === "migration" || role === "all";
+}
+
+/** Whether the role uses the isolated system-migration event queue. */
+export function roleUsesMigrationEventQueue(
+  role: ProcessRole | undefined,
+): boolean {
+  return role === "migration";
+}
+
 /**
  * Whether a subscriber with the given `runIn` role filter should run under the
  * current process role. A subscriber with no filter runs everywhere. The `"all"`
  * role (dev single-process mode) plays every role, so it satisfies any filter —
  * without this, subscribers declared `runIn: ["worker"]` would be excluded in
  * in-process mode and the worker stack would boot but do no subscriber work.
+ * The migration role runs worker subscribers for events on its isolated queue,
+ * but `roleRunsWorkers` remains false so it starts no general worker runtime.
  */
 export function roleSatisfiesRunIn({
   runIn,
@@ -33,6 +47,9 @@ export function roleSatisfiesRunIn({
 }): boolean {
   if (!runIn || !processRole) return true;
   if (processRole === "all") return true;
+  if (processRole === "migration") {
+    return runIn.includes("migration") || runIn.includes("worker");
+  }
   return runIn.includes(processRole);
 }
 
@@ -61,9 +78,10 @@ export interface AppConfig {
   // "web": dispatch commands only (no queue consumers)
   // "worker": full consumers
   // "all": web server + full consumers in one process (dev-only, WORKERS_IN_PROCESS=1)
-  // "migration": direct processCommand() calls, subscribers excluded
+  // "migration": isolated event queue with worker subscribers; no shared queue,
+  // schedulers, process-manager consumers, or general workers
   // undefined: dispatch-only (web-like) — no consumers
-  // Use `roleRunsWorkers(role)` rather than comparing to "worker" directly.
+  // Use the named role predicates rather than comparing roles directly.
   processRole?: ProcessRole;
 
   // Customer.io nurturing
