@@ -7,8 +7,14 @@
  * its memory adapter. A rejected token must never reach an Account or Session
  * write, which is the premise the request-scoped claims recorder relies on.
  */
+
+import {
+  createSign,
+  generateKeyPairSync,
+  type KeyObject,
+  randomUUID,
+} from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { createSign, generateKeyPairSync, randomUUID, type KeyObject } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
@@ -18,7 +24,12 @@ import { z } from "zod";
 
 type MemoryDb = Record<string, Record<string, unknown>[]>;
 
-type TokenVariant = "valid" | "wrong-signature" | "wrong-issuer" | "wrong-audience" | "wrong-nonce";
+type TokenVariant =
+  | "valid"
+  | "wrong-signature"
+  | "wrong-issuer"
+  | "wrong-audience"
+  | "wrong-nonce";
 
 const BASE_URL = "http://localhost:3000";
 const PROVIDER_ID = "auth0";
@@ -40,7 +51,13 @@ const json = (response: import("node:http").ServerResponse, value: unknown) => {
 const base64urlJson = (value: unknown): string =>
   Buffer.from(JSON.stringify(value)).toString("base64url");
 
-const signedIdToken = ({ nonce, variant }: { nonce: string; variant: TokenVariant }): string => {
+const signedIdToken = ({
+  nonce,
+  variant,
+}: {
+  nonce: string;
+  variant: TokenVariant;
+}): string => {
   const now = Math.floor(Date.now() / 1_000);
   const header = base64urlJson({ alg: "RS256", kid: "test-key", typ: "JWT" });
   const payload = base64urlJson({
@@ -147,7 +164,10 @@ const cookiesFor = (response: Response): string => {
     .join("; ");
 };
 
-const applyResponseCookies = (cookieHeader: string, response: Response): string => {
+const applyResponseCookies = (
+  cookieHeader: string,
+  response: Response,
+): string => {
   const jar = new Map<string, string>();
   for (const pair of cookieHeader.split("; ").filter(Boolean)) {
     const separator = pair.indexOf("=");
@@ -165,7 +185,8 @@ const applyResponseCookies = (cookieHeader: string, response: Response): string 
     }
     const name = pair.slice(0, separator);
     const value = pair.slice(separator + 1);
-    const deletesCookie = value === "" || /(?:^|;)\s*max-age=0(?:;|$)/i.test(setCookie);
+    const deletesCookie =
+      value === "" || /(?:^|;)\s*max-age=0(?:;|$)/i.test(setCookie);
     if (deletesCookie) {
       jar.delete(name);
     } else {
@@ -278,20 +299,24 @@ describe("generic OAuth's verified ID-token boundary", () => {
   });
 
   /** @scenario Invalid Auth0 proof never reaches account or session creation */
-  it.each<TokenVariant>(["wrong-signature", "wrong-issuer", "wrong-audience", "wrong-nonce"])(
-    "rejects %s before any Account or Session write",
-    async (variant) => {
-      const { auth, db } = buildHarness();
-      const flow = await beginCallback({ auth, variant });
+  it.each<TokenVariant>([
+    "wrong-signature",
+    "wrong-issuer",
+    "wrong-audience",
+    "wrong-nonce",
+  ])("rejects %s before any Account or Session write", async (variant) => {
+    const { auth, db } = buildHarness();
+    const flow = await beginCallback({ auth, variant });
 
-      const response = await flow.callback();
+    const response = await flow.callback();
 
-      expect(response.status).toBe(302);
-      expect(response.headers.get("location")).toContain("error=unable_to_get_user_info");
-      expect(db.account).toHaveLength(0);
-      expect(db.session).toHaveLength(0);
-    },
-  );
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toContain(
+      "error=unable_to_get_user_info",
+    );
+    expect(db.account).toHaveLength(0);
+    expect(db.session).toHaveLength(0);
+  });
 
   /** @scenario Invalid callback state reaches no account or session write */
   it.each([

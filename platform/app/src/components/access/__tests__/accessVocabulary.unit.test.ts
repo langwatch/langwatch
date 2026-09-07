@@ -44,13 +44,9 @@ function surfaceFiles(): { fileName: string; sourceText: string }[] {
   const componentFiles = readdirSync(ACCESS_COMPONENTS)
     .filter((name) => name.endsWith(".tsx"))
     .map((name) => join(ACCESS_COMPONENTS, name));
-  const pageFiles = [
-    "members.tsx",
-    "roles.tsx",
-    "groups.tsx",
-    "access.tsx",
-    "scim.tsx",
-  ].map((name) => join(SETTINGS_PAGES, name));
+  const pageFiles = ["members.tsx", "roles.tsx", "groups.tsx", "scim.tsx"].map(
+    (name) => join(SETTINGS_PAGES, name),
+  );
 
   return [...componentFiles, ...pageFiles].map((path) => ({
     fileName: path,

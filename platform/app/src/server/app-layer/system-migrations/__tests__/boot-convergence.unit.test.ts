@@ -71,7 +71,7 @@ describe("runSystemMigrationsToQuiescence", () => {
     expect(stubs.runPass).toHaveBeenCalledTimes(3);
   });
 
-  /** @scenario A held tenant that never advances does not loop forever */
+  /** @scenario A recurring reconciliation does not loop forever */
   it("treats a held but unchanged tenant as quiescent", async () => {
     stubs.runPass.mockResolvedValue({
       ...summaryOf({ advanced: 0 }),
@@ -85,6 +85,7 @@ describe("runSystemMigrationsToQuiescence", () => {
     expect(stubs.runPass).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario A finite held or parked migration prevents startup */
   it("rejects finite held work that cannot converge", async () => {
     stubs.runPass.mockResolvedValue({
       ...summaryOf({ advanced: 0 }),
