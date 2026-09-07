@@ -1,5 +1,6 @@
+import { PrismaPg } from "@prisma/adapter-pg";
 import { describe, expect, it, vi } from "vitest";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { PrismaPasskeyRemovalRepository } from "../passkey-removal.prisma.repository";
 
 function driverConflict() {
@@ -10,9 +11,14 @@ function driverConflict() {
 }
 
 function repository() {
-  const transaction = vi.fn<PrismaClient["$transaction"]>();
+  const prisma = new PrismaClient({
+    adapter: new PrismaPg({
+      connectionString: "postgresql://test:test@127.0.0.1:1/test",
+    }),
+  });
+  const transaction = vi.spyOn(prisma, "$transaction");
   const removal = PrismaPasskeyRemovalRepository.create({
-    prisma: { $transaction: transaction },
+    prisma,
     routesToIdentity: async () => false,
   });
   return { removal, transaction };
