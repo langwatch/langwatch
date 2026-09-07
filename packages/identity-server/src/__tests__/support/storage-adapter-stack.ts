@@ -4,7 +4,7 @@ import {
   type IdentityFactInput,
   normalizeIdentifierValue,
 } from "@langwatch/identity";
-import type { BetterAuthOptions } from "better-auth";
+import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { deriveNewbornUserId } from "../../crypto/identifier-identity";
@@ -59,6 +59,40 @@ const emptyDb = (): MemoryDB => ({
 });
 
 /**
+ * The adapter tests exercise the passkey table without mounting the browser
+ * passkey endpoints. Keep the real plugin schema here so Better Auth validates
+ * those direct adapter calls against the same row shape as production.
+ */
+const passkeySchemaPlugin: BetterAuthPlugin = {
+  id: "passkey",
+  schema: {
+    passkey: {
+      fields: {
+        name: { type: "string", required: false },
+        publicKey: { type: "string", required: true },
+        userId: {
+          type: "string",
+          references: { model: "user", field: "id" },
+          required: true,
+          index: true,
+        },
+        credentialID: {
+          type: "string",
+          required: true,
+          index: true,
+        },
+        counter: { type: "number", required: true },
+        deviceType: { type: "string", required: true },
+        backedUp: { type: "boolean", required: true },
+        transports: { type: "string", required: false },
+        createdAt: { type: "date", required: false },
+        aaguid: { type: "string", required: false },
+      },
+    },
+  },
+};
+
+/**
  * One `betterAuth()` shape for both stacks, differing only in the engine.
  * Sharing the literal keeps their inferred `Auth<Options>` types the same,
  * which is what lets one walk drive either of them.
@@ -71,6 +105,7 @@ function authOver(
     baseURL: "http://localhost:3000",
     secret: "test-secret-test-secret-test-secret",
     database,
+    plugins: [passkeySchemaPlugin],
     emailAndPassword: { enabled: true },
     ...(databaseHooks === undefined ? {} : { databaseHooks }),
   });
