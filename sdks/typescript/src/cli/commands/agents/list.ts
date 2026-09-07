@@ -73,9 +73,8 @@ function identityOf(credentials: ResolvedCredentials): string {
  * format. It names the agent, the wait and the credentials the listing was
  * read with, so the reader is left with the agent process as the thing to
  * look at. It never mentions the login commands: under `--format json` the
- * spinner is silent, and when the only line left on stderr was the identity
- * notice with "langwatch login" in it, a model read the timeout as a login
- * failure on a command line that was signed in.
+ * spinner is silent, and a timeout whose only stderr line is the identity
+ * notice with "langwatch login" in it reads as a login failure.
  */
 export function waitOnlineTimeoutLine({
   wanted,
