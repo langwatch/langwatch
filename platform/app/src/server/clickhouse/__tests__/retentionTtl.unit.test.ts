@@ -141,6 +141,10 @@ describe("RETENTION_MANAGED_TABLES", () => {
         table,
       );
     }
+    expect(SECURITY_RETENTION_EXEMPT_TABLES).not.toContain("session");
+    expect(SECURITY_RETENTION_EXEMPT_TABLES).not.toContain(
+      "verification_token",
+    );
   });
 
   it("does not include billable_events", () => {

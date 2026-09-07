@@ -314,6 +314,7 @@ describe("given a confirmation link I have already opened", () => {
 
   describe("when the grace window has closed", () => {
     /** @scenario "A spent link stops working once its grace window closes" */
+    /** @scenario Tenant retention never enrolls durable security projections */
     it("says the link expired", async () => {
       harness.advance(SPENT_LINK_GRACE_MS + 1);
 
