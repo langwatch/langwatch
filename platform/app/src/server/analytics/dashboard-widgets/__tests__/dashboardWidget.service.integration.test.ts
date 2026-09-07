@@ -338,6 +338,7 @@ describe("dashboard widget service (integration)", () => {
     });
 
     describe("when unplaced a second time", () => {
+      /** @scenario "Unplacing a widget clears its grid position" */
       it("succeeds idempotently", async () => {
         const dashboard = await createDashboard(project);
         const widget = await create({ dashboardId: dashboard.id });
