@@ -85,12 +85,23 @@ Feature: Signing up never strands an account
     Then exactly one creates and owns the pending account
     And the other is refused without adopting it
 
-  @integration
+  @unit
   Scenario: Client session flags cannot bypass address confirmation
     Given a new local account is awaiting address confirmation
-    When a client requests any session-minting path with createSession enabled
+    When the canonical session gate receives a client-requested session mint
     Then session creation is refused until a valid emailed proof is consumed
+
+  @integration
+  Scenario: Pending password sign-in cannot mint a session
+    Given a new password account is awaiting address confirmation
+    When its correct password is submitted through the sign-in handler
+    Then the handler refuses session creation with no cookie or session row
     And a legacy unverified account not carrying the pending latch keeps its existing behavior
+
+  @unit
+  Scenario: Raw password sign-up cannot bypass confirmed registration
+    When a client calls BetterAuth's raw password sign-up route
+    Then the route is unavailable in favor of the confirmed registration flow
 
   # The other side of that boundary, and the reason the first one is safe:
   # an account anybody can reach holds a credential, and is still refused.
