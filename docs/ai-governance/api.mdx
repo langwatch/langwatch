@@ -40,7 +40,7 @@ Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`
 | Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
 | Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |
 | Ingestion templates | `/api/governance/ingestion-templates` | [Ingestion templates](/ai-governance/ingestion-templates) |
-| Ingestion keys | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate`) | [Ingestion templates](/ai-governance/ingestion-templates) |
+| Ingestion keys | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate` / `revoke`) | [Ingestion templates](/ai-governance/ingestion-templates) |
 | Members | `/api/governance/members` | [Members and invites](/ai-governance/members-and-invites) |
 | Invites | `/api/governance/invites` | [Members and invites](/ai-governance/members-and-invites) |
 | Role bindings | `/api/governance/role-bindings` | [Roles and permissions](/ai-governance/roles-and-permissions) |
@@ -84,7 +84,8 @@ Three consequences:
 
 - **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `ik-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
 - **`source_type` selects the shaping**: the mint body's `source_type` records which upstream tool the key ingests for, so the gateway can apply the matching ingestion-template OTTL transform when traces arrive on that key. A key minted for an org-authored template carries that template's id.
-- **A personal CLI key follows its session**: a personal key the CLI mints stores the session's login key as `parentApiKeyId`. Logout, a devices-tab revoke, a re-login from the same device and session expiry all revoke that login key, and every key parented to it goes with it under cause `session`, `expired` or `offboarded`. A mint from a revoked session answers 401.
+- **A personal CLI key follows its session**: a personal key the CLI mints stores the session's login key as `parentApiKeyId`. Logout, a devices-tab revoke, a re-login from the same device and session expiry all revoke that login key, and every key parented to it goes with it. A mint from a revoked session answers 401.
+- **Each side records its own cause**: the login key carries why it died (`user` for a logout or a devices-tab revoke, `rotation` for a re-login, `expired` for a session that ran out, `offboarded` for a membership that ended). The keys under it carry `session`, except when they inherit `expired` or `offboarded`.
 - **A project CLI key does not**: a key minted into a named team project carries no parent and outlives the session that asked for it.
 - **Only the CLI mints for a tool it wraps**: `install` and the MCP mint accept only source types a published template names, and a wrapped tool answers `ingestion_key_source_not_allowed`.
 
@@ -140,9 +141,11 @@ The wire shape, request bodies, response envelopes, status-code mapping, and sur
 
 **Ingestion-key wire shape**: `platform/app/src/server/routes/__tests__/auth-cli-ingestion-key-personal.integration.test.ts` and `auth-cli-ingestion-key-project.integration.test.ts`, against real Postgres and the real Hono pipeline. Specifically lock:
 
-- the mint route returns a one-time `ik-lw-…` token and thereafter exposes only the prefix
-- a mint from a CLI session stores that session's login key as `parentApiKeyId`, and a mint from a session whose login key was revoked answers 401
+- the mint route answers 201 with an `ik-lw-…` token, its prefix and the OTLP endpoint, and a second mint for the same source returns a different token rather than replacing the first
+- a mint from a CLI session stores that session's login key as `parentApiKeyId` and the session's device label, and a mint from a session whose login key was revoked answers 401
 - the describe route reports a key's status and its `revocation_cause`, which is what the CLI reads before it re-mints
+
+Surface attribution is not asserted there. `metadata.surface` on the ingestion-key audit rows is locked by `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` and `platform/app/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`.
 
 The `organization:view` caller plus a project-scoped ingest-only RoleBinding is the setup pattern any downstream lane (CLI, MCP) needs for an ingestion-key test path. The cascade itself is locked by `auth-cli-logout.integration.test.ts` and `auth-cli-refresh-expiry.integration.test.ts`, and the service rules by `platform/app/ee/governance/services/__tests__/ingestionKey.lifecycle.unit.test.ts`.
 

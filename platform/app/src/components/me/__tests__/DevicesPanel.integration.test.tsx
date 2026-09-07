@@ -40,11 +40,15 @@ const state = vi.hoisted(() => ({
   sessions: [] as unknown[],
   keys: [] as unknown[],
   isReady: true,
+  sessionsFailed: false,
+  keysFailed: false,
 }));
 
 const calls = vi.hoisted(() => ({
   revokeKey: vi.fn(),
   revokeDevice: vi.fn(),
+  refetchedSessions: vi.fn(),
+  refetchedKeys: vi.fn(),
   invalidatedSessions: vi.fn(),
   invalidatedKeys: vi.fn(),
   toasts: [] as { title?: string; description?: string }[],
@@ -70,7 +74,12 @@ vi.mock("~/utils/api", () => ({
     }),
     personalSessions: {
       list: {
-        useQuery: () => ({ data: state.sessions, isLoading: false }),
+        useQuery: () => ({
+          data: state.sessionsFailed ? void 0 : state.sessions,
+          isLoading: false,
+          isError: state.sessionsFailed,
+          refetch: calls.refetchedSessions,
+        }),
       },
       revoke: {
         useMutation: (options: { onSuccess: (result: unknown) => void }) => {
@@ -83,7 +92,14 @@ vi.mock("~/utils/api", () => ({
       },
     },
     ingestionKey: {
-      list: { useQuery: () => ({ data: state.keys, isLoading: false }) },
+      list: {
+        useQuery: () => ({
+          data: state.keysFailed ? void 0 : state.keys,
+          isLoading: false,
+          isError: state.keysFailed,
+          refetch: calls.refetchedKeys,
+        }),
+      },
       revoke: {
         useMutation: (options: { onSuccess: (result: unknown) => void }) => {
           handlers.onRevokeKeySuccess = options.onSuccess;
@@ -165,8 +181,12 @@ describe("DevicesPanel", () => {
     state.sessions = [];
     state.keys = [];
     state.isReady = true;
+    state.sessionsFailed = false;
+    state.keysFailed = false;
     calls.revokeKey.mockClear();
     calls.revokeDevice.mockClear();
+    calls.refetchedSessions.mockClear();
+    calls.refetchedKeys.mockClear();
     calls.invalidatedSessions.mockClear();
     calls.invalidatedKeys.mockClear();
     calls.toasts.length = 0;
@@ -235,7 +255,7 @@ describe("DevicesPanel", () => {
 
       await user.click(
         screen.getByRole("button", {
-          name: "Revoke the claude_code ingestion key",
+          name: "Revoke the claude_code ingestion key on MacBook Pro",
         }),
       );
       expect(calls.revokeKey).not.toHaveBeenCalled();
@@ -298,6 +318,84 @@ describe("DevicesPanel", () => {
       renderPanel();
 
       expect(screen.getByText("No devices signed in")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a key list that failed to load", () => {
+    it("says so rather than claiming nothing is signed in", async () => {
+      state.keysFailed = true;
+
+      renderPanel();
+
+      expect(
+        screen.queryByText("No devices signed in"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText("Could not load your devices and keys"),
+      ).toBeInTheDocument();
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Try again" }));
+      expect(calls.refetchedSessions).toHaveBeenCalledTimes(1);
+      expect(calls.refetchedKeys).toHaveBeenCalledTimes(1);
+    });
+
+    it("says the same when it is the session list that failed", () => {
+      state.sessionsFailed = true;
+
+      renderPanel();
+
+      expect(
+        screen.getByText("Could not load your devices and keys"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given two keys for the same source on different machines", () => {
+    it("names each revoke button after the machine that holds the key", () => {
+      state.keys = [
+        ingestionKey({
+          apiKeyId: "ak_laptop",
+          parentApiKeyId: null,
+          deviceLabel: "MacBook Pro",
+        }),
+        ingestionKey({
+          apiKeyId: "ak_buildbox",
+          parentApiKeyId: null,
+          deviceLabel: "build-box",
+        }),
+      ];
+
+      renderPanel();
+
+      expect(
+        screen.getByRole("button", {
+          name: "Revoke the claude_code ingestion key on MacBook Pro",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: "Revoke the claude_code ingestion key on build-box",
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("falls back to the key's own id when neither carries a machine label", () => {
+      state.keys = [
+        ingestionKey({
+          apiKeyId: "ak_no_label_aaaaaa",
+          parentApiKeyId: null,
+          deviceLabel: null,
+        }),
+      ];
+
+      renderPanel();
+
+      expect(
+        screen.getByRole("button", {
+          name: "Revoke the claude_code ingestion key on key aaaaaa",
+        }),
+      ).toBeInTheDocument();
     });
   });
 

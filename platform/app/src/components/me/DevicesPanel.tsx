@@ -65,19 +65,13 @@ export function DevicesPanel() {
     keys: keysQuery.data ?? [],
   });
 
-  const renderKeyRow = (key: IngestionKeyView) => (
-    <IngestionKeyRow
-      key={key.apiKeyId}
-      ingestionKey={key}
-      isPendingRevoke={pendingRevokeKeyId === key.apiKeyId}
-      isRevoking={
-        revocation.isRevokingKey && pendingRevokeKeyId === key.apiKeyId
-      }
-      onRequestRevoke={() => setPendingRevokeKeyId(key.apiKeyId)}
-      onCancelRevoke={() => setPendingRevokeKeyId(null)}
-      onConfirmRevoke={() => revocation.revokeKey(key.apiKeyId)}
-    />
-  );
+  const renderKeyRow = useKeyRowRenderer({
+    pendingRevokeKeyId,
+    isRevokingKey: revocation.isRevokingKey,
+    onRequestRevoke: setPendingRevokeKeyId,
+    onCancelRevoke: () => setPendingRevokeKeyId(null),
+    onConfirmRevoke: revocation.revokeKey,
+  });
 
   return (
     <VStack align="stretch" gap={4}>
@@ -90,26 +84,115 @@ export function DevicesPanel() {
         onConfirm={revocation.revokeEveryDevice}
       />
 
-      {!ready || sessionsQuery.isLoading || keysQuery.isLoading ? (
-        <Text fontSize="sm" color="fg.muted" paddingY={8}>
-          Loading devices…
-        </Text>
-      ) : sessions.length === 0 && orphanKeys.length === 0 ? (
-        <NoDevicesState />
-      ) : (
-        <CredentialCards
-          sessions={sessions}
-          keysBySession={keysBySession}
-          orphanKeys={orphanKeys}
-          pendingRevokeId={pendingRevokeId}
-          isRevokingDevice={revocation.isRevokingDevice}
-          onRequestRevoke={setPendingRevokeId}
-          onCancelRevoke={() => setPendingRevokeId(null)}
-          onConfirmRevoke={revocation.revokeDevice}
-          renderKeyRow={renderKeyRow}
-        />
-      )}
+      <DevicesPanelBody
+        isLoading={!ready || sessionsQuery.isLoading || keysQuery.isLoading}
+        hasFailed={sessionsQuery.isError || keysQuery.isError}
+        onRetry={() => {
+          void sessionsQuery.refetch();
+          void keysQuery.refetch();
+        }}
+        sessions={sessions}
+        keysBySession={keysBySession}
+        orphanKeys={orphanKeys}
+        pendingRevokeId={pendingRevokeId}
+        isRevokingDevice={revocation.isRevokingDevice}
+        onRequestRevoke={setPendingRevokeId}
+        onCancelRevoke={() => setPendingRevokeId(null)}
+        onConfirmRevoke={revocation.revokeDevice}
+        renderKeyRow={renderKeyRow}
+      />
     </VStack>
+  );
+}
+
+/**
+ * Which of the four things the panel has to say: still reading, could not
+ * read, nothing to show, or the credentials themselves. They are ordered:
+ * a failed read is not an empty one, and an empty one is only empty once both
+ * lists have actually arrived.
+ */
+function DevicesPanelBody({
+  isLoading,
+  hasFailed,
+  onRetry,
+  sessions,
+  keysBySession,
+  orphanKeys,
+  pendingRevokeId,
+  isRevokingDevice,
+  onRequestRevoke,
+  onCancelRevoke,
+  onConfirmRevoke,
+  renderKeyRow,
+}: {
+  isLoading: boolean;
+  hasFailed: boolean;
+  onRetry: () => void;
+  sessions: DeviceSessionView[];
+  keysBySession: Map<number, IngestionKeyView[]>;
+  orphanKeys: IngestionKeyView[];
+  pendingRevokeId: number | null;
+  isRevokingDevice: boolean;
+  onRequestRevoke: (sessionStartedAtMs: number) => void;
+  onCancelRevoke: () => void;
+  onConfirmRevoke: (sessionStartedAtMs: number) => void;
+  renderKeyRow: (key: IngestionKeyView) => ReactNode;
+}) {
+  if (isLoading) {
+    return (
+      <Text fontSize="sm" color="fg.muted" paddingY={8}>
+        Loading devices…
+      </Text>
+    );
+  }
+  if (hasFailed) return <CredentialsUnavailable onRetry={onRetry} />;
+  if (sessions.length === 0 && orphanKeys.length === 0) {
+    return <NoDevicesState />;
+  }
+  return (
+    <CredentialCards
+      sessions={sessions}
+      keysBySession={keysBySession}
+      orphanKeys={orphanKeys}
+      pendingRevokeId={pendingRevokeId}
+      isRevokingDevice={isRevokingDevice}
+      onRequestRevoke={onRequestRevoke}
+      onCancelRevoke={onCancelRevoke}
+      onConfirmRevoke={onConfirmRevoke}
+      renderKeyRow={renderKeyRow}
+    />
+  );
+}
+
+/**
+ * One ingestion key on its row, with the revoke this panel offers for it.
+ *
+ * Split out so the panel above hands each card a renderer rather than a
+ * closure over four pieces of its own state.
+ */
+function useKeyRowRenderer({
+  pendingRevokeKeyId,
+  isRevokingKey,
+  onRequestRevoke,
+  onCancelRevoke,
+  onConfirmRevoke,
+}: {
+  pendingRevokeKeyId: string | null;
+  isRevokingKey: boolean;
+  onRequestRevoke: (apiKeyId: string) => void;
+  onCancelRevoke: () => void;
+  onConfirmRevoke: (apiKeyId: string) => void;
+}): (key: IngestionKeyView) => ReactNode {
+  return (key: IngestionKeyView) => (
+    <IngestionKeyRow
+      key={key.apiKeyId}
+      ingestionKey={key}
+      isPendingRevoke={pendingRevokeKeyId === key.apiKeyId}
+      isRevoking={isRevokingKey && pendingRevokeKeyId === key.apiKeyId}
+      onRequestRevoke={() => onRequestRevoke(key.apiKeyId)}
+      onCancelRevoke={onCancelRevoke}
+      onConfirmRevoke={() => onConfirmRevoke(key.apiKeyId)}
+    />
   );
 }
 
@@ -422,6 +505,35 @@ function RevokeAllConfirmation({
 }
 
 /** Nothing is signed in yet, so the way to sign something in comes with it. */
+/**
+ * Either list failing is not the same as either list being empty. A key that
+ * could not be read is still live and still exporting, so saying nothing is
+ * signed in would be wrong about the one thing this page exists to answer.
+ */
+function CredentialsUnavailable({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={6}
+    >
+      <VStack align="start" gap={2}>
+        <Text fontSize="sm" fontWeight="medium">
+          Could not load your devices and keys
+        </Text>
+        <Text fontSize="sm" color="fg.muted">
+          Anything already signed in keeps working. Try again to see the current
+          list.
+        </Text>
+        <Button size="xs" variant="outline" onClick={onRetry}>
+          Try again
+        </Button>
+      </VStack>
+    </Box>
+  );
+}
+
 function NoDevicesState() {
   return (
     <VStack align="stretch" gap={4}>
@@ -673,7 +785,10 @@ function IngestionKeyRow({
             size="xs"
             variant="ghost"
             colorPalette="red"
-            aria-label={`Revoke the ${ingestionKey.sourceType} ingestion key`}
+            aria-label={`Revoke the ${ingestionKey.sourceType} ingestion key on ${
+              ingestionKey.deviceLabel ??
+              `key ${ingestionKey.apiKeyId.slice(-6)}`
+            }`}
             onClick={onRequestRevoke}
           >
             Revoke
