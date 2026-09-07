@@ -129,6 +129,8 @@ const SKIP_PATHS: Record<string, string> = {
     UNDOCUMENTED_DASHBOARD_WIDGETS,
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
     UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/placement":
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
