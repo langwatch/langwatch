@@ -15,23 +15,23 @@ keywords:
 | Setting | Value |
 | --- | --- |
 | Method and URL | `GET https://<your-langwatch-host>/api/health/langy` |
-| Header | `X-Auth-Token: <project API key>` |
+| Headers | `X-Auth-Token: <API key>` and `X-Project-Id: <project id>` |
 | Expected status | `200` |
 | Request timeout | 75 seconds or more (the check itself gives up at 55, after the key has been authenticated) |
 | Check interval | 3 minutes or longer |
 
-The API key must belong to a user who has Langy access, and must carry the `langy:create` permission. The turn runs as that user, so create a dedicated user and key for the monitor rather than reusing a person's. The [Langy API surface flag](/self-hosting/langy/setup#staged-rollout) must be on for the key's project; while it is off, the endpoint answers `404` like any unmounted path.
+The API key must be one issued to a user (Settings → API keys), that user must have Langy access, and the key must carry the `langy:create` permission. The turn runs as that user, so create a dedicated user and key for the monitor rather than reusing a person's. The project's own key from the project settings page is not owned by anyone and is refused with `403`. `X-Project-Id` names the project the turn runs in; a key scoped to exactly one project may omit it, any other key without it is refused with `401`. The [Langy API surface flag](/self-hosting/langy/setup#staged-rollout) must be on for that project; while it is off, the endpoint answers `404` like any unmounted path.
 
 ## What it answers
 
 | Status | Body | Meaning |
 | --- | --- | --- |
 | `200` | `{ "status": "ok", "conversationId", "turnId", "durationMs" }` | Langy answered with text. |
-| `503` | `{ "status": "unhealthy", "reason", ... }` | `timeout`: no answer within 55 seconds. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. |
+| `503` | `{ "status": "unhealthy", "reason", ... }` | `timeout`: no answer within 55 seconds, which includes a worker that never managed to start. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. |
 | `429` | `{ "status": "busy" }` | A check for the same key is still running. Poll less often. |
 | `401` / `403` | `{ "message" }` | The key is missing, unknown, lacks `langy:create`, or its owner has no Langy access. |
 
-Every response carries `Cache-Control: no-store`. The endpoint sits beside the other subsystem probes (`/api/health/collector`, `/api/health/scenarios`, and so on) and answers refusals in the same shape they do.
+Every response the probe answers itself carries `Cache-Control: no-store`. The one exception is the `404` while the surface flag is off, which is byte-identical to an unmounted path, headers included, so the flag reveals nothing. The endpoint sits beside the other subsystem probes (`/api/health/collector`, `/api/health/scenarios`, and so on) and answers refusals in the same shape they do.
 
 The 55-second budget starts once the key is authenticated, so a slow database adds to the wall clock. If a reverse proxy in front of LangWatch has its own read timeout (ingress-nginx defaults to 60 seconds), raise it above the monitor's timeout, or a stalled check reaches the monitor as a `504` from the proxy instead of a `503` with `reason: "timeout"`. Either one still fails the check.
 
