@@ -6,8 +6,8 @@
 #
 # Accepted app factory target: serverFeature(...).withApp(ServerApp), with
 # static contract, dependencies and create on the server class. Scenarios tagged
-# @unimplemented describe the agreed API still to be built. Transport descriptor
-# syntax remains undecided; existing behavioural guarantees stay in force.
+# @unimplemented describe the agreed API still to be built. Transports declare
+# an apis array with router on both protocols; namespaces derive from the owner.
 
 Feature: Composing a process from feature installers
   Every process installs the same features the same way, validates the whole
@@ -72,6 +72,106 @@ Feature: Composing a process from feature installers
       Then the contract imports no server implementation or infrastructure
       And the static factory and its dependency metadata belong to the owning server implementation
       And the public app instance exposes only its readonly service members
+
+  Rule: transports declare routers and use the installed app
+
+    @unimplemented @unit
+    Scenario: Both API protocols mount from one transport declaration
+      Given the annotation feature attaches a transport with REST and tRPC APIs
+      And each API declaration supplies its router through the router property
+      When the API process boots and starts
+      Then the REST router mounts at /api/v1/annotations
+      And the tRPC router mounts under annotations
+      And both routers receive the exact annotation app constructed at boot
+      And the feature declares no namespace or base path
+
+    @unimplemented @typecheck
+    Scenario: A router cannot attach to an incompatible app
+      Given a router whose app contract requires annotation queues
+      When its transport is attached to an app without that contract
+      Then type checking rejects the attachment
+
+    @unimplemented @architecture
+    Scenario: Domain dependencies cannot leak into API declarations
+      Given a REST or tRPC API declaration
+      When it declares dependencies, create or an app selector callback
+      Then the declaration is rejected with guidance to use app services and standard request context
+
+    @unimplemented @unit
+    Scenario: Route discovery needs no running application
+      Given annotation REST and tRPC router declarations
+      And no database or app instances have been constructed
+      When the process discovers routes and generates API metadata
+      Then discovery succeeds without invoking an app factory or accessing a service
+
+    @unimplemented @integration
+    Scenario: Shared app injection preserves principal and tenant checks
+      Given a principal authorised for project A but not project B
+      When that principal requests an annotation operation on project B through either protocol
+      Then access is denied using the actual principal and target project
+      And no annotation data is read or mutated for project B
+
+  Rule: singular catalogue owners determine plural public namespaces
+
+    @unimplemented @typecheck @unit
+    Scenario Outline: Types and runtime derive the same namespace
+      Given the catalogue feature name <feature>
+      When its transport is attached without a namespace override
+      Then its inferred namespace literal type is <namespace>
+      And the runtime namespace is <namespace>
+      And its REST root is /api/v1/<namespace>
+      And its tRPC namespace is <namespace>
+
+      Examples:
+        | feature    | namespace   |
+        | annotation | annotations |
+        | query      | queries     |
+        | gateway    | gateways    |
+        | api-key    | api-keys    |
+        | analytics  | analytics   |
+        | presence   | presence    |
+
+    @unimplemented @typecheck
+    Scenario: Plural feature names cannot bypass catalogue ownership
+      Given annotation is a catalogue owner and annotations is not
+      When a declaration calls serverFeature with annotations
+      Then type checking rejects the feature name
+
+    @unimplemented @unit
+    Scenario: Untyped feature names are validated before construction
+      Given an untyped declaration with a feature name absent from the catalogue
+      When the process validates its graph
+      Then validation fails naming the unknown feature
+      And no app factory or router mount runs
+
+    @unimplemented @typecheck @unit
+    Scenario: Every catalogue owner has matching type and runtime derivation
+      Given all core and Enterprise catalogue feature names and the central exception table
+      When namespace derivation is checked for every owner
+      Then each runtime namespace agrees with its inferred literal type
+      And regular names need no explicit namespace mapping
+      And exception types derive from the same exception values used at runtime
+
+    @unimplemented @unit
+    Scenario: Derived namespace collisions fail before mounting
+      Given two selected catalogue owners derive the same public namespace
+      When the process validates its graph
+      Then validation fails naming both owners and the conflicting namespace
+      And no app factory or router mount runs
+
+    @unimplemented @architecture
+    Scenario: Feature declarations cannot override derived addressing
+      Given a feature transport or API declaration
+      When it supplies a namespace override or repeats the process API prefix
+      Then the declaration is rejected with guidance to derive addressing from the feature owner
+
+    @unimplemented @integration
+    Scenario: A published legacy address uses an explicit compatibility alias
+      Given a published annotation address differs from its canonical address
+      And the process migration boundary declares a compatibility alias
+      When a client uses either address
+      Then both reach the same app services with the same authorisation and response contract
+      And the alias does not construct a second app or change the feature namespace
 
   Rule: a feature publishes one app containing its public services
 

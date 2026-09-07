@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-07
 
-**Status:** App factory core accepted; transport declaration API under discussion
+**Status:** Accepted; implementation in progress
 
 **Behavioural contract:** [Composition specification](../../../specs/server/composition-spec.feature)
 
@@ -157,12 +157,103 @@ no runtime data validation and does not justify forwarding methods or a service
 locator. Separate setup/provider calls were rejected because they repeat one
 construction decision and allow the two declarations to drift.
 
-This is the accepted target shape, not a claim that the current runtime builder
-already implements it. Transport descriptor syntax, transport-only dependency
-assembly and shared adapter ownership will be decided next. The previous
-`.withTransportDependencies/.withTransport/.withRest/.withTrpc` chain is not the
-approved replacement API. Existing transport behaviour and lifecycle guarantees
-remain required while that API is designed.
+### Transport declarations and inferred namespaces
+
+A feature attaches one transport declaration containing an `apis` array. Both
+REST and tRPC declarations use the property `router`. They receive the installed
+feature app and the standard request context; they declare no extra dependency
+bag, app selector or construction callback.
+
+```ts
+export const annotationTransport = transport({
+  apis: [
+    restApi({ router: annotationRestRouter }),
+    trpcApi({ router: annotationTrpcRouter }),
+  ],
+});
+
+export const annotationServer = serverFeature("annotation")
+  .withApp(AnnotationApp)
+  .withTransport(annotationTransport)
+  .build();
+```
+
+The helpers preserve each router's required app type. Attaching a transport to
+an incompatible app fails type checking. Router declarations remain inert:
+route discovery and OpenAPI generation read metadata without constructing the
+app or accessing its services. During requests, both protocols use the exact
+app constructed at boot. Workers and tasks do not mount API routers.
+
+Domain orchestration and domain collaborators belong behind app services.
+Routers own input parsing, actor extraction, transport authorisation, error
+mapping and response formatting. Shared authentication and authorisation
+machinery comes from the standard process request context. Moving an operation
+behind an app service never removes its principal or tenant checks. Ordinary
+transport mapping functions need no container registration. The API declaration
+has no `dependencies` or `create` escape hatch; a future transport-only resource
+requires a separate justified design.
+
+The framework derives the public namespace from the singular catalogue feature
+name when attaching the transport. Authors write neither `namespace` nor
+`basePath`. REST mounts under the process API prefix `/api/v1`, so annotation
+mounts at `/api/v1/annotations`. tRPC uses the same derived `annotations`
+namespace. Routers declare relative routes and procedures only. API version
+configuration belongs to the process, once.
+
+`FeatureName` is a literal union derived from the ownership catalogue, not an
+arbitrary string or an attempt to recognise English singular nouns. The
+catalogue remains the authority for singular owners, including established
+uncountable names. `serverFeature("annotations")` fails type checking because
+that plural is not a catalogue owner.
+
+A template literal type derives `PublicNamespace<F>` from that union. Regular
+names need no per-feature namespace mapping. One small central exception table
+handles irregular and uncountable domains; both the runtime pluraliser and the
+type-level helper consume that table. The following type illustrates the rule:
+
+```ts
+type PublicNamespace<F extends FeatureName> =
+  F extends keyof NamespaceExceptions
+    ? NamespaceExceptions[F]
+    : F extends `${infer Stem}y`
+      ? F extends `${string}${"a" | "e" | "i" | "o" | "u"}y`
+        ? `${F}s`
+        : `${Stem}ies`
+      : F extends `${string}${"s" | "x" | "z" | "ch" | "sh"}`
+        ? `${F}es`
+        : `${F}s`;
+```
+
+`NamespaceExceptions` is derived from the central exception value, not maintained
+as a second table. Examples are `analytics -> analytics` and `presence -> presence`.
+Regular examples include `annotation -> annotations`, `query -> queries`,
+`gateway -> gateways` and `api-key -> api-keys`. Namespace derivation does not
+change lower-kebab spelling or singular feature ownership. Exceptional catalogue
+names must be audited explicitly; suffix rules do not understand English.
+
+The inferred namespace remains a literal type through installation, manifests
+and client generation. Runtime derivation must agree with the type-level result
+for every catalogue owner. Untyped inputs are validated against the catalogue;
+namespace collisions fail graph validation before construction or mounting.
+Lint rejects handwritten feature namespace overrides, repeated REST prefixes
+and the displaced dependency/setup/provider registration chain globally.
+
+This replaces the earlier proposed explicit namespace mapping and repeated
+`.withTransportDependencies/.withTransport/.withRest/.withTrpc` assembly. It
+keeps feature declarations short without hiding domain dependencies in routers.
+The trade-off is maintaining agreement between type and runtime pluralisation,
+plus a reviewed exception list for non-regular names.
+
+The user explicitly selected `/api/v1/annotations` as the canonical annotation
+REST root. Migration must inventory existing URLs and tRPC names across all
+features. Any differing published names require explicit compatibility aliases
+at the process migration boundary, with parity coverage; aliases do not become
+feature namespace overrides or a second domain implementation. Other endpoint
+removals or silent renames are not authorised by this naming convention.
+
+These are accepted target APIs, not claims about the current runtime builder.
+The spec marks the new declaration and inference behaviours unimplemented until
+runtime, type tests, global lint and process callers adopt them.
 
 ### Amendment: one public app per feature (2026-09-07)
 
@@ -182,8 +273,8 @@ one process. Dependencies between converted features name their app contracts;
 services receive the complete dependencies they actually use. Root applications
 are never injected as service locators.
 
-Transport-only collaborators belong in named transport adapters, assembled only
-for the API role. A class that enriches responses or extracts actors is not the
+Transport adaptation stays in API-only routers and mapping functions. Domain
+collaborators belong behind the app services, not in router dependency bags. A class that enriches responses or extracts actors is not the
 public feature app. Browser installation uses browser-safe contracts and the
 same feature ownership; it does not import the server graph. The server launcher
 reuses process entrypoints and tasks select the services they need without
