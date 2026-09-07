@@ -3,7 +3,12 @@ import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
-import { type ProcessRole, roleRunsWorkers } from "~/server/app-layer/config";
+import {
+  type ProcessRole,
+  roleConsumesEventQueue,
+  roleRunsWorkers,
+  roleUsesMigrationEventQueue,
+} from "~/server/app-layer/config";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/queues/makeQueueName";
@@ -43,6 +48,14 @@ import { EventRepositoryClickHouse } from "./stores/repositories/eventRepository
 import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
 
 const logger = createLogger("langwatch:event-sourcing");
+
+/** Keeps preflight traffic durable without exposing the application queue. */
+function eventQueueNameForRole(role: ProcessRole | undefined): string {
+  const name = roleUsesMigrationEventQueue(role)
+    ? "event-sourcing/migration-jobs"
+    : "event-sourcing/jobs";
+  return makeQueueName(name);
+}
 
 /**
  * Options for constructing an EventSourcing instance.
@@ -526,7 +539,7 @@ export class EventSourcing {
   }
 
   private createGlobalQueue(): void {
-    const queueName = makeQueueName("event-sourcing/jobs");
+    const queueName = eventQueueNameForRole(this._processRole);
 
     // ADR-052 cutover tombstone: the legacy ReactorOutbox stack staged
     // settle/cadence/graphEval payloads onto this queue. A deploy can race
@@ -651,10 +664,9 @@ export class EventSourcing {
       },
     };
 
-    const effectiveRedis = this._redis;
-    if (effectiveRedis) {
-      this._globalQueue = new GroupQueueProcessor(definition, effectiveRedis, {
-        consumerEnabled: roleRunsWorkers(this._processRole),
+    if (this._redis) {
+      this._globalQueue = new GroupQueueProcessor(definition, this._redis, {
+        consumerEnabled: roleConsumesEventQueue(this._processRole),
         objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
         resolveStorageDestination: resolveProjectStorageDestination,
       });

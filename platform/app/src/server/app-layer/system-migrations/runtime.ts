@@ -1,8 +1,8 @@
 /**
  * The system-migrations composition root: the ONE place the generic runner
  * (@langwatch/system-migrations) meets Prisma, Redis, the authz collector
- * and the registered migrations. Worker boot calls `runSystemMigrationPass`
- * (via ./boot); the ops router reads the same composed state repository.
+ * and the registered migrations. The startup preflight calls
+ * `runSystemMigrationPass` via ./boot; the ops router reads the same state.
  *
  * Server-only - this graph reaches Prisma, Redis and the EE audit writer.
  */
@@ -442,7 +442,7 @@ export async function runSystemMigrationTargetedPass({
 /**
  * One full pass over every cohort organization, then over every cohort user.
  * Composed per call so the lease token, the Redis handle and the enrollment
- * read are all fresh - the ops "run a pass now" action and the worker boot
+ * read are all fresh - the ops "run a pass now" action and startup preflight
  * share this exact entry point. Self-hosted runs only the migrations whose
  * `runsAutomaticallyOnSelfHosted` declaration has been released: the others
  * are not driven for any tenant - never attempted, parked or reported -
@@ -453,7 +453,7 @@ export async function runSystemMigrationPass(args?: {
   /**
    * The process's Redis handle. Pass it when the App is still being composed
    * - `tryGetApp()` answers null until then, and a null handle makes the
-   * lease unacquirable, which would silently turn every boot pass into a
+   * lease unacquirable, which would silently turn every preflight pass into a
    * no-op. Callers that run after startup (the ops action) can omit it.
    */
   redis?: Redis | Cluster | null;

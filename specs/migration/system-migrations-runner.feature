@@ -53,9 +53,9 @@ Feature: Running system migrations across organizations
   # ═══ Converging ═══════════════════════════════════════════════════════
   # One pass is never enough on its own: a pass cannot observe its own
   # events, so an organization it adopts reads as held and only a LATER pass
-  # finalizes it. Starting the app therefore drives passes rather than one
-  # pass — nobody should have to restart the app, or click "run a pass",
-  # until the counts settle.
+  # finalizes it. Startup therefore runs a blocking preflight of passes rather
+  # than one background pass — nobody should receive traffic, have to restart
+  # the app, or click "run a pass" before the counts settle.
   #
   # It stops on NO PROGRESS, never on "everything is terminal": a held
   # organization is re-proved on every pass and may legitimately never reach
@@ -66,6 +66,15 @@ Feature: Running system migrations across organizations
     When the app starts
     Then passes run one after another while each one advances an organization
     And the first pass that advances nothing ends the run
+    And runtime processes start only after that run completes
+
+  @unit
+  Scenario: Preflight projection work cannot consume application traffic
+    Given the preflight emits events while an existing worker is still running
+    When those events and application events are queued concurrently
+    Then the preflight consumes only its isolated migration queue
+    And worker-scoped durable subscribers run for the preflight events
+    And schedulers, process-manager consumers, and general workers do not start
 
   @unit
   Scenario: A held tenant that never advances does not loop forever
@@ -75,11 +84,11 @@ Feature: Running system migrations across organizations
     And being re-proved into the same state does not count as progress
 
   @unit
-  Scenario: Shutting down stops the loop between passes
+  Scenario: Cancelling startup stops the loop between passes
     Given a run waiting between two passes
-    When the app shuts down
+    When startup is cancelled
     Then no further pass starts
-    And the shutdown does not wait out the interval
+    And runtime processes do not start
 
   # `lease.acquire` fails safe to false on contention AND on any Redis error,
   # and a tenant that cannot be claimed does no work — so a pass shut out of
@@ -94,18 +103,20 @@ Feature: Running system migrations across organizations
     But an installation with no organizations at all is converged
 
   @unit
-  Scenario: A loop that never converges stops at its cap and says so
+  Scenario: A loop that never converges prevents startup
     Given passes that report progress every time
     When the maximum number of passes is reached
-    Then the run stops
+    Then the preflight fails
     And it says how many passes it gave up after
+    And runtime processes do not start
 
   @unit
-  Scenario: A failed pass ends the loop rather than retrying it
+  Scenario: A failed pass prevents startup
     Given a pass that fails outright
     When the run reaches it
-    Then the run stops rather than retrying immediately
-    And the failure is recorded for the next start to retry
+    Then the preflight fails rather than retrying immediately
+    And runtime processes do not start
+    And the next start retries the pass
 
   # ═══ Automatic enrollment ═════════════════════════════════════════════
   # Enrollment paces a rollout while it is happening. A finished rollout has
