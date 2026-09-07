@@ -13,10 +13,42 @@
  */
 
 import { Type } from "typebox";
-import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import {
+  createBashTool,
+  type ExtensionAPI,
+  type InlineExtension,
+} from "@earendil-works/pi-coding-agent";
 import { callIds, conversationId, type TurnContext } from "./turn-context.js";
 
 export const CODE_ACCESS_TOOL_NAME = "code_access";
+
+/**
+ * The shell the model reaches for by its standard name. Registered by this
+ * extension in place of pi's built-in, so that while the developer's folder is
+ * connected a command lands in that folder, through the local_bash path with
+ * its permission card, and a `langwatch` command still runs here, where the
+ * CLI is provisioned with this conversation's login. With no folder
+ * connected it is the sandbox shell it always was.
+ */
+export const BASH_TOOL_NAME = "bash";
+
+/**
+ * Is this command an invocation of the langwatch CLI? Leading environment
+ * assignments are skipped, and `npx langwatch` counts. The CLI runs in the
+ * sandbox whatever the folder's state: its cards, its navigate opens and its
+ * login belong to this conversation, not to the developer's machine.
+ */
+export function isLangwatchCliCommand(command: string): boolean {
+  const words = command.trim().split(/\s+/);
+  let index = 0;
+  while (index < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index] ?? "")) {
+    index += 1;
+  }
+  const head = words[index];
+  const next = words[index + 1] ?? "";
+  if (head === "langwatch") return true;
+  return head === "npx" && (next === "langwatch" || next.startsWith("langwatch@"));
+}
 
 export const LOCAL_TOOL_NAMES = [
   "local_read",
@@ -684,20 +716,80 @@ function textResult(text: string) {
 
 export function createLocalWorkspaceExtension({
   turnContext,
+  sandboxCwd,
 }: {
   turnContext: TurnContext;
+  /** Where the sandbox shell runs when no folder is connected. */
+  sandboxCwd: string;
 }): InlineExtension {
   return {
     name: "langy-local-workspace",
     factory: (pi: ExtensionAPI) => {
+      /** The folder's state as of the start of the turn in flight. */
+      const folder = { connected: false };
+
       // The folder's state is read at the start of every turn, and the turn's
       // tool set follows it. A turn that starts because the folder connected
       // is a new prompt, so it already runs without the sandbox file tools;
       // a folder that goes away mid-turn is answered by the local tools' own
       // pushback until the next turn puts the sandbox tools back.
       pi.on("before_agent_start", async () => {
-        const connected = await isWorkspaceConnected({});
-        pi.setActiveTools(activeToolsFor({ connected, active: pi.getActiveTools() }));
+        folder.connected = await isWorkspaceConnected({});
+        pi.setActiveTools(
+          activeToolsFor({ connected: folder.connected, active: pi.getActiveTools() }),
+        );
+      });
+
+      /** One local call as a tool result, with the pushbacks the model acts on. */
+      async function runLocalTool({
+        tool,
+        params,
+        toolCallId,
+        signal,
+      }: {
+        tool: LocalToolName;
+        params: unknown;
+        toolCallId: string;
+        signal?: AbortSignal;
+      }) {
+        try {
+          return textResult(await runLocalCall({ tool, params, turnContext, toolCallId, signal }));
+        } catch (error) {
+          // A call that did not run is a pushback the model acts on, not a
+          // failure. Which pushback depends on the folder, which is read
+          // rather than guessed: a lost call is retried, a folder that is
+          // gone is offered the two ways on.
+          if (error instanceof AppUnreachableError) {
+            return textResult(await localCallPushback({ signal }));
+          }
+          // A refusal names the parameter, so the model corrects the call.
+          if (error instanceof CallRejectedError) {
+            return textResult(error.message);
+          }
+          throw error;
+        }
+      }
+
+      const sandboxBash = createBashTool(sandboxCwd);
+      pi.registerTool({
+        name: BASH_TOOL_NAME,
+        label: sandboxBash.label,
+        description: `${sandboxBash.description} While the user's folder is connected the command runs there, on their machine, as local_bash does; a langwatch command runs here either way.`,
+        parameters: sandboxBash.parameters,
+        async execute(toolCallId, params, signal, onUpdate) {
+          if (folder.connected && !isLangwatchCliCommand(params.command)) {
+            return runLocalTool({
+              tool: "local_bash",
+              params: {
+                command: params.command,
+                ...(params.timeout !== undefined ? { timeout: params.timeout } : {}),
+              },
+              toolCallId,
+              signal,
+            });
+          }
+          return sandboxBash.execute(toolCallId, params, signal, onUpdate);
+        },
       });
 
       pi.registerTool({
@@ -728,24 +820,7 @@ export function createLocalWorkspaceExtension({
           description: localToolDescriptions[name],
           parameters: localToolParams[name],
           async execute(toolCallId, params, signal) {
-            try {
-              return textResult(
-                await runLocalCall({ tool: name, params, turnContext, toolCallId, signal }),
-              );
-            } catch (error) {
-              // A call that did not run is a pushback the model acts on, not a
-              // failure. Which pushback depends on the folder, which is read
-              // rather than guessed: a lost call is retried, a folder that is
-              // gone is offered the two ways on.
-              if (error instanceof AppUnreachableError) {
-                return textResult(await localCallPushback({ signal }));
-              }
-              // A refusal names the parameter, so the model corrects the call.
-              if (error instanceof CallRejectedError) {
-                return textResult(error.message);
-              }
-              throw error;
-            }
+            return runLocalTool({ tool: name, params, toolCallId, signal });
           },
         });
       }

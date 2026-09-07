@@ -149,6 +149,19 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).not.toContain("are written before the question of step 3 is called");
     });
 
+    /** @scenario "Code access is asked once, and the framework line names a file that was read" */
+    it("never asks code access again while a folder is connected, and sources the framework line from a file it read", () => {
+      expect(rendered).toContain(
+        "**While a folder is connected, `code_access` is never called again.** The card is for the not-connected case only: the connect brought the folder facts, and the files are read with the `local_*` tools.",
+      );
+      expect(rendered).toContain(
+        "A folder that looks empty is read with `local_ls`, never with the sandbox's own shell, which holds no project of the user's.",
+      );
+      expect(rendered).toContain(
+        "The file it names is one you read with `local_read` in this step, and the framework is what that file imports: a docs page is never a source for the line, and a framework no file of theirs shows was not found.",
+      );
+    });
+
     /** @scenario "The scenarios name outcomes and carry the inputs they hinge on" */
     it("names observable outcomes in the criteria and puts the concrete input in every suite situation", () => {
       expect(rendered).toContain(

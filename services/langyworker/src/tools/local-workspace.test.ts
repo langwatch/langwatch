@@ -1,7 +1,12 @@
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
+  BASH_TOOL_NAME,
   CODE_ACCESS_TOOL_NAME,
+  isLangwatchCliCommand,
   LOCAL_TOOL_NAMES,
   CALL_LOST_PUSHBACK,
   OFFLINE_PUSHBACK,
@@ -24,13 +29,21 @@ type RegisteredTool = {
   ) => Promise<{ content: { type: string; text: string }[] }>;
 };
 
+/** A sandbox directory of its own for each extension under test. */
+function sandboxDir(): string {
+  return mkdtempSync(join(tmpdir(), "langy-sandbox-"));
+}
+
 function registeredTools(turnContext: TurnContext = turnInFlight()): Map<string, RegisteredTool> {
   const tools = new Map<string, RegisteredTool>();
   const pi = {
     registerTool: (tool: RegisteredTool) => tools.set(tool.name, tool),
     on: () => undefined,
   };
-  const extension = createLocalWorkspaceExtension({ turnContext }) as {
+  const extension = createLocalWorkspaceExtension({
+    turnContext,
+    sandboxCwd: sandboxDir(),
+  }) as {
     factory: (pi: ExtensionAPI) => void;
   };
   extension.factory(pi as unknown as ExtensionAPI);
@@ -91,11 +104,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** A fake pi that records the turn-start handler and holds the active tool set. */
-function piWithActiveTools(active: string[]) {
+/**
+ * A fake pi that records the turn-start handler, the registered tools and
+ * the active tool set.
+ */
+function piWithActiveTools(active: string[], sandboxCwd = sandboxDir()) {
   let onTurnStart: (() => Promise<void>) | undefined;
+  const tools = new Map<string, RegisteredTool>();
   const pi = {
-    registerTool: () => undefined,
+    registerTool: (tool: RegisteredTool) => tools.set(tool.name, tool),
     on: (event: string, handler: () => Promise<void>) => {
       if (event === "before_agent_start") onTurnStart = handler;
     },
@@ -104,13 +121,111 @@ function piWithActiveTools(active: string[]) {
       active.splice(0, active.length, ...names);
     },
   };
-  const extension = createLocalWorkspaceExtension({ turnContext: turnInFlight() }) as {
+  const extension = createLocalWorkspaceExtension({
+    turnContext: turnInFlight(),
+    sandboxCwd,
+  }) as {
     factory: (pi: ExtensionAPI) => void;
   };
   extension.factory(pi as unknown as ExtensionAPI);
   if (!onTurnStart) throw new Error("the extension did not register a turn-start handler");
-  return { active, startTurn: onTurnStart };
+  return { active, tools, startTurn: onTurnStart };
 }
+
+/** A `langwatch` executable of its own on the PATH, so the CLI path is observable. */
+function fakeLangwatchOnPath(): { dir: string; restore: () => void } {
+  const dir = mkdtempSync(join(tmpdir(), "langy-cli-"));
+  const script = join(dir, "langwatch");
+  writeFileSync(script, '#!/bin/sh\necho "cli ok: $*"\n');
+  chmodSync(script, 0o755);
+  const previous = process.env.PATH ?? "";
+  process.env.PATH = `${dir}:${previous}`;
+  return {
+    dir,
+    restore: () => {
+      process.env.PATH = previous;
+    },
+  };
+}
+
+describe("the shell the model gets while a folder is connected", () => {
+  /** @scenario "The shell runs in the folder while it is connected, and the CLI still runs here" */
+  it("runs a command on the user's machine through local_bash, permission flow and all", async () => {
+    const { calls } = fakeApp({
+      "/api/langy/local/workspace": [
+        { connected: true, workspace: { root: "/home/dev/acme", name: "acme" } },
+      ],
+      "/api/langy/local/calls": [{ callId: "call_9" }],
+      "/api/langy/local/calls/call_9": [
+        { callId: "call_9", state: "done", ok: true, text: "On branch main" },
+      ],
+    });
+    const { tools, startTurn } = piWithActiveTools([...EVERY_TOOL]);
+    await startTurn();
+
+    const result = await tools.get(BASH_TOOL_NAME)!.execute("t9", {
+      command: "git status --short",
+      timeout: 30,
+    });
+
+    expect(textOf(result)).toBe("On branch main");
+    const posted = calls.find((call) => call.url.endsWith("/api/langy/local/calls"));
+    expect(posted?.body).toEqual({
+      conversationId: "langyconv_1",
+      turnId: "turn_1",
+      toolCallId: "t9",
+      tool: "local_bash",
+      params: { command: "git status --short", timeout: 30 },
+    });
+  });
+
+  /** @scenario "The shell runs in the folder while it is connected, and the CLI still runs here" */
+  it("still runs a langwatch command in the sandbox, where the CLI has this conversation's login", async () => {
+    const cli = fakeLangwatchOnPath();
+    try {
+      const { calls } = fakeApp({
+        "/api/langy/local/workspace": [
+          { connected: true, workspace: { root: "/home/dev/acme", name: "acme" } },
+        ],
+      });
+      const { tools, startTurn } = piWithActiveTools([...EVERY_TOOL]);
+      await startTurn();
+
+      const result = await tools.get(BASH_TOOL_NAME)!.execute("t10", {
+        command: "langwatch scenario list --format json",
+      });
+
+      expect(textOf(result)).toContain("cli ok: scenario list --format json");
+      expect(calls.some((call) => call.url.endsWith("/api/langy/local/calls"))).toBe(false);
+    } finally {
+      cli.restore();
+    }
+  });
+
+  /** @scenario "The shell runs in the folder while it is connected, and the CLI still runs here" */
+  it("is the sandbox shell when no folder is connected", async () => {
+    const { calls } = fakeApp({ "/api/langy/local/workspace": [{ connected: false }] });
+    const sandbox = sandboxDir();
+    const { tools, startTurn } = piWithActiveTools([...EVERY_TOOL], sandbox);
+    await startTurn();
+
+    const result = await tools.get(BASH_TOOL_NAME)!.execute("t11", { command: "pwd" });
+
+    expect(textOf(result)).toContain(sandbox.split("/").at(-1)!);
+    expect(calls.some((call) => call.url.endsWith("/api/langy/local/calls"))).toBe(false);
+  });
+
+  /** @scenario "The shell runs in the folder while it is connected, and the CLI still runs here" */
+  it("tells a langwatch invocation from the rest of the shell", () => {
+    expect(isLangwatchCliCommand("langwatch agent list --format json")).toBe(true);
+    expect(isLangwatchCliCommand("  LANGWATCH_ENDPOINT=http://x langwatch docs a/b")).toBe(true);
+    expect(isLangwatchCliCommand("npx langwatch@latest onboarding state")).toBe(true);
+    expect(isLangwatchCliCommand("langwatch trace search | head")).toBe(true);
+    expect(isLangwatchCliCommand("git status && ls")).toBe(false);
+    expect(isLangwatchCliCommand("uv run uvicorn app.main:app")).toBe(false);
+    expect(isLangwatchCliCommand("cat langwatch.md")).toBe(false);
+  });
+});
 
 const EVERY_TOOL = [
   "read",
@@ -198,8 +313,9 @@ describe("the local workspace tools", () => {
     it("carries one local tool for each built-in, with the built-in's parameters", () => {
       const tools = registeredTools();
 
+      // Plus the shell under its standard name, which this extension owns.
       expect([...tools.keys()].sort()).toEqual(
-        [CODE_ACCESS_TOOL_NAME, ...LOCAL_TOOL_NAMES].sort(),
+        [BASH_TOOL_NAME, CODE_ACCESS_TOOL_NAME, ...LOCAL_TOOL_NAMES].sort(),
       );
 
       const parameterNames = (name: string) =>

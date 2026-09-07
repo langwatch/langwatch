@@ -785,6 +785,15 @@ Feature: Langy guides the first setup after sign-up
     # traces for proof and found none, and one situation said "a card that is
     # declined" without the number the code declines, so the simulated user
     # invented one the code accepted.
+    # A run with a smaller model explored the empty sandbox, fetched one
+    # integration docs page, reported the framework from that page and raised
+    # the code access card again with the folder connected.
+    @unit
+    Scenario: Code access is asked once, and the framework line names a file that was read
+      When the compiled guided-onboarding skill is read
+      Then code_access is never called again while a folder is connected
+      And the framework line names a file read with local_read, never a docs page
+
     @unit
     Scenario: The scenarios name outcomes and carry the inputs they hinge on
       When the compiled guided-onboarding skill is read

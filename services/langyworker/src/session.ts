@@ -169,7 +169,9 @@ export async function createLangySession({
       createQuestionExtension({ turnContext }),
       createSayExtension(),
       createSecretSnippetExtension(),
-      createLocalWorkspaceExtension({ turnContext }),
+      // Registers `bash` in place of pi's built-in: the extension's tool wins
+      // the name in the session's registry.
+      createLocalWorkspaceExtension({ turnContext, sandboxCwd: home }),
     ],
   });
   await resourceLoader.reload();

@@ -66,9 +66,11 @@ and call `code_access` again, this time without `offer_describe`. Keep their des
 
 **If the folder never connects** (the wait expires with nothing shared), offer GitHub in one line and call `code_access` again. Create nothing on the project until the code is reachable.
 
+**While a folder is connected, `code_access` is never called again.** The card is for the not-connected case only: the connect brought the folder facts, and the files are read with the `local_*` tools. A folder that looks empty is read with `local_ls`, never with the sandbox's own shell, which holds no project of the user's.
+
 ### 2. Read the code and wire it
 
-With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language, then keep one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That is the framework line: it is said with `say` right before the question of step 3, with the two lines of item 7.
+With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language, then keep one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That is the framework line: it is said with `say` right before the question of step 3, with the two lines of item 7. The file it names is one you read with `local_read` in this step, and the framework is what that file imports: a docs page is never a source for the line, and a framework no file of theirs shows was not found.
 
 Work on a branch of your own, never on the branch the user has checked out: `git checkout -b langy/<slug> origin/<default>` (a worktree when the tree is dirty), as step 2 of `code-changes` says. On that branch, load the `tracing` and `connect-agent` skills with the `skill` tool, then, in this order:
 

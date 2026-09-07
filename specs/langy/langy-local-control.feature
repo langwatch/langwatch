@@ -243,6 +243,20 @@ Feature: Langy works in a folder shared from the developer's machine
       And a turn that starts with no folder connected has the sandbox file tools back
       And a turn that starts while the app cannot say keeps them
 
+    # With the file tools gone, a run explored the worker's empty sandbox
+    # through bash instead ("not a git repository"), so the shell the model
+    # reaches for by its standard name lands in the folder while one is
+    # connected. The langwatch CLI is the exception: its cards, navigate opens
+    # and login belong to this conversation, so it runs in the sandbox either
+    # way.
+    @unit
+    Scenario: The shell runs in the folder while it is connected, and the CLI still runs here
+      Given a folder is connected to the conversation
+      When Langy runs a command through bash
+      Then the command runs on the developer's machine through the local_bash path, permission card and all
+      And a langwatch command runs in the sandbox, where the CLI has this conversation's login
+      And with no folder connected bash is the sandbox shell
+
     @integration
     Scenario: A local call travels to the CLI and its result comes back
       Given a connected folder
