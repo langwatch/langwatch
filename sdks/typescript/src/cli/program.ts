@@ -15,6 +15,7 @@
  * `index.ts` — this was a move, not a rewrite.
  */
 
+import chalk from "chalk";
 import { Command, Option } from "commander";
 import {
   REDACTION_AUDIT_URL,
@@ -252,6 +253,33 @@ const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?: boole
 function resolveProgramName(bin: string | undefined): string {
   const invoked = (bin ?? process.argv[1] ?? "").split(/[\\/]/).pop();
   return invoked === "lw" ? "lw" : "langwatch";
+}
+
+/**
+ * Resolves a resource id given either as the positional or as `--id`.
+ *
+ * Dashboard, chart and dashboard-widget ids are nanoids, whose alphabet
+ * includes "-" — so an id can start with a dash. Commander reads a leading
+ * dash as the start of an option and rejects it as unknown before the
+ * command's action ever runs, so the positional alone cannot carry such an
+ * id. `--id` is the escape hatch: its value is taken verbatim regardless of
+ * a leading dash. The positional stays required in spirit — this just moves
+ * the "missing id" check to run after either spelling has had a chance to
+ * supply it.
+ */
+function resolveIdArgument({
+  positional,
+  option,
+}: {
+  positional?: string;
+  option?: string;
+}): string {
+  const id = option ?? positional;
+  if (!id) {
+    console.error(chalk.red("Error: missing required argument 'id'"));
+    process.exit(1);
+  }
+  return id;
 }
 
 export function buildProgram({ bin }: { bin?: string } = {}): Command {
@@ -2037,24 +2065,28 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     dashboardCmd
-      .command("get <id>")
+      .command("get [id]")
       .description("Get dashboard details by ID")
+      .option("--id <id>", "Dashboard id — use this instead of the positional when the id starts with '-'")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
+    async (id: string | undefined, options: { id?: string }) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { getDashboardCommand: impl } = await import("./commands/dashboards/get.js");
-      return impl(id);
+      return impl(resolvedId);
     },
   );
 
   emitsResult(
     dashboardCmd
-      .command("update <id>")
+      .command("update [id]")
       .description("Rename a dashboard")
+      .option("--id <id>", "Dashboard id — use this instead of the positional when the id starts with '-'")
       .requiredOption("--name <name>", "New dashboard name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string }) => {
+    async (id: string | undefined, options: { id?: string; name?: string }) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { updateDashboardCommand: impl } = await import("./commands/dashboards/update.js");
-      return impl(id, options);
+      return impl(resolvedId, options);
     },
   );
 
@@ -2071,12 +2103,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     dashboardCmd
-      .command("delete <id>")
+      .command("delete [id]")
       .description("Delete a dashboard and its graphs")
+      .option("--id <id>", "Dashboard id — use this instead of the positional when the id starts with '-'")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
+    async (id: string | undefined, options: { id?: string }) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { deleteDashboardCommand: impl } = await import("./commands/dashboards/delete.js");
-      return impl(id);
+      return impl(resolvedId);
     },
   );
 
@@ -3380,13 +3414,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     chartCmd
-      .command("get <id>")
+      .command("get [id]")
       .description("Get a saved chart by ID — its SQL, parameters, specification and placement")
+      .option("--id <id>", "Chart id — use this instead of the positional when the id starts with '-'")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { project?: string }) => {
+    async (id: string | undefined, options: { id?: string; project?: string }) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { getChartCommand: impl } = await import("./commands/charts/get.js");
-      return impl(id, options);
+      return impl(resolvedId, options);
     },
   );
 
@@ -3416,8 +3452,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     chartCmd
-      .command("update <id>")
+      .command("update [id]")
       .description("Update a saved chart's name or definition")
+      .option("--id <id>", "Chart id — use this instead of the positional when the id starts with '-'")
       .option("--name <name>", "New chart name")
       .option("--sql <sql>", "New LangWatchQL statement")
       .option("--sql-file <path>", "Read the new statement from a file")
@@ -3426,8 +3463,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
-      id: string,
+      id: string | undefined,
       options: {
+        id?: string;
         name?: string;
         sql?: string;
         sqlFile?: string;
@@ -3436,45 +3474,51 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         project?: string;
       },
     ) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { updateChartCommand: impl } = await import("./commands/charts/update.js");
-      return impl(id, options);
+      return impl(resolvedId, options);
     },
   );
 
   emitsResult(
     chartCmd
-      .command("delete <id>")
+      .command("delete [id]")
       .description("Delete a saved chart")
+      .option("--id <id>", "Chart id — use this instead of the positional when the id starts with '-'")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { project?: string }) => {
+    async (id: string | undefined, options: { id?: string; project?: string }) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { deleteChartCommand: impl } = await import("./commands/charts/delete.js");
-      return impl(id, options);
+      return impl(resolvedId, options);
     },
   );
 
   emitsResult(
     chartCmd
-      .command("run <id>")
+      .command("run [id]")
       .description("Run a saved chart's statement and print the result")
+      .option("--id <id>", "Chart id — use this instead of the positional when the id starts with '-'")
       .option("--start <datetime>", "Period start for statements declaring {dashboard_context_period_start:DateTime}")
       .option("--end <datetime>", "Period end for statements declaring {dashboard_context_period_end:DateTime}")
       .option("--granularity <seconds>", "Datapoint step for statements declaring {dashboard_context_granularity_seconds:UInt32}")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
-      id: string,
-      options: { start?: string; end?: string; granularity?: string; project?: string },
+      id: string | undefined,
+      options: { id?: string; start?: string; end?: string; granularity?: string; project?: string },
     ) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { runChartCommand: impl } = await import("./commands/charts/run.js");
-      return impl(id, options);
+      return impl(resolvedId, options);
     },
   );
 
   emitsResult(
     chartCmd
-      .command("place <id>")
+      .command("place [id]")
       .description("Place a saved chart on a dashboard")
+      .option("--id <id>", "Chart id — use this instead of the positional when the id starts with '-'")
       .requiredOption("--dashboard-id <id>", "Dashboard to place the chart on")
       .option("--grid-column <n>", "Grid column")
       .option("--grid-row <n>", "Grid row (allocated automatically when omitted)")
@@ -3483,8 +3527,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
-      id: string,
+      id: string | undefined,
       options: {
+        id?: string;
         dashboardId?: string;
         gridColumn?: string;
         gridRow?: string;
@@ -3493,20 +3538,23 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         project?: string;
       },
     ) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { placeChartCommand: impl } = await import("./commands/charts/place.js");
-      return impl(id, options);
+      return impl(resolvedId, options);
     },
   );
 
   emitsResult(
     chartCmd
-      .command("unplace <id>")
+      .command("unplace [id]")
       .description("Remove a saved chart from its dashboard")
+      .option("--id <id>", "Chart id — use this instead of the positional when the id starts with '-'")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { project?: string }) => {
+    async (id: string | undefined, options: { id?: string; project?: string }) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { unplaceChartCommand: impl } = await import("./commands/charts/unplace.js");
-      return impl(id, options);
+      return impl(resolvedId, options);
     },
   );
 
@@ -3541,13 +3589,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     dashboardWidgetCmd
-      .command("get <id>")
+      .command("get [id]")
       .description("Get a dashboard widget by ID — its React source and named queries")
+      .option("--id <id>", "Widget id — use this instead of the positional when the id starts with '-'")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { project?: string }) => {
+    async (id: string | undefined, options: { id?: string; project?: string }) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { getDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/get.js");
-      return impl(id, options);
+      return impl(resolvedId, options);
     },
   );
 
@@ -3575,8 +3625,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     dashboardWidgetCmd
-      .command("update <id>")
+      .command("update [id]")
       .description("Update a dashboard widget's name or definition")
+      .option("--id <id>", "Widget id — use this instead of the positional when the id starts with '-'")
       .option("--name <name>", "New widget name")
       .option("--code <code>", "New React source")
       .option("--code-file <path>", "Read the new React source from a file")
@@ -3584,8 +3635,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
-      id: string,
+      id: string | undefined,
       options: {
+        id?: string;
         name?: string;
         code?: string;
         codeFile?: string;
@@ -3593,36 +3645,41 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         project?: string;
       },
     ) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { updateDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/update.js");
-      return impl(id, options);
+      return impl(resolvedId, options);
     },
   );
 
   emitsResult(
     dashboardWidgetCmd
-      .command("delete <id>")
+      .command("delete [id]")
       .description("Delete a dashboard widget")
+      .option("--id <id>", "Widget id — use this instead of the positional when the id starts with '-'")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { project?: string }) => {
+    async (id: string | undefined, options: { id?: string; project?: string }) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
       const { deleteDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/delete.js");
-      return impl(id, options);
+      return impl(resolvedId, options);
     },
   );
 
   emitsResult(
     dashboardWidgetCmd
-      .command("pin <widget>")
+      .command("pin [widget]")
       .description("Add a dashboard widget to a dashboard (widget and dashboard by id or name)")
+      .option("--id <id>", "Widget id — use this instead of the positional when the id starts with '-'")
       .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
-      widget: string,
-      options: { dashboard?: string; project?: string },
+      widget: string | undefined,
+      options: { id?: string; dashboard?: string; project?: string },
     ) => {
+      const resolvedWidget = resolveIdArgument({ positional: widget, option: options.id });
       const { pinDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/pin.js");
-      return impl(widget, options);
+      return impl(resolvedWidget, options);
     },
   );
 

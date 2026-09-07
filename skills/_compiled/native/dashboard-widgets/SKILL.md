@@ -111,12 +111,14 @@ Creating (and updating) validates the queries file's shape and the widget's JS/T
 
 ## Managing saved widgets
 
+**Widget ids can start with `-`.** They are nanoids, whose alphabet includes it, and a plain `langwatch dashboard-widget get -L4zZ...` reads the id as an unknown flag and fails. Always pass the id via `--id <id>`, never as the bare positional:
+
 ```bash
 langwatch dashboard-widget list -f json
-langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
-langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
-langwatch dashboard-widget delete <id>
-langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
+langwatch dashboard-widget get --id <id> -f json      # code, queries, platformUrl
+langwatch dashboard-widget update --id <id> --code-file widget.tsx --queries-file queries.json
+langwatch dashboard-widget delete --id <id>
+langwatch dashboard-widget pin --id <id-or-name> --dashboard <id-or-name>   # add to a dashboard
 ```
 
 `pin` reassigns the widget to that dashboard, at the dashboard's next free row — the widget still lives and is edited on the custom-chart-playground page. See `langwatch dashboard list` for ids.

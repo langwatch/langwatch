@@ -22,7 +22,6 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
-import { nanoid } from "nanoid";
 
 import type {
   CustomGraph,
@@ -35,6 +34,7 @@ import {
   chartGridBottomRow,
 } from "~/server/analytics/chartGrid";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
+import { generateCustomGraphId } from "~/server/analytics/customGraphId";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
@@ -211,7 +211,7 @@ export class DashboardWidgetService {
 
       return await tx.customGraph.create({
         data: {
-          id: nanoid(),
+          id: generateCustomGraphId(),
           projectId,
           name: input.name,
           kind: DASHBOARD_SRCDOC_CHART_KIND,
