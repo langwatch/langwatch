@@ -119,7 +119,7 @@ function resolveInitialForm({
   isOpen,
   projectId,
 }: {
-  agentData: { name?: string | null; config?: unknown } | undefined;
+  agentData: { name?: string | null; config?: unknown } | null | undefined;
   isCreating: boolean;
   isOpen: boolean;
   projectId: string;
@@ -246,7 +246,7 @@ function useVoiceFormState({
   isOpen,
   projectId,
 }: {
-  agentData: { name?: string | null; config?: unknown } | undefined;
+  agentData: { name?: string | null; config?: unknown } | null | undefined;
   agentId: string | undefined;
   isCreating: boolean;
   isOpen: boolean;
