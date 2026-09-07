@@ -16,18 +16,16 @@
  * covers both suffixes, so this costs nothing at collection time. See the
  * added `tests/agentic-e2e/tests` root in `check-feature-parity.ts`.
  */
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
 import {
+  FRONT_DOOR_PASSWORD,
   findSignUpTokenFor,
   generateFrontDoorEmail,
   givenIAmOnTheSignUpScreen,
   givenMyAccountHasAWorkspace,
   thenIAmCalledByMyEmailNeverNull,
   thenTheLinkSignsMeInWithNoSecondPrompt,
-  whenIChooseAPasskeyToFinishSigningUp,
-  whenIChooseAPasswordToFinishSigningUp,
-  whenIEnterANewAddressToSignUpWith,
   whenIOpenTheConfirmationLinkFor,
 } from "./steps";
 
@@ -36,21 +34,38 @@ import {
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe("Sign-up confirmation", () => {
+  async function whenIRequestSignUpVerification(
+    page: Page,
+    email: string,
+  ): Promise<void> {
+    await page.getByLabel("Email", { exact: true }).fill(email);
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(page.getByTestId("verification-sent")).toBeVisible();
+  }
+
+  async function whenIChooseAPasswordAfterProof(page: Page): Promise<void> {
+    await page.getByLabel("Password", { exact: true }).fill(FRONT_DOOR_PASSWORD);
+    await page
+      .getByLabel("Confirm password", { exact: true })
+      .fill(FRONT_DOOR_PASSWORD);
+    await page.getByRole("button", { name: "Create account", exact: true }).click();
+  }
+
   /**
-   * Scenario: Opening the link is what signs me in for the first time
-   * Source: signin-signup-screens.feature lines 204-208
+   * Scenario: Opening the link unlocks credential choice
+   * Source: signin-signup-screens.feature lines 243-249
    */
-  // @scenario "Opening the link is what signs me in for the first time"
-  test("opening the confirmation link signs a fresh account in with no second prompt", async ({
+  // @scenario "Opening the link unlocks credential choice"
+  test("opening the confirmation link unlocks password choice before a session", async ({
     page,
   }) => {
     const email = generateFrontDoorEmail("confirm");
 
     await givenIAmOnTheSignUpScreen(page);
-    await whenIEnterANewAddressToSignUpWith(page, email);
-    await whenIChooseAPasswordToFinishSigningUp(page);
-
+    await whenIRequestSignUpVerification(page, email);
     await whenIOpenTheConfirmationLinkFor(page, email);
+    await expect(page.getByTestId("verified-address")).toContainText(email);
+    await whenIChooseAPasswordAfterProof(page);
     await thenTheLinkSignsMeInWithNoSecondPrompt(page, email);
   });
 
@@ -72,9 +87,10 @@ test.describe("Sign-up confirmation", () => {
     const email = generateFrontDoorEmail("noname");
 
     await givenIAmOnTheSignUpScreen(page);
-    await whenIEnterANewAddressToSignUpWith(page, email);
-    await whenIChooseAPasswordToFinishSigningUp(page);
+    await whenIRequestSignUpVerification(page, email);
     await whenIOpenTheConfirmationLinkFor(page, email);
+    await expect(page.getByTestId("verified-address")).toContainText(email);
+    await whenIChooseAPasswordAfterProof(page);
     await thenTheLinkSignsMeInWithNoSecondPrompt(page, email);
 
     await givenMyAccountHasAWorkspace(page);
@@ -82,24 +98,15 @@ test.describe("Sign-up confirmation", () => {
   });
 
   /**
-   * Scenario: Signing up with a passkey creates the account and the session
-   * together
-   * Source: signin-signup-screens.feature lines 241-246
+   * Scenario: Signing up with a passkey consumes the verified address proof
+   * Source: signin-signup-screens.feature lines 274-279
    *
-   * Bug-bash finding #11. The credential step's passkey button
-   * (`PasskeySignUpButton`) is only ever mounted where `addressIsConfirmed`
-   * is false (`SignUpCredentialForm`'s `offersPasskeys = !addressIsConfirmed`),
-   * so it always calls `authClient.passkey.addPasskey` with
-   * `createSession: false` — the same "check your email" ending the password
-   * path takes, not an immediate session. This test asserts what the code
-   * actually does rather than assuming the spec title's shortest reading, and
-   * proves the finding either way: whichever ending it is, it must move
-   * forward with no error, and the emailed link (if one is needed) must still
-   * sign the account in cleanly — the exact thing finding #1 checks, applied
-   * to a passkey-originated pending sign-up instead of a password one.
+   * The proof is obtained before the passkey ceremony. The confirmed branch
+   * passes that proof to the real WebAuthn registration and opens the session
+   * only after the account and credential are created.
    */
-  // @scenario "Signing up with a passkey creates the account and the session together"
-  test("finishing sign-up with a passkey moves forward with no error", async ({
+  // @scenario "Signing up with a passkey consumes the verified address proof"
+  test("a verified address can be finished with a passkey and signs in", async ({
     page,
   }) => {
     const email = generateFrontDoorEmail("passkey-signup");
@@ -107,30 +114,15 @@ test.describe("Sign-up confirmation", () => {
 
     try {
       await givenIAmOnTheSignUpScreen(page);
-      await whenIEnterANewAddressToSignUpWith(page, email);
-      await whenIChooseAPasskeyToFinishSigningUp(page);
-
-      // Whichever ending the current wiring takes, it must be one of exactly
-      // two — signed straight in, or "check your email" — and never a bare
-      // error alert sitting where either of those should be.
-      const signedInAlready = page.getByTestId("signed-in-handoff");
-      const checkYourEmail = page.getByTestId("verification-sent");
-      await expect(signedInAlready.or(checkYourEmail)).toBeVisible({
-        timeout: 15000,
-      });
+      await whenIRequestSignUpVerification(page, email);
+      await whenIOpenTheConfirmationLinkFor(page, email);
+      await expect(page.getByTestId("verified-address")).toContainText(email);
+      await expect(page.getByTestId("passkey-sign-up")).toBeVisible();
+      await page.getByTestId("passkey-sign-up").click();
       await expect(
         page.getByText("Could not create a passkey", { exact: false }),
       ).toHaveCount(0);
-
-      if (await checkYourEmail.isVisible()) {
-        // The account already exists (the ceremony wrote it) — opening its
-        // link is the ordinary "confirm an existing account" path, so it
-        // must land exactly where finding #1 lands: signed in, no second
-        // prompt.
-        const token = await findSignUpTokenFor(email);
-        await page.goto(`/auth/signup?verify=${encodeURIComponent(token)}`);
-        await thenTheLinkSignsMeInWithNoSecondPrompt(page, email);
-      }
+      await thenTheLinkSignsMeInWithNoSecondPrompt(page, email);
     } finally {
       await removeVirtualAuthenticator(authenticator);
     }
