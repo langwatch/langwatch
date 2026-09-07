@@ -64,19 +64,19 @@ Feature: Platform placeholders — Insights, Analytics, Signals & Alerts
     # and the screen says nothing about it. Not a success claim.
 
   @integration
-  Scenario: The Setup dialog keeps its edits for the sitting and never claims to save
+  Scenario: The Setup drawer keeps its edits for the sitting and never claims to save
     When the member presses "Set up data" and changes the schedule
     And presses "Save"
-    Then the dialog closes with no confirmation of anything being stored
-    And reopening the dialog shows the changed schedule
+    Then the drawer closes with no confirmation of anything being stored
+    And reopening the drawer shows the changed schedule
     # Local state for the sitting. A reload returns the defaults; there
-    # is no store behind this dialog yet and no toast may pretend there is.
+    # is no store behind this drawer yet and no toast may pretend there is.
 
   @integration
   Scenario: Cancel discards the sitting's edits
     When the member presses "Set up data" and changes the schedule
     And presses "Cancel"
-    Then reopening the dialog shows the schedule it had before
+    Then reopening the drawer shows the schedule it had before
 
   # ---------------------------------------------------------------------------
   # Signals & Alerts

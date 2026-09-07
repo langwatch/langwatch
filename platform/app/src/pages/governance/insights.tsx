@@ -4,8 +4,8 @@ import { useState } from "react";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import {
   DEFAULT_INSIGHTS_SETTINGS,
-  InsightsSetupDialog,
-} from "~/components/governance/platform/InsightsSetupDialog";
+  InsightsSetupDrawer,
+} from "~/components/governance/platform/InsightsSetupDrawer";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { LangyPanelSurface } from "~/features/asaplangy/components/LangyPanelSurface";
@@ -17,7 +17,7 @@ import { useLangyStore } from "~/features/langy/stores/langyStore";
  * The Insights inbox before there is anything in it.
  *
  * A placeholder for the brief Langy will write: one card that says what
- * will land here and offers the two ways in. The Setup dialog's values
+ * will land here and offers the two ways in. The Setup drawer's values
  * live in this page's state for the sitting and nowhere else — there is
  * no store behind them yet, and nothing here says otherwise.
  *
@@ -106,7 +106,7 @@ function InsightsPage() {
         </LangyPanelSurface>
       </VStack>
 
-      <InsightsSetupDialog
+      <InsightsSetupDrawer
         open={setupOpen}
         settings={settings}
         onCancel={() => setSetupOpen(false)}

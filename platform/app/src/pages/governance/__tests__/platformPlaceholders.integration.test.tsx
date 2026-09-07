@@ -4,7 +4,7 @@
  * The three Platform placeholder screens, mounted through their real pages
  * and guards. What is under test is the small set of promises the screens
  * make: they stay behind the billed-cost flag, they say exactly what they
- * say, Open Langy opens Langy, and the Setup dialog keeps its edits for the
+ * say, Open Langy opens Langy, and the Setup drawer keeps its edits for the
  * sitting without ever claiming to have stored them.
  *
  * Spec: specs/governance/governance-platform-placeholders.feature
@@ -163,7 +163,7 @@ describe("given the Insights screen", () => {
     expect(useLangyStore.getState().isOpen).toBe(true);
   });
 
-  /** @scenario "The Setup dialog keeps its edits for the sitting and never claims to save" */
+  /** @scenario "The Setup drawer keeps its edits for the sitting and never claims to save" */
   it("keeps a saved edit across close and reopen, with no confirmation", async () => {
     renderPage(InsightsPage);
 
