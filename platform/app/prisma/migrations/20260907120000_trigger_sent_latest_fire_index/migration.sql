@@ -48,5 +48,5 @@
 --   prisma migrate deploy
 CREATE INDEX CONCURRENTLY "TriggerSent_projectId_triggerId_createdAt_idx" ON "TriggerSent"("projectId", "triggerId", "createdAt");
 
--- To roll back, uncomment and run manually.
+-- Down step. To roll back, uncomment and run manually.
 -- DROP INDEX CONCURRENTLY "TriggerSent_projectId_triggerId_createdAt_idx";

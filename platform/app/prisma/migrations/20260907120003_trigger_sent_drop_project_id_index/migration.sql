@@ -3,5 +3,5 @@
 -- (the stats rollup, the open-claims read) walks one of those instead.
 DROP INDEX CONCURRENTLY IF EXISTS "TriggerSent_projectId_idx";
 
--- To roll back, uncomment and run manually.
+-- Down step. To roll back, uncomment and run manually.
 -- CREATE INDEX CONCURRENTLY "TriggerSent_projectId_idx" ON "TriggerSent"("projectId");

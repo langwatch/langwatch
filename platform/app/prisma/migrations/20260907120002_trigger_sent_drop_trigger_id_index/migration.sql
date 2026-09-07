@@ -9,5 +9,5 @@
 -- `IF EXISTS` so a re-run after a partial deploy is a no-op.
 DROP INDEX CONCURRENTLY IF EXISTS "TriggerSent_triggerId_idx";
 
--- To roll back, uncomment and run manually.
+-- Down step. To roll back, uncomment and run manually.
 -- CREATE INDEX CONCURRENTLY "TriggerSent_triggerId_idx" ON "TriggerSent"("triggerId");
