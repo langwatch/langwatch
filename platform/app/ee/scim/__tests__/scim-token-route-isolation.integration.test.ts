@@ -131,7 +131,7 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         path: `/api/scim/v2/Users/${directUserId}`,
         method: "PATCH",
         body: patch([
-          { op: "replace", path: "name.givenName", value: "Taken" },
+          { op: "replace", value: { name: { givenName: "Taken" } } },
         ]),
       });
 
