@@ -390,3 +390,35 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given every permission category at its maximum access level
     When I compute the backend permissions for each category
     Then every permission string matches the CustomRole schema regex
+
+  # ── Cost visibility on the REST read doors ──────────────────
+
+  # A key's grants decide what its reads may see, and cost is one of them. The
+  # governed-SQL door and the trace doors both used to answer "yes" to
+  # cost:view for every key alike, on the reasoning that project keys predate
+  # RBAC — true of a legacy project key, and false of every key minted since.
+
+  @unit
+  Scenario: A key without the cost grant reads the query surface with costs redacted
+    Given a key that may run governed queries but does not carry "cost:view"
+    When the query surface resolves what that key may see
+    Then costs are hidden from it
+
+  @unit
+  Scenario: A key carrying the cost grant reads the query surface with costs
+    Given a key that carries "cost:view" for its project
+    When the query surface resolves what that key may see
+    Then costs are visible to it
+
+  @unit
+  Scenario: A key without the cost grant reads traces with costs redacted
+    Given a key that may view traces but does not carry "cost:view"
+    When the trace read resolves what that key may see
+    Then costs are hidden from it
+
+  @unit
+  Scenario: A legacy project key still reads costs without a grant lookup
+    Given a legacy project key, which predates fine-grained permissions
+    When either read door resolves what that key may see
+    Then costs are visible to it
+    And no per-key permission is looked up

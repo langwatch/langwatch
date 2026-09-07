@@ -463,8 +463,11 @@ function passThroughSecurity(): AppRestSecurity {
   const noop: MiddlewareHandler = async (_c, next) => {
     await next();
   };
+  // The whole resolved credential, as the process's own authentication
+  // installs it: handlers read their caller off this, never off loose keys.
   const asProject: MiddlewareHandler = async (c, next) => {
     c.set("project", PROJECT);
+    c.set("resolvedToken", { type: "legacyProjectKey", project: PROJECT });
     await next();
   };
   const unreachable = () => {

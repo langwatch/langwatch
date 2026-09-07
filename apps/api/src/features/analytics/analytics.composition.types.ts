@@ -1,5 +1,6 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type { AnalyticsApp, LangWatchQLService } from "@langwatch/analytics-server";
 import type { DashboardApp } from "@langwatch/dashboard-server";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
@@ -24,5 +25,8 @@ export type ComposedAnalyticsFeature = Readonly<{
   langWatchQL: LangWatchQLService;
   featureFlags: FeatureFlagService;
   /** See {@link ApiAnalyticsProtections.resolveForApiKey}. */
-  apiKeyProtections: (input: { projectId: string }) => Promise<LangWatchQLProtections>;
+  apiKeyProtections: (input: {
+    projectId: string;
+    credential: RestCredentialPrincipal;
+  }) => Promise<LangWatchQLProtections>;
 }>;

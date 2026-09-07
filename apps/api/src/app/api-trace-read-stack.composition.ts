@@ -12,6 +12,7 @@ import {
 } from "@langwatch/trace-server";
 import { PrismaTraceEditOverlayRepository } from "@langwatch/trace-server/composition/trace-edit-overlay";
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 import {
@@ -330,18 +331,40 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     });
   }
 
-  async getApiKeyProtections(input: Readonly<{ projectId: string }>): Promise<Protections> {
-    // The anonymous resolution, then costs put back. `resolve` with no user id
-    // takes the public branch of every content category, which is what a key
-    // must see; the cost override is what `getProtectionsForProject` did, and
-    // it is sound because every project role grants `cost:view` and a project
-    // key carries full project access.
-    const protections = await this.protections.resolve({
-      projectId: input.projectId,
-      userId: undefined,
-      publiclyShared: false,
+  async getApiKeyProtections(
+    input: Readonly<{ projectId: string; credential: RestCredentialPrincipal }>,
+  ): Promise<Protections> {
+    // The anonymous resolution, then the CREDENTIAL's own cost grant on top.
+    // `resolve` with no user id takes the public branch of every content
+    // category, which is what a key must see. Costs used to be forced on here
+    // for every key alike; they are now the key's own `cost:view`, asked
+    // through the same check the route chain enforces a declared permission
+    // with. A legacy project key predates RBAC and carries full project
+    // access by design, so for that class alone the answer stays yes.
+    const [protections, canSeeCosts] = await Promise.all([
+      this.protections.resolve({
+        projectId: input.projectId,
+        userId: undefined,
+        publiclyShared: false,
+      }),
+      this.keyPermitted(input.credential, "cost:view"),
+    ]);
+    return { ...protections, canSeeCosts };
+  }
+
+  /** One permission, asked of the CREDENTIAL rather than of whoever holds it. */
+  private keyPermitted(
+    credential: RestCredentialPrincipal,
+    permission: "cost:view",
+  ): Promise<boolean> {
+    if (credential.kind !== "apiKey") return Promise.resolve(true);
+    return this.options.authz.hasApiKeyPermission({
+      apiKeyId: credential.apiKeyId,
+      userId: credential.userId,
+      organizationId: credential.organizationId,
+      scope: { type: "project", id: credential.projectId, teamId: credential.teamId },
+      permission,
     });
-    return { ...protections, canSeeCosts: true };
   }
 
   isTraceNotFound(error: unknown): boolean {

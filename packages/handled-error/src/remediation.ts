@@ -312,6 +312,11 @@ const registry = {
       "Send a key scoped to your own personal workspace; being allowed to view a workspace is not the same as it being yours",
     ],
   },
+  personal_usage_service_key_unsupported: {
+    tips: [
+      "Send an API key issued to a person; a service key stands for a job rather than for anyone, so there is nobody to report for",
+    ],
+  },
 
   // ---- agent cache ----
   // Read by agent code inside a run, so the tips name the next call rather

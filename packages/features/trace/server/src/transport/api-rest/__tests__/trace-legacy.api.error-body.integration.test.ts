@@ -55,7 +55,12 @@ const searchBodySchema = z.object({}).catchall(z.unknown()) as unknown as TraceL
 
 function buildApi(readTrace: () => Promise<never>) {
   const ports: TraceLegacyRestPorts<TraceLegacySearchFields, unknown> = {
-    credential: async () => ({ ok: true, project, markUsed: () => undefined }),
+    credential: async () => ({
+      ok: true,
+      project,
+      credential: { kind: "legacyProjectKey" },
+      markUsed: () => undefined,
+    }),
     traces: () => ({
       readTrace,
       readEvaluations: vi.fn(),

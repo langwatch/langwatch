@@ -46,9 +46,16 @@ const AUTH_REASON =
 /** A local call is a small JSON document, never an upload. */
 const MAX_BODY_BYTES = 256 * 1024;
 
+/**
+ * The permission this door declares AND the one it enforces. One constant, so
+ * the declaration the OpenAPI surface publishes and the check the handler runs
+ * cannot drift into disagreeing about what a caller needs.
+ */
+const LOCAL_PERMISSION = "langy:create" as const;
+
 const localAuth = handlerManagedAuth({
   reason: AUTH_REASON,
-  permissions: ["langy:create"],
+  permissions: [LOCAL_PERMISSION],
   credential: "apiKey",
 });
 
@@ -134,8 +141,12 @@ export function createLangyLocalRestApp(options: {
   const localDoor = policy(localAuth);
 
   /**
-   * Authenticate the key and resolve the owning user. The permission ceiling
-   * is the key's own, which a Langy session key holds by construction.
+   * Authenticate the key, enforce the permission this door declares, then
+   * resolve the owning user. Order is the shared chain's: credential (401),
+   * the KEY's own ceiling (403), then the identity bridge. The ceiling is
+   * checked against the credential rather than its holder — a deliberately
+   * narrowed key must not reach local control on the strength of what the
+   * person who made it may do.
    */
   const authorize = async (c: ServiceContext<EndpointVariables>) => {
     const credentials = ports.readCredential(c.req.raw);
@@ -146,6 +157,8 @@ export function createLangyLocalRestApp(options: {
       projectId: credentials.projectId,
     });
     if (!resolved) throw new LangyApiCredentialInvalidError();
+
+    await ports.enforceCeiling({ resolved, permission: LOCAL_PERMISSION });
 
     const identity = await LangyKeyIdentityService.create({
       featureFlags: ports.featureFlags(),

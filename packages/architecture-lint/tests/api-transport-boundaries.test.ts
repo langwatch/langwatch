@@ -225,6 +225,33 @@ describe("strict feature API transport boundaries", () => {
     expect(policy("api-transport-service-locator")).toHaveLength(4);
   });
 
+  it("refuses a transport that reads the caller off the request context bag", () => {
+    write(
+      "packages/features/widget/server/src/api/public/widget.api.ts",
+      `
+        declare const c: { get(key: string): unknown };
+        const apiKeyId = c.get("apiKeyId");
+        const userId = c.get("apiKeyUserId");
+        const token = c.get("resolvedToken");
+        void [apiKeyId, userId, token];
+      `,
+    );
+
+    expect(policy("api-transport-credential-context")).toHaveLength(3);
+  });
+
+  it("accepts a transport reading the application's own context keys", () => {
+    write(
+      "packages/features/widget/server/src/api/public/widget.api.ts",
+      `
+        declare const c: { get(key: string): unknown };
+        void c.get("project");
+      `,
+    );
+
+    expect(policy("api-transport-credential-context")).toEqual([]);
+  });
+
   it("accepts a synchronous request query-string reader", () => {
     write(
       "packages/features/widget/server/src/api/public/widget.api.ts",

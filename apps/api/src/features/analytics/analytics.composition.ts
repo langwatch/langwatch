@@ -25,6 +25,7 @@ import {
 } from "@langwatch/analytics-server";
 import type { Trigger } from "@langwatch/automation-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import {
   AnalyticsSavedWorkbenchChartPolicyAdapter,
   DashboardApp,
@@ -390,7 +391,7 @@ const NO_GRAPH_ALERTS: DashboardGraphAlertLookup = {
  * What one member may read of a project's content, as LangWatchQL's catalogue asks it.
  * Three booleans, from two independent sources, and they are independent on purpose.
  */
-class ApiAnalyticsProtections {
+export class ApiAnalyticsProtections {
   static create(dependencies: {
     authz: AuthzService;
     dataPrivacy: {
@@ -453,11 +454,20 @@ class ApiAnalyticsProtections {
   }
 
   /**
-   * What an API KEY may see, which is a different question from what a person may see. A
-   * project key carries full project access by design — it predates RBAC and every role
-   * that can hold one grants `cost:view` — so costs are visible.
+   * What an API KEY may see, which is a different question from what a person may see.
+   *
+   * Content categories resolve as they do for a caller with no session, because a key is
+   * not a member. Costs are the credential's OWN question: a scoped key holds `cost:view`
+   * or it does not, and it is asked here through the same `hasApiKeyPermission` the route
+   * chain enforces a declared permission with. A legacy project key predates RBAC and
+   * carries full project access by design, so for that credential class alone the answer
+   * is yes without a lookup.
    */
-  async resolveForApiKey(input: { projectId: string }): Promise<LangWatchQLProtections> {
+  async resolveForApiKey(input: {
+    projectId: string;
+    credential: RestCredentialPrincipal;
+  }): Promise<LangWatchQLProtections> {
+    const canSeeCosts = await this.keyPermitted(input.credential, "cost:view");
     let policy: ResolvedDataPrivacy;
     try {
       policy = await this.dependencies.dataPrivacy.getResolvedForProject({
@@ -468,13 +478,28 @@ class ApiAnalyticsProtections {
         { error, projectId: input.projectId },
         "data-privacy policy resolution failed; hiding captured content (fail-closed)",
       );
-      return { canSeeCosts: true, canSeeCapturedInput: false, canSeeCapturedOutput: false };
+      return { canSeeCosts, canSeeCapturedInput: false, canSeeCapturedOutput: false };
     }
     return {
-      canSeeCosts: true,
+      canSeeCosts,
       canSeeCapturedInput: isContentVisibleToPublic(policy.categories.input),
       canSeeCapturedOutput: isContentVisibleToPublic(policy.categories.output),
     };
+  }
+
+  /** One permission, asked of the CREDENTIAL rather than of whoever holds it. */
+  private keyPermitted(
+    credential: RestCredentialPrincipal,
+    permission: "cost:view",
+  ): Promise<boolean> {
+    if (credential.kind !== "apiKey") return Promise.resolve(true);
+    return this.dependencies.authz.hasApiKeyPermission({
+      apiKeyId: credential.apiKeyId,
+      userId: credential.userId,
+      organizationId: credential.organizationId,
+      scope: { type: "project", id: credential.projectId, teamId: credential.teamId },
+      permission,
+    });
   }
 
   private permitted(

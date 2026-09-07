@@ -68,8 +68,19 @@ const boundaryErrorHandler: ErrorHandler = (error, c) => {
 
 function testSecurity(): AppRestSecurity {
   const pass: MiddlewareHandler = async (_c, next) => next();
+  // The whole resolved credential, as the process's own authentication
+  // installs it: handlers read their caller off this, never off loose keys.
   const authenticateProject: MiddlewareHandler = async (c, next) => {
     c.set("project", project);
+    c.set("resolvedToken", {
+      type: "apiKey",
+      apiKeyId: "key-1",
+      userId: "user-1",
+      organizationId: "organization-1",
+      ingestSourceType: null,
+      ingestionTemplateId: null,
+      project,
+    });
     await next();
   };
 

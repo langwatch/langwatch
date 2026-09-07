@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { join, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
@@ -759,6 +759,81 @@ function stringLocatorViolations(file: string, source: ts.SourceFile): Architect
   return violations;
 }
 
+/**
+ * The credential facts a request arrives with, as keys on the framework's own
+ * context bag.
+ *
+ * A handler that reaches for these is doing the boundary's job by hand: it
+ * gets an untyped `any`, it cannot see the credential CLASS (a legacy project
+ * key and a service key both arrive with no user id), and it decides
+ * authorization from whichever half it happened to read. That is exactly how
+ * `/api/coding-agent/pull-request-usage` came to substitute a key's OWNER for
+ * the key. The context is the APPLICATION's — the services and the request's
+ * own plumbing; who is calling arrives as typed input.
+ */
+const CREDENTIAL_CONTEXT_KEYS = new Set([
+  "apiKeyId",
+  "apiKeyUserId",
+  "apiKeyOrganizationId",
+  "resolvedToken",
+  "orgResolvedToken",
+]);
+
+const CREDENTIAL_CONTEXT_BASELINE_FILE = "api-transport-credential-context-baseline.json";
+
+/**
+ * The transports that still read a credential off the bag, frozen so no new
+ * one may. Read once per root: the rule asks per file, and re-parsing the
+ * list for each of several hundred transports is the whole cost of the check.
+ */
+const credentialContextBaselines = new Map<string, ReadonlySet<string>>();
+
+function credentialContextBaseline(root: string): ReadonlySet<string> {
+  const cached = credentialContextBaselines.get(root);
+  if (cached) return cached;
+
+  const file = join(root, "packages/architecture-lint/src", CREDENTIAL_CONTEXT_BASELINE_FILE);
+  // Absent means nothing is excused, not that the rule is off: a root without
+  // the file (a fixture tree, say) is one where every transport is new code.
+  const raw = existsSync(file) ? readFileSync(file, "utf8") : '{"files":[]}';
+  const parsed = JSON.parse(raw) as { files?: readonly string[] };
+  const baseline: ReadonlySet<string> = new Set(parsed.files ?? []);
+  credentialContextBaselines.set(root, baseline);
+  return baseline;
+}
+
+/** `<something>.get("<credential key>")` anywhere in a transport source. */
+function credentialContextViolations(file: string, source: ts.SourceFile): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === "get" &&
+      node.arguments.length === 1 &&
+      node.arguments[0] !== void 0 &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      CREDENTIAL_CONTEXT_KEYS.has(node.arguments[0].text)
+    ) {
+      violations.push({
+        policy: "api-transport-credential-context",
+        file,
+        line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+        message: `API transport reads the credential off the request context (${JSON.stringify(
+          (node.arguments[0] as ts.StringLiteral).text,
+        )}).`,
+        allowed:
+          "Take the caller as typed input: `credentialPrincipalOf(c)` from @langwatch/api/rest answers with the whole resolved credential, including its class. The context bag is the application's, not the handler's input.",
+      });
+    }
+
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(source, visit);
+
+  return violations;
+}
+
 function lintSource(root: string, transport: TransportSource): ArchitectureViolation[] {
   const source = ts.createSourceFile(
     transport.file,
@@ -784,6 +859,10 @@ function lintSource(root: string, transport: TransportSource): ArchitectureViola
     });
   }
 
+  if (!credentialContextBaseline(root).has(relativeFile(root, transport.file))) {
+    violations.push(...credentialContextViolations(transport.file, source));
+  }
+
   violations.push(...handlerConstructionViolations(transport.file, source));
   violations.push(...handlerShapeViolations(transport.file, source));
   violations.push(...stringLocatorViolations(transport.file, source));
@@ -798,6 +877,11 @@ function lintSource(root: string, transport: TransportSource): ArchitectureViola
   // `packages/architecture-lint/apps/api/...`, a path that does not exist. The
   // reader could not open the file the rule named.
   return violations;
+}
+
+/** The baseline names files the way a violation report does: repo-relative, forward slashes. */
+function relativeFile(root: string, file: string): string {
+  return relative(root, file).split(sep).join("/");
 }
 
 /** Fast structural checks for strict feature APIs and the API process transport surface. */

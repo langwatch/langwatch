@@ -175,6 +175,10 @@ export class TestModelProviderService extends ModelProviderService {
     throw new Error("Not used by Coding Agent tests.");
   }
 
+  assertApiKeyMayWriteDefaultScopes(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
   tryGetDefaultConfig(): Promise<null> {
     return Promise.resolve(null);
   }

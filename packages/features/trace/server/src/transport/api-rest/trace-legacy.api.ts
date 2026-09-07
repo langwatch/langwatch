@@ -4,7 +4,7 @@
 import { TraceReadableSpanService } from "#services/trace-readable-span.service";
 import { TraceFormattingService } from "#services/trace-formatting.service";
 import { handlerManagedAuth } from "@langwatch/api";
-import type { AppRestSecurity, SecuredApp } from "@langwatch/api/rest";
+import type { AppRestSecurity, RestCredentialPrincipal, SecuredApp } from "@langwatch/api/rest";
 import type {
   Evaluation,
   Span,
@@ -22,7 +22,13 @@ const AUTH_REASON = "project API key / public share resolved in-handler";
 
 /** A resolved project credential, or the refusal this family publishes. */
 export type TraceLegacyCredential =
-  | Readonly<{ ok: true; project: Readonly<{ id: string }>; markUsed: () => void }>
+  | Readonly<{
+      ok: true;
+      project: Readonly<{ id: string }>;
+      /** What the redactions are resolved FOR: the key, never its holder. */
+      credential: RestCredentialPrincipal;
+      markUsed: () => void;
+    }>
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
 
 /**
@@ -73,7 +79,9 @@ export interface TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw> {
   /**
    * The API KEY caller's read-time redactions for one project. Same resolution the v1 family uses — a key is not a person, so content categories resolve as they do for a caller with no session, and costs are visible because a project key carries full project access.
    */
-  getProtections(input: Readonly<{ projectId: string }>): Promise<unknown>;
+  getProtections(
+    input: Readonly<{ projectId: string; credential: RestCredentialPrincipal }>,
+  ): Promise<unknown>;
   /**
    * The search body a caller may send: the deployment's shared analytics filter vocabulary plus this family's own four additive fields. Parsed STRICTLY here, unlike the v1 family — this deprecated endpoint has always behaved that way, and loosening it would silently accept a typo the caller currently gets told about.
    */
@@ -123,7 +131,7 @@ export function createTraceLegacyRestApp<
     if (!auth.ok) {
       return c.json(auth.body, auth.status);
     }
-    const { project, markUsed } = auth;
+    const { project, credential, markUsed } = auth;
 
     // No catch-all here: an unanticipated failure is the shared error
     // renderer's to answer, which degrades it to the generic unknown plus the
@@ -137,7 +145,7 @@ export function createTraceLegacyRestApp<
     c.header("Deprecation", "true");
     c.header("Link", `</api/traces/${traceId}?format=${format}>; rel="successor-version"`);
 
-    const protections = await ports.getProtections({ projectId: project.id });
+    const protections = await ports.getProtections({ projectId: project.id, credential });
     // `readTrace` resolves offloaded values in full (#4991) — the same
     // `{ full: true }` this handler used to pass for itself.
     const trace = await ports.traces().readTrace({
@@ -223,7 +231,7 @@ export function createTraceLegacyRestApp<
     if (!auth.ok) {
       return c.json(auth.body, auth.status);
     }
-    const { project, markUsed } = auth;
+    const { project, credential, markUsed } = auth;
 
     let body: unknown;
     try {
@@ -244,7 +252,7 @@ export function createTraceLegacyRestApp<
     c.header("Link", `</api/traces/search>; rel="successor-version"`);
 
     const pageSize = Math.min(params.pageSize ?? 1000, 1000);
-    const protections = await ports.getProtections({ projectId: project.id });
+    const protections = await ports.getProtections({ projectId: project.id, credential });
     const results = await ports.traces().listTraces({
       // The body carried the deployment's own filter vocabulary through the
       // schema port, so it already IS a list input once the two date spellings
@@ -308,10 +316,10 @@ export function createTraceLegacyRestApp<
     if (!auth.ok) {
       return c.json(auth.body, auth.status);
     }
-    const { project, markUsed } = auth;
+    const { project, credential, markUsed } = auth;
 
     const threadId = c.req.param("id");
-    const protections = await ports.getProtections({ projectId: project.id });
+    const protections = await ports.getProtections({ projectId: project.id, credential });
     // Thread-detail read consumes conversation content — `readThreadTraces`
     // resolves full IO (#4991), which is what this handler asked for itself.
     const traces = await ports.traces().readThreadTraces({

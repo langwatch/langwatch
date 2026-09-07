@@ -9,6 +9,7 @@ import {
   type AppRestSecurity,
   canonicalBaseResponses,
   canonicalUnprocessableResponses,
+  credentialPrincipalOf,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -92,7 +93,10 @@ export function createQueryRestApp(options: {
 
     return await ports.langWatchQL().execute({
       project: { id, lwqlKey },
-      protections: await ports.protectionsFor({ projectId: id }),
+      protections: await ports.protectionsFor({
+        projectId: id,
+        credential: credentialPrincipalOf(c),
+      }),
       sql,
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
@@ -106,7 +110,10 @@ export function createQueryRestApp(options: {
    */
   const schemaHandler = async (c: QueryContext) =>
     ports.langWatchQL().describeSchema({
-      protections: await ports.protectionsFor({ projectId: projectId(c) }),
+      protections: await ports.protectionsFor({
+        projectId: projectId(c),
+        credential: credentialPrincipalOf(c),
+      }),
     });
 
   return service

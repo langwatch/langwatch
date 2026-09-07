@@ -7,6 +7,7 @@ import { requires } from "@langwatch/api";
 import {
   apiErrorSchema,
   canonicalBaseResponses,
+  credentialPrincipalOf,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   projectOf,
@@ -238,7 +239,10 @@ export function registerSavedWorkbenchChartRoutes(
     input: z.infer<typeof projectParamsSchema> & z.infer<typeof createChartSchema>,
   ) => {
     const project = await projectFor(c, input.projectId);
-    const protections = await ports.protectionsFor({ projectId: project.id });
+    const protections = await ports.protectionsFor({
+      projectId: project.id,
+      credential: credentialPrincipalOf(c),
+    });
     const chart = await dashboardSavedChartCall(ports, () =>
       ports.charts().createSavedWorkbenchChart({
         projectId: project.id,
@@ -269,7 +273,10 @@ export function registerSavedWorkbenchChartRoutes(
         ? undefined
         : {
             definition,
-            protections: await ports.protectionsFor({ projectId: project.id }),
+            protections: await ports.protectionsFor({
+              projectId: project.id,
+              credential: credentialPrincipalOf(c),
+            }),
           };
     const chart = await dashboardSavedChartCall(ports, () =>
       ports.charts().updateSavedWorkbenchChart({

@@ -12,6 +12,7 @@ import {
   type AppRestSecurity,
   baseResponses,
   coerceToEpoch,
+  credentialPrincipalOf,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -19,6 +20,7 @@ import {
   projectOf,
   type ProjectScopedContext,
   RequestValidationError,
+  type RestCredentialPrincipal,
   resolver,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
@@ -132,10 +134,13 @@ export interface TracesRestPorts<TBody extends TraceSearchBody, TBodyRaw> {
   traces(): TracesRestReadPort;
   /**
    * The API key caller's read-time redactions for one project. A key is not a person, so
-   * categories resolve as for a caller with no session; costs are visible since every project
-   * role grants `cost:view` and a project key carries full project access.
+   * categories resolve as for a caller with no session; costs are the CREDENTIAL's own
+   * question, which is why the principal travels with the project rather than the answer
+   * being assumed for every key.
    */
-  getProtections(input: Readonly<{ projectId: string }>): Promise<unknown>;
+  getProtections(
+    input: Readonly<{ projectId: string; credential: RestCredentialPrincipal }>,
+  ): Promise<unknown>;
   /** Deep links back into the product, built from the deployment's origin. */
   platformUrl: PlatformUrlBuilder;
   /**
@@ -266,7 +271,10 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
     logger.info({ projectId: project.id }, "Searching traces for project");
 
     const pageSize = Math.min(params.pageSize ?? 1000, 1000);
-    const protections = await ports.getProtections({ projectId: project.id });
+    const protections = await ports.getProtections({
+      projectId: project.id,
+      credential: credentialPrincipalOf(c),
+    });
 
     // When `select` is present, compile the projection up front: the compiled plan
     // drives column pruning + child-collection joins in the ENGINE, the resolved
@@ -478,7 +486,10 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
 
       logger.info({ projectId: project.id, traceId }, "Getting trace transcript");
 
-      const protections = await ports.getProtections({ projectId: project.id });
+      const protections = await ports.getProtections({
+        projectId: project.id,
+        credential: credentialPrincipalOf(c),
+      });
 
       let trace: Trace | undefined;
       try {
@@ -606,7 +617,10 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
 
     logger.info({ projectId: project.id, traceId }, "Getting trace by ID");
 
-    const protections = await ports.getProtections({ projectId: project.id });
+    const protections = await ports.getProtections({
+      projectId: project.id,
+      credential: credentialPrincipalOf(c),
+    });
     const traceService = ports.traces();
 
     let trace: Trace | undefined;

@@ -12,9 +12,22 @@
 
 import { describe, expect, it } from "vitest";
 
-import { resolvePersonalCaller } from "@langwatch/api/rest";
+import { resolvePersonalCaller, type RestCredentialPrincipal } from "@langwatch/api/rest";
 
 const OWNER_ID = "user_owner";
+
+/** A modern key issued to somebody, the ordinary case. */
+const keyOf = (userId: string | null): RestCredentialPrincipal => ({
+  kind: "apiKey",
+  apiKeyId: "key_abc",
+  userId,
+  organizationId: "organization-1",
+  projectId: "project-1",
+  teamId: "team-1",
+});
+
+/** The credential class that predates RBAC and carries no user at all. */
+const LEGACY_KEY: RestCredentialPrincipal = { kind: "legacyProjectKey" };
 
 /** The refusal `code` a call raised, so a test never asserts on prose. */
 function refusalCode(call: () => unknown): string | undefined {
@@ -34,7 +47,7 @@ describe("resolving who a personal-workspace read answers for", () => {
           refusalCode(() =>
             resolvePersonalCaller({
               project: { isPersonal: false, ownerUserId: null },
-              apiKeyUserId: OWNER_ID,
+              credential: keyOf(OWNER_ID),
             }),
           ),
         ).toBe("personal_project_key_required");
@@ -47,7 +60,7 @@ describe("resolving who a personal-workspace read answers for", () => {
           refusalCode(() =>
             resolvePersonalCaller({
               project: { isPersonal: true, ownerUserId: null },
-              apiKeyUserId: OWNER_ID,
+              credential: keyOf(OWNER_ID),
             }),
           ),
         ).toBe("personal_project_key_required");
@@ -62,7 +75,7 @@ describe("resolving who a personal-workspace read answers for", () => {
           refusalCode(() =>
             resolvePersonalCaller({
               project: { isPersonal: true, ownerUserId: OWNER_ID },
-              apiKeyUserId: "user_someone_else",
+              credential: keyOf("user_someone_else"),
             }),
           ),
         ).toBe("personal_usage_key_mismatch");
@@ -76,20 +89,35 @@ describe("resolving who a personal-workspace read answers for", () => {
         expect(
           resolvePersonalCaller({
             project: { isPersonal: true, ownerUserId: OWNER_ID },
-            apiKeyUserId: OWNER_ID,
+            credential: keyOf(OWNER_ID),
           }),
         ).toBe(OWNER_ID);
       });
     });
 
-    describe("when the key carries no user of its own", () => {
+    describe("when the credential is a legacy project key", () => {
+      /** @scenario "A legacy project key still answers for its workspace's owner" */
       it("answers for the owner, since a project key IS that workspace's key", () => {
         expect(
           resolvePersonalCaller({
             project: { isPersonal: true, ownerUserId: OWNER_ID },
-            apiKeyUserId: undefined,
+            credential: LEGACY_KEY,
           }),
         ).toBe(OWNER_ID);
+      });
+    });
+
+    describe("when the credential is a modern key belonging to no person", () => {
+      /** @scenario "An ownerless service key is refused rather than answered as the owner" */
+      it("refuses rather than answering as the workspace's owner", () => {
+        expect(
+          refusalCode(() =>
+            resolvePersonalCaller({
+              project: { isPersonal: true, ownerUserId: OWNER_ID },
+              credential: keyOf(null),
+            }),
+          ),
+        ).toBe("personal_usage_service_key_unsupported");
       });
     });
   });

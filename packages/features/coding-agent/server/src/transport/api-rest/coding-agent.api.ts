@@ -12,6 +12,7 @@ import { requires } from "@langwatch/api";
 import {
   type AppRestSecurity,
   baseResponses,
+  credentialPrincipalOf,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -21,6 +22,7 @@ import {
   resolver,
 } from "@langwatch/api/rest";
 import type { CodingAgentApp } from "#app/coding-agent.app";
+import type { CodingAgentScopeCaller } from "#ports/coding-agent-caller-scope.port";
 import {
   pullRequestUsageQuerySchema,
   pullRequestUsageResponseSchema,
@@ -248,20 +250,26 @@ export function createCodingAgentRestApp(options: {
   };
 
   // What one pull request cost in assistant usage, across every project of the
-  // organization the CALLER may read. Numbers and names only: no session
-  // title, no prompt, no file list.
+  // organization the CALLING CREDENTIAL may read. Numbers and names only: no
+  // session title, no prompt, no file list.
   const usageHandler = async (
     c: CodingAgentContext,
     input: z.infer<typeof pullRequestUsageQuerySchema>,
   ) => {
     const project = projectOf(c);
     const application = app();
-    // The rollup answers with whatever the CALLER may read across the whole
-    // organization, so it needs a person rather than just a project.
-    const callerUserId = resolvePersonalCaller({
-      project,
-      apiKeyUserId: c.get("apiKeyUserId"),
-    });
+    // Whose data this is stays the personal-workspace question it always was.
+    // What the read REACHES is the credential's, the same way the v1 door
+    // reads it: a deliberately narrowed key reads with its own bindings, never
+    // with the full reach of whoever created it. A legacy project key carries
+    // no bindings of its own — it IS that personal workspace's key — so it,
+    // and only it, is answered as the person.
+    const credential = credentialPrincipalOf(c);
+    const ownerUserId = resolvePersonalCaller({ project, credential });
+    const caller: CodingAgentScopeCaller =
+      credential.kind === "legacyProjectKey"
+        ? { kind: "user", userId: ownerUserId }
+        : { kind: "apiKey", apiKeyId: credential.apiKeyId, userId: credential.userId };
     const host = input.host ?? new URL(application.githubWebBase()).hostname;
 
     // The application resolves the organization behind the project, refuses
@@ -276,7 +284,7 @@ export function createCodingAgentRestApp(options: {
         repositoryFullName: input.repository,
         prNumber: input.pullRequest,
       },
-      { id: callerUserId },
+      caller,
     );
 
     // This answer names people, so who read it stays attributable. Awaited
@@ -285,7 +293,7 @@ export function createCodingAgentRestApp(options: {
     // wide the read reached without copying the names into a second store
     // that outlives it.
     await audit().auditLog({
-      userId: callerUserId,
+      userId: ownerUserId,
       organizationId,
       action: "codingAgents.pullRequestUsage",
       targetKind: "pullRequest",

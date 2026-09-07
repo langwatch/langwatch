@@ -158,14 +158,18 @@ export class CodingAgentApp {
    * REST door records who read an answer that names people, and the audit row
    * is written against the organization the read actually reached. Answering
    * with it spread into the rollup would put it on the wire.
+   *
+   * The caller is a CREDENTIAL where the door resolved one, exactly as
+   * {@link getOrganizationPullRequestUsage} takes it: a narrowed key reads
+   * with its own bindings rather than the full reach of whoever holds it.
    */
   async getPullRequestUsage(
     pullRequest: CodingAgentPullRequestRef,
-    by: CodingAgentCaller,
+    by: CodingAgentScopeCaller,
   ): Promise<{ usage: CodingAgentPullRequestUsage; organizationId: string }> {
     const organizationId = await this.requireOrganizationFor(pullRequest);
     const scope = await this.dependencies.scope.resolveCallerProjectScope({
-      caller: { kind: "user", userId: by.id },
+      caller: by,
       organizationId,
     });
     const usage = await this.dependencies.codingAgents.getPullRequestUsage({

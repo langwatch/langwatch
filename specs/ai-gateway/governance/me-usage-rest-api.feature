@@ -50,6 +50,24 @@ Feature: Personal usage REST API
     And the refusal carries a named code saying the key is for a different workspace
     And nothing in the refusal says whose workspace it is
 
+  # A legacy project key and a modern service key both arrive carrying no user.
+  # They are not the same credential: the first IS the workspace's key, the
+  # second belongs to a job and stands for nobody.
+
+  @unit
+  Scenario: A legacy project key still answers for its workspace's owner
+    Given I authenticate with a legacy project key for my personal workspace
+    When I GET /api/me/usage
+    Then the read answers for the workspace's owner
+
+  @unit
+  Scenario: An ownerless service key is refused rather than answered as the owner
+    Given I authenticate with a service API key that belongs to no person
+    When I GET /api/me/usage
+    Then the response status is 403
+    And the refusal carries a named code saying a service key cannot answer for a person
+    And no usage is answered for the workspace's owner
+
   Scenario: A shared-workspace API key is rejected
     Given I authenticate with an API key from a shared (non-personal) workspace
     When I GET /api/me/usage

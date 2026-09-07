@@ -4,6 +4,7 @@
  * the SDK collector.
  */
 import {
+  credentialPrincipalOfToken,
   flexibleDateSchema,
   type AppRestSecurity,
   type MountableRestApp,
@@ -140,8 +141,18 @@ export function mountTraceLegacyRest(options: {
   collaborators: ApiTraceLegacyRestCollaborators;
 }): MountableRestApp {
   const { traces, shares, reads, credential } = options.collaborators;
-  const resolveCredential: TraceLegacyCredentialPort = (input) =>
-    credential({ request: input.request, permission: input.permission });
+  // The resolved token becomes the family's principal here, so its handlers
+  // ask a second permission question of the KEY rather than of its holder.
+  const resolveCredential: TraceLegacyCredentialPort = async (input) => {
+    const auth = await credential({ request: input.request, permission: input.permission });
+    if (!auth.ok) return auth;
+    return {
+      ok: true,
+      project: auth.project,
+      credential: credentialPrincipalOfToken(auth.resolved),
+      markUsed: auth.markUsed,
+    };
+  };
   return createTraceLegacyRestApp({
     security: options.security,
     ports: {

@@ -16,8 +16,17 @@
  * A legacy project key carries no user of its own. It IS that workspace's key,
  * so its holder is the owner by construction and the ownership guard has
  * nothing to compare.
+ *
+ * A MODERN key with no user is a different credential entirely — a service
+ * key, minted for a job rather than for a person, carrying its own bindings.
+ * The two are indistinguishable from a user id alone, which is why this takes
+ * the whole typed credential: without the credential CLASS, a service key
+ * would answer as the workspace's owner, which is precisely the substitution
+ * these guards exist to prevent.
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
+
+import type { RestCredentialPrincipal } from "./credential-principal.ts";
 
 /**
  * The calling key belongs to a workspace that is not one person's.
@@ -70,22 +79,58 @@ export class PersonalUsageKeyMismatchError extends HandledError {
 }
 
 /**
+ * The calling credential is a service key, which stands for no person.
+ *
+ * A personal read has to name whose data it answers for, and a service key
+ * names nobody: answering for the workspace's owner would hand the key its
+ * creator's identity rather than its own.
+ */
+export class PersonalUsageServiceKeyUnsupportedError extends HandledError {
+  declare readonly code: "personal_usage_service_key_unsupported";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "personal_usage_service_key_unsupported",
+      "This endpoint answers for one person, so a service API key cannot read it. Use an API key issued to you.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("personal_usage_service_key_unsupported"),
+        ...options,
+      },
+    );
+    this.name = "PersonalUsageServiceKeyUnsupportedError";
+  }
+}
+
+/**
  * The user whose data a personal-workspace read answers for.
+ *
+ * Takes the resolved credential rather than fields picked off the request
+ * context: the credential's CLASS is half the decision, and a caller that
+ * reads two loose ids out of a context bag can only guess at it.
  *
  * @throws {PersonalProjectKeyRequiredError} when the workspace is not personal.
  * @throws {PersonalUsageKeyMismatchError} when a user-bound key does not own it.
+ * @throws {PersonalUsageServiceKeyUnsupportedError} for an ownerless modern key.
  */
 export function resolvePersonalCaller({
   project,
-  apiKeyUserId,
+  credential,
 }: {
   project: { isPersonal: boolean | null; ownerUserId: string | null };
-  apiKeyUserId: string | undefined;
+  credential: RestCredentialPrincipal;
 }): string {
   if (!project.isPersonal || !project.ownerUserId) {
     throw new PersonalProjectKeyRequiredError();
   }
-  if (apiKeyUserId && apiKeyUserId !== project.ownerUserId) {
+  if (credential.kind === "legacyProjectKey") {
+    return project.ownerUserId;
+  }
+  if (credential.userId === null) {
+    throw new PersonalUsageServiceKeyUnsupportedError();
+  }
+  if (credential.userId !== project.ownerUserId) {
     throw new PersonalUsageKeyMismatchError();
   }
   return project.ownerUserId;

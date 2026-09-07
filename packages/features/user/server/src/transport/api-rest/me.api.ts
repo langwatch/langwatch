@@ -8,6 +8,7 @@ import {
   baseResponses,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
+  credentialPrincipalOf,
   resolvePersonalCaller,
 } from "@langwatch/api/rest";
 
@@ -152,13 +153,13 @@ export function createMeRestApp(options: {
     const project = c.get("project");
 
     // /api/me/usage is principal-scoped: it only makes sense for a personal
-    // workspace, whose owner identifies whose usage to roll up. Both guards
-    // and both refusals are shared with the coding agent's pull-request
-    // usage read, which needs a person for the same reason.
-    const ownerUserId = resolvePersonalCaller({
-      project,
-      apiKeyUserId: c.get("apiKeyUserId"),
-    });
+    // workspace, whose owner identifies whose usage to roll up. The guards and
+    // their refusals are shared with the coding agent's pull-request usage
+    // read, which needs a person for the same reason. It takes the whole
+    // credential because a service key arrives with no user too, and it must
+    // not be read as this workspace's own legacy key.
+    const credential = credentialPrincipalOf(c);
+    const ownerUserId = resolvePersonalCaller({ project, credential });
 
     const window =
       input.windowStartMs !== undefined && input.windowEndMs !== undefined
@@ -173,7 +174,7 @@ export function createMeRestApp(options: {
     // org never minted an ingestion source, in which case there is no ledger
     // traffic.
     const organizationId =
-      c.get("apiKeyOrganizationId") ??
+      (credential.kind === "apiKey" ? credential.organizationId : undefined) ??
       (await options.organizations().tryGetOrganizationIdByTeamId({ teamId: project.teamId }));
     const governanceProject = organizationId
       ? await options.projects().tryFindInternal({

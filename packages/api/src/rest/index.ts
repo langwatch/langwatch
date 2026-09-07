@@ -245,10 +245,18 @@ export {
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
 } from "./media-response.ts";
 
+// The credential a request arrived with, for a second permission question.
+export {
+  credentialPrincipalOf,
+  credentialPrincipalOfToken,
+  type RestCredentialPrincipal,
+} from "./credential-principal.ts";
+
 // Who is behind a personal-workspace key.
 export {
   PersonalProjectKeyRequiredError,
   PersonalUsageKeyMismatchError,
+  PersonalUsageServiceKeyUnsupportedError,
   resolvePersonalCaller,
 } from "./personal-caller.ts";
 

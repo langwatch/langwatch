@@ -6,6 +6,7 @@
  * Reaching it through the composition would put the composition's adapters,
  * repositories and byte stores into those programs too.
  */
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type {
   Protections,
   TraceLegacyFilterInput,
@@ -81,8 +82,13 @@ export abstract class ApiTraceReadStackPort {
   }): Promise<Protections | null>;
   /**
    * The redactions an API KEY reads through, for the public REST doors.
+   *
+   * The credential is part of the question: cost visibility is the key's own
+   * grant, not the reach of whoever created it.
    */
-  abstract getApiKeyProtections(input: Readonly<{ projectId: string }>): Promise<Protections>;
+  abstract getApiKeyProtections(
+    input: Readonly<{ projectId: string; credential: RestCredentialPrincipal }>,
+  ): Promise<Protections>;
   /** True when the read's trace no longer exists. */
   abstract isTraceNotFound(error: unknown): boolean;
 }

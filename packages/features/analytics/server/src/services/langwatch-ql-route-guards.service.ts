@@ -4,7 +4,7 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import type { PlatformUrlBuilder } from "@langwatch/api/rest";
+import type { PlatformUrlBuilder, RestCredentialPrincipal } from "@langwatch/api/rest";
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
@@ -108,8 +108,16 @@ export interface LangWatchQLRestPorts {
   charts: () => SavedWorkbenchChartRestService;
   /**
    * The caller's content protections for one project.
+   *
+   * The credential travels with the project because the two together are the
+   * question: what a key may see is its OWN cut, not its holder's, and a
+   * narrowed key answering with full project protections is how costs used to
+   * escape a key that holds no `cost:view`.
    */
-  protectionsFor: (input: { projectId: string }) => Promise<LangWatchQLProtections>;
+  protectionsFor: (input: {
+    projectId: string;
+    credential: RestCredentialPrincipal;
+  }) => Promise<LangWatchQLProtections>;
   /** Deep links back into the workbench, built from the deployment's origin. */
   platformUrl: PlatformUrlBuilder;
   /**

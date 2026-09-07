@@ -999,6 +999,27 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     Then the refusal carries a named code saying the key is for a different workspace
     And nothing in the refusal says whose workspace it is
 
+  # Whose data this is stays the personal-workspace question above. What the
+  # read REACHES is the credential's own cut: a key bound to fewer projects
+  # than its holder may read must not widen back out to the holder's access.
+  # Only a legacy project key, which carries no bindings of its own, is
+  # answered as the person.
+  @integration
+  Scenario: A narrowed personal-workspace key reads with its own scope, not its holder's
+    Given a personal-workspace key bound to fewer projects than its holder may view
+    When the pull request usage is read with that key
+    Then only the key's own projects are counted
+    And the projects its holder may otherwise view are absent
+
+  # A key created for no person is a service credential, not this workspace's
+  # own key, so it cannot be answered as the person who owns the workspace.
+  @integration
+  Scenario: An ownerless key on the personal rollup is refused rather than answered as the owner
+    Given a key for a personal workspace that belongs to no person
+    When the pull request usage is read with that key
+    Then the refusal carries a named code saying a service key cannot answer for a person
+    And no rollup is read
+
 # The question is organization-wide, so the v1 door authenticates at the
 # organization: an sk-lw organization key alone, with no project named
 # anywhere. The personal-workspace indirection on the legacy path existed only
