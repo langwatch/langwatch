@@ -1,3 +1,5 @@
+import { lintBoundarySignatureMirrors } from "./boundary-signature-mirrors.ts";
+import { lintEnterpriseSourceLicense } from "./enterprise-source-license.ts";
 import { relative, resolve } from "node:path";
 import { lintApplicationBoundaries } from "./application-boundaries.ts";
 import { lintApiTransportBoundaries } from "./api-transport-boundaries.ts";
@@ -156,6 +158,8 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
   const discovery = discoverClassifiedPackages(root);
   const violations = [
     ...discovery.violations,
+    ...lintBoundarySignatureMirrors(root),
+    ...lintEnterpriseSourceLicense(root),
     ...lintFeatureLayouts(root, discovery.packages),
     ...lintFeatureConfiguration(root, discovery.catalogue),
     ...lintFrontendUiBoundaries(root, discovery.packages),
