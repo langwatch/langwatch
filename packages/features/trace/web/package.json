@@ -153,6 +153,10 @@
     "./surfaces/annotation-queue-session": {
       "types": "./src/surfaces/annotation-queue-session/index.ts",
       "default": "./src/surfaces/annotation-queue-session/index.ts"
+    },
+    "./surfaces/conversation": {
+      "types": "./src/ui/sections/conversation/index.ts",
+      "default": "./src/ui/sections/conversation/index.ts"
     }
   },
   "scripts": {

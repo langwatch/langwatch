@@ -10,7 +10,6 @@ import {
   buildModelChangeValues,
   DEFAULT_SUPPORTED_PARAMETERS,
   getDisplayParameters,
-  getMaxTokenLimit,
   getParameterConfigWithModelOverrides,
   getParamValue,
   type LLMConfigValues,
@@ -18,6 +17,7 @@ import {
   ParameterRow,
   toFormKey,
 } from "../../../surfaces/llm-parameters/index.ts";
+import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";
 
 // Default output when structured outputs is disabled
 const DEFAULT_OUTPUT: Output = { identifier: "output", type: "str" };

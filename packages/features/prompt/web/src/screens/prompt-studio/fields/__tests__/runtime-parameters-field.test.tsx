@@ -6,8 +6,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { afterEach, describe, expect, it } from "vitest";
-import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form/index.ts";
 import { RuntimeParametersField } from "../runtime-parameters-field.tsx";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 function FormValueProbe() {
   const methods = useFormContext<PromptConfigFormValues>();

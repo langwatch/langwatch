@@ -1,5 +1,4 @@
 import { Box, HStack } from "@chakra-ui/react";
-import type { InputProps } from "@copilotkit/react-ui";
 import { useEffect, useRef, useState } from "react";
 import { useIsTabActive } from "../../../behavior/use-is-tab-active.ts";
 import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
@@ -21,18 +20,26 @@ import {
  * - Hover UI: Sync checkbox only visible on hover for clean interface
  * - Keyboard shortcuts: Enter to submit, Shift+Enter for new line
  */
-export function SyncedChatInput({
-  inProgress,
-  onSend,
-  isVisible = true,
-  onStop: _onStop,
-}: InputProps) {
+/** Matches Langy's composer, so the two read as the same control. */
+const COMPOSER_RADIUS = "18px";
+
+export interface ChatInputProps {
+  /** A run is in flight: the send button is held and Enter does nothing. */
+  inProgress: boolean;
+  onSend: (message: string) => void | Promise<void>;
+  /** Cancels the run in flight. */
+  onStop?: () => void;
+  isVisible?: boolean;
+}
+
+export function SyncedChatInput({ inProgress, onSend, isVisible = true, onStop }: ChatInputProps) {
   const { syncedInput, setSyncedInput, isSynced, setIsSynced, submitTrigger, triggerSubmit } =
     usePromptPlaygroundChatSync();
   const tabId = useTabId();
   const windowCount = useDraggableTabsBrowserStore((state) => state.windows.length);
   const [localInput, setLocalInput] = useState("");
   const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isTabActive = useIsTabActive();
   const lastProcessedTrigger = useRef<number>(
@@ -68,7 +75,7 @@ export function SyncedChatInput({
     if (!isTabActive) return;
 
     // Submit the message
-    void onSend(submitTrigger.message).catch((error) => {
+    void Promise.resolve(onSend(submitTrigger.message)).catch((error) => {
       console.error("Failed to send synced message:", error);
     });
   }, [submitTrigger, isSynced, onSend, isTabActive]);
@@ -106,9 +113,11 @@ export function SyncedChatInput({
    * Single Responsibility: Triggers send on Enter key (unless Shift held for new line).
    */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (!e.shiftKey || e.ctrlKey)) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      void handleSend();
+      // Enter is a no-op mid-run rather than a queue: the run in flight is the
+      // one the reader is watching, and nothing here can hold a second.
+      if (!inProgress) void handleSend();
     }
   };
 
@@ -122,49 +131,74 @@ export function SyncedChatInput({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* One integrated surface, the way Langy's composer reads: the field and
+          its action live inside a single rounded card that lights up on focus,
+          rather than a bordered box with a control floating over one corner. */}
+      {/* Focus is tracked on the CARD, not on the field. React's onFocus and
+          onBlur are focusin/focusout, so they fire for any descendant -- which
+          is what keeps the sync checkbox on screen while it holds keyboard
+          focus. Tracking the textarea alone hid the control the moment a
+          keyboard user tabbed onto it. `relatedTarget` is where focus is
+          going; still inside the card means the card is still focused. */}
       <Box
+        onFocus={() => setIsFocused(true)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setIsFocused(false);
+          }
+        }}
         position="relative"
-        borderRadius="xl"
-        border="1px solid"
-        borderColor="border.emphasized"
-        transition="box-shadow 0.2s"
+        borderRadius={COMPOSER_RADIUS}
+        borderWidth="1px"
+        borderStyle="solid"
+        borderColor={isFocused ? "orange.solid/60" : "border.emphasized"}
+        // A soft translucent halo rather than a second, solid ring. The opaque
+        // 4px band this replaced read as a thick brown border around the card
+        // instead of as focus.
+        boxShadow={
+          isFocused
+            ? "0 0 0 3px color-mix(in srgb, var(--chakra-colors-orange-solid) 16%, transparent)"
+            : undefined
+        }
+        transition="border-color 150ms ease, box-shadow 150ms ease"
         bg="bg.panel"
         width="full"
         maxWidth="768px"
         margin="0 auto"
+        overflow="hidden"
       >
-        <ChatTextArea
-          borderRadius="xl"
-          inProgress={inProgress}
-          value={currentInput}
-          onChange={(e) => setCurrentInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          ref={textareaRef}
-          data-tab-id={tabId}
-        />
-        <HStack width="full" justify="space-between" padding={2} position="relative">
-          {/* Bottom left - Sync checkbox (shows on hover, only if multiple windows/splits) */}
-          {windowCount > 1 && (
-            <ChatSyncCheckbox
-              position="absolute"
-              left="50%"
-              bottom={2}
-              transform="translateX(-50%)"
-              checked={isSynced}
-              onChange={setIsSynced}
-              visible={isHovered}
-            />
-          )}
-
-          {/* Right icon - Send button */}
+        {/* The field and the button are siblings on one row, bottom-aligned, so
+            the action stays beside the last line as the field grows. They were
+            previously an absolutely-positioned button over an empty flex row
+            that existed only to reserve the height it sat in. */}
+        <HStack gap={1.5} align="flex-end" paddingRight={2} paddingBottom={2}>
+          <ChatTextArea
+            inProgress={inProgress}
+            value={currentInput}
+            onChange={(e) => setCurrentInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            ref={textareaRef}
+            data-tab-id={tabId}
+          />
           <ChatSendButton
-            position="absolute"
-            right={2}
-            bottom={2}
-            disabled={inProgress || !currentInput.trim()}
+            inProgress={inProgress}
+            disabled={!inProgress && !currentInput.trim()}
             onSend={() => void handleSend()}
+            onStop={onStop}
           />
         </HStack>
+
+        {/* Only worth a row of its own when there is more than one window to
+            sync with; revealed on hover so the resting composer stays quiet. */}
+        {windowCount > 1 && (
+          <HStack justify="center" paddingBottom={2}>
+            <ChatSyncCheckbox
+              checked={isSynced}
+              onChange={setIsSynced}
+              visible={isHovered || isFocused}
+            />
+          </HStack>
+        )}
       </Box>
     </Box>
   );

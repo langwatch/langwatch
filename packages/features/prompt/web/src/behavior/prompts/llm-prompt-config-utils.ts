@@ -11,12 +11,7 @@ import {
   PromptScope,
   type Signature,
 } from "@langwatch/workflow-contract";
-import {
-  inputsAndOutputsToDemostrationColumns,
-  type PromptConfigFormValues,
-  versionMetadataToFormFormat,
-  versionMetadataToNodeFormat,
-} from "../../surfaces/prompt-form/index.ts";
+import { inputsAndOutputsToDemostrationColumns } from "../../surfaces/prompt-form/index.ts";
 import type { SaveVersionParams } from "../../model/prompts/providers/types.ts";
 import {
   type LlmConfigInputType,
@@ -27,7 +22,12 @@ import {
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { kebabCase } from "@langwatch/design-system/string-casing";
 
-import { generateUniqueIdentifier } from "@langwatch/prompt-contract";
+import {
+  generateUniqueIdentifier,
+  type PromptConfigFormValues,
+  versionMetadataToFormFormat,
+  versionMetadataToNodeFormat,
+} from "@langwatch/prompt-contract";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues,

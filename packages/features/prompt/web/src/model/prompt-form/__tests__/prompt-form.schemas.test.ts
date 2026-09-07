@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_FORM_VALUES } from "../default-form-values.ts";
-import { formSchemaForSave } from "../prompt-form.schemas.ts";
+import { formSchemaForSave } from "@langwatch/prompt-contract";
 
 describe("formSchemaForSave — system prompt required refinement (Issue #3196)", () => {
   function valuesWithMessages(

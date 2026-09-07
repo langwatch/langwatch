@@ -1,7 +1,7 @@
 import type { WireVersionedPrompt } from "../wire-versioned-prompt.ts";
 
 import { buildDefaultFormValues } from "./default-form-values.ts";
-import type { PromptConfigFormValues } from "./prompt-form.schemas.ts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import {
   versionedPromptToPromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,

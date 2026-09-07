@@ -161,6 +161,10 @@
     "./surfaces/studio-drawer-footer": {
       "types": "./src/surfaces/studio-drawer-footer/index.ts",
       "default": "./src/surfaces/studio-drawer-footer/index.ts"
+    },
+    "./surfaces/evaluate-api-snippet": {
+      "types": "./src/model/evaluate-api-snippet.ts",
+      "default": "./src/model/evaluate-api-snippet.ts"
     }
   },
   "scripts": {

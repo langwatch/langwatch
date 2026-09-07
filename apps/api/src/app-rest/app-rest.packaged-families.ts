@@ -74,15 +74,11 @@ import type {
   ScenarioTabRegistry,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import type {
-  InlineMediaExtraction,
-  ScenarioRunPlatformUrlBuilder,
-} from "@langwatch/scenario-server";
-import {
-  createScenarioEventsRestApp,
-  createScenariosRestApp,
-  createSimulationRunsRestApp,
-} from "@langwatch/scenario-server";
+import type { InlineMediaExtraction } from "@langwatch/scenario-server/api-rest/scenario-event";
+import type { ScenarioRunPlatformUrlBuilder } from "@langwatch/scenario-server/api-rest/simulation-run";
+import { createScenarioEventsRestApp } from "@langwatch/scenario-server/api-rest/scenario-event";
+import { createScenariosRestApp } from "@langwatch/scenario-server/api-rest/scenario";
+import { createSimulationRunsRestApp } from "@langwatch/scenario-server/api-rest/simulation-run";
 import type { SecretApp } from "@langwatch/secret-server";
 import type {
   FilesProjectPermissionCheck,
@@ -96,7 +92,10 @@ import {
   createSuiteRestApp,
   createTestSuitesV1RestApp,
 } from "@langwatch/suite-server";
-import { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
+import {
+  createEventsRestApp,
+  type TrackedEventPorts,
+} from "@langwatch/trace-server/api-rest/tracked-event";
 import {
   createMeRestApp,
   createUserAvatarRestApp,
@@ -327,7 +326,6 @@ export type ApiPackagedRestFamilyName =
   | "triggers"
   | "user-avatar"
   | "tracked-events"
-  | "copilotkit"
   | "webhooks"
   | "workflows";
 
@@ -779,11 +777,6 @@ export function mountApiPackagedRestFamilies(options: {
           })
       : null,
   );
-
-  // The one family this process cannot build at all, named here rather than
-  // silently missing: `/api/copilotkit` dispatches through an adapter that
-  // reaches the retired studio's runtime.
-  report?.absent("copilotkit");
 
   return features;
 }

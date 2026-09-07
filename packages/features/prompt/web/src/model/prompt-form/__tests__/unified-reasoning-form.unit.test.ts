@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
 import { buildDefaultFormValues } from "../default-form-values.ts";
-import { formSchema } from "../prompt-form.schemas.ts";
+import { formSchema } from "@langwatch/prompt-contract";
 
 describe("formValuesToTriggerSaveVersionParams", () => {
   describe("when form values include reasoning", () => {

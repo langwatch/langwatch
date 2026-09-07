@@ -4,10 +4,10 @@ import { useFormContext } from "react-hook-form";
 
 import { GenerateApiSnippetButton } from "@langwatch/design-system/generate-api-snippet-button";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/surfaces/studio-scope";
-import type { PromptConfigFormValues } from "../../../surfaces/prompt-form/index.ts";
 import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
 import { SavePromptButton } from "./save-prompt-button.tsx";
 import { VersionHistoryButton } from "../../elements/prompts/forms/prompt-config-form/version-history-button.tsx";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 export type PromptEditorFooterProps = {
   /** Callback when save button is clicked */

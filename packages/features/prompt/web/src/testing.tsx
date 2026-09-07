@@ -75,6 +75,7 @@ export class FakePromptHost extends PromptHostPort {
       storage?: PromptBrowserStorage;
       reportedGlobally?: boolean;
       playgroundChat?: PromptPlaygroundChatAvailability;
+      currentUserName?: string | null;
     } = {},
   ) {
     super();
@@ -103,6 +104,10 @@ export class FakePromptHost extends PromptHostPort {
     return (
       this.options.grants ?? new Set(["prompts:view", "prompts:create", "evaluations:manage"])
     ).has(permission);
+  }
+
+  currentUserName(): string | null | undefined {
+    return this.options.currentUserName ?? "Test Reader";
   }
 
   route(): PromptRouteReading {

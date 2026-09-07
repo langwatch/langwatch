@@ -2,14 +2,12 @@ import type { WireVersionedPrompt } from "../../../../model/wire-versioned-promp
 import { Box } from "@chakra-ui/react";
 import { useTabId } from "../../studio-internals.ts";
 import { useFormContext } from "react-hook-form";
-import {
-  type PromptConfigFormValues,
-  versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "../../../../surfaces/prompt-form/index.ts";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../../surfaces/prompt-form/index.ts";
 import { PromptEditorHeader } from "../../prompt-editor-header.tsx";
 import { useHandleSavePrompt } from "../../../../behavior/use-handle-save-prompt.ts";
 import { useHasUnsavedChanges } from "../../../../behavior/use-has-unsaved-changes.ts";
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * Header bar for the prompt browser with handle, model selector, and action buttons.

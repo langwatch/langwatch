@@ -7,10 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DeepPartial, FormProvider } from "react-hook-form";
 import { usePromptConfigForm } from "../../../../behavior/use-prompt-config-form.ts";
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
-import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form/index.ts";
 import { PromptBrowserHeader } from "./prompt-browser-header.tsx";
 import { PromptMessagesEditor } from "./prompt-messages-editor.tsx";
 import { PromptTabbedSection } from "./prompt-tabbed-section.tsx";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /** Height of tabs header (32px) + divider (16px) + minimum chat area (200px) */
 const TABS_AND_DIVIDER_HEIGHT = 48;

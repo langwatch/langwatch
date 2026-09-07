@@ -26,11 +26,28 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
         placeholder="Type your message here. Shift+Enter for new line."
         resize="none"
         rows={1}
-        minHeight="60px"
-        maxHeight="300px"
+        // Tall enough to read as somewhere you write a message rather than a
+        // search field, and it grows from there. The height is the field's own
+        // now — what used to make the box look empty was an absolutely
+        // positioned button sitting in a flex row below it that held nothing.
+        minHeight="72px"
+        maxHeight="240px"
         autoresize
+        flex={1}
+        minWidth={0}
+        paddingX={3}
+        paddingTop={3}
+        paddingBottom={1}
+        fontSize="sm"
+        lineHeight="1.5"
         border="none"
-        outline="none"
+        background="transparent"
+        // Block, not the default inline-block: the baseline descender under an
+        // inline-block textarea is a phantom few pixels of gap beneath the text.
+        display="block"
+        _focus={{ outline: "none", boxShadow: "none" }}
+        // The ring belongs to the card around it, not to the field.
+        _focusVisible={{ outline: "none", boxShadow: "none" }}
       />
     );
   },

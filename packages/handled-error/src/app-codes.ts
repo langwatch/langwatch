@@ -94,6 +94,7 @@ export const APP_ERROR_CODES = [
   "codex_auth_failed",
   "contested_credentials",
   "credential_class_mismatch",
+  "cross_origin_refused",
   "custom_role_id_required",
   "custom_role_in_use",
   "custom_role_name_reserved",

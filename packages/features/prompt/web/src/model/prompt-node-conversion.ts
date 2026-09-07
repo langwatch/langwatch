@@ -2,7 +2,12 @@ import type { WireVersionedPrompt } from "./wire-versioned-prompt.ts";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
-import { PromptScope } from "@langwatch/prompt-contract";
+import {
+  PromptScope,
+  type PromptConfigFormValues,
+  versionMetadataToFormFormat,
+  versionMetadataToNodeFormat,
+} from "@langwatch/prompt-contract";
 import type {
   Component,
   LLMConfig,
@@ -11,12 +16,7 @@ import type {
   NodeDataset,
   Signature,
 } from "@langwatch/workflow-contract";
-import {
-  inputsAndOutputsToDemostrationColumns,
-  type PromptConfigFormValues,
-  versionMetadataToFormFormat,
-  versionMetadataToNodeFormat,
-} from "./prompt-form/index.ts";
+import { inputsAndOutputsToDemostrationColumns } from "./prompt-form/index.ts";
 import type { SaveVersionParams } from "./prompt-config-operations.ts";
 import {
   type LlmConfigInputType,

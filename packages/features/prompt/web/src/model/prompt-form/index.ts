@@ -1,16 +1,3 @@
-export {
-  formSchema,
-  formSchemaForSave,
-  hasNonEmptySystemMessage,
-  refinedFormSchemaWithModelLimits,
-  type PromptConfigFormValues,
-} from "./prompt-form.schemas.ts";
-export {
-  versionMetadataSchema,
-  versionMetadataToFormFormat,
-  versionMetadataToNodeFormat,
-  type VersionMetadata,
-} from "./version-metadata.schemas.ts";
 export { buildDefaultFormValues, DEFAULT_FORM_VALUES } from "./default-form-values.ts";
 export { areFormValuesEqual } from "./are-form-values-equal.ts";
 export { getSaveBlockerMessage } from "./save-blocker-message.ts";

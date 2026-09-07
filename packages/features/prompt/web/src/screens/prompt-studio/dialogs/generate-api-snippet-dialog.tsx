@@ -4,7 +4,7 @@ import React, { createContext, useContext, useMemo, useState } from "react";
 
 import type { Snippet, Target } from "../../../surfaces/api-snippet/index.ts";
 import { uppercaseFirstLetter } from "../../../model/string-casing.ts";
-import { RenderCode } from "../../../ui/blocks/render-code.tsx";
+import { CodePreview } from "@langwatch/onboarding-web/surfaces/code-preview";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
@@ -49,9 +49,21 @@ interface GenerateApiSnippetProps {
   tabs?: ApiSnippetTab[];
   /**
    * Optional extra controls rendered under the header (for example a data-source
-   * picker). Only rendered when `tabs` is provided.
+   * picker, or a route to create an API key when the snippet has none).
    */
   controls?: React.ReactNode;
+  /**
+   * A credential the snippet carries. It is masked until the reader reveals it,
+   * and the copy button always writes the unmasked snippet so a copy is never a
+   * credential that fails only once it is pasted.
+   */
+  sensitiveValue?: string;
+  /**
+   * Hides the copy button. Set it when the snippet still carries a placeholder
+   * the reader has to replace, so copying it would only produce a call that
+   * silently fails.
+   */
+  copyDisabled?: boolean;
   /**
    * Controlled open state. When provided, the caller owns opening and closing
    * the dialog (for example a menu item that closes its own popover as it opens
@@ -80,6 +92,8 @@ export function GenerateApiSnippetDialog({
   children,
   tabs,
   controls,
+  sensitiveValue,
+  copyDisabled = false,
   open: openProp,
   onOpenChange,
 }: GenerateApiSnippetProps) {
@@ -117,6 +131,12 @@ export function GenerateApiSnippetDialog({
     ? (tabs.find((tab) => tab.value === selectedTab) ?? tabs[0])
     : undefined;
 
+  const code = useTabs ? (activeTab?.content ?? "") : (selectedSnippet?.content ?? "");
+  const language = useTabs
+    ? (activeTab?.language ?? "bash")
+    : SnippetTargetToLanguageMap[selectedTarget];
+  const codeFilename = fileNameForLanguage(language);
+
   if (!useTabs && !selectedSnippet) {
     return null;
   }
@@ -124,16 +144,34 @@ export function GenerateApiSnippetDialog({
   return (
     <ApiSnippetDialogContext.Provider value={{ open, onOpen: handleOpen, onClose }}>
       {children}
-      <Dialog.Root open={open} onOpenChange={({ open }) => (open ? onOpen() : onClose())} size="xl">
-        <Dialog.Content bg="bg">
+      <Dialog.Root open={open} onOpenChange={({ open }) => (open ? onOpen() : onClose())} size="lg">
+        <Dialog.Content
+          // Match the site's dialog surface. The shared Dialog wrapper keeps
+          // the backdrop transparent and blurred; `bg.panel` made this one
+          // modal look like a different application floating above it.
+          bg="bg"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="lg"
+          boxShadow="lg"
+          width={{ base: "calc(100vw - 24px)", md: "calc(100vw - 48px)" }}
+          maxWidth="960px"
+          maxHeight="calc(100dvh - 48px)"
+          overflow="hidden"
+        >
           <Dialog.CloseTrigger />
-          <Dialog.Header width="100%" marginTop={4}>
+          {/* One spacing scale throughout. The header carries the title alone
+              and leaves the close button its own corner, so the language picker
+              sits on the row below rather than being pushed out of line by it. */}
+          <Dialog.Header paddingX={5} paddingTop={5} paddingBottom={2} paddingRight={12}>
+            <VStack alignItems="flex-start" gap={1} width="100%">
+              <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
+              {description ? <Dialog.Description>{description}</Dialog.Description> : null}
+            </VStack>
+          </Dialog.Header>
+          <Dialog.Body paddingX={5} paddingTop={1} paddingBottom={5} overflowY="auto" minHeight={0}>
             <VStack alignItems="stretch" gap={3} width="100%">
-              <HStack justifyContent="space-between" width="100%" alignItems="flex-start">
-                <VStack alignItems="flex-start" gap={2}>
-                  <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
-                  <Dialog.Description>{description}</Dialog.Description>
-                </VStack>
+              <HStack alignItems="center" gap={3} width="100%">
                 {useTabs ? (
                   <SegmentedControl
                     size="sm"
@@ -154,28 +192,26 @@ export function GenerateApiSnippetDialog({
                   />
                 )}
               </HStack>
-              {useTabs && controls ? <HStack>{controls}</HStack> : null}
+              {controls ? (
+                <HStack alignItems="center" gap={3} width="100%">
+                  {controls}
+                </HStack>
+              ) : null}
+              <CodePreview
+                code={code}
+                filename={codeFilename}
+                codeLanguage={language}
+                languageIconUrl={languageIconFor(language)}
+                sensitiveValue={sensitiveValue}
+                enableVisibilityToggle={!!sensitiveValue}
+                // Always the unmasked snippet: the copy button would otherwise
+                // hand over the masked key, which fails only once it is pasted.
+                copyText={code}
+                disableActions={copyDisabled}
+                maxHeight="min(460px, 58dvh)"
+              />
             </VStack>
-          </Dialog.Header>
-          <Dialog.Body>
-            <RenderCode
-              code={useTabs ? (activeTab?.content ?? "") : (selectedSnippet?.content ?? "")}
-              language={
-                useTabs
-                  ? (activeTab?.language ?? "bash")
-                  : SnippetTargetToLanguageMap[selectedTarget]
-              }
-              style={{
-                fontSize: "12px",
-                lineHeight: "1.5",
-                fontFamily: "monospace",
-                whiteSpace: "pre-wrap",
-                padding: "20px",
-                borderRadius: "5px",
-              }}
-            />
           </Dialog.Body>
-          <Dialog.Footer></Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
     </ApiSnippetDialogContext.Provider>
@@ -230,7 +266,22 @@ const LanguageMenu = React.memo(function LanguageMenu({
   );
 });
 
+/**
+ * What each target is called in the picker. The target id names the transport
+ * ("node", "shell"), which is not what the reader is choosing between: they
+ * are picking a language, and the name of the tool they will run.
+ */
+const TARGET_LABELS: Partial<Record<Target, string>> = {
+  python_python3: "Python",
+  python_requests: "Python",
+  node_native: "TypeScript",
+  go_native: "Go",
+  shell_curl: "cURL",
+};
+
 function formatTarget(target: Target) {
+  const label = TARGET_LABELS[target];
+  if (label) return label;
   const [language, framework] = target.split("_");
   if (!language || !framework) return target;
   return `${uppercaseFirstLetter(language)}`;
@@ -252,7 +303,7 @@ const SnippetTargetToLanguageMap: Record<Target, string> = {
   java_unirest: "bash",
   javascript_jquery: "javascript",
   javascript_xhr: "javascript",
-  node_native: "javascript",
+  node_native: "typescript",
   node_request: "javascript",
   node_unirest: "javascript",
   objc_nsurlsession: "bash",
@@ -268,3 +319,44 @@ const SnippetTargetToLanguageMap: Record<Target, string> = {
   shell_wget: "bash",
   swift_nsurlsession: "bash",
 } as const;
+
+/**
+ * The file name shown on the code block. A file name reads like a code block
+ * header and, unlike the language name, does not repeat what the picker beside
+ * it already says.
+ */
+function fileNameForLanguage(language: string): string {
+  switch (language) {
+    case "python":
+      return "example.py";
+    case "typescript":
+      return "example.ts";
+    case "javascript":
+      return "example.js";
+    case "go":
+      return "main.go";
+    case "bash":
+    case "shellscript":
+      return "example.sh";
+    default:
+      return "snippet";
+  }
+}
+
+/**
+ * Language mark shown in the code block's title bar. A language we carry no
+ * mark for goes without one — borrowing a neighbouring language's logo tells
+ * the reader they are looking at a snippet they are not.
+ */
+function languageIconFor(language: string): string | undefined {
+  switch (language) {
+    case "python":
+      return "/images/external-icons/python.svg";
+    case "typescript":
+      return "/images/external-icons/typescript.svg";
+    case "go":
+      return "/images/external-icons/golang.svg";
+    default:
+      return undefined;
+  }
+}

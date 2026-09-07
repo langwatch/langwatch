@@ -46,5 +46,4 @@ export {
   PromptPlaygroundChatProvider,
   usePromptPlaygroundChatSync,
 } from "../../model/prompt-chat-sync-context.tsx";
-export { DeletableMessage } from "./deletable-message.tsx";
 export { ResizableDivider, type ResizableDividerProps } from "./resizable-divider.tsx";

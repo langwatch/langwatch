@@ -5,7 +5,6 @@ import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import {
   getSaveBlockerMessage,
-  type PromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../model/prompt-form/index.ts";
 import { useLatestPromptVersion } from "./use-latest-prompt-version.ts";
@@ -15,6 +14,7 @@ import { promptApi } from "./prompt-api.ts";
 import { useTabId } from "../model/prompt-tab-context.tsx";
 import type { TabData } from "../model/prompt-tabs-store.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * Hook to handle the saving of a prompt in the prompt studio: orchestrates

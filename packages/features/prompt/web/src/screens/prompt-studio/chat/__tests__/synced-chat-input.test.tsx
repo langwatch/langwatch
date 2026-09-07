@@ -219,16 +219,17 @@ describe("SyncedChatInput", () => {
       expect(buttons.length).toBeGreaterThan(0);
     });
 
-    it("disables send button when inProgress", () => {
+    it("offers to stop the run while one is in progress", () => {
       store.getState().addTab({ data: createTabData() });
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
 
       renderSyncedChatInput({ tabId: tabId!, inProgress: true });
 
-      // Find the button (there's only one button when no checkbox)
-      const buttons = screen.getAllByRole("button");
-      const sendButton = buttons.find((btn) => btn.getAttribute("type") === "button");
-      expect(sendButton).toBeDisabled();
+      // A run in flight is interruptible, so the same control stops it rather
+      // than going dead until the run ends.
+      const stopButton = screen.getByRole("button", { name: "Stop generating" });
+      expect(stopButton).toBeEnabled();
+      expect(screen.queryByRole("button", { name: "Send message" })).toBeNull();
     });
   });
 });

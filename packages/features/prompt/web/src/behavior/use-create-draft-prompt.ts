@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { getMaxTokenLimit } from "../model/token-limits.ts";
+import { getMaxTokenLimit } from "../model/max-token-limit.ts";
 import { useModelProvidersSettings } from "./use-model-providers-settings.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
 import { buildDefaultFormValues } from "../model/prompt-form/index.ts";

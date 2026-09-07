@@ -13,13 +13,13 @@ import {
   PromptTextAreaWithVariables,
 } from "../../../surfaces/variables/prompt-textarea/index.ts";
 import type { AvailableSource, Variable } from "../../../surfaces/variables/index.ts";
-import type { PromptConfigFormValues } from "../../../surfaces/prompt-form/index.ts";
 import { useLayoutMode } from "../../../model/layout-mode.ts";
 import {
   EditingModeTitle,
   getDefaultEditingMode,
   type PromptEditingMode,
 } from "./editing-mode-title.tsx";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 // Re-export for backwards compatibility
 export type { PromptEditingMode } from "./editing-mode-title.tsx";

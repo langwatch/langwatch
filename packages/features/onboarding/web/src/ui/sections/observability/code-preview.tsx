@@ -70,6 +70,23 @@ interface CodePreviewProps {
    * surface (banner / panel) instead.
    */
   disableActions?: boolean;
+  /** Caps tall snippets while keeping the code header and actions visible. */
+  maxHeight?: string;
+}
+
+/**
+ * A capped block scrolls its own body, so it becomes a column and the header
+ * stays put at the top of it. Without a cap the block grows to its content and
+ * none of this applies.
+ */
+function boundedHeightProps(maxHeight: string | number | undefined) {
+  if (!maxHeight) return {};
+  return { maxHeight, display: "flex", flexDirection: "column" } as const;
+}
+
+function stickyHeaderProps(maxHeight: string | number | undefined) {
+  if (!maxHeight) return {};
+  return { flexShrink: 0 } as const;
 }
 
 export function CodePreview({
@@ -85,6 +102,7 @@ export function CodePreview({
   llmPrompt,
   copyText,
   disableActions,
+  maxHeight,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const [internalIsVisible, setInternalIsVisible] = useState(false);
@@ -96,7 +114,18 @@ export function CodePreview({
       async load() {
         const { createHighlighter } = await import("shiki");
         return createHighlighter({
-          langs: ["typescript", "python", "go", "yaml", "bash", "json", "ini", "shellscript"],
+          langs: [
+            "typescript",
+            "javascript",
+            "python",
+            "go",
+            "php",
+            "yaml",
+            "bash",
+            "json",
+            "ini",
+            "shellscript",
+          ],
           themes: ["github-dark", "github-light"],
         });
       },
@@ -157,9 +186,15 @@ export function CodePreview({
             bg="bg.panel/60"
             backdropFilter="blur(20px) saturate(1.3)"
             boxShadow="0 4px 30px rgba(0,0,0,0.06)"
+            {...boundedHeightProps(maxHeight)}
             overflow="hidden"
           >
-            <CodeBlock.Header display="flex" justifyContent="space-between" borderColor="gray.200">
+            <CodeBlock.Header
+              display="flex"
+              justifyContent="space-between"
+              borderColor="gray.200"
+              {...stickyHeaderProps(maxHeight)}
+            >
               <CodeBlock.Title fontSize="xs" pt={2}>
                 {languageIconUrl ? (
                   <Icon size="xs">
@@ -215,7 +250,8 @@ export function CodePreview({
                   transition: "background-color 0.3s ease, color 0.3s ease",
                 },
               }}
-              overflow="scroll"
+              overflow={maxHeight ? "auto" : "scroll"}
+              minHeight={maxHeight ? 0 : undefined}
             >
               <CodeBlock.Code>
                 <CodeBlock.CodeText />

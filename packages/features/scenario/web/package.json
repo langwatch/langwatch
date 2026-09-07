@@ -38,7 +38,6 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
-    "@copilotkit/runtime-client-gql": "1.8.13",
     "@emotion/react": "^11.14.0",
     "@hookform/resolvers": "^5.4.0",
     "@langwatch/agent-contract": "workspace:*",

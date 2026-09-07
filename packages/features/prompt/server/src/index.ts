@@ -33,3 +33,9 @@ export {
   type PromptRestService,
   type PromptTagCatalogAuthorization,
 } from "./transport/api-rest/prompt.api.ts";
+export {
+  createPromptExecuteRestApp,
+  CrossOriginRefusedError,
+  type PromptExecuteRestPorts,
+  type PromptExecuteRestSession,
+} from "./transport/api-rest/prompt-execute.api.ts";

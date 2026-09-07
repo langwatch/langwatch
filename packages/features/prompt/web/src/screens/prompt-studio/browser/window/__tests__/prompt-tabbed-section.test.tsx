@@ -8,9 +8,9 @@ import { Profiler } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Variable, VariablesSection } from "../../../../../surfaces/variables/index.ts";
-import type { PromptConfigFormValues } from "../../../../../surfaces/prompt-form/index.ts";
 import {
   clearStoreInstances,
+  PromptPlaygroundChatProvider,
   getStoreForTesting,
   type PromptTabsCapabilities,
   type TabData,
@@ -18,6 +18,7 @@ import {
 import { PromptTabbedSection } from "../prompt-tabbed-section.tsx";
 import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
 import { FakePromptHost } from "../../../../../testing.tsx";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * One host for the whole file: nothing here asserts on what the screen asked the
@@ -407,23 +408,32 @@ vi.mock("../../../studio-internals.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../studio-internals.ts")>()),
   useTabId: () => tabIdRef.current,
 }));
-
-// Mock CopilotKit
-vi.mock("@copilotkit/react-core", () => ({
-  CopilotKit: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useCopilotChat: () => ({
-    visibleMessages: [],
-    appendMessage: vi.fn(),
-    setMessages: vi.fn(),
-    isLoading: false,
-  }),
-  useCopilotContext: () => ({
-    chatComponentsCache: { current: {} },
-  }),
+// The chat input reads the tab id from the context module directly, so the
+// aggregator mock above does not reach it.
+vi.mock("../../../../../model/prompt-tab-context.tsx", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../../model/prompt-tab-context.tsx")>()),
+  useTabId: () => tabIdRef.current,
 }));
 
-vi.mock("@copilotkit/react-ui", () => ({
-  CopilotChat: () => <div data-testid="copilot-chat">CopilotChat</div>,
+// The chat input follows which tab is active; that subscription is its own
+// concern, so it is stubbed here to keep this file about the tab layout.
+vi.mock("../../../../../behavior/use-is-tab-active.ts", () => ({
+  useIsTabActive: () => true,
+}));
+
+// The conversation pane posts to the playground execution endpoint; stub the
+// hook so this test stays about the tab layout.
+vi.mock("../../../../../behavior/playground/use-prompt-execution.ts", () => ({
+  usePromptExecution: () => ({
+    messages: [],
+    errors: {},
+    isRunning: false,
+    send: vi.fn(),
+    stop: vi.fn(),
+    reset: vi.fn(),
+    deleteMessage: vi.fn(),
+    setMessages: vi.fn(),
+  }),
 }));
 
 /**
@@ -470,9 +480,11 @@ const renderPromptTabbedSection = (
   return render(
     <ChakraProvider value={defaultSystem}>
       <PromptHostProvider value={host}>
-        <FormWrapper defaultValues={formValues}>
-          <PromptTabbedSection {...defaultProps} />
-        </FormWrapper>
+        <PromptPlaygroundChatProvider>
+          <FormWrapper defaultValues={formValues}>
+            <PromptTabbedSection {...defaultProps} />
+          </FormWrapper>
+        </PromptPlaygroundChatProvider>
       </PromptHostProvider>
     </ChakraProvider>,
   );
@@ -610,22 +622,24 @@ describe("PromptTabbedSection Layout Modes", () => {
       render(
         <ChakraProvider value={defaultSystem}>
           <PromptHostProvider value={testHost}>
-            <FormWrapper>
-              <Profiler
-                id="PromptTabbedSection"
-                onRender={() => {
-                  renderCount += 1;
-                }}
-              >
-                <PromptTabbedSection
-                  layoutMode="vertical"
-                  isPromptExpanded={true}
-                  onPositionChange={vi.fn()}
-                  onDragEnd={vi.fn()}
-                  onToggle={vi.fn()}
-                />
-              </Profiler>
-            </FormWrapper>
+            <PromptPlaygroundChatProvider>
+              <FormWrapper>
+                <Profiler
+                  id="PromptTabbedSection"
+                  onRender={() => {
+                    renderCount += 1;
+                  }}
+                >
+                  <PromptTabbedSection
+                    layoutMode="vertical"
+                    isPromptExpanded={true}
+                    onPositionChange={vi.fn()}
+                    onDragEnd={vi.fn()}
+                    onToggle={vi.fn()}
+                  />
+                </Profiler>
+              </FormWrapper>
+            </PromptPlaygroundChatProvider>
           </PromptHostProvider>
         </ChakraProvider>,
       );
@@ -667,7 +681,9 @@ describe("PromptTabbedSection Layout Modes", () => {
 
       await user.click(screen.getByRole("tab", { name: /variables/i }));
       const textboxes = await screen.findAllByRole("textbox");
-      const valueInput = textboxes.find((el) => (el as HTMLInputElement).value === "");
+      const valueInput = textboxes.find(
+        (el) => el.tagName === "INPUT" && (el as HTMLInputElement).value === "",
+      );
       expect(valueInput).toBeDefined();
       await user.type(valueInput!, "flushed");
 
@@ -702,7 +718,7 @@ describe("PromptTabbedSection Layout Modes", () => {
       const first = renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
       await user.click(screen.getByRole("tab", { name: /variables/i }));
       const emptyInput = (await screen.findAllByRole("textbox")).find(
-        (el) => (el as HTMLInputElement).value === "",
+        (el) => el.tagName === "INPUT" && (el as HTMLInputElement).value === "",
       );
       await user.type(emptyInput!, "kept");
       first.unmount();
@@ -712,7 +728,7 @@ describe("PromptTabbedSection Layout Modes", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
       await user.click(screen.getByRole("tab", { name: /variables/i }));
       const restored = (await screen.findAllByRole("textbox")).find(
-        (el) => (el as HTMLInputElement).value === "kept",
+        (el) => el.tagName === "INPUT" && (el as HTMLInputElement).value === "kept",
       );
       expect(restored).toBeDefined();
     });
@@ -754,7 +770,7 @@ describe("given a deployment that runs no playground chat", () => {
       expect(
         screen.getByText("This deployment doesn't run the chat playground."),
       ).toBeInTheDocument();
-      expect(screen.queryByTestId("copilot-chat")).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText(/type your message here/i)).not.toBeInTheDocument();
     });
 
     /** @scenario "An absent chat runtime offers nothing to reset" */
@@ -770,7 +786,7 @@ describe("given a deployment that runs no playground chat", () => {
     it("mounts the chat as before", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" });
 
-      expect(screen.getByTestId("copilot-chat")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/type your message here/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
     });
   });

@@ -1,6 +1,6 @@
 import type { UseFormReturn } from "react-hook-form";
 
-import type { PromptConfigFormValues } from "./prompt-form.schemas.ts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * Picks the most relevant user-facing message to surface in the

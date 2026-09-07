@@ -23,12 +23,12 @@ import type { Logger } from "@langwatch/observability";
 import { SecretApp, type SecretEncryptionPort } from "@langwatch/secret-server";
 import type { SecretService } from "@langwatch/secret-contract";
 import type { StoredObjectsService } from "@langwatch/stored-object-server";
-import {
-  TraceMediaStorePort,
-  type CollectorProject,
-  type CollectorUsageLimitPort,
-  type TrackedEventPorts,
-} from "@langwatch/trace-server";
+import { TraceMediaStorePort } from "@langwatch/trace-server";
+import type {
+  CollectorProject,
+  CollectorUsageLimitPort,
+} from "@langwatch/trace-server/api-rest/collector";
+import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
 import type { WorkflowEvaluationOutcome } from "@langwatch/workflow-server";
 import type { MiddlewareHandler } from "hono";
 
@@ -65,7 +65,10 @@ import { canonicalErrorFor } from "./api-canonical-error.ts";
 import { composeApiWebhookApplication } from "../features/enterprise/enterprise-webhook.composition.ts";
 import { orgRequestLedgerActor } from "./api-ledger-actor.ts";
 import { createApiDualCredentialAuth } from "./api-dual-credential-auth.ts";
-import { ApiRestCapabilityUnavailableError, createOrganizationMiddleware } from "./api-rest-ports.ts";
+import {
+  ApiRestCapabilityUnavailableError,
+  createOrganizationMiddleware,
+} from "./api-rest-ports.ts";
 import type {
   ApiPackagedRestCollaborators,
   ApiPackagedRestFamilyName,
@@ -480,6 +483,4 @@ const CONSEQUENCE: Partial<Record<ApiPackagedRestFamilyName, string>> = {
     "API process serves no /api/user-avatar: it composed no stored-object read, or no dual-credential verifier for the browser to load an image with. Every member list, annotation and presence bar falls back to initials rather than the photo a person uploaded.",
   "tracked-events":
     "API process serves neither /api/events/track nor /api/track_event: recording a feedback event needs the trace command queue this process did not register, and a door mounted without one would answer 200 to a rating it then dropped.",
-  copilotkit:
-    "API process serves no /api/copilotkit: the prompt-studio adapter it dispatches through reaches the retired studio post-event module, the platform Lambda runtime and a browser package, none of which a server composition may hold.",
 };

@@ -8,7 +8,6 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type Variable, VariablesSection } from "../../../../surfaces/variables/index.ts";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { RuntimeParametersField } from "../../fields/runtime-parameters-field.tsx";
-import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form/index.ts";
 import type { LlmConfigInputType } from "@langwatch/prompt-contract";
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import {
@@ -19,6 +18,7 @@ import { PromptPlaygroundChatUnavailable } from "../../chat/prompt-playground-ch
 import { usePromptHost } from "../../../../model/prompt-host.ts";
 import { DemonstrationsTabContent } from "./demonstrations-tab-content.tsx";
 import type { LayoutMode } from "../../../../model/layout-mode.ts";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /** The default "input" variable is locked - cannot be removed or renamed */
 const LOCKED_VARIABLES = new Set(["input"]);

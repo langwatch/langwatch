@@ -5,13 +5,15 @@ import { type DeepPartial, useForm } from "react-hook-form";
 import { useModelLimits } from "./use-model-limits.ts";
 import {
   buildDefaultFormValues,
-  formSchema,
-  formSchemaForSave,
   inputsAndOutputsToDemostrationColumns,
-  type PromptConfigFormValues,
-  refinedFormSchemaWithModelLimits,
 } from "../model/prompt-form/index.ts";
 import { salvageValidData } from "../model/zod-salvage.ts";
+import {
+  formSchema,
+  formSchemaForSave,
+  type PromptConfigFormValues,
+  refinedFormSchemaWithModelLimits,
+} from "@langwatch/prompt-contract";
 
 interface UsePromptConfigFormProps {
   configId?: string;

@@ -15,7 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { DeepPartial } from "react-hook-form";
-import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form/index.ts";
 import {
   clearStoreInstances,
   getStoreForTesting,
@@ -25,6 +24,7 @@ import {
 import { ExperimentFromPlaygroundButton } from "../experiment-from-playground-button.tsx";
 import { PromptHostProvider } from "../../../../model/prompt-host.ts";
 import { FakePromptHost } from "../../../../testing.tsx";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * One host for the whole file: nothing here asserts on what the screen asked

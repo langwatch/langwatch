@@ -10,8 +10,8 @@ import {
   TraceSpanCollectionService,
   TraceSpanDedupPort,
   TrackedEventSpanService,
-  type TrackedEventPorts,
 } from "@langwatch/trace-server";
+import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
 import type { UserAvatarObjectReader } from "@langwatch/user-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -103,7 +103,6 @@ describe("given a process that composed none of the packaged services", () => {
         new Set([
           ...new Set(FAMILY_PATHS.map(([family]) => family)),
           // The one this process cannot build at all, named unconditionally.
-          "copilotkit",
         ]),
       );
     });

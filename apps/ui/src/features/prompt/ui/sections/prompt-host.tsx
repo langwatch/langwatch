@@ -77,6 +77,7 @@ export function PromptHost({ children }: { children: ReactNode }) {
         projectApiKey: project?.apiKey,
       }),
       hasPermission: (permission) => session.hasPermission(permission),
+      currentUserName: () => session.currentUser()?.name,
       route: () => reading,
       setQuery: (next, options) => route.setQuery(next, options),
       navigate: (to) => navigation.navigate(to),

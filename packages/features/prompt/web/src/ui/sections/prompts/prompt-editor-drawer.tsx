@@ -4,7 +4,6 @@ import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
-import { getMaxTokenLimit } from "../../../surfaces/llm-parameters/index.ts";
 import { FormOutputsSection } from "../../elements/outputs/form-outputs-section.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/ui-host/toaster";
@@ -43,8 +42,6 @@ import {
   buildDefaultFormValues,
   type ChangeHandleFormValues,
   getSaveBlockerMessage,
-  hasNonEmptySystemMessage,
-  type PromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../../../surfaces/prompt-form/index.ts";
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
@@ -52,6 +49,8 @@ import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import type { LlmConfigInputType } from "@langwatch/workflow-web/surfaces/component-types";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values.ts";
+import { hasNonEmptySystemMessage, type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";
 
 export type PromptEditorDrawerProps = {
   open?: boolean;

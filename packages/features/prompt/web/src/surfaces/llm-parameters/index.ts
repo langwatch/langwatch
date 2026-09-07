@@ -29,7 +29,6 @@ export {
   type SliderParameterConfig,
 } from "./parameter-config.ts";
 export type { LLMConfigValues } from "./llm-config-values.types.ts";
-export { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "../../model/token-limits.ts";
 export { getParamValue } from "./parameter-value.utils.ts";
 export {
   buildModelChangeValues,

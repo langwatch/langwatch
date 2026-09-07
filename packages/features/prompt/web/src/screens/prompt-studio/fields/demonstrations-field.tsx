@@ -4,8 +4,8 @@ import { useFormContext } from "react-hook-form";
 import { DatasetPreview } from "./dataset-preview.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { VerticalFormControl } from "../../../ui/elements/vertical-form-control.tsx";
-import type { PromptConfigFormValues } from "../../../surfaces/prompt-form/index.ts";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * The few-shot examples a prompt carries, shown read-only.

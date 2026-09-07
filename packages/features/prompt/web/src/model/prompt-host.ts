@@ -82,11 +82,10 @@ export type PromptCopyTarget = {
  * does not.
  *
  * The chat is not a screen this package can decide about on its own: it talks
- * to a chat runtime the SERVER has to mount, and whether one is mounted is a
- * property of the process the screen was served from. `apps/api` declares that
- * family absent at boot in so many words — "API process serves no
- * /api/copilotkit" — so on this deployment the chat had nowhere to post, and
- * rendered anyway. A reader typed a message and got a 404 with no explanation.
+ * to an execution endpoint the SERVER has to mount, and whether one is mounted
+ * is a property of the process the screen was served from. A deployment that
+ * mounts none leaves the chat with nowhere to post, and it used to render
+ * anyway: a reader typed a message and got a 404 with no explanation.
  *
  * The words travel with the answer rather than being written here, because the
  * copy a customer reads is resolved from an error code by the host's
@@ -117,6 +116,14 @@ export abstract class PromptHostPort {
 
   /** Whether the reader holds a grant, answered synchronously and fail-closed. */
   abstract hasPermission(permission: string): boolean;
+
+  /**
+   * The reader's own profile name, or nothing.
+   *
+   * The playground conversation labels one side with the person writing it,
+   * because "User" names neither of the two parties a reader is comparing.
+   */
+  abstract currentUserName(): string | null | undefined;
 
   abstract route(): PromptRouteReading;
 

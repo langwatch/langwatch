@@ -41,4 +41,9 @@ if (typeof window !== "undefined") {
       // Nothing to scroll in jsdom.
     };
   }
+  if (!Element.prototype.scrollTo) {
+    Element.prototype.scrollTo = function scrollTo() {
+      // Nothing to scroll in jsdom.
+    };
+  }
 }
