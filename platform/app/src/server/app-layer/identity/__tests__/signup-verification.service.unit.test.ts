@@ -25,9 +25,6 @@ function makeService({
   const issued: Array<{ identifier: string; token: string; expires: Date }> =
     [];
   const sent: Array<{ email: string; verificationUrl: string }> = [];
-  const created: Array<{ email: string; passwordHash: string }> = [];
-  /** Addresses a spent link proved. The whole job of a link now. */
-  const confirmed: string[] = [];
   let addressIsTaken = registered;
   let clock = NOW;
   /**
@@ -104,8 +101,6 @@ function makeService({
     service,
     issued,
     sent,
-    created,
-    confirmed,
     takeAddress: () => {
       addressIsTaken = true;
     },
@@ -211,20 +206,20 @@ describe("given a sign-up address to confirm", () => {
       await harness.service.requestVerification({ email: "sam@acme.com" });
 
       expect(harness.sent).toHaveLength(1);
-      expect(harness.created).toHaveLength(0);
       // Nothing that could become a password travels on the link. Both doors
       // send this one, and the password is chosen once, on the screen the
       // link lands on, where it is typed twice and held to a length.
       expect(harness.issued[0]?.identifier).toContain('"passwordHash":null');
     });
 
-    /** @scenario "Asking for verification creates no account" */
-    it("leaves the account to be finished, never creating one itself", async () => {
+    it("returns a proof for the account step that follows the link", async () => {
       await harness.service.requestVerification({ email: "sam@acme.com" });
 
-      await expect(
-        harness.service.completeVerification({ token: "token-1" }),
-      ).resolves.toEqual({
+      const result = await harness.service.completeVerification({
+        token: "token-1",
+      });
+
+      expect(result).toEqual({
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
@@ -232,7 +227,8 @@ describe("given a sign-up address to confirm", () => {
         // confirmation to whichever call creates the account next.
         addressProof: expect.any(String),
       });
-      expect(harness.created).toHaveLength(0);
+      expect(harness.sent[0]?.email).toBe("sam@acme.com");
+      expect(harness.issued).toHaveLength(1);
     });
   });
 
@@ -265,8 +261,6 @@ describe("given a sign-up address to confirm", () => {
         accountExists: false,
         addressProof: expect.any(String),
       });
-      expect(harness.created).toHaveLength(0);
-      expect(harness.confirmed).toHaveLength(0);
     });
 
     it("creates nothing when the address gained an account meanwhile", async () => {
@@ -276,8 +270,6 @@ describe("given a sign-up address to confirm", () => {
       await expect(
         harness.service.completeVerification({ token: "link-in-flight" }),
       ).rejects.toMatchObject({ code: "identity_verification_expired" });
-      expect(harness.confirmed).toHaveLength(0);
-      expect(harness.created).toHaveLength(0);
     });
   });
 });
@@ -312,14 +304,11 @@ describe("given a confirmation link I have already opened", () => {
 
     /** @scenario "Opening a confirmation link a second time confirms, rather than refusing" */
     it("creates nothing a second time", async () => {
-      const confirmationsBefore = harness.confirmed.length;
+      const proofsBefore = harness.issued.length;
 
       await harness.service.completeVerification({ token: "token-1" });
 
-      expect(harness.created).toHaveLength(0);
-      // The address was proven by the first opening. Proving it again is not
-      // harmless bookkeeping, it is a write nobody asked for.
-      expect(harness.confirmed).toHaveLength(confirmationsBefore);
+      expect(harness.issued).toHaveLength(proofsBefore);
     });
   });
 
@@ -379,8 +368,6 @@ describe("given a link that proved an address with no account yet", () => {
     expect(
       results.filter((result) => result.addressProof === null),
     ).toHaveLength(1);
-    expect(harness.created).toHaveLength(0);
-    expect(harness.confirmed).toHaveLength(0);
   });
 
   describe("when I open it a second time", () => {
