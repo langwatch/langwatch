@@ -26,6 +26,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dockerjanitor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hygiene"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/jobscratch"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/otellgtm"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/portlessproxy"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/postgresbrew"
@@ -218,12 +219,14 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		RepoRoot:                  worktree,
 		ObservabilityConsoleLevel: obsConsoleLevel,
 		ShouldDisableGoogleDLP:    shouldDisableGoogleDLP(disableDLP, disableDLPSet),
+		JobsRoot:                  jobsRoot(),
+		OwnJobDirs:                ownJobDirs(),
 	}
 
 	orch := app.New(app.Deps{
 		Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
 		CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
-		Container: rt, Janitor: dockerjanitor.New(rt),
+		Container: rt, Janitor: dockerjanitor.New(rt), Jobs: jobscratch.New(),
 		ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
 		Claude:  claudesettings.New(), Log: logger,
 	})
@@ -243,6 +246,34 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		worktree: worktree,
 		isAgent:  isAgent,
 	}
+}
+
+// jobsRoot is where agent job directories live. HAVEN_JOBS_ROOT overrides it;
+// the default is Claude Code's own ~/.claude/jobs. Empty when the home
+// directory cannot be resolved, which disables the reclaim rather than guessing
+// at a path to delete inside.
+func jobsRoot() string {
+	if v := devEnv("HAVEN_JOBS_ROOT"); v != "" {
+		return v
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".claude", "jobs")
+}
+
+// ownJobDirs names the job directory haven was launched from, so a cleanup
+// never reclaims the scratch it is standing in. Both spellings are read because
+// the two harnesses that set one do not agree on the name.
+func ownJobDirs() []string {
+	var dirs []string
+	for _, key := range []string{"HAVEN_JOB_DIR", "CLAUDE_JOB_DIR"} {
+		if v := os.Getenv(key); v != "" {
+			dirs = append(dirs, v)
+		}
+	}
+	return dirs
 }
 
 // observabilityEndpoints are fixed ports rather than ephemeral ones: the gcx CLI

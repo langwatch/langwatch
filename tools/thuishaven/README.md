@@ -372,6 +372,18 @@ registry, and dashboard stay the same.
   be serving a live run whatever its age. Ryuk itself is never touched, and the
   sweep never boots the VM just to clean it. See
   `specs/setup/haven-testcontainer-reaper.feature`.
+- **Temporary and merged worktrees, and finished job scratch, are reclaimed
+  daily.** The two places a multi-agent machine silts up unattended. Once a day
+  the daemon removes every worktree classified temporary or merged (see
+  `haven clean` below for both definitions) with `git worktree remove --force`
+  plus a `git worktree prune`, logging one line per removal naming the reason,
+  and reclaims the scratch of every finished or week-cold agent job while
+  keeping its `state.json` and `timeline.jsonl`. It drops no database on this
+  path — a database is not regenerable, so only the interactive picker, which
+  shows exactly which are in scope, may drop one (ADR-064) — and it never
+  touches a worktree that is dirty, live, the primary checkout, or the one haven
+  runs from, nor a job any live process still names. See
+  `specs/setup/haven-disk-reclaim.feature`.
 - **Always migrate + seed, fully static identity.** Every `up` migrates _and_
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API
@@ -432,8 +444,35 @@ registry, and dashboard stay the same.
   directory removed — the primary checkout, the current worktree, and `lw_main`
   are never touched), and finishes by reclaiming the safe categories:
   regenerable build artifacts of idle worktrees and orphaned dev runtimes.
-  `--yes` skips the picker and applies only the safe categories. Agents (and
-  any non-TTY) get the read-only report and delete nothing.
+  Two more categories are pre-ticked on their class rather than their age, with
+  the reason in the row:
+  - **temporary** worktrees — a detached checkout under `.apidiff/` or
+    `.claude/worktrees/`, a `visual-*` / `apidiff-*` directory under a
+    `worktrees` parent, anything under `.claude/jobs/`, or any worktree on a
+    `worktree-agent-` / `agent/` branch — once nothing has been written in the
+    directory itself for a day. That clock is the directory's own mtime, not its
+    HEAD's committer date: a diff drive checks out whatever ref it is comparing,
+    so a comparison made five minutes ago against a year-old tag would otherwise
+    read as a year idle.
+  - **merged** worktrees, whose branch is already an ancestor of `origin/main`
+    (`git merge-base --is-ancestor`), at any age.
+
+  The same screen lists the reclaimable **agent jobs** under `~/.claude/jobs`
+  (`HAVEN_JOBS_ROOT`) with their size, name, state and age. Reclaiming a job
+  deletes its scratch — `tmp/`, worktree copies, logs — and keeps `state.json`
+  and `timeline.jsonl`, so what the job was and what it did survive. A job is
+  reclaimable once its state is terminal (`done`, `stopped`, `failed`) or its
+  directory has gone both unwritten and unread for seven days; a job any live
+  process still names, and the job haven itself was launched from
+  (`HAVEN_JOB_DIR` / `CLAUDE_JOB_DIR`), are never touched.
+
+  `--yes` skips the picker and applies the safe categories, which now include
+  those two: everything they remove is regenerable — a temporary worktree is
+  scratch a tool makes on demand, a merged one's commits are already on main,
+  and a job's scratch comes back by re-running the job. Databases are still
+  never dropped unattended, and a worktree with uncommitted changes is never a
+  candidate whatever its age. Agents (and any non-TTY) get the read-only report,
+  which names both new categories, and delete nothing.
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
   typechecks across worktrees don't exhaust RAM (bounded by memory / CPU). The
   `typecheck` script slots itself too (`dev/scripts/check-queue.mjs`,

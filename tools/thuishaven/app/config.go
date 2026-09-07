@@ -56,6 +56,14 @@ type Config struct {
 	ShouldStartObservability bool
 	LocalAPIKey              string // stable local dev API key seeded + injected into every stack
 	RepoRoot                 string // repo root the daemon prunes orphaned git worktrees from
+	// JobsRoot is where agent job directories live (~/.claude/jobs). Empty
+	// disables the job-scratch reclaim entirely — nothing is enumerated and
+	// nothing is deleted.
+	JobsRoot string
+	// OwnJobDirs are the job directories haven itself was launched from
+	// (HAVEN_JOB_DIR, CLAUDE_JOB_DIR). Never reclaimed: a run must not delete the
+	// scratch it is standing in.
+	OwnJobDirs []string
 	// ShouldDisableGoogleDLP injects LANGWATCH_DISABLE_GOOGLE_DLP=true into every
 	// stack. On by default — local dev should never ship trace text to Google, and
 	// the app then never loads the @google-cloud/dlp SDK. Setting the variable to

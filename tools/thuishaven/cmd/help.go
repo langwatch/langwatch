@@ -92,7 +92,8 @@ var envHelpText = `Environment variables.
     These describe ONE run rather than one machine, so they are read from the
     process environment only: LANGWATCH_SLUG, HAVEN_BASELINE, LANGWATCH_SEED,
     HAVEN_SEED_TRACES, HAVEN_STUB, HAVEN_AGENT, NO_COLOR, FORCE_COLOR,
-    HAVEN_TRUSTED_REPO_ROOT, HAVEN_UNTRUSTED_CHECKOUT. Every worktree shares one
+    HAVEN_TRUSTED_REPO_ROOT, HAVEN_UNTRUSTED_CHECKOUT, HAVEN_JOB_DIR,
+    CLAUDE_JOB_DIR. Every worktree shares one
     .env, so pinning a slug or a baseline marker there would apply it to all of
     them, and a seed flag would re-seed on every up.
 
@@ -153,6 +154,12 @@ var envHelpText = `Environment variables.
                                  and lw_main is always kept.
     HAVEN_PRUNE_STALE_DAYS=5     Idle age at which "haven clean" pre-ticks a
                                  worktree for deletion (--stale-days N overrides).
+                                 Temporary and merged worktrees are pre-ticked on
+                                 their class instead, whatever their age.
+    HAVEN_JOBS_ROOT=<dir>        Where agent job directories live (default
+                                 ~/.claude/jobs). "haven clean" and the daemon
+                                 reclaim a finished job's scratch and keep its
+                                 state.json + timeline.jsonl. Empty disables it.
 
   Services and data
     LANGWATCH_SEED=1             Seed the DB during up.

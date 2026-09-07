@@ -37,6 +37,9 @@ type Orchestrator struct {
 	// janitor sweeps leaked testcontainers off that same VM. Nil in tests that
 	// never reap.
 	janitor ContainerJanitor
+	// jobs is the agent job scratch under ~/.claude/jobs. Nil when no jobs root
+	// is configured, and in tests that never reclaim one.
+	jobs JobScratch
 	// claude edits Claude Code's own settings, which only `haven setup` does.
 	// Nil everywhere else, including in tests that never install a feature.
 	claude ClaudeSettings
@@ -72,6 +75,7 @@ type Deps struct {
 	Sem       Semaphore
 	Container ContainerRuntime
 	Janitor   ContainerJanitor
+	Jobs      JobScratch
 	ProcTel   ProcTelemetry
 	Claude    ClaudeSettings
 	Log       *zap.Logger
@@ -89,7 +93,7 @@ func New(d Deps) *Orchestrator {
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
 		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
-		container: d.Container, janitor: d.Janitor, procTel: d.ProcTel, claude: d.Claude, log: d.Log,
+		container: d.Container, janitor: d.Janitor, jobs: d.Jobs, procTel: d.ProcTel, claude: d.Claude, log: d.Log,
 	}
 }
 

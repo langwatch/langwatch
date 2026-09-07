@@ -62,7 +62,7 @@ func (m model) scrollCap() int {
 func (m model) renderHeader() string {
 	sel := m.countSelected()
 	n := len(m.rows)
-	parts := []string{fmt.Sprintf("%d worktree(s)", n)}
+	parts := []string{itemCount(m.rows)}
 	if m.metaCount < n {
 		parts = append(parts, fmt.Sprintf("reading %d/%d", m.metaCount, n))
 	}
@@ -101,7 +101,7 @@ func (m model) divider() int {
 func (m model) renderList(budget int) string {
 	n := len(m.order)
 	if n == 0 {
-		return styleDim.Render("  no worktrees found") + "\n"
+		return styleDim.Render("  nothing to clean") + "\n"
 	}
 	clipped := n > budget
 	rowBudget := budget
@@ -208,6 +208,9 @@ func (m model) facts(r Row) string {
 	if r.OriginGone {
 		parts = append(parts, styleGone.Render("origin-gone"))
 	}
+	if r.Reason != "" {
+		parts = append(parts, styleGone.Render(r.Reason))
+	}
 	return strings.Join(parts, "  ")
 }
 
@@ -216,9 +219,9 @@ func (m model) renderFooter() string {
 	if m.mode == modeConfirm {
 		n := m.countSelected()
 		b.WriteString("\n")
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  Delete %d worktree(s) — stops their stacks, drops their databases, removes their", n)))
+		b.WriteString(styleWarn.Render(fmt.Sprintf("  Reclaim %d item(s) — a worktree's stack is stopped, its databases dropped and its", n)))
 		b.WriteString("\n")
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  directories (uncommitted changes included). Reclaims ~%s.", domain.HumanBytes(m.selectedBytes()))))
+		b.WriteString(styleWarn.Render(fmt.Sprintf("  directory removed; a job keeps its record and loses its scratch. Reclaims ~%s.", domain.HumanBytes(m.selectedBytes()))))
 		b.WriteString("\n")
 		b.WriteString(styleWarn.Render(fmt.Sprintf("  type %q to confirm: %s▏", confirmWord, m.confirm)))
 		b.WriteString("\n")

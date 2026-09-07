@@ -357,12 +357,44 @@ type Hygiene interface {
 	// "how long has this sat idle" signal interactive prune ranks and default-selects
 	// by; the bool is false only when neither can be established.
 	LastActivity(worktreeDir string) (t time.Time, ok bool)
+	// LastTouched is when the worktree DIRECTORY itself was last written — its own
+	// mtime, not its HEAD's committer date. LastActivity answers "how long has this
+	// branch sat", which for a diff drive checked out at an old ref reads as months
+	// idle the moment it is created; this answers "when did anything happen here",
+	// which is the only safe clock for deleting a tool's scratch out from under it.
+	LastTouched(worktreeDir string) (t time.Time, ok bool)
+	// MergedIntoMain reports whether the worktree's branch is already contained in
+	// origin/main (`git merge-base --is-ancestor`) — every commit on it is on main,
+	// so the directory is a copy of history rather than history. False for a
+	// detached HEAD, for a branch with commits main has not taken, and whenever git
+	// cannot tell, so an unanswerable question never reads as "safe to delete".
+	MergedIntoMain(worktreeDir, branch string) bool
 	// UpstreamGone reports whether the branch tracks an upstream whose remote-tracking
 	// ref no longer exists — the "merged, and the remote branch was deleted" signal
 	// that marks a worktree as a prime cleanup candidate. It reflects the local
 	// remote-tracking state, so it needs a prior `git fetch --prune` to be current;
 	// false for a branch with no upstream, a detached HEAD, or when git cannot tell.
 	UpstreamGone(worktreeDir, branch string) bool
+}
+
+// JobScratch is the agent job directories under ~/.claude/jobs. Each holds a
+// record of what the job was (state.json) and what it did (timeline.jsonl)
+// beside the scratch it produced getting there — a tmp/ tree, worktree copies,
+// logs — which is what runs a laptop out of disk. The port is deliberately
+// narrow: enumerate, size, and reclaim the scratch while keeping the record.
+type JobScratch interface {
+	// Jobs reads every job directory under root, parsing each state.json and
+	// walking the tree for its newest modification and access times. A directory
+	// whose state.json is missing or unreadable is still returned, with an empty
+	// State, so the age rule can still reclaim it. It never sets InUse: which jobs
+	// a live process is working in is read from the process table, which the app
+	// layer samples once per plan through System.
+	Jobs(root string) ([]domain.JobRecord, error)
+	// Size reports how much disk the job directory occupies.
+	Size(ctx context.Context, dir string) (bytes int64, ok bool)
+	// Reclaim deletes everything in dir except the named files, and reports how
+	// many bytes went. It never removes the directory itself.
+	Reclaim(dir string, keep []string) (freed int64, err error)
 }
 
 // Worktree is one entry from `git worktree list`.

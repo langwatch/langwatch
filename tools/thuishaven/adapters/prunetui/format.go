@@ -9,11 +9,31 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// itemCount labels the list by what is actually in it, so a run with jobs in it
+// does not call them worktrees.
+func itemCount(rows []Row) string {
+	jobs := 0
+	for _, r := range rows {
+		if r.Kind == KindJob {
+			jobs++
+		}
+	}
+	if jobs == 0 {
+		return fmt.Sprintf("%d worktree(s)", len(rows))
+	}
+	return fmt.Sprintf("%d worktree(s) · %d job(s)", len(rows)-jobs, jobs)
+}
+
 // displayName is a worktree's label (slug, else directory basename); dbChips are
 // its owned-database chips. Both delegate to the shared domain formatters so the
 // picker and the non-interactive report label worktrees identically.
-func displayName(r Row) string { return domain.SlugOrBase(r.Slug, r.Dir) }
-func dbChips(r Row) string     { return domain.DBChips(r.HasCHDB, r.HasPGDB) }
+func displayName(r Row) string {
+	if r.Kind == KindJob {
+		return domain.SlugOrBase(r.Branch, r.Dir)
+	}
+	return domain.SlugOrBase(r.Slug, r.Dir)
+}
+func dbChips(r Row) string { return domain.DBChips(r.HasCHDB, r.HasPGDB) }
 
 // pathPreview shortens a worktree path to its last two segments, so the inline
 // preview shows where it lives without the full absolute path.
@@ -44,6 +64,12 @@ func reclaimDetail(r Row) string {
 	}
 	if r.OriginGone {
 		parts = append(parts, "branch merged + deleted upstream")
+	}
+	if r.Reason != "" {
+		parts = append(parts, r.Reason)
+	}
+	if r.Kind == KindJob {
+		parts = append(parts, "record kept: "+strings.Join(domain.JobRecordFiles, ", "))
 	}
 	return strings.Join(parts, " · ")
 }

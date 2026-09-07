@@ -39,6 +39,11 @@ type Row struct {
 	IsCurrent bool
 	IsLive    bool
 	Deletable bool
+	// Kind separates the two things one cleanup reclaims: a worktree, whose
+	// deletion stops a stack and drops databases, and an agent job, whose reclaim
+	// deletes scratch and keeps the two record files. The zero value is a
+	// worktree, so every existing caller keeps its meaning.
+	Kind Kind
 
 	MetaKnown  bool
 	HasCHDB    bool
@@ -48,10 +53,25 @@ type Row struct {
 	OriginGone bool
 	StaleFor   time.Duration
 	StaleKnown bool
+	// Reason names why this row is reclaimable ahead of the idle clock —
+	// "temporary scratch, untouched 2d", "finished (done)". Empty means the
+	// ordinary idle-age rule decides. A non-empty reason pre-ticks the row.
+	Reason string
 
 	SizeKnown bool
 	DiskBytes int64
 }
+
+// Kind is what a row reclaims.
+type Kind string
+
+const (
+	// KindWorktree is a git worktree — the zero value, so an unset Kind means
+	// what every row meant before jobs joined the list.
+	KindWorktree Kind = ""
+	// KindJob is an agent job's scratch under ~/.claude/jobs.
+	KindJob Kind = "job"
+)
 
 // MetaResult is a worktree's cheap facts, pushed in as the meta queue completes.
 type MetaResult struct {
@@ -62,6 +82,7 @@ type MetaResult struct {
 	OriginGone bool
 	StaleFor   time.Duration
 	StaleKnown bool
+	Reason     string
 }
 
 // Actions wires the picker to the world. Scan runs the two concurrent scan

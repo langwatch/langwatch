@@ -148,6 +148,14 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 					o.pruneIdleDatabases(ctx)
 				}
 			}
+			// Once a day (and once on the first tick after a daemon start),
+			// reclaim the two categories that grow without bound while nobody
+			// is looking: worktrees a tool made and forgot or whose branch is
+			// already on main, and the scratch of finished agent jobs.
+			if cycles%dailyCycles == 1 {
+				o.reapReclaimableWorktrees(ctx)
+				o.reapJobScratch()
+			}
 			o.reapDeadStacks()
 			o.governPressure()
 			o.governProcesses()
@@ -156,6 +164,11 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 		}
 	}
 }
+
+// dailyCycles is a day expressed in monitor ticks — the cadence of the
+// disk-reclaim passes, which are slow (a `du` and a git question per worktree)
+// and have nothing to gain from running more often than the disk fills.
+const dailyCycles = int((24 * time.Hour) / (10 * time.Second))
 
 // reapDeadStacks is the tick's route-to-backend reconciliation: every 10s it
 // compares each registered stack against the process that is supposed to be

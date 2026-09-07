@@ -225,6 +225,8 @@ type fakeHygiene struct {
 	dirtyDirs    map[string]bool
 	lastActivity map[string]time.Time
 	goneDirs     map[string]bool
+	mergedDirs   map[string]bool
+	lastTouched  map[string]time.Time
 	// mu guards the two removal logs: DestroyWorktrees removes concurrently.
 	mu               sync.Mutex
 	removed          []string
@@ -272,7 +274,19 @@ func (f *fakeHygiene) LastActivity(dir string) (time.Time, bool) {
 	t, ok := f.lastActivity[dir]
 	return t, ok
 }
-func (f *fakeHygiene) UpstreamGone(dir, _ string) bool { return f.goneDirs[dir] }
+func (f *fakeHygiene) UpstreamGone(dir, _ string) bool   { return f.goneDirs[dir] }
+func (f *fakeHygiene) MergedIntoMain(dir, _ string) bool { return f.mergedDirs[dir] }
+
+// LastTouched is the directory's own mtime. The fake keeps a separate map so a
+// test can make a worktree's HEAD look ancient while the directory is fresh —
+// the exact shape a diff drive has, and the one the temporary rule must survive.
+func (f *fakeHygiene) LastTouched(dir string) (time.Time, bool) {
+	if f.lastTouched == nil {
+		return f.LastActivity(dir)
+	}
+	t, ok := f.lastTouched[dir]
+	return t, ok
+}
 
 func hubOrchestrator(store *fakeStore, sys *fakeSystem, proxy *fakeProxy, ch, pg *fakeDBServer, hyg *fakeHygiene) *Orchestrator {
 	return &Orchestrator{
