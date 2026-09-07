@@ -125,11 +125,10 @@ export function SubscriptionPage() {
     );
 
   // Fetch pending invites for seat counting
-  const pendingInvites =
-    api.invite.getOrganizationPendingInvites.useQuery(
-      { organizationId: organization?.id ?? "" },
-      { enabled: !!organization },
-    );
+  const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization },
+  );
 
   // Mutation for sending invites to already-paid seats
   const createInvitesMutation = api.invite.createInvites.useMutation();
