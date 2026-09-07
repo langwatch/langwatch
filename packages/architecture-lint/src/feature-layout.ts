@@ -4,6 +4,7 @@ import ts from "typescript";
 import { walkFiles } from "./files.ts";
 import { readFeatureCatalogue } from "./feature-catalogue.ts";
 import { lintFeatureAppContracts } from "./feature-app-contract.ts";
+import { lintFeatureSetupInfrastructure } from "./feature-setup-infrastructure.ts";
 import {
   CONTRACT_ARTIFACT,
   isFeatureApiContract,
@@ -689,9 +690,9 @@ export function lintFeatureLayouts(
 
     return resolver;
   };
-  violations.push(
-    ...lintFeatureAppContracts(root, readFeatureCatalogue(root, []), packages, getResolver()),
-  );
+  const catalogue = readFeatureCatalogue(root, []);
+  violations.push(...lintFeatureAppContracts(root, catalogue, packages, getResolver()));
+  violations.push(...lintFeatureSetupInfrastructure(root, packages, catalogue, getResolver()));
 
   for (const pkg of packages) {
     if (pkg.layoutVersion !== 0) continue;

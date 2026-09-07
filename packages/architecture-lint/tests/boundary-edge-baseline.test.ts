@@ -8,6 +8,7 @@ import {
   filterBaselinedBoundaryEdges,
   lintBoundaryEdgeBaseline,
 } from "../src/index.ts";
+import { Temporal } from "@langwatch/time";
 
 function writeFixture(root: string, file: string, source: string): void {
   const path = join(root, file);
@@ -38,7 +39,12 @@ describe("boundary edge baseline (R8)", () => {
       edges: [{ ...edge, expires: "2099-01-01" }],
     });
 
-    const check = lintBoundaryEdgeBaseline(root, [edge], void 0, new Date("2026-01-01T00:00:00Z"));
+    const check = lintBoundaryEdgeBaseline(
+      root,
+      [edge],
+      void 0,
+      Temporal.Instant.from("2026-01-01T00:00:00Z"),
+    );
 
     expect(check.violations).toEqual([]);
     expect(check.entries).toEqual([{ ...edge, expires: "2099-01-01" }]);
@@ -58,7 +64,7 @@ describe("boundary edge baseline (R8)", () => {
         },
       ],
       [],
-      new Date("2026-01-01T00:00:00Z"),
+      Temporal.Instant.from("2026-01-01T00:00:00Z"),
     );
 
     expect(violations).toHaveLength(1);
@@ -81,7 +87,7 @@ describe("boundary edge baseline (R8)", () => {
     const violations = filterBaselinedBoundaryEdges(
       [listedViolation, otherPolicyViolation],
       [{ ...edge, expires: "2099-01-01" }],
-      new Date("2026-01-01T00:00:00Z"),
+      Temporal.Instant.from("2026-01-01T00:00:00Z"),
     );
 
     expect(violations).toEqual([otherPolicyViolation]);
@@ -91,7 +97,12 @@ describe("boundary edge baseline (R8)", () => {
     const root = mkdtempSync(join(tmpdir(), "boundary-edge-expired-"));
     writeBaselineFile(root, { version: 0, edges: [{ ...edge, expires: "2020-01-01" }] });
 
-    const check = lintBoundaryEdgeBaseline(root, [edge], void 0, new Date("2026-01-01T00:00:00Z"));
+    const check = lintBoundaryEdgeBaseline(
+      root,
+      [edge],
+      void 0,
+      Temporal.Instant.from("2026-01-01T00:00:00Z"),
+    );
 
     expect(check.violations).toMatchObject([{ policy: "boundary-edge-expired" }]);
   });
@@ -100,7 +111,12 @@ describe("boundary edge baseline (R8)", () => {
     const root = mkdtempSync(join(tmpdir(), "boundary-edge-stale-"));
     writeBaselineFile(root, { version: 0, edges: [{ ...edge, expires: "2099-01-01" }] });
 
-    const check = lintBoundaryEdgeBaseline(root, [], void 0, new Date("2026-01-01T00:00:00Z"));
+    const check = lintBoundaryEdgeBaseline(
+      root,
+      [],
+      void 0,
+      Temporal.Instant.from("2026-01-01T00:00:00Z"),
+    );
 
     expect(check.violations).toMatchObject([{ policy: "boundary-edge-baseline-stale" }]);
   });

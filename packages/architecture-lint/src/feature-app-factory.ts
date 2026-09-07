@@ -97,17 +97,25 @@ function canonicalSetup(
   return ts.isIdentifier(type.typeName) && setupAlias(type.typeName.text, file, resolver, visited);
 }
 
+function declaredTypeParameters(
+  node: ts.Node,
+): ts.NodeArray<ts.TypeParameterDeclaration> | undefined {
+  if (ts.isTypeAliasDeclaration(node)) return node.typeParameters;
+
+  if (ts.isMethodDeclaration(node)) return node.typeParameters;
+
+  if (ts.isClassDeclaration(node)) return node.typeParameters;
+
+  return void 0;
+}
+
 function shadowedTypeParameter(type: ts.TypeReferenceNode): boolean {
   if (!ts.isIdentifier(type.typeName)) return false;
 
   const name = type.typeName.text;
   let parent = type.parent;
   while (parent) {
-    const declaresTypeParameters =
-      ts.isTypeAliasDeclaration(parent) ||
-      ts.isMethodDeclaration(parent) ||
-      ts.isClassDeclaration(parent);
-    const parameters = declaresTypeParameters ? parent.typeParameters : void 0;
+    const parameters = declaredTypeParameters(parent);
     if (parameters?.some((parameter) => parameter.name.text === name)) return true;
 
     parent = parent.parent;

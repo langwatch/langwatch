@@ -9,6 +9,7 @@ import {
   lintCommentBlockRoots,
   lintCommentBlocks,
 } from "../src/index.ts";
+import { Temporal } from "@langwatch/time";
 
 function lineComments(lines: number): string {
   return Array.from({ length: lines }, () => "// comment").join("\n");
@@ -124,7 +125,11 @@ describe("oversized comment blocks", () => {
         roots: [{ root: "packages/legacy", blocks: 10, expires: "2020-01-01" }],
       });
 
-      const check = lintCommentBlockRoots(root, void 0, new Date("2026-01-01T00:00:00Z"));
+      const check = lintCommentBlockRoots(
+        root,
+        void 0,
+        Temporal.Instant.from("2026-01-01T00:00:00Z"),
+      );
 
       expect(check.violations).toMatchObject([{ policy: "comment-block-root-expired" }]);
     });
@@ -136,7 +141,11 @@ describe("oversized comment blocks", () => {
         roots: [{ root: "packages/legacy", blocks: 10, expires: "2099-01-01" }],
       });
 
-      const check = lintCommentBlockRoots(root, void 0, new Date("2026-01-01T00:00:00Z"));
+      const check = lintCommentBlockRoots(
+        root,
+        void 0,
+        Temporal.Instant.from("2026-01-01T00:00:00Z"),
+      );
 
       expect(check.violations).toEqual([]);
       expect(check.entries).toEqual([

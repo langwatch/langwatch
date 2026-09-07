@@ -6,8 +6,8 @@ import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const TEST_SOURCE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
-const SERVICE_OR_REPOSITORY = /(?:Service|Repository)$/;
-const SERVICE_OR_REPOSITORY_FACTORY = /^create[A-Z].*(?:Service|Repository)$/;
+const SERVICE_OR_REPOSITORY = /(?:App|Service|Repository)$/;
+const SERVICE_OR_REPOSITORY_FACTORY = /^create[A-Z].*(?:App|Service|Repository)$/;
 const RAW_HONO_METHODS = new Set([
   "all",
   "delete",
@@ -20,7 +20,6 @@ const RAW_HONO_METHODS = new Set([
   "put",
   "route",
 ]);
-const MODERN_API_METHODS = new Set(["delete", "get", "patch", "post", "put", "register"]);
 const HANDLER_STATEMENT_LIMIT = 6;
 
 type TransportSource = {
@@ -284,9 +283,6 @@ function handlerForEndpoint(
   functions: ReadonlyMap<string, ts.FunctionLikeDeclaration>,
 ): ts.FunctionLikeDeclaration | null {
   if (ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === "handle") {
-    const registration = enclosingRestRegistration(call);
-    if (!registration) return null;
-
     return resolveHandler(call.arguments[0], functions);
   }
 
@@ -297,27 +293,255 @@ function handlerForEndpoint(
   return resolveHandler(call.arguments[2], functions);
 }
 
-function enclosingRestRegistration(call: ts.CallExpression): ts.CallExpression | null {
+function handlerRegistration(
+  call: ts.CallExpression,
+): { candidate: ts.Expression; fluent: boolean } | null {
+  if (!ts.isPropertyAccessExpression(call.expression)) return null;
+
+  if (call.expression.name.text === "handle" && call.arguments[0] && isFluentEndpointHandle(call)) {
+    return { candidate: call.arguments[0], fluent: true };
+  }
+
+  return null;
+}
+
+const FLUENT_ENDPOINT_METHODS = new Set([
+  "withAuth",
+  "withInput",
+  "withOutput",
+  "withPermission",
+  "withoutPermission",
+  "withStatus",
+  "withMiddleware",
+  "withRateLimit",
+  "withoutRateLimit",
+  "withResourceLimit",
+  "withoutResourceLimit",
+]);
+
+function isFluentEndpointHandle(call: ts.CallExpression): boolean {
+  if (!ts.isPropertyAccessExpression(call.expression)) return false;
+  let receiver: ts.Expression = call.expression.expression;
+  while (ts.isCallExpression(receiver) && ts.isPropertyAccessExpression(receiver.expression)) {
+    if (FLUENT_ENDPOINT_METHODS.has(receiver.expression.name.text)) return true;
+    receiver = receiver.expression.expression;
+  }
+
   let current: ts.Node = call;
   while (current.parent) {
     current = current.parent;
     if (!ts.isArrowFunction(current) && !ts.isFunctionExpression(current)) continue;
-
     const parent = current.parent;
     if (
       ts.isCallExpression(parent) &&
       ts.isPropertyAccessExpression(parent.expression) &&
-      MODERN_API_METHODS.has(parent.expression.name.text) &&
-      parent.expression.name.text !== "register" &&
-      parent.arguments[2] === current
+      new Set(["delete", "get", "patch", "post", "put", "register"]).has(
+        parent.expression.name.text,
+      ) &&
+      parent.arguments.includes(current)
     ) {
-      return parent;
+      return true;
     }
-
-    return null;
   }
 
-  return null;
+  return false;
+}
+
+function unwrapHandlerExpression(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isSatisfiesExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function handlerBoundaryViolations(file: string, source: ts.SourceFile): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  const functions = localFunctions(source);
+  const visited = new Set<ts.FunctionLikeDeclaration>();
+  const report = (node: ts.Node, message: string, allowed: string): void => {
+    violations.push({
+      policy: "api-transport-handler-boundary",
+      file,
+      line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+      message,
+      allowed,
+    });
+  };
+  const allowedContextFields = new Set(["input", "app", "actor", "scope", "signal"]);
+  const rawFields = new Set(["req", "request", "res", "response", "ctx", "context", "headers"]);
+  const transportMethods = new Set([
+    "json",
+    "body",
+    "text",
+    "html",
+    "redirect",
+    "status",
+    "header",
+    "headers",
+  ]);
+
+  const inspect = (handler: ts.FunctionLikeDeclaration): void => {
+    if (visited.has(handler) || !handler.body) return;
+    visited.add(handler);
+
+    const first = handler.parameters[0];
+    const contextNames = new Set<string>();
+    if (first && ts.isIdentifier(first.name)) contextNames.add(first.name.text);
+    if (first && ts.isObjectBindingPattern(first.name)) {
+      for (const element of first.name.elements) {
+        const key = element.propertyName ?? element.name;
+        if (ts.isIdentifier(key) && !allowedContextFields.has(key.text)) {
+          report(
+            element,
+            `Handler receives raw context field "${key.text}" (ADR-133).`,
+            "Handlers receive only { input, app, actor, scope, signal }; request authentication and response shaping belong to framework middleware.",
+          );
+        }
+      }
+    }
+
+    const aliases = new Set<string>(contextNames);
+    const pathStartsAtContext = (expression: ts.Expression): boolean => {
+      const path = propertyPath(expression);
+      return Boolean(path && path.length === 1 && aliases.has(path[0]!));
+    };
+    const pathIsDirectContextMember = (expression: ts.Expression): boolean => {
+      const path = propertyPath(expression);
+      if (path && path.length === 1 && aliases.has(path[0]!)) return true;
+
+      if (
+        ts.isElementAccessExpression(expression) &&
+        expression.argumentExpression &&
+        ts.isStringLiteral(expression.argumentExpression)
+      ) {
+        const parent = propertyPath(expression.expression);
+        return Boolean(parent && parent.length === 1 && aliases.has(parent[0]!));
+      }
+
+      return false;
+    };
+    const directContextMemberName = (expression: ts.Expression): string | null => {
+      if (
+        ts.isPropertyAccessExpression(expression) &&
+        pathIsDirectContextMember(expression.expression)
+      ) {
+        return expression.name.text;
+      }
+      if (
+        ts.isElementAccessExpression(expression) &&
+        expression.argumentExpression &&
+        ts.isStringLiteral(expression.argumentExpression) &&
+        pathIsDirectContextMember(expression.expression)
+      ) {
+        return expression.argumentExpression.text;
+      }
+      return null;
+    };
+    const visit = (node: ts.Node): void => {
+      if (ts.isVariableDeclaration(node) && node.initializer && ts.isIdentifier(node.name)) {
+        if (pathStartsAtContext(node.initializer)) aliases.add(node.name.text);
+      }
+
+      if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+        const member = directContextMemberName(node);
+        const propertyName = ts.isPropertyAccessExpression(node)
+          ? node.name.text
+          : ts.isStringLiteral(node.argumentExpression)
+            ? node.argumentExpression.text
+            : null;
+        if ((member && rawFields.has(member)) || propertyName === "headers") {
+          report(
+            node,
+            propertyName === "headers"
+              ? `Handler accesses transport headers through ${node.getText(source)} (ADR-133).`
+              : `Handler reaches raw request context through ${node.getText(source)} (ADR-133).`,
+            "Handlers receive parsed domain input only; authentication, request headers and response shaping belong to framework middleware.",
+          );
+        }
+      }
+
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+        const member = directContextMemberName(node.expression);
+        const methodName = node.expression.name.text;
+        if (transportMethods.has(methodName)) {
+          report(
+            node,
+            `Handler calls transport response method ${methodName}() (ADR-133).`,
+            "Return a declared JSON object/array or void; text, SSE and other response shapes require an explicit custom framework integration outside the handler.",
+          );
+        }
+      }
+
+      if (
+        ts.isNewExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "Response"
+      ) {
+        report(
+          node,
+          "Handler constructs a raw Response (ADR-133).",
+          "Return a declared JSON object/array or void; text, SSE and other response shapes require an explicit custom framework integration outside the handler.",
+        );
+      }
+
+      if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+        if (
+          (ts.isPropertyAccessExpression(node.left) || ts.isElementAccessExpression(node.left)) &&
+          directContextMemberName(node.left)
+        ) {
+          report(
+            node,
+            `Handler mutates transport response state through ${node.left.getText(source)} (ADR-133).`,
+            "Declare status and headers on the fluent endpoint or middleware.",
+          );
+        }
+      }
+
+      if (ts.isReturnStatement(node) && node.expression) {
+        const expression = node.expression;
+        if (
+          (ts.isIdentifier(expression) && expression.text === "NO_CONTENT") ||
+          (ts.isPropertyAccessExpression(expression) && expression.name.text === "NO_CONTENT")
+        ) {
+          report(
+            expression,
+            "Handler returns the NO_CONTENT sentinel (ADR-133).",
+            "Return void (or await a void service method) for an empty response; NO_CONTENT is not a transport value.",
+          );
+        }
+      }
+
+      ts.forEachChild(node, visit);
+    };
+    visit(handler.body);
+  };
+
+  const visitRegistration = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const registration = handlerRegistration(node);
+      if (registration) {
+        const inline = unwrapHandlerExpression(registration.candidate);
+        if (!ts.isArrowFunction(inline) && !ts.isFunctionExpression(inline)) {
+          report(
+            registration.candidate,
+            "Fluent endpoint handler must be an inline function.",
+            "Keep the handler next to its endpoint verb, input, output and permission declarations so the complete boundary is reviewable.",
+          );
+        }
+        const handler = resolveHandler(registration.candidate, functions);
+        if (handler) inspect(handler);
+      }
+    }
+    ts.forEachChild(node, visitRegistration);
+  };
+  ts.forEachChild(source, visitRegistration);
+  return violations;
 }
 
 function resolveHandler(
@@ -325,6 +549,7 @@ function resolveHandler(
   functions: ReadonlyMap<string, ts.FunctionLikeDeclaration>,
 ): ts.FunctionLikeDeclaration | null {
   if (!candidate) return null;
+  candidate = unwrapHandlerExpression(candidate);
 
   if (ts.isArrowFunction(candidate) || ts.isFunctionExpression(candidate)) return candidate;
 
@@ -452,12 +677,30 @@ function serviceAliases(handler: ts.FunctionLikeDeclaration): ReadonlySet<string
       .map((parameter) => (ts.isIdentifier(parameter.name) ? parameter.name.text : null))
       .filter((name): name is string => name !== null),
   );
-  const visit = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-      const path = propertyPath(node.initializer);
-      if (path?.length === 3 && contextNames.has(path[0]!) && path[1] === "app") {
-        aliases.add(node.name.text);
+  const isServicePath = (path: string[]): boolean =>
+    (path.length >= 3 && contextNames.has(path[0]!) && path[1] === "app") || aliases.has(path[0]!);
+  const bind = (name: ts.BindingName, path: string[]): void => {
+    if (ts.isIdentifier(name)) {
+      if (isServicePath(path)) aliases.add(name.text);
+
+      return;
+    }
+
+    if (!ts.isObjectBindingPattern(name)) return;
+
+    for (const element of name.elements) {
+      if (element.dotDotDotToken) continue;
+
+      const key = element.propertyName ?? element.name;
+      if (ts.isIdentifier(key) || ts.isStringLiteral(key)) {
+        bind(element.name, [...path, key.text]);
       }
+    }
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && node.initializer) {
+      const path = propertyPath(node.initializer);
+      if (path) bind(node.name, path);
     }
 
     ts.forEachChild(node, visit);
@@ -475,11 +718,10 @@ function isCanonicalServiceCall(
   if (!ts.isPropertyAccessExpression(node.expression)) return false;
 
   const receiver = node.expression.expression;
-  if (ts.isIdentifier(receiver) && aliases.has(receiver.text)) return true;
-
   const path = propertyPath(receiver);
+  if (path && aliases.has(path[0]!)) return true;
 
-  return Boolean(path && path.length === 3 && contextNames.has(path[0]!) && path[1] === "app");
+  return Boolean(path && path.length >= 3 && contextNames.has(path[0]!) && path[1] === "app");
 }
 
 function isDomainControlFlow(node: ts.Node): boolean {
@@ -534,7 +776,7 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
         line: source.getLineAndCharacterOfPosition(second.getStart(source)).line + 1,
         message: `Endpoint handler makes ${serviceCalls.length} canonical service calls.`,
         allowed:
-          "Authorize and validate at the transport, then call one canonical service once. Move orchestration into the owning service; a pure response mapper may wrap its result.",
+          "Authorize and validate at the transport, then call one canonical service once. Move orchestration into the owning service; a pure response mapper may wrap its result. See dev/docs/adr/133-composition-spec.md.",
       });
     }
 
@@ -865,6 +1107,7 @@ function lintSource(root: string, transport: TransportSource): ArchitectureViola
 
   violations.push(...handlerConstructionViolations(transport.file, source));
   violations.push(...handlerShapeViolations(transport.file, source));
+  violations.push(...handlerBoundaryViolations(transport.file, source));
   violations.push(...stringLocatorViolations(transport.file, source));
   if (transport.strictFeatureApi) {
     violations.push(...rawHonoViolations(transport.file, source));

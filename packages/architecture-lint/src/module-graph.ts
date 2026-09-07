@@ -3,17 +3,9 @@ import { dirname, join, resolve, sep } from "node:path";
 import ts from "typescript";
 
 /**
- * One value-import graph walker for every rule that needs to know what a file
- * actually pulls at runtime.
- *
- * Two rules needed the same three things — parse a file's module specifiers,
- * turn a specifier into a file on disk, and follow the result — and the second
- * one nearly grew its own copy. A second resolver is not a duplicate function,
- * it is a second opinion about what the graph is: `@langwatch/react-rum` and
- * `@langwatch/react-rum/constants` are the same package and different
- * reachability stories, and a rule that resolves both to the barrel reports the
- * safe import as a leak. So resolution lives here, once, and the rules bring
- * their own policy.
+ * Rules share source resolution so package barrels and safe leaf exports retain
+ * their distinct runtime reachability. Resolving both to the barrel would
+ * incorrectly report a leaf import as a dependency leak.
  */
 
 const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
@@ -74,18 +66,22 @@ export type WorkspaceModuleResolver = {
 };
 
 type ParsedSource = {
-  sourceFile: ts.SourceFile;
   imports: ModuleImport[];
   rendersJsx: boolean;
 };
 
+type ParsedSourceCacheEntry = ParsedSource & {
+  mtimeMs: number;
+  ctimeMs: number;
+  size: number;
+};
+
 /**
- * Keyed by content identity, not by path. `lintFrontendUiBoundaries`'s suite
- * writes fixtures under a fresh temporary directory per test, and a path-keyed
- * cache would be correct there only by accident; a rule that rewrites a file
- * and re-reads it deserves the answer for what is on disk now.
+ * Keyed by path with filesystem freshness metadata. The AST is deliberately
+ * not retained: the derived import facts are all callers need, and retaining
+ * every SourceFile keeps the whole workspace tree alive for the process.
  */
-const parsedSources = new Map<string, ParsedSource>();
+const parsedSources = new Map<string, ParsedSourceCacheEntry>();
 
 function scriptKind(file: string): ts.ScriptKind {
   const isTsxLike = file.endsWith(".tsx") || file.endsWith(".jsx");
@@ -158,9 +154,14 @@ function importRecordFor(node: ts.Node): ImportRecordInput | undefined {
 
 function parseSource(file: string): ParsedSource {
   const stats = statSync(file);
-  const key = `${file}\0${stats.mtimeMs}\0${stats.size}`;
-  const cached = parsedSources.get(key);
-  if (cached) return cached;
+  const cached = parsedSources.get(file);
+  const sameVersion =
+    cached?.mtimeMs === stats.mtimeMs &&
+    cached?.ctimeMs === stats.ctimeMs &&
+    cached?.size === stats.size;
+  if (cached && sameVersion) {
+    return cached;
+  }
 
   const sourceFile = ts.createSourceFile(
     file,
@@ -198,8 +199,13 @@ function parseSource(file: string): ParsedSource {
 
   visit(sourceFile);
 
-  const parsed: ParsedSource = { sourceFile, imports, rendersJsx };
-  parsedSources.set(key, parsed);
+  const parsed = { imports, rendersJsx };
+  parsedSources.set(file, {
+    ...parsed,
+    mtimeMs: stats.mtimeMs,
+    ctimeMs: stats.ctimeMs,
+    size: stats.size,
+  });
 
   return parsed;
 }
@@ -470,14 +476,9 @@ function resolveSpecifierUncached(
 }
 
 /**
- * A resolver over the workspace's source-linked packages.
- *
- * Workspace packages are the reason this is not `require.resolve`: their code
- * is ours, on disk, and the walk has to continue through it. Honouring
- * `exports` and `imports` is the point rather than pedantry — a package's
- * barrel and its leaf modules are different reachability stories, and the 110
- * `#`-prefixed subpath imports in the feature packages are real edges that a
- * resolver ignorant of `imports` would silently drop.
+ * Follow workspace source through both `exports` and private `imports`.
+ * Each leaf must resolve independently of its package barrel; `#` subpaths
+ * participate in the same reachability graph as public exports.
  */
 export function createWorkspaceModuleResolver({ root }: { root: string }): WorkspaceModuleResolver {
   const found = collectWorkspaceManifests(root);
@@ -528,13 +529,8 @@ export type ValueImportGraph = {
 };
 
 /**
- * Walk the value-import graph forward from `roots`, recording edges and the
- * files that reach something forbidden directly.
- *
- * `terminal` stops the walk on entry rather than excusing an importer: a
- * service that sends mail is not reported for the React its templates
- * legitimately render with, but a file that reaches the terminal's neighbours
- * some other way still is.
+ * `terminal` stops traversal on entry: callers may reach React through mail
+ * templates, but reaching React through another path must still be reported.
  */
 type ValueImportGraphOptions = {
   resolve: (options: { specifier: string; file: string }) => string | undefined;
@@ -607,15 +603,9 @@ export function walkValueImportGraph({
 }
 
 /**
- * The chain from each root to whatever seeded the graph, as a fixed point
- * rather than by recursive descent.
- *
- * Recursion has to cut import cycles, and this codebase has them. A "cannot
- * reach" answer computed under a cut cycle is not sound, so it cannot be
- * cached — which means it is recomputed from every path that reaches it, and
- * the walk degrades sharply as the graph grows. Flooding backwards from the
- * seeds makes a cycle a non-event — it yields a chain only if something inside
- * it does — and settles every node exactly once, in O(files + imports).
+ * Flooding backwards from forbidden seeds handles import cycles without caching
+ * unsound "cannot reach" answers from cut cycles. Each node settles once,
+ * keeping traversal O(files + imports).
  */
 /** Every edge's target mapped back to the files that reach it, the reverse of `graph.children`. */
 function parentsIndex(graph: ValueImportGraph): Map<string, string[]> {

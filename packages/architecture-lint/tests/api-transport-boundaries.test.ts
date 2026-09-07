@@ -302,6 +302,55 @@ describe("strict feature API transport boundaries", () => {
     ]);
   });
 
+  it.each([
+    [
+      "direct",
+      "context.app.widget.widgets.get(input); return context.app.widget.widgets.update(input);",
+    ],
+    [
+      "service alias",
+      "const widgets = context.app.widget.widgets; widgets.get(input); return widgets.update(input);",
+    ],
+    [
+      "app alias",
+      "const widget = context.app.widget; widget.widgets.get(input); return widget.widgets.update(input);",
+    ],
+    [
+      "destructured service",
+      "const { widgets } = context.app.widget; widgets.get(input); return widgets.update(input);",
+    ],
+    [
+      "nested destructuring",
+      "const { widget: { widgets } } = context.app; widgets.get(input); return widgets.update(input);",
+    ],
+  ])("counts nested feature service calls through %s", (_name, body) => {
+    write(
+      "packages/features/widget/server/src/api/public/widget.api.ts",
+      `
+      group.register("many", "2026-08-28", async (context, input) => { ${body} });
+    `,
+    );
+    expect(policy("api-transport-handler-shape")).toEqual([
+      expect.objectContaining({ message: "Endpoint handler makes 2 canonical service calls." }),
+    ]);
+  });
+
+  it("rejects nested feature-service calls inside callbacks", () => {
+    write(
+      "packages/features/widget/server/src/api/public/widget.api.ts",
+      `
+      group.register("nested", "2026-08-28", async (context, input) => {
+        return Promise.all(input.ids.map(id => context.app.widget.widgets.get(id)));
+      });
+    `,
+    );
+    expect(policy("api-transport-handler-shape")).toEqual([
+      expect.objectContaining({
+        message: "Endpoint handler calls a canonical service from a nested callback.",
+      }),
+    ]);
+  });
+
   it("applies the same thin-handler law to every fluent REST method", () => {
     write(
       "packages/features/widget/server/src/api/public/widget.api.ts",
@@ -363,4 +412,103 @@ describe("strict feature API transport boundaries", () => {
       found.filter((violation) => violation.policy === "api-transport-service-locator"),
     ).toHaveLength(1);
   });
+
+  it("requires inline handlers and rejects raw transport responses and empty sentinels", () => {
+    write(
+      "packages/features/widget/server/src/api/public/widget.api.ts",
+      `
+        declare const rest: { get(...args: unknown[]): void };
+        const detached = async (context: { req: Request; app: { widgets: { get(): Promise<unknown> } } }) => {
+          context.req;
+          return NO_CONTENT;
+        };
+        rest.get("/widgets", "2026-08-28", (endpoint) => endpoint.handle(detached));
+        rest.get("/raw", "2026-08-28", (endpoint) => endpoint.handle(async (context) => {
+          context.status = 204;
+          return context.json({ ok: true });
+        }));
+        rest.get("/response", "2026-08-28", (endpoint) => endpoint.handle(() => new Response("ok")));
+      `,
+    );
+
+    expect(policy("api-transport-handler-boundary").map(({ message }) => message)).toEqual([
+      "Handler calls transport response method json() (ADR-133).",
+      "Handler constructs a raw Response (ADR-133).",
+      "Handler reaches raw request context through context.req (ADR-133).",
+      "Handler returns the NO_CONTENT sentinel (ADR-133).",
+      "Fluent endpoint handler must be an inline function.",
+      "Handler mutates transport response state through context.status (ADR-133).",
+    ]);
+  });
+
+  it("allows the complete typed handler context and a void return", () => {
+    write(
+      "packages/features/widget/server/src/api/public/widget.api.ts",
+      `
+        declare const rest: { post(...args: unknown[]): void };
+        rest.post("/widgets", "2026-08-28", (endpoint) => endpoint.handle(async ({ input, app, actor, scope, signal }) => {
+          await app.widgets.create({ input, actor, scope, signal });
+          return void 0;
+        }));
+      `,
+    );
+
+    expect(policy("api-transport-handler-boundary")).toEqual([]);
+  });
+
+  it("rejects handler header access and response-shaped methods while allowing DTO status", () => {
+    write(
+      "packages/features/widget/server/src/api/public/widget.api.ts",
+      `
+        declare const rest: { post(...args: unknown[]): void };
+        rest.post("/widgets", "2026-08-28", (endpoint) => endpoint.withInput({}).handle(async ({ input, app }) => {
+          const data = input;
+          data.headers;
+          data.status = "draft";
+          await app.text({ value: data.headers });
+          return NO_CONTENTS;
+        }));
+      `,
+    );
+
+    expect(policy("api-transport-handler-boundary").map(({ message }) => message)).toEqual([
+      "Handler accesses transport headers through data.headers (ADR-133).",
+      "Handler calls transport response method text() (ADR-133).",
+      "Handler accesses transport headers through data.headers (ADR-133).",
+    ]);
+  });
+
+  it("rejects computed raw context access and handler factories", () => {
+    write(
+      "packages/features/widget/server/src/api/public/widget.api.ts",
+      `
+        declare const rest: { get(...args: unknown[]): void };
+        const makeHandler = () => async (context: unknown) => context;
+        rest.get("/raw", "2026-08-28", (endpoint) => endpoint.handle(async (context) => context["req"]));
+        rest.get("/factory", "2026-08-28", (endpoint) => endpoint.handle(makeHandler()));
+      `,
+    );
+
+    expect(policy("api-transport-handler-boundary").map(({ message }) => message)).toEqual([
+      'Handler reaches raw request context through context["req"] (ADR-133).',
+      "Fluent endpoint handler must be an inline function.",
+    ]);
+  });
+});
+
+describe("feature app construction", () => {
+  it.each(["new WidgetApp()", "WidgetApp.create()", "createWidgetApp()"])(
+    "rejects %s in a request handler",
+    (construction) => {
+      write(
+        "packages/features/widget/server/src/api/public/widget.api.ts",
+        `
+      group.register("create", "2026-08-28", async (context, input) => ${construction});
+    `,
+      );
+      expect(policy("api-transport-construction")).toEqual([
+        expect.objectContaining({ message: expect.stringContaining("WidgetApp") }),
+      ]);
+    },
+  );
 });
