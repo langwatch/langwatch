@@ -39,7 +39,7 @@ Feature: Retention stamping at ingestion time
     When an experiment run event is recorded for this project
     Then its event_log record has _retention_days = 91
 
-  Scenario: Durable content-free and control-plane events are retained indefinitely
+  Scenario: Explicitly durable event families are retained indefinitely
     When identity, MFA, SSO, join-request, SCIM, authorization, governance, gateway-spend, pulled-usage, ingestion-pull, automation-trigger, or coding-agent-fact events are recorded
     Then their event_log records have _retention_days = 0
 
