@@ -17,6 +17,7 @@ import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import {
   bornFinalizedOptIn,
   passwordResetSessionBridge,
+  sessionCallbackEvidence,
   sessionRevocation,
 } from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
@@ -198,8 +199,10 @@ const betterAuthCatchAll = async (c: Context) => {
   // The reset scope is opened around EVERY request rather than only the
   // reset path: it is a per-request slot that costs nothing empty, and the
   // path check belongs to the hook that reads it, not to the route.
-  const response = await passwordResetSessionBridge().runWithScope(() =>
-    isBorn ? runWithIdentityBirth(handle) : handle(),
+  const response = await sessionCallbackEvidence().runWithScope(() =>
+    passwordResetSessionBridge().runWithScope(() =>
+      isBorn ? runWithIdentityBirth(handle) : handle(),
+    ),
   );
   // better-auth's refusals speak its own vocabulary, which is neither a
   // registered code nor copy anybody wrote for a customer. This is where the

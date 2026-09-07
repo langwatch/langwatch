@@ -142,12 +142,12 @@ import {
 import { SsoConnectionDomainRoutingRepository } from "./repositories/sso-connection-routing.prisma.repository";
 import { IdentitySecretHealMigration } from "./secret-heal.migration";
 import {
-  IdTokenProviderAssertions,
   PrismaSessionIdentifiers,
   PrismaSessionRecords,
   PrismaSessionRevocationRecords,
   RedisSessionCache,
   RedisSessionRevocationCache,
+  VerifiedCallbackProviderAssertions,
 } from "./session-adapters";
 import { SessionClaimsService } from "./session-claims.service";
 import { SessionInventoryService } from "./session-inventory.service";
@@ -629,10 +629,17 @@ export function organizationMfa(): OrganizationMfaService {
  * answers claims for a row better-auth is about to create, and nothing in it
  * can create, change or end a session of its own.
  */
+const verifiedCallbackProviderAssertions =
+  new VerifiedCallbackProviderAssertions();
+
+export function sessionCallbackEvidence(): VerifiedCallbackProviderAssertions {
+  return verifiedCallbackProviderAssertions;
+}
+
 export function sessionClaims(): SessionClaimsService {
   return new SessionClaimsService({
     identifiers: new PrismaSessionIdentifiers(prisma),
-    assertions: new IdTokenProviderAssertions(prisma),
+    assertions: verifiedCallbackProviderAssertions,
   });
 }
 
