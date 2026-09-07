@@ -58,6 +58,7 @@ export class PrismaCredentialAccountRepository
     accountId,
     passwordHash,
   }: {
+    userId: string;
     accountId: string;
     passwordHash: string;
   }): Promise<void> {
