@@ -41,7 +41,6 @@ export interface EmailAndPasswordDeps {
   revokeAllSessions: (args: { userId: string }) => Promise<void>;
   /** Who reset, remembered for the after-hook that opens the new session. */
   recordPasswordReset: (args: { userId: string }) => void;
-  clearSignUpConfirmationPending: (args: { userId: string }) => Promise<void>;
 }
 
 /**

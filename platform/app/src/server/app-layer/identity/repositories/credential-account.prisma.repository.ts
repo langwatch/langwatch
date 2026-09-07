@@ -46,7 +46,9 @@ export function passkeySignUpClaimMatches({
  * middleware's exemption, so these queries carry no `projectId` — the models
  * have none, and a person is not scoped to a project.
  */
-export class PrismaCredentialAccountRepository implements CredentialAccountRecordsPort {
+export class PrismaCredentialAccountRepository
+  implements CredentialAccountRecordsPort
+{
   constructor(private readonly prisma: PrismaClient) {}
 
   async findLinkedAccounts({
