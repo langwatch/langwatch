@@ -1,6 +1,6 @@
 Feature: A Langy health check that sends a real greeting and says what broke
 
-  GET /api/langy/health exists for an external uptime monitor, not a person.
+  GET /api/health/langy exists for an external uptime monitor, not a person.
   It sends one real user turn, "Hi Langy.", through the same in-process turn
   service the browser and the key-authed API use, holds until that turn
   settles on the durable fold, and answers with a shape a monitor can alert
@@ -25,17 +25,21 @@ Feature: A Langy health check that sends a real greeting and says what broke
   LLM turn carries. Every response carries `Cache-Control: no-store`, so a
   monitor always sees the current turn's result rather than a cached one.
 
-  Auth is the same chain, in the same order, as POST /api/langy/conversations:
-  a project API key resolves (else 401), the surface flag is open (else the
-  same 404 an unmounted path gives), the key clears the `langy:create` ceiling
-  (else 403), and the key's owner is in the Langy cohort (else 403). The turn
-  runs as that owner. No new env var and no new credential class is involved.
+  It sits beside the other subsystem probes under /api/health, declared public
+  like them and authenticating in-handler like them, and answers a refusal in
+  their `{ message }` shape. The chain it authenticates with is the turn
+  routes' own, in the same order, as POST /api/langy/conversations: a project
+  API key resolves (else 401), the surface flag is open (else the same 404 an
+  unmounted path gives), the key clears the `langy:create` ceiling (else 403),
+  and the key's owner is in the Langy cohort (else 403). The turn runs as that
+  owner. No new env var and no new credential class is involved.
 
   # Bindings:
   #   platform/app/src/server/health-probes/langy-canary.service.ts
   #   platform/app/src/server/health-probes/__tests__/langy-canary.service.unit.test.ts
-  #   platform/app/src/server/routes/langy-api.ts
-  #   platform/app/src/server/routes/__tests__/langy-api-health.unit.test.ts
+  #   platform/app/src/server/app-layer/langy/langyApiKeyAuthorization.ts
+  #   platform/app/src/server/routes/health-checks.ts
+  #   platform/app/src/server/routes/__tests__/langy-canary.integration.test.ts
 
   # ---------------------------------------------------------------------------
   # Classification — what one settled turn means
@@ -150,69 +154,69 @@ Feature: A Langy health check that sends a real greeting and says what broke
     Then that check runs
 
   # ---------------------------------------------------------------------------
-  # Route — GET /api/langy/health
+  # Route — GET /api/health/langy
   # ---------------------------------------------------------------------------
 
   @unit
   Scenario: A request with no credential is refused before any turn is started
     Given a request carrying no project API key
-    When GET /api/langy/health is called
+    When GET /api/health/langy is called
     Then the response is 401
     And no turn is started
 
   @unit
   Scenario: A switched-off surface answers the health check as a route that does not exist
     Given the Langy API surface flag is off for the key's project
-    When GET /api/langy/health is called with a valid key
+    When GET /api/health/langy is called with a valid key
     Then the response is byte-identical to an unmounted path's 404
     And no turn is started
 
   @unit
   Scenario: A key without langy:create is refused
     Given a project API key that does not clear the langy:create ceiling
-    When GET /api/langy/health is called
+    When GET /api/health/langy is called
     Then the response is 403
     And no turn is started
 
   @unit
   Scenario: A key whose owner is outside the Langy cohort is refused
     Given a project API key owned by a user without Langy access
-    When GET /api/langy/health is called
-    Then the response is 403 with code "langy_api_key_no_langy_access"
+    When GET /api/health/langy is called
+    Then the response is 403 with the denial's message, in the shape the sibling probes use
     And no turn is started
 
   @unit
   Scenario: A healthy run answers 200 with the turn's ids
     Given the canary reports healthy
-    When GET /api/langy/health is called with a valid key
+    When GET /api/health/langy is called with a valid key
     Then the response is 200 with status "ok"
     And the body carries the conversation id, turn id and duration
 
   @unit
   Scenario: An unhealthy run answers 503 with its reason
     Given the canary reports unhealthy with reason "empty_reply"
-    When GET /api/langy/health is called with a valid key
+    When GET /api/health/langy is called with a valid key
     Then the response is 503 with status "unhealthy"
     And the body carries the reason "empty_reply"
 
   @unit
   Scenario: A busy probe answers 429
     Given the canary reports busy
-    When GET /api/langy/health is called with a valid key
+    When GET /api/health/langy is called with a valid key
     Then the response is 429 with status "busy"
 
   @unit
   Scenario: Every health response is uncacheable
     Given any outcome from the canary
-    When GET /api/langy/health is called
+    When GET /api/health/langy is called
     Then the response carries "Cache-Control: no-store"
 
   @unit
-  Scenario: The health route is registered under the same policy as the turn routes
-    Given the Langy API app is loaded
-    When the route registry is read for GET /api/langy/health
-    Then its policy is handler-managed with the langy:create permission
-    And it matches the policy of POST /api/langy/conversations
+  Scenario: The Langy probe is declared public like its sibling health probes
+    Given the health-checks app is loaded
+    When the route registry is read for GET /api/health/langy
+    Then its policy is public, the key being authenticated in-handler
+    And it matches the policy of GET /api/health/scenarios
 
   # ---------------------------------------------------------------------------
   # Live proof — against a running stack, before the monitor is trusted
@@ -222,7 +226,7 @@ Feature: A Langy health check that sends a real greeting and says what broke
   Scenario: The check goes green and red against a running stack
     Given a running stack with the Langy API surface open for one project
     And a project API key owned by a user in the Langy cohort
-    When GET /api/langy/health is called with that key
+    When GET /api/health/langy is called with that key
     Then the response is 200 within 60 seconds and the reply text is logged
     When the Langy worker is made unreachable and the check is called again
     Then the response is 503 with reason "timeout" or "turn_failed"

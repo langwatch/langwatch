@@ -3,10 +3,11 @@
  *
  * @see specs/langy/langy-health-canary.feature
  *
- * Route-level proof for `GET /api/langy/health`, driven through the real Hono
- * app with the same auth seams as the refusal-chain suite next door. The
- * canary service's own budget/single-flight logic is unit-tested against an
- * injected boundary in
+ * Route-level proof for `GET /api/health/langy`, driven through the real Hono
+ * app with the same auth seams as `langy-api-refusal-chain.unit.test.ts`: the
+ * probe shares the turn routes' authorization chain, so the same mocks stand in
+ * for the same boundaries. The canary service's own budget/single-flight logic
+ * is unit-tested against an injected boundary in
  * `../../health-probes/__tests__/langy-canary.service.unit.test.ts` — here its
  * production entrypoint (`runLangyHealthCanary`) is mocked as the one boundary
  * this route crosses, so "no turn is started" means "the entrypoint was never
@@ -65,11 +66,6 @@ vi.mock("~/server/app-layer/langy/langyApiKeyActorSession", () => ({
     mockResolveLangyActorSession(...args),
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: vi.fn(() => ({ langy: { turns: {}, conversations: {} } })),
-  tryGetApp: vi.fn(() => null),
-}));
-
 // ─── The one boundary this route crosses ──────────────────────────────────────
 const mockRunLangyHealthCanary = vi.fn();
 
@@ -78,14 +74,20 @@ vi.mock("~/server/health-probes/langy-canary.service", () => ({
     mockRunLangyHealthCanary(...args),
 }));
 
+// The sibling probe on the same app is not under test; keep its production
+// deps (queues, judge) out of this suite's module graph.
+vi.mock("~/server/health-probes/scenario-canary.service", () => ({
+  runScenarioHealthCanary: vi.fn(),
+}));
+
 // Imported AFTER every mock, same as the sibling suites.
-const { app: langyApp } = await import("../langy-api");
+const { app: healthApp } = await import("../health-checks");
 
 const testApp = new Hono();
-testApp.route("/", langyApp);
+testApp.route("/", healthApp);
 
-const HEALTH_URL = "http://localhost/api/langy/health";
-const UNMOUNTED_URL = "http://localhost/api/langy/not-a-real-route";
+const HEALTH_URL = "http://localhost/api/health/langy";
+const UNMOUNTED_URL = "http://localhost/api/health/not-a-real-route";
 
 const SESSION = { user: { id: "user-1" } };
 
@@ -110,7 +112,7 @@ async function describeResponse(res: Response) {
   };
 }
 
-describe("GET /api/langy/health", () => {
+describe("GET /api/health/langy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockExtractCredentials.mockReturnValue({
@@ -141,7 +143,7 @@ describe("GET /api/langy/health", () => {
       mockExtractCredentials.mockReturnValue(null);
     });
 
-    describe("when GET /api/langy/health is called", () => {
+    describe("when GET /api/health/langy is called", () => {
       /** @scenario "A request with no credential is refused before any turn is started" */
       it("responds 401 and starts no turn", async () => {
         const res = await getHealth();
@@ -164,7 +166,7 @@ describe("GET /api/langy/health", () => {
       mockIsEnabled.mockResolvedValue(false);
     });
 
-    describe("when GET /api/langy/health is called", () => {
+    describe("when GET /api/health/langy is called", () => {
       /** @scenario "A switched-off surface answers the health check as a route that does not exist" */
       it("answers byte-identically to an unmounted path and starts no turn", async () => {
         const dark = await describeResponse(await getHealth());
@@ -186,7 +188,7 @@ describe("GET /api/langy/health", () => {
       );
     });
 
-    describe("when GET /api/langy/health is called", () => {
+    describe("when GET /api/health/langy is called", () => {
       /** @scenario "A key without langy:create is refused" */
       it("responds 403 and starts no turn", async () => {
         const res = await getHealth();
@@ -206,21 +208,20 @@ describe("GET /api/langy/health", () => {
       });
     });
 
-    describe("when GET /api/langy/health is called", () => {
+    describe("when GET /api/health/langy is called", () => {
       /** @scenario "A key whose owner is outside the Langy cohort is refused" */
-      it("responds 403 with the cohort denial code and starts no turn", async () => {
+      it("responds 403 with the denial's message in the siblings' shape and starts no turn", async () => {
         const res = await getHealth();
 
         expect(res.status).toBe(403);
-        const body = (await res.json()) as { error: { code: string } };
-        expect(body.error.code).toBe("langy_api_key_no_langy_access");
+        expect(await res.json()).toEqual({ message: "no access" });
         expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
       });
     });
   });
 
   describe("given the canary reports healthy", () => {
-    describe("when GET /api/langy/health is called", () => {
+    describe("when GET /api/health/langy is called", () => {
       /** @scenario "A healthy run answers 200 with the turn's ids" */
       it("responds 200 with status ok and the turn's ids, as the key's owner", async () => {
         const res = await getHealth();
@@ -259,7 +260,7 @@ describe("GET /api/langy/health", () => {
       });
     });
 
-    describe("when GET /api/langy/health is called", () => {
+    describe("when GET /api/health/langy is called", () => {
       /** @scenario "An unhealthy run answers 503 with its reason" */
       it("responds 503 with status unhealthy and the reason", async () => {
         const res = await getHealth();
@@ -288,7 +289,7 @@ describe("GET /api/langy/health", () => {
       mockRunLangyHealthCanary.mockResolvedValue({ busy: true });
     });
 
-    describe("when GET /api/langy/health is called", () => {
+    describe("when GET /api/health/langy is called", () => {
       /** @scenario "A busy probe answers 429" */
       it("responds 429 with status busy", async () => {
         const res = await getHealth();
@@ -299,19 +300,15 @@ describe("GET /api/langy/health", () => {
     });
   });
 
-  describe("given the Langy API app is loaded", () => {
-    describe("when the health route's policy is looked up", () => {
-      /** @scenario "The health route is registered under the same policy as the turn routes" */
-      it("registers GET /api/langy/health under the same handler-managed langy:create policy as the turn route", async () => {
-        const health = getRoutePolicy("GET", "/api/langy/health");
-        const turn = getRoutePolicy("POST", "/api/langy/conversations");
+  describe("given the health-checks app is loaded", () => {
+    describe("when the Langy probe's policy is looked up", () => {
+      /** @scenario "The Langy probe is declared public like its sibling health probes" */
+      it("registers GET /api/health/langy as a public endpoint that authenticates in-handler, like its siblings", () => {
+        const langy = getRoutePolicy("GET", "/api/health/langy");
+        const sibling = getRoutePolicy("GET", "/api/health/scenarios");
 
-        expect(health?.policy).toMatchObject({
-          kind: "handlerManaged",
-          credential: "apiKey",
-          permissions: ["langy:create"],
-        });
-        expect(health?.policy).toEqual(turn?.policy);
+        expect(langy?.policy.kind).toBe("public");
+        expect(langy?.policy).toEqual(sibling?.policy);
       });
     });
   });

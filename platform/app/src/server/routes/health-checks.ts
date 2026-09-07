@@ -7,10 +7,13 @@
  * - GET /api/health/processor   (sends canary traces + polls until processed)
  * - GET /api/health/triggers    (checks a trigger fired within the last hour)
  * - GET /api/health/workflows   (runs a sample workflow)
+ * - GET /api/health/scenarios   (runs a scenario plan and waits for the judge)
+ * - GET /api/health/langy       (sends Langy one greeting turn and waits for it)
  *
  * NOTE: The simple GET /api/health (204) is already handled in health.ts.
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type {
   ESpanKind,
@@ -21,8 +24,10 @@ import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { authorizeLangyApiKey } from "~/server/app-layer/langy/langyApiKeyAuthorization";
 import { prisma } from "~/server/db";
 import { sendCanary } from "~/server/health-probes/canary.service";
+import { runLangyHealthCanary } from "~/server/health-probes/langy-canary.service";
 import { runScenarioHealthCanary } from "~/server/health-probes/scenario-canary.service";
 import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
@@ -637,6 +642,81 @@ secured
       runPlanId: query.runPlanId,
     });
     return canaryResultToResponse({ c, result });
+  });
+
+/**
+ * The Langy probe's auth, in the shape of `authenticateProject` above: the
+ * shared Langy chain (credential, surface flag, `langy:create` ceiling,
+ * cohort, actor) answers a refusal as `{ error, status }` for the handler to
+ * serialise like its siblings, a dark surface as `{ dark: true }`, and a
+ * pass as the actor the turn runs as. It is the key's OWNER who sends the
+ * greeting, so a plain project key with no owner is refused here.
+ */
+async function authenticateLangyActor(
+  c: Context,
+): Promise<
+  | { error: string; status: number }
+  | Awaited<ReturnType<typeof authorizeLangyApiKey>>
+> {
+  try {
+    return await authorizeLangyApiKey(c);
+  } catch (error) {
+    if (error instanceof HandledError) {
+      return { error: error.message, status: error.httpStatus };
+    }
+    throw error;
+  }
+}
+
+// Same job as `canaryResultToResponse` for the Langy probe, whose ids are a
+// conversation and a turn rather than a scenario run.
+function langyCanaryResultToResponse({
+  c,
+  result,
+}: {
+  c: Context;
+  result: Awaited<ReturnType<typeof runLangyHealthCanary>>;
+}) {
+  if ("busy" in result) {
+    return c.json({ status: "busy" }, { status: 429 });
+  }
+  const { healthy, conversationId, turnId, durationMs } = result;
+  if (healthy) {
+    return c.json({ status: "ok", conversationId, turnId, durationMs });
+  }
+  return c.json(
+    {
+      status: "unhealthy",
+      reason: result.reason,
+      conversationId,
+      turnId,
+      durationMs,
+    },
+    { status: 503 },
+  );
+}
+
+secured
+  .access(publicEndpoint("subsystem health probe"))
+  .get("/langy", async (c) => {
+    // A monitor polls this on an interval; a cached 200/503 would hide the
+    // next turn's real result, so no response on any path is cacheable.
+    c.header("Cache-Control", "no-store");
+
+    const auth = await authenticateLangyActor(c);
+    if ("error" in auth) {
+      return c.json({ message: auth.error }, { status: auth.status });
+    }
+    // The Langy API surface is dark for this project: answer as the turn
+    // routes do, with the same 404 an unmounted path gives.
+    if (auth.dark) return c.notFound();
+
+    const result = await runLangyHealthCanary({
+      projectId: auth.projectId,
+      session: auth.session,
+    });
+    auth.markUsed();
+    return langyCanaryResultToResponse({ c, result });
   });
 
 export const app = secured.hono;

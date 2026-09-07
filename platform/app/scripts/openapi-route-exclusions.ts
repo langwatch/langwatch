@@ -276,11 +276,6 @@ export const UNPUBLISHED = [
     why: "the continuation half of the same dark surface: an authenticated caller reaches the same flag check and the same 404, and it becomes publishable on the same trigger (#6821)",
   },
   {
-    match: "GET /api/langy/health",
-    category: "internal",
-    why: "the uptime probe for the same dark surface: it sends Langy one real greeting turn and answers 200/503/429 for an external monitor, not a product capability (specs/langy/langy-health-canary.feature). It sits behind the same flag check and the same 404, and an operator configures it from docs/self-hosting/langy/health-check.mdx rather than the API reference (#7944)",
-  },
-  {
     match: "POST /api/rpc.discover",
     category: "gap",
     why: "the RPC catalogue, a projection of this document filtered to dotted operations. It should be published once a family actually adopts RPC naming and the catalogue stops being empty — describing an operation whose response is always `{operations: []}` teaches a reader nothing",

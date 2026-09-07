@@ -60544,13 +60544,13 @@ keywords:
   - langy canary
 ---
 
-`GET /api/langy/health` sends one real user turn, "Hi Langy.", through the same path the browser and the API use, waits for the answer, and reports the result in a shape an uptime monitor can alert on. Point any HTTP monitor at it.
+`GET /api/health/langy` sends one real user turn, "Hi Langy.", through the same path the browser and the API use, waits for the answer, and reports the result in a shape an uptime monitor can alert on. Point any HTTP monitor at it.
 
 ## Configure the monitor
 
 | Setting | Value |
 | --- | --- |
-| Method and URL | `GET https://<your-langwatch-host>/api/langy/health` |
+| Method and URL | `GET https://<your-langwatch-host>/api/health/langy` |
 | Header | `X-Auth-Token: <project API key>` |
 | Expected status | `200` |
 | Request timeout | 75 seconds or more (the check itself gives up at 55, after the key has been authenticated) |
@@ -60565,9 +60565,9 @@ The API key must belong to a user who has Langy access, and must carry the `lang
 | `200` | `{ "status": "ok", "conversationId", "turnId", "durationMs" }` | Langy answered with text. |
 | `503` | `{ "status": "unhealthy", "reason", ... }` | `timeout`: no answer within 55 seconds. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. |
 | `429` | `{ "status": "busy" }` | A check for the same key is still running. Poll less often. |
-| `401` / `403` | error envelope | The key is missing, unknown, lacks `langy:create`, or its owner has no Langy access. |
+| `401` / `403` | `{ "message" }` | The key is missing, unknown, lacks `langy:create`, or its owner has no Langy access. |
 
-Every response carries `Cache-Control: no-store`.
+Every response carries `Cache-Control: no-store`. The endpoint sits beside the other subsystem probes (`/api/health/collector`, `/api/health/scenarios`, and so on) and answers refusals in the same shape they do.
 
 The 55-second budget starts once the key is authenticated, so a slow database adds to the wall clock. If a reverse proxy in front of LangWatch has its own read timeout (ingress-nginx defaults to 60 seconds), raise it above the monitor's timeout, or a stalled check reaches the monitor as a `504` from the proxy instead of a `503` with `reason: "timeout"`. Either one still fails the check.
 

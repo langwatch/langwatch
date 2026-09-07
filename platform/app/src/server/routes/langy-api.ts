@@ -80,41 +80,24 @@
  * capacity, model policy) stays in the app layer and arrives here as a
  * HandledError that is re-thrown untouched.
  *
- * `GET /health` is the uptime probe for this surface: the same chain (steps
- * 1–5) authorizes it, then the canary service sends one real greeting turn as
- * the key's owner and answers 200/503/429 with a named reason — see
- * `specs/langy/langy-health-canary.feature`. It lives here rather than under
- * `/api/health` so it is dark exactly when the surface is dark.
+ * Steps 1–5 live in `app-layer/langy/langyApiKeyAuthorization.ts`, shared with
+ * the uptime probe `GET /api/health/langy` in `health-checks.ts`, which runs
+ * one real greeting turn as the key's owner behind the same chain — see
+ * `specs/langy/langy-health-canary.feature`.
  */
 
 import type { Context } from "hono";
 import { z } from "zod";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import {
-  enforceApiKeyCeiling,
-  extractCredentials,
-} from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
-import {
-  LangyApiCredentialInvalidError,
-  LangyApiCredentialMissingError,
-  LangyApiIdentityDeniedError,
-  LangyApiRequestInvalidError,
-} from "~/server/app-layer/langy/errors";
+import { LangyApiRequestInvalidError } from "~/server/app-layer/langy/errors";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
-import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
-import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
+import {
+  authorizeLangyApiKey,
+  LANGY_API_KEY_AUTH_REASON,
+} from "~/server/app-layer/langy/langyApiKeyAuthorization";
 import { awaitTurnSettlement } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
-import { prisma } from "~/server/db";
-import { featureFlagService } from "~/server/featureFlag";
-import { runLangyHealthCanary } from "~/server/health-probes/langy-canary.service";
 import { bodyLimit } from "./_lib/body-limit";
-
-const tokenResolver = TokenResolver.create(prisma);
-
-const AUTH_REASON =
-  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling, then bridged to an owning user by resolveLangyKeyIdentity";
 
 /**
  * A turn is text plus small structured parts, never an upload. The cap is well
@@ -130,7 +113,7 @@ const MAX_TURN_BODY_BYTES = 1024 * 1024;
  * by hand from the UI.
  */
 const langyTurnAuth = handlerManagedAuth({
-  reason: AUTH_REASON,
+  reason: LANGY_API_KEY_AUTH_REASON,
   permissions: ["langy:create"],
   credential: "apiKey",
 });
@@ -176,88 +159,6 @@ const turnBodySchema = z.object({
    */
   adoptConversationId: z.boolean().optional(),
 });
-
-/**
- * Authenticate, open the flag, enforce the ceiling, and bridge to an actor.
- *
- * Throws on every refusal EXCEPT the dark surface, which returns `{ dark: true }`
- * for the caller to answer — see the flag check below for why that one cannot
- * throw. `enforceApiKeyCeiling` already throws a `HandledError`
- * (`ApiKeyPermissionDeniedError`), so the ceiling denial needs no translation
- * here at all — catching it only to re-serialise it was how the code, the
- * permission in `meta` and the tips got dropped.
- */
-async function authorizeTurn(c: Context) {
-  const credentials = extractCredentials((name) => c.req.header(name));
-  if (!credentials) throw new LangyApiCredentialMissingError();
-
-  const resolved = await tokenResolver.resolve({
-    token: credentials.token,
-    projectId: credentials.projectId,
-  });
-  if (!resolved) throw new LangyApiCredentialInvalidError();
-
-  // Dark surface ⇒ 404, not 403: rollback should look like the route was never
-  // deployed, so a client retries nothing and no one reads a denial as a
-  // permissions bug.
-  //
-  // This sits BEFORE the ceiling on purpose. Behind it, a key without
-  // `langy:create` got a 403 while the flag was off — a refusal no unmounted
-  // route can produce, which told the caller the surface was there.
-  //
-  // It also cannot THROW, unlike every other refusal in this function. Anything
-  // thrown here reaches `createServiceApp`'s `onError` and comes back as the
-  // canonical JSON envelope, carrying `trace_id` and `span_id`; a path that was
-  // never mounted falls to Hono's default handler and comes back as plain-text
-  // `404 Not Found`. Content-Type and body would differ, and that difference is
-  // the leak this 404 exists to prevent. So the caller answers with
-  // `c.notFound()`, which IS that default handler — no router in the chain
-  // overrides it.
-  const surfaceOpen = await featureFlagService.isEnabled(
-    "release_langy_api_key_turns_enabled",
-    {
-      distinctId: resolved.project.id,
-      projectId: resolved.project.id,
-      organizationId: resolved.project.team.organizationId,
-    },
-  );
-  if (!surfaceOpen) return { dark: true as const };
-
-  await enforceApiKeyCeiling({ resolved, permission: "langy:create" });
-
-  const identity = await resolveLangyKeyIdentity({ resolved });
-  if (!identity.ok) {
-    throw new LangyApiIdentityDeniedError(
-      identity.reason === "unowned"
-        ? "langy_api_key_unowned"
-        : "langy_api_key_no_langy_access",
-      identity.message,
-    );
-  }
-
-  const actor = await resolveLangyActorSession({
-    prisma,
-    userId: identity.userId,
-    now: new Date(),
-  });
-  if (!actor.ok) {
-    throw new LangyApiIdentityDeniedError(
-      "langy_api_actor_missing",
-      actor.message,
-    );
-  }
-
-  return {
-    dark: false as const,
-    session: actor.session,
-    projectId: resolved.project.id,
-    markUsed: () => {
-      if (resolved.type === "apiKey") {
-        tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
-      }
-    },
-  };
-}
 
 /**
  * `Prefer: wait=<seconds>` (RFC 7240) opts a caller into synchronous delivery:
@@ -316,7 +217,7 @@ async function startTurn({
   c: Context;
   conversationId: string | null;
 }) {
-  const auth = await authorizeTurn(c);
+  const auth = await authorizeLangyApiKey(c);
   // Hono's default 404, byte-for-byte what an unmounted path returns.
   if (auth.dark) return c.notFound();
 
@@ -397,57 +298,5 @@ secured
     async (c) =>
       startTurn({ c, conversationId: c.req.param("conversationId") }),
   );
-
-/**
- * Maps the canary's result union to its HTTP response, mirroring
- * `GET /api/health/scenarios`: 200 `ok`, 503 `unhealthy` with `reason`,
- * 429 `busy`. Kept out of the handler so its branching stays flat.
- */
-function canaryResultToResponse({
-  c,
-  result,
-}: {
-  c: Context;
-  result: Awaited<ReturnType<typeof runLangyHealthCanary>>;
-}) {
-  if ("busy" in result) {
-    return c.json({ status: "busy" }, 429);
-  }
-  const { healthy, conversationId, turnId, durationMs } = result;
-  if (healthy) {
-    return c.json({ status: "ok", conversationId, turnId, durationMs }, 200);
-  }
-  return c.json(
-    {
-      status: "unhealthy",
-      reason: result.reason,
-      conversationId,
-      turnId,
-      durationMs,
-    },
-    503,
-  );
-}
-
-/**
- * The uptime probe: one real greeting turn as the key's owner, answered in a
- * shape a monitor can alert on. Same auth chain as the turn routes, so a
- * refused or dark surface answers exactly as it would for a turn.
- */
-secured.access(langyTurnAuth).get("/health", async (c) => {
-  // A monitor polls this on an interval; a cached 200/503 would hide the next
-  // turn's real result, so no response on any path is cacheable.
-  c.header("Cache-Control", "no-store");
-
-  const auth = await authorizeTurn(c);
-  if (auth.dark) return c.notFound();
-
-  const result = await runLangyHealthCanary({
-    projectId: auth.projectId,
-    session: auth.session,
-  });
-  auth.markUsed();
-  return canaryResultToResponse({ c, result });
-});
 
 export const app = secured.hono;
