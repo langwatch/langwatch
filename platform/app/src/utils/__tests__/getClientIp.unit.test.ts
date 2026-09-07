@@ -117,7 +117,6 @@ describe("getTrustedProxyClientIp()", () => {
     expect(from("198.51.100.12, 10.0.0.9")).toBe("198.51.100.12");
   });
 
-  /** @scenario A forwarding header from an untrusted peer is ignored */
   it("uses the socket peer when an untrusted caller forges forwarding headers", () => {
     expect(
       getTrustedProxyClientIp(

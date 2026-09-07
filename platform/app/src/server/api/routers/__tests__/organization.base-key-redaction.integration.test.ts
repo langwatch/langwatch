@@ -234,7 +234,7 @@ describe("Feature: base key in the organizations payload", () => {
   });
 
   describe("given a caller who can only view the project", () => {
-    /** @scenario The base key is withheld from the session payload for read-only roles */
+    /** @scenario The base key is withheld from the session payload for project members */
     it("withholds the base key from the payload", async () => {
       const apiKey = await projectApiKeyFor(viewerCaller, projectId);
 

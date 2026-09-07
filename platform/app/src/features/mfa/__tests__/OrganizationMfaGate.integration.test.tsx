@@ -141,6 +141,7 @@ describe("the enrollment gate", () => {
 
     describe("when sam finishes setting two-step verification up", () => {
       /** @scenario Setting it up opens the gate on the session they already hold */
+      /** @scenario "Landing the change signs nobody out" */
       it("makes acme's data reachable on the same session, without signing in again", async () => {
         renderHarness();
         expect(screen.getByTestId("organization-mfa-gate")).toBeInTheDocument();

@@ -11,7 +11,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { inviteRouter } from "../invite";
+import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
 
 /**
