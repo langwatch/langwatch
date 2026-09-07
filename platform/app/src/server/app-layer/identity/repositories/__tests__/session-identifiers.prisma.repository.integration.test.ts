@@ -42,6 +42,7 @@ afterEach(async () => {
 });
 
 describe("the identifier recorded on an enterprise callback session", () => {
+  /** @scenario An enterprise callback records the exact accepted account */
   it("uses Auth0's verbatim provider and subject instead of the folded vocabulary", async () => {
     await addEnterpriseIdentifier({
       id: `${namespace}-auth0`,
@@ -58,6 +59,7 @@ describe("the identifier recorded on an enterprise callback session", () => {
     ).resolves.toBe(`${namespace}-auth0`);
   });
 
+  /** @scenario An enterprise callback records the exact accepted account */
   it("keeps Auth0 and Okta sessions separately revocable when subjects overlap", async () => {
     await addEnterpriseIdentifier({
       id: `${namespace}-auth0`,

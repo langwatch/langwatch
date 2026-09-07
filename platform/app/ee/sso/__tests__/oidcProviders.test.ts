@@ -69,6 +69,7 @@ const configFor = (
     | undefined;
 
 describe("buildGenericOAuthConfigs", () => {
+  /** @scenario Supported enterprise providers require ID-token verification */
   it.each([
     "auth0",
     "okta",

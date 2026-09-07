@@ -368,18 +368,18 @@ Feature: Two-step verification - one setup per person, and organizations that re
   # reason the session records what it proved: for these people the
   # requirement is satisfied by the sign-in, not by the account.
   @unit
-  Scenario: A provider that asserted a second factor satisfies the requirement
+  Scenario: A supported verified provider factor satisfies the requirement
     Given "acme" requires two-step verification
-    And "sam" signs in through "acme"'s identity provider
-    When the provider asserts that a second factor was used
+    And "sam" signs in through a supported Auth0 or Okta connection
+    When the current cryptographically verified token matches the accepted account subject and asserts a second factor
     Then "sam" reaches "acme"'s data with no setup of their own
     And the session records the factor the provider asserted
 
   @unit
-  Scenario: A provider that asserts nothing satisfies nothing
+  Scenario: A supported verified provider that asserts nothing satisfies nothing
     Given "acme" requires two-step verification
-    And "sam" signs in through "acme"'s identity provider
-    When the provider asserts no second factor
+    And "sam" signs in through a supported Auth0 or Okta connection
+    When its current cryptographically verified token matches the accepted account subject and asserts no second factor
     Then "sam" is held at the enrollment gate like any other member
     And setting one up here is the way through
     And nothing infers a factor the provider did not assert
@@ -391,6 +391,12 @@ Feature: Two-step verification - one setup per person, and organizations that re
   # adapter's exact Auth0/Okta lookup is separately covered by
   # `session-identifiers.prisma.repository.integration.test.ts`.
   @unit
+  Scenario: Supported enterprise providers require ID-token verification
+    Given the active enterprise connection uses Auth0 or Okta
+    When the server mounts its generic OAuth provider
+    Then ID-token verification is required before callback claims are trusted
+
+  @unit
   Scenario Outline: An enterprise callback records the exact accepted account
     Given "sam" has an identifier for "<provider>" subject "<subject>"
     And that provider requires cryptographic ID-token verification
@@ -400,7 +406,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
 
     Examples:
       | provider | subject        |
-      | auth0    | auth0\|sam    |
+      | auth0    | auth0\|sam     |
       | okta     | okta-user-sam |
 
   @unit
@@ -409,6 +415,43 @@ Feature: Two-step verification - one setup per person, and organizations that re
     When the accepted callback for "sam" asserts "pwd otp unknown"
     Then the new session records "oidc pwd otp"
     And the unsupported assertion is omitted
+
+  @unit
+  Scenario: A valid signed Auth0 callback reaches account and session creation
+    Given Auth0 discovery publishes the issuer, audience and signing key
+    When Auth0 returns a correctly signed token with the callback nonce
+    Then BetterAuth accepts the callback and writes its Account and Session
+
+  @unit
+  Scenario Outline: Invalid Auth0 proof never reaches account or session creation
+    Given Auth0 requires cryptographic ID-token verification
+    When its callback token carries <invalid proof>
+    Then BetterAuth refuses the callback before writing an Account or Session
+
+    Examples:
+      | invalid proof        |
+      | an unknown signature |
+      | the wrong issuer     |
+      | the wrong audience   |
+      | the wrong nonce      |
+
+  @unit
+  Scenario Outline: Invalid callback state reaches no account or session write
+    Given an Auth0 sign-in has issued callback state
+    When the callback state is <state defect>
+    Then BetterAuth refuses the callback before writing an Account or Session
+
+    Examples:
+      | state defect                    |
+      | missing                         |
+      | different from the issued state |
+
+  @unit
+  Scenario: Replaying an accepted callback creates no additional account or session
+    Given a valid Auth0 callback has created one Account and Session
+    When the browser applies the callback response cookies and replays the same callback
+    Then BetterAuth refuses the replay
+    And no additional Account or Session is written
 
   @unit
   Scenario: A stored MFA assertion cannot speak for a later callback
@@ -433,10 +476,18 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And identifier attribution comes only from the accepted callback account
 
     Examples:
-      | unsafe evidence                                                |
-      | the callback provider does not guarantee token verification |
+      | unsafe evidence                                               |
+      | the callback provider does not guarantee token verification  |
       | the claims are requested for a different callback provider    |
       | the token subject differs from the accepted provider account  |
+      | the token merely appears on a non-callback request             |
+
+  @unit
+  Scenario: A held member cannot carry the standing recovery exemption into API-key creation
+    Given "sam" is authenticated but held until two-step verification is enrolled
+    And "sam" can read the standing needed to recover
+    When "sam" tries to create an API key for the organization
+    Then the request is refused before membership or API-key persistence
 
   @integration
   Scenario: An administrator is told when their connection asserts nothing

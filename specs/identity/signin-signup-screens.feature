@@ -40,17 +40,17 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   Scenario: The email step renders the routed outcome
     When I enter my email on the sign-in screen
     Then a domain-routed decision sends me to my identity provider
-    And any other decision shows the method picker the decision named
+    And a method-picker decision shows the methods it named
+    But an unknown-account decision continues to account creation
 
   # Account-aware routing may name that an address is unknown; it must not turn
   # a credential refusal into an oracle for which half of a submitted pair was
   # wrong. Bound in `betterAuthErrorSweep.unit.test.ts`.
   @unit
-  Scenario: A credential refusal never identifies the wrong half
-    Given one visitor enters a wrong password for a registered address
-    And another enters a password for an address nobody holds
-    When both submit their credentials
-    Then both receive the same registered refusal
+  Scenario: The credential error boundary preserves one non-enumerating refusal
+    Given BetterAuth rejects a credential as an invalid email-or-password pair
+    When the auth boundary translates that rejection
+    Then it returns the registered identity sign-in refusal
     And the refusal identifies neither the address nor password as wrong
 
   @integration

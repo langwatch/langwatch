@@ -289,8 +289,7 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
-  describe("when two visitors enter a registered and an unregistered address", () => {
-    /** @scenario The picker looks the same whether or not my account exists */
+  describe("when two visitors receive the same routed decision", () => {
     it("renders the same picker, from the same one request, for both", async () => {
       routeMock.mockResolvedValue(localPicker);
 

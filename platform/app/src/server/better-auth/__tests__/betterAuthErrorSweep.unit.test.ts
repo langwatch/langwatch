@@ -59,7 +59,7 @@ describe("the sign-in, sign-up, reset and passkey refusals", () => {
        * is what turns credential stuffing from guessing pairs into guessing
        * one field at a time.
        */
-      /** @scenario A refused credential still refuses in one way */
+      /** @scenario The credential error boundary preserves one non-enumerating refusal */
       /** @scenario A wrong password says the password is wrong */
       it("answers one code, whatever the reason underneath was", async () => {
         const body = await translate({

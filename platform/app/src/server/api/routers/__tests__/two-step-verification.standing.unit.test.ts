@@ -80,7 +80,7 @@ describe("twoStepVerification.standing", () => {
   });
 
   describe("given a required member who has not enrolled", () => {
-    /** @scenario Someone joining an organization that requires it meets the gate on the way in */
+    /** @scenario A held member can read the standing needed to recover */
     it("returns the unsatisfied standing that paints the setup screen", async () => {
       await expect(callerFor("sam").standing({ organizationId: "org-acme" })).resolves.toEqual({
         organizationId: "org-acme",
@@ -96,6 +96,7 @@ describe("twoStepVerification.standing", () => {
       });
     });
 
+    /** @scenario A held member cannot carry the standing recovery exemption into API-key creation */
     it("cannot carry the recovery exemption into an API-key mutation", async () => {
       const context = contextFor("sam");
       const apiKeyCreate = vi.spyOn(context.prisma.apiKey, "create");
@@ -128,6 +129,7 @@ describe("twoStepVerification.standing", () => {
   });
 
   describe("given no authenticated person", () => {
+    /** @scenario A standing read still requires an authenticated person */
     it("still refuses before reading any organization standing", async () => {
       await expect(callerFor(null).standing({ organizationId: "org-acme" })).rejects.toMatchObject({
         code: "UNAUTHORIZED",
@@ -137,6 +139,7 @@ describe("twoStepVerification.standing", () => {
   });
 
   describe("given an authenticated stranger", () => {
+    /** @scenario A stranger cannot use standing to inspect an organization */
     it("keeps the organization's identity and requirement private", async () => {
       await expect(
         callerFor("mallory").standing({ organizationId: "org-acme" }),
