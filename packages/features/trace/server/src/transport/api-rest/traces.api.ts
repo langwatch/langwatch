@@ -22,12 +22,12 @@ import {
 import type { TraceDateField } from "@langwatch/trace-contract";
 import type { TraceMetadataUpdate } from "#services/trace-metadata-write.service";
 
-import { registerTracesSearchRoute } from "./traces-search.api";
+import { registerTracesSearchRoute } from "./traces-search.api.ts";
 import {
   registerTraceMetadataRoute,
   registerTraceReadRoute,
   registerTraceTranscriptRoute,
-} from "./traces-detail.api";
+} from "./traces-detail.api.ts";
 
 /**
  * The additive half of the search body; the other half is the deployment's shared analytics

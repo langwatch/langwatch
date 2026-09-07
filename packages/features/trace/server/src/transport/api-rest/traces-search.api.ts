@@ -25,8 +25,8 @@ import { z } from "zod";
 
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 
-import type { TraceSearchBody, TracesRestPorts } from "./traces.api";
-import { logger, TRACE_ANSWER_REASON, type TraceContext } from "./traces-shared.api";
+import type { TraceSearchBody, TracesRestPorts } from "./traces.api.ts";
+import { logger, TRACE_ANSWER_REASON, type TraceContext } from "./traces-shared.api.ts";
 
 /**
  * When `select` is present the projection is compiled up front: the compiled plan drives column

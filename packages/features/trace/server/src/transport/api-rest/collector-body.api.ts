@@ -21,7 +21,7 @@ import {
   type Span,
 } from "@langwatch/trace-contract";
 
-import type { CollectorErrorReportPort } from "./collector.api";
+import type { CollectorErrorReportPort } from "./collector.api.ts";
 
 const logger = createLogger("langwatch.collector");
 

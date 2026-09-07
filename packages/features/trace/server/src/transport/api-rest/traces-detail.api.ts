@@ -20,7 +20,7 @@ import { z } from "zod";
 
 import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
 
-import type { TraceSearchBody, TracesRestPorts } from "./traces.api";
+import type { TraceSearchBody, TracesRestPorts } from "./traces.api.ts";
 import {
   ambiguousPrefixResponse,
   logger,
@@ -32,7 +32,7 @@ import {
   traceNotFoundResponse,
   transcriptResponseSchema,
   type TraceContext,
-} from "./traces-shared.api";
+} from "./traces-shared.api.ts";
 
 export function registerTraceTranscriptRoute<TBody extends TraceSearchBody, TBodyRaw>(
   family: RestApiVersionedFamily,

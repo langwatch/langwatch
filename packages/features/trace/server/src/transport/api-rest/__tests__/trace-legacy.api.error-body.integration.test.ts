@@ -66,6 +66,7 @@ function buildApi(readTrace: () => Promise<never>) {
       readEvaluations: vi.fn(),
       listTraces: vi.fn(),
       readThreadTraces: vi.fn(),
+      content: { readTrace, listTraces: vi.fn(), readThreadTraces: vi.fn() } as never,
     }),
     shares: () => ({ createShare: vi.fn(), unshare: vi.fn() }),
     getProtections: async () => ({}),

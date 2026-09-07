@@ -31,8 +31,8 @@ import {
   resolveTraceId,
   type CollectorMetadata,
   type CollectorRejection,
-} from "./collector-body.api";
-import { dispatchEvaluations, dispatchSpans, partitionFreshSpans } from "./collector-dispatch.api";
+} from "./collector-body.api.ts";
+import { dispatchEvaluations, dispatchSpans, partitionFreshSpans } from "./collector-dispatch.api.ts";
 
 const logger = createLogger("langwatch.collector");
 
