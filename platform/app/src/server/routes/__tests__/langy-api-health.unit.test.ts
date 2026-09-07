@@ -14,6 +14,8 @@
  */
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getRoutePolicy } from "~/server/api/security/route-registry";
+import { ApiKeyPermissionDeniedError } from "~/server/api-key/errors";
 import type { LangyIdentityDenialReason } from "~/server/app-layer/langy/langyApiKeyIdentity";
 
 // ─── Auth mocks (same seam as langy-api-refusal-chain.unit.test.ts) ───────────
@@ -178,10 +180,7 @@ describe("GET /api/langy/health", () => {
   });
 
   describe("given a project API key that does not clear the langy:create ceiling", () => {
-    beforeEach(async () => {
-      const { ApiKeyPermissionDeniedError } = await import(
-        "~/server/api-key/errors"
-      );
+    beforeEach(() => {
       mockEnforceApiKeyCeiling.mockRejectedValue(
         new ApiKeyPermissionDeniedError("langy:create"),
       );
@@ -304,10 +303,6 @@ describe("GET /api/langy/health", () => {
     describe("when the health route's policy is looked up", () => {
       /** @scenario "The health route is registered under the same policy as the turn routes" */
       it("registers GET /api/langy/health under the same handler-managed langy:create policy as the turn route", async () => {
-        const { getRoutePolicy } = await import(
-          "~/server/api/security/route-registry"
-        );
-
         const health = getRoutePolicy("GET", "/api/langy/health");
         const turn = getRoutePolicy("POST", "/api/langy/conversations");
 
