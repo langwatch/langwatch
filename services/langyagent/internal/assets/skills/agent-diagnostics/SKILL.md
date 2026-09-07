@@ -14,7 +14,7 @@ checks and a "convicts when" rule — lives in the docs. Read it first; it is
 the single source of truth for this skill:
 
 ```bash
-langwatch docs agent-simulations/agent-diagnostics-playbook
+langwatch docs agent-testing/agent-diagnostics-playbook
 ```
 
 The seven dimensions, in the order the playbook works them:
