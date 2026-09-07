@@ -71,6 +71,7 @@ vi.mock(
     identityNewbornReconciliation: () => ({}),
     identitySecretCarry: () => ({}),
     identitySecretHealMigration: () => ({}),
+    databaseHooks: () => ({}),
     isLatched: async () => false,
     isAnyoneLatched: async () => false,
     // A value, not a factory: the runtime exports the birth-aware gate itself
@@ -90,6 +91,8 @@ vi.mock(
     connectionGrandfatherMigration: () => ({}),
     joinRequests: () => ({}),
     joinRequestsService: () => ({}),
+    looksLikeSsoConnectionId: () => false,
+    memberProvenance: () => ({}),
     // These two are re-exported from ./signin-method-policy rather than built
     // here, so they are the functions themselves, not factories returning one.
     deploymentIsFederationCapable: () => false,
@@ -101,7 +104,17 @@ vi.mock(
     clearSignUpConfirmationPending: async () => void 0,
     signUpIdentifier: () => ({}),
     signUpVerification: () => ({}),
+    scimOversight: () => ({}),
+    scimReconciliation: () => ({}),
+    ssoArrival: () => ({}),
+    ssoAssertion: () => ({}),
+    ssoBreakGlass: () => ({}),
     ssoConnections: () => ({}),
+    ssoDomainClaimQueue: () => ({}),
+    ssoDomainReproof: () => ({}),
+    ssoEngineProviderDerivation: () => undefined,
+    ssoRegisteredIssuers: () => ({}),
+    ssoSelfServe: () => ({}),
     // Core identity additions. Stubbed rather than omitted because the annotation
     // above is exhaustive on purpose: a new runtime export has to be looked
     // at here, and this suite reaches none of them.
