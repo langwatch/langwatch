@@ -69,6 +69,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { nowInstant, toDate } from "@langwatch/time";
 
 /**
  * The platform application's persist ceilings, stated here.
@@ -178,8 +179,8 @@ function unevaluatedGraphAnalytics(): AnalyticsService {
 
 /** The process's own wall clock, as the feature reads time. */
 class ApiAutomationClock extends AutomationClockPort {
-  now(): Date {
-    return new Date();
+  now() {
+    return nowInstant();
   }
 }
 

@@ -1,4 +1,5 @@
 import type { RedisConnection } from "@langwatch/redis-client";
+import { nowInstant } from "@langwatch/time";
 
 /** The verdict one fixed window answers with. */
 export interface ApiRateLimitResult {
@@ -76,7 +77,7 @@ export class ApiRateLimitInfrastructure {
 
   /** Counts one hit against `key`'s window and answers whether it is allowed. */
   async consume({ key, windowSeconds, max }: ApiRateLimitRequest): Promise<ApiRateLimitResult> {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const redis = this.connection?.();
     if (redis) {
       return this.consumeInRedis({ redis, key, windowSeconds, max, now });

@@ -94,7 +94,7 @@ import {
   WORKER_LIVENESS_REFRESH_MS,
 } from "./scripts.ts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 
 /** Mutable state shared across one dispatch's bisection descent. */
 interface BisectionDispatchState {
@@ -669,7 +669,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
           payload,
           groupKey: groupId,
           dedupKey: dedupId || undefined,
-          scheduledAt: new Date(dispatchAfterMs),
+          scheduledAt: Temporal.Instant.fromEpochMilliseconds(dispatchAfterMs),
           // Mirror the queue's actual retry budget into any attached audit
           // projection so its terminal status agrees with queue behavior.
           maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
@@ -806,7 +806,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
               payload: payloads[i]!,
               groupKey: job.groupId,
               dedupKey: job.dedupId || undefined,
-              scheduledAt: new Date(job.dispatchAfterMs),
+              scheduledAt: Temporal.Instant.fromEpochMilliseconds(job.dispatchAfterMs),
               maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
             }),
         ),
@@ -1230,9 +1230,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
               // `leasedUntil` is a soft projection of when the queue's retry
               // layer would reschedule the job if it stalled: now +
               // maxBackoffMs. Adapters use it for stuck-state dashboards.
-              const leasedUntil = new Date(
-                nowInstant().epochMilliseconds + JOB_RETRY_CONFIG.maxBackoffMs,
-              );
+              const leasedUntil = nowInstant().add({
+                milliseconds: JOB_RETRY_CONFIG.maxBackoffMs,
+              });
               await this.runAuditAll(
                 (batchPayloads ?? [payload]).map(
                   (p) => () =>
@@ -1286,7 +1286,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
 
                 // Audit hook: onDispatched fires once per dispatched payload
                 // (dispatched + every drained sibling on success).
-                const dispatchedAt = new Date();
+                const dispatchedAt = nowInstant();
                 await this.runAuditAll(
                   (batchPayloads ?? [payload]).map(
                     (p) => () =>
@@ -1532,7 +1532,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
 
                 // Audit hook: willRetry=true. Fires for the dispatched
                 // payload + every drained sibling (they all get re-staged).
-                const nextAttemptAt = new Date(nowInstant().epochMilliseconds + backoffMs);
+                const nextAttemptAt = nowInstant().add({ milliseconds: backoffMs });
                 await this.runAuditAll(
                   (batchPayloads ?? [payload]).map(
                     (p) => () =>

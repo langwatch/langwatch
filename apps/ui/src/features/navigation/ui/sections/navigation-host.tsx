@@ -12,6 +12,7 @@ import {
   type NavigationHostPort,
   type NavigationLangy,
   type NavigationOrganization,
+  type NavigationProject,
   type NavigationTeam,
   type NavigationUser,
 } from "@langwatch/navigation-web/screens/navigation";
@@ -75,8 +76,8 @@ type OrganizationsRead = ReadonlyArray<{
       name: string;
       slug: string;
       presenceEnabled?: boolean;
-      lastCodingAgentSessionAt?: string | Date | null;
-      lastCodingAgentPullRequestAt?: string | Date | null;
+      lastCodingAgentSessionAt?: NavigationProject["lastCodingAgentSessionAt"];
+      lastCodingAgentPullRequestAt?: NavigationProject["lastCodingAgentPullRequestAt"];
     }>;
   }>;
 }>;

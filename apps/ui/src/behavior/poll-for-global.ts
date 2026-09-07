@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 // Returns a cancel function so callers can stop polling if the component
 // unmounts or the value is no longer needed — otherwise a stale poll could
 // call `onFound` with data belonging to whatever the global becomes later,
@@ -16,7 +17,7 @@ export function pollForGlobal<T>(
     };
   }
 
-  const deadline = Date.now() + timeoutMs;
+  const deadline = nowInstant().epochMilliseconds + timeoutMs;
   const interval = setInterval(() => {
     let value: T | undefined;
     try {
@@ -34,7 +35,7 @@ export function pollForGlobal<T>(
       onFound(value);
       return;
     }
-    if (Date.now() >= deadline) {
+    if (nowInstant().epochMilliseconds >= deadline) {
       clearInterval(interval);
     }
   }, intervalMs);

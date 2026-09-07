@@ -342,7 +342,7 @@ export function resolveWebhookPlan(
  */
 function pruneExpiredIdempotencyReceipts(
   options: WorkerGatewaySpendCompositionInput,
-  now: Date,
+  now: Parameters<WebhookDeliveryProcessDeps["pruneExpiredIdempotencyReceipts"]>[0],
 ): Promise<unknown> {
   const database = options.database as unknown as PrismaClient;
   return database.$executeRaw`

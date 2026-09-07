@@ -9,7 +9,7 @@ import type {
 import { FoldAccumulator, MapAccumulator } from "./replayExecutor.ts";
 import type { ReplayLogWriter } from "./replayLog.ts";
 import { nullLog } from "./replayLog.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import {
   aggregateKey,
   cleanupAll,
@@ -148,7 +148,7 @@ async function discoverTenantAggregates({
 }): Promise<void> {
   const aggregates = await ctx.eventSource.discoverAffectedAggregates({
     eventTypes: selected.allEventTypes,
-    sinceMs: new Date(config.since).getTime(),
+    sinceMs: toEpochMs(config.since),
     tenantId,
   });
   for (const agg of aggregates) {

@@ -21,6 +21,7 @@ import { TRPCError } from "@trpc/server";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createEvaluatorTrpcRouter } from "./evaluator-trpc.mount.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 /**
  * The ONE evaluator service on this process.
@@ -154,7 +155,7 @@ function composeEvaluatorPorts(options: EvaluatorFeatureCollaborators): Evaluato
     archiveLinkedWorkflow: (_ctx, { workflowId, projectId }) =>
       prisma.workflow.update({
         where: { id: workflowId, projectId },
-        data: { archivedAt: new Date() },
+        data: { archivedAt: toDate(nowInstant()) },
       }),
     replicateEvaluatorWorkflow: async (ctx, { workflowId, sourceProjectId, targetProjectId }) => {
       const workflow = await prisma.workflow.findFirst({

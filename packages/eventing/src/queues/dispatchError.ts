@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 /**
  * Typed error thrown by outbox dispatch endpoints to signal whether the
  * failure is worth retrying.
@@ -76,7 +76,7 @@ export function parseRetryAfterMs(
     const ms = parseInt(trimmed, 10) * 1000;
     return Math.min(ms, MAX_RETRY_AFTER_MS);
   }
-  const date = Date.parse(trimmed);
+  const date = toEpochMs(trimmed);
   if (Number.isNaN(date)) return undefined;
   const delta = date - now;
   if (delta <= 0) return undefined;

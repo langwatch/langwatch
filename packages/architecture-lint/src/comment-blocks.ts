@@ -14,6 +14,7 @@ import {
   marksLicenseHeader,
   mayContainReviewBlock,
 } from "@langwatch/lint-core/grammar/comment-block-policy.mjs";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"]);
 
@@ -188,12 +189,12 @@ export function compareCommentBlockRoots(
 export function lintCommentBlockRoots(
   root: string,
   baselineReference?: string,
-  now: Date = new Date(),
+  now: Instant = nowInstant(),
 ): CommentBlockRootsBaselineCheck {
   const file = commentBlockRootsFile(root);
   const current = readCommentBlockRootsFile(file);
   const violations = [...current.violations];
-  const today = now.toISOString().slice(0, 10);
+  const today = now.toString({ fractionalSecondDigits: 3 }).slice(0, 10);
 
   for (const entry of current.entries) {
     if (entry.expires < today) {

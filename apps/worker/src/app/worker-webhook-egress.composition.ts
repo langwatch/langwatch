@@ -8,6 +8,7 @@ import {
 import type { RedisConnection } from "@langwatch/redis-client";
 import { WorkerWebhookDeliveryTransportAdapter } from "../features/automation/webhook-delivery.transport.adapter.ts";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The SSRF-fenced outbound sender this process reaches customer-supplied
@@ -107,7 +108,7 @@ class WorkerWebhookDispatchRateLimiter extends WebhookDispatchRateLimiterPort {
     windowSeconds: number;
     max: number;
   }): Promise<WebhookDispatchRateLimitResult> {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const redisKey = `langwatch:ratelimit:${key}`;
     const count = await this.connection.incr(redisKey);
     if (count === 1) {

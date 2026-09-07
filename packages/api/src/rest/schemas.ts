@@ -1,11 +1,12 @@
 import type { SerializedReason } from "@langwatch/handled-error";
+import { toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
 /**
  * Coerces a date value (ISO string or epoch number) to epoch milliseconds.
  */
 export function coerceToEpoch(value: string | number): number {
-  return typeof value === "string" ? Date.parse(value) : value;
+  return toEpochMs(value);
 }
 
 /**
@@ -13,7 +14,7 @@ export function coerceToEpoch(value: string | number): number {
  */
 export const flexibleDateSchema = z.union([
   z.number(),
-  z.string().refine((val) => !Number.isNaN(Date.parse(val)), {
+  z.string().refine((val) => !Number.isNaN(toEpochMs(val)), {
     message: "Invalid date format",
   }),
 ]);

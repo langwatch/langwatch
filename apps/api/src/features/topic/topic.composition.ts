@@ -46,7 +46,7 @@ export function refusingTopicFeature(): ComposedTopicFeature {
 
 /** A process that never schedules clustering: the status panel reads "not scheduled". */
 class UnscheduledTopicClustering extends TopicClusteringSchedulePort {
-  tryGetNextWakeAt(): Promise<Date | null> {
+  tryGetNextWakeAt() {
     return Promise.resolve(null);
   }
 }

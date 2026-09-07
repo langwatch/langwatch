@@ -342,8 +342,9 @@ export class ProcessRuntime {
   }
 
   private armSchedule({ registered }: { registered: RegisteredProcessManager }): void {
-    const now = nowInstant().epochMilliseconds;
-    const day = new Date(now).toISOString().slice(0, 10);
+    const instant = nowInstant();
+    const now = instant.epochMilliseconds;
+    const day = instant.toString({ fractionalSecondDigits: 3 }).slice(0, 10);
     const processName = registered.definition.config.name;
     void registered.manager
       .handleEvent({

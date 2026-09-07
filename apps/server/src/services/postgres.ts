@@ -6,6 +6,7 @@ import type { EventBus } from "./event-bus.ts";
 import { execCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
+import { nowInstant } from "@langwatch/time";
 
 const DB_USER = "langwatch";
 const DB_NAME = "langwatch_db";
@@ -57,7 +58,7 @@ function pgEnv(resolvedPath: string, base: NodeJS.ProcessEnv = process.env): Nod
  */
 export async function startPostgres(ctx: RuntimeContext, bus: EventBus): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "postgres" });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   const resolvedPath = ctx.predeps.postgres?.resolvedPath;
   if (!resolvedPath) throw new Error("postgres predep not resolved — run install first");
@@ -109,7 +110,11 @@ export async function startPostgres(ctx: RuntimeContext, bus: EventBus): Promise
 
   await ensureDatabase(layout, ctx.ports.postgres, env);
 
-  bus.emit({ type: "healthy", service: "postgres", durationMs: Date.now() - start });
+  bus.emit({
+    type: "healthy",
+    service: "postgres",
+    durationMs: nowInstant().epochMilliseconds - start,
+  });
   return handle;
 }
 

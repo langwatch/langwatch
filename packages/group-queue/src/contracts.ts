@@ -2,6 +2,7 @@ import type { Attributes } from "@opentelemetry/api";
 import type { Cluster, Redis as IORedis } from "ioredis";
 
 import type { ObjectStore, ProjectStorageDestination } from "./storage.ts";
+import type { Instant } from "@langwatch/time";
 
 export interface GroupQueuePayloadSchema<Payload> {
   parse(value: unknown): Payload;
@@ -109,16 +110,16 @@ export interface QueueAuditAdapter<Payload> {
     payload: Payload;
     groupKey: string;
     dedupKey: string | undefined;
-    scheduledAt: Date;
+    scheduledAt: Instant;
     maxAttempts?: number;
   }): Promise<void>;
-  onLeased(event: { payload: Payload; attempt: number; leasedUntil?: Date }): Promise<void>;
-  onDispatched(event: { payload: Payload; at: Date; attempt: number }): Promise<void>;
+  onLeased(event: { payload: Payload; attempt: number; leasedUntil?: Instant }): Promise<void>;
+  onDispatched(event: { payload: Payload; at: Instant; attempt: number }): Promise<void>;
   onFailed(event: {
     payload: Payload;
     error: string;
     willRetry: boolean;
-    nextAttemptAt?: Date;
+    nextAttemptAt?: Instant;
     attempt: number;
   }): Promise<void>;
   onDead(event: { payload: Payload; lastError: string; attempt: number }): Promise<void>;

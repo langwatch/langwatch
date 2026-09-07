@@ -468,14 +468,9 @@ class ApiUsageWarningDirectory implements BillingUsageLimitOrganization {
 
   private constructor(private readonly prisma: PrismaClient) {}
 
-  async findWithAdmins(organizationId: string): Promise<{
-    id: string;
-    name: string;
-    sentPlanLimitAlert: Date | null;
-    members: Array<{ user: { id: string; name: string | null; email: string | null } }>;
-    pricingModel: BillingPricingModel | null;
-    currency: "USD" | "EUR";
-  } | null> {
+  async findWithAdmins(
+    organizationId: string,
+  ): ReturnType<BillingUsageLimitOrganization["findWithAdmins"]> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: {
@@ -498,7 +493,10 @@ class ApiUsageWarningDirectory implements BillingUsageLimitOrganization {
     };
   }
 
-  async updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void> {
+  async updateSentPlanLimitAlert(
+    organizationId: string,
+    timestamp: Parameters<BillingUsageLimitOrganization["updateSentPlanLimitAlert"]>[1],
+  ): Promise<void> {
     await this.prisma.organization.update({
       where: { id: organizationId },
       data: { sentPlanLimitAlert: timestamp },

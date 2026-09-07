@@ -3,6 +3,7 @@ import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The Go-native NLP service (services/nlpgo) — the only NLP engine. Reuses
@@ -17,7 +18,7 @@ export async function startNlpgo(
   envFromFile: Record<string, string>,
 ): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "nlpgo" as never });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   // Reuse the aigateway predep's mono-binary — same `cmd/service` build,
   // dispatched here as `nlpgo` instead of `aigateway`. Saves us shipping
@@ -68,7 +69,7 @@ export async function startNlpgo(
   bus.emit({
     type: "healthy",
     service: "nlpgo" as never,
-    durationMs: Date.now() - start,
+    durationMs: nowInstant().epochMilliseconds - start,
   });
   return handle;
 }

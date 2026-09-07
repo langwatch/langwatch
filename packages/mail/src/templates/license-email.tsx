@@ -1,8 +1,16 @@
 import { z } from "zod";
 import { sendEmail } from "../email-sender.ts";
 import type { EmailDeliveryPort } from "../providers/types.ts";
-import { CodeBlock, DetailTable, EmailLayout, InlineLink, Muted, Paragraph } from "./email-layout.tsx";
+import {
+  CodeBlock,
+  DetailTable,
+  EmailLayout,
+  InlineLink,
+  Muted,
+  Paragraph,
+} from "./email-layout.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
+import { readableDate } from "./readable-date.ts";
 
 export const licenseEmailProps = z.object({
   email: z.email(),
@@ -34,7 +42,7 @@ export type LicenseEmailProps = z.infer<typeof licenseEmailProps>;
 export const licenseEmailSubject = (): string => "Your LangWatch License Key";
 
 const formatExpiry = (expiresAt: string): string =>
-  new Date(expiresAt).toLocaleDateString("en-US", {
+  readableDate(expiresAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",

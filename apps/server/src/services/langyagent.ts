@@ -6,6 +6,7 @@ import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Whether the downloaded mono-binary knows the `langyagent` subcommand.
@@ -63,7 +64,7 @@ export async function startLangyagent(
   envFromFile: Record<string, string>,
 ): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "langyagent" });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   const binary = ctx.predeps.aigateway?.resolvedPath;
   if (!binary) throw new Error("aigateway/langyagent monobinary predep not resolved");
@@ -121,6 +122,10 @@ export async function startLangyagent(
     await handle.stop();
     throw new Error(`langyagent did not become healthy: ${ready.reason}`);
   }
-  bus.emit({ type: "healthy", service: "langyagent", durationMs: Date.now() - start });
+  bus.emit({
+    type: "healthy",
+    service: "langyagent",
+    durationMs: nowInstant().epochMilliseconds - start,
+  });
   return handle;
 }

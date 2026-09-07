@@ -5,6 +5,7 @@
  * widening the allowlist or tightening the headers updates all of them at once.
  */
 import { isReadbackSafe } from "@langwatch/stored-object-contract";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Static response headers attached to every stored-object read. Never vary by
@@ -56,7 +57,9 @@ export function rateLimitedResponse(resetAtMs: number): Response {
     status: 429,
     headers: {
       "Content-Type": "application/json",
-      "Retry-After": String(Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000))),
+      "Retry-After": String(
+        Math.max(1, Math.ceil((resetAtMs - nowInstant().epochMilliseconds) / 1000)),
+      ),
       ...STORED_OBJECT_RESPONSE_BASE_HEADERS,
     },
   });

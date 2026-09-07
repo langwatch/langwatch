@@ -8,6 +8,7 @@ import type { Cost, PrismaClient, Project } from "@langwatch/prisma-client/gener
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createCostTrpcRouter, createLimitsTrpcRouter } from "./entitlement-trpc.mount.ts";
+import { Temporal, toDate } from "@langwatch/time";
 
 /**
  * The usage reading and the approaching-limit mail, over the deployment's billing store.
@@ -145,7 +146,10 @@ async function readOrganizationSpend(
   });
   const projectsById = new Map(projects.map((project) => [project.id, project]));
   const projectIds = [...projectsById.keys()];
-  const createdAt = { gte: new Date(input.startDate), lte: new Date(input.endDate) };
+  const createdAt = {
+    gte: toDate(Temporal.Instant.fromEpochMilliseconds(input.startDate)),
+    lte: toDate(Temporal.Instant.fromEpochMilliseconds(input.endDate)),
+  };
 
   const [traceCheckCosts, otherCosts] = await Promise.all([
     prisma.cost.groupBy({

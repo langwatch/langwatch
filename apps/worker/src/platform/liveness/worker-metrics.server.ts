@@ -2,6 +2,7 @@ import http, { type IncomingMessage, type RequestListener, type ServerResponse }
 import { Worker } from "node:worker_threads";
 import type { Logger } from "@langwatch/observability";
 import { WORKER_HEARTBEAT_STALL_BUDGET_MS, WORKER_LIVENESS_PATH } from "./worker.liveness.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The worker process's single HTTP listener: the Prometheus metrics port, which
@@ -209,9 +210,9 @@ export async function startWorkerMetricsServer(
 
   // BigInt64 + Atomics — see the note in LIVENESS_THREAD_SOURCE.
   const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
-  Atomics.store(heartbeat, 0, BigInt(Date.now()));
+  Atomics.store(heartbeat, 0, BigInt(nowInstant().epochMilliseconds));
   const heartbeatTimer = setInterval(() => {
-    Atomics.store(heartbeat, 0, BigInt(Date.now()));
+    Atomics.store(heartbeat, 0, BigInt(nowInstant().epochMilliseconds));
   }, WORKER_HEARTBEAT_INTERVAL_MS);
   heartbeatTimer.unref();
 

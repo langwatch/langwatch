@@ -11,6 +11,7 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { AgentCacheEntryStorePort } from "./agent-cache.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** The entry keyspace, shared across every pod of one deployment. */
 export class RedisAgentCacheEntryStore extends AgentCacheEntryStorePort {
@@ -59,13 +60,13 @@ export class MemoryAgentCacheEntryStore extends AgentCacheEntryStorePort {
   }
 
   set(key: string, value: string, ttlMs: number): Promise<void> {
-    this.entries.set(key, { value, expiresAt: Date.now() + ttlMs });
+    this.entries.set(key, { value, expiresAt: nowInstant().epochMilliseconds + ttlMs });
     return Promise.resolve();
   }
 
   claim(key: string, value: string, ttlMs: number): Promise<boolean> {
     if (this.live(key)) return Promise.resolve(false);
-    this.entries.set(key, { value, expiresAt: Date.now() + ttlMs });
+    this.entries.set(key, { value, expiresAt: nowInstant().epochMilliseconds + ttlMs });
     return Promise.resolve(true);
   }
 
@@ -78,7 +79,7 @@ export class MemoryAgentCacheEntryStore extends AgentCacheEntryStorePort {
   private live(key: string): { value: string; expiresAt: number } | undefined {
     const entry = this.entries.get(key);
     if (!entry) return undefined;
-    if (entry.expiresAt <= Date.now()) {
+    if (entry.expiresAt <= nowInstant().epochMilliseconds) {
       this.entries.delete(key);
       return undefined;
     }

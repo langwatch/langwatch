@@ -23,6 +23,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Where a self-hosted install reports what it is running. */
 const USAGE_STATS_RECEIVER = "https://app.langwatch.ai/api/track_usage";
@@ -86,7 +87,7 @@ export function createWorkerOps(options: WorkerOpsCompositionInput): WorkerOpsCo
     usageStats: {
       database: options.database,
       clickhouse: WorkerUsageStatsClickHouse.create(options.resolveOrganizationClient),
-      config: { ...options.config.ops.usageStats, now: () => new Date() },
+      config: { ...options.config.ops.usageStats, now: nowInstant },
       telemetry: WorkerUsageStatsTelemetry.create(),
       errors: LoggedUsageStatsErrors.create(logger),
       builderChartKind: BUILDER_CHART_KIND,

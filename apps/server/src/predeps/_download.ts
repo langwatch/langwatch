@@ -2,6 +2,7 @@ import { createWriteStream } from "node:fs";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { PredepTask } from "./types.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Stream-download a URL to disk while reporting MB / total MB to the
@@ -31,7 +32,7 @@ export async function downloadWithProgress(
   const reporter = new Transform({
     transform(chunk: Buffer, _enc, cb) {
       downloaded += chunk.length;
-      const now = Date.now();
+      const now = nowInstant().epochMilliseconds;
       if (now - lastUpdate > 100) {
         task.output = `${prefix} ${formatMB(downloaded)}${total ? ` / ${totalLabel}` : ""}`;
         lastUpdate = now;

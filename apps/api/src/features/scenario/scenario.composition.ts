@@ -72,6 +72,7 @@ import { createSuiteTrpcRouter } from "../suite/suite-trpc.mount.ts";
 import { createScenarioTrpcRouter } from "./scenario-trpc.mount.ts";
 import { ApiAgentTestConnectedDispatchAdapter } from "../agent/agent-test-connected-dispatch.adapter.ts";
 import { ApiAgentTestOwnershipAdapter } from "../agent/agent-test-ownership.adapter.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 /**
  * The ksuid resource prefixes a scenario and a run are persisted under.
@@ -424,8 +425,8 @@ class NanoidScenarioTestSuiteId extends ScenarioTestSuiteIdPort {
 }
 
 class SystemScenarioClock extends ScenarioClockPort {
-  now(): Date {
-    return new Date();
+  now() {
+    return toDate(nowInstant());
   }
 }
 

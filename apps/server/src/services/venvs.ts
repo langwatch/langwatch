@@ -7,6 +7,7 @@ import type { EventBus } from "./event-bus.ts";
 import { servicePaths } from "./paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 import { resolveEffectiveFeatures } from "../shared/features.ts";
+import { nowInstant } from "@langwatch/time";
 
 type VenvSpec = {
   name: "langevals";
@@ -39,7 +40,7 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
       if (existsSync(venvDir) && readFileSafely(hashFile) === expected) return;
 
       bus.emit({ type: "starting", service: `prepare:${spec.name}` as never });
-      const start = Date.now();
+      const start = nowInstant().epochMilliseconds;
 
       mkdirSync(venvDir, { recursive: true });
       const extraArgs = (spec.extras ?? []).flatMap((e) => ["--extra", e]);
@@ -59,7 +60,7 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
       bus.emit({
         type: "healthy",
         service: `prepare:${spec.name}` as never,
-        durationMs: Date.now() - start,
+        durationMs: nowInstant().epochMilliseconds - start,
       });
     }),
   );

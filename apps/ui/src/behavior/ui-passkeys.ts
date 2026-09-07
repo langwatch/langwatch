@@ -6,12 +6,13 @@
 
 import { passkeyClient } from "@better-auth/passkey/client";
 import { createAuthClient } from "better-auth/react";
+import type { HeldPasskey } from "@langwatch/user-web/screens/personal-workspace";
 
 /** One passkey, as the plugin stores it and the screen reads it. */
 export type UiPasskey = {
   id: string;
   name?: string | null;
-  createdAt: string | Date;
+  createdAt: HeldPasskey["createdAt"];
   transports?: string | null;
 };
 

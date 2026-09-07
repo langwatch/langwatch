@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * Recovery from stale content-hashed chunks after a deploy — the next
  * lazy `import()` of a removed chunk 404s with "Failed to fetch
@@ -20,9 +21,9 @@ export function forceReloadOnce(): boolean {
   if (typeof window === "undefined") return false;
 
   const lastReloadAt = Number(sessionStorage.getItem(RELOAD_AT_KEY) ?? "0");
-  if (Date.now() - lastReloadAt <= RELOAD_COOLDOWN_MS) return false;
+  if (nowInstant().epochMilliseconds - lastReloadAt <= RELOAD_COOLDOWN_MS) return false;
 
-  sessionStorage.setItem(RELOAD_AT_KEY, String(Date.now()));
+  sessionStorage.setItem(RELOAD_AT_KEY, String(nowInstant().epochMilliseconds));
   window.location.reload();
   return true;
 }

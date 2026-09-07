@@ -2,6 +2,7 @@ import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { locateTasksDir, resolvePnpm } from "./node-deps.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Run Prisma migrations against the embedded postgres + ClickHouse goose
@@ -30,7 +31,7 @@ export async function runMigrations(
   }
 
   bus.emit({ type: "starting", service: "postgres" }); // re-emitted as a "phase 2" marker
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -71,6 +72,6 @@ export async function runMigrations(
   bus.emit({
     type: "healthy",
     service: "postgres",
-    durationMs: Date.now() - start,
+    durationMs: nowInstant().epochMilliseconds - start,
   });
 }

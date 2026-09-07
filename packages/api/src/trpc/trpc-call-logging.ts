@@ -10,6 +10,7 @@ import { createWarnThrottle, type Logger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import { TRPCError } from "@trpc/server";
 import { getHTTPStatusCodeFromError } from "@trpc/server/http";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * How long a call may take before its record is raised from info to warning.
@@ -67,7 +68,7 @@ export function handleTrpcCallLogging({
   // that wants the operator override resolves it with
   // `resolveSlowCallBudgetMs(process.env)` and passes the number in.
   slowCallBudgetMs = DEFAULT_SLOW_CALL_MS,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   result: { ok: boolean; error?: unknown };
   path: string;

@@ -43,6 +43,7 @@ import type {
   TrpcMiddlewareContext,
 } from "./trpc-policy-ports.ts";
 import type { TrpcRoot } from "./trpc-root.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -301,7 +302,7 @@ export function createTrpcRuntimePolicy<
     const parentContext = callerTraceContext({ req: ctx.req, type });
 
     if (isSilencedCall({ path, type })) {
-      const startTime = Date.now();
+      const startTime = nowInstant().epochMilliseconds;
       const result = await next();
       if (result.ok) return result;
 
@@ -412,12 +413,12 @@ export function createTrpcRuntimePolicy<
     };
 
     return runWithContext(requestContext, async () => {
-      const start = Date.now();
+      const start = nowInstant().epochMilliseconds;
       // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
       // caught by callRecursive and returned as { ok: false, error } result
       // objects. Use result.ok to detect errors — NOT try/catch.
       const result = await next();
-      const duration = Date.now() - start;
+      const duration = nowInstant().epochMilliseconds - start;
 
       recordTrpcCall({
         result,

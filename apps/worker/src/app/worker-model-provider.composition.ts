@@ -33,6 +33,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Reports the two composition decisions the model gateway would otherwise hide.
@@ -278,7 +279,7 @@ class WorkerModelProviderRateLimit extends ModelProviderRateLimitPort {
     windowSeconds: number;
     max: number;
   }): Promise<{ allowed: boolean; resetAt: number }> {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const redisKey = `langwatch:ratelimit:${key}`;
     const count = await this.connection.incr(redisKey);
     if (count === 1) {

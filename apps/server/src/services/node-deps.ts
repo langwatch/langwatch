@@ -15,6 +15,7 @@ import type { LangwatchPaths } from "../shared/paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The workspace name of the langwatch app, as declared in
@@ -125,7 +126,7 @@ export async function ensureLangwatchDeps(
   }
 
   bus.emit({ type: "starting", service: "prepare:langwatch" as never });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   // We use `pnpm -C <dir>` instead of a cwd because pnpm's
   // workspace-aware mode resolves the workspace ROOT package.json when
@@ -292,7 +293,7 @@ export async function ensureLangwatchDeps(
   bus.emit({
     type: "healthy",
     service: "prepare:langwatch" as never,
-    durationMs: Date.now() - start,
+    durationMs: nowInstant().epochMilliseconds - start,
   });
 }
 

@@ -10,6 +10,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { AiCallFailureService, getProjectModelProviders } from "@langwatch/model-provider-server";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant, toDate } from "@langwatch/time";
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
@@ -365,7 +366,7 @@ export function composeWorkflowFeature(options: {
       _ctx: unknown,
       input: Readonly<{ projectId: string; workflowId: string; unarchive?: boolean }>,
     ) => {
-      const now = input.unarchive ? null : new Date();
+      const now = input.unarchive ? null : toDate(nowInstant());
 
       return prisma.$transaction(async (tx) => {
         // 1. Find all evaluators linked to this workflow

@@ -13,6 +13,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Who a limit notice goes to, resolved through this process's own directories.
@@ -242,7 +243,7 @@ async function claimOnce(input: {
     }
   }
 
-  const now = Date.now();
+  const now = nowInstant().epochMilliseconds;
   sweepExpiredClaims(now);
   const existing = claimMemory.get(key);
   if (existing !== undefined && existing.expiresAt > now) return null;

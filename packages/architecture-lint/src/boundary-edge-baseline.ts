@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import type { ArchitectureViolation } from "./types.ts";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 const FILE_NAME = "boundary-edge-baseline.json";
 const KINDS = ["cross-feature", "private-runtime-export"] as const;
@@ -146,12 +147,12 @@ export function lintBoundaryEdgeBaseline(
   root: string,
   currentEdges: readonly BoundaryEdge[],
   baselineReference?: string,
-  now: Date = new Date(),
+  now: Instant = nowInstant(),
 ): BoundaryEdgeBaselineCheck {
   const file = boundaryEdgeBaselineFile(root);
   const current = readBoundaryEdgeBaselineFile(file);
   const violations = [...current.violations];
-  const today = now.toISOString().slice(0, 10);
+  const today = now.toString({ fractionalSecondDigits: 3 }).slice(0, 10);
   const currentKeys = new Set(currentEdges.map(key));
 
   for (const entry of current.entries) {
@@ -221,9 +222,9 @@ export function boundaryEdgesFromViolations(
 export function filterBaselinedBoundaryEdges(
   violations: readonly ArchitectureViolation[],
   entries: readonly BoundaryEdgeEntry[],
-  now: Date = new Date(),
+  now: Instant = nowInstant(),
 ): ArchitectureViolation[] {
-  const today = now.toISOString().slice(0, 10);
+  const today = now.toString({ fractionalSecondDigits: 3 }).slice(0, 10);
   const allowed = new Set(entries.filter((entry) => entry.expires >= today).map(key));
 
   return violations.filter((violation) => {

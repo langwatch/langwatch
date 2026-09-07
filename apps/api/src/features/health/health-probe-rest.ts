@@ -11,6 +11,7 @@ import crypto from "crypto";
 import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import type { CollectorRESTParams } from "@langwatch/trace-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:health-checks");
 
@@ -89,7 +90,10 @@ async function collectorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
         type: "span",
         input: { type: "text", value: "\u{1F423}" },
         output: { type: "text", value: "\u{1F4AF}" },
-        timestamps: { started_at: Date.now(), finished_at: Date.now() },
+        timestamps: {
+          started_at: nowInstant().epochMilliseconds,
+          finished_at: nowInstant().epochMilliseconds,
+        },
       },
     ],
     metadata: { canary: true } as any,
@@ -119,8 +123,8 @@ async function collectorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
                 ),
                 name: "Health check",
                 kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
-                startTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
-                endTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
+                startTimeUnixNano: (nowInstant().epochMilliseconds * 1000 * 1000).toString(),
+                endTimeUnixNano: (nowInstant().epochMilliseconds * 1000 * 1000).toString(),
                 attributes: [
                   {
                     key: "gen_ai.prompt.0.role",
@@ -251,7 +255,10 @@ async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
         type: "span",
         input: { type: "text", value: "\u{1F424}" },
         output: { type: "text", value: "\u{1F4AF}" },
-        timestamps: { started_at: Date.now(), finished_at: Date.now() },
+        timestamps: {
+          started_at: nowInstant().epochMilliseconds,
+          finished_at: nowInstant().epochMilliseconds,
+        },
       },
     ],
     metadata: { canary: true } as any,
@@ -280,8 +287,8 @@ async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
                 ),
                 name: "Health check",
                 kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
-                startTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
-                endTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
+                startTimeUnixNano: (nowInstant().epochMilliseconds * 1000 * 1000).toString(),
+                endTimeUnixNano: (nowInstant().epochMilliseconds * 1000 * 1000).toString(),
                 attributes: [
                   {
                     key: "gen_ai.request.model",
@@ -309,7 +316,7 @@ async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
     ],
   };
 
-  const t0 = Date.now();
+  const t0 = nowInstant().epochMilliseconds;
   logger.info(
     { restTraceId, otelTraceId: otelTraceIdBase64 },
     "Healthcheck started, sending canary traces",
@@ -334,7 +341,7 @@ async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
     }),
   ]);
 
-  const sendDurationMs = Date.now() - t0;
+  const sendDurationMs = nowInstant().epochMilliseconds - t0;
   logger.info(
     {
       restTraceId,
@@ -358,28 +365,28 @@ async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
 
   // Check traces with retry mechanism
   const checkTraceWithRetry = async (traceId: string): Promise<Response> => {
-    const startTime = Date.now();
+    const startTime = nowInstant().epochMilliseconds;
     const timeoutMs = 60 * 1000;
     const retryIntervalMs = 2000;
     let attempt = 0;
 
-    while (Date.now() - startTime < timeoutMs) {
+    while (nowInstant().epochMilliseconds - startTime < timeoutMs) {
       await sleep(retryIntervalMs);
       attempt++;
 
       try {
-        const fetchStart = Date.now();
+        const fetchStart = nowInstant().epochMilliseconds;
         const traceResponse = await fetch(
           `${ports.publicBaseUrl}/api/traces/${encodeURIComponent(traceId)}`,
           {
             headers: { "X-Auth-Token": authToken },
           },
         );
-        const fetchMs = Date.now() - fetchStart;
+        const fetchMs = nowInstant().epochMilliseconds - fetchStart;
 
         if (traceResponse.ok) {
           logger.info(
-            { traceId, attempt, fetchMs, elapsedMs: Date.now() - startTime },
+            { traceId, attempt, fetchMs, elapsedMs: nowInstant().epochMilliseconds - startTime },
             "Trace found",
           );
           return traceResponse;
@@ -392,7 +399,7 @@ async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
               attempt,
               fetchMs,
               status: traceResponse.status,
-              elapsedMs: Date.now() - startTime,
+              elapsedMs: nowInstant().epochMilliseconds - startTime,
             },
             "Trace poll slow response",
           );
@@ -402,7 +409,7 @@ async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
           {
             traceId,
             attempt,
-            elapsedMs: Date.now() - startTime,
+            elapsedMs: nowInstant().epochMilliseconds - startTime,
             error: error instanceof Error ? error.message : String(error),
           },
           "Trace poll fetch error",
@@ -411,7 +418,7 @@ async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
     }
 
     logger.warn(
-      { traceId, attempts: attempt, elapsedMs: Date.now() - startTime },
+      { traceId, attempts: attempt, elapsedMs: nowInstant().epochMilliseconds - startTime },
       "Trace poll exhausted all attempts",
     );
     throw new Error("Timeout waiting for trace to be available");
@@ -427,7 +434,7 @@ async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
       }),
     ]);
   } catch (error) {
-    const totalMs = Date.now() - t0;
+    const totalMs = nowInstant().epochMilliseconds - t0;
     logger.warn(
       { restTraceId, otelTraceId: otelTraceIdBase64, totalMs },
       `Healthcheck failed: ${(error as Error).message}`,
@@ -435,7 +442,7 @@ async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<
     return c.json({ message: (error as Error).message }, { status: 500 });
   }
 
-  const totalMs = Date.now() - t0;
+  const totalMs = nowInstant().epochMilliseconds - t0;
   logger.info({ restTraceId, otelTraceId: otelTraceIdBase64, totalMs }, "Healthcheck passed");
 
   return c.json({
@@ -474,7 +481,7 @@ async function triggersProbe(c: Context, ports: HealthProbeRestPorts): Promise<R
     return c.json({ message: "No trigger sent found." }, { status: 404 });
   }
 
-  const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
+  const oneHourAgo = toDate(nowInstant().subtract({ milliseconds: 60 * 60 * 1000 }));
   if (lastTriggerSent.createdAt < oneHourAgo) {
     return c.json({ message: "Trigger not triggered within the last hour." }, { status: 404 });
   }

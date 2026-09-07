@@ -42,6 +42,7 @@ import {
   type TraceClickHouseWriteResolver,
 } from "@langwatch/trace-server";
 import type { WorkerAutomationSettlementAbsenceReportPort } from "./worker-automation-settlement.composition.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The four trace reads a settled match is confirmed and rendered from.
@@ -183,7 +184,7 @@ export class WorkerTraceRecordReader {
         "visibility window failing closed: plan resolution failed",
       );
 
-      return Date.now() - FREE_VISIBILITY_DAYS * DAY_MS;
+      return nowInstant().epochMilliseconds - FREE_VISIBILITY_DAYS * DAY_MS;
     }
   }
 
@@ -300,7 +301,7 @@ class RetentionFloorFromDefault extends EvaluationRetentionFloorPort {
   }
 
   async getFloorMs(): Promise<number> {
-    return Date.now() - this.defaultRetentionDays * 24 * 60 * 60 * 1000;
+    return nowInstant().epochMilliseconds - this.defaultRetentionDays * 24 * 60 * 60 * 1000;
   }
 }
 

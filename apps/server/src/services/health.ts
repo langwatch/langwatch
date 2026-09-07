@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { execa } from "execa";
+import { nowInstant } from "@langwatch/time";
 
 export type HealthProbeOk = { ok: true; durationMs: number };
 export type HealthProbeFail = { ok: false; durationMs: number; reason: string };
@@ -21,17 +22,17 @@ export async function pollUntilHealthy({
   timeoutMs: number;
   intervalMs?: number;
 }): Promise<HealthProbeResult> {
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
   let lastReason = "no probe attempted";
-  while (Date.now() - start < timeoutMs) {
+  while (nowInstant().epochMilliseconds - start < timeoutMs) {
     const result = await check();
-    if (result.ok) return { ok: true, durationMs: Date.now() - start };
+    if (result.ok) return { ok: true, durationMs: nowInstant().epochMilliseconds - start };
     lastReason = result.reason;
     await sleep(intervalMs);
   }
   return {
     ok: false,
-    durationMs: Date.now() - start,
+    durationMs: nowInstant().epochMilliseconds - start,
     reason: `timed out: ${lastReason}`,
   };
 }
@@ -50,7 +51,7 @@ export function httpGetCheck(
 ): HealthCheck {
   const requestTimeoutMs = opts.requestTimeoutMs ?? 5_000;
   return async () => {
-    const start = Date.now();
+    const start = nowInstant().epochMilliseconds;
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), requestTimeoutMs);
     try {
@@ -60,7 +61,7 @@ export function httpGetCheck(
       if (status !== expected) {
         return {
           ok: false,
-          durationMs: Date.now() - start,
+          durationMs: nowInstant().epochMilliseconds - start,
           reason: `status ${status} (expected ${expected})`,
         };
       }
@@ -69,17 +70,17 @@ export function httpGetCheck(
         if (!body.includes(opts.expectBodyContains)) {
           return {
             ok: false,
-            durationMs: Date.now() - start,
+            durationMs: nowInstant().epochMilliseconds - start,
             reason: `body missing "${opts.expectBodyContains}"`,
           };
         }
       }
-      return { ok: true, durationMs: Date.now() - start };
+      return { ok: true, durationMs: nowInstant().epochMilliseconds - start };
     } catch (err) {
       const reason = ac.signal.aborted
         ? `request timed out after ${requestTimeoutMs}ms`
         : (err as Error).message;
-      return { ok: false, durationMs: Date.now() - start, reason };
+      return { ok: false, durationMs: nowInstant().epochMilliseconds - start, reason };
     } finally {
       clearTimeout(timer);
     }
@@ -92,27 +93,31 @@ export function execCheck(
   opts: { expectStdoutContains?: string; env?: NodeJS.ProcessEnv } = {},
 ): HealthCheck {
   return async () => {
-    const start = Date.now();
+    const start = nowInstant().epochMilliseconds;
     try {
       const { exitCode, stdout } = await execa(command, args, {
         reject: false,
         env: opts.env,
       });
       if (exitCode !== 0) {
-        return { ok: false, durationMs: Date.now() - start, reason: `exit ${exitCode}` };
+        return {
+          ok: false,
+          durationMs: nowInstant().epochMilliseconds - start,
+          reason: `exit ${exitCode}`,
+        };
       }
       if (opts.expectStdoutContains && !stdout.includes(opts.expectStdoutContains)) {
         return {
           ok: false,
-          durationMs: Date.now() - start,
+          durationMs: nowInstant().epochMilliseconds - start,
           reason: `stdout missing "${opts.expectStdoutContains}"`,
         };
       }
-      return { ok: true, durationMs: Date.now() - start };
+      return { ok: true, durationMs: nowInstant().epochMilliseconds - start };
     } catch (err) {
       return {
         ok: false,
-        durationMs: Date.now() - start,
+        durationMs: nowInstant().epochMilliseconds - start,
         reason: (err as Error).message,
       };
     }

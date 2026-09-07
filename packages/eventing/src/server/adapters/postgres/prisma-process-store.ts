@@ -22,6 +22,7 @@ import {
   type ProcessManagerInstance,
   type ProcessManagerOutbox,
 } from "@langwatch/prisma-client/generated";
+import { Temporal, toDate } from "@langwatch/time";
 
 const PROCESS_MANAGER_INSTANCE_KSUID_RESOURCE = "pminstance";
 const PROCESS_MANAGER_INBOX_KSUID_RESOURCE = "pminbox";
@@ -57,8 +58,8 @@ function refLockKey(ref: ProcessRef): string {
   return JSON.stringify([ref.processName, ref.projectId, ref.processKey]);
 }
 
-function asDate(epochMs: number): Date {
-  return new Date(epochMs);
+function asDate(epochMs: number) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
 }
 
 function toJsonInput(value: JsonValue): Prisma.InputJsonValue | typeof Prisma.JsonNull {

@@ -84,6 +84,7 @@ export type ExperimentPeers = Readonly<{
 }>;
 
 import type { ComposedExperimentFeature } from "./experiment.composition.types.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Composes the experiment surface and its run loop over this process's graph. */
 export function composeExperimentFeature(options: {
@@ -351,7 +352,7 @@ class EmitterExperimentWorkbenchUpdates extends ExperimentWorkbenchUpdatesPort {
     const { projectId, ...signal } = input;
     this.broadcast.getTenantEmitter(projectId).emit("experiment_updated", {
       event: JSON.stringify({ event: "experiment_updated", ...signal }),
-      timestamp: Date.now(),
+      timestamp: nowInstant().epochMilliseconds,
     });
 
     return Promise.resolve();

@@ -5,6 +5,7 @@ import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
+import { nowInstant } from "@langwatch/time";
 
 const DB_NAME = "langwatch";
 
@@ -13,7 +14,7 @@ export async function startClickhouse(
   bus: EventBus,
 ): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "clickhouse" });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   const resolvedPath = ctx.predeps.clickhouse?.resolvedPath;
   if (!resolvedPath) throw new Error("clickhouse predep not resolved — run install first");
@@ -54,7 +55,11 @@ export async function startClickhouse(
 
   await ensureDatabase(ctx);
 
-  bus.emit({ type: "healthy", service: "clickhouse", durationMs: Date.now() - start });
+  bus.emit({
+    type: "healthy",
+    service: "clickhouse",
+    durationMs: nowInstant().epochMilliseconds - start,
+  });
   return handle;
 }
 

@@ -12,6 +12,7 @@ import type { Context, Next } from "hono";
 import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
 import { getSSECompletion } from "./sse.ts";
 import { ENDPOINT_ROUTE, REQUEST_FAMILY, REQUEST_LOG_CLAIM } from "./types.ts";
+import { nowInstant } from "@langwatch/time";
 
 // ---------------------------------------------------------------------------
 // Tracer middleware
@@ -129,7 +130,7 @@ export function loggerMiddleware(options?: { name?: string }) {
     };
 
     return runWithContext(ctx, async () => {
-      const start = Date.now();
+      const start = nowInstant().epochMilliseconds;
       let error: unknown = c.error;
 
       try {
@@ -146,7 +147,7 @@ export function loggerMiddleware(options?: { name?: string }) {
         throw err;
       } finally {
         const logRequest = () => {
-          const duration = Date.now() - start;
+          const duration = nowInstant().epochMilliseconds - start;
           // Prefer what the error handler resolved. Re-deriving the error and
           // its status here disagrees with the response whenever the handler
           // promoted the throw -- a ZodError has no `httpStatus`, so we derived

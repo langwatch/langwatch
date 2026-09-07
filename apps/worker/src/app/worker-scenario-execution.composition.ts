@@ -60,6 +60,7 @@ import type { LLMConfig } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 /**
  * Reports the composition decision an absent executor would otherwise hide. A worker that composes
@@ -367,8 +368,8 @@ class NanoidScenarioTestSuiteId extends ScenarioTestSuiteIdPort {
 }
 
 class SystemScenarioClock extends ScenarioClockPort {
-  now(): Date {
-    return new Date();
+  now() {
+    return toDate(nowInstant());
   }
 }
 

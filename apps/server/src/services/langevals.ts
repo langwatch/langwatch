@@ -6,6 +6,7 @@ import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
+import { nowInstant } from "@langwatch/time";
 
 export async function startLangevals(
   ctx: RuntimeContext,
@@ -13,7 +14,7 @@ export async function startLangevals(
   envFromFile: Record<string, string>,
 ): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "langevals" });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   const uvBin = ctx.predeps.uv?.resolvedPath;
   if (!uvBin) throw new Error("uv predep not resolved");
@@ -52,7 +53,11 @@ export async function startLangevals(
     await handle.stop();
     throw new Error(`langevals did not become healthy: ${ready.reason}`);
   }
-  bus.emit({ type: "healthy", service: "langevals", durationMs: Date.now() - start });
+  bus.emit({
+    type: "healthy",
+    service: "langevals",
+    durationMs: nowInstant().epochMilliseconds - start,
+  });
   return handle;
 }
 

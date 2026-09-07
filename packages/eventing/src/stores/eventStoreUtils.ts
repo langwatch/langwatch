@@ -9,7 +9,7 @@ import {
 } from "../services/errorHandling.ts";
 import type { EventStoreReadContext } from "./eventStore.types.ts";
 import type { EventRecord } from "./repositories/eventRepository.types.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 
 /**
  * Transforms an EventRecord from storage into a domain Event.
@@ -22,7 +22,7 @@ export function recordToEvent<EventType extends Event>(
   if (typeof record.EventTimestamp === "number" && !Number.isNaN(record.EventTimestamp)) {
     timestampMs = record.EventTimestamp;
   } else if (typeof record.EventTimestamp === "string") {
-    const parsed = Date.parse(record.EventTimestamp);
+    const parsed = toEpochMs(record.EventTimestamp);
     timestampMs = Number.isNaN(parsed) ? nowInstant().epochMilliseconds : parsed;
   } else {
     timestampMs = nowInstant().epochMilliseconds;

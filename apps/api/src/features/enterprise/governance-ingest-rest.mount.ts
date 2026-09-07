@@ -17,6 +17,7 @@ import {
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
+import { nowInstant } from "@langwatch/time";
 import {
   enforceApiKeyIdOnLogRequest,
   enforceApiKeyIdOnMetricRequest,
@@ -56,7 +57,7 @@ export class ApiGovernanceIngestRateLimit extends GovernanceIngestRateLimitPort 
       max: INGEST_RATE_LIMIT_MAX_REQUESTS,
     });
     if (decision.allowed) return { allowed: true, retryAfterSec: 0 };
-    const remainingMs = decision.resetAt - Date.now();
+    const remainingMs = decision.resetAt - nowInstant().epochMilliseconds;
     return {
       allowed: false,
       retryAfterSec: Math.max(1, Math.ceil(remainingMs / 1000)),

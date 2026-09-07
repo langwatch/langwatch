@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { resolvePnpm } from "./node-deps.ts";
+import { nowInstant } from "@langwatch/time";
 
 // The `langwatch` CLI is the assistant's ONLY interface to LangWatch, every
 // skill is written against its command grammar, and a worker with no CLI can
@@ -42,7 +43,7 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
   }
 
   bus.emit({ type: "starting", service: "prepare:langy-cli" as never });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   mkdirSync(cliRoot, { recursive: true });
   // A bare package.json keeps pnpm from walking up into ~/.langwatch/app and
@@ -79,6 +80,6 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
   bus.emit({
     type: "healthy",
     service: "prepare:langy-cli" as never,
-    durationMs: Date.now() - start,
+    durationMs: nowInstant().epochMilliseconds - start,
   });
 }

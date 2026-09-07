@@ -7,6 +7,7 @@ import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { locateApiDir, resolvePnpm } from "./node-deps.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The langwatch API process. Launched via `pnpm run start` in apps/api, which
@@ -22,7 +23,7 @@ export async function startLangwatch(
   envFromFile: Record<string, string>,
 ): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "langwatch" });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   const apiDir = locateApiDir();
   if (!apiDir) throw new Error("langwatch api dir not found");
@@ -72,7 +73,11 @@ export async function startLangwatch(
     await handle.stop();
     throw new Error(`langwatch did not become healthy: ${ready.reason}`);
   }
-  bus.emit({ type: "healthy", service: "langwatch", durationMs: Date.now() - start });
+  bus.emit({
+    type: "healthy",
+    service: "langwatch",
+    durationMs: nowInstant().epochMilliseconds - start,
+  });
   return handle;
 }
 

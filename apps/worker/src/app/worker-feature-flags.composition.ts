@@ -6,6 +6,7 @@ import {
   type FeatureFlagExperimentDatabase,
 } from "@langwatch/feature-flag-server";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** The two models the flag store reads from the client. */
 export type WorkerFeatureFlagDatabase = FeatureFlagDatabase & FeatureFlagExperimentDatabase;
@@ -61,6 +62,6 @@ export function createWorkerFeatureFlags(options: {
     database: options.database,
     cache: RedisFeatureFlagCacheAdapter.create(options.redis ?? null),
     config: options.config.featureFlags,
-    now: options.now ?? (() => Date.now()),
+    now: options.now ?? (() => nowInstant().epochMilliseconds),
   });
 }

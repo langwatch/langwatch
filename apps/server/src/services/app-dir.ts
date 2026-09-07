@@ -12,6 +12,7 @@ import { execa } from "execa";
 import { paths } from "../shared/paths.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
+import { nowInstant } from "@langwatch/time";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -83,7 +84,7 @@ export async function ensureAppDir(ctx: RuntimeContext, bus: EventBus): Promise<
   }
 
   bus.emit({ type: "starting", service: "prepare:app" as never });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   mkdirSync(dst, { recursive: true });
 
@@ -124,7 +125,7 @@ export async function ensureAppDir(ctx: RuntimeContext, bus: EventBus): Promise<
   bus.emit({
     type: "healthy",
     service: "prepare:app" as never,
-    durationMs: Date.now() - start,
+    durationMs: nowInstant().epochMilliseconds - start,
   });
 }
 

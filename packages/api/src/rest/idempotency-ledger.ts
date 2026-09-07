@@ -11,6 +11,7 @@ import { createLogger } from "@langwatch/observability";
 
 import { fingerprintJson, sha256 } from "./idempotency-fingerprint.ts";
 import type { IdempotentOutcome, IdempotentRunner } from "./idempotency.ts";
+import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api:idempotency");
 
@@ -265,7 +266,7 @@ function startClaimHeartbeat({
     receipts.idempotencyReceipt
       .updateMany({
         where: { id: receiptId, claimId },
-        data: { heartbeatAt: new Date() },
+        data: { heartbeatAt: toDate(nowInstant()) },
       })
       .then(({ count }) => {
         if (count > 0) return;
@@ -360,7 +361,7 @@ async function claimReceipt({
   requestFingerprint: string;
 }): Promise<Claim> {
   for (let attempt = 0; attempt < CLAIM_ATTEMPTS; attempt++) {
-    const now = new Date();
+    const now = nowInstant();
 
     const claimed = await insertPendingReceipt({
       receipts,
@@ -406,7 +407,7 @@ async function insertPendingReceipt({
   scopeId: string;
   key: string;
   requestFingerprint: string;
-  now: Date;
+  now: Instant;
 }): Promise<Extract<Claim, { kind: "claimed" }> | null> {
   const claimId = randomUUID();
 
@@ -419,8 +420,8 @@ async function insertPendingReceipt({
         requestFingerprint,
         // The first beat is the insert itself, so the row is never momentarily
         // takeable in the interval before the timer's first tick.
-        heartbeatAt: now,
-        expiresAt: new Date(now.getTime() + RECEIPT_TTL_MS),
+        heartbeatAt: toDate(now),
+        expiresAt: toDate(now.add({ milliseconds: RECEIPT_TTL_MS })),
       },
       select: { id: true },
     });
@@ -434,8 +435,14 @@ async function insertPendingReceipt({
 /**
  * Turns on the last heartbeat, never how long ago the claim was made.
  */
-export function isClaimAbandoned({ heartbeatAt, now }: { heartbeatAt: Date; now: Date }): boolean {
-  return now.getTime() - heartbeatAt.getTime() > TAKEOVER_AFTER_MS;
+export function isClaimAbandoned({
+  heartbeatAt,
+  now,
+}: {
+  heartbeatAt: Instant;
+  now: Instant;
+}): boolean {
+  return now.epochMilliseconds - heartbeatAt.epochMilliseconds > TAKEOVER_AFTER_MS;
 }
 
 /**
@@ -449,15 +456,15 @@ async function takeOverClaim({
 }: {
   receipts: IdempotencyReceiptPersistence;
   existing: IdempotencyReceiptRecord;
-  now: Date;
+  now: Instant;
 }): Promise<ExistingVerdict> {
   const claimId = randomUUID();
   const { count } = await receipts.idempotencyReceipt.updateMany({
     where: { id: existing.id, claimId: existing.claimId, responseStatus: null },
     data: {
       claimId,
-      heartbeatAt: now,
-      expiresAt: new Date(now.getTime() + RECEIPT_TTL_MS),
+      heartbeatAt: toDate(now),
+      expiresAt: toDate(now.add({ milliseconds: RECEIPT_TTL_MS })),
     },
   });
 
@@ -468,7 +475,7 @@ async function takeOverClaim({
       receiptId: existing.id,
       displacedClaimId: existing.claimId,
       claimId,
-      quietForMs: now.getTime() - existing.heartbeatAt.getTime(),
+      quietForMs: now.epochMilliseconds - existing.heartbeatAt.getTime(),
     },
     "Took over an idempotency claim that stopped reporting itself alive",
   );
@@ -492,11 +499,11 @@ async function readExistingReceipt({
   cipher: IdempotencyResponseCipher;
   existing: IdempotencyReceiptRecord;
   requestFingerprint: string;
-  now: Date;
+  now: Instant;
 }): Promise<ExistingVerdict> {
   // Expiry is read before anything else, so a key past its lifetime is a
   // fresh key regardless of what the stale row happens to say.
-  if (existing.expiresAt.getTime() <= now.getTime()) {
+  if (existing.expiresAt.getTime() <= now.epochMilliseconds) {
     await discardReceipt({ receipts, receiptId: existing.id });
     return { kind: "retry" };
   }
@@ -512,7 +519,7 @@ async function readExistingReceipt({
     // Still reporting itself alive, however long ago it started. However slow
     // it is being, it is going to write its resource, and taking the key off
     // it is what would make one key stand for two.
-    if (!isClaimAbandoned({ heartbeatAt: existing.heartbeatAt, now })) {
+    if (!isClaimAbandoned({ heartbeatAt: fromDate(existing.heartbeatAt), now })) {
       throw new IdempotencyConflictError("in_progress");
     }
     return await takeOverClaim({ receipts, existing, now });

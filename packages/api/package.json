@@ -14,13 +14,37 @@
   "type": "module",
   "main": "src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./rest": "./src/rest/index.ts",
-    "./trpc": "./src/trpc/index.ts",
-    "./composition": "./src/composition.ts"
+    ".": {
+      "types": {
+        "langwatch-declarations": "./dist/src/index.d.ts",
+        "default": "./src/index.ts"
+      },
+      "default": "./src/index.ts"
+    },
+    "./rest": {
+      "types": {
+        "langwatch-declarations": "./dist/src/rest/index.d.ts",
+        "default": "./src/rest/index.ts"
+      },
+      "default": "./src/rest/index.ts"
+    },
+    "./trpc": {
+      "types": {
+        "langwatch-declarations": "./dist/src/trpc/index.d.ts",
+        "default": "./src/trpc/index.ts"
+      },
+      "default": "./src/trpc/index.ts"
+    },
+    "./composition": {
+      "types": {
+        "langwatch-declarations": "./dist/src/composition.d.ts",
+        "default": "./src/composition.ts"
+      },
+      "default": "./src/composition.ts"
+    }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.type-tests.json",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/api/tsconfig.json && tsc --noEmit && tsc -p tsconfig.type-tests.json",
     "test": "vitest",
     "test:unit": "vitest run"
   },
@@ -32,6 +56,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@standard-schema/spec": "^1.1.0",
     "@trpc/server": "11.18.0",

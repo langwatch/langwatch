@@ -8,6 +8,7 @@ import type { ApiSchema } from "../schema.ts";
 
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
+import { Temporal } from "@langwatch/time";
 
 // ---------------------------------------------------------------------------
 // Version primitives
@@ -34,11 +35,9 @@ export function isDateVersion(value: string): value is DateVersion {
   if (!DATE_VERSION_RE.test(value)) return false;
 
   const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year!, month! - 1, day!));
+  const date = Temporal.PlainDate.from({ year: year!, month: month!, day: day! });
 
-  return (
-    date.getUTCFullYear() === year && date.getUTCMonth() === month! - 1 && date.getUTCDate() === day
-  );
+  return date.year === year && date.month === month && date.day === day;
 }
 
 /** Asserts the version argument of a registration call. */

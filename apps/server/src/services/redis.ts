@@ -5,10 +5,11 @@ import type { EventBus } from "./event-bus.ts";
 import { execCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
+import { nowInstant } from "@langwatch/time";
 
 export async function startRedis(ctx: RuntimeContext, bus: EventBus): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "redis" });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   const resolvedPath = ctx.predeps.redis?.resolvedPath;
   if (!resolvedPath) throw new Error("redis predep not resolved — run install first");
@@ -45,7 +46,11 @@ export async function startRedis(ctx: RuntimeContext, bus: EventBus): Promise<Su
     throw new Error(`redis did not become ready: ${ready.reason}`);
   }
 
-  bus.emit({ type: "healthy", service: "redis", durationMs: Date.now() - start });
+  bus.emit({
+    type: "healthy",
+    service: "redis",
+    durationMs: nowInstant().epochMilliseconds - start,
+  });
   return handle;
 }
 

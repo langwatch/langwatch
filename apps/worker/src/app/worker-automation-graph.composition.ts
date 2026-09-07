@@ -21,6 +21,7 @@ import { WorkerAutomationNotificationDeliveryAdapter } from "../features/automat
 import type { WorkerMailComposition } from "./worker-mail.composition.ts";
 import { createWorkerWebhookTransport } from "./worker-webhook-egress.composition.ts";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 /**
  * What this process still has to be HANDED before the graph vertical composes.
@@ -240,8 +241,8 @@ class UnconfiguredAutomationCrypto implements AutomationSecretCrypto {
  * evaluator has not reached.
  */
 export class WorkerAutomationClock extends AutomationClockPort {
-  now(): Date {
-    return new Date();
+  now() {
+    return nowInstant();
   }
 }
 

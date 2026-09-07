@@ -21,6 +21,7 @@ import type { TraceRecord } from "@langwatch/trace-contract";
 import type { EmailDeliveryPort } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { WorkerSlackWebApiTransportAdapter } from "./slack-web-api.transport.adapter.ts";
+import { Temporal } from "@langwatch/time";
 
 /** One settled match, as the digest renders it. */
 type SettlementDigestEntry = {
@@ -49,7 +50,13 @@ function toDigestEntry(entry: SettlementDigestEntry): TriggerDigestEntry {
 
   return {
     traceId: entry.traceId,
-    ...(typeof startedAt === "number" ? { occurredAt: new Date(startedAt).toISOString() } : {}),
+    ...(typeof startedAt === "number"
+      ? {
+          occurredAt: Temporal.Instant.fromEpochMilliseconds(startedAt).toString({
+            fractionalSecondDigits: 3,
+          }),
+        }
+      : {}),
     ...(preview ? { preview: preview.slice(0, DIGEST_PREVIEW_MAX_CHARS) } : {}),
   };
 }

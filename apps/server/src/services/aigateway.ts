@@ -3,6 +3,7 @@ import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
+import { nowInstant } from "@langwatch/time";
 
 export async function startAigateway(
   ctx: RuntimeContext,
@@ -10,7 +11,7 @@ export async function startAigateway(
   envFromFile: Record<string, string>,
 ): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "aigateway" });
-  const start = Date.now();
+  const start = nowInstant().epochMilliseconds;
 
   const binary = ctx.predeps.aigateway?.resolvedPath;
   if (!binary) throw new Error("aigateway predep not resolved");
@@ -44,6 +45,10 @@ export async function startAigateway(
     await handle.stop();
     throw new Error(`aigateway did not become healthy: ${ready.reason}`);
   }
-  bus.emit({ type: "healthy", service: "aigateway", durationMs: Date.now() - start });
+  bus.emit({
+    type: "healthy",
+    service: "aigateway",
+    durationMs: nowInstant().epochMilliseconds - start,
+  });
   return handle;
 }
