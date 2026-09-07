@@ -36,11 +36,18 @@ Feature: Retroactive retention changes
     Then the UI shows a progress entry per table from system.mutations
     And the progress shows the parts still pending counting down to zero
 
-  Scenario: Rate-limited to one mutation per tenant per table
+  Scenario: Rate-limited to one mutation per tenant, category, and table
     Given a retroactive update is in progress for stored_spans
     When the admin attempts another retroactive update for stored_spans
     Then the request is rejected with a rate-limit error
     And the error indicates the existing mutation must complete first
+
+  Scenario: Event-log category mutations can run in parallel
+    Given a trace-category event_log mutation is in progress
+    When scenario and experiment retroactive updates start for the same tenant
+    Then neither update is blocked by the trace-category event_log mutation
+    And each event_log mutation carries its explicit retention category
+    And progress reports trace, scenario, and experiment event_log mutations under their own categories
 
   Scenario: Conflict error names the mutation IDs callers can kill
     Given retroactive updates are in progress for stored_spans and trace_summaries

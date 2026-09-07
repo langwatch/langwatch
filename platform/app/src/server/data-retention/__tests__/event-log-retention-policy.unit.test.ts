@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   classifyEventLogRowRetention,
   EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE,
+  eventLogRetentionCategoryFromMutationCommand,
+  eventLogRetentionCategoryMutationMarkerSql,
   eventLogRetentionCategorySqlPredicate,
 } from "../event-log-retention-policy";
 
@@ -69,14 +71,17 @@ describe("event log retention policy", () => {
     });
   });
 
-  it("treats unknown historical payloads as traces", () => {
-    expect(
-      classifyEventLogRowRetention({
-        AggregateType: "unknown_historical_aggregate",
-        EventType: "legacy.event",
-      }),
-    ).toBe("traces");
-  });
+  it.each(["unknown_historical_aggregate", "constructor", "toString", "__proto__"])(
+    "treats the unknown aggregate key %s as traces",
+    (AggregateType) => {
+      expect(
+        classifyEventLogRowRetention({
+          AggregateType,
+          EventType: "legacy.event",
+        }),
+      ).toBe("traces");
+    },
+  );
 
   it("derives the indefinite ClickHouse predicate from the same policy", () => {
     expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toContain(
@@ -109,5 +114,27 @@ describe("event log retention policy", () => {
       "AggregateType IN ('simulation_run', 'simulation_set', 'suite_run')",
     );
     expect(experiments).toContain("AggregateType IN ('experiment_run')");
+  });
+
+  it.each(["traces", "scenarios", "experiments"] as const)(
+    "round-trips the %s mutation marker from a stored ClickHouse command",
+    (category) => {
+      const markerSql = eventLogRetentionCategoryMutationMarkerSql(category);
+      const command = `UPDATE _retention_days = 49 WHERE ${markerSql}`;
+
+      expect(markerSql).toContain(`'langwatch:event-log-retention-category:${category}'`);
+      expect(eventLogRetentionCategoryFromMutationCommand(command)).toBe(category);
+    },
+  );
+
+  it("rejects absent or ambiguous mutation markers", () => {
+    const ambiguousCommand = [
+      eventLogRetentionCategoryMutationMarkerSql("traces"),
+      eventLogRetentionCategoryMutationMarkerSql("scenarios"),
+    ].join(" AND ");
+
+    expect(eventLogRetentionCategoryFromMutationCommand(undefined)).toBeNull();
+    expect(eventLogRetentionCategoryFromMutationCommand("UPDATE without marker")).toBeNull();
+    expect(eventLogRetentionCategoryFromMutationCommand(ambiguousCommand)).toBeNull();
   });
 });
