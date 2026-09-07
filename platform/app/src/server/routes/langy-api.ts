@@ -79,6 +79,12 @@
  * owns transport concerns only; every domain rule (ownership, idempotency,
  * capacity, model policy) stays in the app layer and arrives here as a
  * HandledError that is re-thrown untouched.
+ *
+ * `GET /health` is the uptime probe for this surface: the same chain (steps
+ * 1–5) authorizes it, then the canary service sends one real greeting turn as
+ * the key's owner and answers 200/503/429 with a named reason — see
+ * `specs/langy/langy-health-canary.feature`. It lives here rather than under
+ * `/api/health` so it is dark exactly when the surface is dark.
  */
 
 import type { Context } from "hono";
@@ -102,6 +108,7 @@ import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIde
 import { awaitTurnSettlement } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
+import { runLangyHealthCanary } from "~/server/health-probes/langy-canary.service";
 import { bodyLimit } from "./_lib/body-limit";
 
 const tokenResolver = TokenResolver.create(prisma);
@@ -390,5 +397,57 @@ secured
     async (c) =>
       startTurn({ c, conversationId: c.req.param("conversationId") }),
   );
+
+/**
+ * Maps the canary's result union to its HTTP response, mirroring
+ * `GET /api/health/scenarios`: 200 `ok`, 503 `unhealthy` with `reason`,
+ * 429 `busy`. Kept out of the handler so its branching stays flat.
+ */
+function canaryResultToResponse({
+  c,
+  result,
+}: {
+  c: Context;
+  result: Awaited<ReturnType<typeof runLangyHealthCanary>>;
+}) {
+  if ("busy" in result) {
+    return c.json({ status: "busy" }, 429);
+  }
+  const { healthy, conversationId, turnId, durationMs } = result;
+  if (healthy) {
+    return c.json({ status: "ok", conversationId, turnId, durationMs }, 200);
+  }
+  return c.json(
+    {
+      status: "unhealthy",
+      reason: result.reason,
+      conversationId,
+      turnId,
+      durationMs,
+    },
+    503,
+  );
+}
+
+/**
+ * The uptime probe: one real greeting turn as the key's owner, answered in a
+ * shape a monitor can alert on. Same auth chain as the turn routes, so a
+ * refused or dark surface answers exactly as it would for a turn.
+ */
+secured.access(langyTurnAuth).get("/health", async (c) => {
+  // A monitor polls this on an interval; a cached 200/503 would hide the next
+  // turn's real result, so no response on any path is cacheable.
+  c.header("Cache-Control", "no-store");
+
+  const auth = await authorizeTurn(c);
+  if (auth.dark) return c.notFound();
+
+  const result = await runLangyHealthCanary({
+    projectId: auth.projectId,
+    session: auth.session,
+  });
+  auth.markUsed();
+  return canaryResultToResponse({ c, result });
+});
 
 export const app = secured.hono;

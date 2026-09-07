@@ -1022,7 +1022,8 @@
               "self-hosting/langy/setup",
               "self-hosting/langy/github-app",
               "self-hosting/langy/environment-variables",
-              "self-hosting/langy/networking-and-egress"
+              "self-hosting/langy/networking-and-egress",
+              "self-hosting/langy/health-check"
             ]
           }
         ]
