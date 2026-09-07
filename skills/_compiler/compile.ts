@@ -11,7 +11,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { splitFrontmatter } from "../_lib/frontmatter.js";
+import { splitFrontmatter } from "../_lib/frontmatter.ts";
 import { inlineMdx } from "../_lib/mdx-inline.js";
 
 const __filename = fileURLToPath(import.meta.url);

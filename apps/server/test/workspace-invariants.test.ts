@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { APP_PACKAGE_NAMES, workspaceInstallArgs } from "../src/services/node-deps";
+import { APP_PACKAGE_NAMES, workspaceInstallArgs } from "../src/services/node-deps.ts";
 
 /**
  * The invariants ADR-076 established, asserted against the repo itself.
