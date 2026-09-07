@@ -233,7 +233,7 @@ describe("given the sign-up screen", () => {
       expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
     });
 
-    /** @scenario Password registration consumes the proof exactly once */
+    /** @scenario Opening the link unlocks credential choice */
     it("creates and signs in only after the proof returns", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token");
       completeVerificationMock.mockResolvedValue({
@@ -273,7 +273,7 @@ describe("given the sign-up screen", () => {
   });
 
   describe("when a confirmation link comes back for an account that exists", () => {
-    /** @scenario A confirmation link for an existing account signs it in */
+    /** Existing accounts are refused by the verification boundary. */
     it("goes straight into the app on the session the link opened", async () => {
       searchParamsRef.current = new URLSearchParams(
         "verify=a-token&callbackUrl=%2Fprojects",
@@ -299,7 +299,7 @@ describe("given the sign-up screen", () => {
       expect(routeMock).not.toHaveBeenCalled();
     });
 
-    /** @scenario Reopening a consumed link offers fresh-link recovery */
+    /** @scenario A claimed proof whose enrollment failed recovers by email */
     it("offers the way in when the link was reopened and opened no session", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token");
       completeVerificationMock.mockResolvedValue({

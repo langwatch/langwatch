@@ -428,7 +428,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
      * ceremony is the bug this pins: the hand-rolled mint that predated
      * better-auth 1.7 would now run beside the plugin's.
      */
-    /** @scenario A verified address can enroll a passkey and continue into its new session */
+    /** @scenario Signing up with a passkey consumes the verified address proof */
     it("leaves the session to the transaction that writes the credential", async () => {
       const { ctx, createSession } = fakeContext();
 

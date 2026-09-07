@@ -35,6 +35,9 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   "auth.requestFreshInvite",
   "auth.requestSignUpVerification",
   "auth.route",
+  // Requires the high-entropy, address-bound proof issued after the mailbox
+  // link is opened; the address alone cannot query this decision.
+  "auth.signUpEnrollment",
   // Client bootstrap: exposes only the PUBLIC_* env whitelist, no tenant data.
   "publicEnv",
   // The one anonymous trace read. Token-gated by ShareService.resolveForViewer;

@@ -11,7 +11,7 @@
  */
 
 import { PlanTypes } from "@ee/billing/planTypes";
-import { platformSSOAllowed } from "@ee/sso/sso-gate";
+import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import {
   normalizeIdentifierValue,
   type SignInMethod,
@@ -472,10 +472,16 @@ export type LocalSignUpDecision =
       reasonCode: SignInRoutingReasonCode;
     };
 
-export async function localSignUpDecision(
+export async function decideLocalSignUp(
   email: string,
+  deps: {
+    router: SignInRouterService;
+    findUserIdByEmail(normalizedValue: string): Promise<string | null>;
+    resolveDefaultMethods(): Promise<readonly SignInMethod[]>;
+    passwordIsAllowed(): Promise<boolean>;
+  },
 ): Promise<LocalSignUpDecision> {
-  const decision = await signInRouter().route({ identifier: email });
+  const decision = await deps.router.route({ identifier: email });
   if (decision.outcome === "redirect_to_connection") {
     return {
       outcome: "redirect",
@@ -490,9 +496,9 @@ export async function localSignUpDecision(
       reasonCode: decision.reasonCode,
     };
   }
-  const existing = await identityUsers.findUserIdByEmail({
-    normalizedValue: normalizeIdentifierValue(email),
-  });
+  const existing = await deps.findUserIdByEmail(
+    normalizeIdentifierValue(email),
+  );
   if (existing !== null) {
     return {
       outcome: "existing_account",
@@ -500,29 +506,48 @@ export async function localSignUpDecision(
       reasonCode: "account_methods",
     };
   }
+
+  let methodSet: readonly SignInMethod[];
   if (decision.outcome === "route_to_signup") {
-    const policy = await signInMethodPolicyPort.resolvePolicy();
-    return {
-      outcome: "enroll",
-      methodSet: policy.defaultMethods,
-      reasonCode: decision.reasonCode,
-    };
-  }
-  if (
+    methodSet = await deps.resolveDefaultMethods();
+  } else if (
     decision.reasonCode === "method_not_licensed" ||
     decision.reasonCode === "method_not_configured"
   ) {
+    methodSet = decision.methodSet;
+  } else {
     return {
-      outcome: "enroll",
-      methodSet: decision.methodSet,
+      outcome: "unavailable",
+      methodSet: [],
       reasonCode: decision.reasonCode,
     };
   }
-  return {
-    outcome: "unavailable",
-    methodSet: [],
-    reasonCode: decision.reasonCode,
-  };
+
+  if (!(await deps.passwordIsAllowed())) {
+    methodSet = methodSet.filter((method) => method.kind !== "password");
+  }
+  if (methodSet.length === 0) {
+    return {
+      outcome: "unavailable",
+      methodSet: [],
+      reasonCode: decision.reasonCode,
+    };
+  }
+
+  return { outcome: "enroll", methodSet, reasonCode: decision.reasonCode };
+}
+
+export async function localSignUpDecision(
+  email: string,
+): Promise<LocalSignUpDecision> {
+  return decideLocalSignUp(email, {
+    router: signInRouter(),
+    findUserIdByEmail: (normalizedValue) =>
+      identityUsers.findUserIdByEmail({ normalizedValue }),
+    resolveDefaultMethods: async () =>
+      (await signInMethodPolicyPort.resolvePolicy()).defaultMethods,
+    passwordIsAllowed: async () => (await resolveAuthProvider()) === "email",
+  });
 }
 
 /**

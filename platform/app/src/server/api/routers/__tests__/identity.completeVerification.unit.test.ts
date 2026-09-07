@@ -96,6 +96,7 @@ vi.mock(
     resolveSignInMethodPolicy: async () => ({}),
     signInDomainRoutingPort: () => ({}),
     signInRouter: () => ({}),
+    decideLocalSignUp: async () => ({}),
     localSignUpDecision: async () => ({}),
     signUpIdentifier: () => ({}),
     signUpVerification: () => ({}),
