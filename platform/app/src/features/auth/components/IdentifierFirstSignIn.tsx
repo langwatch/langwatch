@@ -1,9 +1,10 @@
-import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
-import { HandledErrorAlert } from "~/features/errors";
+import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { normalizeErrorCode, SignInError } from "~/pages/auth/error";
+import { api } from "~/utils/api";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { replaceLocation } from "~/utils/browserNavigation";
 import { useSearchParams } from "~/utils/compat/next-navigation";
@@ -46,7 +47,6 @@ import {
   hasAlternativeMethods,
   SignInMethodPicker,
 } from "./SignInMethodPicker";
-import { SignUpCredentialForm } from "./SignUpCredentialForm";
 import {
   TwoStepChallengePanel,
   twoStepChallengeTitle,
@@ -459,22 +459,8 @@ function signInDepth({
  * almost certainly came for, and keeps the other real possibility — a mistyped
  * address — one click away rather than behind the browser's back button.
  *
- * It asks for the CREDENTIAL, and nothing has been sent when it appears.
- *
- * This card used to be a single "Create an account" button that mailed a
- * confirmation link, and asked for a password afterwards, on the screen the
- * link lands on. That was the older order, kept here after the sign-up door
- * moved off it, and it is wrong twice over: the mail goes out before anybody
- * has committed to anything — so a mistyped address costs a stranger a message
- * — and it puts a "check your email" screen between somebody and the one
- * action that would have finished the job.
- *
- * So it is the sign-up door's own credential step, rendered here with the
- * words that say how this address got to it. A password or a passkey, then
- * `user.register` creates the account and mails the link on the same call, and
- * only then does the screen become "check your email". The passkey it offers
- * CREATES one for this address — an existing passkey signs somebody else's
- * account in, which is not a way to finish making this one.
+ * It sends the same confirmation link as the sign-up door. No password or
+ * passkey control is mounted until that link returns its single-use proof.
  */
 function NoAccountYet({
   email,
@@ -494,6 +480,18 @@ function NoAccountYet({
   onUseDifferentEmail: () => void;
 }) {
   const guidance = reasonCode ? signInRoutingReasonCopy(reasonCode) : null;
+  const requestVerification = api.auth.requestSignUpVerification.useMutation();
+
+  const beginSignUp = async () => {
+    try {
+      await requestVerification.mutateAsync({ email });
+      onAwaitingConfirmation(email);
+    } catch (failure) {
+      if (readHandledError(failure)?.code === "email_already_registered") {
+        onAddressAlreadyRegistered();
+      }
+    }
+  };
 
   return (
     <AuthCard
@@ -508,15 +506,20 @@ function NoAccountYet({
         <div data-testid="unknown-identifier" hidden>
           {email}
         </div>
-        <SignUpCredentialForm
-          email={email}
-          callbackUrl={callbackUrl}
-          onUseDifferentEmail={onUseDifferentEmail}
-          onAwaitingConfirmation={(confirmed) =>
-            onAwaitingConfirmation(confirmed)
-          }
-          onAddressAlreadyRegistered={onAddressAlreadyRegistered}
+        <HandledErrorAlert
+          error={requestVerification.error}
+          fallbackTitle="Couldn't start your sign-up"
+          className="lw-auth-alert"
         />
+        <AuthPrimaryButton
+          isBusy={requestVerification.isPending}
+          onClick={() => void beginSignUp()}
+        >
+          Send confirmation link
+        </AuthPrimaryButton>
+        <Button variant="ghost" onClick={onUseDifferentEmail}>
+          Use a different email
+        </Button>
         <SignUpLink
           callbackUrl={callbackUrl}
           email={email}

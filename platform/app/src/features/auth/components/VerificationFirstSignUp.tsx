@@ -25,6 +25,7 @@ import { usePasskeyCeremony } from "../logic/passkeyCeremony";
 import { JOIN_BEFORE_CREATE_PATH } from "../logic/signUpDestination";
 import { useTwoStepChallenge } from "../logic/twoStepChallenge";
 import { AuthFinePrint } from "./AuthFinePrint";
+import { AuthPrimaryButton } from "./AuthPrimaryButton";
 import { CheckYourEmail } from "./CheckYourEmail";
 import { CredentialSignInForm } from "./CredentialSignInForm";
 import { RoutedToConnection } from "./IdentifierFirstSignIn";
@@ -100,6 +101,16 @@ export function VerificationFirstSignUp() {
   // where there was no account to mark: it rides to `user.register` so the
   // account it creates is born confirmed rather than mailed a second link.
   const [addressProof, setAddressProof] = useState<string | null>(null);
+  const [enrollmentMethods, setEnrollmentMethods] = useState<
+    readonly SignInMethod[]
+  >([]);
+  const [proofRecoveryEmail, setProofRecoveryEmail] = useState<string | null>(
+    null,
+  );
+  const [postLinkRouting, setPostLinkRouting] = useState<{
+    email: string;
+    addressProof: string;
+  } | null>(null);
   const [accountIsReady, setAccountIsReady] = useState(false);
   const [welcomeBackEmail, setWelcomeBackEmail] = useState<string | null>(null);
   const [instanceMethods, setInstanceMethods] = useState<
@@ -144,14 +155,43 @@ export function VerificationFirstSignUp() {
             hardRedirect(callbackUrl ?? JOIN_BEFORE_CREATE_PATH);
             return;
           }
-          setVerifiedEmail(email);
-          setAddressProof(addressProof);
+          if (!accountCreated && !accountExists && !addressProof) {
+            setProofRecoveryEmail(email);
+            return;
+          }
           // "Ready" means there is nothing left to choose. An account that
           // was already there is just as ready as one this link created —
           // this is the link reopened inside its grace window, which confirms
           // again but opens no second session, so the way in is offered.
-          setAccountIsReady(accountCreated || accountExists);
-          await decide({ identifier: email });
+          if (accountCreated || accountExists) {
+            setVerifiedEmail(email);
+            setAddressProof(addressProof);
+            setAccountIsReady(true);
+            await decide({ identifier: email });
+            return;
+          }
+
+          const decision = await decide({ identifier: email });
+          if (decision?.outcome === "redirect_to_connection") {
+            setRoutedEmail(email);
+            return;
+          }
+          if (decision?.outcome === "route_to_signup") {
+            const policy = await decide({ identifier: null });
+            if (policy?.outcome !== "method_picker") {
+              setPostLinkRouting({ email, addressProof });
+              return;
+            }
+            setEnrollmentMethods(policy.methodSet);
+            setVerifiedEmail(email);
+            setAddressProof(addressProof);
+            return;
+          }
+          if (decision?.outcome === "method_picker") {
+            setWelcomeBackEmail(email);
+            return;
+          }
+          setPostLinkRouting({ email, addressProof });
         },
       )
       .catch((failure: unknown) => {
@@ -308,6 +348,52 @@ export function VerificationFirstSignUp() {
     );
   }
 
+  if (proofRecoveryEmail) {
+    return (
+      <LinkNoLongerWorks
+        error={{ error: "identity_verification_used" }}
+        isSending={requestVerification.isPending}
+        callbackUrl={callbackUrl}
+        onResend={async (email) => {
+          if (await sendTo(email)) {
+            setProofRecoveryEmail(null);
+          }
+        }}
+      />
+    );
+  }
+
+  if (postLinkRouting) {
+    return (
+      <PostLinkRoutingFailure
+        error={routing.error}
+        onRetry={async () => {
+          const decision = await decide({
+            identifier: postLinkRouting.email,
+          });
+          if (decision?.outcome === "redirect_to_connection") {
+            setPostLinkRouting(null);
+            setRoutedEmail(postLinkRouting.email);
+            return;
+          }
+          if (decision?.outcome === "route_to_signup") {
+            const policy = await decide({ identifier: null });
+            if (policy?.outcome !== "method_picker") return;
+            setEnrollmentMethods(policy.methodSet);
+            setVerifiedEmail(postLinkRouting.email);
+            setAddressProof(postLinkRouting.addressProof);
+            setPostLinkRouting(null);
+            return;
+          }
+          if (decision?.outcome === "method_picker") {
+            setPostLinkRouting(null);
+            setWelcomeBackEmail(postLinkRouting.email);
+          }
+        }}
+      />
+    );
+  }
+
   if (verifiedEmail && accountIsReady) {
     return (
       <AccountIsReady
@@ -320,12 +406,12 @@ export function VerificationFirstSignUp() {
     );
   }
 
-  if (verifiedEmail) {
+  if (verifiedEmail && addressProof) {
     return (
       <MethodChoice
         verifiedEmail={verifiedEmail}
         addressProof={addressProof}
-        decision={routing.decision}
+        methodSet={enrollmentMethods}
         lastUsedMethodId={lastUsedMethodId}
         callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
         onFederatedMethodChosen={dialFederated}
@@ -617,6 +703,26 @@ function LinkNoLongerWorks({
   );
 }
 
+function PostLinkRoutingFailure({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry: () => Promise<void>;
+}) {
+  return (
+    <AuthCard title="Your email is confirmed">
+      <HandledErrorAlert
+        error={error ?? { error: "identity_routing_unavailable" }}
+        fallbackTitle="Couldn't check how you should sign in"
+      />
+      <AuthPrimaryButton onClick={() => void onRetry()}>
+        Try again
+      </AuthPrimaryButton>
+    </AuthCard>
+  );
+}
+
 /**
  * Which of the sign-up door's steps the screen below is drawing, for the
  * ground behind it. Read in the same order the returns are written in, so the
@@ -706,15 +812,15 @@ const noPasskeyOnThisStep = () => undefined;
 function MethodChoice({
   verifiedEmail,
   addressProof,
-  decision,
+  methodSet,
   lastUsedMethodId,
   callbackUrl,
   onFederatedMethodChosen,
 }: {
   verifiedEmail: string;
   /** The spent link's proof, on its way to the account it will confirm. */
-  addressProof: string | null;
-  decision: RoutingDecision | null;
+  addressProof: string;
+  methodSet: readonly SignInMethod[];
   lastUsedMethodId: string | null;
   callbackUrl: string;
   onFederatedMethodChosen: (method: SignInMethod) => void;
@@ -734,7 +840,7 @@ function MethodChoice({
         fallbackTitle="Could not create a passkey"
         className="lw-auth-alert"
       />
-      {addressProof ? (
+      {methodSet.some((method) => method.kind === "passkey") ? (
         <PasskeySignUpButton
           email={verifiedEmail}
           addressProof={addressProof}
@@ -744,15 +850,13 @@ function MethodChoice({
           onAddressAlreadyRegistered={() => hardRedirect("/auth/signin")}
         />
       ) : null}
-      {decision ? (
+      {methodSet.length > 0 ? (
         <SignInMethodPicker
           // Existing passkeys are sign-in credentials and do not belong on an
           // account-creation step. The dedicated button above creates a new
           // credential bound to the verified address proof.
-          methodSet={decision.methodSet.filter(
-            (method) => method.kind !== "passkey",
-          )}
-          reasonCode={decision.reasonCode}
+          methodSet={methodSet.filter((method) => method.kind !== "passkey")}
+          reasonCode="identifier_unknown"
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={onFederatedMethodChosen}
           callbackUrl={callbackUrl}
@@ -768,7 +872,6 @@ function MethodChoice({
                 // The link has been spent, so this address is proved: the
                 // account this creates is signed straight into rather than
                 // sent another confirmation.
-                addressIsConfirmed
                 addressProof={addressProof}
                 // This address arrived on a link that has just been spent, so
                 // there is no step behind this one to go back to. Changing it
