@@ -18,9 +18,15 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import { LANGY_TRACE_ORIGIN } from "../../derive-trace-origin";
 import { FACET_REGISTRY } from "../../facet-registry";
 import { translateFilterToClickHouse } from "../../filter-to-clickhouse";
 import { boundedSubquery } from "../../filter-to-clickhouse/subqueries";
+import {
+  explorerHiddenOrigins,
+  type FilterWhere,
+  withHiddenOrigins,
+} from "../../hidden-origins";
 import { TraceListClickHouseRepository } from "../trace-list.clickhouse.repository";
 import type { TraceListQuery } from "../trace-list.repository";
 
@@ -607,6 +613,127 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
       });
 
       expect(counts.values).toEqual({});
+    });
+  });
+});
+
+/**
+ * Langy's own turns are stamped `langwatch.origin = "langy"` and the explorer
+ * leaves them out unless the query names the origin field
+ * (specs/traces-v2/origin-badge-filter.feature).
+ */
+describe("TraceListClickHouseRepository with the explorer's hidden origins", () => {
+  const langyTenant = `test-hidden-origins-${nanoid()}`;
+  const customerTraceId = "ho-customer";
+  const langyTraceId = "ho-langy";
+  const timeRange = { from: base - 60_000, to: base + 60_000 };
+
+  const originFacetExpression = (() => {
+    const def = FACET_REGISTRY.find((facet) => facet.key === "origin");
+    if (!def || !("expression" in def)) {
+      throw new Error("the origin facet no longer carries an expression");
+    }
+    return def.expression;
+  })();
+
+  const filterFor = (queryText: string) =>
+    translateFilterToClickHouse(queryText, langyTenant, timeRange) ?? undefined;
+
+  const listWith = (filterWhere: FilterWhere | undefined) =>
+    repo.findAll({
+      tenantId: langyTenant,
+      timeRange,
+      sort: { column: "OccurredAt", direction: "desc" },
+      limit: 50,
+      offset: 0,
+      filterWhere,
+    });
+
+  beforeAll(async () => {
+    await insertRows([
+      makeTraceSummaryRow(0, {
+        TenantId: langyTenant,
+        TraceId: customerTraceId,
+        Attributes: {},
+        OccurredAt: new Date(base),
+        CreatedAt: new Date(base),
+        UpdatedAt: new Date(base),
+        LastEventOccurredAt: new Date(base),
+      }),
+      makeTraceSummaryRow(1, {
+        TenantId: langyTenant,
+        TraceId: langyTraceId,
+        Attributes: { "langwatch.origin": LANGY_TRACE_ORIGIN },
+        OccurredAt: new Date(base + 1),
+        CreatedAt: new Date(base + 1),
+        UpdatedAt: new Date(base + 1),
+        LastEventOccurredAt: new Date(base + 1),
+      }),
+    ]);
+  }, 120_000);
+
+  afterAll(async () => {
+    if (!ch) return;
+    await ch.exec({
+      query:
+        "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+      query_params: { tenantId: langyTenant },
+    });
+  });
+
+  describe("given one customer trace and one of Langy's own turns", () => {
+    /** @scenario "Picking Langy in the origin facet shows the turns" */
+    it("lists only the customer trace with the default hidden origins", async () => {
+      const page = await listWith(
+        withHiddenOrigins(undefined, explorerHiddenOrigins("")),
+      );
+
+      expect(page.rows.map((row) => row.traceId)).toEqual([customerTraceId]);
+      expect(page.totalHits).toBe(1);
+    });
+
+    /** @scenario "Picking Langy in the origin facet shows the turns" */
+    it("lists only Langy's turn once the query asks for that origin", async () => {
+      const query = "origin:langy";
+      const page = await listWith(
+        withHiddenOrigins(filterFor(query), explorerHiddenOrigins(query)),
+      );
+
+      expect(page.rows.map((row) => row.traceId)).toEqual([langyTraceId]);
+      expect(page.totalHits).toBe(1);
+    });
+
+    /** @scenario "The list leaves out Langy's turns by default" */
+    it("keeps a filter of its own and still hides the turn", async () => {
+      const query = "status:ok";
+      const page = await listWith(
+        withHiddenOrigins(filterFor(query), explorerHiddenOrigins(query)),
+      );
+
+      expect(page.rows.map((row) => row.traceId)).toEqual([customerTraceId]);
+    });
+
+    /** @scenario "The list leaves out Langy's turns by default" */
+    it("counts only the customer trace as new", async () => {
+      const count = await repo.findCount({
+        tenantId: langyTenant,
+        timeRange,
+        since: base - 1,
+        filterWhere: withHiddenOrigins(undefined, explorerHiddenOrigins("")),
+      });
+
+      expect(count).toBe(1);
+    });
+
+    /** @scenario "The origin facet still offers Langy" */
+    it("counts both origins in the origin facet when read without the exclusion", async () => {
+      const counts = await repo.findFacetCounts({
+        tenantId: langyTenant,
+        timeRange,
+        facetExpression: originFacetExpression,
+      });
+
+      expect(counts.values).toEqual({ application: 1, langy: 1 });
     });
   });
 });

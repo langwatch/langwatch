@@ -20,19 +20,7 @@ const promptPath = path.resolve(
   "../../../../../../services/langyagent/internal/assets/AGENTS.md",
 );
 
-/**
- * `langy` is stamped by the relay and has its own precedence rule in
- * `trace-origin.service.ts`, but has no row in `ORIGIN_DISPLAY` yet, so it
- * renders in the Trace Explorer as a raw lowercase label with a hash-rotated
- * colour. Adding that row is a Trace Explorer change with a palette decision
- * attached; until then it is named here so this check still covers it.
- */
-const STAMPED_ONLY_ORIGINS = ["langy"];
-
-const expectedOrigins = [
-  ...Object.keys(ORIGIN_DISPLAY),
-  ...STAMPED_ONLY_ORIGINS,
-];
+const expectedOrigins = Object.keys(ORIGIN_DISPLAY);
 
 function originsNamedInPrompt(prompt: string): string[] {
   const line = prompt

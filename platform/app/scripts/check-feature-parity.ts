@@ -602,7 +602,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/model-chip-interactive-card.feature",
   "specs/traces-v2/multiplayer-presence.feature",
   "specs/traces-v2/onboarding-empty-state.feature",
-  "specs/traces-v2/origin-badge-filter.feature",
   "specs/traces-v2/prompt-facets.feature",
   "specs/traces-v2/prompt-integration.feature",
   "specs/traces-v2/skill-invocation-highlight.feature",
