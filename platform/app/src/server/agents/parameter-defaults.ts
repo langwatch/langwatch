@@ -95,6 +95,25 @@ export function staleParameterDefaultNames({
   return Object.keys(userDefaults).filter((name) => !declared.has(name));
 }
 
+/** The reason a value does not fit the declared type, or null when it fits. */
+function typeMismatchReason({
+  type,
+  value,
+}: {
+  type: NonNullable<ScenarioParameterDefinition["type"]>;
+  value: ScenarioParameterValue;
+}): string | null {
+  if (type === "number") {
+    return typeof value === "number" && Number.isFinite(value)
+      ? null
+      : "expected a number";
+  }
+  if (type === "boolean") {
+    return typeof value === "boolean" ? null : "expected a boolean";
+  }
+  return typeof value === "string" ? null : "expected text";
+}
+
 /**
  * Refuses a user-default value the current declarations cannot accept, at save
  * time, against the declaration as it stands right now.
@@ -128,26 +147,9 @@ export function validateUserParameterDefault({
 
   // Type absent reads as string, the same rule the resolver reads it by.
   const type = definition.type ?? "string";
-  if (
-    type === "number" &&
-    (typeof value !== "number" || !Number.isFinite(value))
-  ) {
-    throw new AgentParameterDefaultInvalidError({
-      name,
-      reason: "expected a number",
-    });
-  }
-  if (type === "boolean" && typeof value !== "boolean") {
-    throw new AgentParameterDefaultInvalidError({
-      name,
-      reason: "expected a boolean",
-    });
-  }
-  if (type === "string" && typeof value !== "string") {
-    throw new AgentParameterDefaultInvalidError({
-      name,
-      reason: "expected text",
-    });
+  const mismatch = typeMismatchReason({ type, value });
+  if (mismatch) {
+    throw new AgentParameterDefaultInvalidError({ name, reason: mismatch });
   }
 
   if (definition.options && !definition.options.includes(value)) {
