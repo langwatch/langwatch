@@ -22,6 +22,7 @@ import {
   assertPathCompletedAfterSkill,
   attachKickoffConversation,
   CREATE_FIRST_SCENARIO_OPTION,
+  carriesProposalText,
   conversationMessages,
   createFirstScenarioLabel,
   createGuidedCheckout,
@@ -138,7 +139,7 @@ describe("Langy sets up the llmops path through the shared folder", () => {
                   "When the developer types an unrelated question while the card is up, Langy answers in one warm line that keeps the setup going and never drops the path it was on.",
                   "After the folder connects, Langy reads the code, reports the framework it found, and wires tracing and the connect call into the developer's own code.",
                   `Before proposing the first scenario, Langy either says "${GUIDED_LINES.pullRequestOpened} <the address the command printed>. ${GUIDED_LINES.pullRequestMerge}" with a real address, or, when the folder has no remote or GitHub is not signed in, says in one line that the branch holds the commit and no pull request was opened. Either way it never leaves the pull request to the end of the path.`,
-                  `Langy proposes the first scenario in words, word for word from "${GUIDED_LINES.proposalStart}" up to the reason, then asks with a question card that carries only two options: one reading Create "<the scenario title>" as your first scenario test, and the quiet "${GUIDED_OPTIONS.chatAboutThis}". It creates nothing before the developer picks the create option.`,
+                  `Langy proposes the first scenario as one bare question card: the card's own text is the proposal, word for word from "${GUIDED_LINES.proposalStart}" up to the reason, shown as a paragraph above exactly two options, one reading Create "<the scenario title>" as your first scenario test and the quiet "${GUIDED_OPTIONS.chatAboutThis}". Nothing is said between the pull request sentence and that card, and it creates nothing before the developer picks the create option.`,
                   `After the go, Langy says, word for word: "${GUIDED_LINES.whyScenario}"`,
                   `Langy says, word for word: "${GUIDED_LINES.running}"`,
                   `After the first run, Langy says, word for word: "${GUIDED_LINES.proved}"`,
@@ -264,8 +265,10 @@ describe("Langy sets up the llmops path through the shared folder", () => {
           .find((question) => isProposalQuestion(question));
         console.log("[layer2] proposal:", JSON.stringify(proposal));
         expect(proposal).toBeDefined();
-        // The words carry the proposal; the card carries the options alone.
+        // The card carries the proposal as its own text, drawn as prose, and
+        // the options under it.
         expect((proposal as { bare?: boolean }).bare).toBe(true);
+        expect(carriesProposalText(proposal!)).toBe(true);
         const labels = proposal!.options?.map((option) => option.label) ?? [];
         expect(labels).toHaveLength(2);
         expect(labels[0]).toMatch(CREATE_FIRST_SCENARIO_OPTION);

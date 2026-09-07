@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertPathCompletedAfterSkill,
   attachKickoffConversation,
+  carriesProposalText,
   conversationMessages,
   createGuidedCheckout,
   GUIDED_LINES,
@@ -128,6 +129,7 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
                 model,
                 criteria: [
                   `Langy opens with, word for word: "${GUIDED_LINES.llmopsOpener}"`,
+                  `Langy proposes the first scenario as one bare question card whose own text is the proposal, word for word from "${GUIDED_LINES.proposalStart}" up to the reason, above two options: one reading Create "<the scenario title>" as your first scenario test and the quiet "${GUIDED_OPTIONS.chatAboutThis}". Nothing is said between the pull request sentence and that card.`,
                   `When the developer picks "${GUIDED_OPTIONS.chatAboutThis}", Langy says, word for word, "${GUIDED_LINES.chatAboutThis}" and ends its turn there, creating nothing.`,
                   "After the developer describes the scenario, Langy writes it as described, opens it, runs it against the connected agent, and does not argue the developer out of it.",
                   "When the run fails, Langy explains in plain words what the judge saw and why the agent did not meet the criteria (the code was refused as expired), without blaming the developer and without hiding the failure.",
@@ -211,6 +213,7 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
           .find((question) => isProposalQuestion(question));
         expect(proposal).toBeDefined();
         expect((proposal as { bare?: boolean }).bare).toBe(true);
+        expect(carriesProposalText(proposal!)).toBe(true);
         expect(proposal!.options?.[1]?.label).toBe(
           GUIDED_OPTIONS.chatAboutThis,
         );

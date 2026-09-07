@@ -19,8 +19,11 @@
  * A question is an ask, not a view Langy composed from the project's data, so
  * it wears none of the derived frame (the dashed provenance chrome is for the
  * timeseries, table and stats cards): it is a plain option list under the
- * reply. A `bare` card drops the question title too, because the words before
- * it already said what is being asked.
+ * reply. A `bare` card draws its question as ordinary reply prose above the
+ * options instead of as a title: the ask is then the whole of what Langy
+ * says, so the words live in the question field and the card carries them in
+ * the reply's own typography. The prose sits beside the option buttons, never
+ * inside them, so it is no part of their accessible names.
  */
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type {
@@ -30,6 +33,7 @@ import type {
 } from "@langwatch/langy";
 import { Check, CircleSlash } from "lucide-react";
 import { useState } from "react";
+import { Markdown } from "~/components/Markdown";
 
 import { type ChoicesRefRow, useChoicesRefRows } from "./useChoicesRefRows";
 
@@ -129,7 +133,26 @@ export function LangyChoicesCard({
       data-choices-bare={card.bare === true ? "true" : undefined}
       data-choices-forming={forming ? "true" : undefined}
     >
-      {card.bare === true ? null : (
+      {card.bare === true ? (
+        <Box
+          data-langy-choices-prose
+          // The same offsets the reply's own paragraphs get, so the words
+          // sit on the reply's text column and read as one more paragraph.
+          paddingX="2px"
+          css={{
+            "& > div > :first-child": { marginTop: 0 },
+            "& > div > :last-child": { marginBottom: 0 },
+          }}
+        >
+          <Markdown
+            fontSize="langyAnswer"
+            linkVariant="langy"
+            color="langy.answerFg"
+          >
+            {card.question}
+          </Markdown>
+        </Box>
+      ) : (
         <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
           {card.question}
         </Text>

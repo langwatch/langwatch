@@ -144,15 +144,20 @@ Feature: Langy asks a real question with selectable options
       Then it is a plain list of options under the reply, titled by the question
       And it wears no derived frame and no provenance label
 
-    # When the reply before the call already says what is being asked, the
-    # card repeating it as a title says the same thing twice. The tool's
-    # `bare` flag keeps the options alone; the question is still recorded
-    # with the answer.
+    # When the ask is the whole of what Langy has to say, trusting the model
+    # to write the words before the tool call leaves a bare option list with
+    # nothing above it whenever it skips them. The tool's `bare` flag makes
+    # it structural: the words live in the question field, and the card draws
+    # them as ordinary reply prose above the plain option list, with no title
+    # style and no frame. The prose sits beside the option buttons, so it is
+    # no part of their accessible names.
     @integration
-    Scenario: A bare question shows only its options
-      Given Langy said in words what it proposes
-      When it asks with the question tool marked bare
-      Then the card shows the options and no question title
+    Scenario: A bare question draws its words as prose above the options
+      Given Langy asks with the question tool marked bare, its words in the question field
+      When the card renders
+      Then the question reads as a reply paragraph, markdown and all, in the reply's own typography
+      And the plain option list sits under it, with no title and no frame
+      And each option's accessible name is its label alone
 
     @unit
     Scenario: A question renders in a tab that never watched the turn

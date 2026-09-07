@@ -92,13 +92,29 @@ export const GUIDED_LINES = {
 export const CREATE_FIRST_SCENARIO_OPTION =
   /^Create ".+" as your first scenario test$/;
 
-/** Is this the proposal question: the one whose first option creates the scenario? */
+/**
+ * Is this the proposal question: the bare question whose own text is the
+ * proposal and whose first option creates the scenario? Either mark finds it,
+ * so a run that got the words right but not the option, or the other way
+ * round, still lands on the assertions that say which.
+ */
 export function isProposalQuestion(question: {
+  question?: string;
   options?: Array<{ label: string }>;
 }): boolean {
-  return (question.options ?? []).some((option) =>
-    CREATE_FIRST_SCENARIO_OPTION.test(option.label),
+  return (
+    carriesProposalText(question) ||
+    (question.options ?? []).some((option) =>
+      CREATE_FIRST_SCENARIO_OPTION.test(option.label),
+    )
   );
+}
+
+/** Does the question's own text open with the proposal, word for word? */
+export function carriesProposalText(question: { question?: string }): boolean {
+  return (question.question ?? "")
+    .trim()
+    .startsWith(GUIDED_LINES.proposalStart);
 }
 
 /** The create option's label on the proposal question, as Langy worded it. */

@@ -126,7 +126,7 @@ export const questionSchema = z.object({
   multiple: z.boolean().optional(),
   /** Offer a free-text answer next to the options. */
   allowOther: z.boolean().optional(),
-  /** Show only the options: the words before the call carry the question. */
+  /** Draw the question as reply prose above the options, not as a title. */
   bare: z.boolean().optional(),
 });
 

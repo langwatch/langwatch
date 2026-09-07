@@ -111,18 +111,23 @@ describe("the guided-onboarding skill", () => {
     });
 
     /** @scenario "Sharing the folder leads to a proposal, not a creation" */
-    it("says the proposal in words and asks with a bare question whose first option names the scenario", () => {
+    it("puts the proposal in the question field of a bare question whose first option names the scenario", () => {
+      const bare = rendered.indexOf("Ask with the `question` tool with `bare: true`");
       const proposal = rendered.indexOf(VERBATIM_LINES["the proposal"]);
-      const bare = rendered.indexOf("ask with the `question` tool with `bare: true`");
       const create = rendered.indexOf('1. Create "{title}" as your first scenario test');
       const chat = rendered.indexOf('2. "Chat about this", quiet');
-      expect(proposal).toBeGreaterThan(-1);
-      expect(bare).toBeGreaterThan(proposal);
-      expect(create).toBeGreaterThan(bare);
+      expect(bare).toBeGreaterThan(-1);
+      expect(proposal).toBeGreaterThan(bare);
+      expect(create).toBeGreaterThan(proposal);
       expect(chat).toBeGreaterThan(create);
       expect(rendered).toContain(
-        'The `question` field is "Create the first scenario test?"; it is recorded with the answer and not drawn.',
+        "so the proposal is the `question` field itself, verbatim",
       );
+      expect(rendered).toContain(
+        "say nothing before the call beyond the step 2 lines",
+      );
+      expect(rendered).not.toContain("Say the proposal as your reply");
+      expect(rendered).not.toContain("it is recorded with the answer and not drawn");
       expect(rendered).not.toContain("Sure, go ahead!");
     });
 

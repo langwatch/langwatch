@@ -741,8 +741,8 @@ Feature: Langy guides the first setup after sign-up
       Then Langy detects LangGraph
       And Langy instruments tracing and the connect endpoint through the tracing, connect-agent and code-changes skills
       And Langy starts the agent
-      And Langy says "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is Guest completes checkout, because it is the path most of your users take and it crosses the discount, payment and confirmation steps in one conversation."
-      And the question under it carries only the options: "Create "Guest completes checkout" as your first scenario test" and the quiet "Chat about this"
+      And Langy asks with a bare question whose own text reads "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is Guest completes checkout, because it is the path most of your users take and it crosses the discount, payment and confirmation steps in one conversation."
+      And that text is drawn as a reply paragraph above the options "Create "Guest completes checkout" as your first scenario test" and the quiet "Chat about this", with nothing said before the card
       And no scenario exists yet
 
     @e2e

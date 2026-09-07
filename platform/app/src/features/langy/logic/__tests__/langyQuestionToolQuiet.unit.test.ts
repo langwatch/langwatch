@@ -36,7 +36,7 @@ describe("questionToolCardParts", () => {
       ]);
     });
 
-    /** @scenario "A bare question shows only its options" */
+    /** @scenario "A bare question draws its words as prose above the options" */
     it("carries the bare mark, so the card draws the options alone", () => {
       const [card] = questionToolCardParts({
         type: "tool-question",

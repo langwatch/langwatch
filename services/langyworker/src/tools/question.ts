@@ -177,7 +177,7 @@ const questionParams = Type.Object({
       bare: Type.Optional(
         Type.Boolean({
           description:
-            "Show only the options, without the question text on the card. Use it when the words before the call already say what is being asked; the question field is still recorded with the answer.",
+            "Draw the question field as ordinary reply prose (markdown) above the options, with no title and no frame. Use it when the question is the whole of what you have to say, so put every word of it in the question field and say nothing before the call.",
         }),
       ),
     }),

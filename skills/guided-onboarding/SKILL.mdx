@@ -99,11 +99,11 @@ No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds th
 
 This question is the gate of step 4: no `scenario create`, no run and no suite before the person has answered it. Whatever arrives first, a message describing a scenario, a question, or a setup that stopped at a failed step and was then fixed, finish step 2 and ask it; a scenario the person described before the question becomes `{title}` in it, and the answer is still theirs to give.
 
-Do not create it yet. Say the proposal as your reply, verbatim, with the braces filled from what you read:
+Do not create it yet. Ask with the `question` tool with `bare: true`, and say nothing before the call beyond the step 2 lines: a bare question draws its `question` field as ordinary reply prose above the options, so the proposal is the `question` field itself, verbatim, with the braces filled from what you read:
 
 Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is {title}, because {reason}.
 
-Then, in the same step, ask with the `question` tool with `bare: true`, so the card shows the options alone under those words. The `question` field is "Create the first scenario test?"; it is recorded with the answer and not drawn. Options, in this order, with the same `{title}`:
+Options, in this order, with the same `{title}`:
 
 1. Create "{title}" as your first scenario test
 2. "Chat about this", quiet

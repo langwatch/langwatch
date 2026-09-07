@@ -204,9 +204,9 @@ export const choicesCardFields = {
   multiSelect: z.boolean().optional(),
   allowOther: z.boolean().optional(),
   /**
-   * Only the options are drawn. The reply before the card carries the
-   * question in words, so the card repeating it as a title would say the
-   * same thing twice. The question is still recorded with the answer.
+   * The question is drawn as ordinary reply prose above the options, not as
+   * a title: the ask is the whole of what Langy says, so its words live here
+   * and the card carries them in the reply's own typography.
    */
   bare: z.boolean().optional(),
 } as const;

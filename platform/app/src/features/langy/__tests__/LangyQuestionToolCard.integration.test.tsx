@@ -115,15 +115,17 @@ describe("the question tool card", () => {
         expect(screen.queryByText("Made by Langy")).toBeNull();
       });
 
-      /** @scenario "A bare question shows only its options" */
-      it("draws only the options when the question is bare", () => {
+      /** @scenario "A bare question draws its words as prose above the options" */
+      it("draws the question as reply prose, not a title, when the question is bare", () => {
+        const proposal =
+          "Now that your agent is integrated, I think we should write some tests for it. The first one I'd write is **Guest completes checkout**, because it is the golden path.";
         renderMessage(
           assistantMessage([
             questionToolPart({
               input: {
                 questions: [
                   {
-                    question: "Create the first scenario test?",
+                    question: proposal,
                     bare: true,
                     options: [
                       {
@@ -139,19 +141,46 @@ describe("the question tool card", () => {
           ]),
         );
 
+        const card = choicesCards()[0]!;
         expect(choicesCards().length).toBe(1);
-        expect(
-          screen.queryByText("Create the first scenario test?"),
-        ).toBeNull();
-        expect(
-          screen.getByText(
-            'Create "Guest completes checkout" as your first scenario test',
-          ),
-        ).toBeInTheDocument();
-        expect(screen.getByText("Chat about this")).toBeInTheDocument();
-        expect(choicesCards()[0]!.getAttribute("data-choices-bare")).toBe(
-          "true",
+        expect(card.getAttribute("data-choices-bare")).toBe("true");
+
+        // The words render as markdown prose inside the card, above the
+        // options, with no title element carrying them.
+        const prose = card.querySelector("[data-langy-choices-prose]");
+        expect(prose).not.toBeNull();
+        expect(prose!.textContent).toContain(
+          "Now that your agent is integrated, I think we should write some tests for it.",
         );
+        expect(prose!.querySelector("strong")?.textContent).toBe(
+          "Guest completes checkout",
+        );
+        const options = card.querySelectorAll(
+          "[data-testid='langy-choice-option']",
+        );
+        expect(options.length).toBe(2);
+        expect(
+          prose!.compareDocumentPosition(options[0]!) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+
+        // The prose is no part of what a button is called.
+        expect(
+          screen.getByRole("button", {
+            name: 'Create "Guest completes checkout" as your first scenario test',
+          }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Chat about this" }),
+        ).toBeInTheDocument();
+      });
+
+      it("keeps the title for a question that is not bare", () => {
+        renderMessage(assistantMessage([questionToolPart()]));
+
+        const card = choicesCards()[0]!;
+        expect(card.querySelector("[data-langy-choices-prose]")).toBeNull();
+        expect(card.getAttribute("data-choices-bare")).toBeNull();
       });
 
       it("never renders the tool as raw activity — no dead 'Question…' card, no JSON", () => {

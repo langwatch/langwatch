@@ -450,7 +450,7 @@ export const langyUserWaitQuestionSchema = z.object({
   options: z.array(langyUserWaitQuestionOptionSchema),
   multiple: z.boolean().optional(),
   allowOther: z.boolean().optional(),
-  /** Only the options are shown: the words before the call carry the question. */
+  /** The question is drawn as reply prose above the options, not as a title. */
   bare: z.boolean().optional(),
 });
 
