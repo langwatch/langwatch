@@ -619,8 +619,12 @@ export function organizationMfa(): OrganizationMfaService {
     sessions: new PrismaSessionFactors(prisma),
     members: new PrismaOrganizationMemberFactors(prisma),
     connections: new PrismaOrganizationConnectionFactors(prisma),
-    notifier: new EmailOrganizationMfaNotifier(prisma, ({ userId }) =>
-      identityEmail().resolveEmail({ userId }),
+    notifier: new EmailOrganizationMfaNotifier(
+      prisma,
+      async ({ userId, legacyEmail }) => {
+        if (!(await isLatched({ userId }))) return legacyEmail;
+        return identityEmail().resolveEmail({ userId });
+      },
     ),
     // Stated once, here, like every other environment read this root owns.
     offered: deploymentOffersTwoStepVerification,
