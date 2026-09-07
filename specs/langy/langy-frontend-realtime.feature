@@ -193,6 +193,21 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Then the panel adopts the turn from the durable record and reattaches to its stream
     And a navigate instruction from that turn opens the page it names in place
 
+  # The fold and the transcript are different reads. The fold advances on the
+  # freshness signal, so a turn started elsewhere is adopted within a batch;
+  # the transcript is re-read on an explicit open, or on a poll armed by its
+  # own in-flight flag — which a snapshot taken before the turn existed does
+  # not carry. A tab that had already answered a turn therefore held the
+  # previous transcript for the whole of the next one, was never ready to
+  # resume, and never subscribed: every live-only entry that turn issued
+  # reached nobody.
+  @integration
+  Scenario: A folder-connected turn reaches a tab that already answered one
+    Given this tab answered a turn of its own, so the last thing on screen is that answer
+    When the folder connects and the server starts the next turn
+    Then the panel re-reads the transcript once, which lands the new turn's own message
+    And it then reattaches to that turn's stream and navigates where the turn says
+
   # ---------------------------------------------------------------------------
   # Domain-error rendering (ADR-045)
   # ---------------------------------------------------------------------------

@@ -739,7 +739,21 @@ export class LangyTokenBuffer {
     await this.append(conversationId, turnId, { type: "error", error });
   }
 
-  /** Refresh the per-turn liveness key. TTL = 2× the heartbeat interval. */
+  /**
+   * Refresh the per-turn liveness key AND the stream's TTL. The liveness key
+   * gets 2× the heartbeat interval; the stream key gets a full
+   * STREAM_TTL_SECONDS from now.
+   *
+   * The stream TTL used to move on `append` alone, so a turn that spent longer
+   * than STREAM_TTL_SECONDS inside one tool call — a suite run waited on, a
+   * long build — lost its whole buffer while the worker was provably alive and
+   * still beating. A reader attaching after that replayed an empty tail, and
+   * the turn-order reader at finalize recorded the turn's parts with no order.
+   * A heartbeat IS the statement that this turn is still live, and the stream
+   * is that turn's live edge, so it carries the same proof: one EXPIRE, no
+   * entry, so the buffer's content and its MAXLEN are untouched. A turn with no
+   * stream key yet is a no-op (EXPIRE on a missing key returns 0).
+   */
   async heartbeat({
     conversationId,
     turnId,
@@ -754,6 +768,10 @@ export class LangyTokenBuffer {
       String(now),
       "EX",
       LANGY_LIVENESS.heartbeatTtlSeconds(),
+    );
+    await this.redis.expire(
+      this.streamKey(conversationId, turnId),
+      LANGY_STREAMING.STREAM_TTL_SECONDS,
     );
   }
 

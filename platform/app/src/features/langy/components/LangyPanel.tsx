@@ -101,7 +101,10 @@ import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
 import { useLangyWarmWorker } from "../hooks/useLangyWarmWorker";
 import { useLingeringDodge } from "../hooks/useLingeringDodge";
 import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
-import { shouldResumeAdoptedTurn } from "../logic/adoptedTurnResume";
+import {
+  shouldRefetchHistoryForAdoptedTurn,
+  shouldResumeAdoptedTurn,
+} from "../logic/adoptedTurnResume";
 import { syncLangyAfterDefaultModelWrite } from "../logic/codingDefaultSync";
 import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
@@ -1640,6 +1643,40 @@ function LangyPanel({
     historyMessages,
     messages.length,
     applyHistoryToEngine,
+  ]);
+
+  // The fold adopted a turn the transcript snapshot has never seen (the server
+  // starting one when the shared folder connects, another tab's send). The
+  // transcript is not refreshed by the freshness signal — that drives the
+  // event fold instead — and its own in-flight poll is armed by a flag the
+  // stale snapshot does not carry, so without this read the engine never gains
+  // the turn's user message and the resume below stays blocked on its
+  // engine-ready guard for the turn's whole run. One read per adopted turn:
+  // it lands that message and re-arms the poll for the rest of the turn.
+  const refetchedForTurnRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !shouldRefetchHistoryForAdoptedTurn({
+        turnActive,
+        activeTurnId: localTurnId,
+        dispatchedTurnId: dispatchedTurnIdRef.current,
+        foldInFlightTurnId,
+        refetchedTurnId: refetchedForTurnRef.current,
+        hasHistory: historyMessages.length > 0,
+        isFetchingHistory,
+      })
+    ) {
+      return;
+    }
+    refetchedForTurnRef.current = localTurnId;
+    refetchHistory();
+  }, [
+    turnActive,
+    localTurnId,
+    foldInFlightTurnId,
+    historyMessages.length,
+    isFetchingHistory,
+    refetchHistory,
   ]);
 
   // Reattach to a turn this tab did not dispatch. The durable fold adopts it

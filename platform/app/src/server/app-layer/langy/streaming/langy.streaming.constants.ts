@@ -47,7 +47,11 @@ export const LANGY_STREAMING = {
    * trim (cheaper for ClickHouse-free Redis MergeTree-style trimming).
    */
   STREAM_MAXLEN: 2000,
-  /** TTL (seconds) refreshed on every append; the buffer self-cleans. */
+  /**
+   * TTL (seconds) refreshed on every append AND on every heartbeat, so a turn
+   * that spends longer than this inside one silent tool call keeps its buffer;
+   * a finished or abandoned turn stops being refreshed and self-cleans.
+   */
   STREAM_TTL_SECONDS: 180, // 3 min (ADR-044: 2–5 min)
   /** Max ms an `XREAD BLOCK` waits before returning to re-check terminal state. */
   FOLLOW_BLOCK_MS: 15_000,
