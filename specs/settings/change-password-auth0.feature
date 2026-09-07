@@ -1,4 +1,4 @@
-Feature: Change password from /settings/authentication
+Feature: Change password from /settings/security
   As a LangWatch user (whether the tenant uses Auth0 or BetterAuth credentials)
   I want a single, clear way to change my password without leaving the settings page
   So that the action is intentional, the page stays uncluttered, and toast feedback confirms success
@@ -14,7 +14,7 @@ Feature: Change password from /settings/authentication
 
   Background:
     Given I am signed in
-    And I am on /settings/authentication
+    And I am on /settings/security
 
   @integration
   Scenario: Auth0 user with a database identity sees the Change Password link in their linked sign-in row

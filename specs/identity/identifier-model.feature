@@ -104,10 +104,33 @@ Feature: The identifier model - identity as an event-sourced pipeline
 
   @unit
   Scenario: A fact the heads already carry is not stated again
-    Given "sam"'s Google identifier is already folded into the projection
+    Given "sam"'s projection has folded at least once
+    And "sam"'s Google identifier is already folded into the projection
     When the same attach is handled again, from a staged re-run or a later backfill pass
     Then no event is emitted and nothing is appended, applied, or staged
     And an attach for an identifier the projection lacks is still emitted
+
+  @unit
+  Scenario: Signing up makes the address routable before the fold lands
+    Given "sam" is a newborn whose projection has never folded
+    When a sign-up commits the attach of "sam"'s credential identifier
+    Then the Identifier row is written before the command is staged, and no cursor is written with it
+    And the front door can route the address while the fold is still in the queue
+    And when the fold lands it overwrites the same row whole and sets the cursor
+
+  @unit
+  Scenario: A newborn's provisional head does not silence its own attach
+    Given "sam" is a newborn whose provisional Identifier row is already written
+    When the queued run re-runs the attach guard against those heads
+    Then the attach event is still emitted and appended, and the cursor advances
+    But a user whose projection has folded gets no provisional write, and a restated attach still emits nothing
+
+  @unit
+  Scenario: A provisional head with no event is restated by the next pass
+    Given a newborn's provisional row was written and then staging failed
+    Then the row exists with no event behind it, and a replay before the next pass would drop it
+    When the next pass states the same attach again
+    Then the guard emits it, because the projection has still never folded
 
   @unit
   Scenario: Every identity event rides the pipeline's declared aggregate type

@@ -32,4 +32,15 @@ export class PrismaLegacySsoOrganizationRepository
       ssoProvider: organization.ssoProvider,
     };
   }
+
+  async findByDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null> {
+    return await this.prisma.organization.findUnique({
+      where: { ssoDomain: domain },
+      select: { id: true, name: true, ssoProvider: true },
+    });
+  }
 }

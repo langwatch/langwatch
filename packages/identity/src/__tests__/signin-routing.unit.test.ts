@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { normalizeIdentifierValue } from "../identifier";
 import {
+  type AccountSignInMethods,
   compareToLegacy,
+  rankAccountMethods,
   type RoutableConnection,
   type RoutingDecision,
   type SignInMethod,
@@ -31,6 +33,8 @@ function connection(
     method: okta,
     state: "ACTIVE",
     configured: true,
+    // The field this replaced was `arrivalPolicy`; "admit" is the answer that
+    // let an unmatched subject through, which is `allowsJit: true`.
     allowsJit: true,
     ...overrides,
   };
@@ -54,12 +58,14 @@ function route({
   domainConnection = null,
   activeConnections = [],
   methodPolicy = policy(),
+  account,
 }: {
   raw?: string | null;
   breakGlass?: boolean;
   domainConnection?: RoutableConnection | null;
   activeConnections?: readonly RoutableConnection[];
   methodPolicy?: SignInMethodPolicy;
+  account?: AccountSignInMethods | null;
 } = {}): RoutingDecision {
   return routeSignIn({
     identifier: raw === null ? null : routingIdentifierOf(raw),
@@ -67,8 +73,16 @@ function route({
     policy: methodPolicy,
     domainConnection,
     activeConnections,
+    account,
   });
 }
+
+/** An account holding a password and nothing else. */
+const PASSWORD_ACCOUNT: AccountSignInMethods = {
+  hasPassword: true,
+  hasPasskey: false,
+  connectionIds: [],
+};
 
 describe("the identifier-first sign-in router", () => {
   describe("given a domain that belongs to an ACTIVE connection", () => {
@@ -116,21 +130,125 @@ describe("the identifier-first sign-in router", () => {
       });
     });
 
-    /** @scenario "The decision never depends on whether an account exists" */
-    it("answers a known address and an unknown one with one decision, field for field", () => {
-      // The engine takes no user data at all, so "known" and "unknown" are the
-      // same call. That is the invariant: there is no branch here that could
-      // tell them apart, and none can be added without this test noticing.
+    /**
+     * The old invariant here — "answers a known address and an unknown one
+     * with one decision, field for field" — is RETIRED by ADR-117's
+     * 2026-08-25 revision, and this is its replacement rather than its
+     * deletion. Telling the two apart is now the point; what must still hold
+     * is that a deployment which never wires the lookup is unchanged, which is
+     * what this asserts.
+     */
+    /** @scenario "A router that was never asked about accounts answers as it always did" */
+    it("offers the uniform picker when the account was never looked up", () => {
+      // No `account` key at all: the composition layer skipped the lookup.
+      // Distinct from `null`, which is a routing answer meaning "nobody holds
+      // this address" — conflating the two is what would make a deployment
+      // without the lookup send every visitor to sign-up.
       const known = route({ raw: "sam@home.net" });
       const unknown = route({ raw: "nobody-has-ever-signed-up@home.net" });
 
       expect(known).toEqual(unknown);
-      expect(Object.keys(known).sort()).toEqual([
-        "methodSet",
-        "outcome",
-        "reasonCode",
-      ]);
+      expect(known.reasonCode).toBe("no_domain_match");
       expect(JSON.stringify(known)).not.toContain("sam");
+    });
+
+    /** @scenario "An address with no account carries on as a sign-up" */
+    it("routes an address nobody holds to sign-up, offering no method at all", () => {
+      const decision = route({ raw: "nobody@home.net", account: null });
+
+      expect(decision).toEqual({
+        outcome: "route_to_signup",
+        methodSet: [],
+        reasonCode: "identifier_unknown",
+      });
+    });
+
+    /** @scenario "The methods offered are the ones that account holds" */
+    it("offers the account's own methods rather than the instance's", () => {
+      const decision = route({
+        raw: "sam@home.net",
+        account: { hasPassword: false, hasPasskey: true, connectionIds: [] },
+        methodPolicy: policy({
+          defaultMethods: [
+            PASSWORD,
+            { id: "passkey", kind: "passkey", connectionId: null },
+          ],
+        }),
+      });
+
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.reasonCode).toBe("account_methods");
+      // The password this deployment offers is NOT offered to an account that
+      // holds none: that box could only ever fail.
+      expect(decision.methodSet).toEqual([
+        { id: "passkey", kind: "passkey", connectionId: null },
+      ]);
+    });
+
+    /** @scenario "An account whose every method was turned off still gets a way in" */
+    it("falls back to the uniform picker when policy offers none of the account's methods", () => {
+      const decision = route({
+        raw: "sam@home.net",
+        // Holds a password on a deployment that has since stopped offering one.
+        account: PASSWORD_ACCOUNT,
+        methodPolicy: policy({
+          defaultMethods: [{ id: "google", kind: "federated", connectionId: null }],
+        }),
+      });
+
+      // Not a sign-up: the account is real, and somebody may yet turn the
+      // method back on. It gets the ways in that do work.
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.reasonCode).toBe("no_domain_match");
+    });
+  });
+
+  describe("given an address on a domain a connection owns", () => {
+    /** @scenario "A connected domain routes before the account is consulted" */
+    it("redirects a brand-new hire to their identity provider rather than to sign-up", () => {
+      // The ordering that makes just-in-time provisioning work. Asking "do we
+      // know this person" first would send every genuine new employee to a
+      // sign-up form instead of to their employer's single sign-on.
+      const decision = route({
+        raw: "newhire@acme.com",
+        domainConnection: connection(),
+        account: null,
+      });
+
+      expect(decision.outcome).toBe("redirect_to_connection");
+      expect(decision.reasonCode).toBe("domain_routed");
+    });
+  });
+
+  describe("given an account holding several kinds of method", () => {
+    const passkey: SignInMethod = {
+      id: "passkey",
+      kind: "passkey",
+      connectionId: null,
+    };
+
+    /** @scenario "The methods offered are the ones that account holds" */
+    it("ranks a passkey above a connection and a connection above a password", () => {
+      const ranked = rankAccountMethods({
+        account: {
+          hasPassword: true,
+          hasPasskey: true,
+          connectionIds: ["conn_acme"],
+        },
+        policy: policy({ defaultMethods: [PASSWORD, okta, passkey] }),
+      });
+
+      expect(ranked).toEqual([passkey, okta, PASSWORD]);
+    });
+
+    /** @scenario "The methods offered are the ones that account holds" */
+    it("drops a connection the account has never signed in through", () => {
+      const ranked = rankAccountMethods({
+        account: { hasPassword: true, hasPasskey: false, connectionIds: [] },
+        policy: policy({ defaultMethods: [PASSWORD, okta] }),
+      });
+
+      expect(ranked).toEqual([PASSWORD]);
     });
   });
 

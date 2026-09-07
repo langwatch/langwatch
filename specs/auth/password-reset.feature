@@ -14,21 +14,12 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   # endpoints; this feature wires the previously-missing `sendResetPassword`
   # callback to the mailer and adds the two user-facing pages.
 
-  # --- Sign-in entry point ---
-
-  @integration
-  Scenario: The credential sign-in form shows a Forgot password link
-    Given the tenant runs on NEXTAUTH_PROVIDER="email"
-    When I open /auth/signin
-    Then I see the email and password fields
-    And I see a "Forgot password?" link pointing to /auth/forgot-password
-
-  @integration
-  Scenario: SSO sign-in renders no credential form and no Forgot password link
-    Given the tenant runs on a social provider (NEXTAUTH_PROVIDER is not "email")
-    When I open /auth/signin
-    Then the credential form is not rendered
-    And there is no "Forgot password?" link
+  # The sign-in entry point used to be described here as a property of the
+  # credential form: email and password fields with a reset link beside them,
+  # absent on a social deployment. There is no credential form on the sign-in
+  # screen now. The router says which methods an address is offered, and the
+  # reset link travels with the password method wherever it appears - bound in
+  # specs/identity/signin-signup-screens.feature.
 
   @integration
   Scenario: The forgot and reset pages are reachable without signing in
@@ -91,6 +82,7 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   Scenario: A successful reset revokes all of the user's existing sessions
     Given a user completes a password reset
     Then every existing session for that user is revoked
+    And only then is the one new session for the resetting device opened
 
   @integration
   Scenario: Password reset endpoints are rate-limited to five attempts per hour
@@ -100,12 +92,25 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
 
   # --- Setting the new password (/auth/reset-password) ---
 
-  @integration
-  Scenario: Submitting a valid new password with a token resets it and returns to sign-in
+  # The reset SIGNS ME IN. The link proved the address and the password I just
+  # set is the credential, so there is nothing left for the log-in screen to
+  # check; sending me there to type both again was the old ending. The
+  # session is opened by the reset endpoint itself, after every old session
+  # is revoked, so the device that set the password is the one device signed
+  # in afterwards.
+  @integration @e2e
+  Scenario: Submitting a valid new password with a token resets it and signs me in
     Given I open /auth/reset-password with a valid token
     When I enter a new password and a matching confirmation and submit
     Then the app calls BetterAuth resetPassword with the new password and token
-    And on success I see a confirmation and a link to sign in
+    And on success I see a confirmation and a way to continue into LangWatch
+
+  @unit
+  Scenario: A completed reset opens a session for the device that set the password
+    Given the reset endpoint accepted my new password
+    When BetterAuth's after-hook runs for that request
+    Then a session is created for my account and its cookie is set
+    And a refused reset opens nothing
 
   @integration
   Scenario: The reset form rejects passwords shorter than 8 characters
@@ -146,17 +151,10 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   # method-set policy speaking (ADR-027's semantics, kept), and it stops
   # speaking when those installations hold password identifiers.
 
-  @integration
-  Scenario: Password reset stays a credential-mode concept before the flip
-    Given the deployment signs in through an identity provider
-    And the identifier-first front door is not enforced
-    When I open the reset screen
-    Then I am told my password is managed by my identity provider
 
   @integration
-  Scenario: Password reset follows the identifier once the front door is enforced
+  Scenario: Password reset follows the identifier
     Given an installation that federates but holds passwords of its own
-    And the identifier-first front door is enforced
     When I request a password reset
     Then the reset is offered
     And the answer is the same confirmation whether or not the address has an account
@@ -168,14 +166,66 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     Then I am told my password is managed by my identity provider
     And no reset is offered that could not be completed
 
-  # --- Full end-to-end (manual dogfood) ---
+  # --- After the reset: the moment to offer a passkey ---
+  #
+  # ADR-120's rule is that a passkey is offered where somebody already is, and
+  # this is one of the three places they already are: they just proved control
+  # of the address, they are thinking about how they get in, and the thing
+  # they have most recently learned is that the password did not work.
+  #
+  # It is an OFFER and it behaves like one. It never stands between them and
+  # finishing, it can be waved away, and it never opens a system prompt on its
+  # own - the ceremony starts on a real gesture, the same rule the sign-in
+  # screen's conditional offer obeys.
+  #
+  # The offer is TAKEN here rather than somewhere else. The reset signed them
+  # in, so the ceremony this screen can run is the same one the settings page
+  # runs, and sending somebody to a settings page to press a second button was
+  # a step that existed only because this screen used to have no session.
 
-  # Verified manually in the QA phase against a real database and a real
-  # SendGrid send: request a reset for a seeded credential user, open the
-  # emailed link, set a new password, and sign in with it. There is no
-  # automated full-stack auth e2e harness with email interception in this
-  # repo, so this stays @unimplemented and is proved via browser QA in the PR.
-  @e2e @unimplemented
+  @integration @e2e
+  Scenario: A completed reset offers a passkey rather than assuming one
+    Given I have just set a new password from a valid link
+    Then the screen confirms the reset and offers to add a passkey
+    And signing in is still the plain, unmissable way on
+    And no device prompt has opened, because I have not asked for one
+
+  @integration
+  Scenario: Declining the offer costs nothing
+    Given I am offered a passkey after resetting my password
+    When I dismiss the offer
+    Then the confirmation and the way to sign in are both still there
+    And the offer does not come back on this screen
+
+  @integration @e2e
+  Scenario: Accepting the offer adds the passkey on this screen
+    Given I am offered a passkey after resetting my password
+    When I ask for one
+    Then the screen waits on my device and says whose prompt it is
+    And once the device answers the screen says the passkey was added
+    And the way on is still there throughout
+
+  @integration
+  Scenario: A refused ceremony says so in words and leaves the way on
+    Given I asked for a passkey after resetting my password
+    When the ceremony is refused
+    Then the screen shows the copy registered for that refusal
+    And it never shows the code itself or an internal message
+    And the way on is still there
+
+  # --- Full end-to-end ---
+
+  # No inbox exists in CI to receive the "emailed" link — there is still no
+  # full-stack auth e2e harness with real EMAIL interception in this repo.
+  # What changed: the request endpoint writes its single-use token row
+  # BEFORE it ever tries to send mail (`runInBackgroundOrAwait` around
+  # `sendResetPassword`, better-auth's own `password.mjs`), so a Playwright
+  # test can call the request endpoint directly and read that row straight
+  # out of Postgres — reproducing exactly what clicking the email does,
+  # without needing the email. See
+  # `tests/agentic-e2e/tests/front-door/password-reset.test.ts` and its
+  # `db.ts` for the coupling this leans on.
+  @e2e
   Scenario: A user who forgot their password resets it and signs in with the new one
     Given a credential user who forgot their password
     When they request a reset, open the emailed link, and set a new password

@@ -21,7 +21,7 @@ import { toaster } from "../ui/toaster";
  * dialog read too, so the form cannot accept what the server refuses. Asked as
  * a refinement rather than restated as a `min(8)` for the same reason:
  * restating them is how they drift, and this dialog had drifted — it enforced
- * eight characters of its own while the front door enforced the shared policy.
+ * eight characters of its own while the auth screens enforced the shared policy.
  */
 const newPassword = z.string().superRefine((value, ctx) => {
   const problem = passwordProblem(value);
@@ -158,7 +158,8 @@ export function ChangePasswordDialog({
               {isSetting && (
                 <Text fontSize="sm" color="fg.muted">
                   You sign in without a password today. Setting one gives you a
-                  way in from a device that does not hold your passkey.
+                  second way in, for a browser or a device your passkey provider
+                  does not reach.
                 </Text>
               )}
               <Text fontSize="sm" color="fg.muted">

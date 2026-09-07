@@ -51,7 +51,12 @@ export function isOrgScopedPermission(permission: Permission): boolean {
     // ORG_EXCLUSIVE_RESOURCES). Omitting it here sent the check down the
     // team-role path, where no bag carries it, so the screen refused every
     // org admin while the router allowed them.
-    permission.startsWith("governanceCost:")
+    permission.startsWith("governanceCost:") ||
+    // Single sign-on, and the directory sync it gates, are org-tier by
+    // declaration (registry scopes: ["organization"]); resolving them
+    // against team roles denies org admins client-side while the server
+    // allows them.
+    permission.startsWith("sso:")
   );
 }
 
@@ -277,7 +282,21 @@ export const useOrganizationTeamProject = (
   const organizations = api.organization.getAll.useQuery(
     { isDemo: isDemo },
     {
-      enabled: !!session.data || !isPublicRoute,
+      // Nothing is asked FOR a session that has not resolved yet. On a private
+      // route `!isPublicRoute` alone was true on the very first render, before
+      // `useSession` had finished its fetch, so the query went out with no
+      // cookie behind it and came back 401 — and 401 is one of the statuses
+      // `shouldRetryQuery` will never replay, deliberately, because a replay
+      // cannot change a rejected credential. The query then SAT in error until
+      // something remounted an observer: an empty organization list that never
+      // recovers, which the landing redirect reads as "this account has no
+      // organization" and answers with /onboarding/welcome.
+      //
+      // Waiting for RESOLUTION rather than for data is what makes it correct
+      // both ways: an unauthenticated visitor on a private route still asks,
+      // and is still refused, which is the answer that sends them to the door.
+      enabled:
+        session.status !== "loading" && (!!session.data || !isPublicRoute),
       // Small reference query that drives load-bearing client state (current
       // project incl. defaultModel). Cheap to refetch — prefer freshness over
       // a "cache forever" default. Background refetch on focus picks up edits

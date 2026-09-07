@@ -46,6 +46,7 @@ import {
 import {
   deploymentIsFederationCapable,
   LOCAL_METHOD_SET,
+  PASSKEY_METHOD,
   PASSWORD_METHOD,
   resolveSignInMethodPolicy,
 } from "../signin-method-policy";
@@ -89,6 +90,7 @@ describe("the instance sign-in method policy", () => {
 
       expect(policy.defaultMethods).toEqual([
         { id: "auth0", kind: "federated", connectionId: null },
+        PASSKEY_METHOD,
       ]);
       expect(policy.federationLicensed).toBe(true);
       expect(policy.selfHosted).toBe(true);
@@ -135,7 +137,7 @@ describe("the instance sign-in method policy", () => {
       const policy = await resolveSignInMethodPolicy();
 
       expect(policy.federationLicensed).toBe(false);
-      expect(policy.defaultMethods).toEqual([PASSWORD_METHOD]);
+      expect(policy.defaultMethods).toEqual([PASSWORD_METHOD, PASSKEY_METHOD]);
       expect(policy.localMethods).toEqual(LOCAL_METHOD_SET);
       expect(
         policy.defaultMethods.some((method) => method.kind === "federated"),
@@ -155,7 +157,7 @@ describe("the instance sign-in method policy", () => {
       });
 
       expect(decision.outcome).toBe("method_picker");
-      expect(decision.methodSet).toEqual([PASSWORD_METHOD]);
+      expect(decision.methodSet).toEqual([PASSWORD_METHOD, PASSKEY_METHOD]);
     });
   });
 
