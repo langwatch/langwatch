@@ -348,6 +348,29 @@ describe("the account's email addresses", () => {
     });
   });
 
+  /** @scenario An unconfirmed address offers to send its link again */
+  it("resends the account's own unconfirmed identifier through the own-address sender", async () => {
+    confirmationRef.current = { email: "sam@acme.test", confirmed: false };
+    identifiersRef.current = [
+      address({
+        identifierId: "own-address",
+        value: "sam@acme.test",
+        isPrimary: true,
+        confirmed: false,
+        resendable: true,
+      }),
+    ];
+    renderSection();
+
+    fireEvent.click(screen.getByTestId("resend-address-link"));
+
+    await waitFor(() => expect(resendOwnMock).toHaveBeenCalledWith({}));
+    expect(resendAddedMock).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("address-link-sent")).toHaveTextContent(
+      "sam@acme.test",
+    );
+  });
+
   describe("given no identifiers yet and the account's own address", () => {
     /** @scenario Each email address says whether it has been confirmed */
     it("still says whether that address is confirmed, from the shell's own read", () => {
