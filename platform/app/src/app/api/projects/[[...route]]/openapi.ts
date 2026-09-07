@@ -182,7 +182,7 @@ export const GET_PROJECT: DescribeRouteOptions = {
   operationId: "getProject",
   summary: "Get a project",
   description:
-    "Get a project by ID, including its API key. Requires project:view permission.",
+    "Get a project by ID without secret keys. Requires project:view permission.",
   security: [
     {
       admin_api_key: [],
@@ -349,15 +349,12 @@ export const ARCHIVE_PROJECT: DescribeRouteOptions = {
   },
 };
 
-/**
- * The project's own ingestion key. Reading it is gated on `project:update`
- * rather than `project:view`, to match the write access the key itself grants.
- */
 export const GET_PROJECT_API_KEY: DescribeRouteOptions = {
   operationId: "getProjectApiKey",
   summary: "Get the project API key",
+  deprecated: true,
   description:
-    "Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with. Requires an admin API key holding project:update on this project.",
+    "Deprecated. Project base keys can be revealed only by a signed-in project administrator in the browser or an approved device flow. Organization API keys are always refused with 403.",
   security: [
     {
       admin_api_key: [],
@@ -373,34 +370,20 @@ export const GET_PROJECT_API_KEY: DescribeRouteOptions = {
     },
   ],
   responses: {
-    "200": {
-      description: "The project's API key",
-      content: {
-        "application/json": {
-          schema: {
-            type: "object",
-            properties: {
-              apiKey: {
-                type: "string",
-                description: "Send as X-Auth-Token, Bearer, or Basic",
-              },
-            },
-            required: ["apiKey"],
-          },
-        },
-      },
-    },
     "401": { description: "Invalid or missing API key token" },
-    "403": { description: "Insufficient permissions for this operation" },
-    "404": { description: "No project with that id in this organization" },
+    "403": {
+      description:
+        "A signed-in project administrator is required; API-key principals cannot reveal base keys",
+    },
   },
 };
 
 export const REGENERATE_PROJECT_API_KEY: DescribeRouteOptions = {
   operationId: "regenerateProjectApiKey",
   summary: "Regenerate the project API key",
+  deprecated: true,
   description:
-    "Issue a new API key for the project and invalidate the previous one immediately. Anything still sending the old key starts failing authentication as soon as this returns, so roll it out before calling this. Requires an admin API key holding project:manage.",
+    "Deprecated. Project base keys can be rotated only by a signed-in project administrator in the browser. Organization API keys are always refused with 403.",
   security: [
     {
       admin_api_key: [],
@@ -416,25 +399,10 @@ export const REGENERATE_PROJECT_API_KEY: DescribeRouteOptions = {
     },
   ],
   responses: {
-    "200": {
-      description: "The new API key. The previous one no longer authenticates.",
-      content: {
-        "application/json": {
-          schema: {
-            type: "object",
-            properties: {
-              apiKey: {
-                type: "string",
-                description: "Send as X-Auth-Token, Bearer, or Basic",
-              },
-            },
-            required: ["apiKey"],
-          },
-        },
-      },
-    },
     "401": { description: "Invalid or missing API key token" },
-    "403": { description: "Insufficient permissions for this operation" },
-    "404": { description: "No project with that id in this organization" },
+    "403": {
+      description:
+        "A signed-in project administrator is required; API-key principals cannot rotate base keys",
+    },
   },
 };

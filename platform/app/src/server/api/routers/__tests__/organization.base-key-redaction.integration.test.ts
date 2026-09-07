@@ -75,6 +75,7 @@ describe("Feature: base key in the organizations payload", () => {
   /** Database-minted, so the control below is the real stored value. */
   let storedLangWatchQLKey: string;
 
+  let adminCaller: ReturnType<typeof callerFor>;
   let updaterCaller: ReturnType<typeof callerFor>;
   let viewerCaller: ReturnType<typeof callerFor>;
 
@@ -176,9 +177,11 @@ describe("Feature: base key in the organizations payload", () => {
     projectId = project.id;
     storedLangWatchQLKey = project.lwqlKey;
 
+    const adminId = await makeUser("admin", TeamUserRole.ADMIN);
     const updaterId = await makeUser("updater", TeamUserRole.MEMBER);
     const viewerId = await makeUser("viewer", TeamUserRole.VIEWER);
 
+    adminCaller = callerFor(adminId);
     updaterCaller = callerFor(updaterId);
     viewerCaller = callerFor(viewerId);
   });
@@ -197,12 +200,36 @@ describe("Feature: base key in the organizations payload", () => {
     ]);
   });
 
-  describe("given a caller who can change the project", () => {
-    /** @scenario The base key stays in the session payload for those who can change the project */
+  describe("given a caller who can manage the project", () => {
+    /** @scenario The base key stays in the session payload for project admins */
     it("includes the base key in the payload", async () => {
-      const apiKey = await projectApiKeyFor(updaterCaller, projectId);
+      const apiKey = await projectApiKeyFor(adminCaller, projectId);
 
       expect(apiKey).toBe(baseApiKey);
+    });
+  });
+
+  describe("given a caller who can update but not manage the project", () => {
+    /** @scenario The base key is withheld from the session payload for project members */
+    it("redacts every base-key occurrence from the whole organization payload", async () => {
+      const organizations = await updaterCaller.organization.getAll({});
+      const visibleProjects = organizations.flatMap((organization) =>
+        organization.teams.flatMap((team) => team.projects),
+      );
+      expect(visibleProjects.some((project) => project.id === projectId)).toBe(
+        true,
+      );
+      expect(visibleProjects.every((project) => project.apiKey === "")).toBe(
+        true,
+      );
+      expect(JSON.stringify(organizations)).not.toContain(baseApiKey);
+    });
+
+    it("withholds the base key from the payload", async () => {
+      const apiKey = await projectApiKeyFor(updaterCaller, projectId);
+
+      expect(apiKey).toBe("");
+      expect(apiKey).not.toBe(baseApiKey);
     });
   });
 

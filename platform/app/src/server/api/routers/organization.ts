@@ -212,7 +212,7 @@ export const organizationRouter = createTRPCRouter({
       // Decides the base-key redaction below. One batched resolution per org,
       // not one check per project — a scoped check is ~4 queries, so a
       // per-project fan-out would scale with the org's project count.
-      const updatableProjectsByOrg = new Map<string, Map<string, boolean>>();
+      const manageableProjectsByOrg = new Map<string, Map<string, boolean>>();
       for (const organization of organizations) {
         const canManage = await probeOrganizationPermission(
           ctx,
@@ -230,17 +230,17 @@ export const organizationRouter = createTRPCRouter({
         const projectIds = Object.keys(projectTeamId);
         if (projectIds.length === 0) continue;
 
-        const { projects: updatableProjects } = await batchScopePermissions(
+        const { projects: manageableProjects } = await batchScopePermissions(
           ctx,
           {
             organizationId: organization.id,
             teamIds: [],
             projectIds,
             projectTeamId,
-            permission: "project:update",
+            permission: "project:manage",
           },
         );
-        updatableProjectsByOrg.set(organization.id, updatableProjects);
+        manageableProjectsByOrg.set(organization.id, manageableProjects);
       }
 
       for (const organization of organizations) {
@@ -258,14 +258,13 @@ export const organizationRouter = createTRPCRouter({
           if (project.s3Endpoint) {
             project.s3Endpoint = decrypt(project.s3Endpoint);
           }
-          // The base key is a project-level write credential. Same rule as the
-          // S3 secret above: send it only to those who can change the project,
-          // rather than relying on the UI not to render it. Demo projects
+          // A base key grants full access to one project, so include it only
+          // for callers who can administer that exact project. Demo projects
           // expose it to no one.
-          const canUpdateProject =
-            updatableProjectsByOrg.get(organization.id)?.get(project.id) ??
+          const canManageProject =
+            manageableProjectsByOrg.get(organization.id)?.get(project.id) ??
             false;
-          if (isDemo || !canUpdateProject) {
+          if (isDemo || !canManageProject) {
             project.apiKey = "";
           }
           // The LangWatchQL key is a control-plane secret: no client surface
