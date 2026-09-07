@@ -100,6 +100,158 @@ export interface DatabaseHooksDeps {
   providerAssertions: () => VerifiedProviderAssertionsPort;
 }
 
+type ConfiguredDatabaseHooks = NonNullable<BetterAuthOptions["databaseHooks"]>;
+type AccountDatabaseHookSet = NonNullable<ConfiguredDatabaseHooks["account"]>;
+
+function userDatabaseHooks({
+  hooks,
+  userErasure,
+}: DatabaseHooksDeps): NonNullable<ConfiguredDatabaseHooks["user"]> {
+  return {
+    create: {
+      before: async (user, context) => {
+        const refusal = await hooks().beforeUserCreate({
+          user: user as {
+            email: string;
+            deactivatedAt?: Date | null;
+          } & Record<string, unknown>,
+        });
+        if (refusal === false) return false;
+
+        if (hookPath(context) !== "/sign-up/email") return;
+        return { data: { ...user, signupConfirmationPending: true } };
+      },
+      after: async (user) => {
+        await hooks().afterUserCreate({
+          user: user as { id: string; email: string; name: string },
+        });
+      },
+    },
+    delete: {
+      before: async (user) => {
+        await userErasure().beforeUserDelete(user);
+      },
+    },
+  };
+}
+
+function accountCreateHooks({
+  hooks,
+  accountCeremonies,
+  providerAssertions,
+}: DatabaseHooksDeps): NonNullable<AccountDatabaseHookSet["create"]> {
+  return {
+    before: async (account, context) => {
+      await hooks().beforeAccountCreate({
+        account: {
+          userId: account.userId,
+          providerId: account.providerId,
+          accountId: account.accountId,
+        },
+      });
+      providerAssertions().recordVerifiedCallbackToken({
+        providerId: account.providerId,
+        path: hookPath(context) ?? void 0,
+        verifiedIdToken:
+          typeof account.idToken === "string" ? account.idToken : undefined,
+      });
+      return accountCeremonies().beforeAccountCreate(account);
+    },
+    after: async (account, context) => {
+      providerAssertions().recordAuthenticatedCallbackAccount({
+        providerId: account.providerId,
+        providerAccountId: account.accountId,
+        path: hookPath(context) ?? void 0,
+      });
+      if (!account.userId || !account.providerId || !account.accountId) return;
+
+      await hooks().afterAccountCreate({
+        account: {
+          userId: account.userId as string,
+          providerId: account.providerId as string,
+          accountId: account.accountId as string,
+        },
+      });
+    },
+  };
+}
+
+function accountUpdateHooks({
+  hooks,
+  providerAssertions,
+}: DatabaseHooksDeps): NonNullable<AccountDatabaseHookSet["update"]> {
+  return {
+    before: async (account, context) => {
+      if (typeof account.providerId !== "string") return;
+
+      providerAssertions().recordVerifiedCallbackToken({
+        providerId: account.providerId,
+        path: hookPath(context) ?? void 0,
+        verifiedIdToken:
+          typeof account.idToken === "string" ? account.idToken : undefined,
+      });
+    },
+    after: async (account, context) => {
+      if (
+        typeof account.providerId === "string" &&
+        typeof account.accountId === "string"
+      ) {
+        providerAssertions().recordAuthenticatedCallbackAccount({
+          providerId: account.providerId,
+          providerAccountId: account.accountId,
+          path: hookPath(context) ?? void 0,
+        });
+      }
+      if (!account.userId || !account.providerId || !account.accountId) return;
+
+      await hooks().afterAccountUpdate({
+        account: {
+          userId: account.userId as string,
+          providerId: account.providerId as string,
+          accountId: account.accountId as string,
+        },
+      });
+    },
+  };
+}
+
+function accountDatabaseHooks(deps: DatabaseHooksDeps): AccountDatabaseHookSet {
+  return {
+    create: accountCreateHooks(deps),
+    update: accountUpdateHooks(deps),
+    delete: {
+      before: async (account) => {
+        await deps.accountCeremonies().beforeAccountDelete(account);
+      },
+    },
+  };
+}
+
+function sessionDatabaseHooks({
+  hooks,
+  sessionClaims,
+}: DatabaseHooksDeps): NonNullable<ConfiguredDatabaseHooks["session"]> {
+  return {
+    create: {
+      before: async (session, context) => {
+        const refusal = await hooks().beforeSessionCreate({
+          session: { userId: session.userId },
+        });
+        if (refusal === false) return false;
+
+        return sessionClaimsData({
+          userId: session.userId,
+          path: hookPath(context) ?? void 0,
+          claims: sessionClaims(),
+        });
+      },
+      after: async (session) => {
+        await hooks().afterSessionCreate({ userId: session.userId });
+      },
+    },
+  };
+}
+
 /**
  * better-auth's `databaseHooks:` entry, bound to the class that answers them.
  *
@@ -115,162 +267,16 @@ export function databaseHooks({
   sessionClaims,
   providerAssertions,
 }: DatabaseHooksDeps): BetterAuthOptions["databaseHooks"] {
+  const deps = {
+    hooks,
+    userErasure,
+    accountCeremonies,
+    sessionClaims,
+    providerAssertions,
+  };
   return {
-    user: {
-      create: {
-        before: async (user, context) => {
-          const refusal = await hooks().beforeUserCreate({
-            user: user as {
-              email: string;
-              deactivatedAt?: Date | null;
-            } & Record<string, unknown>,
-          });
-          if (refusal === false) {
-            return false;
-          }
-          const path = hookPath(context);
-          if (path !== "/sign-up/email") {
-            return;
-          }
-          return {
-            data: { ...user, signupConfirmationPending: true },
-          };
-        },
-        after: async (user) => {
-          await hooks().afterUserCreate({
-            user: user as { id: string; email: string; name: string },
-          });
-        },
-      },
-      delete: {
-        /**
-         * ADR-101 §2: a user delete is an ERASURE, and erasure is what wipes
-         * `Identifier.value` and `identifierHash`. Before the row goes, so a
-         * refused ceremony refuses the delete with it; a no-op for users
-         * whose backfill has not latched.
-         */
-        before: async (user) => {
-          await userErasure().beforeUserDelete(user);
-        },
-      },
-    },
-    account: {
-      create: {
-        before: async (account, context) => {
-          await hooks().beforeAccountCreate({
-            account: {
-              userId: account.userId,
-              providerId: account.providerId,
-              accountId: account.accountId,
-            },
-          });
-          providerAssertions().recordVerifiedCallbackToken({
-            providerId: account.providerId,
-            path: (context as { path?: string } | undefined)?.path,
-            verifiedIdToken:
-              typeof account.idToken === "string" ? account.idToken : undefined,
-          });
-          // ADR-101 §2: the account row is an identifier attach. Returning
-          // the row data pins its id, which is what makes the live
-          // identifier id and the backfill's derived id the same id.
-          //
-          // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
-          // storage adapter states this fact itself for every user it routes
-          // to the identity branch, and a hook that stated it too would
-          // append the event twice whenever the first fold had not landed.
-          return accountCeremonies().beforeAccountCreate(account);
-        },
-        after: async (account, context) => {
-          providerAssertions().recordAuthenticatedCallbackAccount({
-            providerId: account.providerId,
-            providerAccountId: account.accountId,
-            path: (context as { path?: string } | undefined)?.path,
-          });
-          if (!account.userId || !account.providerId || !account.accountId)
-            return;
-          await hooks().afterAccountCreate({
-            account: {
-              userId: account.userId as string,
-              providerId: account.providerId as string,
-              accountId: account.accountId as string,
-            },
-          });
-        },
-      },
-      update: {
-        before: async (account, context) => {
-          if (typeof account.providerId !== "string") return;
-          providerAssertions().recordVerifiedCallbackToken({
-            providerId: account.providerId,
-            path: (context as { path?: string } | undefined)?.path,
-            verifiedIdToken:
-              typeof account.idToken === "string" ? account.idToken : undefined,
-          });
-        },
-        after: async (account, context) => {
-          if (
-            typeof account.providerId === "string" &&
-            typeof account.accountId === "string"
-          ) {
-            providerAssertions().recordAuthenticatedCallbackAccount({
-              providerId: account.providerId,
-              providerAccountId: account.accountId,
-              path: (context as { path?: string } | undefined)?.path,
-            });
-          }
-          // BetterAuth refreshes tokens on the linked Account row on every
-          // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
-          // for users whose correct-provider account is already linked.
-          if (!account.userId || !account.providerId || !account.accountId)
-            return;
-          await hooks().afterAccountUpdate({
-            account: {
-              userId: account.userId as string,
-              providerId: account.providerId as string,
-              accountId: account.accountId as string,
-            },
-          });
-        },
-      },
-      delete: {
-        /** ADR-101 §2: an account row removed is an identifier detach — and
-         *  the adapter's own, for anyone it routes to the identity branch. */
-        before: async (account) => {
-          await accountCeremonies().beforeAccountDelete(account);
-        },
-      },
-    },
-    session: {
-      create: {
-        /**
-         * Two jobs in one hook, in this order and no other: the refusal
-         * first, then the claims (D06). A deactivated user's session must
-         * not be described before it is refused, and a refusal returns
-         * `false` before any read about what was proved happens.
-         *
-         * `context.path` is the endpoint minting the session, which is what
-         * says what the sign-in proved — a password, a two-step challenge
-         * answered, a passkey, a federated callback.
-         */
-        before: async (session, context) => {
-          const refusal = await hooks().beforeSessionCreate({
-            session: { userId: session.userId },
-          });
-          if (refusal === false) {
-            return false;
-          }
-          return sessionClaimsData({
-            userId: session.userId,
-            path: hookPath(context) ?? void 0,
-            claims: sessionClaims(),
-          });
-        },
-        after: async (session) => {
-          await hooks().afterSessionCreate({
-            userId: session.userId,
-          });
-        },
-      },
-    },
+    user: userDatabaseHooks(deps),
+    account: accountDatabaseHooks(deps),
+    session: sessionDatabaseHooks(deps),
   };
 }

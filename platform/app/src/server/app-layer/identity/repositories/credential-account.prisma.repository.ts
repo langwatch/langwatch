@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import {
   belongsToSomebody,
   PasskeySignUpAddressTakenError,
@@ -13,6 +13,15 @@ import type {
   SecureAccountFacts,
   UnlinkAttempt,
 } from "../credential-account.service";
+
+interface ExistingPasskeyUser {
+  id: string;
+  passkeySignupClaimHash: string | null;
+  accounts: { id: string; provider: string; password: string | null }[];
+  accountCredentials: { provider: string; password: string | null }[];
+  passkeys: { id: string }[];
+  orgMemberships: { organizationId: string }[];
+}
 
 /** Only the browser that created unfinished passkey residue may adopt it. */
 export function passkeySignUpClaimMatches({
@@ -293,74 +302,83 @@ export class PrismaCredentialAccountRepository
       });
 
       if (existing) {
-        // Asked AGAIN, here, rather than trusted from the caller. The caller's
-        // refusal ran before this transaction opened, and between the two an
-        // account that was residue can become somebody's — a password set, a
-        // passkey landed, an invitation redeemed. Deciding it inside the
-        // transaction that adopts is what makes the read and the write one
-        // decision instead of two; before, the unique index on the address was
-        // the backstop for that race, and adopting rather than creating is
-        // exactly what takes the index out of the path.
-        if (belongsToSomebody(existing)) {
-          throw new PasskeySignUpAddressTakenError(
-            "the address gained a credential between the guard and the adoption",
-          );
-        }
-
-        if (
-          !passkeySignUpClaimMatches({
-            storedClaimHash: existing.passkeySignupClaimHash,
-            presentedClaimHash: claimHash,
-          })
-        ) {
-          throw new PasskeySignUpAddressTakenError(
-            "an unfinished passkey sign-up belongs to another browser",
-          );
-        }
-
-        // All that can be missing is the placeholder itself, if the earlier
-        // attempt died between its two writes.
-        const hasPlaceholder = existing.accounts.some(
-          (account) => account.provider === "credential",
-        );
-        if (!hasPlaceholder) {
-          await tx.account.create({
-            data: {
-              userId: existing.id,
-              type: "credential",
-              provider: "credential",
-              issuer: issuerForProviderId("credential"),
-              providerAccountId: existing.id,
-              password: null,
-            },
-          });
-        }
-        return { id: existing.id, created: false };
+        return await this.resumePasskeyUser({ tx, existing, claimHash });
       }
+      return await this.createFreshPasskeyUser({ tx, email, claimHash });
+    });
+  }
 
-      // The address stands in for the name nobody has asked for, as on the
-      // password path: a blank name renders as nothing everywhere a member is
-      // listed, and onboarding still offers to replace it.
-      const user = await tx.user.create({
-        data: {
-          name: email,
-          email,
-          emailVerified: true,
-          signupConfirmationPending: false,
-          passkeySignupClaimHash: claimHash,
-        },
-      });
-      await tx.account.create({
-        data: {
-          userId: user.id,
-          type: "credential",
-          provider: "credential",
-          issuer: issuerForProviderId("credential"),
-          providerAccountId: user.id,
-          password: null,
-        },
-      });
-      return { id: user.id, created: true };
+  private async resumePasskeyUser({
+    tx,
+    existing,
+    claimHash,
+  }: {
+    tx: Prisma.TransactionClient;
+    existing: ExistingPasskeyUser;
+    claimHash: string;
+  }): Promise<{ id: string; created: false }> {
+    // Re-decided in the adopting transaction: residue may gain a credential,
+    // passkey or membership after the route's earlier guard.
+    if (belongsToSomebody(existing)) {
+      throw new PasskeySignUpAddressTakenError(
+        "the address gained a credential between the guard and the adoption",
+      );
+    }
+    if (
+      !passkeySignUpClaimMatches({
+        storedClaimHash: existing.passkeySignupClaimHash,
+        presentedClaimHash: claimHash,
+      })
+    ) {
+      throw new PasskeySignUpAddressTakenError(
+        "an unfinished passkey sign-up belongs to another browser",
+      );
+    }
+
+    const hasPlaceholder = existing.accounts.some(
+      (account) => account.provider === "credential",
+    );
+    if (!hasPlaceholder) {
+      await this.createPasskeyCredentialPlaceholder(tx, existing.id);
+    }
+    return { id: existing.id, created: false };
+  }
+
+  private async createFreshPasskeyUser({
+    tx,
+    email,
+    claimHash,
+  }: {
+    tx: Prisma.TransactionClient;
+    email: string;
+    claimHash: string;
+  }): Promise<{ id: string; created: true }> {
+    const user = await tx.user.create({
+      data: {
+        name: email,
+        email,
+        emailVerified: true,
+        signupConfirmationPending: false,
+        passkeySignupClaimHash: claimHash,
+      },
+    });
+    await this.createPasskeyCredentialPlaceholder(tx, user.id);
+    return { id: user.id, created: true };
+  }
+
+  private async createPasskeyCredentialPlaceholder(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<void> {
+    await tx.account.create({
+      data: {
+        userId,
+        type: "credential",
+        provider: "credential",
+        issuer: issuerForProviderId("credential"),
+        providerAccountId: userId,
+        password: null,
+      },
     });
   }
 }

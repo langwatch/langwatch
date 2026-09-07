@@ -127,6 +127,36 @@ function enforceGate({
   }
 }
 
+function refuseDirectEmailSignUp(pathname: string): void {
+  if (!pathname.endsWith("/sign-up/email")) return;
+
+  throw new APIError("NOT_FOUND", {
+    code: "NOT_FOUND",
+    message: "Not found",
+  });
+}
+
+async function enforceFederationRoutes({
+  url,
+  pathname,
+  deploymentIsFederationCapable,
+  resolveSignInMethodPolicy,
+}: {
+  url: string;
+  pathname: string;
+  deploymentIsFederationCapable: () => boolean;
+  resolveSignInMethodPolicy: () => Promise<SignInMethodPolicy>;
+}): Promise<void> {
+  // Deployments that name no federated method never register an IdP, so
+  // there is no policy to enforce. The answer stays synchronous in email mode.
+  if (!deploymentIsFederationCapable()) return;
+
+  refuseCredentialMutation(pathname);
+  if (!isGateDependentPath(url)) return;
+
+  enforceGate({ url, pathname, policy: await resolveSignInMethodPolicy() });
+}
+
 /**
  * Global before-hook that blocks credential-management endpoints in
  * cloud/SSO mode, and the after-hook that states what a finished call meant.
@@ -176,12 +206,7 @@ export function requestHooks({
       // pending-confirmation latch and sends its continuation email. Leaving
       // BetterAuth's raw route reachable would create an account with no
       // supported way to request that proof.
-      if (pathname.endsWith("/sign-up/email")) {
-        throw new APIError("NOT_FOUND", {
-          code: "NOT_FOUND",
-          message: "Not found",
-        });
-      }
+      refuseDirectEmailSignUp(pathname);
 
       // ADR-119, on the two removals that reach no ceremony: the passkey
       // plugin owns its own table so `account.delete.before` never sees a
@@ -200,19 +225,6 @@ export function requestHooks({
         });
       }
 
-      // Deployments that name no federated method never register an IdP, so
-      // there is no policy to enforce — leave every route untouched (zero
-      // behavior change from `main`). Synchronous by contract (ADR-117 §4):
-      // an email-mode deployment must not wait on the licensing store to be
-      // told it has nothing to wait for.
-      if (!deploymentIsFederationCapable()) return;
-
-      refuseCredentialMutation(pathname);
-
-      // Nothing below this line can change the answer for the rest of the
-      // route table, so it never waits on the gate (see `isGateDependentPath`).
-      if (!isGateDependentPath(url)) return;
-
       // ADR-117 §4: the hook is the ENFORCEMENT BACKSTOP now, and it asks the
       // router's method policy rather than raw env. The decision moved to
       // where the data is; enforcement stayed here, because absence from a
@@ -221,7 +233,12 @@ export function requestHooks({
       // `/callback/auth0|okta` rewrite. Every ADR-027 semantic is unchanged:
       // the gate inside the policy is the same per-process memo, so a license
       // still takes effect on restart and never mid-flight.
-      enforceGate({ url, pathname, policy: await resolveSignInMethodPolicy() });
+      await enforceFederationRoutes({
+        url,
+        pathname,
+        deploymentIsFederationCapable,
+        resolveSignInMethodPolicy,
+      });
     }),
     /**
      * D06 follow-up 1: the two-factor endpoints, as identity facts.
