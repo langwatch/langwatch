@@ -3683,6 +3683,50 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  emitsResult(
+    dashboardWidgetCmd
+      .command("place [id]")
+      .description("Place a dashboard widget on a dashboard at an explicit grid position")
+      .option("--id <id>", "Widget id — use this instead of the positional when the id starts with '-'")
+      .requiredOption("--dashboard-id <id>", "Dashboard to place the widget on")
+      .option("--grid-column <n>", "Grid column (0-based, on the 8-column grid)")
+      .option("--grid-row <n>", "Grid row (allocated automatically when omitted)")
+      .option("--col-span <n>", "Column span")
+      .option("--row-span <n>", "Row span")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string | undefined,
+      options: {
+        id?: string;
+        dashboardId?: string;
+        gridColumn?: string;
+        gridRow?: string;
+        colSpan?: string;
+        rowSpan?: string;
+        project?: string;
+      },
+    ) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
+      const { placeDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/place.js");
+      return impl(resolvedId, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("unplace [id]")
+      .description("Remove a dashboard widget from its dashboard")
+      .option("--id <id>", "Widget id — use this instead of the positional when the id starts with '-'")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string | undefined, options: { id?: string; project?: string }) => {
+      const resolvedId = resolveIdArgument({ positional: id, option: options.id });
+      const { unplaceDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/unplace.js");
+      return impl(resolvedId, options);
+    },
+  );
+
   // Add trigger (automation) command group
   const triggerCmd = program
     .command("trigger")

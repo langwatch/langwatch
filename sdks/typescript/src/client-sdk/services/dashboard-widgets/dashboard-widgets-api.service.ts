@@ -190,6 +190,43 @@ export class DashboardWidgetsApiService {
     return data as unknown as DashboardWidget;
   }
 
+  /**
+   * Places a widget on a dashboard at the grid position supplied — or, when
+   * no grid row is given, at the next row free on that dashboard. The twin
+   * of `ChartsApiService.place`, unlike {@link assignToDashboard} (which
+   * always auto-places and keeps the widget's existing size).
+   */
+  async place(
+    id: string,
+    params: {
+      dashboardId: string;
+      gridColumn?: number;
+      gridRow?: number;
+      colSpan?: number;
+      rowSpan?: number;
+    },
+  ): Promise<DashboardWidget> {
+    const projectId = this.projectId(`place dashboard widget "${id}"`);
+    const { data, error, response } = await this.apiClient.PUT(
+      "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/placement",
+      { params: { path: { projectId, widgetId: id } }, body: params },
+    );
+    if (error)
+      this.handleApiError({ operation: `place dashboard widget "${id}"`, error, response });
+    return data as unknown as DashboardWidget;
+  }
+
+  /** Removes a widget from its dashboard. The route answers `204` with no body. */
+  async unplace(id: string): Promise<void> {
+    const projectId = this.projectId(`unplace dashboard widget "${id}"`);
+    const { error, response } = await this.apiClient.DELETE(
+      "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/placement",
+      { params: { path: { projectId, widgetId: id } } },
+    );
+    if (error)
+      this.handleApiError({ operation: `unplace dashboard widget "${id}"`, error, response });
+  }
+
   /** Deletes a widget. The route answers `204` with no body. */
   async delete(id: string): Promise<void> {
     const projectId = this.projectId(`delete dashboard widget "${id}"`);

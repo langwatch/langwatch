@@ -217,4 +217,135 @@ describe("dashboard widget service (integration)", () => {
       });
     });
   });
+
+  describe("given an unplaced widget", () => {
+    describe("when placed at an explicit grid position", () => {
+      /** @scenario "A widget is placed at an explicit grid position" */
+      it("writes the position given, not the auto-allocated one", async () => {
+        const dashboard = await createDashboard(project);
+        const widget = await create();
+
+        const placed = await service.placeWidget({
+          id: widget.id,
+          projectId: project.id,
+          input: {
+            dashboardId: dashboard.id,
+            gridColumn: 4,
+            gridRow: 3,
+            colSpan: 4,
+            rowSpan: 2,
+          },
+        });
+
+        expect(placed.dashboardId).toBe(dashboard.id);
+        expect(placed.gridColumn).toBe(4);
+        expect(placed.gridRow).toBe(3);
+        expect(placed.colSpan).toBe(4);
+        expect(placed.rowSpan).toBe(2);
+      });
+    });
+
+    describe("when placed with no grid row given", () => {
+      /** @scenario "A widget's grid row is allocated from its target dashboard alone" */
+      it("allocates the next free row on the target dashboard", async () => {
+        const dashboard = await createDashboard(project);
+        await prisma.customGraph.create({
+          data: {
+            id: nanoid(),
+            projectId: project.id,
+            dashboardId: dashboard.id,
+            name: "Existing card",
+            graph: { series: [] },
+            gridRow: 0,
+            rowSpan: 5,
+          },
+        });
+        const widget = await create();
+
+        const placed = await service.placeWidget({
+          id: widget.id,
+          projectId: project.id,
+          input: { dashboardId: dashboard.id },
+        });
+
+        expect(placed.gridRow).toBe(5);
+      });
+    });
+
+    describe("when the grid position overflows the grid's columns", () => {
+      it("refuses without persisting", async () => {
+        const dashboard = await createDashboard(project);
+        const widget = await create();
+
+        await expect(
+          service.placeWidget({
+            id: widget.id,
+            projectId: project.id,
+            input: { dashboardId: dashboard.id, gridColumn: 6, colSpan: 4 },
+          }),
+        ).rejects.toThrow();
+
+        const read = await service.getById({
+          id: widget.id,
+          projectId: project.id,
+        });
+        expect(read.dashboardId).toBeNull();
+      });
+    });
+
+    describe("when placed onto a dashboard from another project", () => {
+      /** @scenario "A widget targeting a dashboard from another project is refused" */
+      it("refuses and leaves the widget unplaced", async () => {
+        const foreign = await createDashboard(otherProject);
+        const widget = await create();
+
+        await expect(
+          service.placeWidget({
+            id: widget.id,
+            projectId: project.id,
+            input: { dashboardId: foreign.id },
+          }),
+        ).rejects.toMatchObject({ code: "dashboard_widget_not_found" });
+
+        const read = await service.getById({
+          id: widget.id,
+          projectId: project.id,
+        });
+        expect(read.dashboardId).toBeNull();
+      });
+    });
+  });
+
+  describe("given a widget placed on a dashboard", () => {
+    describe("when unplaced", () => {
+      it("clears its dashboard id and resets its grid position", async () => {
+        const dashboard = await createDashboard(project);
+        const widget = await create({ dashboardId: dashboard.id });
+
+        await service.unplaceWidget({ id: widget.id, projectId: project.id });
+
+        const read = await service.getById({
+          id: widget.id,
+          projectId: project.id,
+        });
+        expect(read.dashboardId).toBeNull();
+        expect(read.gridColumn).toBe(0);
+        expect(read.gridRow).toBe(0);
+        expect(read.colSpan).toBe(1);
+        expect(read.rowSpan).toBe(1);
+      });
+    });
+
+    describe("when unplaced a second time", () => {
+      it("succeeds idempotently", async () => {
+        const dashboard = await createDashboard(project);
+        const widget = await create({ dashboardId: dashboard.id });
+        await service.unplaceWidget({ id: widget.id, projectId: project.id });
+
+        await expect(
+          service.unplaceWidget({ id: widget.id, projectId: project.id }),
+        ).resolves.toBeUndefined();
+      });
+    });
+  });
 });
