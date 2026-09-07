@@ -4,41 +4,13 @@ import { getLangWatchTracer } from "langwatch";
 import {
   INDEFINITE_RETENTION_DAYS,
   PLATFORM_DEFAULT_RETENTION_DAYS,
-  type RetentionCategory,
 } from "../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
+import { classifyEventLogRowRetention } from "../../data-retention/event-log-retention-policy";
 import type { Event } from "../domain/types";
 import { AbstractEventStore } from "./abstractEventStore";
 import type { EventStoreReadContext } from "./eventStore.types";
 import type { EventRecord, EventRepository } from "./repositories/eventRepository.types";
-
-const AUTH_EVENT_TYPE_PREFIXES = ["lw.identity.", "lw.authz."] as const;
-const INDEFINITE_RETENTION_AGGREGATE_TYPES = new Set([
-  "authz_grant",
-  "authz_role",
-  "user_identity",
-  "sso_connection",
-  "join_request",
-  "scim_sync",
-]);
-
-const RETENTION_CATEGORY_BY_AGGREGATE_TYPE: Readonly<Record<string, RetentionCategory>> = {
-  simulation_run: "scenarios",
-  simulation_set: "scenarios",
-  suite_run: "scenarios",
-  experiment_run: "experiments",
-};
-
-function hasIndefiniteRetention(record: EventRecord): boolean {
-  return (
-    AUTH_EVENT_TYPE_PREFIXES.some((prefix) => record.EventType.startsWith(prefix)) ||
-    INDEFINITE_RETENTION_AGGREGATE_TYPES.has(record.AggregateType)
-  );
-}
-
-function retentionCategoryFor(record: EventRecord): RetentionCategory {
-  return RETENTION_CATEGORY_BY_AGGREGATE_TYPE[record.AggregateType] ?? "traces";
-}
 
 /**
  * ClickHouse-backed EventStore with OpenTelemetry instrumentation and structured logging.
@@ -117,25 +89,29 @@ export class EventStoreClickHouse<
   ): Promise<EventRecord[]> {
     if (records.length === 0) return records;
 
-    const indefiniteStampedRecords = records.map((record) =>
-      hasIndefiniteRetention(record)
-        ? { ...record, _retention_days: INDEFINITE_RETENTION_DAYS }
-        : record,
+    const classifiedRecords = records.map((record) => ({
+      record,
+      retentionClass: classifyEventLogRowRetention(record),
+    }));
+    const hasFiniteEvents = classifiedRecords.some(
+      ({ retentionClass }) => retentionClass !== "indefinite",
     );
-    const hasRetainedEvents = records.some((record) => !hasIndefiniteRetention(record));
 
-    if (!this.retentionPolicyResolver || !hasRetainedEvents) {
-      return indefiniteStampedRecords;
+    if (!this.retentionPolicyResolver || !hasFiniteEvents) {
+      return classifiedRecords.map(({ record, retentionClass }) =>
+        retentionClass === "indefinite"
+          ? { ...record, _retention_days: INDEFINITE_RETENTION_DAYS }
+          : record,
+      );
     }
 
     const policy = await this.retentionPolicyResolver.resolve(String(context.tenantId));
-    return indefiniteStampedRecords.map((record) =>
-      hasIndefiniteRetention(record)
-        ? record
+    return classifiedRecords.map(({ record, retentionClass }) =>
+      retentionClass === "indefinite"
+        ? { ...record, _retention_days: INDEFINITE_RETENTION_DAYS }
         : {
             ...record,
-            _retention_days:
-              policy?.[retentionCategoryFor(record)] ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+            _retention_days: policy?.[retentionClass] ?? PLATFORM_DEFAULT_RETENTION_DAYS,
           },
     );
   }
