@@ -209,6 +209,23 @@ Rule: The installation flow verifies who is installing what
     Then the claim is refused and audited
     And no installation is recorded
 
+  # The App's own JWT reads every installation of this App on every account, so the account
+  # GitHub reports back is the only ownership evidence the callback holds. A flow that named
+  # the account it is installing on — and a reconfigure, which already knows its installation
+  # — is bound to it, and anything else coming back is refused rather than claimed.
+  @unit
+  Scenario: A setup callback cannot bind an installation on an account its flow never named
+    Given I started an installation for the "acme" GitHub account
+    When my setup callback claims an installation owned by the "victim" GitHub account
+    Then the claim is refused and audited
+    And no installation is recorded
+
+  @unit
+  Scenario: An installation on the account the flow named is bound
+    Given I started an installation for the "acme" GitHub account
+    When my setup callback claims an installation owned by "acme"
+    Then the installation is recorded against my organization
+
   @integration
   Scenario: An installation cannot be rebound across organizations
     Given the "acme" organization already recorded installation 12345

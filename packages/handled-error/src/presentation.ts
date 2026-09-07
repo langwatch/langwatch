@@ -1292,6 +1292,14 @@ const presentations = {
     describe: () =>
       "A key only reports on the personal workspace it belongs to, even where you can otherwise view the workspace. Use the API key from your own personal workspace.",
   },
+  personal_usage_service_key_unsupported: {
+    // Read by a script holding a service key, so the copy has to say why this
+    // one read is different from every other the key makes: it names a person,
+    // and the key is not one. Nothing here names the workspace's owner.
+    title: "A service key can't answer for a person",
+    describe: () =>
+      "This shows one person's own activity, and a service key belongs to a job rather than to anybody. Use an API key issued to you.",
+  },
   personal_workspace_not_managed_here: {
     // Whoever reads this was managing somebody's access, so the answer has to
     // say why there is nothing to manage here rather than restate the rule. An
@@ -3337,6 +3345,14 @@ const presentations = {
     title: "GitHub is not connected",
     describe: () =>
       "Connect GitHub for this organization in Settings, Integrations. An organization admin can do it.",
+  },
+  github_installation_account_mismatch: {
+    // The callback carried an installation on a GitHub account this flow never
+    // named. Starting again from the organization's own settings is the only
+    // action, and it is the one that mints a fresh, correctly bound state.
+    title: "That GitHub installation belongs to a different account",
+    describe: () =>
+      "Start the connection again from Settings, Integrations, and pick the account you want to connect.",
   },
   github_installation_suspended: {
     // Only a person on github.com can lift a suspension, so there is nothing to

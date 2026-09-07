@@ -52,7 +52,11 @@ export abstract class SavedViewRepository {
     projectId: string;
     kind?: string;
   }): Promise<SavedViewRecord | null>;
-  abstract findByIds(input: { ids: string[]; projectId: string }): Promise<Array<{ id: string }>>;
+  /** The ownership of each named view, so the caller can tell a shared one from a personal one. */
+  abstract findByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<Array<{ id: string; userId: string | null }>>;
   abstract create(input: CreateSavedViewInput): Promise<SavedViewRecord>;
   abstract createMany(input: { views: CreateSavedViewInput[] }): Promise<void>;
   abstract update(input: UpdateSavedViewInput): Promise<SavedViewRecord>;

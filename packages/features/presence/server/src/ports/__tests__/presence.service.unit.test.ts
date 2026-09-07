@@ -140,9 +140,44 @@ describe("PresenceService", () => {
     const { service, repository, broadcast } = createService();
     repository.remove.mockResolvedValue(false);
     await expect(
-      service.leave({ projectId: "project-1", sessionId: "missing" }),
+      service.leave({ projectId: "project-1", sessionId: "missing", userId: "user-1" }),
     ).resolves.toBeUndefined();
     expect(broadcast.publish).not.toHaveBeenCalled();
+  });
+
+  describe("when the session belongs to another member", () => {
+    /** @scenario "A member cannot remove another member's presence session" */
+    it("refuses the removal and leaves the session published", async () => {
+      const { service, repository, broadcast } = createService();
+      repository.current = session;
+
+      await expect(
+        service.leave({ projectId: "project-1", sessionId: "tab-1", userId: "user-2" }),
+      ).rejects.toMatchObject({ code: "insufficient_permissions" });
+
+      expect(repository.remove).not.toHaveBeenCalled();
+      expect(broadcast.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the session belongs to the caller", () => {
+    /** @scenario "Leaving the project removes the session immediately" */
+    it("removes it and tells peers", async () => {
+      const { service, repository, broadcast } = createService();
+      repository.current = session;
+
+      await service.leave({ projectId: "project-1", sessionId: "tab-1", userId: "user-1" });
+
+      expect(repository.remove).toHaveBeenCalledWith({
+        projectId: "project-1",
+        sessionId: "tab-1",
+      });
+      expect(broadcast.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: JSON.stringify({ kind: "leave", sessionId: "tab-1" }),
+        }),
+      );
+    });
   });
 
   it("publishes cursor ticks through the rate-limited channel", async () => {

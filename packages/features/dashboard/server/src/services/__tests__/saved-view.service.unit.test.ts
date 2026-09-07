@@ -54,7 +54,7 @@ function serviceWith(
 }
 
 const seeded = (names: string[]) =>
-  names.map((name, index) => ({ id: `view-${index}`, name, order: index }));
+  names.map((name, index) => ({ id: `view-${index}`, name, order: index, userId: null }));
 
 describe("SavedViewService.getAll", () => {
   describe("given a project nobody has opened yet", () => {
@@ -223,7 +223,7 @@ describe("SavedViewService.reorder", () => {
       const { service, calls } = serviceWith({ existing: seeded(["A", "B"]) });
 
       await expect(
-        service.reorder({ projectId: "project-1", viewIds: ["view-0", "view-1"] }),
+        service.reorder({ projectId: "project-1", viewIds: ["view-0", "view-1"], userId: "me" }),
       ).resolves.toEqual({ success: true });
       expect(calls.some((call) => call.method === "updateOrder")).toBe(true);
     });
@@ -234,7 +234,7 @@ describe("SavedViewService.reorder", () => {
       const { service } = serviceWith({ existing: seeded(["A"]) });
 
       const error = await service
-        .reorder({ projectId: "project-1", viewIds: ["view-0", "view-elsewhere"] })
+        .reorder({ projectId: "project-1", viewIds: ["view-0", "view-elsewhere"], userId: "me" })
         .catch((caught: SavedViewReorderError) => caught);
 
       expect(error).toBeInstanceOf(SavedViewReorderError);
@@ -246,10 +246,47 @@ describe("SavedViewService.reorder", () => {
       const { service, calls } = serviceWith({ existing: seeded(["A"]) });
 
       await service
-        .reorder({ projectId: "project-1", viewIds: ["view-0", "view-elsewhere"] })
+        .reorder({ projectId: "project-1", viewIds: ["view-0", "view-elsewhere"], userId: "me" })
         .catch(() => undefined);
 
       expect(calls.some((call) => call.method === "updateOrder")).toBe(false);
+    });
+  });
+
+  describe("given a personal view that belongs to another member", () => {
+    /** @scenario "Reordering cannot move another member's personal view" */
+    it("refuses it as one this caller does not have, and writes no order", async () => {
+      const { service, calls } = serviceWith({
+        existing: [
+          { id: "view-0", name: "Shared", order: 0, userId: null },
+          { id: "view-theirs", name: "Theirs", order: 1, userId: "someone-else" },
+        ],
+      });
+
+      const error = await service
+        .reorder({ projectId: "project-1", viewIds: ["view-0", "view-theirs"], userId: "me" })
+        .catch((caught: SavedViewReorderError) => caught);
+
+      expect(error).toBeInstanceOf(SavedViewReorderError);
+      expect((error as SavedViewReorderError).missingIds).toEqual(["view-theirs"]);
+      expect(calls.some((call) => call.method === "updateOrder")).toBe(false);
+    });
+  });
+
+  describe("given a personal view that belongs to the caller", () => {
+    /** @scenario "Reordering moves my own personal view" */
+    it("writes the new order", async () => {
+      const { service, calls } = serviceWith({
+        existing: [
+          { id: "view-0", name: "Shared", order: 0, userId: null },
+          { id: "view-mine", name: "Mine", order: 1, userId: "me" },
+        ],
+      });
+
+      await expect(
+        service.reorder({ projectId: "project-1", viewIds: ["view-0", "view-mine"], userId: "me" }),
+      ).resolves.toEqual({ success: true });
+      expect(calls.some((call) => call.method === "updateOrder")).toBe(true);
     });
   });
 });

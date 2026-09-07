@@ -1,4 +1,5 @@
 import {
+  GithubInstallationAccountMismatchError,
   GithubInstallationConflictError,
   GithubInstallationNotFromFlowError,
   type GithubRepositoryRef,
@@ -62,14 +63,23 @@ export class GithubInstallationsService {
 
   /**
    * Binds an installation to the organization whose flow produced it. `flowStartedAt` is the
-   * signed state's issue time.
+   * signed state's issue time; `expectedAccountLogin` and `expectedInstallationId` are what
+   * the flow recorded about which installation it is coming back for.
    */
   async recordInstallation(input: {
     installationId: string;
     organizationId: string;
     flowStartedAt: number;
+    expectedAccountLogin?: string | undefined;
+    expectedInstallationId?: string | undefined;
   }): Promise<{ accountLogin: string }> {
     const details = await this.appTokens.getInstallation(input.installationId);
+    assertInstallationMatchesFlow({
+      details,
+      organizationId: input.organizationId,
+      expectedAccountLogin: input.expectedAccountLogin,
+      expectedInstallationId: input.expectedInstallationId,
+    });
     const alreadyRecorded = await this.repository.tryFindByInstallationId(details.installationId);
     if (!alreadyRecorded && !installationBelongsToFlow(details.createdAt, input.flowStartedAt)) {
       throw new GithubInstallationNotFromFlowError({
@@ -201,6 +211,37 @@ export class GithubInstallationsService {
       logger.warn({ error, installationId, action }, "failed to refresh webhook repositories");
     }
   }
+}
+
+/**
+ * Whom GitHub says the installation belongs to, against whom the flow said it would.
+ * The App JWT reads every installation of this App on every account, so the account
+ * GitHub reports is the ownership evidence the callback has; a mismatch is refused.
+ */
+function assertInstallationMatchesFlow(input: {
+  details: { installationId: string; accountLogin: string; accountId: string };
+  organizationId: string;
+  expectedAccountLogin: string | undefined;
+  expectedInstallationId: string | undefined;
+}): void {
+  const { details } = input;
+  const wrongInstallation =
+    input.expectedInstallationId !== void 0 &&
+    input.expectedInstallationId !== details.installationId;
+  const wrongAccount =
+    input.expectedAccountLogin !== void 0 &&
+    !accountsMatch(input.expectedAccountLogin, details.accountLogin, details.accountId);
+  if (wrongInstallation || wrongAccount) {
+    throw new GithubInstallationAccountMismatchError({
+      installationId: details.installationId,
+      attemptedOrganizationId: input.organizationId,
+    });
+  }
+}
+
+/** GitHub logins are case-insensitive; the numeric account id is accepted too. */
+function accountsMatch(expected: string, accountLogin: string, accountId: string): boolean {
+  return expected.toLowerCase() === accountLogin.toLowerCase() || expected === accountId;
 }
 
 /** Clock skew allowed between GitHub's creation stamp and our own state. */

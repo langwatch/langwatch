@@ -55,6 +55,10 @@ export abstract class GithubService {
     organizationId: string;
     /** When the signed state that is claiming this installation was issued. */
     flowStartedAt: number;
+    /** The GitHub account login the flow named, when it named one. */
+    expectedAccountLogin?: string | undefined;
+    /** The installation the flow was pinned to, when it was a reconfigure. */
+    expectedInstallationId?: string | undefined;
   }): Promise<{ accountLogin: string }>;
   abstract handleWebhookEvent(input: {
     action: "created" | "deleted" | "suspend" | "unsuspend" | "added" | "removed";

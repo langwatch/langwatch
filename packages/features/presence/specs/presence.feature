@@ -23,6 +23,15 @@ Feature: Collaborative presence
     Then the service reports success
     And it publishes no second leave delta
 
+  # Every project member holds the permission presence takes, so the permission is not what
+  # separates one member's published session from another's: ownership is.
+  @unit
+  Scenario: A member cannot remove another member's presence session
+    Given another member of the project is present in a browser session
+    When I ask to remove that member's session
+    Then the removal is refused as not mine to make
+    And that member stays present to everyone watching
+
   @unit
   Scenario: Presence uses Project-owned policy
     When Presence decides whether a project is enabled

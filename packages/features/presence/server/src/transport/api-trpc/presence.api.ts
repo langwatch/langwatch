@@ -134,10 +134,13 @@ export class PresenceTrpcApi {
               return { ok: true as const };
             }),
         )
-        /** Remove a session immediately and notify peers. */
+        /**
+         * Remove a session immediately and notify peers. The owner is taken from the
+         * authenticated session, so a member cannot remove another member's session.
+         */
         .mutation("leave", (p) =>
           p
-            .withInput(presenceLeaveInputSchema)
+            .withInput(presenceLeaveInputSchema.omit({ userId: true }))
             .withOutput(presenceAcknowledgedSchema)
             .withPermission(PRESENCE_PERMISSION)
             .handle(async ({ ctx, input }) => {
@@ -147,6 +150,7 @@ export class PresenceTrpcApi {
               await ctx.app.presence.leave({
                 projectId: input.projectId,
                 sessionId: input.sessionId,
+                userId: ctx.actor().id,
               });
               return { ok: true as const };
             }),

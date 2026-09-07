@@ -6,7 +6,7 @@
  *   create:  a new view, shared with the project or personal to the caller.
  *   delete:  one view; a personal view only for the member who owns it.
  *   rename:  one view, under the same ownership rule.
- *   reorder: the order the tab strip lists them in.
+ *   reorder: the order the tab strip lists them in, under the same ownership rule.
  *
  * Every procedure takes `traces:view`: a saved view is a stored trace filter,
  * so being able to read traces is exactly the right to keep one.
@@ -104,7 +104,9 @@ export type SavedViewsPort<TView> = Readonly<{
   rename(
     input: Readonly<{ projectId: string; viewId: string; name: string; userId: string }>,
   ): Promise<TView>;
-  reorder(input: Readonly<{ projectId: string; viewIds: string[] }>): Promise<{ success: true }>;
+  reorder(
+    input: Readonly<{ projectId: string; viewIds: string[]; userId: string }>,
+  ): Promise<{ success: true }>;
 }>;
 
 export type SavedViewTrpcPorts<TView> = Readonly<{ savedViews: SavedViewsPort<TView> }>;
@@ -286,11 +288,12 @@ export class SavedViewTrpcApi {
             .withOutput(z.object({ success: z.literal(true) }))
             .withPermission("traces:view")
             .handle(
-              async ({ input }) =>
+              async ({ ctx, input }) =>
                 await savedViewCall(() =>
                   ports.savedViews.reorder({
                     projectId: input.projectId,
                     viewIds: input.viewIds,
+                    userId: ctx.actor().id,
                   }),
                 ),
             ),

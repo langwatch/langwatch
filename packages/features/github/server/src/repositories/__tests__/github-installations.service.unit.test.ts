@@ -273,6 +273,75 @@ describe("recordInstallation", () => {
     });
   });
 
+  describe("when the flow named the GitHub account it is installing on", () => {
+    /** @scenario "A setup callback cannot bind an installation on an account its flow never named" */
+    it("refuses an installation owned by a different account, and records nothing", async () => {
+      // The installation is brand new, so the creation-window guard lets it through: the
+      // account GitHub reports is the only thing separating the attacker's flow from the
+      // victim's installation.
+      const repo = makeRepo();
+      const appTokens = makeAppTokens({
+        getInstallation: vi.fn(async (installationId: string) => ({
+          installationId,
+          accountLogin: "victim",
+          accountType: "Organization",
+          accountId: "1234",
+          repositorySelection: "all",
+          createdAt: new Date().toISOString(),
+        })),
+      });
+      const svc = service(repo, appTokens);
+
+      await expect(
+        svc.recordInstallation({
+          installationId: "inst-victim",
+          organizationId: "org-attacker",
+          flowStartedAt: Date.now(),
+          expectedAccountLogin: "acme",
+        }),
+      ).rejects.toMatchObject({ code: "github_installation_account_mismatch" });
+
+      expect(repo.insertOrGetExisting).not.toHaveBeenCalled();
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An installation on the account the flow named is bound" */
+    it("binds an installation owned by that account", async () => {
+      const repo = makeRepo();
+      const svc = service(repo, makeAppTokens());
+
+      await expect(
+        svc.recordInstallation({
+          installationId: "inst-1",
+          organizationId: "org-1",
+          flowStartedAt: Date.now(),
+          expectedAccountLogin: "ACME",
+        }),
+      ).resolves.toEqual({ accountLogin: "acme" });
+
+      expect(repo.insertOrGetExisting).toHaveBeenCalledWith(
+        expect.objectContaining({ installationId: "inst-1", organizationId: "org-1" }),
+      );
+    });
+
+    it("refuses an installation other than the one a reconfigure was pinned to", async () => {
+      const repo = makeRepo();
+      const svc = service(repo, makeAppTokens());
+
+      await expect(
+        svc.recordInstallation({
+          installationId: "inst-1",
+          organizationId: "org-1",
+          flowStartedAt: Date.now(),
+          expectedAccountLogin: "acme",
+          expectedInstallationId: "inst-other",
+        }),
+      ).rejects.toMatchObject({ code: "github_installation_account_mismatch" });
+
+      expect(repo.insertOrGetExisting).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the same organization re-installs the same installation", () => {
     it("upserts cleanly (no conflict on a genuine re-install)", async () => {
       const repo = makeRepo([row({ installationId: "inst-1", organizationId: "org-1" })]);

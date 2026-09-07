@@ -10,7 +10,10 @@ import {
 import type { ProjectService } from "@langwatch/project-contract";
 import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { describe, expect, it, vi } from "vitest";
-import { PresenceTrpcApi, type PresenceTrpcContext } from "../../transport/api-trpc/presence.api.ts";
+import {
+  PresenceTrpcApi,
+  type PresenceTrpcContext,
+} from "../../transport/api-trpc/presence.api.ts";
 import { PresenceBroadcastPort, PresenceEmitterPort } from "../presence.port.ts";
 import { PresenceRepository } from "../../repositories/presence.repository.ts";
 import { PresenceService as ComposedPresenceService } from "../../services/presence.service.ts";
@@ -165,6 +168,7 @@ describe("PresenceTrpcApi", () => {
       expect(presence.leave).toHaveBeenCalledWith({
         projectId: "project-1",
         sessionId: "tab-1",
+        userId: "user-1",
       });
     });
 
@@ -270,10 +274,11 @@ describe("PresenceTrpcApi", () => {
 
   describe("given the composed presence service rather than a stub", () => {
     class StubRepository extends PresenceRepository {
+      current: PresenceSession | null = null;
       readonly upsert = vi.fn(async () => undefined);
       readonly remove = vi.fn(async () => true);
       readonly listByProject = vi.fn(async () => [] as PresenceSession[]);
-      readonly tryFindSession = vi.fn(async () => null);
+      readonly tryFindSession = vi.fn(async () => this.current);
     }
 
     class StubBroadcast extends PresenceBroadcastPort {
@@ -322,6 +327,13 @@ describe("PresenceTrpcApi", () => {
 
     it("asks the policy for the project alone, so a leave reaches the repository", async () => {
       const { repository, caller } = createComposedCaller();
+      repository.current = {
+        projectId: "project-1",
+        sessionId: "tab-1",
+        user: { id: "user-1", name: "Ada", image: null },
+        location: { lens: "traces", route: {} },
+        updatedAt: 1,
+      };
 
       await expect(caller.leave({ projectId: "project-1", sessionId: "tab-1" })).resolves.toEqual({
         ok: true,

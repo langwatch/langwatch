@@ -80,3 +80,19 @@ Feature: Saved views
     When the reorder is attempted
     Then it is refused and names the unknown id
     And no view's order is changed
+
+  # Ordering is a write to the views named, so it carries the same ownership
+  # rule the rename and the delete carry, and the same not-found refusal.
+
+  @unit
+  Scenario: Reordering cannot move another member's personal view
+    Given a request to reorder views including a personal view of another member
+    When the reorder is attempted
+    Then it is refused and names that view as one I do not have
+    And no view's order is changed
+
+  @unit
+  Scenario: Reordering moves my own personal view
+    Given a request to reorder the project's views together with a personal view of mine
+    When the reorder is attempted
+    Then the new order is written

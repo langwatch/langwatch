@@ -104,6 +104,16 @@ export const githubInstallStatePayloadSchema = z
     issuedAt: z.number(),
     nonce: z.string(),
     nonceRegistered: z.boolean(),
+    /**
+     * The GitHub account this flow was started for, when the flow named one. The setup
+     * callback refuses an installation whose account is a different one.
+     */
+    expectedAccountLogin: z.string().optional(),
+    /**
+     * An installation this organization already owns, pinned when the flow is a
+     * reconfigure and therefore already knows which installation it is returning to.
+     */
+    expectedInstallationId: z.string().optional(),
   })
   .strict();
 

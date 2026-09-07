@@ -109,6 +109,8 @@ export class GithubFeatureService extends GithubServiceContract {
     installationId: string;
     organizationId: string;
     flowStartedAt: number;
+    expectedAccountLogin?: string | undefined;
+    expectedInstallationId?: string | undefined;
   }): Promise<{ accountLogin: string }> {
     return this.installations.recordInstallation(input);
   }

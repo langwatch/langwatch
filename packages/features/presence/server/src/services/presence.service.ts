@@ -1,5 +1,6 @@
 import {
   PresenceService as PresenceServiceContract,
+  PresenceSessionNotOwnedError,
   presenceCursorInputSchema,
   presenceLeaveInputSchema,
   presenceProjectInputSchema,
@@ -77,6 +78,19 @@ export class PresenceService extends PresenceServiceContract {
 
   async leave(input: PresenceLeaveInput): Promise<void> {
     const parsed = presenceLeaveInputSchema.parse(input);
+    // A session already gone answers the same as one this member published: leaving twice is
+    // ordinary, and an absence must not tell a caller which sessions exist.
+    const existing = await this.repository.tryFindSession({
+      projectId: parsed.projectId,
+      sessionId: parsed.sessionId,
+    });
+    if (!existing) {
+      return;
+    }
+    if (existing.user.id !== parsed.userId) {
+      throw new PresenceSessionNotOwnedError();
+    }
+
     const removed = await this.repository.remove({
       projectId: parsed.projectId,
       sessionId: parsed.sessionId,

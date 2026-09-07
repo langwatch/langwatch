@@ -97,3 +97,27 @@ export class GithubInstallationNotFromFlowError extends Error {
     this.name = "GithubInstallationNotFromFlowError";
   }
 }
+
+/**
+ * A setup callback claimed an installation on a GitHub account other than the one its flow
+ * named, or other than the installation the flow was pinned to. The App's own JWT reads any
+ * installation of this App, so the account GitHub reports is the only ownership evidence the
+ * callback has; a mismatch is refused rather than bound.
+ */
+export class GithubInstallationAccountMismatchError extends HandledError {
+  declare readonly code: "github_installation_account_mismatch";
+
+  readonly installationId: string;
+  readonly attemptedOrganizationId: string;
+
+  constructor(input: { installationId: string; attemptedOrganizationId: string }) {
+    super(
+      "github_installation_account_mismatch",
+      "That GitHub installation belongs to a different account than the one this installation was started for.",
+      { httpStatus: 403 },
+    );
+    this.name = "GithubInstallationAccountMismatchError";
+    this.installationId = input.installationId;
+    this.attemptedOrganizationId = input.attemptedOrganizationId;
+  }
+}

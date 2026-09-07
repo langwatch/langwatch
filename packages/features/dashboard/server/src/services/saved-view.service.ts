@@ -178,23 +178,29 @@ export class SavedViewService {
   }
 
   /**
-   * Reorders saved views by updating their order field.
-   * @throws {SavedViewReorderError} if any view doesn't exist
+   * Reorders saved views by updating their order field. A personal view is only the owner's
+   * to move: another member's reads as one this caller does not have, the same absence
+   * `delete` and `rename` answer with, so an ordering cannot be probed for whose views exist.
+   * @throws {SavedViewReorderError} if any view doesn't exist for this caller
    */
   async reorder({
     projectId,
     viewIds,
+    userId,
   }: {
     projectId: string;
     viewIds: string[];
+    userId: string;
   }): Promise<{ success: true }> {
     const existingViews = await this.repository.findByIds({
       ids: viewIds,
       projectId,
     });
 
-    const existingIds = new Set(existingViews.map((v) => v.id));
-    const missingIds = viewIds.filter((id) => !existingIds.has(id));
+    const reachableIds = new Set(
+      existingViews.filter((v) => v.userId === null || v.userId === userId).map((v) => v.id),
+    );
+    const missingIds = viewIds.filter((id) => !reachableIds.has(id));
 
     if (missingIds.length > 0) {
       throw new SavedViewReorderError(missingIds);

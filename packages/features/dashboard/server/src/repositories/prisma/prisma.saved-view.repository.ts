@@ -75,13 +75,16 @@ export class PrismaSavedViewRepository extends SavedViewRepository {
   /**
    * Finds saved views by their ids within a project.
    */
-  async findByIds(input: { ids: string[]; projectId: string }): Promise<Array<{ id: string }>> {
+  async findByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<Array<{ id: string; userId: string | null }>> {
     return await this.prisma.savedView.findMany({
       where: {
         id: { in: input.ids },
         projectId: input.projectId,
       },
-      select: { id: true },
+      select: { id: true, userId: true },
     });
   }
 

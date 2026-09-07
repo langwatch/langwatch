@@ -108,7 +108,7 @@ describe("given a project several people are working in", () => {
       await service.update(heartbeat(alice, "tab-one", tracesAt("T1")));
 
       advanceSeconds(1);
-      await service.leave({ projectId: PROJECT, sessionId: "tab-one" });
+      await service.leave({ projectId: PROJECT, sessionId: "tab-one", userId: alice.id });
 
       expect(broadcast.events().at(-1)).toEqual({ kind: "leave", sessionId: "tab-one" });
       await expect(service.list({ projectId: PROJECT })).resolves.toEqual([]);

@@ -117,6 +117,11 @@ export const presenceLeaveInputSchema = z
   .object({
     projectId: z.string().min(1),
     sessionId: z.string().min(1),
+    /**
+     * Who is asking. Read from the authenticated session by the transport, never from the
+     * payload: a session is removed only by the person publishing it.
+     */
+    userId: z.string().min(1),
   })
   .strict();
 export type PresenceLeaveInput = z.infer<typeof presenceLeaveInputSchema>;

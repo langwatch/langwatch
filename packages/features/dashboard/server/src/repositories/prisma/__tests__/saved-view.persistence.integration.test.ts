@@ -186,7 +186,11 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
         input: { name: "View C", filters: {} },
       });
 
-      await service().reorder({ projectId, viewIds: [viewC.id, viewA.id, viewB.id] });
+      await service().reorder({
+        projectId,
+        viewIds: [viewC.id, viewA.id, viewB.id],
+        userId: "user-1",
+      });
 
       const result = await service().getAll({ projectId });
       const reordered = result

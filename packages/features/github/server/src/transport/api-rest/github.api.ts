@@ -12,6 +12,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import type { GithubInstallStatePayload, GithubService } from "@langwatch/github-contract";
 import {
+  GithubInstallationAccountMismatchError,
   GithubInstallationConflictError,
   GithubInstallationNotFromFlowError,
 } from "@langwatch/github-contract";
@@ -177,6 +178,13 @@ async function handleInstall(c: Context, ports: GithubRestPorts): Promise<Respon
     ttlSec: Math.ceil(service.getInstallStateTtlMs() / 1000),
   });
 
+  const expected = await resolveExpectedInstallationTarget({
+    service,
+    organizationId,
+    accountLogin: c.req.query("account"),
+    installationId: c.req.query("installationId"),
+  });
+
   const state = signState(service, {
     userId: session.user.id,
     organizationId,
@@ -185,6 +193,7 @@ async function handleInstall(c: Context, ports: GithubRestPorts): Promise<Respon
     issuedAt: Date.now(),
     nonce,
     nonceRegistered,
+    ...expected,
   });
 
   // GitHub redirects back to the App's configured Setup URL after install; the
@@ -219,6 +228,8 @@ async function handleSetup(c: Context, ports: GithubRestPorts): Promise<Response
       installationId,
       organizationId: state.organizationId,
       flowStartedAt: state.issuedAt,
+      expectedAccountLogin: state.expectedAccountLogin,
+      expectedInstallationId: state.expectedInstallationId,
     }));
   } catch (err) {
     await reportInstallationFailure({ err, ports, state });
@@ -315,10 +326,75 @@ async function rejectUnauthorizedSetup({
   return null;
 }
 
+/** A claim one of the three ownership guards turned away, and how it is audited. */
+type BlockedInstallationClaim = Readonly<{
+  action: string;
+  installationId: string;
+  attemptedOrganizationId: string;
+}>;
+
+/**
+ * The refused claim behind a failure, or null when the failure was not one. Each guard names
+ * its own audit action, so the three refusals are told apart in the audit log.
+ */
+function blockedClaimOf(err: unknown): BlockedInstallationClaim | null {
+  if (err instanceof GithubInstallationConflictError) {
+    return { action: "github.connection.install.rejected_cross_tenant", ...claimOf(err) };
+  }
+  if (err instanceof GithubInstallationNotFromFlowError) {
+    return { action: "github.connection.install.rejected_foreign_installation", ...claimOf(err) };
+  }
+  if (err instanceof GithubInstallationAccountMismatchError) {
+    return { action: "github.connection.install.rejected_account_mismatch", ...claimOf(err) };
+  }
+  return null;
+}
+
+/** The two fields every refusal carries about what was claimed. */
+function claimOf(err: {
+  installationId: string;
+  attemptedOrganizationId: string;
+}): Omit<BlockedInstallationClaim, "action"> {
+  return {
+    installationId: err.installationId,
+    attemptedOrganizationId: err.attemptedOrganizationId,
+  };
+}
+
+/**
+ * What this flow will accept back from GitHub. A caller naming the account it means to
+ * install on has that account bound into the signed state; an installation id is pinned only
+ * when this organization already owns it, so a reconfigure cannot come back as a different
+ * installation and a supplied id can never widen what the flow accepts.
+ */
+async function resolveExpectedInstallationTarget(input: {
+  service: GithubService;
+  organizationId: string;
+  accountLogin: string | undefined;
+  installationId: string | undefined;
+}): Promise<{ expectedAccountLogin?: string; expectedInstallationId?: string }> {
+  const target: { expectedAccountLogin?: string; expectedInstallationId?: string } = {};
+  if (input.accountLogin) {
+    target.expectedAccountLogin = input.accountLogin;
+  }
+  if (!input.installationId) {
+    return target;
+  }
+
+  const owned = await input.service.tryGetByInstallationId(input.installationId);
+  if (owned && owned.organizationId === input.organizationId) {
+    target.expectedInstallationId = owned.installationId;
+    target.expectedAccountLogin = owned.accountLogin;
+  }
+
+  return target;
+}
+
 /**
  * Record why the installation could not be written. A takeover attempt — an installation
- * already owned by another organization, or one this flow did not create — is a security event,
- * not an ordinary failure: audit it against the acting user/org so it is visible.
+ * already owned by another organization, one this flow did not create, or one on an account
+ * this flow never named — is a security event, not an ordinary failure: audit it against the
+ * acting user and organization so it is visible.
  */
 async function reportInstallationFailure({
   err,
@@ -329,21 +405,15 @@ async function reportInstallationFailure({
   ports: GithubRestPorts;
   state: GithubInstallStatePayload;
 }): Promise<void> {
-  if (
-    !(err instanceof GithubInstallationConflictError) &&
-    !(err instanceof GithubInstallationNotFromFlowError)
-  ) {
+  const claim = blockedClaimOf(err);
+  if (!claim) {
     logger.warn({ err }, "github installation record failed");
     return;
   }
-  const action =
-    err instanceof GithubInstallationConflictError
-      ? "github.connection.install.rejected_cross_tenant"
-      : "github.connection.install.rejected_foreign_installation";
   logger.warn(
     {
-      installationId: err.installationId,
-      attemptedOrganizationId: err.attemptedOrganizationId,
+      installationId: claim.installationId,
+      attemptedOrganizationId: claim.attemptedOrganizationId,
       userId: state.userId,
     },
     "blocked github installation claim",
@@ -352,8 +422,8 @@ async function reportInstallationFailure({
     await ports.audit({
       userId: state.userId,
       organizationId: state.organizationId,
-      action,
-      args: { installationId: err.installationId },
+      action: claim.action,
+      args: { installationId: claim.installationId },
     });
   } catch (auditErr) {
     logger.warn({ err: auditErr }, "audit log write failed after blocked rebind");
