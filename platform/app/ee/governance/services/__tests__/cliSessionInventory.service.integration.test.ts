@@ -4,10 +4,13 @@
  *
  * The devices tab's revoke retires the machine, telemetry included: the
  * session's login key and the ingest keys parented to it go with its tokens,
- * and the other sessions of the same person are untouched. Real Redis + real
- * Postgres.
+ * and the other sessions of the same person are untouched. The listing that
+ * feeds the devices tab is here too: it carries each session's login key id,
+ * which is what puts a key on a card, and it never reaches past its caller.
+ * Real Redis + real Postgres.
  *
  * Feature: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
+ * Feature: specs/ai-gateway/governance/sessions-and-devices.feature
  */
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
@@ -30,6 +33,7 @@ const suffix = nanoid(8)
   .replace(/[^a-z0-9]/g, "0");
 const ORG_ID = `org-csi-${suffix}`;
 const USER_ID = `usr-csi-${suffix}`;
+const OTHER_USER_ID = `usr-csi-other-${suffix}`;
 
 let redisConnection: Redis | null = null;
 
@@ -46,12 +50,14 @@ interface Session {
 async function openSession({
   hostname,
   sessionStartedAtMs,
+  userId = USER_ID,
 }: {
   hostname: string;
   sessionStartedAtMs: number;
+  userId?: string;
 }): Promise<Session> {
   const minted = await CliLoginKeyService.create(prisma).mintForDeviceSession({
-    userId: USER_ID,
+    userId,
     organizationId: ORG_ID,
     deviceLabel: `${hostname}-${suffix}`,
     selection: {
@@ -63,7 +69,7 @@ async function openSession({
     refreshWindowMs: 90 * 24 * 60 * 60 * 1000,
   });
   const ingest = await IngestionKeyService.create(prisma).mint({
-    userId: USER_ID,
+    userId,
     organizationId: ORG_ID,
     sourceType: "claude_code",
     parentApiKeyId: minted.apiKeyId,
@@ -74,7 +80,7 @@ async function openSession({
   const accessKey = `lwcli:access:lw_at_${hostname}-${suffix}`;
   const refreshKey = `lwcli:refresh:lw_rt_${hostname}-${suffix}`;
   const record = {
-    user_id: USER_ID,
+    user_id: userId,
     organization_id: ORG_ID,
     issued_at: sessionStartedAtMs,
     expires_at: Date.now() + 60 * 60 * 1000,
@@ -88,7 +94,7 @@ async function openSession({
   await redisConnection.set(accessKey, JSON.stringify(record), "EX", 3600);
   await redisConnection.set(refreshKey, JSON.stringify(record), "EX", 3600);
   await redisConnection.sadd(
-    CliTokenRevocationService.userTokensIndexKey(USER_ID),
+    CliTokenRevocationService.userTokensIndexKey(userId),
     accessKey,
     refreshKey,
   );
@@ -142,12 +148,37 @@ describe("CliSessionInventoryService with the keys a session owns", () => {
       userId: USER_ID,
       organizationId: ORG_ID,
     });
+
+    await prisma.user.create({
+      data: {
+        id: OTHER_USER_ID,
+        email: `${OTHER_USER_ID}@example.com`,
+        name: "CSI other",
+      },
+    });
+    await prisma.organizationUser.create({
+      data: { organizationId: ORG_ID, userId: OTHER_USER_ID, role: "ADMIN" },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        organizationId: ORG_ID,
+        userId: OTHER_USER_ID,
+        role: "ADMIN",
+        scopeType: "ORGANIZATION",
+        scopeId: ORG_ID,
+      },
+    });
+    await new PersonalWorkspaceService(prisma).ensure({
+      userId: OTHER_USER_ID,
+      organizationId: ORG_ID,
+    });
   }, 60_000);
 
   afterAll(async () => {
     if (redisConnection) {
       await redisConnection.del(
         CliTokenRevocationService.userTokensIndexKey(USER_ID),
+        CliTokenRevocationService.userTokensIndexKey(OTHER_USER_ID),
       );
     }
     await prisma.roleBinding
@@ -169,7 +200,7 @@ describe("CliSessionInventoryService with the keys a session owns", () => {
       .deleteMany({ where: { organizationId: ORG_ID } })
       .catch(() => undefined);
     await prisma.user
-      .deleteMany({ where: { id: USER_ID } })
+      .deleteMany({ where: { id: { in: [USER_ID, OTHER_USER_ID] } } })
       .catch(() => undefined);
     await prisma.organization
       .deleteMany({ where: { id: ORG_ID } })
@@ -250,6 +281,37 @@ describe("CliSessionInventoryService with the keys a session owns", () => {
       expect(
         await resolver.resolve({ token: phone.ingestToken, projectId: null }),
       ).toBeNull();
+    });
+  });
+
+  describe("given two people in the same organization, each signed in", () => {
+    /** @scenario "User sees only their own credentials on the devices tab (never other users')" */
+    it("lists only the caller's session, carrying the login key its ingest keys hang off", async () => {
+      const mine = await openSession({
+        hostname: "mine",
+        sessionStartedAtMs: Date.now() - 400,
+      });
+      const theirs = await openSession({
+        hostname: "theirs",
+        sessionStartedAtMs: Date.now() - 300,
+        userId: OTHER_USER_ID,
+      });
+
+      const listed = await service.listForUser({ userId: USER_ID });
+
+      expect(listed.map((session) => session.cliApiKeyId)).toEqual([
+        mine.loginKeyId,
+      ]);
+      expect(
+        listed.some((session) => session.cliApiKeyId === theirs.loginKeyId),
+      ).toBe(false);
+
+      const theirListing = await service.listForUser({
+        userId: OTHER_USER_ID,
+      });
+      expect(theirListing.map((session) => session.cliApiKeyId)).toEqual([
+        theirs.loginKeyId,
+      ]);
     });
   });
 });
