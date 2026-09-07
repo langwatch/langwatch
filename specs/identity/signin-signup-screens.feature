@@ -241,14 +241,16 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # is the better thing to leave with — beside them rather than in front of
   # them, so declining costs a glance and the other way on is already drawn.
   #
-  # The proof accompanies the registration context and is claimed atomically
-  # with the new account and passkey.
+  # The proof accompanies the registration context. Claiming it is atomic and
+  # precedes the account and credential writes; those writes are not one
+  # cross-resource transaction. If enrollment then fails, recovery starts
+  # with a fresh email proof rather than replaying the claimed one.
   @unit @e2e
   Scenario: Signing up with a passkey consumes the verified address proof
     Given I returned with a valid proof for an address that has no account
     When I create a passkey instead of choosing a password
     Then my account is created and the passkey belongs to it
-    And the proof is consumed with that registration
+    And the proof is claimed before that registration writes anything
     And I am signed in
 
   # THE one that matters. Registration without a session is what lets somebody
@@ -256,10 +258,25 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # anyone attach their own passkey to anybody's account by naming the address.
   @unit
   Scenario: A passkey is never registered against an address that already has an account
-    Given the address proof has already been claimed by an account
-    When another passkey registration is started with it
+    Given I hold a fresh valid proof for an address that gained an account
+    When a passkey registration is started with it
     Then it is refused before any ceremony begins
     And no system prompt opens for it
+
+  @integration
+  Scenario: A claimed proof whose enrollment failed recovers by email
+    Given my proof was claimed but account enrollment did not finish
+    When I reopen its confirmation link
+    Then no password or passkey control is shown
+    And I am offered a fresh confirmation link
+
+  @integration
+  Scenario: Post-link routing still governs credential enrollment
+    Given I returned with a valid proof for my address
+    When routing that address fails
+    Then no password or passkey control is shown and I can retry
+    When the domain is now routed to an identity provider
+    Then I am handed to that provider without being offered a local credential
 
   @unit
   Scenario: Declining the passkey leaves the password fields where they were
@@ -588,25 +605,24 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # pressing "send a fresh one" over and over at a screen that had already
   # done its job.
   #
-  # A second opening asks the same question and deserves the same answer: the
-  # address is confirmed. Nothing is created twice — the row is marked spent
-  # rather than deleted, so it can never confirm or create anything again —
-  # and the grace window means a link stays honest for as long as it is
-  # plausibly still in somebody's inbox.
+  # A second opening may report the confirmed status, but it returns no second
+  # proof and opens no session. If the first consumer claimed the proof without
+  # finishing account creation, the screen offers a fresh email instead.
   @unit
   Scenario: Opening a confirmation link a second time confirms, rather than refusing
     Given I opened my confirmation link and my address is confirmed
     When I open the same link again
-    Then the screen carries on as though it had just worked
+    Then the screen reports the address status without returning another proof
     And nothing is created a second time
     And no additional session or session cookie is minted
 
   @integration
-  Scenario: Simultaneous confirmation-link consumers mint one session
-    Given one unspent confirmation link for an account awaiting confirmation
+  Scenario: Simultaneous confirmation-link consumers yield one proof
+    Given one unspent confirmation link for an address with no account
     When two requests consume that link at the same time
-    Then exactly one request opens the account's first session and sets its cookie
-    And the other request confirms the address without minting another session
+    Then exactly one request receives the single-use address proof
+    And the other request receives status only
+    And neither request creates an account, opens a session or sets a session cookie
 
   @unit
   Scenario: A spent link stops working once its grace window closes
