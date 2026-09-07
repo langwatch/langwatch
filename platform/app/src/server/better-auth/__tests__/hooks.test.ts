@@ -96,6 +96,7 @@ const hooksOver = ({
   };
   const createMembership = vi.fn().mockResolvedValue("created");
   const applyPendingInvite = vi.fn().mockResolvedValue(pendingInvite);
+  const requestFromSsoArrival = vi.fn().mockResolvedValue(null);
   const attachBindings = vi.fn().mockResolvedValue(undefined);
   const announceSignup = vi.fn();
   const startNurturing = vi.fn();
@@ -115,9 +116,7 @@ const hooksOver = ({
         .mockResolvedValue(arrivalOrganization),
     },
     invites: { applyPendingInvite },
-    joinRequests: {
-      requestFromSsoArrival: vi.fn().mockResolvedValue(null),
-    },
+    joinRequests: { requestFromSsoArrival },
     grants: { attachBindings },
     notifications: { announceSignup, startNurturing },
   });
@@ -139,6 +138,7 @@ const hooksOver = ({
     ssoMigration,
     createMembership,
     applyPendingInvite,
+    requestFromSsoArrival,
     attachBindings,
     announceSignup,
     trackSignUp,
@@ -246,6 +246,77 @@ describe("afterUserCreate", () => {
 
       expect(organizations.findByDomain).not.toHaveBeenCalled();
       expect(createMembership).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an authenticated callback resolves to a proved admitting connection", () => {
+    /** @scenario PostHog signed_up still fires when the SSO auto-add path runs */
+    it("tracks signup once and admits the user with an organization grant", async () => {
+      const account = {
+        userId: "user_1",
+        providerId: "ssoc_acme",
+        accountId: "subject_1",
+      };
+      const { hooks, trackSignUp, createMembership, attachBindings } =
+        hooksOver({
+          user: userRow({ email: "new@acme.com", name: "New User" }),
+          migrationDecision: {
+            kind: "allow_connection",
+            arrivalConnectionId: "ssoc_acme",
+            keepAccounts: [account],
+          },
+          arrivalConnection: {
+            organizationId: "org_1",
+            state: "ACTIVE",
+            verifiedDomains: ["acme.com"],
+            domainVerifications: [
+              {
+                domain: "acme.com",
+                method: "dns-txt",
+                actorId: "user_admin",
+                verifiedAtMs: 1_725_000_000_000,
+                proofState: "VERIFIED",
+                firstAbsentAtMs: null,
+                graceEndsAtMs: null,
+                tokenHash: "sha256:proof",
+                evidenceRef: "sha256:proof",
+                verifier: null,
+                note: null,
+              },
+            ],
+            lapsedDomains: [],
+            arrivalPolicy: "admit",
+            createdBy: "user_admin",
+            source: "self-serve",
+            providerId: "ssoc_acme",
+          },
+          arrivalOrganization: { id: "org_1", name: "Acme" },
+        });
+
+      hooks.afterUserCreate({
+        user: { id: "user_1", email: "new@acme.com", name: "New User" },
+      });
+      await hooks.afterAccountCreate({ account });
+
+      expect(trackSignUp).toHaveBeenCalledTimes(1);
+      expect(trackSignUp).toHaveBeenCalledWith({ userId: "user_1" });
+      expect(createMembership).toHaveBeenCalledWith({
+        userId: "user_1",
+        organizationId: "org_1",
+      });
+      expect(attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_1",
+          bindings: [
+            expect.objectContaining({
+              principal: { userId: "user_1" },
+              role: "MEMBER",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            }),
+          ],
+        }),
+      );
     });
   });
 });
@@ -364,6 +435,46 @@ describe("beforeAccountCreate", () => {
   });
 
   describe("when the platform SSO gate DENIES (unlicensed deployment)", () => {
+    /** @scenario Unlicensed-mode signup does not auto-join a domain-matched organization */
+    it("accepts credential hooks without any federation side effects", async () => {
+      const {
+        hooks,
+        trackSignUp,
+        organizations,
+        createMembership,
+        attachBindings,
+        applyPendingInvite,
+        requestFromSsoArrival,
+      } = hooksOver({
+        user: userRow({ email: "new@acme.com", name: "New User" }),
+        organization: legacyOrganization({ ssoProvider: "auth0" }),
+        federationAllowed: false,
+      });
+      const account = {
+        userId: "user_1",
+        providerId: "credential",
+        accountId: "new@acme.com",
+      };
+
+      hooks.afterUserCreate({
+        user: { id: "user_1", email: "new@acme.com", name: "New User" },
+      });
+      await expect(
+        hooks.beforeAccountCreate({ account }),
+      ).resolves.toBeUndefined();
+      await expect(
+        hooks.afterAccountCreate({ account }),
+      ).resolves.toBeUndefined();
+
+      expect(trackSignUp).toHaveBeenCalledTimes(1);
+      expect(trackSignUp).toHaveBeenCalledWith({ userId: "user_1" });
+      expect(organizations.findByDomain).not.toHaveBeenCalled();
+      expect(createMembership).not.toHaveBeenCalled();
+      expect(attachBindings).not.toHaveBeenCalled();
+      expect(applyPendingInvite).not.toHaveBeenCalled();
+      expect(requestFromSsoArrival).not.toHaveBeenCalled();
+    });
+
     /** @scenario Existing users on an unlicensed deployment self-recover via password reset */
     it("does not set pendingSsoSetup for a credential account at a matching ssoDomain", async () => {
       // The v6 reset-recovery path creates a `credential` account for an
@@ -646,7 +757,9 @@ describe("beforeSessionCreate", () => {
         beforeAccountDelete: vi.fn(),
       }),
       sessionClaims: () => ({
-        claimsForMint: vi.fn().mockResolvedValue({ identifierId: null, amr: [] }),
+        claimsForMint: vi
+          .fn()
+          .mockResolvedValue({ identifierId: null, amr: [] }),
       }),
       providerAssertions: () => ({
         recordVerifiedCallbackToken: vi.fn(),
@@ -664,9 +777,7 @@ describe("beforeSessionCreate", () => {
         { path: "/callback/auth0" },
       ]),
     ).rejects.toThrow("SSO_LEGACY_AUTH_RETIRED");
-    expect(
-      ssoMigration.authorizeAndRecordAuthentication,
-    ).toHaveBeenCalledWith(
+    expect(ssoMigration.authorizeAndRecordAuthentication).toHaveBeenCalledWith(
       expect.objectContaining({ path: "/callback/auth0" }),
     );
   });

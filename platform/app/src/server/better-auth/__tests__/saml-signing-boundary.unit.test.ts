@@ -34,7 +34,9 @@ async function signingIdentity(commonName: string): Promise<SigningIdentity> {
     privateKey: pem.private,
     signingCert: pem.cert,
     wantAuthnRequestsSigned: false,
-    singleSignOnService: [{ Binding: POST_BINDING, Location: `${IDP_ENTITY_ID}/sso` }],
+    singleSignOnService: [
+      { Binding: POST_BINDING, Location: `${IDP_ENTITY_ID}/sso` },
+    ],
   });
   return { certificate: pem.cert, idp };
 }
@@ -61,7 +63,9 @@ async function responseFrom(identity: SigningIdentity, email = "ana@acme.com") {
     wantAssertionsSigned: true,
     assertionConsumerService: [{ Binding: POST_BINDING, Location: ACS }],
   });
-  return identity.idp.createLoginResponse(sp, { extract: {} }, "post", { email });
+  return identity.idp.createLoginResponse(sp, { extract: {} }, "post", {
+    email,
+  });
 }
 
 function authFor(metadata: string) {
@@ -169,7 +173,10 @@ function authFor(metadata: string) {
   return { auth, db };
 }
 
-async function post(auth: ReturnType<typeof authFor>["auth"], samlResponse: string) {
+async function post(
+  auth: ReturnType<typeof authFor>["auth"],
+  samlResponse: string,
+) {
   return auth.handler(
     new Request(ACS, {
       method: "POST",
@@ -194,12 +201,43 @@ describe("the mounted SAML signing boundary", () => {
     expect(db.session).toHaveLength(1);
   });
 
+  /** @scenario A signed SAML callback creates the federated identity rows */
+  it("creates one associated user, account, and session for the asserted address", async () => {
+    const { auth, db } = authFor(metadataWith(oldIdentity));
+    expect(db.user).toEqual([]);
+    expect(db.account).toEqual([]);
+    expect(db.session).toEqual([]);
+    const signed = await responseFrom(oldIdentity, "ana@acme.com");
+
+    const result = await post(auth, signed.context);
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("location")).not.toContain("error=");
+    expect(db.user).toHaveLength(1);
+    expect(db.account).toHaveLength(1);
+    expect(db.session).toHaveLength(1);
+    expect(db.user[0]).toEqual(
+      expect.objectContaining({ email: "ana@acme.com" }),
+    );
+    expect(db.account[0]).toEqual(
+      expect.objectContaining({
+        userId: db.user[0]?.id,
+        providerId: PROVIDER_ID,
+      }),
+    );
+    expect(db.session[0]).toEqual(
+      expect.objectContaining({ userId: db.user[0]?.id }),
+    );
+  });
+
   /** @scenario "A different or tampered signing certificate authenticates nothing" */
   it.each(["unrelated", "tampered"])(
     "rejects an %s assertion without identity writes",
     async (kind) => {
       const { auth, db } = authFor(metadataWith(oldIdentity));
-      const signed = await responseFrom(kind === "unrelated" ? unrelatedIdentity : oldIdentity);
+      const signed = await responseFrom(
+        kind === "unrelated" ? unrelatedIdentity : oldIdentity,
+      );
       const response =
         kind === "tampered"
           ? Buffer.from(
