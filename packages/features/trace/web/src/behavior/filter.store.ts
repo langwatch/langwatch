@@ -222,30 +222,17 @@ function applyMutation(state: FilterState, mutate: (text: string) => string) {
   };
 }
 
-/**
- * Pure store. The lens dirty-tracking is handled by `useLensFilterDirtySync`
- * (mounted in TracesPage), which subscribes to `queryText` and updates the
- * active lens's draft. filterStore never reaches into viewStore.
- */
-export const useFilterStore = create<FilterState>((set, get) => ({
-  ast: EMPTY_AST,
-  queryText: "",
-  parseError: null,
-  aiError: null,
-  timeRange: INITIAL_TIME_RANGE,
-  page: 1,
-  pageSize: 50,
-  pageCursors: { 1: null },
-  debouncedQueryText: "",
-  debouncedTimeRange: INITIAL_TIME_RANGE,
-  lastAiTranslation: null,
+type FilterSet = (
+  partial:
+    | FilterState
+    | Partial<FilterState>
+    | ((state: FilterState) => FilterState | Partial<FilterState>),
+  replace?: false,
+) => void;
 
-  setAiError: (err) => set({ aiError: err }),
-  dismissParseError: () => set({ parseError: null }),
-
-  recordAiTranslation: (translation) => set({ lastAiTranslation: translation }),
-
-  applyQueryText: (text) =>
+/** Applies a search-bar query string (parse → AST), preserving refs on a no-op edit. */
+function applyQueryTextAction(set: FilterSet): FilterState["applyQueryText"] {
+  return (text) =>
     set((state) => {
       const result = safeParseAndSerialize(text);
       if (result.parseError) {
@@ -276,19 +263,12 @@ export const useFilterStore = create<FilterState>((set, get) => ({
         pageCursors: { 1: null },
         lastAiTranslation: null,
       };
-    }),
+    });
+}
 
-  setQuery: (text, ast) =>
-    set({
-      ast,
-      queryText: text,
-      parseError: null,
-      page: 1,
-      pageCursors: { 1: null },
-      lastAiTranslation: null,
-    }),
-
-  setFilterFromLens: (text) =>
+/** Applies a saved lens's filter text, falling back to empty on a corrupt parse. */
+function setFilterFromLensAction(set: FilterSet): FilterState["setFilterFromLens"] {
+  return (text) =>
     set(() => {
       const result = safeParseAndSerialize(text);
       // If the saved lens text is unparseable (corrupt persistence), fall
@@ -309,9 +289,12 @@ export const useFilterStore = create<FilterState>((set, get) => ({
         pageCursors: { 1: null },
         lastAiTranslation: null,
       };
-    }),
+    });
+}
 
-  toggleFacet: (field, value, options) =>
+/** Three-stage facet toggle: neutral → include → exclude → neutral. */
+function toggleFacetAction(set: FilterSet): FilterState["toggleFacet"] {
+  return (field, value, options) =>
     set((s) => {
       const state = getFacetValueState(s.ast, field, value);
       // OR-group splice path: when the field is already part of an OR
@@ -346,9 +329,12 @@ export const useFilterStore = create<FilterState>((set, get) => ({
           combinator: options?.combinator ?? "AND",
         }),
       );
-    }),
+    });
+}
 
-  excludeFacet: (field, value) =>
+/** Forces a facet value into the EXCLUDED (`NOT field:value`) state. */
+function excludeFacetAction(set: FilterSet): FilterState["excludeFacet"] {
+  return (field, value) =>
     set((s) => {
       const state = getFacetValueState(s.ast, field, value);
       // Already excluded → second press on the `−` toggles it back off.
@@ -373,7 +359,49 @@ export const useFilterStore = create<FilterState>((set, get) => ({
           currentState: "include",
         }),
       );
+    });
+}
+
+/**
+ * Pure store. The lens dirty-tracking is handled by `useLensFilterDirtySync`
+ * (mounted in TracesPage), which subscribes to `queryText` and updates the
+ * active lens's draft. filterStore never reaches into viewStore.
+ */
+export const useFilterStore = create<FilterState>((set, get) => ({
+  ast: EMPTY_AST,
+  queryText: "",
+  parseError: null,
+  aiError: null,
+  timeRange: INITIAL_TIME_RANGE,
+  page: 1,
+  pageSize: 50,
+  pageCursors: { 1: null },
+  debouncedQueryText: "",
+  debouncedTimeRange: INITIAL_TIME_RANGE,
+  lastAiTranslation: null,
+
+  setAiError: (err) => set({ aiError: err }),
+  dismissParseError: () => set({ parseError: null }),
+
+  recordAiTranslation: (translation) => set({ lastAiTranslation: translation }),
+
+  applyQueryText: applyQueryTextAction(set),
+
+  setQuery: (text, ast) =>
+    set({
+      ast,
+      queryText: text,
+      parseError: null,
+      page: 1,
+      pageCursors: { 1: null },
+      lastAiTranslation: null,
     }),
+
+  setFilterFromLens: setFilterFromLensAction(set),
+
+  toggleFacet: toggleFacetAction(set),
+
+  excludeFacet: excludeFacetAction(set),
 
   toggleEvaluatorSubFilter: ({ evaluatorId, field, value }) =>
     set((s) =>

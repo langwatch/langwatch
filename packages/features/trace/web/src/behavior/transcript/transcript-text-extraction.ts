@@ -11,6 +11,22 @@ function joinTextBlocks(blocks: ContentBlock[]): string {
     .join("\n");
 }
 
+/** Latest message from `prefer`'s role, falling back to the latest message overall. */
+function extractFromChatMessages(chat: ChatMessage[], prefer: "user" | "assistant"): string {
+  for (let i = chat.length - 1; i >= 0; i--) {
+    const msg = chat[i]!;
+    if (msg.role === prefer) {
+      const text = joinTextBlocks(parseContentBlocks(msg.content));
+      if (text.trim()) return text;
+    }
+  }
+  for (let i = chat.length - 1; i >= 0; i--) {
+    const text = joinTextBlocks(parseContentBlocks(chat[i]!.content));
+    if (text.trim()) return text;
+  }
+  return "";
+}
+
 export function extractReadableText(
   raw: string | null | undefined,
   prefer: "user" | "assistant",
@@ -19,20 +35,7 @@ export function extractReadableText(
 
   const parsed = tryParseJSON(raw);
   const chat = coerceToChatMessages(parsed);
-  if (chat) {
-    for (let i = chat.length - 1; i >= 0; i--) {
-      const msg = chat[i]!;
-      if (msg.role === prefer) {
-        const text = joinTextBlocks(parseContentBlocks(msg.content));
-        if (text.trim()) return text;
-      }
-    }
-    for (let i = chat.length - 1; i >= 0; i--) {
-      const text = joinTextBlocks(parseContentBlocks(chat[i]!.content));
-      if (text.trim()) return text;
-    }
-    return "";
-  }
+  if (chat) return extractFromChatMessages(chat, prefer);
 
   if (Array.isArray(parsed)) {
     const content = parsed.filter(

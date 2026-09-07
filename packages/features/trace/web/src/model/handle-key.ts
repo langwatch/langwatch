@@ -69,18 +69,22 @@ function acceptAction(ctx: EditorContext, highlighted: string): KeyAction | null
   };
 }
 
+function handleEnterOrTab(ctx: EditorContext, key: "Enter" | "Tab"): KeyAction {
+  if (ctx.suggestion.open && ctx.highlightedText) {
+    const accept = acceptAction(ctx, ctx.highlightedText);
+    if (accept) {
+      return accept;
+    }
+  }
+  if (key === "Tab") {
+    return { kind: "noop" };
+  }
+  return { kind: "submit", text: ctx.text };
+}
+
 export function handleKey(ctx: EditorContext, key: string): KeyAction {
   if (key === "Enter" || key === "Tab") {
-    if (ctx.suggestion.open && ctx.highlightedText) {
-      const accept = acceptAction(ctx, ctx.highlightedText);
-      if (accept) {
-        return accept;
-      }
-    }
-    if (key === "Tab") {
-      return { kind: "noop" };
-    }
-    return { kind: "submit", text: ctx.text };
+    return handleEnterOrTab(ctx, key);
   }
 
   if (key === "Escape") {

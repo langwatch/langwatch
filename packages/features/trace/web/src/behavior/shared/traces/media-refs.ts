@@ -3,7 +3,7 @@
  */
 
 import { isMediaPartRole, type MediaPartRole, type TraceMediaRef } from "@langwatch/trace-contract";
-import { collectAnnotatedMediaParts } from "./media-parts.ts";
+import { type CollectedMediaPart, collectAnnotatedMediaParts } from "./media-parts.ts";
 
 /** Which summary strip a ref belongs on. */
 export type TraceMediaSide = "input" | "output";
@@ -42,6 +42,32 @@ function isStoredObjectRefUrl(url: string): boolean {
 }
 
 /**
+ * Builds the compact ref for one collected media part, or null when it isn't a
+ * stored-object url.
+ */
+function refFromCollectedMedia(
+  media: CollectedMediaPart["media"],
+  role: MediaPartRole | undefined,
+): TraceMediaRef | null {
+  const withRole = role ? { role } : {};
+  if (media.type === "binary") {
+    if (!media.url || !isStoredObjectRefUrl(media.url)) return null;
+    const kind = kindFromMime(media.mimeType);
+    return {
+      kind,
+      url: media.url,
+      ...(media.filename ? { filename: media.filename } : {}),
+      ...(kind === "file" ? { mimeType: media.mimeType } : {}),
+      ...withRole,
+    };
+  }
+  if (media.source.type === "url" && isStoredObjectRefUrl(media.source.value)) {
+    return { kind: media.type, url: media.source.value, ...withRole };
+  }
+  return null;
+}
+
+/**
  * Walks a span IO value (typed envelope, messages, nested JSON strings — the same
  * shapes `collectMediaParts` handles) and returns the compact reference list.
  */
@@ -50,21 +76,7 @@ export function collectMediaRefs(value: unknown): TraceMediaRef[] {
   const seen = new Set<string>();
   for (const { media, role } of collectAnnotatedMediaParts(value)) {
     if (refs.length >= MAX_TRACE_MEDIA_REFS) break;
-    const withRole = role ? { role } : {};
-    let ref: TraceMediaRef | null = null;
-    if (media.type === "binary") {
-      if (!media.url || !isStoredObjectRefUrl(media.url)) continue;
-      const kind = kindFromMime(media.mimeType);
-      ref = {
-        kind,
-        url: media.url,
-        ...(media.filename ? { filename: media.filename } : {}),
-        ...(kind === "file" ? { mimeType: media.mimeType } : {}),
-        ...withRole,
-      };
-    } else if (media.source.type === "url" && isStoredObjectRefUrl(media.source.value)) {
-      ref = { kind: media.type, url: media.source.value, ...withRole };
-    }
+    const ref = refFromCollectedMedia(media, role);
     if (!ref || seen.has(ref.url)) continue;
     seen.add(ref.url);
     refs.push(ref);

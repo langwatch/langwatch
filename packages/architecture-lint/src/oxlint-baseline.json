@@ -2698,107 +2698,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/explorer/ai/use-typewriter-placeholder.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/explorer/onboarding/store/onboarding-store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/explorer/search-bar/filter-highlight.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/explorer/use-overflow-visibility.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/filter.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/flame/use-flame-keyboard.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/flame/use-flame-viewport.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/preview-formatter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/refresh-ui.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/selection.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/sequence/use-mermaid-renderer.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/shared/traces/media-parts.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/shared/traces/media-refs.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/transcript/chat-message-coercion.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/transcript/content-parser.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/transcript/media-part.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/transcript/transcript-text-extraction.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/transcript/turns.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/use-drawer.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/use-global-ai-shortcut.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/use-viewport-zoom.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/model/attribute-format.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/model/evaluation-results.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/model/explorer/trace-drawer/trace-accordions/log-summary.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/model/handle-key.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/model/prompt-attributes.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4315,10 +4219,6 @@
     },
     {
       "key": "complexity|packages/features/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/trace/web/src/behavior/flame/use-flame-keyboard.ts",
       "measured": "2026-09-06"
     },
     {

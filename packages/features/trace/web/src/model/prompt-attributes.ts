@@ -142,6 +142,45 @@ export function parseTracePromptIds(
 /**
  * Parses prompt reference data from flat span attributes.
  */
+/** A reference from a handle plus an optional raw version number, defaulting to no version. */
+function withHandleAndVersion(
+  handle: string,
+  versionRaw: unknown,
+  variables: Record<string, string> | null,
+  draft: boolean,
+): PromptReference {
+  if (versionRaw != null) {
+    const version = Number(versionRaw);
+    if (Number.isInteger(version) && version > 0) {
+      return { handle, versionNumber: version, tag: null, variables, draft };
+    }
+  }
+  return { handle, versionNumber: null, tag: null, variables, draft };
+}
+
+/** Parses the `"slug:version_or_tag"` colon form of `langwatch.prompt.id`. */
+function parseColonPromptId(
+  promptId: string,
+  variables: Record<string, string> | null,
+  draft: boolean,
+): PromptReference | null {
+  const colonIndex = promptId.lastIndexOf(":");
+  const slug = promptId.substring(0, colonIndex);
+  const suffix = promptId.substring(colonIndex + 1);
+
+  if (slug.length > 0 && suffix.length > 0 && suffix !== "latest") {
+    const parsed = Number(suffix);
+    if (Number.isInteger(parsed) && parsed > 0) {
+      return { handle: slug, versionNumber: parsed, tag: null, variables, draft };
+    }
+    return { handle: slug, versionNumber: null, tag: suffix, variables, draft };
+  }
+
+  return slug.length > 0
+    ? { handle: slug, versionNumber: null, tag: null, variables, draft }
+    : null;
+}
+
 export function extractPromptReference(
   params: Record<string, unknown> | null | undefined,
 ): PromptReference | null {
@@ -158,46 +197,15 @@ export function extractPromptReference(
 
   const promptId = readAttribute(params, "langwatch.prompt.id");
   if (typeof promptId === "string" && promptId.includes(":")) {
-    const colonIndex = promptId.lastIndexOf(":");
-    const slug = promptId.substring(0, colonIndex);
-    const suffix = promptId.substring(colonIndex + 1);
-
-    if (slug.length > 0 && suffix.length > 0 && suffix !== "latest") {
-      const parsed = Number(suffix);
-      if (Number.isInteger(parsed) && parsed > 0) {
-        return {
-          handle: slug,
-          versionNumber: parsed,
-          tag: null,
-          variables,
-          draft,
-        };
-      }
-      return {
-        handle: slug,
-        versionNumber: null,
-        tag: suffix,
-        variables,
-        draft,
-      };
-    }
-
-    if (slug.length > 0) {
-      return { handle: slug, versionNumber: null, tag: null, variables, draft };
-    }
+    const ref = parseColonPromptId(promptId, variables, draft);
+    if (ref) return ref;
   }
 
   const handle = readAttribute(params, "langwatch.prompt.handle");
   const versionRaw = readAttribute(params, "langwatch.prompt.version.number");
 
   if (typeof handle === "string" && handle.length > 0) {
-    if (versionRaw != null) {
-      const version = Number(versionRaw);
-      if (Number.isInteger(version) && version > 0) {
-        return { handle, versionNumber: version, tag: null, variables, draft };
-      }
-    }
-    return { handle, versionNumber: null, tag: null, variables, draft };
+    return withHandleAndVersion(handle, versionRaw, variables, draft);
   }
 
   // Bare-slug `prompt.id` (no colon, no separate handle attribute) — the
@@ -205,25 +213,7 @@ export function extractPromptReference(
   // the v2 accordion lights up on llm spans that the server enriched
   // via ancestor lookup (which writes nested `langwatch.prompt.id` only).
   if (typeof promptId === "string" && promptId.length > 0) {
-    if (versionRaw != null) {
-      const version = Number(versionRaw);
-      if (Number.isInteger(version) && version > 0) {
-        return {
-          handle: promptId,
-          versionNumber: version,
-          tag: null,
-          variables,
-          draft,
-        };
-      }
-    }
-    return {
-      handle: promptId,
-      versionNumber: null,
-      tag: null,
-      variables,
-      draft,
-    };
+    return withHandleAndVersion(promptId, versionRaw, variables, draft);
   }
 
   return null;

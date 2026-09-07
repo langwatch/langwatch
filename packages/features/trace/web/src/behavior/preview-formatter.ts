@@ -178,33 +178,38 @@ function unwrapChatArray(arr: unknown[]): UnwrapResult | null {
  */
 const RENDERABLE_PART_TYPES = new Set(["text", "reasoning"]);
 
-function extractMessagePartsText(parts: unknown[]): string | null {
-  const texts: string[] = [];
-  for (const part of parts) {
-    if (typeof part === "string") {
-      texts.push(part);
-      continue;
-    }
-    if (!part || typeof part !== "object") continue;
-    const p = part as { type?: unknown; text?: unknown; content?: unknown };
+/** Appends the renderable text of one message part to `texts`, if any. */
+function collectMessagePartText(part: unknown, texts: string[]): void {
+  if (typeof part === "string") {
+    texts.push(part);
+    return;
+  }
+  if (!part || typeof part !== "object") return;
+  const p = part as { type?: unknown; text?: unknown; content?: unknown };
 
-    // Typed part: only renderable types contribute to the preview.
-    if (typeof p.type === "string") {
-      if (!RENDERABLE_PART_TYPES.has(p.type)) continue;
-      if (typeof p.text === "string") {
-        texts.push(p.text);
-      } else if (typeof p.content === "string") {
-        texts.push(p.content);
-      }
-      continue;
-    }
-
-    // Typeless part: accept text or content directly.
+  // Typed part: only renderable types contribute to the preview.
+  if (typeof p.type === "string") {
+    if (!RENDERABLE_PART_TYPES.has(p.type)) return;
     if (typeof p.text === "string") {
       texts.push(p.text);
     } else if (typeof p.content === "string") {
       texts.push(p.content);
     }
+    return;
+  }
+
+  // Typeless part: accept text or content directly.
+  if (typeof p.text === "string") {
+    texts.push(p.text);
+  } else if (typeof p.content === "string") {
+    texts.push(p.content);
+  }
+}
+
+function extractMessagePartsText(parts: unknown[]): string | null {
+  const texts: string[] = [];
+  for (const part of parts) {
+    collectMessagePartText(part, texts);
   }
   return texts.length > 0 ? texts.join(" ") : null;
 }
@@ -283,37 +288,41 @@ function unwrapObject(obj: Record<string, unknown>): UnwrapResult {
   }
 }
 
+/** Handles a string `content` field, which might itself be a typed-block JSON. */
+function extractStringContent(content: string): string {
+  const t = content.trim();
+  if (t.startsWith('{"type":"text"')) {
+    try {
+      const inner = JSON.parse(t) as { text?: string };
+      if (typeof inner.text === "string") return inner.text;
+    } catch {
+      /* fall through */
+    }
+  }
+  const isNonTextTypedBlock = t.startsWith('{"type":"') && !t.startsWith('{"type":"text"');
+  if (isNonTextTypedBlock) {
+    // Non-text typed block — nothing readable.
+    return "";
+  }
+  return content;
+}
+
+function extractArrayContent(content: unknown[]): string {
+  const parts: string[] = [];
+  for (const part of content) {
+    if (typeof part === "string") {
+      parts.push(part);
+    } else if (isTextPart(part)) {
+      parts.push(part.text);
+    }
+  }
+  return parts.join(" ");
+}
+
 /** Pull a string out of a chat message's `content` field (string | array). */
 function extractMessageContent(content: unknown): string {
-  if (typeof content === "string") {
-    // The string might itself be a typed-block JSON — try one more unwrap.
-    const t = content.trim();
-    if (t.startsWith('{"type":"text"')) {
-      try {
-        const inner = JSON.parse(t) as { text?: string };
-        if (typeof inner.text === "string") return inner.text;
-      } catch {
-        /* fall through */
-      }
-    }
-    const isNonTextTypedBlock = t.startsWith('{"type":"') && !t.startsWith('{"type":"text"');
-    if (isNonTextTypedBlock) {
-      // Non-text typed block — nothing readable.
-      return "";
-    }
-    return content;
-  }
-  if (Array.isArray(content)) {
-    const parts: string[] = [];
-    for (const part of content) {
-      if (typeof part === "string") {
-        parts.push(part);
-      } else if (isTextPart(part)) {
-        parts.push(part.text);
-      }
-    }
-    return parts.join(" ");
-  }
+  if (typeof content === "string") return extractStringContent(content);
+  if (Array.isArray(content)) return extractArrayContent(content);
   return "";
 }
 

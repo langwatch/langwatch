@@ -35,6 +35,59 @@ interface UseOverflowVisibilityOptions {
   remeasureKey?: string | number;
 }
 
+interface MeasureOverflowArgs {
+  root: HTMLElement;
+  attribute: string;
+  reservePx: number;
+  activeId?: string | null;
+}
+
+/** Measures which marked descendants of `root` fall past the overflow cutoff. */
+function measureOverflow({
+  root,
+  attribute,
+  reservePx,
+  activeId,
+}: MeasureOverflowArgs): ReadonlySet<string> | null {
+  const els = Array.from(root.querySelectorAll<HTMLElement>(`[${attribute}]`));
+  if (els.length === 0) return null;
+
+  const containerRect = root.getBoundingClientRect();
+  // A row with no width is not laid out — it is `display: none`, or not in
+  // the document yet. Measuring it would put every item past the cutoff and
+  // collapse the whole row; the resize observer re-measures once it has a
+  // size.
+  if (containerRect.width === 0) return null;
+  const limit = containerRect.right - reservePx;
+
+  const next = new Set<string>();
+  const visibleIds: string[] = [];
+  let cutoff = false;
+  for (const el of els) {
+    const id = el.getAttribute(attribute);
+    if (!id) continue;
+    if (cutoff) {
+      next.add(id);
+      continue;
+    }
+    const rect = el.getBoundingClientRect();
+    if (rect.right > limit) {
+      next.add(id);
+      cutoff = true;
+    } else {
+      visibleIds.push(id);
+    }
+  }
+
+  if (activeId && next.has(activeId) && visibleIds.length > 0) {
+    const sacrifice = visibleIds[visibleIds.length - 1]!;
+    next.delete(activeId);
+    next.add(sacrifice);
+  }
+
+  return next.size > 0 ? next : null;
+}
+
 /**
  * Generic first-fit overflow detector. Measures children of `scrollerRef` marked with
  * `data-overflow-id` (or a custom attribute), and returns the set of ids whose right
@@ -75,43 +128,8 @@ export function useOverflowVisibility({
     const root = scrollerRef.current;
     if (!root) return;
 
-    const els = Array.from(root.querySelectorAll<HTMLElement>(`[${attribute}]`));
-    if (els.length === 0) return;
-
-    const containerRect = root.getBoundingClientRect();
-    // A row with no width is not laid out — it is `display: none`, or not in
-    // the document yet. Measuring it would put every item past the cutoff and
-    // collapse the whole row; the resize observer re-measures once it has a
-    // size.
-    if (containerRect.width === 0) return;
-    const limit = containerRect.right - reservePx;
-
-    const next = new Set<string>();
-    const visibleIds: string[] = [];
-    let cutoff = false;
-    for (const el of els) {
-      const id = el.getAttribute(attribute);
-      if (!id) continue;
-      if (cutoff) {
-        next.add(id);
-        continue;
-      }
-      const rect = el.getBoundingClientRect();
-      if (rect.right > limit) {
-        next.add(id);
-        cutoff = true;
-      } else {
-        visibleIds.push(id);
-      }
-    }
-
-    if (activeId && next.has(activeId) && visibleIds.length > 0) {
-      const sacrifice = visibleIds[visibleIds.length - 1]!;
-      next.delete(activeId);
-      next.add(sacrifice);
-    }
-
-    if (next.size > 0) setHiddenIds(next);
+    const next = measureOverflow({ root, attribute, reservePx, activeId });
+    if (next) setHiddenIds(next);
   }, [measureSeq, hiddenIds, items, scrollerRef, activeId, attribute, reservePx]);
 
   return hiddenIds;

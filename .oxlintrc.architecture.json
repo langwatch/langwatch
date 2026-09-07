@@ -433,7 +433,6 @@
         "packages/features/scenario/web/src/ui/sections/suites/suite-sidebar.tsx",
         "packages/features/topic/server/src/services/topic.service.ts",
         "packages/features/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
-        "packages/features/trace/web/src/behavior/flame/use-flame-keyboard.ts",
         "packages/features/trace/web/src/behavior/transcript/content-parser.ts",
         "packages/features/trace/web/src/behavior/transcript/media-part.ts",
         "packages/features/trace/web/src/model/evaluation-results.ts",
