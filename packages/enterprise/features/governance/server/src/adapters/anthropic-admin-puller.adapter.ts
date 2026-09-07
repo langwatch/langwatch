@@ -44,7 +44,7 @@ import { z } from "zod";
 
 import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
 import { AdminUsageReportAdapter } from "./admin-usage-report.adapter.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
@@ -605,7 +605,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
         "anthropic admin usage cursor was minted under a different query; dropping the page token and resuming from the newest bucket it certifies",
       );
       const resumeFrom = [parsed.watermark, parsed.startingAt].find(
-        (candidate) => candidate !== null && !Number.isNaN(Date.parse(candidate)),
+        (candidate) => candidate !== null && !Number.isNaN(toEpochMs(candidate)),
       );
       return {
         startingAt:
@@ -627,9 +627,9 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     // behind (paused, erroring) holds a watermark older than the default
     // window, and snapping it to `configuredStart` would silently skip
     // everything in between.
-    const watermarkMs = Date.parse(parsed.startingAt);
+    const watermarkMs = toEpochMs(parsed.startingAt);
     const rewoundStart =
-      Number.isNaN(watermarkMs) || Date.parse(configuredStart) <= watermarkMs
+      Number.isNaN(watermarkMs) || toEpochMs(configuredStart) <= watermarkMs
         ? configuredStart
         : parsed.startingAt;
     return { startingAt: rewoundStart, page: null, watermark: null };
@@ -660,10 +660,13 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
    */
   private static defaultStartingAt(report: "usage" | "cost"): string {
     const daysBack = report === "cost" ? 3 : 1;
-    const d = new Date(nowInstant().epochMilliseconds - daysBack * 24 * 60 * 60 * 1000);
     // Snap to midnight UTC so the timestamp aligns with daily bucket boundaries.
-    d.setUTCHours(0, 0, 0, 0);
-    return d.toISOString();
+    return nowInstant()
+      .subtract({ milliseconds: daysBack * 24 * 60 * 60 * 1000 })
+      .toZonedDateTimeISO("UTC")
+      .startOfDay()
+      .toInstant()
+      .toString({ fractionalSecondDigits: 3 });
   }
 
   private static async fetchPageError(

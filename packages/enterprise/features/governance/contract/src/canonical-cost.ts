@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 export type OtlpAnyValue = {
   stringValue?: string | null;
   intValue?: string | number | null;
@@ -26,7 +27,7 @@ export type CanonicalCostEvent = {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   requestId: string;
-  occurredAt: Date;
+  occurredAt: Instant;
   userEmail: string | null;
   teamIdHint: string | null;
   raw: Record<string, unknown>;

@@ -29,7 +29,7 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
 import { COPILOT_CONVERSATION_ACTION } from "../services/copilot-studio-trace-mapper.service.ts";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant } from "@langwatch/time";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
   DataverseEnvironmentService,
@@ -563,7 +563,9 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
 
     const filters = cursor
       ? CopilotStudioDataversePullerAdapter.continuationFilters(cursor)
-      : [`createdon ge ${new Date(now - FIRST_RUN_LOOKBACK_MS).toISOString()}`];
+      : [
+          `createdon ge ${Temporal.Instant.fromEpochMilliseconds(now - FIRST_RUN_LOOKBACK_MS).toString({ fractionalSecondDigits: 3 })}`,
+        ];
     if (config.botIds.length > 0) {
       // Bare, not quoted. The lookup column is an `Edm.Guid`, and Dataverse
       // refuses to compare one against a string literal: a quoted id answers

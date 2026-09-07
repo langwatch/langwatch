@@ -37,7 +37,7 @@ export class IngestionPullLifecycleService {
   async sync(source: IngestionPullLifecycleSource): Promise<void> {
     const tenantId = await this.tenant.resolveTenantId(source.organizationId);
     const occurredAt = this.now();
-    const configVersion = `${source.updatedAt.getTime()}:${source.status}:${source.pullSchedule}:${source.archivedAt?.getTime() ?? "live"}`;
+    const configVersion = `${source.updatedAt.epochMilliseconds}:${source.status}:${source.pullSchedule}:${source.archivedAt?.epochMilliseconds ?? "live"}`;
     const enabled =
       source.pullSchedule !== null &&
       source.archivedAt === null &&

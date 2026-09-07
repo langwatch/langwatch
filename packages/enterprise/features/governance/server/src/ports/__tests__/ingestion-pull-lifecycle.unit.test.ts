@@ -7,6 +7,7 @@ import {
   IngestionPullTenantPort,
 } from "../ingestion-pull-lifecycle.port.ts";
 import { IngestionPullLifecycleService } from "../../services/ingestion-pull-lifecycle.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const source = (
   overrides: Partial<IngestionPullLifecycleSource> = {},
@@ -16,7 +17,7 @@ const source = (
   status: "active",
   pullSchedule: "*/5 * * * *",
   pollerCursor: { page: 2 },
-  updatedAt: new Date(1_000),
+  updatedAt: Temporal.Instant.fromEpochMilliseconds(1_000),
   archivedAt: null,
   ...overrides,
 });
@@ -78,7 +79,7 @@ describe("IngestionPullLifecycleService", () => {
       now: () => 2_000,
     });
 
-    await service.sync(source({ archivedAt: new Date(1_500) }));
+    await service.sync(source({ archivedAt: Temporal.Instant.fromEpochMilliseconds(1_500) }));
 
     expect(commands.disable).toHaveBeenCalledWith({
       tenantId: "project:org-1",

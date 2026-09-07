@@ -4,6 +4,7 @@ import type {
   PlatformIngestionTemplateSeed,
   PlatformIngestionTemplateSyncResult,
 } from "@langwatch/enterprise-governance-contract";
+import type { Instant } from "@langwatch/time";
 
 export type NewIngestionTemplate = Omit<IngestionTemplate, "id" | "platformPublished" | "enabled">;
 
@@ -37,11 +38,11 @@ export abstract class IngestionTemplatePort {
     organizationId: string;
     callerUserId: string;
     surface: GovernanceCallSurface;
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<IngestionTemplateMutationResult>;
   abstract syncPlatformCatalog(input: {
     templates: readonly PlatformIngestionTemplateSeed[];
     retiredSlugs: readonly string[];
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<PlatformIngestionTemplateSyncResult>;
 }

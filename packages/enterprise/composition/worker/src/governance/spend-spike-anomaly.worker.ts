@@ -8,6 +8,7 @@ import {
   PostgresSpendSpikeAnomalyAdapter,
   type SpendSpikeAnomalyDatabase,
 } from "@langwatch/enterprise-governance-server";
+import { nowInstant } from "@langwatch/time";
 /**
  * Periodic spend-spike anomaly evaluation tick.
  *
@@ -82,7 +83,7 @@ export function startSpendSpikeAnomalyWorker(
   const tick = async () => {
     if (stopped) return;
     try {
-      const result = await evaluator.evaluateAll({ now: new Date() });
+      const result = await evaluator.evaluateAll({ now: nowInstant() });
       logger.info(
         {
           rulesEvaluated: result.rulesEvaluated,

@@ -1,3 +1,4 @@
+import { Temporal, type Instant } from "@langwatch/time";
 /**
  * Plan and subscription status values shared across SaaS billing runtime.
  * Values must stay aligned with Prisma enums.
@@ -80,16 +81,24 @@ export const ACTIVE_SUBSCRIPTION_ORDER_BY = [{ createdAt: "desc" }, { id: "desc"
  * id format rather than a guarantee.
  */
 export function compareBySubscriptionOrder(
-  a: { id: string; createdAt: Date },
-  b: { id: string; createdAt: Date },
+  a: { id: string; createdAt: Instant },
+  b: { id: string; createdAt: Instant },
 ): number {
   for (const clause of ACTIVE_SUBSCRIPTION_ORDER_BY) {
     const [field, direction] = Object.entries(clause)[0] as ["createdAt" | "id", "desc"];
-    const left = a[field];
-    const right = b[field];
-    const ascending = left < right ? -1 : left > right ? 1 : 0;
+    const ascending =
+      field === "createdAt"
+        ? Temporal.Instant.compare(a.createdAt, b.createdAt)
+        : compareIds(a.id, b.id);
     const ordered = direction === "desc" ? -ascending : ascending;
     if (ordered !== 0) return ordered;
   }
   return 0;
+}
+
+/** Byte order, matching the collation Postgres reads these ids under. */
+function compareIds(left: string, right: string): number {
+  if (left < right) return -1;
+
+  return left > right ? 1 : 0;
 }

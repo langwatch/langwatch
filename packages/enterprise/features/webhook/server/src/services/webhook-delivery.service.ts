@@ -59,6 +59,7 @@ import {
 } from "../rules/webhook-delivery-fold.rules.ts";
 import { WebhookBatchSendService } from "./webhook-batch-send.service.ts";
 import { WebhookDeliveryMaintenanceService } from "./webhook-delivery-maintenance.service.ts";
+import type { Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:webhooks:delivery-process");
 
@@ -84,7 +85,7 @@ const logger = createLogger("langwatch:webhooks:delivery-process");
 export interface WebhookDeliveryProcessDeps {
   processStore: ProcessStore;
   endpoints: WebhookDeliveryEndpointService;
-  pruneExpiredIdempotencyReceipts: (now: Date) => Promise<unknown>;
+  pruneExpiredIdempotencyReceipts: (now: Instant) => Promise<unknown>;
   dispatch: (input: {
     destination: WebhookDestinationConfig;
     organizationId: string;

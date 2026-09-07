@@ -7,6 +7,7 @@ import type {
   GatewayBudgetScope,
   GatewayBudgetWindow,
 } from "./gateway-debit.port.ts";
+import type { Instant } from "@langwatch/time";
 
 export type GovernanceVirtualKeyLifecycleSignal = {
   virtualKey: {
@@ -37,14 +38,14 @@ export type GovernanceResolvedBudgetCrossing = {
 
 export abstract class GovernanceSignalPort {
   abstract available(): boolean;
-  abstract now(): Date;
+  abstract now(): Instant;
   abstract tryResolveLifecycleTenant(input: {
     organizationId: string;
     preferredProjectId: string | null;
   }): Promise<string | null>;
   abstract resolveBudgetCrossings(
     candidates: GatewayBudgetCrossingCandidate[],
-    now: Date,
+    now: Instant,
   ): Promise<GovernanceResolvedBudgetCrossing[]>;
   abstract appendVirtualKeyLifecycle(data: GovernanceVkLifecycleData): Promise<void>;
   abstract appendBudgetCrossing(data: GovernanceBudgetCrossingData): Promise<void>;

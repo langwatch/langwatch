@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { IncomingWebhook, type IncomingWebhookSendArguments } from "@slack/webhook";
+import { nowInstant } from "@langwatch/time";
 import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
@@ -29,6 +30,7 @@ import {
   signupAlertText,
   signupFormBody,
 } from "../rules/billing-usage-notice-copy.rules.ts";
+import { toDate, type Instant } from "@langwatch/time";
 
 const logger = createLogger("ee:notification-service");
 
@@ -363,7 +365,7 @@ export class NotificationService {
     rejectedMessage: string;
     errorLog: string;
   }): Promise<void> {
-    const formData = { submittedAt: Date.now(), ...body };
+    const formData = { submittedAt: nowInstant().epochMilliseconds, ...body };
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_SERVICE_TIMEOUT_MS);
 
@@ -392,12 +394,12 @@ export class NotificationService {
     return typeof value === "number" ? value.toLocaleString() : "-";
   }
 
-  private static formatDate(value?: Date | null) {
+  private static formatDate(value?: Instant | null) {
     return value
       ? new Intl.DateTimeFormat("en-US", {
           dateStyle: "medium",
           timeStyle: "short",
-        }).format(value)
+        }).format(toDate(value))
       : "Now";
   }
 }

@@ -12,8 +12,10 @@ import {
 } from "../../ports/spend-spike-anomaly.port.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "../spend-spike-anomaly-evaluator.service.ts";
+import { Temporal, type Instant } from "@langwatch/time";
 
 const NOW = new Date("2026-08-24T12:00:00.000Z");
+const NOW_INSTANT = Temporal.Instant.from("2026-08-24T12:00:00.000Z");
 
 function rule(overrides: Partial<AnomalyRule> = {}): AnomalyRule {
   return {
@@ -80,9 +82,9 @@ class FixedSpendReader extends AnomalySpendReaderPort {
   readonly findSpendTotals = vi.fn(
     async (_input: {
       tenantId: string;
-      windowStart: Date;
-      windowEnd: Date;
-      baselineStart: Date;
+      windowStart: Instant;
+      windowEnd: Instant;
+      baselineStart: Instant;
       sourceFilter: AnomalySpendSourceFilter;
     }) => ({ currentSpend: 10, baselineSpend: 6 }),
   );
@@ -116,7 +118,7 @@ describe("SpendSpikeAnomalyEvaluatorService", () => {
     const repository = new MemoryAnomalyRepository([rule()]);
     const { service } = createService(repository);
 
-    await expect(service.evaluateAll({ now: NOW })).resolves.toEqual({
+    await expect(service.evaluateAll({ now: NOW_INSTANT })).resolves.toEqual({
       rulesEvaluated: 1,
       alertsFired: 1,
       skipped: {},
@@ -136,7 +138,7 @@ describe("SpendSpikeAnomalyEvaluatorService", () => {
     repository.hasOpen = true;
     const { service } = createService(repository);
 
-    const summary = await service.evaluateAll({ now: NOW });
+    const summary = await service.evaluateAll({ now: NOW_INSTANT });
 
     expect(summary.skipped).toEqual({ skip_dedup: 1 });
     expect(repository.createAlert).not.toHaveBeenCalled();
@@ -148,7 +150,7 @@ describe("SpendSpikeAnomalyEvaluatorService", () => {
     ]);
     const { service, spend } = createService(repository);
 
-    const summary = await service.evaluateAll({ now: NOW });
+    const summary = await service.evaluateAll({ now: NOW_INSTANT });
 
     expect(summary.skipped).toEqual({ skip_invalid_config: 1 });
     expect(spend.findSpendTotals).not.toHaveBeenCalled();
@@ -159,7 +161,7 @@ describe("SpendSpikeAnomalyEvaluatorService", () => {
     repository.tenantId = null;
     const { service, spend } = createService(repository);
 
-    const summary = await service.evaluateAll({ now: NOW });
+    const summary = await service.evaluateAll({ now: NOW_INSTANT });
 
     expect(summary.skipped).toEqual({ skip_no_data: 1 });
     expect(spend.findSpendTotals).not.toHaveBeenCalled();
@@ -171,7 +173,7 @@ describe("SpendSpikeAnomalyEvaluatorService", () => {
     ]);
     const { service, spend } = createService(repository);
 
-    await service.evaluateAll({ now: NOW });
+    await service.evaluateAll({ now: NOW_INSTANT });
 
     expect(spend.findSpendTotals).toHaveBeenCalledWith(
       expect.objectContaining({

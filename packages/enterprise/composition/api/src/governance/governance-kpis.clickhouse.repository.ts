@@ -23,6 +23,7 @@ import {
  * Migration: 00021_create_governance_kpis.sql
  */
 import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.port.ts";
+import { type Instant, toDate } from "@langwatch/time";
 
 const TABLE_NAME = "governance_kpis" as const;
 
@@ -32,12 +33,12 @@ export interface GovernanceKpiContribution {
   tenantId: string;
   sourceId: string;
   sourceType: string;
-  hourBucket: Date;
+  hourBucket: Instant;
   traceId: string;
   spendUsd: number;
   promptTokens: number;
   completionTokens: number;
-  lastEventOccurredAt: Date;
+  lastEventOccurredAt: Instant;
 }
 
 export class AppGovernanceKpisAdapter extends AnomalySpendReaderPort {
@@ -60,12 +61,12 @@ export class AppGovernanceKpisAdapter extends AnomalySpendReaderPort {
             TenantId: row.tenantId,
             SourceId: row.sourceId,
             SourceType: row.sourceType,
-            HourBucket: row.hourBucket,
+            HourBucket: toDate(row.hourBucket),
             TraceId: row.traceId,
             SpendUsd: row.spendUsd,
             PromptTokens: row.promptTokens,
             CompletionTokens: row.completionTokens,
-            LastEventOccurredAt: row.lastEventOccurredAt,
+            LastEventOccurredAt: toDate(row.lastEventOccurredAt),
           },
         ],
         format: "JSONEachRow",
@@ -96,9 +97,9 @@ export class AppGovernanceKpisAdapter extends AnomalySpendReaderPort {
    */
   async findSpendTotals(input: {
     tenantId: string;
-    windowStart: Date;
-    windowEnd: Date;
-    baselineStart: Date;
+    windowStart: Instant;
+    windowEnd: Instant;
+    baselineStart: Instant;
     sourceFilter: AnomalySpendSourceFilter;
   }): Promise<{ currentSpend: number; baselineSpend: number }> {
     const client = await this.resolveClient(input.tenantId);
@@ -116,9 +117,9 @@ export class AppGovernanceKpisAdapter extends AnomalySpendReaderPort {
       `,
       query_params: {
         tenantId: input.tenantId,
-        windowStartMs: input.windowStart.getTime(),
-        windowEndMs: input.windowEnd.getTime(),
-        baselineStartMs: input.baselineStart.getTime(),
+        windowStartMs: input.windowStart.epochMilliseconds,
+        windowEndMs: input.windowEnd.epochMilliseconds,
+        baselineStartMs: input.baselineStart.epochMilliseconds,
         ...sourceFilter.params,
       },
       format: "JSONEachRow",

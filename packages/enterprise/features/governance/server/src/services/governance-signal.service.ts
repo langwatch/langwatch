@@ -8,6 +8,7 @@ import {
   type GovernanceResolvedBudgetCrossing,
   type GovernanceVirtualKeyLifecycleSignal,
 } from "../ports/governance-signal.port.ts";
+import { type Instant } from "@langwatch/time";
 
 export class GovernanceSignalService {
   private constructor(
@@ -44,7 +45,7 @@ export class GovernanceSignalService {
         name: signal.virtualKey.name,
         display_prefix: signal.virtualKey.displayPrefix,
         reason: signal.reason ?? null,
-        occurred_at: this.port.now().getTime(),
+        occurred_at: this.port.now().epochMilliseconds,
       });
     } catch (error) {
       this.diagnostics.warn("failed to append vk lifecycle governance event (best effort)", {
@@ -79,7 +80,7 @@ export class GovernanceSignalService {
 
   private tryCrossingData(
     resolved: GovernanceResolvedBudgetCrossing,
-    now: Date,
+    now: Instant,
   ): GovernanceBudgetCrossingData | null {
     const spent = Number.parseFloat(resolved.spentUsd) || 0;
     const limit = Number.parseFloat(resolved.budget.limitUsd) || 0;
@@ -119,7 +120,7 @@ export class GovernanceSignalService {
       limit_usd: limit.toFixed(6),
       spent_usd: spent.toFixed(6),
       on_breach: budget.onBreach === "BLOCK" ? "block" : "warn",
-      occurred_at: now.getTime(),
+      occurred_at: now.epochMilliseconds,
     };
   }
 }

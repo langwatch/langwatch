@@ -22,6 +22,7 @@ import {
   type BillingCooldownCache,
 } from "./billing-alert-cooldown.service.ts";
 import { NullNotificationRecordService } from "./null-notification-record.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 
@@ -202,7 +203,8 @@ export class UsageLimitService {
       }
 
       if (organization.sentPlanLimitAlert) {
-        const timeSinceLastAlert = Date.now() - organization.sentPlanLimitAlert.getTime();
+        const timeSinceLastAlert =
+          nowInstant().epochMilliseconds - organization.sentPlanLimitAlert.epochMilliseconds;
         const daysSinceLastAlert = Math.floor(timeSinceLastAlert / (1000 * 60 * 60 * 24));
 
         if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
@@ -231,7 +233,7 @@ export class UsageLimitService {
       ]);
 
       try {
-        await this.organizationService.updateSentPlanLimitAlert(organizationId, new Date());
+        await this.organizationService.updateSentPlanLimitAlert(organizationId, nowInstant());
       } catch (error) {
         this.errorReporter.capture(
           new Error(

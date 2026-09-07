@@ -10,6 +10,7 @@ import type {
 import type { NotificationService as NotificationRecordService } from "@langwatch/notification-contract";
 import type { NotificationService } from "../services/billing-usage-notice.service.ts";
 import type { UsageLimitEmailData } from "../services/billing-usage-notice.service.ts";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 /** What an organization's usage is metered in, resolved by the deployment's own meter policy. */
 export type BillingUsageUnit = "traces" | "events";
@@ -34,10 +35,12 @@ export type BillingNextStepResolver = {
 /** Ascending, so the last one passed is the highest one crossed. */
 export const USAGE_WARNING_THRESHOLDS = [50, 70, 90, 95, 100] as const;
 
-export const getCurrentMonthStart = (): Date => {
-  const now = new Date();
+export const getCurrentMonthStart = (): Instant => {
+  const now = nowInstant().toZonedDateTimeISO("UTC");
 
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  return Temporal.PlainDateTime.from({ year: now.year, month: now.month, day: 1 })
+    .toZonedDateTime("UTC")
+    .toInstant();
 };
 
 /** The highest warning threshold this usage percentage has crossed, or nothing below them all. */

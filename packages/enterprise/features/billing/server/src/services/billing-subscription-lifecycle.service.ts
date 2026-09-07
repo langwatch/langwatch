@@ -28,6 +28,7 @@ import type {
   SubscriptionWithOrg,
 } from "../ports/billing-webhook-subscription.port.ts";
 import type { BillingSubscriptionRecord } from "../ports/subscription.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
 
@@ -111,7 +112,7 @@ export class BillingSubscriptionLifecycleService {
           organizationName: org?.name ?? "Unknown",
           plan: existingSubscription.plan,
           subscriptionId: existingSubscription.id,
-          cancellationDate: new Date(),
+          cancellationDate: nowInstant(),
         });
       },
     });

@@ -3,6 +3,7 @@ import {
   DuplicateSubscriptionsReportRepository,
   type SubscriptionReportRow,
 } from "../duplicate-subscriptions-report.repository.ts";
+import { fromDate } from "@langwatch/time";
 
 const SUBSCRIPTION_SELECT = {
   id: true,
@@ -34,9 +35,11 @@ export class PrismaDuplicateSubscriptionsReportRepository extends DuplicateSubsc
   }
 
   async findByStatus(status: string): Promise<SubscriptionReportRow[]> {
-    return this.database.subscription.findMany({
+    const rows = await this.database.subscription.findMany({
       where: { status: status as SubscriptionStatus },
       select: SUBSCRIPTION_SELECT,
     });
+
+    return rows.map((row) => ({ ...row, createdAt: fromDate(row.createdAt) }));
   }
 }

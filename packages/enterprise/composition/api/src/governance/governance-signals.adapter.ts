@@ -11,6 +11,7 @@ import {
   type GovernanceVkLifecycleData,
 } from "@langwatch/enterprise-governance-server";
 import { createLogger } from "@langwatch/observability";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:signals");
 
@@ -22,7 +23,7 @@ export abstract class GovernanceSignalStoragePort {
   }): Promise<string | null>;
   abstract resolveBudgetCrossings(
     candidates: GatewayBudgetCrossingCandidate[],
-    now: Date,
+    now: Instant,
   ): Promise<GovernanceResolvedBudgetCrossing[]>;
 }
 
@@ -78,8 +79,8 @@ class AppGovernanceSignalPort extends GovernanceSignalPort {
     return this.delivery.available();
   }
 
-  now(): Date {
-    return new Date();
+  now(): Instant {
+    return nowInstant();
   }
 
   async tryResolveLifecycleTenant(input: {
@@ -91,7 +92,7 @@ class AppGovernanceSignalPort extends GovernanceSignalPort {
 
   async resolveBudgetCrossings(
     candidates: GatewayBudgetCrossingCandidate[],
-    now: Date,
+    now: Instant,
   ): Promise<GovernanceResolvedBudgetCrossing[]> {
     return this.storage.resolveBudgetCrossings(candidates, now);
   }

@@ -1,5 +1,6 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import type { Instant } from "@langwatch/time";
 
 export type GovernanceTraceSummary = {
   traceId: string;
@@ -26,12 +27,12 @@ export type GovernanceKpiContribution = {
   tenantId: string;
   sourceId: string;
   sourceType: string;
-  hourBucket: Date;
+  hourBucket: Instant;
   traceId: string;
   spendUsd: number;
   promptTokens: number;
   completionTokens: number;
-  lastEventOccurredAt: Date;
+  lastEventOccurredAt: Instant;
 };
 
 export type GovernanceOcsfEvent = {
@@ -42,7 +43,7 @@ export type GovernanceOcsfEvent = {
   sourceType: string;
   activityId: number;
   severityId: number;
-  eventTime: Date;
+  eventTime: Instant;
   actorUserId: string;
   actorEmail: string;
   actorEnduserId: string;

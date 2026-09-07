@@ -13,9 +13,13 @@ import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.adapter.ts";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port.ts";
+import {
+  GovernanceHttpPort,
+  type GovernanceHttpResponse,
+} from "../../ports/governance-http.port.ts";
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 
@@ -52,7 +56,7 @@ const SOURCE = {
   organizationId: "org_acme",
   teamId: "team_platform",
 };
-const OBSERVED_AT = new Date("2026-08-06T09:00:00.000Z");
+const OBSERVED_AT = Temporal.Instant.from("2026-08-06T09:00:00.000Z");
 
 function jsonResponse(body: unknown) {
   return {
@@ -507,7 +511,7 @@ describe("the Anthropic Admin puller", () => {
       const after = buildPulledUsageRecord({
         event: corrected.events[0]!,
         source: SOURCE,
-        observedAt: new Date("2026-08-07T09:00:00.000Z"),
+        observedAt: Temporal.Instant.from("2026-08-07T09:00:00.000Z"),
       });
 
       // 999.5 cents = $9.995.

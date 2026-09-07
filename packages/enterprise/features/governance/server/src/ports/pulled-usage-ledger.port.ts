@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 export type PulledUsageLedgerRow = {
   tenantId: string;
   scopeId: string;
@@ -8,8 +9,8 @@ export type PulledUsageLedgerRow = {
   tokensCacheRead: number;
   tokensCacheWrite: number;
   model: string;
-  occurredAt: Date;
-  observedAt: Date;
+  occurredAt: Instant;
+  observedAt: Instant;
 };
 
 export abstract class PulledUsageLedgerPort {

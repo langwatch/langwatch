@@ -53,6 +53,7 @@ import {
   type ToolCall,
   type Turn,
 } from "../rules/copilot-transcript.rules.ts";
+import { toEpochMs } from "@langwatch/time";
 
 type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
 
@@ -125,7 +126,7 @@ export class CopilotStudioTraceMapperService {
       return false;
     }
 
-    const modified = Date.parse(bot.modifiedOn);
+    const modified = toEpochMs(bot.modifiedOn);
 
     return Number.isFinite(modified) && modified > conversationEndMs;
   }

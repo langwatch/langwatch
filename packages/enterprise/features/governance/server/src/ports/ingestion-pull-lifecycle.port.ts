@@ -1,11 +1,12 @@
+import type { Instant } from "@langwatch/time";
 export type IngestionPullLifecycleSource = {
   id: string;
   organizationId: string;
   status: string;
   pullSchedule: string | null;
   pollerCursor: unknown;
-  updatedAt: Date;
-  archivedAt: Date | null;
+  updatedAt: Instant;
+  archivedAt: Instant | null;
 };
 
 export type IngestionPullLifecycleDatabase = {

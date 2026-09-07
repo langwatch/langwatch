@@ -17,6 +17,7 @@ import type {
   BillingNextStepResolver,
   BillingUsageUnit,
 } from "../rules/usage-warning-thresholds.rules.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:notifications:usageWarning");
 
@@ -228,7 +229,7 @@ export class UsageWarningDispatchService {
   }): Promise<Notification> {
     return this.deps.records.create({
       organizationId,
-      sentAt: new Date(),
+      sentAt: toDate(nowInstant()),
       metadata: {
         type: NOTIFICATION_TYPES.USAGE_LIMIT_WARNING,
         currentUsage: currentMonthMessagesCount,

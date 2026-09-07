@@ -1,10 +1,12 @@
+import type { Instant } from "@langwatch/time";
+
 /** One subscription, in the shape the duplicate-subscription report groups on. */
 export type SubscriptionReportRow = Readonly<{
   id: string;
   organizationId: string;
   plan: string;
   status: string;
-  createdAt: Date;
+  createdAt: Instant;
   stripeSubscriptionId: string | null;
 }>;
 

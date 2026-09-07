@@ -8,6 +8,7 @@ import type {
   DuplicateSubscriptionsReportRepository,
   SubscriptionReportRow,
 } from "../repositories/duplicate-subscriptions-report.repository.ts";
+import { Temporal, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:task:duplicate-subscriptions-report");
 
@@ -24,7 +25,7 @@ export type DuplicateSubscriptionsReport = Readonly<{
   pendingSubscriptions: number;
   organizationsWithPending: number;
   pendingByPlan: ReadonlyArray<{ plan: string; count: number }>;
-  oldestPending: Date | null;
+  oldestPending: Instant | null;
 }>;
 
 /**
@@ -64,8 +65,8 @@ export async function reportDuplicateSubscriptions({
     organizationsWithPending: groupByOrganization(pending).size,
     pendingByPlan,
     oldestPending:
-      [...pending].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.createdAt ??
-      null,
+      [...pending].sort((a, b) => Temporal.Instant.compare(a.createdAt, b.createdAt))[0]
+        ?.createdAt ?? null,
   };
 }
 
@@ -96,9 +97,7 @@ export class DuplicateSubscriptionsReportTask extends Task {
   readonly description =
     "Reports organizations holding more than one active subscription, and which row plan resolution picks.";
 
-  private constructor(
-    private readonly repository: () => DuplicateSubscriptionsReportRepository,
-  ) {
+  private constructor(private readonly repository: () => DuplicateSubscriptionsReportRepository) {
     super();
   }
 

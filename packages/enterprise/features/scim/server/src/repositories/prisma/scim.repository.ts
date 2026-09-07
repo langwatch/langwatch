@@ -4,6 +4,7 @@ import {
   Prisma,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 import {
   ScimRepositoryPort,
   type ScimGrantBindingScope,
@@ -14,6 +15,29 @@ import {
   type ScimTokenRecord,
   type ScimTokenIdentity,
 } from "../../ports/scim-repository.port.ts";
+
+/** The Prisma group row as the SCIM seam reads it: one clock above this line. */
+function scimGroupRecordOf(row: {
+  id: string;
+  organizationId: string;
+  name: string;
+  slug: string;
+  scimSource: string | null;
+  externalId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): ScimGroupRecord {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    name: row.name,
+    slug: row.slug,
+    scimSource: row.scimSource,
+    externalId: row.externalId,
+    createdAt: fromDate(row.createdAt),
+    updatedAt: fromDate(row.updatedAt),
+  };
+}
 
 type ScimIdentityDatabase = {
   ssoConnection: {
@@ -128,10 +152,15 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       where: { userId_organizationId: input },
     });
   }
-  tryFindGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
-    return this.prisma.group.findFirst({
+  async tryFindGroup(input: {
+    organizationId: string;
+    id: string;
+  }): Promise<ScimGroupRecord | null> {
+    const row = await this.prisma.group.findFirst({
       where: { id: input.id, organizationId: input.organizationId },
     });
+
+    return row ? scimGroupRecordOf(row) : null;
   }
   async listGroups(input: {
     organizationId: string;
@@ -163,15 +192,20 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       }),
       this.prisma.group.count({ where }),
     ]);
-    return { rows, total };
+    return {
+      rows: rows.map((row) => ({ ...scimGroupRecordOf(row), members: row.members })),
+      total,
+    };
   }
-  createGroup(input: {
+  async createGroup(input: {
     organizationId: string;
     name: string;
     slug: string;
     externalId: string | null;
   }): Promise<ScimGroupRecord> {
-    return this.prisma.group.create({ data: { ...input, scimSource: "scim" } });
+    return scimGroupRecordOf(
+      await this.prisma.group.create({ data: { ...input, scimSource: "scim" } }),
+    );
   }
   async renameGroup(input: { id: string; name: string }): Promise<void> {
     await this.prisma.group.update({
@@ -303,10 +337,10 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       select: { id: true, organizationId: true, connectionId: true },
     });
   }
-  async recordTokenUse(input: { tokenId: string; usedAt: Date }): Promise<void> {
+  async recordTokenUse(input: { tokenId: string; usedAt: Instant }): Promise<void> {
     await this.prisma.scimToken.updateMany({
       where: { id: input.tokenId },
-      data: { lastUsedAt: input.usedAt },
+      data: { lastUsedAt: toDate(input.usedAt) },
     });
   }
 

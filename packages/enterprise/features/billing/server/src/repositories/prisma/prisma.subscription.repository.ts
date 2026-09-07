@@ -4,12 +4,46 @@ import type {
   SubscriptionStatus as PrismaSubscriptionStatus,
 } from "@langwatch/prisma-client/generated";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
+import { fromDate } from "@langwatch/time";
 import { NUMERIC_OVERRIDE_FIELDS } from "../../services/plan-provider.service.ts";
 import {
   BillingSubscriptionPort,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
 } from "../../ports/subscription.port.ts";
+
+type SubscriptionRow = {
+  id: string;
+  organizationId: string;
+  status: string;
+  plan: string;
+  stripeSubscriptionId: string | null;
+  createdAt: Date;
+  startDate: Date | null;
+  endDate: Date | null;
+  maxMembers: number | null;
+  maxMembersLite: number | null;
+  maxMessagesPerMonth: number | null;
+  lastPaymentFailedDate: Date | null;
+};
+
+/** The subscription row on the one clock every reader above this file uses. */
+function subscriptionRecordOf(row: SubscriptionRow): BillingSubscriptionRecord {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    status: row.status,
+    plan: row.plan,
+    stripeSubscriptionId: row.stripeSubscriptionId,
+    createdAt: fromDate(row.createdAt),
+    startDate: row.startDate ? fromDate(row.startDate) : null,
+    endDate: row.endDate ? fromDate(row.endDate) : null,
+    maxMembers: row.maxMembers,
+    maxMembersLite: row.maxMembersLite,
+    maxMessagesPerMonth: row.maxMessagesPerMonth,
+    lastPaymentFailedDate: row.lastPaymentFailedDate ? fromDate(row.lastPaymentFailedDate) : null,
+  };
+}
 
 /**
  * Prisma-backed implementation of SubscriptionRepository.
@@ -34,14 +68,16 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionPort {
   }
 
   async tryFindActive(organizationId: string): Promise<BillingSubscriptionRecord | null> {
-    return this.prisma.subscription.findFirst({
+    const row = await this.prisma.subscription.findFirst({
       where: { organizationId, status: SubscriptionStatus.ACTIVE },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
+
+    return row ? subscriptionRecordOf(row) : null;
   }
 
   async tryFindLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {
-    return await this.prisma.subscription.findFirst({
+    const row = await this.prisma.subscription.findFirst({
       where: {
         organizationId,
         status: {
@@ -50,41 +86,51 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionPort {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    return row ? subscriptionRecordOf(row) : null;
   }
 
   async createPending(input: {
     organizationId: string;
     plan: string;
   }): Promise<BillingSubscriptionRecord> {
-    return await this.prisma.subscription.create({
-      data: {
-        organizationId: input.organizationId,
-        status: SubscriptionStatus.PENDING as PrismaSubscriptionStatus,
-        plan: input.plan as PrismaPlanTypes,
-      },
-    });
+    return subscriptionRecordOf(
+      await this.prisma.subscription.create({
+        data: {
+          organizationId: input.organizationId,
+          status: SubscriptionStatus.PENDING as PrismaSubscriptionStatus,
+          plan: input.plan as PrismaPlanTypes,
+        },
+      }),
+    );
   }
 
   async updateStatus(input: { id: string; status: string }): Promise<BillingSubscriptionRecord> {
-    return await this.prisma.subscription.update({
-      where: { id: input.id },
-      data: { status: input.status as PrismaSubscriptionStatus },
-    });
+    return subscriptionRecordOf(
+      await this.prisma.subscription.update({
+        where: { id: input.id },
+        data: { status: input.status as PrismaSubscriptionStatus },
+      }),
+    );
   }
 
   async updatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord> {
-    return await this.prisma.subscription.update({
-      where: { id: input.id },
-      data: { plan: input.plan as PrismaPlanTypes },
-    });
+    return subscriptionRecordOf(
+      await this.prisma.subscription.update({
+        where: { id: input.id },
+        data: { plan: input.plan as PrismaPlanTypes },
+      }),
+    );
   }
 
   // --- Webhook handler methods ---
 
   async tryFindByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
-    return await this.prisma.subscription.findUnique({
+    const row = await this.prisma.subscription.findUnique({
       where: { stripeSubscriptionId },
     });
+
+    return row ? subscriptionRecordOf(row) : null;
   }
 
   async linkStripeId(input: {
@@ -112,11 +158,13 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionPort {
     if (input.previousStatus !== SubscriptionStatus.ACTIVE) {
       data.startDate = new Date();
     }
-    return await this.prisma.subscription.update({
+    const row = await this.prisma.subscription.update({
       where: { id: input.id },
       data,
       include: { organization: true },
     });
+
+    return { ...subscriptionRecordOf(row), organization: row.organization };
   }
 
   async recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void> {
@@ -200,7 +248,7 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionPort {
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;
   }): Promise<BillingSubscriptionWithOrganization> {
-    return await this.prisma.subscription.update({
+    const row = await this.prisma.subscription.update({
       where: { id: input.id },
       data: {
         status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
@@ -210,5 +258,7 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionPort {
       },
       include: { organization: true },
     });
+
+    return { ...subscriptionRecordOf(row), organization: row.organization };
   }
 }

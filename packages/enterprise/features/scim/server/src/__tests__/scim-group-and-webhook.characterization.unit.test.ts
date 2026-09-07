@@ -11,6 +11,7 @@ import { ScimGrantsService } from "../services/scim-grants.service.ts";
 import type { ScimDirectoryRepository } from "../services/scim-directory.service.ts";
 import { GrantsFake } from "./support/grants-fake.ts";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
+import { nowInstant } from "@langwatch/time";
 
 function groupsRepository(): ScimDirectoryRepository {
   return {
@@ -22,8 +23,8 @@ function groupsRepository(): ScimDirectoryRepository {
       slug: "provisioned",
       scimSource: "scim",
       externalId: "external_1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: nowInstant(),
+      updatedAt: nowInstant(),
     })),
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),

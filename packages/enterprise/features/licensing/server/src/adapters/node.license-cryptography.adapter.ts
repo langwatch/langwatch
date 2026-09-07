@@ -12,6 +12,7 @@ import {
   type ValidationResult,
 } from "@langwatch/enterprise-licensing-contract";
 import { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
+import { nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 
 /**
  * PEM normalization for license signing keys.
@@ -137,19 +138,19 @@ export class NodeLicenseCryptographyAdapter extends LicenseCryptographyPort {
     }
   }
 
-  isExpired(expiresAt: string, now = new Date()): boolean {
-    const expirationDate = new Date(expiresAt);
-    return Number.isNaN(expirationDate.getTime()) || now >= expirationDate;
+  isExpired(expiresAt: string, now = nowInstant()): boolean {
+    const expirationMs = toEpochMs(expiresAt);
+    return Number.isNaN(expirationMs) || now.epochMilliseconds >= expirationMs;
   }
 
   validateLicense({
     licenseKey,
     publicKey = this.publicKey,
-    now = new Date(),
+    now = nowInstant(),
   }: {
     licenseKey: string;
     publicKey?: string;
-    now?: Date;
+    now?: Instant;
   }): ValidationResult {
     const signedLicense = this.tryParseLicenseKey(licenseKey);
     if (!signedLicense) {

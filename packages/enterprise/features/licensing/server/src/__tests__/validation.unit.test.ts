@@ -13,6 +13,7 @@ import {
   TAMPERED_LICENSE_KEY,
   VALID_LICENSE_KEY,
 } from "../testing.ts";
+import { Temporal } from "@langwatch/time";
 
 const cryptography = NodeLicenseCryptographyAdapter.create();
 const isExpired = cryptography.isExpired.bind(cryptography);
@@ -176,7 +177,7 @@ describe("isExpired", () => {
   });
 
   it("returns true at exactly the expiration time", () => {
-    const now = new Date("2024-06-15T12:00:00Z");
+    const now = Temporal.Instant.from("2024-06-15T12:00:00Z");
     const expiresAt = "2024-06-15T12:00:00Z";
 
     const result = isExpired(expiresAt, now);
@@ -185,7 +186,7 @@ describe("isExpired", () => {
   });
 
   it("returns false one millisecond before expiration", () => {
-    const now = new Date("2024-06-15T11:59:59.999Z");
+    const now = Temporal.Instant.from("2024-06-15T11:59:59.999Z");
     const expiresAt = "2024-06-15T12:00:00Z";
 
     const result = isExpired(expiresAt, now);

@@ -16,6 +16,7 @@ import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port.
 import type { BillingWebhookOrganizationPort } from "../ports/billing-webhook-organization.port.ts";
 import type { BillingWebhookSubscriptionPort } from "../ports/billing-webhook-subscription.port.ts";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
+import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:checkoutCompletion");
 
@@ -150,7 +151,9 @@ export class BillingCheckoutCompletionService {
       groupType: "organization",
       groupKey: organizationId,
       properties: {
-        subscriptionCreatedAt: new Date(checkoutSession.created * 1000).toISOString(),
+        subscriptionCreatedAt: Temporal.Instant.fromEpochMilliseconds(
+          checkoutSession.created * 1000,
+        ).toString({ fractionalSecondDigits: 3 }),
         hasActiveSubscription: true,
       },
     });

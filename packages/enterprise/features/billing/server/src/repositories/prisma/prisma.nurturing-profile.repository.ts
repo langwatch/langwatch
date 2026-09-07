@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { NurturingProfileRepository, type NurturingProfile } from "../nurturing-profile.repository.ts";
+import {
+  NurturingProfileRepository,
+  type NurturingProfile,
+} from "../nurturing-profile.repository.ts";
+import { fromDate } from "@langwatch/time";
 
 type Database = Pick<
   PrismaClient,
@@ -47,7 +51,7 @@ export class PrismaNurturingProfileRepository extends NurturingProfileRepository
     if (!organization) return null;
 
     return {
-      user,
+      user: { ...user, createdAt: fromDate(user.createdAt) },
       organization: {
         id: organization.id,
         name: organization.name,

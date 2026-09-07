@@ -1,16 +1,17 @@
+import type { Instant } from "@langwatch/time";
 export type BillingSubscriptionRecord = {
   id: string;
   organizationId: string;
   status: string;
   plan: string;
   stripeSubscriptionId: string | null;
-  createdAt: Date;
-  startDate: Date | null;
-  endDate: Date | null;
+  createdAt: Instant;
+  startDate: Instant | null;
+  endDate: Instant | null;
   maxMembers: number | null;
   maxMembersLite: number | null;
   maxMessagesPerMonth: number | null;
-  lastPaymentFailedDate: Date | null;
+  lastPaymentFailedDate: Instant | null;
 };
 
 export type BillingOrganizationRecord = {

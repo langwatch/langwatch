@@ -8,6 +8,7 @@ import {
   PersonalVirtualKeyIssuerPort,
 } from "@langwatch/enterprise-governance-server";
 import { nanoid } from "nanoid";
+import type { Instant } from "@langwatch/time";
 
 type VirtualKeyWithScopes = {
   id: string;
@@ -18,9 +19,9 @@ type VirtualKeyWithScopes = {
   status: string;
   principalUserId: string | null;
   routingPolicyId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  lastUsedAt: Date | null;
+  createdAt: Instant;
+  updatedAt: Instant;
+  lastUsedAt: Instant | null;
   scopes: Array<{
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
@@ -148,9 +149,9 @@ function toPersonalVirtualKey(key: VirtualKeyWithScopes): PersonalVirtualKey {
     status: key.status,
     principalUserId: key.principalUserId,
     routingPolicyId: key.routingPolicyId,
-    createdAtMs: key.createdAt.getTime(),
-    updatedAtMs: key.updatedAt.getTime(),
-    lastUsedAtMs: key.lastUsedAt?.getTime() ?? null,
+    createdAtMs: key.createdAt.epochMilliseconds,
+    updatedAtMs: key.updatedAt.epochMilliseconds,
+    lastUsedAtMs: key.lastUsedAt?.epochMilliseconds ?? null,
     scopes: key.scopes.map(({ scopeType, scopeId }) => ({ scopeType, scopeId })),
   };
 }

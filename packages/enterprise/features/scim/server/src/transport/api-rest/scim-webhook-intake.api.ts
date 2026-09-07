@@ -31,6 +31,7 @@ import {
   verifyScimWebhookSignature,
 } from "../../rules/scim-webhook-signature.rules.ts";
 import type { ScimService } from "@langwatch/enterprise-scim-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 /** Everything the intake reaches that the SCIM boundary does not own. */
 export type ScimWebhookRestPorts = Readonly<{
@@ -45,7 +46,7 @@ export type ScimWebhookRestPorts = Readonly<{
    */
   webhookSecret: () => string | undefined;
   /** Wall clock, injectable so the freshness window is testable. */
-  now?: () => Date;
+  now?: () => Instant;
 }>;
 
 /**
@@ -94,14 +95,14 @@ export function createScimWebhookRestApp(options: {
   });
   const scimWebhookApi = ScimWebhookApi.create();
   const replays = new ScimWebhookReplayWindow();
-  const clock = ports.now ?? (() => new Date());
+  const clock = ports.now ?? nowInstant;
 
   const intakeHandler = async (c: ServiceContext<EndpointVariables>, input: { body: string }) => {
     const secret = ports.webhookSecret();
     if (!secret) return c.json({ error: "Webhook not configured" }, { status: 404 });
 
     const raw = input.body;
-    const nowSeconds = Math.floor(clock().getTime() / 1000);
+    const nowSeconds = Math.floor(clock().epochMilliseconds / 1000);
     const signature = verifyScimWebhookSignature({
       secret,
       body: raw,

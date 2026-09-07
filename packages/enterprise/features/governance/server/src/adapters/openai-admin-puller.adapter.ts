@@ -52,7 +52,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
 import { AdminUsageReportAdapter } from "./admin-usage-report.adapter.ts";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:openai-admin-puller");
 
@@ -675,9 +675,9 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
     // must never move the watermark FORWARD. A source that fell behind holds a
     // watermark older than the default window, and snapping it forward would
     // silently skip everything in between.
-    const storedMs = Date.parse(parsed.startingAt);
+    const storedMs = toEpochMs(parsed.startingAt);
     const rewound =
-      Number.isNaN(storedMs) || Date.parse(configuredStart) <= storedMs
+      Number.isNaN(storedMs) || toEpochMs(configuredStart) <= storedMs
         ? configuredStart
         : parsed.startingAt;
     return {
@@ -701,14 +701,16 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
     stored: string;
     config: OpenAiAdminPullConfig;
   }): string {
-    const storedMs = Date.parse(stored);
+    const storedMs = toEpochMs(stored);
     if (Number.isNaN(storedMs))
       return config.startingAt ?? OpenAiAdminPullerAdapter.defaultStartingAt();
 
-    const floorMs = Date.parse(config.startingAt ?? OpenAiAdminPullerAdapter.defaultStartingAt());
+    const floorMs = toEpochMs(config.startingAt ?? OpenAiAdminPullerAdapter.defaultStartingAt());
     const lookedBack = storedMs - RESTATEMENT_LOOKBACK_DAYS * MS_PER_DAY;
     const notBeforeConfigured = Number.isNaN(floorMs) ? lookedBack : Math.max(lookedBack, floorMs);
-    return new Date(Math.min(notBeforeConfigured, storedMs)).toISOString();
+    return Temporal.Instant.fromEpochMilliseconds(Math.min(notBeforeConfigured, storedMs)).toString(
+      { fractionalSecondDigits: 3 },
+    );
   }
 
   /**
@@ -718,9 +720,12 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
    * one settled bucket. Snapped to midnight UTC to align with bucket boundaries.
    */
   private static defaultStartingAt(): string {
-    const d = new Date(nowInstant().epochMilliseconds - 3 * MS_PER_DAY);
-    d.setUTCHours(0, 0, 0, 0);
-    return d.toISOString();
+    return nowInstant()
+      .subtract({ milliseconds: 3 * MS_PER_DAY })
+      .toZonedDateTimeISO("UTC")
+      .startOfDay()
+      .toInstant()
+      .toString({ fractionalSecondDigits: 3 });
   }
 
   /**
@@ -751,7 +756,9 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
 
   /** ISO instant for a bucket's epoch-seconds start. */
   private static bucketStartIso(startTime: number): string {
-    return new Date(startTime * 1000).toISOString();
+    return Temporal.Instant.fromEpochMilliseconds(startTime * 1000).toString({
+      fractionalSecondDigits: 3,
+    });
   }
 
   /**
@@ -772,7 +779,7 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
     hasKeyGrouping: boolean;
   }): URL {
     const url = new URL(`${API_BASE}/costs`);
-    const startMs = Date.parse(startingAt);
+    const startMs = toEpochMs(startingAt);
     if (Number.isNaN(startMs)) {
       throw new Error(`openai admin puller cannot read a window start of "${startingAt}"`);
     }
@@ -824,7 +831,11 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
       // the watermark: that day was already emitted with user-only dimensions,
       // and re-reading it with keyed dimensions would produce a different
       // source_event_id, doubling that day.
-      startingAt: !hasKeyGrouping ? new Date(Date.parse(start) + MS_PER_DAY).toISOString() : start,
+      startingAt: !hasKeyGrouping
+        ? Temporal.Instant.fromEpochMilliseconds(toEpochMs(start) + MS_PER_DAY).toString({
+            fractionalSecondDigits: 3,
+          })
+        : start,
       page: null,
       query,
       watermark: null,
@@ -837,8 +848,8 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
   private static laterOf(a: string | null, b: string | null): string | null {
     if (a === null) return b;
     if (b === null) return a;
-    const aMs = Date.parse(a);
-    const bMs = Date.parse(b);
+    const aMs = toEpochMs(a);
+    const bMs = toEpochMs(b);
     if (Number.isNaN(aMs)) return b;
     if (Number.isNaN(bMs)) return a;
     return bMs > aMs ? b : a;

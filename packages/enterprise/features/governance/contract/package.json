@@ -22,6 +22,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/project-contract": "workspace:*",

@@ -2,6 +2,7 @@ import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service.
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 
 import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * The onboarding answers a new person gives, as this signal reads them.
@@ -95,7 +96,7 @@ export class NurturingSignupIdentificationService {
       has_prompts: false,
       has_simulations: false,
       has_subscription: false,
-      createdAt: new Date().toISOString(),
+      createdAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
     };
 
     void nurturing

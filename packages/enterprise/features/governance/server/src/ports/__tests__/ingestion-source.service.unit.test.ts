@@ -19,6 +19,7 @@ import {
 import { IngestionSourceService } from "../../services/ingestion-source.service.ts";
 import { PullDestinationService } from "../../services/pull-destination.service.ts";
 import { TestProjectService } from "./support/test-project-service.ts";
+import { toDate } from "@langwatch/time";
 
 const NOW = Date.parse("2026-08-24T10:00:00.000Z");
 
@@ -45,6 +46,17 @@ function source(overrides: Partial<GovernanceIngestionSource> = {}): GovernanceI
   };
 }
 
+/** The update as the contract row carries it: instants back to wire dates. */
+function rowPatchOf(input: UpdateIngestionSourceRecord) {
+  const { archivedAt, lastEventAt, ...rest } = input;
+
+  return {
+    ...rest,
+    ...(archivedAt === undefined ? {} : { archivedAt: toDate(archivedAt) }),
+    ...(lastEventAt === undefined ? {} : { lastEventAt: toDate(lastEventAt) }),
+  };
+}
+
 class FakeSourceRepository extends IngestionSourceRepository {
   row: GovernanceIngestionSource = source();
   createInput: CreateIngestionSourceRecord | null = null;
@@ -61,7 +73,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
   });
   update = vi.fn(async (_id: string, input: UpdateIngestionSourceRecord) => {
     this.updateInput = input;
-    this.row = source({ ...this.row, ...input });
+    this.row = source({ ...this.row, ...rowPatchOf(input) });
     return this.row;
   });
   tryUpdateIfCursorUnchanged = vi.fn(
@@ -69,7 +81,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
       update: UpdateIngestionSourceRecord;
     }): Promise<GovernanceIngestionSource | null> => {
       this.updateInput = input.update;
-      this.row = source({ ...this.row, ...input.update });
+      this.row = source({ ...this.row, ...rowPatchOf(input.update) });
       return this.row;
     },
   );

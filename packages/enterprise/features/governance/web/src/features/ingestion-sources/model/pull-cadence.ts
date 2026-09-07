@@ -4,6 +4,7 @@ import {
   isValidPullSchedule,
   type GovernanceSourceType,
 } from "@langwatch/enterprise-governance-contract";
+import { Temporal } from "@langwatch/time";
 
 const WEEKDAYS = [
   "Sunday",
@@ -245,8 +246,11 @@ export function pullCadenceCronError(cron: string): string | null {
   ) {
     // A leap year gives February its widest legitimate range. Anything
     // still rolling into another month can never be reached by any year.
-    const widestCalendarDate = new Date(Date.UTC(2024, month - 1, dayOfMonth));
-    if (widestCalendarDate.getUTCMonth() !== month - 1) {
+    const widestCalendarDate = Temporal.PlainDate.from(
+      { year: 2024, month, day: dayOfMonth },
+      { overflow: "constrain" },
+    );
+    if (widestCalendarDate.day !== dayOfMonth) {
       return "This schedule never comes around — it names a date that does not exist.";
     }
   }

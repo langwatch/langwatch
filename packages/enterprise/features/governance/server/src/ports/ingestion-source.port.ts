@@ -2,6 +2,7 @@ import type {
   GovernanceIngestionSource,
   GovernanceIngestionSourceType,
 } from "@langwatch/enterprise-governance-contract";
+import type { Instant } from "@langwatch/time";
 
 export type CreateIngestionSourceRecord = {
   organizationId: string;
@@ -26,8 +27,8 @@ export type UpdateIngestionSourceRecord = {
   traceProjectId?: string | null;
   pullSchedule?: string | null;
   ingestSecretHash?: string;
-  archivedAt?: Date;
-  lastEventAt?: Date;
+  archivedAt?: Instant;
+  lastEventAt?: Instant;
 };
 
 export abstract class IngestionSourceRepository {

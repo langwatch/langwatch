@@ -13,6 +13,7 @@ import {
   type GovernanceVkLifecycleData,
   type GovernanceWebhookEnvelope,
 } from "../ports/governance-webhook.port.ts";
+import { Temporal } from "@langwatch/time";
 
 export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as const;
 
@@ -29,7 +30,9 @@ export class GovernanceEventDeliveryProcess {
     return {
       id,
       type,
-      created: new Date(data.occurred_at).toISOString(),
+      created: Temporal.Instant.fromEpochMilliseconds(data.occurred_at).toString({
+        fractionalSecondDigits: 3,
+      }),
       schema_version: "1",
       data: {
         event_id: id,
@@ -39,7 +42,9 @@ export class GovernanceEventDeliveryProcess {
         name: data.name,
         display_prefix: data.display_prefix,
         reason: data.reason,
-        occurred_at: new Date(data.occurred_at).toISOString(),
+        occurred_at: Temporal.Instant.fromEpochMilliseconds(data.occurred_at).toString({
+          fractionalSecondDigits: 3,
+        }),
       },
     };
   }
@@ -51,7 +56,9 @@ export class GovernanceEventDeliveryProcess {
     return {
       id,
       type,
-      created: new Date(data.occurred_at).toISOString(),
+      created: Temporal.Instant.fromEpochMilliseconds(data.occurred_at).toString({
+        fractionalSecondDigits: 3,
+      }),
       schema_version: "1",
       data: {
         event_id: id,
@@ -64,11 +71,15 @@ export class GovernanceEventDeliveryProcess {
         anchor_project_id: data.anchor_project_id,
         end_user_id: data.end_user_id,
         window: data.window.toLowerCase(),
-        period_started_at: new Date(data.period_started_at_ms).toISOString(),
+        period_started_at: Temporal.Instant.fromEpochMilliseconds(
+          data.period_started_at_ms,
+        ).toString({ fractionalSecondDigits: 3 }),
         limit_usd: data.limit_usd,
         spent_usd: data.spent_usd,
         on_breach: data.on_breach.toLowerCase(),
-        occurred_at: new Date(data.occurred_at).toISOString(),
+        occurred_at: Temporal.Instant.fromEpochMilliseconds(data.occurred_at).toString({
+          fractionalSecondDigits: 3,
+        }),
       },
     };
   }

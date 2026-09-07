@@ -35,6 +35,7 @@ import {
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { WebhookApp } from "#app/webhook.app";
+import { fromDate, toDate } from "@langwatch/time";
 
 /**
  * The process supplies authentication; authorization arrives as `policy`.
@@ -151,14 +152,26 @@ export class WebhookEndpointTrpcApi {
           )
           .withOutput(webhookDeliveryPageSchema)
           .withCustomPermission(entitled("webhookEndpoints:view"), VIEW)
-          .handle(({ ctx, input }) =>
-            ctx.app.webhooks.endpoints.getDeliveries({
+          .handle(async ({ ctx, input }) => {
+            const page = await ctx.app.webhooks.endpoints.getDeliveries({
               organizationId: input.organizationId,
               endpointId: input.endpointId,
               limit: input.limit,
-              cursor: input.cursor,
-            }),
-          ),
+              cursor: input.cursor
+                ? { firedAt: fromDate(input.cursor.firedAt), id: input.cursor.id }
+                : undefined,
+            });
+
+            return {
+              deliveries: page.deliveries.map((delivery) => ({
+                ...delivery,
+                firedAt: toDate(delivery.firedAt),
+              })),
+              nextCursor: page.nextCursor
+                ? { firedAt: toDate(page.nextCursor.firedAt), id: page.nextCursor.id }
+                : null,
+            };
+          }),
       )
       .mutation("create", (p) =>
         p

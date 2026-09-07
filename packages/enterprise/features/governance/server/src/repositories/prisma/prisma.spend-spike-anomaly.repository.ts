@@ -6,6 +6,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { SpendSpikeAnomalyRepository } from "../../ports/spend-spike-anomaly.port.ts";
+import { toDate, type Instant } from "@langwatch/time";
 
 const GOVERNANCE_PROJECT_KIND = "internal_governance";
 
@@ -50,13 +51,13 @@ export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     return project?.id ?? null;
   }
 
-  async hasOpenAlert(input: { ruleId: string; since: Date }): Promise<boolean> {
+  async hasOpenAlert(input: { ruleId: string; since: Instant }): Promise<boolean> {
     return (
       (await this.prisma.anomalyAlert.count({
         where: {
           ruleId: input.ruleId,
           state: "open",
-          triggerWindowEnd: { gte: input.since },
+          triggerWindowEnd: { gte: toDate(input.since) },
         },
       })) > 0
     );

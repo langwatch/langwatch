@@ -13,15 +13,16 @@ import {
   validateThresholdConfig,
 } from "@langwatch/enterprise-governance-contract";
 import type { AnomalyRuleChanges, AnomalyRulePort } from "../ports/anomaly-rule.port.ts";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 export class AnomalyRuleService {
   private constructor(
     private readonly repository: AnomalyRulePort,
-    private readonly now: () => Date,
+    private readonly now: () => Instant,
   ) {}
 
-  static create(options: { repository: AnomalyRulePort; now?: () => Date }): AnomalyRuleService {
-    return new AnomalyRuleService(options.repository, options.now ?? (() => new Date()));
+  static create(options: { repository: AnomalyRulePort; now?: () => Instant }): AnomalyRuleService {
+    return new AnomalyRuleService(options.repository, options.now ?? nowInstant);
   }
 
   async list(organizationId: string): Promise<AnomalyRule[]> {
@@ -242,7 +243,7 @@ export class AnomalyRuleService {
     const existing = await this.getById({ id, organizationId });
 
     return this.repository.update(existing.id, {
-      archivedAt: this.now(),
+      archivedAt: toDate(this.now()),
       status: "disabled",
     });
   }

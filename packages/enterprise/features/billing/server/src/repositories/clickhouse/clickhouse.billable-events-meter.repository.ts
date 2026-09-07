@@ -17,6 +17,7 @@ import {
   BillableEventsMeterPort,
   type BillableEventRecord,
 } from "../../ports/billable-events-meter.port.ts";
+import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:billable-events-repository");
 
@@ -55,7 +56,9 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
           EventId: record.eventId,
           EventType: record.eventType,
           DeduplicationKey: record.deduplicationKey,
-          EventTimestamp: new Date(record.eventTimestamp),
+          EventTimestamp: toDate(
+            Temporal.Instant.fromEpochMilliseconds(toEpochMs(record.eventTimestamp)),
+          ),
         },
       ],
       format: "JSONEachRow",

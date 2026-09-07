@@ -10,9 +10,10 @@ import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { createScimWebhookRestApp } from "../scim-webhook-intake.api.ts";
+import { Temporal } from "@langwatch/time";
 
 const SECRET = "deployment-shared-secret";
-const NOW = new Date("2026-09-04T10:00:00.000Z");
+const NOW = Temporal.Instant.from("2026-09-04T10:00:00.000Z");
 
 const createEvent = [
   {
@@ -50,7 +51,7 @@ class ScimServiceFake extends ScimService {
 }
 
 function signature(body: string, options: { secret?: string; atSeconds?: number } = {}): string {
-  const t = options.atSeconds ?? Math.floor(NOW.getTime() / 1000);
+  const t = options.atSeconds ?? Math.floor(NOW.epochMilliseconds / 1000);
   const digest = createHmac("sha256", options.secret ?? SECRET)
     .update(`${t}.${body}`)
     .digest("hex");
@@ -201,7 +202,7 @@ describe("given the Auth0 SCIM webhook intake", () => {
         headers: {
           authorization: "Bearer scim_token_attacker",
           "x-langwatch-signature": signature(JSON.stringify(body), {
-            atSeconds: Math.floor(NOW.getTime() / 1000) - 3600,
+            atSeconds: Math.floor(NOW.epochMilliseconds / 1000) - 3600,
           }),
         },
       });

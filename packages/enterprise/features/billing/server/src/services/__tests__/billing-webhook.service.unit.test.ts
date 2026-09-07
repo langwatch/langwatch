@@ -13,6 +13,7 @@ import {
   type BillingWebhookSubscriptionPort,
   type SubscriptionWithOrg,
 } from "../../index.ts";
+import { Temporal } from "@langwatch/time";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
 const mockSendSlackBillingThresholdFailureAlert = vi.fn().mockResolvedValue(undefined);
@@ -1162,7 +1163,7 @@ describe("EEWebhookService", () => {
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
           expect.objectContaining({
             type: "cancelled",
-            cancellationDate: expect.any(Date),
+            cancellationDate: expect.any(Temporal.Instant),
           }),
         );
       });

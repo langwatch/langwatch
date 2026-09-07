@@ -22,6 +22,7 @@ import {
   GovernanceSignalDeliveryPort,
   GovernanceSignalStoragePort,
 } from "./governance-signals.adapter.ts";
+import { type Instant, fromDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:gateway-debits");
 
@@ -69,7 +70,7 @@ export abstract class GatewayGovernanceBudgetStore {
   abstract getSpendForTargetsAcrossTenants(
     tenantIds: string[],
     targets: BudgetSpendTarget[],
-    now: Date,
+    now: Instant,
   ): Promise<Array<{ budgetId: string; spentUsd: string }>>;
 }
 
@@ -168,7 +169,7 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
 
   async resolveBudgetCrossings(
     candidates: GatewayBudgetCrossingCandidate[],
-    now: Date,
+    now: Instant,
   ): Promise<GovernanceResolvedBudgetCrossing[]> {
     const budgetIds = [...new Set(candidates.map(({ budgetId }) => budgetId))];
     const budgets = await this.database.gatewayBudget.findMany({
@@ -237,7 +238,8 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
           onBreach: budget.onBreach,
         },
         spentUsd: spentByBudget.get(candidate.budgetId) ?? "0",
-        periodStartedAtMs: target.periodFloorMs ?? currentPeriodStart(budget.window, now).getTime(),
+        periodStartedAtMs:
+          target.periodFloorMs ?? currentPeriodStart(budget.window, now).epochMilliseconds,
       };
     });
   }
@@ -256,10 +258,18 @@ function toBudgetSpendTarget(
   candidate: GatewayBudgetCrossingCandidate,
   budget: GatewayBudget,
   boundaryByKey: Map<string, number>,
-  now: Date,
+  now: Instant,
 ): BudgetSpendTarget {
   const floors = [
-    budgetPeriodFloorMs(budget, now),
+    budgetPeriodFloorMs(
+      {
+        window: budget.window,
+        currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),
+        lastResetAt: budget.lastResetAt === null ? null : fromDate(budget.lastResetAt),
+        cycleAnchorAt: budget.cycleAnchorAt === null ? null : fromDate(budget.cycleAnchorAt),
+      },
+      now,
+    ),
     boundaryByKey.get(`${candidate.budgetId}:${candidate.bucketScopeId}`),
   ].filter((value): value is number => typeof value === "number");
 

@@ -14,6 +14,7 @@ import {
   type WebhookEndpointView,
 } from "@langwatch/enterprise-webhook-contract";
 import type { Prisma, PrismaClient, WebhookEndpoint } from "@langwatch/prisma-client/generated";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import type { WebhookIdPort } from "../../ports/webhook-id.port.ts";
 import type { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
 import {
@@ -88,12 +89,29 @@ export type WebhookEndpointDatabase = Pick<
   "webhookEndpoint" | "webhookEndpointDelivery" | "$queryRaw"
 >;
 
+/** The endpoint row's health stamps, on the one clock the seam above reads. */
+function statusSnapshotOf(row: {
+  status: "ACTIVE" | "DISABLED";
+  disabledReason: string | null;
+  failingSince: Date | null;
+  lastSuccessAt: Date | null;
+  lastFailureAt: Date | null;
+}) {
+  return {
+    status: row.status,
+    disabledReason: row.disabledReason,
+    failingSince: row.failingSince === null ? null : fromDate(row.failingSince),
+    lastSuccessAt: row.lastSuccessAt === null ? null : fromDate(row.lastSuccessAt),
+    lastFailureAt: row.lastFailureAt === null ? null : fromDate(row.lastFailureAt),
+  };
+}
+
 export interface WebhookEndpointDeps {
   prisma: WebhookEndpointDatabase;
   ids: WebhookIdPort;
   secrets: WebhookSecretPort;
   configuration?: WebhookEndpointConfiguration;
-  pruneDeliveries?: (now: Date) => Promise<number>;
+  pruneDeliveries?: (now: Instant) => Promise<number>;
   /**
    * Called when the 72h streak flips an endpoint to DISABLED. The transport
    * (email, in-app) is the caller's; the service guarantees the call fires
@@ -104,7 +122,7 @@ export interface WebhookEndpointDeps {
     endpointId: string;
     /** Where it was delivering, in words: the receiver URL, or the queue. */
     destination: string;
-    failingSince: Date;
+    failingSince: Instant;
   }) => Promise<void>;
 }
 
@@ -256,11 +274,11 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
   async rollSecret(params: {
     organizationId: string;
     endpointId: string;
-    now?: Date;
+    now?: Instant;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     const endpoint = await this.getEndpoint(params);
     const secret = PrismaWebhookEndpointRepository.newSecret();
-    const now = params.now ?? new Date();
+    const now = toDate(params.now ?? nowInstant());
     const updated = await this.prisma.webhookEndpoint.update({
       where: { id: endpoint.id },
       data: {
@@ -385,10 +403,10 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
   async getSigningSecrets(params: {
     organizationId: string;
     endpointId: string;
-    now?: Date;
+    now?: Instant;
   }): Promise<string[]> {
     const endpoint = await this.getEndpoint(params);
-    const now = params.now ?? new Date();
+    const now = toDate(params.now ?? nowInstant());
     const previousIsValid =
       endpoint.previousSecretEncrypted !== null &&
       endpoint.previousSecretExpiresAt !== null &&
@@ -412,9 +430,9 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
   async tryGetStatusSnapshot(params: { organizationId: string; endpointId: string }): Promise<{
     status: "ACTIVE" | "DISABLED";
     disabledReason: string | null;
-    failingSince: Date | null;
-    lastSuccessAt: Date | null;
-    lastFailureAt: Date | null;
+    failingSince: Instant | null;
+    lastSuccessAt: Instant | null;
+    lastFailureAt: Instant | null;
   } | null> {
     const endpoint = await this.prisma.webhookEndpoint.findFirst({
       where: {
@@ -430,7 +448,8 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
         lastFailureAt: true,
       },
     });
-    return endpoint;
+
+    return endpoint ? statusSnapshotOf(endpoint) : null;
   }
 
   /**
@@ -441,14 +460,14 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
   async getDeliveryStats(params: {
     organizationId: string;
     endpointId: string;
-    since: Date;
+    since: Instant;
     sampleLimit: number;
   }): Promise<{ attempted: number; delivered: number; latencies: number[] }> {
     const where = {
       channel: "platform" as const,
       organizationId: params.organizationId,
       endpointId: params.endpointId,
-      firedAt: { gt: params.since },
+      firedAt: { gt: toDate(params.since) },
     };
     const [byOutcome, sample] = await Promise.all([
       this.prisma.webhookEndpointDelivery.groupBy({
@@ -516,9 +535,9 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
     latencyMs?: number;
     error?: string;
     response?: unknown;
-    now?: Date;
+    now?: Instant;
   }): Promise<void> {
-    const now = params.now ?? new Date();
+    const now = toDate(params.now ?? nowInstant());
     // The (endpoint, org) pairing is verified before anything is written,
     // so a caller bug cannot file one tenant's delivery log under another.
     const endpoint = await this.prisma.webhookEndpoint.findFirst({
@@ -655,7 +674,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
         organizationId,
         endpointId: endpoint.id,
         destination: this.policy.describeDestination(endpoint),
-        failingSince,
+        failingSince: fromDate(failingSince),
       });
     } catch (error) {
       logger.error({ endpointId: endpoint.id, error }, "webhook auto-disable notification failed");
@@ -667,7 +686,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
     endpointId: string;
     limit?: number;
     /** Resume after this row: the previous page's last (firedAt, id). */
-    cursor?: { firedAt: Date; id: string };
+    cursor?: { firedAt: Instant; id: string };
   }): Promise<{
     deliveries: Array<{
       id: string;
@@ -678,9 +697,9 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
       responseStatus: number | null;
       latencyMs: number | null;
       error: string | null;
-      firedAt: Date;
+      firedAt: Instant;
     }>;
-    nextCursor: { firedAt: Date; id: string } | null;
+    nextCursor: { firedAt: Instant; id: string } | null;
   }> {
     await this.getEndpoint(params);
     const limit = Math.min(params.limit ?? 25, 200);
@@ -696,10 +715,11 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
       // so a page boundary stays stable while new attempts land above.
     };
     if (params.cursor) {
+      const cursorFiredAt = toDate(params.cursor.firedAt);
       where.OR = [
-        { firedAt: { lt: params.cursor.firedAt } },
+        { firedAt: { lt: cursorFiredAt } },
         {
-          firedAt: params.cursor.firedAt,
+          firedAt: cursorFiredAt,
           id: { lt: params.cursor.id },
         },
       ];
@@ -725,9 +745,10 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
         responseStatus: r.responseStatus,
         latencyMs: r.latencyMs,
         error: r.error,
-        firedAt: r.firedAt,
+        firedAt: fromDate(r.firedAt),
       })),
-      nextCursor: rows.length > limit && last ? { firedAt: last.firedAt, id: last.id } : null,
+      nextCursor:
+        rows.length > limit && last ? { firedAt: fromDate(last.firedAt), id: last.id } : null,
     };
   }
 
@@ -735,30 +756,23 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
   async health(params: { organizationId: string; endpointId: string }): Promise<{
     status: "ACTIVE" | "DISABLED";
     disabledReason: string | null;
-    failingSince: Date | null;
-    lastSuccessAt: Date | null;
-    lastFailureAt: Date | null;
+    failingSince: Instant | null;
+    lastSuccessAt: Instant | null;
+    lastFailureAt: Instant | null;
   }> {
-    const endpoint = await this.getEndpoint(params);
-    return {
-      status: endpoint.status,
-      disabledReason: endpoint.disabledReason,
-      failingSince: endpoint.failingSince,
-      lastSuccessAt: endpoint.lastSuccessAt,
-      lastFailureAt: endpoint.lastFailureAt,
-    };
+    return statusSnapshotOf(await this.getEndpoint(params));
   }
 
   /** 30-day delivery-log prune; returns the deleted count. Runs the shared
    *  sweep, so it clears both channels' rows from the one table. */
-  async pruneDeliveries(now: Date = new Date()): Promise<number> {
+  async pruneDeliveries(now: Instant = nowInstant()): Promise<number> {
     if (this.deps.pruneDeliveries) {
       return await this.deps.pruneDeliveries(now);
     }
     const result = await this.prisma.webhookEndpointDelivery.deleteMany({
       where: {
         firedAt: {
-          lt: new Date(now.getTime() - WEBHOOK_DELIVERY_RETENTION_MS),
+          lt: toDate(now.subtract({ milliseconds: WEBHOOK_DELIVERY_RETENTION_MS })),
         },
       },
     });

@@ -27,6 +27,7 @@ import {
   type UsageWarningServiceOptions,
 } from "../rules/usage-warning-thresholds.rules.ts";
 import { UsageWarningDispatchService } from "./usage-warning-dispatch.service.ts";
+import { toDate } from "@langwatch/time";
 
 export class UsageWarningService {
   private readonly records: NotificationRecordService;
@@ -156,7 +157,7 @@ export class UsageWarningService {
 
     const recentNotifications = await this.records.listRecentByOrganization({
       organizationId,
-      since: currentMonthStart,
+      since: toDate(currentMonthStart),
     });
 
     const alreadySent = recentNotifications.find((notification) => {

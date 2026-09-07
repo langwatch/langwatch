@@ -1,3 +1,4 @@
+import type { S3ClientConfig } from "@aws-sdk/client-s3";
 import type {
   GovernanceHttpResponse,
   PulledUsageRateInput,
@@ -25,6 +26,7 @@ import {
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
 import { createLogger, type Logger } from "@langwatch/observability";
+import { Temporal, toDate } from "@langwatch/time";
 
 const NANO_USD_PER_USD = 1_000_000_000;
 
@@ -56,7 +58,7 @@ export abstract class GovernanceIngestionAwsPort {
       secretAccessKey?: string;
       sessionToken?: string;
     };
-  }): ReturnType<GovernanceIngestionPullHost["buildAwsClientConfig"]>;
+  }): S3ClientConfig;
 }
 
 export type WorkerGovernanceIngestionPullHostOptions = {
@@ -159,7 +161,7 @@ export class WorkerGovernanceIngestionPullHost extends GovernanceIngestionPullHo
       secretAccessKey?: string;
       sessionToken?: string;
     };
-  }) {
+  }): S3ClientConfig {
     return this.options.aws.build(input);
   }
 }
@@ -218,7 +220,7 @@ export class UtcGovernanceIngestionPullSchedule implements GovernanceIngestionPu
     return computeNextRunAt({
       cron: input.cron,
       timezone: "UTC",
-      after: new Date(input.after),
+      after: toDate(Temporal.Instant.fromEpochMilliseconds(input.after)),
     }).getTime();
   }
 }

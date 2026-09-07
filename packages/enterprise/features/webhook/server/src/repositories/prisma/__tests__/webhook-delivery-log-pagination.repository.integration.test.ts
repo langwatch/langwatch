@@ -27,6 +27,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { WebhookIdPort } from "../../../ports/webhook-id.port.ts";
 import type { WebhookSecretPort } from "../../../ports/webhook-secret.port.ts";
 import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
+import { Temporal } from "@langwatch/time";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -87,7 +88,7 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository delivery log", ()
         outcome: "success",
         responseStatus: 200,
         latencyMs: 10,
-        now: new Date(base + i * 1000),
+        now: Temporal.Instant.fromEpochMilliseconds(base + i * 1000),
       });
     }
 

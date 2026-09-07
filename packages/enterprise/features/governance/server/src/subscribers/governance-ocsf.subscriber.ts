@@ -9,6 +9,7 @@ import {
   type GovernanceTraceContext,
   type GovernanceTraceEvent,
 } from "../ports/governance-subscriber.port.ts";
+import { Temporal } from "@langwatch/time";
 
 export const GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS = 30_000;
 export const GOVERNANCE_OCSF_INVOKE_ACTIVITY_ID = 6;
@@ -99,7 +100,7 @@ export class GovernanceOcsfSubscriber {
       sourceType,
       activityId: GOVERNANCE_OCSF_INVOKE_ACTIVITY_ID,
       severityId,
-      eventTime: new Date(state.occurredAt),
+      eventTime: Temporal.Instant.fromEpochMilliseconds(state.occurredAt),
       actorUserId,
       actorEmail,
       actorEnduserId,

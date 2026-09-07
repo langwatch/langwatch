@@ -1,4 +1,5 @@
 import type { Event } from "@langwatch/eventing";
+import type { Instant } from "@langwatch/time";
 
 export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
 export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;
@@ -112,7 +113,7 @@ export type GatewayBudgetDebitRow = {
   model: string;
   durationMs: number;
   status: "SUCCESS" | "BLOCKED_BY_GUARDRAIL" | "PROVIDER_ERROR";
-  occurredAt: Date;
+  occurredAt: Instant;
 };
 
 export type GatewayBudgetCrossingCandidate = {

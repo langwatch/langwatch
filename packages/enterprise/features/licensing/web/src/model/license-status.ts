@@ -1,4 +1,6 @@
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
+import { toEpochMs } from "@langwatch/time";
+import { readableDate } from "./display-formatters.ts";
 
 /** License status with metadata fields (excludes corrupted/no-license states) */
 export type LicenseStatusWithMetadata = Extract<LicenseStatus, { hasLicense: true; plan: string }>;
@@ -66,11 +68,11 @@ export function normalizeKeyForActivation(key: string): string | null {
  * Returns the original string if parsing fails.
  */
 export function formatLicenseDate(isoDate: string): string {
-  const date = new Date(isoDate);
-  if (isNaN(date.getTime())) {
+  const epochMilliseconds = toEpochMs(isoDate);
+  if (isNaN(epochMilliseconds)) {
     return isoDate;
   }
-  return date.toLocaleDateString("en-US", {
+  return readableDate(epochMilliseconds).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",

@@ -20,6 +20,7 @@ import {
   type ScimTokenEntitlement,
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
+import { nowInstant } from "@langwatch/time";
 import type { ScimRepositoryPort } from "../ports/scim-repository.port.ts";
 import type {
   ScimSyncLifecyclePort,
@@ -196,7 +197,7 @@ export class ScimService extends ScimServiceContract {
       return { status: "plan_not_entitled", organizationId: stored.organizationId };
     }
 
-    await this.repository.recordTokenUse({ tokenId: stored.id, usedAt: new Date() });
+    await this.repository.recordTokenUse({ tokenId: stored.id, usedAt: nowInstant() });
 
     return {
       status: "ok",

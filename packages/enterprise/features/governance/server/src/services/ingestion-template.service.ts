@@ -19,24 +19,25 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import type { IngestionTemplatePort } from "../ports/ingestion-template.port.ts";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 export class IngestionTemplateService {
   private constructor(
     private readonly repository: IngestionTemplatePort,
     private readonly newSlugSuffix: () => string,
-    private readonly now: () => Date,
+    private readonly now: () => Instant,
   ) {}
 
   static create(options: {
     repository: IngestionTemplatePort;
     newSlugSuffix?: () => string;
-    now?: () => Date;
+    now?: () => Instant;
   }): IngestionTemplateService {
     return new IngestionTemplateService(
       options.repository,
       options.newSlugSuffix ??
         (() => generate("ingestiontemplate").toString().slice(-6).toLowerCase()),
-      options.now ?? (() => new Date()),
+      options.now ?? nowInstant,
     );
   }
 

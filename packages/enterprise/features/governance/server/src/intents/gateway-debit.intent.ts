@@ -6,6 +6,7 @@ import {
   type GatewayResolvedBudget,
   type GatewaySpendUsage,
 } from "../ports/gateway-debit.port.ts";
+import { Temporal } from "@langwatch/time";
 
 export const writeGatewayDebitsSchema = z.object({
   gateway_request_id: z.string(),
@@ -137,7 +138,7 @@ export class GatewayDebitIntent {
       model: payload.model || "unknown",
       durationMs: payload.duration_ms,
       status,
-      occurredAt: new Date(payload.occurred_at),
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(payload.occurred_at),
     }));
   }
 

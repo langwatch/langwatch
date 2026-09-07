@@ -12,6 +12,7 @@ import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
+import { Temporal } from "@langwatch/time";
 
 const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const parse = (operations: unknown[]) =>
@@ -42,8 +43,8 @@ function groupRepository(): ScimDirectoryRepository {
       slug: "engineering",
       scimSource: "scim",
       externalId: "group-1",
-      createdAt: new Date("2024-01-01T00:00:00Z"),
-      updatedAt: new Date("2024-01-02T00:00:00Z"),
+      createdAt: Temporal.Instant.from("2024-01-01T00:00:00Z"),
+      updatedAt: Temporal.Instant.from("2024-01-02T00:00:00Z"),
     })),
     listGroupMemberIds: vi.fn(async () => ["user-1"]),
     listGroupMembers: vi.fn(async () => []),

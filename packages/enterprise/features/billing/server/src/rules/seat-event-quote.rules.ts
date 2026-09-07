@@ -5,6 +5,7 @@
  */
 import type Stripe from "stripe";
 import { QuoteExpiredError } from "@langwatch/enterprise-billing-contract";
+import { nowInstant } from "@langwatch/time";
 
 export type InviteInput = {
   email: string;
@@ -91,7 +92,7 @@ export const QUOTE_VALIDITY_SECONDS = 15 * 60;
  * The instant to price a seat change at.
  */
 export const resolveProrationDate = (quotedAt: number | undefined) => {
-  const now = Math.floor(Date.now() / 1000);
+  const now = Math.floor(nowInstant().epochMilliseconds / 1000);
   if (quotedAt === undefined) {
     return now;
   }

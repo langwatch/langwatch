@@ -24,6 +24,7 @@ import {
   type PulledUsageSourceAttribution,
 } from "@langwatch/enterprise-governance-contract";
 import type { PulledUsagePricingService } from "./pulled-usage-pricing.service.ts";
+import { type Instant, toEpochMs } from "@langwatch/time";
 
 /**
  * The dimension-only identity two versions of one bucket share.
@@ -83,7 +84,7 @@ export class PulledUsageRecordService {
   }: {
     event: NormalizedPullEvent;
     source: PulledUsageSourceAttribution;
-    observedAt: Date;
+    observedAt: Instant;
   }): PulledUsageObservedEventData | null {
     const raw = event.extra?.[PULLED_USAGE_HINT_KEY];
     if (raw === undefined || raw === null) {
@@ -92,7 +93,7 @@ export class PulledUsageRecordService {
 
     const hint = pulledUsageHintSchema.parse(raw);
 
-    const occurredAtMs = Date.parse(event.event_timestamp);
+    const occurredAtMs = toEpochMs(event.event_timestamp);
     if (!Number.isFinite(occurredAtMs)) {
       throw new Error(
         `pulled usage event ${event.source_event_id} has an unparseable bucket timestamp: ${JSON.stringify(event.event_timestamp)}`,
@@ -147,7 +148,7 @@ export class PulledUsageRecordService {
       costBasis: priced.costBasis,
       costStatus: priced.costStatus,
       occurredAtMs,
-      observedAtMs: observedAt.getTime(),
+      observedAtMs: observedAt.epochMilliseconds,
     };
   }
 }

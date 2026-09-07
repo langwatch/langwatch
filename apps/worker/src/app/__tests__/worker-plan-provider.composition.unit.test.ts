@@ -10,6 +10,7 @@ import {
   createWorkerPlanProvider,
   WorkerEntitlementAbsenceReportPort,
 } from "../worker-plan-provider.composition.ts";
+import { Temporal } from "@langwatch/time";
 
 /**
  * Spec: specs/automations/worker-plan-resolution.feature
@@ -43,8 +44,8 @@ const subscription = (overrides: Partial<SubscriptionRecord> = {}): Subscription
   status: "ACTIVE",
   plan: PlanTypes.LAUNCH,
   stripeSubscriptionId: "stripe-1",
-  createdAt: new Date("2026-09-01T00:00:00.000Z"),
-  startDate: new Date("2026-09-01T00:00:00.000Z"),
+  createdAt: Temporal.Instant.from("2026-09-01T00:00:00.000Z"),
+  startDate: Temporal.Instant.from("2026-09-01T00:00:00.000Z"),
   endDate: null,
   maxMembers: null,
   maxMembersLite: null,

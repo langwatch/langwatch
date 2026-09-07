@@ -7,6 +7,7 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { getPlanTemplate, quotedPlanLimits } from "@langwatch/plans";
 import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
 /**
  * Generates a signed, encoded license key. Pure business logic — no HTTP, no Prisma, no env var
@@ -31,7 +32,7 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
     maxMessagesPerMonth,
     expiresAt: requestedExpiresAt,
     privateKey,
-    now = new Date(),
+    now = toDate(nowInstant()),
   }: GenerateLicenseInput): GenerateLicenseOutput {
     const template = getPlanTemplate(planType);
     if (!template) {
@@ -39,7 +40,7 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
     }
 
     const seats = maxMembers > 0 ? maxMembers : 1;
-    const oneYearOut = new Date(now);
+    const oneYearOut = toDate(fromDate(now));
     oneYearOut.setFullYear(oneYearOut.getFullYear() + 1);
     const expiresAt = requestedExpiresAt ?? oneYearOut;
     if (Number.isNaN(expiresAt.getTime())) {

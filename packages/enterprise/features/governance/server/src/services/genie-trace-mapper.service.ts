@@ -46,7 +46,7 @@ import {
 } from "./conversation-trace-assembly.service.ts";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { GenieSpanAttributesService } from "./genie-span-attributes.service.ts";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import type {
   GenieMessageFrame,
   GenieMessagePayload,
@@ -191,7 +191,7 @@ export class GenieTraceMapperService {
     // Both timestamp sources can be garbage (mapToOcsfRow guards the same
     // field). NaN here would serialize as "NaN000000" and fail spanSchema,
     // dropping the whole conversation — degrade to pull time instead.
-    const eventMs = Date.parse(event.event_timestamp);
+    const eventMs = toEpochMs(event.event_timestamp);
     const startMs =
       GenieSpanAttributesService.tryToMs(payload.created_timestamp) ??
       (Number.isFinite(eventMs) ? eventMs : nowInstant().epochMilliseconds);

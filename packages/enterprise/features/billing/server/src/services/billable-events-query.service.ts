@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { BillableEventsPort } from "../ports/billable-events.port.ts";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:billableEventsQuery");
 
@@ -14,18 +15,17 @@ export class BillableEventsQueryService {
   }
 
   /** Formats a date as a billing month string (YYYY-MM). */
-  static getBillingMonth(now: Date = new Date()): string {
-    const year = now.getUTCFullYear();
-    const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  static getBillingMonth(now: Instant = nowInstant()): string {
+    const utc = now.toZonedDateTimeISO("UTC");
 
-    return `${year}-${month}`;
+    return `${utc.year}-${String(utc.month).padStart(2, "0")}`;
   }
 
   /** Returns the billing month string for the previous month. */
-  static getPreviousBillingMonth(now: Date = new Date()): string {
-    const previous = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  static getPreviousBillingMonth(now: Instant = nowInstant()): string {
+    const previous = now.toZonedDateTimeISO("UTC").subtract({ months: 1 });
 
-    return BillableEventsQueryService.getBillingMonth(previous);
+    return `${previous.year}-${String(previous.month).padStart(2, "0")}`;
   }
 
   /** Converts YYYY-MM into a ClickHouse [start, end) datetime range. */
@@ -34,11 +34,14 @@ export class BillableEventsQueryService {
     const year = Number.parseInt(yearText, 10);
     const month = Number.parseInt(monthText, 10);
     const startDate = `${year}-${String(month).padStart(2, "0")}-01 00:00:00.000`;
-    const nextMonth = new Date(Date.UTC(year, month, 1));
-    const endYear = nextMonth.getUTCFullYear();
-    const endMonth = String(nextMonth.getUTCMonth() + 1).padStart(2, "0");
+    const nextMonth = Temporal.PlainDateTime.from({ year, month: 1, day: 1 }).add({
+      months: month,
+    });
 
-    return [startDate, `${endYear}-${endMonth}-01 00:00:00.000`];
+    return [
+      startDate,
+      `${nextMonth.year}-${String(nextMonth.month).padStart(2, "0")}-01 00:00:00.000`,
+    ];
   }
 
   async tryQueryBillableEventsTotal({

@@ -29,6 +29,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "@langwatch/enterprise": "workspace:*",
     "@langwatch/enterprise-api": "workspace:*",
     "@langwatch/enterprise-governance-server": "workspace:*",

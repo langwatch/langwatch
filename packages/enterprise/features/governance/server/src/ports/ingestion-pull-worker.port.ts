@@ -4,6 +4,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
 import type { z } from "zod";
+import type { Instant } from "@langwatch/time";
 
 export type GovernanceTraceRequest = z.input<typeof exportTraceServiceRequestSchema>;
 
@@ -23,7 +24,7 @@ export type GovernanceOcsfEventInput = {
   sourceType: string;
   activityId: 1 | 2 | 3 | 4 | 6;
   severityId: 1 | 3 | 4 | 5 | 6;
-  eventTime: Date;
+  eventTime: Instant;
   actorUserId: string;
   actorEmail: string;
   actorEnduserId: string;

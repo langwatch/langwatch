@@ -13,6 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 import { WebhookEnvelopeService, type WebhookSpendEventRow } from "../webhook-envelope.service.ts";
+import { Temporal } from "@langwatch/time";
 
 function row(overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRow {
   return {
@@ -43,7 +44,7 @@ function row(overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRo
     labels: ["customer:acme-172"],
     metadata: '{"call_site":"summary"}',
     durationMs: 1234,
-    occurredAt: new Date("2026-07-27T14:03:11.482Z"),
+    occurredAt: Temporal.Instant.from("2026-07-27T14:03:11.482Z"),
     ...overrides,
   };
 }

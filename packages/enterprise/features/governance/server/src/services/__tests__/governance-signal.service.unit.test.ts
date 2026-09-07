@@ -24,6 +24,7 @@ import {
   type GovernanceResolvedBudgetCrossing,
 } from "../../ports/governance-signal.port.ts";
 import { GovernanceSignalService } from "../governance-signal.service.ts";
+import { type Instant, Temporal } from "@langwatch/time";
 
 function candidate(budgetId: string, bucketScopeId: string): GatewayBudgetCrossingCandidate {
   return { tenantId: "proj_1", budgetId, bucketScopeId, endUserId: null };
@@ -66,8 +67,8 @@ class FakeGovernanceSignalPort extends GovernanceSignalPort {
     return true;
   }
 
-  now(): Date {
-    return new Date("2026-08-01T00:00:00.000Z");
+  now(): Instant {
+    return Temporal.Instant.from("2026-08-01T00:00:00.000Z");
   }
 
   async tryResolveLifecycleTenant(): Promise<string | null> {

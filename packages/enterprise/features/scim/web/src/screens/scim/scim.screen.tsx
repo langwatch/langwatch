@@ -33,6 +33,7 @@ import { useState } from "react";
 import { scimApi } from "../../behavior/scim-api.ts";
 import { useScimHost } from "../../model/scim-host.ts";
 import { CopyInput } from "../../ui/elements/copy-input.tsx";
+import { readableDate } from "../../model/display-formatters.ts";
 
 /** The grant the platform page asked for, unchanged. */
 export const SCIM_PAGE_PERMISSION = "organization:manage";
@@ -159,10 +160,10 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
                         <Text>{token.description ?? "No description"}</Text>
                       </HStack>
                     </Table.Cell>
-                    <Table.Cell>{new Date(token.createdAt).toLocaleDateString()}</Table.Cell>
+                    <Table.Cell>{readableDate(token.createdAt).toLocaleDateString()}</Table.Cell>
                     <Table.Cell>
                       {token.lastUsedAt ? (
-                        new Date(token.lastUsedAt).toLocaleDateString()
+                        readableDate(token.lastUsedAt).toLocaleDateString()
                       ) : (
                         <Badge size="sm" colorPalette="gray">
                           Never

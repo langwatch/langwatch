@@ -18,6 +18,7 @@ import {
   TEST_PUBLIC_KEY,
   VALID_LICENSE_KEY,
 } from "../testing.ts";
+import { nowInstant, Temporal } from "@langwatch/time";
 
 /** A freshly minted key, bound to one organization or to none. */
 function mintLicenseKey(options: { organizationId?: string } = {}): string {
@@ -133,7 +134,7 @@ describe("LicenseService", () => {
       retention,
       logger,
       configuration: LicenseServiceConfiguration.create({
-        now: () => new Date("2026-01-02T03:04:05.000Z"),
+        now: () => Temporal.Instant.from("2026-01-02T03:04:05.000Z"),
         retention: { categories: ["traces", "scenarios"], defaultDays: 30 },
       }),
     });
@@ -160,8 +161,8 @@ describe("LicenseService", () => {
   it("scans organization licenses after an invalid instance candidate and accepts a signed expired license", async () => {
     repository.stored.set(ORGANIZATION_ID, {
       licenseKey: EXPIRED_LICENSE_KEY,
-      expiresAt: new Date("2000-01-01T00:00:00.000Z"),
-      validatedAt: new Date("1999-01-01T00:00:00.000Z"),
+      expiresAt: Temporal.Instant.from("2000-01-01T00:00:00.000Z"),
+      validatedAt: Temporal.Instant.from("1999-01-01T00:00:00.000Z"),
     });
 
     const result = await service.inspectPlatformAccess({
@@ -190,13 +191,13 @@ describe("LicenseService", () => {
     repository.organizations.add("org_other");
     repository.stored.set("org_other", {
       licenseKey: TAMPERED_LICENSE_KEY,
-      expiresAt: new Date("2030-01-01T00:00:00.000Z"),
-      validatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      expiresAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
+      validatedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
     });
     repository.stored.set(ORGANIZATION_ID, {
       licenseKey: VALID_LICENSE_KEY,
-      expiresAt: new Date("2030-01-01T00:00:00.000Z"),
-      validatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      expiresAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
+      validatedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
     });
 
     const result = await service.inspectPlatformAccess({});
@@ -222,7 +223,7 @@ describe("LicenseService", () => {
     expect(result.success).toBe(true);
     expect(repository.stored.get(ORGANIZATION_ID)).toMatchObject({
       licenseKey: VALID_LICENSE_KEY,
-      validatedAt: new Date("2026-01-02T03:04:05.000Z"),
+      validatedAt: Temporal.Instant.from("2026-01-02T03:04:05.000Z"),
     });
     expect(retention.written).toEqual([
       {
@@ -282,8 +283,8 @@ describe("LicenseService", () => {
   it("does not read a stored license as platform access for another organization", async () => {
     repository.stored.set(ORGANIZATION_ID, {
       licenseKey: mintLicenseKey({ organizationId: "org_someone_else" }),
-      expiresAt: new Date("2030-01-01T00:00:00.000Z"),
-      validatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      expiresAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
+      validatedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
     });
 
     const result = await service.inspectPlatformAccess({});
@@ -311,8 +312,8 @@ describe("LicenseService", () => {
   it("lets a lapsed license step aside on Cloud but preserves its self-hosted plan", async () => {
     repository.stored.set(ORGANIZATION_ID, {
       licenseKey: EXPIRED_LICENSE_KEY,
-      expiresAt: new Date(0),
-      validatedAt: new Date(0),
+      expiresAt: Temporal.Instant.fromEpochMilliseconds(0),
+      validatedAt: Temporal.Instant.fromEpochMilliseconds(0),
     });
 
     await expect(service.getActivePlan(ORGANIZATION_ID)).resolves.toBe(UNLIMITED_PLAN);
@@ -326,8 +327,8 @@ describe("LicenseService", () => {
   it("reports usage and distinguishes a genuine lapse from a forged one", async () => {
     repository.stored.set(ORGANIZATION_ID, {
       licenseKey: EXPIRED_LICENSE_KEY,
-      expiresAt: new Date(0),
-      validatedAt: new Date(0),
+      expiresAt: Temporal.Instant.fromEpochMilliseconds(0),
+      validatedAt: Temporal.Instant.fromEpochMilliseconds(0),
     });
 
     await expect(service.getLicenseStatus(ORGANIZATION_ID)).resolves.toMatchObject({
@@ -356,8 +357,8 @@ describe("LicenseService", () => {
   it("removes a license idempotently", async () => {
     repository.stored.set(ORGANIZATION_ID, {
       licenseKey: VALID_LICENSE_KEY,
-      expiresAt: new Date(),
-      validatedAt: new Date(),
+      expiresAt: nowInstant(),
+      validatedAt: nowInstant(),
     });
 
     await expect(service.removeLicense(ORGANIZATION_ID)).resolves.toEqual({

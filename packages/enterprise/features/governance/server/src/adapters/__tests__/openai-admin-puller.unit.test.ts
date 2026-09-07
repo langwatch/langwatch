@@ -12,7 +12,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port.ts";
+import {
+  GovernanceHttpPort,
+  type GovernanceHttpResponse,
+} from "../../ports/governance-http.port.ts";
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
@@ -31,6 +34,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 import { OPENAI_ADMIN_ADAPTER_ID } from "@langwatch/enterprise-governance-contract";
 import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.adapter.ts";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
+import { Temporal } from "@langwatch/time";
 
 class StubHttp extends GovernanceHttpPort {
   async fetch(
@@ -65,7 +69,7 @@ const SOURCE = {
   organizationId: "org_acme",
   teamId: "team_platform",
 };
-const OBSERVED_AT = new Date("2026-08-26T09:00:00.000Z");
+const OBSERVED_AT = Temporal.Instant.from("2026-08-26T09:00:00.000Z");
 
 /** 2026-08-01T00:00:00Z, the shape the API reports a bucket start in. */
 const BUCKET_START_EPOCH = 1785542400;
@@ -323,7 +327,7 @@ describe("given an OpenAI Admin cost source", () => {
       const after = buildPulledUsageRecord({
         event: second.events[0]!,
         source: SOURCE,
-        observedAt: new Date(OBSERVED_AT.getTime() + 60_000),
+        observedAt: OBSERVED_AT.add({ milliseconds: 60_000 }),
       });
 
       expect(after?.restatementKey).toBe(before?.restatementKey);

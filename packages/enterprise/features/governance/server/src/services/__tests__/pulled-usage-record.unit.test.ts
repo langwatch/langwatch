@@ -14,6 +14,7 @@ import {
 import { PulledUsageRatePort } from "../../ports/pulled-usage-rate.port.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
+import { Temporal } from "@langwatch/time";
 
 class FixedRatePort extends PulledUsageRatePort {
   rate(input: Parameters<PulledUsageRatePort["rate"]>[0]): {
@@ -39,7 +40,7 @@ const SOURCE: PulledUsageSourceAttribution = {
   teamId: "team_platform",
 };
 
-const OBSERVED_AT = new Date("2026-08-06T09:00:00.000Z");
+const OBSERVED_AT = Temporal.Instant.from("2026-08-06T09:00:00.000Z");
 
 function usageEvent({
   overrides = {},
@@ -92,7 +93,7 @@ describe("building one pulled usage record", () => {
       expect(record?.rateVersion).toBeTruthy();
       // The bucket is the provider's; the observation is ours.
       expect(record?.occurredAtMs).toBe(Date.parse("2026-08-01T00:00:00.000Z"));
-      expect(record?.observedAtMs).toBe(OBSERVED_AT.getTime());
+      expect(record?.observedAtMs).toBe(OBSERVED_AT.epochMilliseconds);
     });
 
     it("attributes to the source's own organization and team", () => {
@@ -181,7 +182,7 @@ describe("building one pulled usage record", () => {
           },
         }),
         source: SOURCE,
-        observedAt: new Date("2026-08-07T09:00:00.000Z"),
+        observedAt: Temporal.Instant.from("2026-08-07T09:00:00.000Z"),
       });
 
       // The whole correction mechanic: the key a restatement must MATCH
@@ -217,7 +218,7 @@ describe("building one pulled usage record", () => {
       const corrected = buildPulledUsageRecord({
         event: withHour("3600000"),
         source: SOURCE,
-        observedAt: new Date("2026-08-07T09:00:00.000Z"),
+        observedAt: Temporal.Instant.from("2026-08-07T09:00:00.000Z"),
       });
 
       expect(corrected?.restatementKey).toBe(first?.restatementKey);

@@ -1,5 +1,6 @@
 import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service.ts";
 import type { CioOrgTraits, CioPersonTraits } from "@langwatch/enterprise-billing-contract";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Tracks which users have had a full CIO profile sync this process lifetime.
@@ -36,8 +37,8 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
     ...(signupData.companySize ? { company_size: signupData.companySize as string } : {}),
     has_traces: hasTraces,
     has_subscription: hasSubscription,
-    createdAt: user.createdAt.toISOString(),
-    last_active_at: new Date().toISOString(),
+    createdAt: user.createdAt.toString({ fractionalSecondDigits: 3 }),
+    last_active_at: nowInstant().toString({ fractionalSecondDigits: 3 }),
   };
 
   const orgTraits: Partial<CioOrgTraits> = {

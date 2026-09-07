@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { WebhookDestinationService } from "../webhook-destination.service.ts";
 import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
 import { WebhookEnvelopeService, type WebhookSpendEventRow } from "../webhook-envelope.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const spendRow = (overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRow => ({
   tenantId: "project_1",
@@ -31,7 +32,7 @@ const spendRow = (overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEv
   labels: [],
   metadata: "{}",
   durationMs: 12,
-  occurredAt: new Date("2026-08-24T00:00:00.000Z"),
+  occurredAt: Temporal.Instant.from("2026-08-24T00:00:00.000Z"),
   ...overrides,
 });
 

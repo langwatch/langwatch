@@ -3,16 +3,17 @@ import {
   type AnomalyRuleDatabase,
 } from "../repositories/prisma/prisma.anomaly-rule.repository.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
+import { type Instant } from "@langwatch/time";
 
 export class PostgresAnomalyRuleAdapter {
   private constructor(
     private readonly database: AnomalyRuleDatabase,
-    private readonly now: (() => Date) | undefined,
+    private readonly now: (() => Instant) | undefined,
   ) {}
 
   static create(options: {
     database: AnomalyRuleDatabase;
-    now?: () => Date;
+    now?: () => Instant;
   }): PostgresAnomalyRuleAdapter {
     return new PostgresAnomalyRuleAdapter(options.database, options.now);
   }

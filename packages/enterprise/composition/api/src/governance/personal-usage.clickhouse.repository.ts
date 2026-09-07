@@ -20,6 +20,7 @@
  * the trace_summaries reads apply the IN-tuple / argMax dedup pattern.
  */
 import { nanoUsdToDecimalString, parseSummedNanoUsd } from "@langwatch/gateway-contract";
+import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 
 type PersonalUsageClickHouseClient = {
   query(input: {
@@ -39,9 +40,9 @@ const PERSONAL_USAGE_CLICKHOUSE_SETTINGS: Record<string, number> = {
 
 export interface PersonalUsageWindow {
   /** Inclusive UTC start of the rollup window. */
-  start: Date;
+  start: Instant;
   /** Exclusive UTC end of the rollup window. */
-  end: Date;
+  end: Instant;
 }
 
 export interface PersonalUsageSummaryRow {
@@ -152,13 +153,16 @@ export class AppPersonalUsageReadAdapter {
     input: { personalProjectId: string },
     limit = 8,
   ): Promise<PersonalUsageModelBreakdownRow[]> {
-    const now = new Date();
+    const now = nowInstant();
+    const utc = now.toZonedDateTimeISO("UTC");
 
     return this.findModelBreakdown({
       tenantId: input.personalProjectId,
       window: {
-        start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
-        end: new Date(now.getTime() + 1),
+        start: Temporal.PlainDateTime.from({ year: utc.year, month: utc.month, day: 1 })
+          .toZonedDateTime("UTC")
+          .toInstant(),
+        end: now.add({ milliseconds: 1 }),
       },
       limit,
     });
@@ -198,8 +202,8 @@ export class AppPersonalUsageReadAdapter {
       `,
       query_params: {
         tenantId: input.tenantId,
-        fromMs: input.window.start.getTime(),
-        toMs: input.window.end.getTime(),
+        fromMs: input.window.start.epochMilliseconds,
+        toMs: input.window.end.epochMilliseconds,
       },
       format: "JSONEachRow",
     });
@@ -259,8 +263,8 @@ export class AppPersonalUsageReadAdapter {
       `,
       query_params: {
         tenantId: input.tenantId,
-        fromMs: input.window.start.getTime(),
-        toMs: input.window.end.getTime(),
+        fromMs: input.window.start.epochMilliseconds,
+        toMs: input.window.end.epochMilliseconds,
       },
       format: "JSONEachRow",
     });
@@ -303,8 +307,8 @@ export class AppPersonalUsageReadAdapter {
       `,
       query_params: {
         tenantId: input.tenantId,
-        fromMs: input.window.start.getTime(),
-        toMs: input.window.end.getTime(),
+        fromMs: input.window.start.epochMilliseconds,
+        toMs: input.window.end.epochMilliseconds,
       },
       format: "JSONEachRow",
     });
@@ -364,8 +368,8 @@ export class AppPersonalUsageReadAdapter {
       `,
       query_params: {
         tenantId: input.tenantId,
-        fromMs: input.window.start.getTime(),
-        toMs: input.window.end.getTime(),
+        fromMs: input.window.start.epochMilliseconds,
+        toMs: input.window.end.epochMilliseconds,
         lim: input.limit,
       },
       format: "JSONEachRow",
@@ -401,8 +405,8 @@ export class AppPersonalUsageReadAdapter {
     const queryParams = {
       tenantId: input.tenantId,
       userId: input.userId,
-      fromMs: input.window.start.getTime(),
-      toMs: input.window.end.getTime(),
+      fromMs: input.window.start.epochMilliseconds,
+      toMs: input.window.end.epochMilliseconds,
     };
 
     const result = await client.query({
@@ -475,8 +479,8 @@ export class AppPersonalUsageReadAdapter {
       query_params: {
         tenantId: input.tenantId,
         userId: input.userId,
-        fromMs: input.window.start.getTime(),
-        toMs: input.window.end.getTime(),
+        fromMs: input.window.start.epochMilliseconds,
+        toMs: input.window.end.epochMilliseconds,
       },
       format: "JSONEachRow",
     });
@@ -516,8 +520,8 @@ export class AppPersonalUsageReadAdapter {
       query_params: {
         tenantId: input.tenantId,
         userId: input.userId,
-        fromMs: input.window.start.getTime(),
-        toMs: input.window.end.getTime(),
+        fromMs: input.window.start.epochMilliseconds,
+        toMs: input.window.end.epochMilliseconds,
       },
       format: "JSONEachRow",
     });

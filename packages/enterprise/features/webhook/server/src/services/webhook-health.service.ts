@@ -14,6 +14,7 @@ import {
   type EndpointStreamState,
   WEBHOOK_DELIVERY_PROCESS_NAME,
 } from "../rules/webhook-delivery-contract.rules.ts";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 
 /** The last-hour window the rate figures aggregate over. */
 const RATE_WINDOW_MS = 60 * 60 * 1000;
@@ -24,14 +25,14 @@ export interface WebhookEndpointHealthSource {
   tryGetStatusSnapshot(input: { organizationId: string; endpointId: string }): Promise<{
     status: "ACTIVE" | "DISABLED";
     disabledReason: string | null;
-    failingSince: Date | null;
-    lastSuccessAt: Date | null;
-    lastFailureAt: Date | null;
+    failingSince: Instant | null;
+    lastSuccessAt: Instant | null;
+    lastFailureAt: Instant | null;
   } | null>;
   getDeliveryStats(input: {
     organizationId: string;
     endpointId: string;
-    since: Date;
+    since: Instant;
     sampleLimit: number;
   }): Promise<{ attempted: number; delivered: number; latencies: number[] }>;
 }
@@ -88,7 +89,7 @@ export class WebhookHealthService extends WebhookHealthServiceContract {
     const stats = await this.deps.endpoints.getDeliveryStats({
       organizationId: params.organizationId,
       endpointId: params.endpointId,
-      since: new Date(now - RATE_WINDOW_MS),
+      since: Temporal.Instant.fromEpochMilliseconds(now - RATE_WINDOW_MS),
       sampleLimit: LATENCY_SAMPLE_LIMIT,
     });
 
@@ -104,9 +105,9 @@ export class WebhookHealthService extends WebhookHealthServiceContract {
     return {
       status: endpoint.status,
       disabledReason: endpoint.disabledReason,
-      failingSince: endpoint.failingSince,
-      lastSuccessAt: endpoint.lastSuccessAt,
-      lastFailureAt: endpoint.lastFailureAt,
+      failingSince: endpoint.failingSince === null ? null : toDate(endpoint.failingSince),
+      lastSuccessAt: endpoint.lastSuccessAt === null ? null : toDate(endpoint.lastSuccessAt),
+      lastFailureAt: endpoint.lastFailureAt === null ? null : toDate(endpoint.lastFailureAt),
       oldestUndeliveredAgeMs:
         oldestUndeliveredMs === null ? null : Math.max(0, now - oldestUndeliveredMs),
       dlqDepth,

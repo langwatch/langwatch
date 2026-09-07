@@ -10,6 +10,7 @@ import type {
   BillingSubscriptionPort,
 } from "../../ports/subscription.port.ts";
 import { DeploymentPlanSourcesService } from "../deployment-plan-sources.service.ts";
+import { Temporal } from "@langwatch/time";
 
 /**
  * Spec: packages/enterprise/features/billing/specs/deployment-plan-sources.feature
@@ -23,8 +24,8 @@ const subscription = (
   status: "ACTIVE",
   plan: PlanTypes.LAUNCH,
   stripeSubscriptionId: "stripe-1",
-  createdAt: new Date("2026-09-01T00:00:00.000Z"),
-  startDate: new Date("2026-09-01T00:00:00.000Z"),
+  createdAt: Temporal.Instant.from("2026-09-01T00:00:00.000Z"),
+  startDate: Temporal.Instant.from("2026-09-01T00:00:00.000Z"),
   endDate: null,
   maxMembers: null,
   maxMembersLite: null,

@@ -25,6 +25,7 @@ import {
   resolveProrationDate,
   seatChangeParams,
 } from "../rules/seat-event-quote.rules.ts";
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:seatEventSubscription");
 
@@ -208,11 +209,18 @@ export class SeatEventSubscriptionService {
     // Anchor billing cycle to the 1st of next month for all plans.
     // Customer pays prorated amount for the partial period (checkout → anchor),
     // then full price (monthly or annual) starting on the 1st.
-    const now = new Date();
-    const billingCycleAnchor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    const now = nowInstant().toZonedDateTimeISO("UTC");
+    const billingCycleAnchor = Temporal.PlainDateTime.from({
+      year: now.year,
+      month: now.month,
+      day: 1,
+    })
+      .toZonedDateTime("UTC")
+      .add({ months: 1 })
+      .toInstant();
     const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] = {
       metadata: selectedOptionsMetadata,
-      billing_cycle_anchor: Math.floor(billingCycleAnchor.getTime() / 1000),
+      billing_cycle_anchor: Math.floor(billingCycleAnchor.epochMilliseconds / 1000),
       proration_behavior:
         "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
     };
@@ -256,7 +264,7 @@ export class SeatEventSubscriptionService {
 
     await this.db.subscription.updateMany({
       where,
-      data: { status: SubscriptionStatus.CANCELLED, endDate: new Date() },
+      data: { status: SubscriptionStatus.CANCELLED, endDate: toDate(nowInstant()) },
     });
     if (staleSubIds.length === 0) {
       return;
@@ -305,7 +313,7 @@ export class SeatEventSubscriptionService {
             email: invite.email,
             organizationId,
             status: { in: ["PENDING", "PAYMENT_PENDING"] },
-            OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+            OR: [{ expiration: { gt: toDate(nowInstant()) } }, { expiration: null }],
           },
         });
         if (existing) {

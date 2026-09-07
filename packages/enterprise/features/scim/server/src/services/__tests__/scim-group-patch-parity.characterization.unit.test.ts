@@ -6,6 +6,7 @@ import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
 import { ScimDirectoryService } from "../scim-directory.service.ts";
 import { ScimGrantsService } from "../scim-grants.service.ts";
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { Temporal } from "@langwatch/time";
 
 const schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const group = {
@@ -15,8 +16,8 @@ const group = {
   slug: "engineering",
   scimSource: "scim",
   externalId: "group-1",
-  createdAt: new Date("2024-01-01T00:00:00Z"),
-  updatedAt: new Date("2024-01-02T00:00:00Z"),
+  createdAt: Temporal.Instant.from("2024-01-01T00:00:00Z"),
+  updatedAt: Temporal.Instant.from("2024-01-02T00:00:00Z"),
 };
 
 function repository(): ScimDirectoryRepository {

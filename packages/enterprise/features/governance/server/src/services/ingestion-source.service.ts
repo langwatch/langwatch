@@ -23,6 +23,7 @@ import type { IngestionCredentialsService } from "./ingestion-credentials.servic
 import type { IngestionSecretService } from "./ingestion-source-secret.service.ts";
 import type { PullDestinationService } from "./pull-destination.service.ts";
 import { IngestionSourceValidationService } from "./ingestion-source-validation.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
@@ -316,7 +317,7 @@ export class IngestionSourceService {
   }): Promise<GovernanceIngestionSource> {
     const existing = await this.getById({ id, organizationId });
     const source = await this.repository.update(existing.id, {
-      archivedAt: new Date(this.now()),
+      archivedAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
       status: "disabled",
     });
     if (source.pullSchedule) {
@@ -328,7 +329,7 @@ export class IngestionSourceService {
 
   async recordEventReceived(id: string): Promise<void> {
     await this.repository.update(id, {
-      lastEventAt: new Date(this.now()),
+      lastEventAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
       status: "active",
     });
   }

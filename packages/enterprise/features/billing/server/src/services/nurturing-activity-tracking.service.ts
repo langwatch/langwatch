@@ -1,4 +1,6 @@
 import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service.ts";
+import { nowInstant } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -57,7 +59,7 @@ export class NurturingActivityTrackingService {
       return;
     }
 
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     sweepExpiredEntries({ now });
     const lastSent = lastActivitySentAt.get(userId);
 
@@ -70,7 +72,11 @@ export class NurturingActivityTrackingService {
     void nurturing
       .identifyUser({
         userId,
-        traits: { last_active_at: new Date(now).toISOString() },
+        traits: {
+          last_active_at: Temporal.Instant.fromEpochMilliseconds(now).toString({
+            fractionalSecondDigits: 3,
+          }),
+        },
       })
       .catch((error) => {
         lastActivitySentAt.delete(userId);

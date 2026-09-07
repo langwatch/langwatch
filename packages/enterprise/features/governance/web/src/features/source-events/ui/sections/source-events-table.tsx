@@ -17,6 +17,8 @@ import { Fragment, type ReactNode, useState } from "react";
 import { EventDetailRow } from "./source-event-detail-panels.tsx";
 import type { SourceEventsPager } from "../../behavior/use-source-events-pager.ts";
 import { nowInstant } from "@langwatch/time";
+import { toEpochMs } from "@langwatch/time";
+import { readableDate } from "../../../../model/display-formatters.ts";
 
 /**
  * The events section of the ingestion-source detail page: a cursor-walked
@@ -107,7 +109,7 @@ function EventsTableHeader() {
 }
 
 function EventTimeCell({ iso }: { iso: string }) {
-  const ms = Date.parse(iso);
+  const ms = toEpochMs(iso);
   // An unparsable timestamp gets a plain dash — a tooltip would only
   // have "Invalid Date" to say.
   if (Number.isNaN(ms)) {
@@ -118,7 +120,7 @@ function EventTimeCell({ iso }: { iso: string }) {
     );
   }
   return (
-    <Tooltip content={new Date(ms).toLocaleString()}>
+    <Tooltip content={readableDate(ms).toLocaleString()}>
       <Text textStyle="sm" cursor="help" whiteSpace="nowrap">
         {formatTimeAgo(ms) ?? "—"}
       </Text>

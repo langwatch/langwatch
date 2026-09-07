@@ -12,6 +12,7 @@ import {
   type StoreLicenseResult,
 } from "@langwatch/enterprise-licensing-contract";
 import { licenseResourceCounts } from "@langwatch/plans";
+import { nowInstant, Temporal, toEpochMs, type Instant } from "@langwatch/time";
 import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
 import type { LicenseLoggerPort } from "../ports/license-logger.port.ts";
 import type { LicenseRetentionPort } from "../ports/license-retention.port.ts";
@@ -26,18 +27,18 @@ export type LicenseRetentionConfiguration = {
 
 export type LicenseServiceConfigurationInput = {
   retention?: LicenseRetentionConfiguration;
-  now?: () => Date;
+  now?: () => Instant;
 };
 
 /** Immutable runtime configuration; environment resolution stays in composition. */
 export class LicenseServiceConfiguration {
   private constructor(
     readonly retention: LicenseRetentionConfiguration | undefined,
-    readonly now: () => Date,
+    readonly now: () => Instant,
   ) {}
 
   static create(input: LicenseServiceConfigurationInput = {}): LicenseServiceConfiguration {
-    return new LicenseServiceConfiguration(input.retention, input.now ?? (() => new Date()));
+    return new LicenseServiceConfiguration(input.retention, input.now ?? nowInstant);
   }
 }
 
@@ -162,7 +163,7 @@ export class LicenseService extends LicensingServiceContract {
 
     await this.repository.storeLicense(organizationId, {
       licenseKey,
-      expiresAt: new Date(result.licenseData.expiresAt),
+      expiresAt: Temporal.Instant.fromEpochMilliseconds(toEpochMs(result.licenseData.expiresAt)),
       validatedAt: this.configuration.now(),
     });
     await this.provisionMissingRetentionPolicies(organizationId);

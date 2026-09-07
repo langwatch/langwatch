@@ -9,6 +9,7 @@ import {
   ANOMALY_RULE_SCOPES,
   anomalyRuleSchema,
   ANOMALY_RULE_SEVERITIES,
+  type AnomalyRule,
   type GovernanceService,
   redactDestinationConfig,
 } from "@langwatch/enterprise-governance-contract";
@@ -64,23 +65,25 @@ const updateSchema = idAndOrg.extend({
   status: statusSchema.optional(),
 });
 
-type AnomalyRuleRow = Readonly<{
-  id: string;
-  organizationId: string;
-  scope: string;
-  scopeId: string;
-  name: string;
-  description: string | null;
-  severity: string;
-  ruleType: string;
-  thresholdConfig: unknown;
-  destinationConfig: unknown;
-  status: string;
-  archivedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  createdById: string | null;
-}>;
+/** The moments a rule carries, on the contract's own wire types. */
+type AnomalyRuleMoments = Pick<AnomalyRule, "archivedAt" | "createdAt" | "updatedAt">;
+
+type AnomalyRuleRow = Readonly<
+  AnomalyRuleMoments & {
+    id: string;
+    organizationId: string;
+    scope: string;
+    scopeId: string;
+    name: string;
+    description: string | null;
+    severity: string;
+    ruleType: string;
+    thresholdConfig: unknown;
+    destinationConfig: unknown;
+    status: string;
+    createdById: string | null;
+  }
+>;
 
 /**
  * The wire shape of one rule. Exported so the redaction it applies can be

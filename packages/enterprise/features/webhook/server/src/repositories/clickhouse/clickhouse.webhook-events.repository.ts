@@ -7,6 +7,7 @@ import type {
   WebhookSpendEventStatus,
 } from "../../services/webhook-envelope.service.ts";
 import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
+import { Temporal } from "@langwatch/time";
 
 const SPEND_TABLE = "gateway_spend";
 const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
@@ -58,7 +59,7 @@ function mapSpendEventRow(raw: Record<string, unknown>): WebhookSpendEventRow {
     labels: Array.isArray(raw.Labels) ? raw.Labels.map(String) : [],
     metadata: String(raw.Metadata ?? ""),
     durationMs: Number(raw.DurationMS),
-    occurredAt: new Date(Number(raw.OccurredAtMs)),
+    occurredAt: Temporal.Instant.fromEpochMilliseconds(Number(raw.OccurredAtMs)),
   };
 }
 
@@ -184,7 +185,7 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepositoryPo
       nextCursor:
         rows.length === input.limit && last
           ? encodeCursor({
-              occurredAtMs: last.occurredAt.getTime(),
+              occurredAtMs: last.occurredAt.epochMilliseconds,
               gatewayRequestId: last.gatewayRequestId,
             })
           : null,

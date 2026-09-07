@@ -1,3 +1,5 @@
+import { readableDate } from "./display-formatters.ts";
+
 /**
  * Pure utility functions for invoice display.
  *
@@ -25,7 +27,7 @@ export function getInvoiceStatusColor(status: string): string {
  * Formats a unix timestamp into a human-readable date string.
  */
 export function formatInvoiceDate(unixTimestamp: number): string {
-  return new Date(unixTimestamp * 1000).toLocaleDateString("en-US", {
+  return readableDate(unixTimestamp * 1000).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",

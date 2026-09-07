@@ -5,6 +5,8 @@ import { createLogger } from "@langwatch/observability";
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import type { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
+import { nowInstant } from "@langwatch/time";
+import { type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:meterDispatch");
 
@@ -52,19 +54,19 @@ export class EventingBillingMeterDispatchAdapter {
      */
     getDispatch: () => (data: ReportUsageForMonthCommandData) => Promise<void>;
     /** Injected so a test can place the run inside or outside the grace window. */
-    now?: () => Date;
+    now?: () => Instant;
   }): EventingBillingMeterDispatchAdapter {
     return new EventingBillingMeterDispatchAdapter(
       options.organizations,
       options.getDispatch,
-      options.now ?? (() => new Date()),
+      options.now ?? nowInstant,
     );
   }
 
   private constructor(
     private readonly organizations: BillingTenantOrganizationService,
     private readonly getDispatch: () => (data: ReportUsageForMonthCommandData) => Promise<void>,
-    private readonly now: () => Date,
+    private readonly now: () => Instant,
   ) {}
 
   /**
@@ -125,12 +127,12 @@ export class EventingBillingMeterDispatchAdapter {
         try {
           const dispatch = this.getDispatch();
 
-          if (now.getUTCDate() <= GRACE_PERIOD_DAYS) {
+          if (now.toZonedDateTimeISO("UTC").day <= GRACE_PERIOD_DAYS) {
             await dispatch({
               organizationId,
               billingMonth: BillableEventsQueryService.getPreviousBillingMonth(now),
               tenantId: organizationId,
-              occurredAt: Date.now(),
+              occurredAt: nowInstant().epochMilliseconds,
             });
           }
 
@@ -138,7 +140,7 @@ export class EventingBillingMeterDispatchAdapter {
             organizationId,
             billingMonth: BillableEventsQueryService.getBillingMonth(now),
             tenantId: organizationId,
-            occurredAt: Date.now(),
+            occurredAt: nowInstant().epochMilliseconds,
           });
         } catch (error) {
           logger.warn(

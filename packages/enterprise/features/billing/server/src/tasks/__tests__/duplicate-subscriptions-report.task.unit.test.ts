@@ -4,6 +4,7 @@ import {
   type SubscriptionReportRow,
 } from "../../repositories/duplicate-subscriptions-report.repository.ts";
 import { reportDuplicateSubscriptions } from "../duplicate-subscriptions-report.task.ts";
+import { Temporal } from "@langwatch/time";
 
 function row(overrides: Partial<SubscriptionReportRow>): SubscriptionReportRow {
   return {
@@ -11,7 +12,7 @@ function row(overrides: Partial<SubscriptionReportRow>): SubscriptionReportRow {
     organizationId: "org-1",
     plan: "PRO",
     status: "ACTIVE",
-    createdAt: new Date("2026-01-01T00:00:00Z"),
+    createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
     stripeSubscriptionId: null,
     ...overrides,
   };
@@ -35,11 +36,14 @@ describe("reportDuplicateSubscriptions", () => {
   describe("given an organization holding two active subscriptions", () => {
     /** @scenario "The duplicate-subscription report names the row plan resolution picks" */
     it("reports the duplicate and names the winner by the product's own ordering", async () => {
-      const older = row({ id: "sub-old", createdAt: new Date("2026-01-01T00:00:00Z") });
+      const older = row({
+        id: "sub-old",
+        createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+      });
       const newer = row({
         id: "sub-new",
         plan: "ENTERPRISE",
-        createdAt: new Date("2026-06-01T00:00:00Z"),
+        createdAt: Temporal.Instant.from("2026-06-01T00:00:00Z"),
       });
       const repository = fakeRepository({ active: [older, newer], pending: [] });
 
@@ -59,7 +63,7 @@ describe("reportDuplicateSubscriptions", () => {
       const repository = fakeRepository({
         active: [],
         pending: [
-          row({ id: "p1", plan: "PRO", createdAt: new Date("2025-02-01T00:00:00Z") }),
+          row({ id: "p1", plan: "PRO", createdAt: Temporal.Instant.from("2025-02-01T00:00:00Z") }),
           row({ id: "p2", plan: "PRO", organizationId: "org-2" }),
           row({ id: "p3", plan: "LAUNCH", organizationId: "org-3" }),
         ],
@@ -73,7 +77,9 @@ describe("reportDuplicateSubscriptions", () => {
         { plan: "PRO", count: 2 },
         { plan: "LAUNCH", count: 1 },
       ]);
-      expect(report.oldestPending?.toISOString()).toBe("2025-02-01T00:00:00.000Z");
+      expect(report.oldestPending?.toString({ fractionalSecondDigits: 3 })).toBe(
+        "2025-02-01T00:00:00.000Z",
+      );
     });
   });
 });

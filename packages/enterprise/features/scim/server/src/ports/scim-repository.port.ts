@@ -1,17 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { ScimTokenRecord } from "@langwatch/enterprise-scim-contract";
+import type { Instant } from "@langwatch/time";
+import type { UserProfile } from "@langwatch/user-contract";
+
 /** SCIM-owned persistence records. Prisma models do not cross this seam. */
-export interface ScimUserRecord {
-  id: string;
-  email: string | null;
-  name: string | null;
-  emailVerified: boolean;
-  image: string | null;
-  pendingSsoSetup: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  lastLoginAt: Date | null;
-  deactivatedAt: Date | null;
-}
+export type ScimUserRecord = UserProfile;
 export interface ScimMembershipRecord {
   userId: string;
   organizationId: string;
@@ -36,8 +29,8 @@ export interface ScimGroupRecord {
   slug: string;
   scimSource: string | null;
   externalId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 }
 export interface ScimRoleBindingRecord {
   id: string;
@@ -67,14 +60,7 @@ export type ScimGrantBindingScope =
       organizationId: string;
       userId: string;
     };
-export interface ScimTokenRecord {
-  id: string;
-  organizationId: string;
-  connectionId: string | null;
-  description: string | null;
-  createdAt: Date;
-  lastUsedAt: Date | null;
-}
+export type { ScimTokenRecord };
 export interface ScimTokenIdentity {
   id: string;
   organizationId: string;
@@ -159,7 +145,7 @@ export abstract class ScimRepositoryPort extends ScimGrantRepositoryPort {
     connectionId: string;
   }): Promise<number>;
   abstract tryFindTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null>;
-  abstract recordTokenUse(input: { tokenId: string; usedAt: Date }): Promise<void>;
+  abstract recordTokenUse(input: { tokenId: string; usedAt: Instant }): Promise<void>;
   abstract scimConnectionExists(input: {
     organizationId: string;
     connectionId: string;

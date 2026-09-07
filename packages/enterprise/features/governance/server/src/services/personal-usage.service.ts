@@ -10,6 +10,7 @@ import type {
   IngestionPrincipalSummaryRow,
   PersonalUsageReaderPort,
 } from "../ports/personal-usage.port.ts";
+import { Temporal } from "@langwatch/time";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
@@ -185,17 +186,23 @@ export class DefaultGovernancePersonalUsageService {
   }
 
   private currentMonthWindow(): PersonalUsageWindow {
-    const now = new Date(this.clock());
+    const nowMs = this.clock();
+    const now = Temporal.Instant.fromEpochMilliseconds(nowMs).toZonedDateTimeISO("UTC");
 
     return {
-      startMs: Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
-      endMs: now.getTime() + 1,
+      startMs: Temporal.PlainDateTime.from({
+        year: now.year,
+        month: now.month,
+        day: 1,
+      }).toZonedDateTime("UTC").epochMilliseconds,
+      endMs: nowMs + 1,
     };
   }
 
   private lastFourteenDaysWindow(): PersonalUsageWindow {
-    const now = new Date(this.clock());
-    const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const todayMs = Temporal.Instant.fromEpochMilliseconds(this.clock())
+      .toZonedDateTimeISO("UTC")
+      .startOfDay().epochMilliseconds;
 
     return { startMs: todayMs - 13 * DAY_MS, endMs: todayMs + DAY_MS };
   }
@@ -206,7 +213,10 @@ export class DefaultGovernancePersonalUsageService {
   ): PersonalUsageBucket[] {
     const buckets: PersonalUsageBucket[] = [];
     for (let cursor = window.startMs; cursor < window.endMs; cursor += DAY_MS) {
-      const day = new Date(cursor).toISOString().slice(0, 10);
+      const day = Temporal.Instant.fromEpochMilliseconds(cursor)
+        .toZonedDateTimeISO("UTC")
+        .toPlainDate()
+        .toString();
       buckets.push(data.get(day) ?? { day, spentUsd: 0, billedUsd: 0, requests: 0 });
     }
 

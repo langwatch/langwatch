@@ -16,6 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const row = (over: Record<string, unknown> = {}) =>
   WebhookDeliveryService.payloadToRow({
@@ -146,7 +147,7 @@ describe("WebhookDeliveryService.payloadToRow", () => {
     });
 
     it("dates the row from when the outcome happened", () => {
-      expect(row().occurredAt).toEqual(new Date(1_700_000_000_000));
+      expect(row().occurredAt).toEqual(Temporal.Instant.fromEpochMilliseconds(1_700_000_000_000));
     });
   });
 

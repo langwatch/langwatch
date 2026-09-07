@@ -17,6 +17,7 @@ import {
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "./governance-ocsf-events.clickhouse.repository.ts";
+import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:admin-workspace-view-audit");
 
@@ -55,7 +56,7 @@ export class AppAdminWorkspaceViewOcsf extends AdminWorkspaceViewOcsfPort {
       sourceType: input.view.kind === "personal" ? "personal_workspace" : "team_workspace",
       activityId: OCSF_ACTIVITY.READ,
       severityId: OCSF_SEVERITY.INFO,
-      eventTime: new Date(input.createdAtMs),
+      eventTime: Temporal.Instant.fromEpochMilliseconds(input.createdAtMs),
       actorUserId: input.view.actorUserId,
       actorEmail: "",
       actorEnduserId: "",

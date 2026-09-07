@@ -13,6 +13,7 @@ export type {
   OtlpLogRecord,
   OtlpLogsRequest,
 } from "@langwatch/enterprise-governance-contract";
+import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 
 const FIELD = {
   costUsd: "langwatch.cost.usd",
@@ -121,9 +122,9 @@ export class CanonicalCostExtractorService {
     return Number.isFinite(Number(value)) ? value.trim() : null;
   }
 
-  private date(value: OtlpFixed64 | undefined): Date {
+  private date(value: OtlpFixed64 | undefined): Instant {
     if (value === undefined) {
-      return new Date();
+      return nowInstant();
     }
 
     let nanos: bigint;
@@ -135,6 +136,6 @@ export class CanonicalCostExtractorService {
       nanos = (BigInt(value.high >>> 0) << 32n) | BigInt(value.low >>> 0);
     }
 
-    return new Date(Number(nanos / 1_000_000n));
+    return Temporal.Instant.fromEpochMilliseconds(Number(nanos / 1_000_000n));
   }
 }

@@ -15,8 +15,11 @@ import type {
   IngestionKeyIssuerPort,
   IngestionKeyRepository,
 } from "../ports/ingestion-source-key.port.ts";
+import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:ingestion-key");
+
+const EPOCH = Temporal.Instant.fromEpochMilliseconds(0);
 
 export class IngestionKeyService {
   private constructor(
@@ -173,7 +176,7 @@ export class IngestionKeyService {
     }
 
     const lastActivityMs = (key: (typeof live)[number]): number =>
-      (key.lastUsedAt ?? key.createdAt ?? new Date(0)).getTime();
+      (key.lastUsedAt ?? key.createdAt ?? EPOCH).epochMilliseconds;
     const doomed = [...live].sort((a, b) => lastActivityMs(a) - lastActivityMs(b)).slice(0, excess);
     for (const key of doomed) {
       try {

@@ -34,6 +34,7 @@ import {
 } from "../../../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../../../services/webhook-events.service.ts";
 import { createWebhookRestApp } from "../webhook.api.ts";
+import { Temporal } from "@langwatch/time";
 
 const ORGANIZATION_ID = "org-events-1";
 const PROJECT_ID = "proj-events-1";
@@ -147,9 +148,11 @@ class FakeWebhookEventsRepository extends WebhookEventsRepositoryPort {
     const rows = this.rows
       .filter((row) => input.tenantIds.includes(row.tenantId))
       .filter((row) => statuses.includes(row.status))
-      .filter((row) => input.fromMs === undefined || row.occurredAt.getTime() >= input.fromMs)
-      .filter((row) => input.toMs === undefined || row.occurredAt.getTime() < input.toMs)
-      .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+      .filter(
+        (row) => input.fromMs === undefined || row.occurredAt.epochMilliseconds >= input.fromMs,
+      )
+      .filter((row) => input.toMs === undefined || row.occurredAt.epochMilliseconds < input.toMs)
+      .sort((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
       .slice(0, input.limit);
     return { rows, nextCursor: null };
   }
@@ -211,7 +214,7 @@ function spendRow(overrides: Partial<WebhookSpendEventRow>): WebhookSpendEventRo
     labels: [],
     metadata: "",
     durationMs: 500,
-    occurredAt: new Date("2026-07-20T12:00:00.000Z"),
+    occurredAt: Temporal.Instant.from("2026-07-20T12:00:00.000Z"),
     ...overrides,
   };
 }

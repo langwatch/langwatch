@@ -16,6 +16,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppPersonalUsageReadAdapter } from "../../src/governance/personal-usage.clickhouse.repository.ts";
+import { Temporal } from "@langwatch/time";
 
 const LEDGER_TABLE = "gateway_budget_ledger_events";
 
@@ -45,8 +46,8 @@ function ledgerQueries(): string[] {
 }
 
 const window = {
-  start: new Date("2026-08-01T00:00:00.000Z"),
-  end: new Date("2026-09-01T00:00:00.000Z"),
+  start: Temporal.Instant.from("2026-08-01T00:00:00.000Z"),
+  end: Temporal.Instant.from("2026-09-01T00:00:00.000Z"),
 };
 
 const params = {

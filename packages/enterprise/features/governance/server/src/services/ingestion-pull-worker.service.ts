@@ -27,6 +27,7 @@ import type {
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
 import type { PulledUsageRecordService } from "./pulled-usage-record.service.ts";
 import type { PullerRegistryService } from "./puller-registry.service.ts";
+import { Temporal, toEpochMs } from "@langwatch/time";
 
 const OCSF_CLASS_API_ACTIVITY = 6003;
 const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
@@ -295,7 +296,7 @@ export class IngestionPullWorkerService {
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
     const recordCost = await this.usageEntitlement.isEnabled(input.source.organizationId);
-    const observedAt = new Date(this.now());
+    const observedAt = Temporal.Instant.fromEpochMilliseconds(this.now());
     for (const event of input.events) {
       await this.sink.insertEvent(
         this.toOcsfRow({
@@ -356,8 +357,10 @@ export class IngestionPullWorkerService {
     ingestionSourceId: string;
     sourceType: string;
   }): GovernanceOcsfEventInput {
-    const parsedTime = new Date(input.event.event_timestamp);
-    const eventTime = Number.isFinite(parsedTime.getTime()) ? parsedTime : new Date(this.now());
+    const parsedMs = toEpochMs(input.event.event_timestamp);
+    const eventTime = Temporal.Instant.fromEpochMilliseconds(
+      Number.isFinite(parsedMs) ? parsedMs : this.now(),
+    );
     const eventId = `${input.sourceType}:${input.ingestionSourceId}:${input.event.source_event_id}`;
     const rawOcsfJson = JSON.stringify({
       class_uid: OCSF_CLASS_API_ACTIVITY,
@@ -365,7 +368,7 @@ export class IngestionPullWorkerService {
       activity_id: OCSF_ACTIVITY_INVOKE,
       type_uid: OCSF_CLASS_API_ACTIVITY * 100 + OCSF_ACTIVITY_INVOKE,
       severity_id: OCSF_SEVERITY_INFO,
-      time: eventTime.getTime(),
+      time: eventTime.epochMilliseconds,
       actor: {
         user: { uid: "", email_addr: input.event.actor },
         enduser: { uid: "" },

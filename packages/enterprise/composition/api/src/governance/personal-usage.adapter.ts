@@ -10,6 +10,7 @@ import type {
   AppPersonalUsageReadAdapter,
   PersonalUsageWindow,
 } from "./personal-usage.clickhouse.repository.ts";
+import { Temporal } from "@langwatch/time";
 
 type PersonalUsageSummaryRow = {
   totalCost: number;
@@ -101,8 +102,8 @@ export class AppPersonalUsageReader extends PersonalUsageReaderPort {
     return {
       tenantId: input.tenantId,
       window: {
-        start: new Date(input.window.startMs),
-        end: new Date(input.window.endMs),
+        start: Temporal.Instant.fromEpochMilliseconds(input.window.startMs),
+        end: Temporal.Instant.fromEpochMilliseconds(input.window.endMs),
       },
     };
   }

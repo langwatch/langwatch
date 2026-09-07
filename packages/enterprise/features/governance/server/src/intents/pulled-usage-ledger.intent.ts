@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PulledUsageLedgerPort } from "../ports/pulled-usage-ledger.port.ts";
+import { Temporal } from "@langwatch/time";
 
 export const writePulledUsageSchema = z.object({
   restatement_key: z.string(),
@@ -38,8 +39,8 @@ export class PulledUsageLedgerIntent {
         tokensCacheRead: payload.tokens_cache_read,
         tokensCacheWrite: payload.tokens_cache_write,
         model: payload.model,
-        occurredAt: new Date(payload.occurred_at_ms),
-        observedAt: new Date(payload.observed_at_ms),
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(payload.occurred_at_ms),
+        observedAt: Temporal.Instant.fromEpochMilliseconds(payload.observed_at_ms),
       },
     ]);
   }

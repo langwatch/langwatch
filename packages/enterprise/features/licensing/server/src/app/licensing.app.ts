@@ -3,17 +3,27 @@
  * port the feature's api files reach, and it is the one typed thing a transport is given.
  */
 import {
+  LicensingApi,
+  type LicensingApi as LicensingApiContract,
   buildMintedPlan,
   licenseValidationError,
   limitTypes,
   type LicenseData,
   type LimitCheckResult,
   type LimitType,
+  type LicensingServerConfig,
+  licensingServerConfigSchema,
 } from "@langwatch/enterprise-licensing-contract";
 import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
-import type { LicenseService } from "../services/license.service.ts";
-import { nowInstant } from "@langwatch/time";
+import type { LicenseLoggerPort } from "../ports/license-logger.port.ts";
+import type { LicenseRetentionPort } from "../ports/license-retention.port.ts";
+import type { LicenseStoragePort } from "../ports/license-storage.port.ts";
+import type { LicenseUsagePort } from "../ports/license-usage.port.ts";
+import { NodeLicenseCryptographyAdapter } from "../adapters/node.license-cryptography.adapter.ts";
+import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 /**
  * The caller, as the enforcement service classifies them: a lite member is
@@ -34,7 +44,7 @@ export type MintLicenseInput = Readonly<{
   privateKey: string;
   organizationName: string;
   email: string;
-  expiresAt: Date;
+  expiresAt: Instant;
   planType: "PRO" | "ENTERPRISE" | "CUSTOM";
   plan: Readonly<{
     maxMembers: number;
@@ -47,60 +57,102 @@ export type MintLicenseInput = Readonly<{
 }>;
 
 /** What the process composes this feature's application from. */
-export interface LicensingAppDependencies {
-  /** The process-composed license service. */
-  licenses(): LicenseService;
-  /** The process-composed signing and encoding adapter. */
-  cryptography(): LicenseCryptographyPort;
+export type LicensingInfrastructure = Readonly<{
+  repository: LicenseStoragePort;
+  usage?: LicenseUsagePort;
+  retention?: LicenseRetentionPort;
+  logger?: LicenseLoggerPort;
   /**
    * The provider name the deployment is CONFIGURED with, before the license
    * gate and the mount inspector have their say. `null` or `"email"` means
    * nobody asked for federation.
    */
-  configuredAuthProvider(): string | null | undefined;
+  configuredAuthProvider: () => string | null | undefined;
   /** Whether the license permits platform single sign-on. */
-  platformSsoAllowed(): Promise<boolean>;
+  platformSsoAllowed: () => Promise<boolean>;
   /** Whether the configured provider actually mounted. */
-  authProviderIsMounted(): boolean;
+  authProviderIsMounted: () => boolean;
   /** Records a signing failure; the customer never sees the diagnostic. */
-  reportSigningFailure(entry: Readonly<{ organizationId: string; error: unknown }>): void;
+  reportSigningFailure: (entry: Readonly<{ organizationId: string; error: Error }>) => void;
   /** Whether one limit still admits another resource, for this caller. */
-  checkLimit(
+  checkLimit: (
     input: Readonly<{
       organizationId: string;
       limitType: LimitType;
       user: LicensingCaller;
     }>,
-  ): Promise<LimitCheckResult>;
+  ) => Promise<LimitCheckResult>;
   /** Swallows a notification failure into the process's error channel. */
-  reportError(error: unknown): void;
-}
+  reportError: (error: Error) => void;
+}>;
 
-export class LicensingApp {
-  static create(dependencies: LicensingAppDependencies): LicensingApp {
-    return new LicensingApp(dependencies);
+export type LicensingRuntime = Readonly<
+  Omit<LicensingInfrastructure, "repository" | "usage" | "retention" | "logger">
+>;
+
+type LicensingSetup = FeatureSetup<
+  Record<never, never>,
+  LicensingInfrastructure,
+  LicensingServerConfig
+>;
+
+export class LicensingApp implements LicensingApiContract {
+  static readonly contract: typeof LicensingApi = LicensingApi;
+  static readonly dependencies: Readonly<Record<string, never>> = {};
+  static readonly configSchema = licensingServerConfigSchema;
+
+  readonly #service: LicenseService;
+  readonly #cryptography: LicenseCryptographyPort;
+  readonly #runtime: LicensingRuntime;
+
+  private constructor(
+    service: LicenseService,
+    cryptography: LicenseCryptographyPort,
+    runtime: LicensingRuntime,
+  ) {
+    this.#service = service;
+    this.#cryptography = cryptography;
+    this.#runtime = runtime;
   }
 
-  private constructor(private readonly dependencies: LicensingAppDependencies) {}
+  static create({ infrastructure, config }: LicensingSetup): LicensingApp {
+    const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: config.publicKey });
+    const service = LicenseService.create({
+      repository: infrastructure.repository,
+      cryptography,
+      usage: infrastructure.usage,
+      retention: infrastructure.retention,
+      logger: infrastructure.logger,
+      configuration: LicenseServiceConfiguration.create(),
+    });
+    const {
+      repository: _repository,
+      usage: _usage,
+      retention: _retention,
+      logger: _logger,
+      ...runtime
+    } = infrastructure;
+    return new LicensingApp(service, cryptography, runtime);
+  }
 
   /** The license an organization is running on, its plan and its usage. */
   getLicenseStatus(organizationId: string) {
-    return this.dependencies.licenses().getLicenseStatus(organizationId);
+    return this.#service.getLicenseStatus(organizationId);
   }
 
   /**
    * Why a deployment configured for single sign-on is not using it.
    */
   async getSsoGateStatus(): Promise<SsoGateStatus> {
-    const configuredProvider = this.dependencies.configuredAuthProvider();
+    const configuredProvider = this.#runtime.configuredAuthProvider();
     if (!configuredProvider || configuredProvider === "email") {
       return { configuredProvider: null, licensed: true, mounted: true };
     }
 
     return {
       configuredProvider,
-      licensed: await this.dependencies.platformSsoAllowed(),
-      mounted: this.dependencies.authProviderIsMounted(),
+      licensed: await this.#runtime.platformSsoAllowed(),
+      mounted: this.#runtime.authProviderIsMounted(),
     };
   }
 
@@ -108,7 +160,7 @@ export class LicensingApp {
    * Validates a pasted key and stores it, answering the plan it grants.
    */
   async uploadLicense(input: Readonly<{ organizationId: string; licenseKey: string }>) {
-    const result = await this.dependencies.licenses().validateAndStoreLicense({
+    const result = await this.#service.validateAndStoreLicense({
       organizationId: input.organizationId,
       licenseKey: input.licenseKey,
     });
@@ -120,7 +172,7 @@ export class LicensingApp {
 
   /** Drops the key, returning the organization to the free tier. */
   removeLicense(organizationId: string) {
-    return this.dependencies.licenses().removeLicense(organizationId);
+    return this.#service.removeLicense(organizationId);
   }
 
   /**
@@ -130,7 +182,7 @@ export class LicensingApp {
    */
   mintLicenseKey(input: MintLicenseInput): string {
     const template = getPlanTemplate(input.planType);
-    const cryptography = this.dependencies.cryptography();
+    const cryptography = this.#cryptography;
 
     const licenseData: LicenseData = {
       licenseId: cryptography.generateLicenseId(),
@@ -138,7 +190,7 @@ export class LicensingApp {
       organizationName: input.organizationName,
       email: input.email,
       issuedAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
-      expiresAt: input.expiresAt.toISOString(),
+      expiresAt: input.expiresAt.toString({ fractionalSecondDigits: 3 }),
       plan: buildMintedPlan({
         type: template?.type ?? input.planType,
         name: template?.name ?? input.planType,
@@ -153,7 +205,10 @@ export class LicensingApp {
     try {
       return cryptography.encodeLicenseKey(cryptography.signLicense(licenseData, input.privateKey));
     } catch (error) {
-      this.dependencies.reportSigningFailure({ organizationId: input.organizationId, error });
+      this.#runtime.reportSigningFailure({
+        organizationId: input.organizationId,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
       throw error;
     }
   }
@@ -162,7 +217,7 @@ export class LicensingApp {
   checkLimit(
     input: Readonly<{ organizationId: string; limitType: LimitType; user: LicensingCaller }>,
   ): Promise<LimitCheckResult> {
-    return this.dependencies.checkLimit(input);
+    return this.#runtime.checkLimit(input);
   }
 
   /**
@@ -175,21 +230,36 @@ export class LicensingApp {
   ): Promise<Record<LimitType, LimitCheckResult>> {
     const results = await Promise.all(
       limitTypes.map((limitType) =>
-        this.dependencies.checkLimit({
+        this.#runtime.checkLimit({
           organizationId: input.organizationId,
           limitType,
           user: input.user,
         }),
       ),
     );
-    return Object.fromEntries(results.map((result) => [result.limitType, result])) as Record<
-      LimitType,
-      LimitCheckResult
-    >;
+    return Object.fromEntries(
+      results.map((result: LimitCheckResult) => [result.limitType, result]),
+    ) as Record<LimitType, LimitCheckResult>;
   }
 
   /** Swallows a notification failure into the process's error channel. */
   reportError(error: unknown): void {
-    this.dependencies.reportError(error);
+    this.#runtime.reportError(error instanceof Error ? error : new Error(String(error)));
+  }
+
+  inspectPlatformAccess(input: { instanceLicenseKey?: string | undefined }) {
+    return this.#service.inspectPlatformAccess(input);
+  }
+
+  getActivePlan(organizationId: string) {
+    return this.#service.getActivePlan(organizationId);
+  }
+
+  getSelfHostedPlan(organizationId: string) {
+    return this.#service.getSelfHostedPlan(organizationId);
+  }
+
+  validateAndStoreLicense(input: { organizationId: string; licenseKey: string }) {
+    return this.#service.validateAndStoreLicense(input);
   }
 }

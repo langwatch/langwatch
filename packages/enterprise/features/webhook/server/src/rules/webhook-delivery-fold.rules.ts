@@ -27,6 +27,7 @@ import {
   type DeliverInstance,
   type WebhookDeliveryState,
 } from "./webhook-delivery-contract.rules.ts";
+import { Temporal, toEpochMs } from "@langwatch/time";
 
 /** What an outcome handler needs from the process context. */
 export interface DeliverOutcomeContext<Intent> {
@@ -74,7 +75,7 @@ export function payloadToRow(payload: DeliverPayload): WebhookSpendEventRow {
     needsReconciliation: payload.status === "settled",
     settleReason: payload.settle_reason ?? "",
     durationMs: payload.duration_ms,
-    occurredAt: new Date(payload.occurred_at),
+    occurredAt: Temporal.Instant.fromEpochMilliseconds(toEpochMs(payload.occurred_at)),
   };
 }
 

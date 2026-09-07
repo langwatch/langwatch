@@ -17,6 +17,8 @@ const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProviderService =>
     adminEmails: mockEnv.ADMIN_EMAILS,
   });
 
+const EPOCH = new Date(0);
+
 const createMockDb = ({
   findFirstResult = null,
   orgFindUniqueResult = undefined,
@@ -26,7 +28,11 @@ const createMockDb = ({
 } = {}) => {
   return {
     subscription: {
-      findFirst: vi.fn().mockResolvedValue(findFirstResult),
+      findFirst: vi
+        .fn()
+        .mockResolvedValue(
+          findFirstResult ? { createdAt: EPOCH, ...(findFirstResult as object) } : findFirstResult,
+        ),
     },
     organization: {
       findUnique: vi.fn().mockResolvedValue(orgFindUniqueResult),

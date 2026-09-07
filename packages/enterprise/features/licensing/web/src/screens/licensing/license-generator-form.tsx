@@ -22,6 +22,8 @@ import { ENTERPRISE_TEMPLATE, quotedPlanLimitsOf, templateFormDefaults } from "@
 // shared with the package entry are reached by relative path.
 import { formatFileSize } from "../../model/license-status.ts";
 import { getPlanDefaults, type PlanType } from "../../model/plan-form-defaults.ts";
+import { nowInstant, toDate } from "@langwatch/time";
+import { readableDate } from "../../model/display-formatters.ts";
 
 const planTypeCollection = createListCollection({
   items: [
@@ -71,7 +73,7 @@ interface FormData {
 
 // Calculate default expiration date (1 year from now)
 function getDefaultExpirationDate(): string {
-  const oneYearFromNow = new Date();
+  const oneYearFromNow = toDate(nowInstant());
   oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
   // Split always returns at least one element, so first element is guaranteed
   return oneYearFromNow.toISOString().split("T")[0] ?? "";
@@ -229,7 +231,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         privateKey: formData.privateKey,
         organizationName: formData.organizationName,
         email: formData.email,
-        expiresAt: new Date(formData.expiresAt),
+        expiresAt: readableDate(formData.expiresAt),
         planType: formData.planType,
         plan: {
           ...quotedPlanLimitsOf(formData),

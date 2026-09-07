@@ -1,4 +1,5 @@
 import type { WebhookEnvelope } from "@langwatch/enterprise-webhook-contract";
+import type { Instant } from "@langwatch/time";
 
 export type WebhookSpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
 
@@ -30,7 +31,7 @@ export type WebhookSpendEventRow = {
   labels: string[];
   metadata: string;
   durationMs: number;
-  occurredAt: Date;
+  occurredAt: Instant;
 };
 
 function envelopeKind(status: WebhookSpendEventStatus): {
@@ -98,13 +99,13 @@ export class WebhookEnvelopeService {
     return {
       id: eventId,
       type,
-      created: row.occurredAt.toISOString(),
+      created: row.occurredAt.toString({ fractionalSecondDigits: 3 }),
       schema_version: "1",
       data: {
         event_id: eventId,
         event_type: type,
         gateway_request_id: row.gatewayRequestId,
-        occurred_at: row.occurredAt.toISOString(),
+        occurred_at: row.occurredAt.toString({ fractionalSecondDigits: 3 }),
         organization_id: row.organizationId,
         project_id: row.tenantId,
         virtual_key_id: row.virtualKeyId,

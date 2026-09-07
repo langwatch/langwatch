@@ -3,6 +3,7 @@ import type {
   IngestionKeyMintCommand,
   IssuedIngestionKey,
 } from "@langwatch/enterprise-governance-contract";
+import type { Instant } from "@langwatch/time";
 
 export type StoredIngestionKey = {
   id: string;
@@ -10,15 +11,15 @@ export type StoredIngestionKey = {
   ingestSourceType: string | null;
   ingestionTemplateId: string | null;
   /** When the key last authenticated; nothing when it never has. */
-  lastUsedAt?: Date | null;
-  createdAt?: Date;
+  lastUsedAt?: Instant | null;
+  createdAt?: Instant;
 };
 
 /** One key as `tryDescribePersonalKey` reads it, ownership included. */
 export type StoredIngestionKeyOwnership = StoredIngestionKey & {
   organizationId: string;
   userId: string | null;
-  revokedAt: Date | null;
+  revokedAt: Instant | null;
   revocationCause: string | null;
 };
 

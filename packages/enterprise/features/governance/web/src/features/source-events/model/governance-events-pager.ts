@@ -1,3 +1,4 @@
+import { Temporal, toEpochMs } from "@langwatch/time";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Cursor-walk arithmetic for the source events table.
@@ -38,7 +39,7 @@ export type PageRequest = {
 /** `eventsForSource`'s input schema caps `limit` at 200. */
 export const SERVER_MAX_LIMIT = 200;
 
-const tsMs = (row: PagerRow) => Date.parse(row.eventTimestampIso);
+const tsMs = (row: PagerRow) => toEpochMs(row.eventTimestampIso);
 
 /** All trailing displayed rows that share the last row's millisecond. */
 const boundaryTies = (displayedRows: readonly PagerRow[]): PagerRow[] => {
@@ -77,7 +78,9 @@ export function buildPageRequest({
   return {
     // One millisecond PAST the boundary, so the strict `<` on the server
     // re-includes the boundary millisecond and its cut-off siblings.
-    beforeIso: new Date(tsMs(last) + 1).toISOString(),
+    beforeIso: Temporal.Instant.fromEpochMilliseconds(tsMs(last) + 1).toString({
+      fractionalSecondDigits: 3,
+    }),
     limit: Math.min(pageSize + dropIds.length + 1, SERVER_MAX_LIMIT),
     dropIds,
   };
@@ -98,7 +101,9 @@ export function stallSkipRequest({
 }): PageRequest {
   const last = displayedRows[displayedRows.length - 1];
   return {
-    beforeIso: last ? new Date(tsMs(last)).toISOString() : undefined,
+    beforeIso: last
+      ? Temporal.Instant.fromEpochMilliseconds(tsMs(last)).toString({ fractionalSecondDigits: 3 })
+      : undefined,
     limit: Math.min(pageSize + 1, SERVER_MAX_LIMIT),
     dropIds: [],
   };

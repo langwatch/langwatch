@@ -36,6 +36,7 @@ import {
   WebhookEndpointConfiguration,
 } from "../../../services/webhook-endpoint-policy.service.ts";
 import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
+import { nowInstant, Temporal } from "@langwatch/time";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -362,7 +363,7 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
         url: "https://example.com/hooks",
         enabledEvents: ["gateway.request.completed"],
       });
-      const rolledAt = new Date();
+      const rolledAt = nowInstant();
       const { secret: rolled } = await repo.rollSecret({
         organizationId: orgId,
         endpointId: endpoint.id,
@@ -372,14 +373,14 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
       const insideWindow = await repo.getSigningSecrets({
         organizationId: orgId,
         endpointId: endpoint.id,
-        now: new Date(rolledAt.getTime() + 60 * 60 * 1000),
+        now: rolledAt.add({ milliseconds: 60 * 60 * 1000 }),
       });
       expect(insideWindow).toEqual([rolled, original]);
 
       const afterWindow = await repo.getSigningSecrets({
         organizationId: orgId,
         endpointId: endpoint.id,
-        now: new Date(rolledAt.getTime() + 25 * 60 * 60 * 1000),
+        now: rolledAt.add({ milliseconds: 25 * 60 * 60 * 1000 }),
       });
       expect(afterWindow).toEqual([rolled]);
     });
@@ -437,7 +438,7 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
         url: "https://example.com/hooks/auto-disable",
         enabledEvents: ["gateway.request.completed"],
       });
-      const t0 = new Date("2026-07-20T00:00:00Z");
+      const t0 = Temporal.Instant.from("2026-07-20T00:00:00Z");
 
       await repo.recordDeliveryAttempt({
         organizationId: orgId,
@@ -459,7 +460,7 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
         eventCount: 5,
         outcome: "retryable",
         responseStatus: 500,
-        now: new Date(t0.getTime() + WEBHOOK_AUTO_DISABLE_AFTER_MS + 1),
+        now: t0.add({ milliseconds: WEBHOOK_AUTO_DISABLE_AFTER_MS + 1 }),
       });
 
       const health = await repo.health({ organizationId: orgId, endpointId: endpoint.id });

@@ -56,6 +56,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PricingModel, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ApiMailComposition } from "./api-mail.composition.ts";
 import { ApiUsageStatsPort } from "../features/entitlement/spend.composition.ts";
+import { fromDate, toDate } from "@langwatch/time";
 
 /** What the plan provider is composed from. */
 export type ApiPlanProviderOptions = Readonly<{
@@ -489,6 +490,8 @@ class ApiUsageWarningDirectory implements BillingUsageLimitOrganization {
 
     return {
       ...organization,
+      sentPlanLimitAlert:
+        organization.sentPlanLimitAlert === null ? null : fromDate(organization.sentPlanLimitAlert),
       pricingModel: (organization.pricingModel ?? null) as BillingPricingModel | null,
     };
   }
@@ -499,7 +502,7 @@ class ApiUsageWarningDirectory implements BillingUsageLimitOrganization {
   ): Promise<void> {
     await this.prisma.organization.update({
       where: { id: organizationId },
-      data: { sentPlanLimitAlert: timestamp },
+      data: { sentPlanLimitAlert: toDate(timestamp) },
     });
   }
 

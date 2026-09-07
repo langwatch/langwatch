@@ -7,6 +7,7 @@ import {
   type StoredIngestionKey,
   type StoredIngestionKeyOwnership,
 } from "@langwatch/enterprise-governance-server";
+import { fromDate } from "@langwatch/time";
 
 type IngestionKeyCreateInput = {
   name: string;
@@ -30,6 +31,21 @@ type IngestionKeyRevokeInput = {
   cause?: ApiKeyRevocationCause;
 };
 
+/** One key row as the API-key service answers it. */
+type ApiKeyIngestionRow = Awaited<ReturnType<ApiKeyService["listIngestionKeysForProject"]>>[number];
+
+/** One key row's stamps, on the one clock the governance seam reads. */
+function storedIngestionKeyOf(key: ApiKeyIngestionRow): StoredIngestionKey {
+  return {
+    id: key.id,
+    lookupId: key.lookupId,
+    ingestSourceType: key.ingestSourceType,
+    ingestionTemplateId: key.ingestionTemplateId,
+    lastUsedAt: key.lastUsedAt === null ? null : fromDate(key.lastUsedAt),
+    createdAt: fromDate(key.createdAt),
+  };
+}
+
 export class AppIngestionKeyRepository extends IngestionKeyRepository {
   private constructor(private readonly apiKeys: ApiKeyService) {
     super();
@@ -44,21 +60,33 @@ export class AppIngestionKeyRepository extends IngestionKeyRepository {
     projectId: string;
     sourceType: string;
   }): Promise<StoredIngestionKey | null> {
-    return this.apiKeys.tryGetIngestionKey(input);
+    return this.apiKeys
+      .tryGetIngestionKey(input)
+      .then((key) => (key === null ? null : storedIngestionKeyOf(key)));
   }
 
   findIngestKeysForProject(input: {
     organizationId: string;
     projectId: string;
   }): Promise<StoredIngestionKey[]> {
-    return this.apiKeys.listIngestionKeysForProject(input);
+    return this.apiKeys
+      .listIngestionKeysForProject(input)
+      .then((keys) => keys.map(storedIngestionKeyOf));
   }
 
   async tryFindByLookupId(input: {
     lookupId: string;
   }): Promise<StoredIngestionKeyOwnership | null> {
     const key = await this.apiKeys.tryGetByLookupId(input);
-    return key ? { ...key, revocationCause: key.revocationCause ?? null } : null;
+    if (!key) return null;
+
+    return {
+      ...storedIngestionKeyOf(key),
+      organizationId: key.organizationId,
+      userId: key.userId,
+      revokedAt: key.revokedAt === null ? null : fromDate(key.revokedAt),
+      revocationCause: key.revocationCause ?? null,
+    };
   }
 }
 

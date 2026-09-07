@@ -10,6 +10,7 @@ import type {
   GovernanceVkLifecycleData,
 } from "../governance-webhook.port.ts";
 import { GovernanceSignalService } from "../../services/governance-signal.service.ts";
+import { type Instant, Temporal } from "@langwatch/time";
 
 class RecordingDiagnostics extends GovernanceDiagnosticsPort {
   readonly warnings: Array<{
@@ -34,8 +35,8 @@ class RecordingSignalPort extends GovernanceSignalPort {
     return this.enabled;
   }
 
-  now(): Date {
-    return new Date("2026-08-24T12:00:00.000Z");
+  now(): Instant {
+    return Temporal.Instant.from("2026-08-24T12:00:00.000Z");
   }
 
   tryResolveLifecycleTenant(): Promise<string | null> {

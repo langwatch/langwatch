@@ -1,9 +1,10 @@
 import { OrganizationLicensePort } from "./organization-license.port.ts";
+import type { Instant } from "@langwatch/time";
 
 export type StoredLicense = {
   licenseKey: string;
-  expiresAt: Date;
-  validatedAt: Date;
+  expiresAt: Instant;
+  validatedAt: Instant;
 };
 
 export type OrganizationLicenseCandidate = {

@@ -11,6 +11,7 @@ import { z } from "zod";
 import type { WebhookEndpointView } from "@langwatch/enterprise-webhook-contract";
 import type { PendingEnvelope } from "../services/webhook-batch-planner.service.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
+import type { Instant } from "@langwatch/time";
 
 export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
 export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;
@@ -129,7 +130,7 @@ export interface WebhookDeliveryEndpointService {
       outcome: "success" | "retryable" | "terminal";
     },
   ): Promise<void>;
-  pruneDeliveries(now?: Date): Promise<number>;
+  pruneDeliveries(now?: Instant): Promise<number>;
 }
 
 export const WEBHOOK_DELIVERY_PROCESS_NAME = "webhookDelivery" as const;

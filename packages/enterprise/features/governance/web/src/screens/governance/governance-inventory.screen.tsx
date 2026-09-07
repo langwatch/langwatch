@@ -78,7 +78,7 @@ import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { useShowErrorToast } from "../../behavior/governance-feedback.ts";
 import { useGovernancePlan, useGovernanceScope } from "../../behavior/governance-session.ts";
 import { api } from "../../behavior/governance-api.ts";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import {
   type DestinationContext,
   type Source,
@@ -152,10 +152,9 @@ const blankComposer = (): ComposerState => ({
   traceProjectId: null,
 });
 
-function fmtRelative(date: Date | string | null): string {
+function fmtRelative(date: TimeInput | null): string {
   if (!date) return "-";
-  const d = typeof date === "string" ? new Date(date) : date;
-  const diffMs = nowInstant().epochMilliseconds - d.getTime();
+  const diffMs = nowInstant().epochMilliseconds - toEpochMs(date);
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return `${sec}s ago`;
   const min = Math.floor(sec / 60);
@@ -1695,9 +1694,13 @@ export function dateInputValue(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-  const parsed = Date.parse(trimmed);
+  const parsed = toEpochMs(trimmed);
   if (Number.isNaN(parsed)) return "";
-  return new Date(parsed).toISOString().slice(0, 10);
+
+  return Temporal.Instant.fromEpochMilliseconds(parsed)
+    .toZonedDateTimeISO("UTC")
+    .toPlainDate()
+    .toString();
 }
 
 /**
@@ -2279,12 +2282,9 @@ function validBucketWidth(raw: string, report: string): string | null | undefine
 
 /** Whether y-m-d is a date that exists, rather than one Date would roll forward. */
 function isRealCalendarDate(year: number, month: number, day: number): boolean {
-  const probe = new Date(Date.UTC(year, month - 1, day));
-  return (
-    probe.getUTCFullYear() === year &&
-    probe.getUTCMonth() === month - 1 &&
-    probe.getUTCDate() === day
-  );
+  const probe = Temporal.PlainDate.from({ year, month, day }, { overflow: "constrain" });
+
+  return probe.year === year && probe.month === month && probe.day === day;
 }
 
 /**
@@ -2317,8 +2317,11 @@ function normalizeStartingAt(raw: string): string | null | undefined {
     return null;
   }
 
-  const parsed = Date.parse(raw);
-  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
+  const parsed = toEpochMs(raw);
+
+  return Number.isNaN(parsed)
+    ? null
+    : Temporal.Instant.fromEpochMilliseconds(parsed).toString({ fractionalSecondDigits: 3 });
 }
 
 /**

@@ -4,6 +4,7 @@ import type {
   WebhookDeliveryOutcome,
   WebhookEndpointView,
 } from "@langwatch/enterprise-webhook-contract";
+import type { Instant } from "@langwatch/time";
 import type { WebhookIdPort } from "../ports/webhook-id.port.ts";
 import type { WebhookSecretPort } from "../ports/webhook-secret.port.ts";
 import {
@@ -18,21 +19,21 @@ export type WebhookEndpointServiceOptions = {
   ids: WebhookIdPort;
   secrets: WebhookSecretPort;
   configuration?: WebhookEndpointConfiguration;
-  pruneDeliveries?: (now: Date) => Promise<number>;
+  pruneDeliveries?: (now: Instant) => Promise<number>;
   notifyAutoDisabled?: (input: {
     organizationId: string;
     endpointId: string;
     destination: string;
-    failingSince: Date;
+    failingSince: Instant;
   }) => Promise<void>;
 };
 
 export type WebhookEndpointStatusSnapshot = {
   status: "ACTIVE" | "DISABLED";
   disabledReason: string | null;
-  failingSince: Date | null;
-  lastSuccessAt: Date | null;
-  lastFailureAt: Date | null;
+  failingSince: Instant | null;
+  lastSuccessAt: Instant | null;
+  lastFailureAt: Instant | null;
 };
 
 export interface WebhookEndpointRuntime {
@@ -45,7 +46,7 @@ export interface WebhookEndpointRuntime {
   rollSecret(input: {
     organizationId: string;
     endpointId: string;
-    now?: Date;
+    now?: Instant;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
   enable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
   disable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
@@ -62,7 +63,7 @@ export interface WebhookEndpointRuntime {
   getSigningSecrets(input: {
     organizationId: string;
     endpointId: string;
-    now?: Date;
+    now?: Instant;
   }): Promise<string[]>;
   tryGetStatusSnapshot(input: {
     organizationId: string;
@@ -71,7 +72,7 @@ export interface WebhookEndpointRuntime {
   getDeliveryStats(input: {
     organizationId: string;
     endpointId: string;
-    since: Date;
+    since: Instant;
     sampleLimit: number;
   }): Promise<{ attempted: number; delivered: number; latencies: number[] }>;
   getActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
@@ -87,13 +88,13 @@ export interface WebhookEndpointRuntime {
     latencyMs?: number;
     error?: string;
     response?: unknown;
-    now?: Date;
+    now?: Instant;
   }): Promise<void>;
   getDeliveries(input: {
     organizationId: string;
     endpointId: string;
     limit?: number;
-    cursor?: { firedAt: Date; id: string };
+    cursor?: { firedAt: Instant; id: string };
   }): Promise<{
     deliveries: Array<{
       id: string;
@@ -104,15 +105,15 @@ export interface WebhookEndpointRuntime {
       responseStatus: number | null;
       latencyMs: number | null;
       error: string | null;
-      firedAt: Date;
+      firedAt: Instant;
     }>;
-    nextCursor: { firedAt: Date; id: string } | null;
+    nextCursor: { firedAt: Instant; id: string } | null;
   }>;
   health(input: {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointStatusSnapshot>;
-  pruneDeliveries(now?: Date): Promise<number>;
+  pruneDeliveries(now?: Instant): Promise<number>;
 }
 
 export class WebhookEndpointAdapter {

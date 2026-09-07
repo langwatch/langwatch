@@ -9,8 +9,9 @@ import {
   type NewAnomalyRule,
 } from "../anomaly-rule.port.ts";
 import { AnomalyRuleService } from "../../services/anomaly-rule.service.ts";
+import { Temporal, toDate } from "@langwatch/time";
 
-const FIXED_NOW = new Date("2026-08-24T12:00:00.000Z");
+const FIXED_NOW = Temporal.Instant.from("2026-08-24T12:00:00.000Z");
 
 function rule(overrides: Partial<AnomalyRule> = {}): AnomalyRule {
   return {
@@ -146,7 +147,7 @@ describe("AnomalyRuleService", () => {
       now: () => FIXED_NOW,
     }).archive({ id: "rule-1", organizationId: "organization-1" });
 
-    expect(archived.archivedAt).toBe(FIXED_NOW);
+    expect(archived.archivedAt).toEqual(toDate(FIXED_NOW));
     expect(archived.status).toBe("disabled");
   });
 });

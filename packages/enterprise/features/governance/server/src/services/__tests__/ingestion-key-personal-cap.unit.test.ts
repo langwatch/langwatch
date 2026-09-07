@@ -23,6 +23,7 @@ import {
 } from "../../ports/ingestion-source-key.port.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { IngestionKeyService } from "../ingestion-source-key.service.ts";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-personal";
@@ -35,9 +36,9 @@ type Row = {
   userId: string | null;
   ingestSourceType: string | null;
   ingestionTemplateId: string | null;
-  lastUsedAt: Date | null;
-  createdAt: Date;
-  revokedAt: Date | null;
+  lastUsedAt: Instant | null;
+  createdAt: Instant;
+  revokedAt: Instant | null;
   revocationCause: string | null;
 };
 
@@ -59,7 +60,7 @@ class KeyLedger {
       ingestSourceType: input.sourceType,
       ingestionTemplateId: null,
       lastUsedAt: null,
-      createdAt: new Date(1_700_000_000_000 + this.nextId),
+      createdAt: Temporal.Instant.fromEpochMilliseconds(1_700_000_000_000 + this.nextId),
       revokedAt: null,
       revocationCause: null,
     };
@@ -72,7 +73,7 @@ class KeyLedger {
     if (this.unrevokable.has(input.id)) throw new Error("already revoked");
     const row = this.rows.find((candidate) => candidate.id === input.id);
     if (row && !row.revokedAt) {
-      row.revokedAt = new Date();
+      row.revokedAt = nowInstant();
       row.revocationCause = input.cause ?? "user";
     }
   }
@@ -162,9 +163,9 @@ describe("given a workspace holding the cap of live keys for a tool", () => {
       await mint(ledger, "claude_code");
     }
     const live = ledger.live("claude_code");
-    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const monthAgo = nowInstant().subtract({ milliseconds: 30 * 24 * 60 * 60 * 1000 });
     for (const [index, row] of live.entries()) {
-      row.lastUsedAt = index === 2 ? monthAgo : new Date();
+      row.lastUsedAt = index === 2 ? monthAgo : nowInstant();
     }
     return { ledger, idle: live[2]! };
   }
@@ -197,8 +198,8 @@ describe("given a workspace holding the cap of live keys for a tool", () => {
       // One key over the cap, the way a race between two devices leaves it, so
       // this mint has two to retire and one of them refuses.
       const alsoIdle = ledger.issue({ sourceType: "claude_code" });
-      alsoIdle.lastUsedAt = new Date(1);
-      idle.lastUsedAt = new Date(0);
+      alsoIdle.lastUsedAt = Temporal.Instant.fromEpochMilliseconds(1);
+      idle.lastUsedAt = Temporal.Instant.fromEpochMilliseconds(0);
       ledger.unrevokable.add(idle.id);
 
       const fresh = await mint(ledger, "claude_code");

@@ -14,6 +14,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 import Stripe from "stripe";
+import { nowInstant } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:task:stripe-prices-sync");
 
@@ -45,7 +47,13 @@ export const createEmptyCatalog = (): StripePricesFile => {
     meters[key] = { test: "", live: "" };
   }
 
-  return { schemaVersion: 1, updatedAt: new Date(0).toISOString(), mapping, meters, prices: {} };
+  return {
+    schemaVersion: 1,
+    updatedAt: Temporal.Instant.fromEpochMilliseconds(0).toString({ fractionalSecondDigits: 3 }),
+    mapping,
+    meters,
+    prices: {},
+  };
 };
 
 export const backfillCatalogDefaults = (raw: Record<string, unknown>): Record<string, unknown> => {
@@ -358,7 +366,7 @@ export const mergeWithExisting = (params: {
 
   return {
     schemaVersion: 1,
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
     mapping: mergedMapping,
     meters: mergedMeters,
     prices: mergedPrices,

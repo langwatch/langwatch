@@ -11,6 +11,7 @@ import {
   type IngestionTemplateMutationResult,
   type NewIngestionTemplate,
 } from "../../ports/ingestion-template.port.ts";
+import { toDate, type Instant } from "@langwatch/time";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 
@@ -156,7 +157,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplatePort {
     organizationId: string;
     callerUserId: string;
     surface: GovernanceCallSurface;
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<IngestionTemplateMutationResult> {
     return this.prisma.$transaction(async (transaction) => {
       const existing = await this.tryFindMutableCandidate(transaction, input);
@@ -166,7 +167,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplatePort {
       const updated = await transaction.ingestionTemplate.update({
         where: { id: existing.id },
         data: {
-          archivedAt: input.archivedAt,
+          archivedAt: toDate(input.archivedAt),
           enabled: false,
           updatedById: input.callerUserId,
         },
@@ -191,7 +192,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplatePort {
   syncPlatformCatalog(input: {
     templates: readonly PlatformIngestionTemplateSeed[];
     retiredSlugs: readonly string[];
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<PlatformIngestionTemplateSyncResult> {
     return this.prisma.$transaction(async (transaction) => {
       let created = 0;
@@ -230,7 +231,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplatePort {
       for (const slug of input.retiredSlugs) {
         const result = await transaction.ingestionTemplate.updateMany({
           where: { organizationId: null, slug, archivedAt: null },
-          data: { archivedAt: input.archivedAt, enabled: false },
+          data: { archivedAt: toDate(input.archivedAt), enabled: false },
         });
         archived += result.count;
       }

@@ -35,6 +35,7 @@ import { z } from "zod";
 
 import type { WebhookApp } from "#app/webhook.app";
 import type { WebhookEndpointRuntime } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 // ── Wire enums ──────────────────────────────────────────────────────────
 // Every enum this surface publishes and accepts is lower_snake_case, input
@@ -390,13 +391,13 @@ function destinationFromBody(body: {
 }
 
 /** The single-envelope batch a test fire sends. */
-function testFireBody(now: Date): string {
+function testFireBody(now: Instant): string {
   return JSON.stringify({
     batch: [
       {
         id: `evt_test_${randomUUID()}`,
         type: "test.ping",
-        created: now.toISOString(),
+        created: now.toString({ fractionalSecondDigits: 3 }),
         schema_version: "1",
         data: { message: "LangWatch webhook test delivery" },
       },
@@ -513,7 +514,7 @@ async function testEndpointHandler(
       destination,
       organizationId: organization.id,
       endpointId,
-      body: testFireBody(new Date()),
+      body: testFireBody(nowInstant()),
       batchId: dispatchId,
       attempt: 1,
       signingSecrets: secrets,
@@ -811,14 +812,14 @@ export function createWebhookRestApp(options: {
         const organization = organizationOf(c);
         const { limit } = input;
         const cursorParam = input.cursor;
-        let cursor: { firedAt: Date; id: string } | undefined;
+        let cursor: { firedAt: Instant; id: string } | undefined;
         if (cursorParam) {
           const [firedAtMs, cursorId] = cursorParam.split("~");
           const parsedMs = Number(firedAtMs);
           if (!Number.isInteger(parsedMs) || !cursorId) {
             throw new BadRequestError("invalid cursor");
           }
-          cursor = { firedAt: new Date(parsedMs), id: cursorId };
+          cursor = { firedAt: Temporal.Instant.fromEpochMilliseconds(parsedMs), id: cursorId };
         }
         const page = await webhooks().endpoints.getDeliveries({
           organizationId: organization.id,
@@ -828,7 +829,7 @@ export function createWebhookRestApp(options: {
         });
         return {
           next_cursor: page.nextCursor
-            ? `${page.nextCursor.firedAt.getTime()}~${page.nextCursor.id}`
+            ? `${page.nextCursor.firedAt.epochMilliseconds}~${page.nextCursor.id}`
             : null,
           data: page.deliveries.map((r) => ({
             id: r.id,
@@ -839,7 +840,7 @@ export function createWebhookRestApp(options: {
             response_status: r.responseStatus,
             latency_ms: r.latencyMs,
             error: r.error,
-            fired_at: r.firedAt.toISOString(),
+            fired_at: r.firedAt.toString({ fractionalSecondDigits: 3 }),
           })),
         };
       },

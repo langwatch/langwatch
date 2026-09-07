@@ -1,4 +1,5 @@
 import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 export class NurturingSsoAutoAddService {
   static create(): NurturingSsoAutoAddService {
@@ -38,7 +39,7 @@ export class NurturingSsoAutoAddService {
           has_prompts: false,
           has_simulations: false,
           has_subscription: false,
-          createdAt: new Date().toISOString(),
+          createdAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
         },
       })
       .catch(NurturingSinkRegistryService.reportFailure);

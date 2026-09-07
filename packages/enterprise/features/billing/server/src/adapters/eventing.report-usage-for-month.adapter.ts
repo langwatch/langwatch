@@ -14,6 +14,7 @@ import type {
 import type { BillingCheckpointPort } from "../ports/billing-checkpoint.port.ts";
 import type { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import type { UsageReportingService } from "../services/usage-reporting.service.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing-reporting:report-usage-for-month");
 
@@ -213,7 +214,7 @@ export class EventingReportUsageForMonthAdapter implements CommandHandler<
         organizationId,
         billingMonth,
         tenantId,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
       });
     }
 
@@ -337,7 +338,7 @@ export class EventingReportUsageForMonthAdapter implements CommandHandler<
           {
             eventName: BILLABLE_EVENTS_EVENT_NAME,
             identifier,
-            timestamp: Math.floor(Date.now() / 1000),
+            timestamp: Math.floor(nowInstant().epochMilliseconds / 1000),
             value: delta,
           },
         ],

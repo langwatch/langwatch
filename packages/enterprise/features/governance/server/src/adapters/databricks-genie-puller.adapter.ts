@@ -69,7 +69,7 @@ import {
   warehouseCostRowSchema,
 } from "../rules/warehouse-cost.rules.ts";
 import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
@@ -1756,7 +1756,9 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
 
     return {
       source_event_id: message.message_id,
-      event_timestamp: new Date(createdMs).toISOString(),
+      event_timestamp: Temporal.Instant.fromEpochMilliseconds(createdMs).toString({
+        fractionalSecondDigits: 3,
+      }),
       // The login when the directory has one, the identity key otherwise. An
       // account with no `userName` still has an object id or a numeric id, and
       // an empty `actor` would drop it out of every actor-filtered SIEM view —
@@ -1916,7 +1918,9 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         {
           adapter: this.id,
           warehouseId,
-          pricedThrough: new Date(chunk.fromMs).toISOString(),
+          pricedThrough: Temporal.Instant.fromEpochMilliseconds(chunk.fromMs).toString({
+            fractionalSecondDigits: 3,
+          }),
         },
         "databricks warehouse cost has no room left in this run; holding the watermark at the last priced day",
       );
@@ -2019,8 +2023,12 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         adapter: this.id,
         warehouseId,
         outcome: read.outcome,
-        chunkFrom: new Date(chunk.fromMs).toISOString(),
-        chunkTo: new Date(chunk.toMs).toISOString(),
+        chunkFrom: Temporal.Instant.fromEpochMilliseconds(chunk.fromMs).toString({
+          fractionalSecondDigits: 3,
+        }),
+        chunkTo: Temporal.Instant.fromEpochMilliseconds(chunk.toMs).toString({
+          fractionalSecondDigits: 3,
+        }),
         pieces: pieces.length,
       },
       "databricks warehouse cost could not price a period whole; asking about smaller pieces of it",
@@ -2051,8 +2059,12 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         {
           adapter: this.id,
           warehouseId,
-          pricedThrough: new Date(refused.fromMs).toISOString(),
-          refusedTo: new Date(refused.toMs).toISOString(),
+          pricedThrough: Temporal.Instant.fromEpochMilliseconds(refused.fromMs).toString({
+            fractionalSecondDigits: 3,
+          }),
+          refusedTo: Temporal.Instant.fromEpochMilliseconds(refused.toMs).toString({
+            fractionalSecondDigits: 3,
+          }),
         },
         "databricks warehouse cost could not price a period even in pieces; holding the watermark so it is asked again",
       );
@@ -2410,7 +2422,9 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       // correctly.
       {
         name: "from_ts",
-        value: new Date(DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs)).toISOString(),
+        value: Temporal.Instant.fromEpochMilliseconds(
+          DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs),
+        ).toString({ fractionalSecondDigits: 3 }),
         type: "TIMESTAMP",
       },
       // Where the SCAN starts, which is earlier than where the answer starts.
@@ -2419,15 +2433,17 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       // that hour.
       {
         name: "scan_from_ts",
-        value: new Date(
+        value: Temporal.Instant.fromEpochMilliseconds(
           DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs) -
             WAREHOUSE_COST_STRADDLE_LOOKBACK_MS,
-        ).toISOString(),
+        ).toString({ fractionalSecondDigits: 3 }),
         type: "TIMESTAMP",
       },
       {
         name: "to_ts",
-        value: new Date(DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs)).toISOString(),
+        value: Temporal.Instant.fromEpochMilliseconds(
+          DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs),
+        ).toString({ fractionalSecondDigits: 3 }),
         type: "TIMESTAMP",
       },
       {
@@ -2478,8 +2494,12 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     return {
       adapter,
       warehouseId,
-      askedFrom: new Date(DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs)).toISOString(),
-      askedTo: new Date(DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs)).toISOString(),
+      askedFrom: Temporal.Instant.fromEpochMilliseconds(
+        DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs),
+      ).toString({ fractionalSecondDigits: 3 }),
+      askedTo: Temporal.Instant.fromEpochMilliseconds(
+        DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs),
+      ).toString({ fractionalSecondDigits: 3 }),
       askedHours: Math.round(
         (DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs) -
           DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs)) /
@@ -2834,7 +2854,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       }
     }
     const sinceMs = config.startingAt
-      ? Date.parse(config.startingAt)
+      ? toEpochMs(config.startingAt)
       : DatabricksGeniePullerAdapter.defaultSinceMs();
     return {
       sinceMs: Number.isFinite(sinceMs) ? sinceMs : DatabricksGeniePullerAdapter.defaultSinceMs(),
@@ -3117,7 +3137,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       };
     }
 
-    const askedAtMs = Date.parse(event.event_timestamp);
+    const askedAtMs = toEpochMs(event.event_timestamp);
     const isReread = Number.isFinite(askedAtMs) && askedAtMs <= watermarkMs;
     if (!isReread) return event;
 

@@ -9,6 +9,7 @@ import {
   type GovernanceTraceContext,
   type GovernanceTraceEvent,
 } from "../ports/governance-subscriber.port.ts";
+import { Temporal } from "@langwatch/time";
 
 export const GOVERNANCE_KPIS_SYNC_WINDOW_MS = 30_000;
 
@@ -57,12 +58,14 @@ export class GovernanceKpisSubscriber {
       tenantId,
       sourceId,
       sourceType: state.attributes[GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE] ?? "unknown",
-      hourBucket: new Date(Math.floor(state.occurredAt / hourMs) * hourMs),
+      hourBucket: Temporal.Instant.fromEpochMilliseconds(
+        Math.floor(state.occurredAt / hourMs) * hourMs,
+      ),
       traceId: state.traceId,
       spendUsd: state.totalCost ?? 0,
       promptTokens: state.totalPromptTokenCount ?? 0,
       completionTokens: state.totalCompletionTokenCount ?? 0,
-      lastEventOccurredAt: new Date(state.occurredAt),
+      lastEventOccurredAt: Temporal.Instant.fromEpochMilliseconds(state.occurredAt),
     };
   }
 }

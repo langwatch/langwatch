@@ -8,17 +8,17 @@ import { useGovernanceScope } from "../../behavior/governance-session.ts";
 import { api } from "../../behavior/governance-api.ts";
 import { useGovernanceRouter } from "../../behavior/governance-router.ts";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
-import { nowInstant } from "@langwatch/time";
+import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 const fmtUsd = (n: number | string) => {
   const v = typeof n === "string" ? Number(n) : n;
   return v === 0 ? "$0.00" : numeral(v).format("$0,0.00");
 };
 
-const fmtRelative = (date: Date | string | null): string => {
+const fmtRelative = (date: TimeInput | null): string => {
   if (!date) return "—";
-  const d = typeof date === "string" ? new Date(date) : date;
-  if (Number.isNaN(d.getTime())) return "—";
-  const diffMs = nowInstant().epochMilliseconds - d.getTime();
+  const epochMs = toEpochMs(date);
+  if (Number.isNaN(epochMs)) return "—";
+  const diffMs = nowInstant().epochMilliseconds - epochMs;
   if (diffMs < 0) return "just now";
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return `${sec}s ago`;

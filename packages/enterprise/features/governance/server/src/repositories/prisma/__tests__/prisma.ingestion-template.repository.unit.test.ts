@@ -1,8 +1,10 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 import { PrismaIngestionTemplateRepository } from "../prisma.ingestion-template.repository.ts";
+import { Temporal, toDate } from "@langwatch/time";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
+const NOW_INSTANT = Temporal.Instant.from("2026-08-24T00:00:00.000Z");
 
 function storedRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -195,7 +197,7 @@ describe("PrismaIngestionTemplateRepository", () => {
       const repository = PrismaIngestionTemplateRepository.create(
         prisma.database as unknown as PrismaClient,
       );
-      const archivedAt = new Date("2026-08-25T00:00:00.000Z");
+      const archivedAt = Temporal.Instant.from("2026-08-25T00:00:00.000Z");
 
       const result = await repository.archiveWithAudit({
         id: "template-1",
@@ -208,7 +210,7 @@ describe("PrismaIngestionTemplateRepository", () => {
       expect(result.status).toBe("updated");
       expect(prisma.templateUpdate).toHaveBeenCalledWith({
         where: { id: "template-1" },
-        data: { archivedAt, enabled: false, updatedById: "user-1" },
+        data: { archivedAt: toDate(archivedAt), enabled: false, updatedById: "user-1" },
       });
       expect(prisma.auditCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -231,7 +233,7 @@ describe("PrismaIngestionTemplateRepository", () => {
         organizationId: "organization-1",
         callerUserId: "user-1",
         surface: "hono",
-        archivedAt: NOW,
+        archivedAt: NOW_INSTANT,
       });
 
       expect(result.status).toBe("platform");
@@ -250,7 +252,7 @@ describe("PrismaIngestionTemplateRepository", () => {
         organizationId: "organization-1",
         callerUserId: "user-1",
         surface: "hono",
-        archivedAt: NOW,
+        archivedAt: NOW_INSTANT,
       });
 
       expect(result.status).toBe("not_found");

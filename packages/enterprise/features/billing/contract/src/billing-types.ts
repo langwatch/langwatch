@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { PlanTypes } from "./plan-types.ts";
+import type { Instant } from "@langwatch/time";
 
 export type UsageUnit = "traces" | "events";
 export type LimitType = "members" | "membersLite";
@@ -82,7 +83,7 @@ type ProspectiveSubscriptionNotification = SubscriptionNotificationBase & {
 type ConfirmedSubscriptionNotification = SubscriptionNotificationBase & {
   type: "confirmed";
   subscriptionId: string;
-  startDate?: Date | null;
+  startDate?: Instant | null;
   maxMembers?: number | null;
   maxMessagesPerMonth?: number | null;
 };
@@ -90,7 +91,7 @@ type ConfirmedSubscriptionNotification = SubscriptionNotificationBase & {
 type CancelledSubscriptionNotification = SubscriptionNotificationBase & {
   type: "cancelled";
   subscriptionId: string;
-  cancellationDate?: Date | null;
+  cancellationDate?: Instant | null;
 };
 
 export type SubscriptionNotificationPayload =
@@ -161,14 +162,14 @@ export interface BillingUsageLimitOrganization {
   findWithAdmins(organizationId: string): Promise<{
     id: string;
     name: string;
-    sentPlanLimitAlert: Date | null;
+    sentPlanLimitAlert: Instant | null;
     members: Array<{ user: { id: string; name: string | null; email: string | null } }>;
     /** Which self-serve ladder this organization buys from, for the next-step hook. */
     pricingModel: BillingPricingModel | null;
     /** What the next-step plan is quoted in for this organization. */
     currency: "USD" | "EUR";
   } | null>;
-  updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void>;
+  updateSentPlanLimitAlert(organizationId: string, timestamp: Instant): Promise<void>;
   findProjectsWithName(organizationId: string): Promise<Array<{ id: string; name: string }>>;
 }
 

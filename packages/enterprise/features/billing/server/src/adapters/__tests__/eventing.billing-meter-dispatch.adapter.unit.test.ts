@@ -9,10 +9,11 @@ import {
 import { RedisBillingTenantOrganizationCacheAdapter } from "../redis.tenant-organization-cache.adapter.ts";
 import { PostgresBillingTenantOrganizationAdapter } from "../postgres.tenant-organization.adapter.ts";
 import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
+import { Temporal, type Instant } from "@langwatch/time";
 
 function compose(
   options: {
-    now?: Date;
+    now?: Instant;
     project?: { team: { organizationId: string } } | null;
   } = {},
 ) {
@@ -30,7 +31,7 @@ function compose(
       }),
     }),
     getDispatch: () => async (data) => void dispatched.push(data),
-    ...(options.now ? { now: () => options.now as Date } : {}),
+    ...(options.now ? { now: () => options.now as Instant } : {}),
   }).build();
 
   return { subscriber, dispatched };
@@ -60,7 +61,9 @@ describe("EventingBillingMeterDispatchAdapter", () => {
 
     /** @scenario "A late-arriving month is reported inside the grace window" */
     it("reports the previous month as well inside the grace window", async () => {
-      const { subscriber, dispatched } = compose({ now: new Date("2026-03-03T12:00:00.000Z") });
+      const { subscriber, dispatched } = compose({
+        now: Temporal.Instant.from("2026-03-03T12:00:00.000Z"),
+      });
 
       await subscriber.handle(EVENT, CONTEXT);
 
@@ -71,7 +74,9 @@ describe("EventingBillingMeterDispatchAdapter", () => {
 
     /** @scenario "A late-arriving month is reported inside the grace window" */
     it("reports the current month only outside that window", async () => {
-      const { subscriber, dispatched } = compose({ now: new Date("2026-03-04T00:00:00.000Z") });
+      const { subscriber, dispatched } = compose({
+        now: Temporal.Instant.from("2026-03-04T00:00:00.000Z"),
+      });
 
       await subscriber.handle(EVENT, CONTEXT);
 

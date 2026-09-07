@@ -9,6 +9,26 @@ import type {
   UpdateIngestionSourceRecord,
 } from "../../ports/ingestion-source.port.ts";
 import { IngestionSourceRepository } from "../../ports/ingestion-source.port.ts";
+import { toDate } from "@langwatch/time";
+
+/** The update as Prisma takes it: the seam where instants become dates. */
+function updateDataOf(
+  input: UpdateIngestionSourceRecord,
+): Prisma.IngestionSourceUncheckedUpdateInput {
+  const { parserConfig, archivedAt, lastEventAt, ...rest } = input;
+  const data: Prisma.IngestionSourceUncheckedUpdateInput = rest;
+  if (parserConfig !== undefined) {
+    data.parserConfig = parserConfig as Prisma.InputJsonValue;
+  }
+  if (archivedAt !== undefined) {
+    data.archivedAt = toDate(archivedAt);
+  }
+  if (lastEventAt !== undefined) {
+    data.lastEventAt = toDate(lastEventAt);
+  }
+
+  return data;
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -108,14 +128,9 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
   }
 
   async update(id: string, input: UpdateIngestionSourceRecord): Promise<GovernanceIngestionSource> {
-    const { parserConfig, ...rest } = input;
-    const data: Prisma.IngestionSourceUncheckedUpdateInput = rest;
-    if (parserConfig !== undefined) {
-      data.parserConfig = parserConfig as Prisma.InputJsonValue;
-    }
     const row = await this.database.ingestionSource.update({
       where: { id },
-      data,
+      data: updateDataOf(input),
     });
     return toIngestionSource(row);
   }
@@ -136,11 +151,7 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
       });
       if (matched.count === 0) return null;
 
-      const { parserConfig, ...rest } = input.update;
-      const data: Prisma.IngestionSourceUncheckedUpdateInput = rest;
-      if (parserConfig !== undefined) {
-        data.parserConfig = parserConfig as Prisma.InputJsonValue;
-      }
+      const data = updateDataOf(input.update);
       const row = await database.ingestionSource.update({
         where: { id: input.id },
         data,

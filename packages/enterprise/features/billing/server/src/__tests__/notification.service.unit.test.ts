@@ -28,6 +28,7 @@ import {
   UsageLimitEmailPort,
   type UsageLimitEmailData,
 } from "../index.ts";
+import { Temporal } from "@langwatch/time";
 
 class FakeErrorReporter extends BillingErrorReporterPort {
   private constructor(readonly capture = vi.fn()) {
@@ -351,7 +352,7 @@ describe("NotificationService", () => {
           organizationName: "Acme",
           plan: "LAUNCH",
           subscriptionId: "sub_1",
-          startDate: new Date("2025-01-01"),
+          startDate: Temporal.Instant.from("2025-01-01T00:00:00Z"),
           maxMembers: 5,
           maxMessagesPerMonth: 10000,
         });
@@ -404,7 +405,7 @@ describe("NotificationService", () => {
           organizationName: "Acme",
           plan: "GROWTH_SEAT_EUR_MONTHLY",
           subscriptionId: "sub_1",
-          cancellationDate: new Date("2026-03-15T10:00:00Z"),
+          cancellationDate: Temporal.Instant.from("2026-03-15T10:00:00Z"),
         });
 
         expect(mockSlackSend).toHaveBeenCalledWith({
@@ -428,7 +429,7 @@ describe("NotificationService", () => {
           organizationName: "Acme",
           plan: "GROWTH_SEAT_EUR_MONTHLY",
           subscriptionId: "sub_1",
-          cancellationDate: new Date("2026-03-15T10:00:00Z"),
+          cancellationDate: Temporal.Instant.from("2026-03-15T10:00:00Z"),
         });
 
         const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;

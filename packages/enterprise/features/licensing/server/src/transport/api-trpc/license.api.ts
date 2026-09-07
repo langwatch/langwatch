@@ -40,6 +40,7 @@ import {
 import { mintablePlanLimitsSchema } from "@langwatch/plans";
 import { z } from "zod";
 import type { LicensingApp } from "#app/licensing.app";
+import { fromDate, nowInstant, Temporal } from "@langwatch/time";
 
 /**
  * The process supplies authentication; authorization arrives as a policy.
@@ -202,8 +203,10 @@ export class LicenseTrpcApi {
           .withPermission("organization:manage")
           .handle(async ({ ctx, input }) => {
             const { privateKey, organizationName, email, expiresAt, planType, plan } = input;
+            const expiresAtInstant = fromDate(expiresAt);
+            const alreadyElapsed = Temporal.Instant.compare(expiresAtInstant, nowInstant()) <= 0;
 
-            if (expiresAt <= new Date()) {
+            if (alreadyElapsed) {
               throw new TRPCError({
                 code: "BAD_REQUEST",
                 message: "Expiration date must be in the future",
@@ -219,7 +222,7 @@ export class LicenseTrpcApi {
                 privateKey,
                 organizationName,
                 email,
-                expiresAt,
+                expiresAt: expiresAtInstant,
                 planType,
                 plan,
               });

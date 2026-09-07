@@ -20,6 +20,7 @@ import { GovernanceOcsfEventsReaderPort } from "@langwatch/enterprise-governance
  * Migration: 00023_create_governance_ocsf_events.sql
  */
 import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.port.ts";
+import { type Instant, toDate } from "@langwatch/time";
 
 const TABLE_NAME = "governance_ocsf_events" as const;
 
@@ -85,7 +86,7 @@ export interface GovernanceOcsfEventInput {
   sourceType: string;
   activityId: OcsfActivity;
   severityId: OcsfSeverity;
-  eventTime: Date;
+  eventTime: Instant;
   actorUserId: string;
   actorEmail: string;
   actorEnduserId: string;
@@ -154,7 +155,7 @@ export class AppGovernanceOcsfEventsAdapter extends GovernanceOcsfEventsReaderPo
             ActivityId: row.activityId,
             TypeUid: OCSF_CLASS_API_ACTIVITY * 100 + row.activityId,
             SeverityId: row.severityId,
-            EventTime: row.eventTime,
+            EventTime: toDate(row.eventTime),
             ActorUserId: row.actorUserId,
             ActorEmail: row.actorEmail,
             ActorEnduserId: row.actorEnduserId,

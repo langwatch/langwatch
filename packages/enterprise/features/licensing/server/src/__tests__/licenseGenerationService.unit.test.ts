@@ -3,6 +3,7 @@ import { DEFAULT_LIMIT } from "@langwatch/enterprise-licensing-contract";
 import { LicenseGenerationService, NodeLicenseCryptographyAdapter } from "../index.ts";
 import { ENTERPRISE_TEMPLATE, GROWTH_TEMPLATE } from "@langwatch/plans";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing.ts";
+import { fromDate } from "@langwatch/time";
 
 const baseParams = {
   organizationName: "Acme Corp",
@@ -25,7 +26,7 @@ describe("generateLicenseKey", () => {
       const result = validateLicense({
         licenseKey,
         publicKey: TEST_PUBLIC_KEY,
-        now: baseParams.now,
+        now: fromDate(baseParams.now),
       });
 
       expect(result.valid).toBe(true);
@@ -111,7 +112,7 @@ describe("generateLicenseKey", () => {
       const result = validateLicense({
         licenseKey,
         publicKey: TEST_PUBLIC_KEY,
-        now: baseParams.now,
+        now: fromDate(baseParams.now),
       });
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("PRO");
@@ -137,7 +138,7 @@ describe("generateLicenseKey", () => {
       const validated = validateLicense({
         licenseKey,
         publicKey: TEST_PUBLIC_KEY,
-        now: baseParams.now,
+        now: fromDate(baseParams.now),
       });
       expect(validated.valid).toBe(true);
       if (validated.valid) {
@@ -155,7 +156,7 @@ describe("generateLicenseKey", () => {
       const result = validateLicense({
         licenseKey,
         publicKey: TEST_PUBLIC_KEY,
-        now: baseParams.now,
+        now: fromDate(baseParams.now),
       });
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("ENTERPRISE");
@@ -271,7 +272,7 @@ describe("generateLicenseKey", () => {
       const result = validateLicense({
         licenseKey,
         publicKey: TEST_PUBLIC_KEY,
-        now: baseParams.now,
+        now: fromDate(baseParams.now),
       });
 
       expect(result.valid).toBe(true);
@@ -347,7 +348,7 @@ describe("generateLicenseKey overrides", () => {
         validateLicense({
           licenseKey,
           publicKey: TEST_PUBLIC_KEY,
-          now: baseParams.now,
+          now: fromDate(baseParams.now),
         }).valid,
       ).toBe(true);
     });

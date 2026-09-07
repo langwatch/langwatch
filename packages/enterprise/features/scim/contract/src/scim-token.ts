@@ -5,20 +5,6 @@ export type ScimTokenEntitlement =
   | { status: "plan_not_entitled"; organizationId: string }
   | { status: "ok"; organizationId: string; connectionId: string | null };
 
-export interface ScimTokenRecord {
-  id: string;
-  organizationId: string;
-  connectionId: string | null;
-  description: string | null;
-  createdAt: Date;
-  lastUsedAt: Date | null;
-}
-
-export type ScimTokenSummary = Pick<
-  ScimTokenRecord,
-  "id" | "connectionId" | "description" | "createdAt" | "lastUsedAt"
->;
-
 /** One token as the settings page lists it. Never the token value itself. */
 export const scimTokenSummarySchema = z
   .object({
@@ -29,6 +15,12 @@ export const scimTokenSummarySchema = z
     lastUsedAt: z.date().nullable(),
   })
   .strict();
+
+export type ScimTokenSummary = z.infer<typeof scimTokenSummarySchema>;
+
+export interface ScimTokenRecord extends ScimTokenSummary {
+  organizationId: string;
+}
 
 /**
  * A newly minted token: the one moment its value exists outside the database.

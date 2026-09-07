@@ -14,6 +14,7 @@ import type {
   SpendSpikeAnomalyRepository,
 } from "../ports/spend-spike-anomaly.port.ts";
 import type { AnomalyAlertDispatcherService } from "./anomaly-alert-dispatcher.service.ts";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 const BASELINE_WINDOWS = 6;
 
@@ -45,8 +46,8 @@ export class SpendSpikeAnomalyEvaluatorService {
     );
   }
 
-  async evaluateAll(input: { now?: Date } = {}): Promise<SpendSpikeEvaluationSummary> {
-    const now = input.now ?? new Date();
+  async evaluateAll(input: { now?: Instant } = {}): Promise<SpendSpikeEvaluationSummary> {
+    const now = input.now ?? nowInstant();
     const rules = await this.repository.listActiveRules();
     const skipped: Record<string, number> = {};
     let alertsFired = 0;
@@ -72,7 +73,7 @@ export class SpendSpikeAnomalyEvaluatorService {
     return { rulesEvaluated: rules.length, alertsFired, skipped };
   }
 
-  private async evaluateRule(rule: AnomalyRule, now: Date): Promise<SpendSpikeEvaluationResult> {
+  private async evaluateRule(rule: AnomalyRule, now: Instant): Promise<SpendSpikeEvaluationResult> {
     const parsed = safeParseSpendSpikeThresholdConfig(rule.thresholdConfig);
     if (!parsed.ok) {
       this.diagnostics.warn("Spend spike rule has invalid threshold configuration", {
@@ -94,8 +95,8 @@ export class SpendSpikeAnomalyEvaluatorService {
 
     const windowMs = parsed.data.windowSec * 1_000;
     const windowEnd = now;
-    const windowStart = new Date(now.getTime() - windowMs);
-    const baselineStart = new Date(windowStart.getTime() - BASELINE_WINDOWS * windowMs);
+    const windowStart = now.subtract({ milliseconds: windowMs });
+    const baselineStart = windowStart.subtract({ milliseconds: BASELINE_WINDOWS * windowMs });
     const tenantId = await this.repository.tryResolveGovernanceTenantId(rule.organizationId);
     if (!tenantId) {
       return SpendSpikeAnomalyEvaluatorService.noDataResult(
@@ -136,8 +137,8 @@ export class SpendSpikeAnomalyEvaluatorService {
       currentSpendUsd: totals.currentSpend,
       baselineSpendUsd: totals.baselineSpend / BASELINE_WINDOWS,
       hasOpenAlertInWindow,
-      windowStart,
-      windowEnd,
+      windowStart: toDate(windowStart),
+      windowEnd: toDate(windowEnd),
     });
   }
 
@@ -195,10 +196,10 @@ export class SpendSpikeAnomalyEvaluatorService {
 
   private static noDataResult(
     rule: AnomalyRule,
-    windowEnd: Date,
+    windowEnd: Instant,
     decision: "skip_no_data" | "skip_invalid_config",
     reason: string,
-    windowStart: Date = windowEnd,
+    windowStart: Instant = windowEnd,
   ): SpendSpikeEvaluationResult {
     return {
       ruleId: rule.id,
@@ -207,8 +208,8 @@ export class SpendSpikeAnomalyEvaluatorService {
       reason,
       currentSpendUsd: 0,
       baselineSpendUsd: 0,
-      windowStart,
-      windowEnd,
+      windowStart: toDate(windowStart),
+      windowEnd: toDate(windowEnd),
     };
   }
 

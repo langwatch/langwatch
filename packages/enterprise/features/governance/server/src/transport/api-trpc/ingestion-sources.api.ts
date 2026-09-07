@@ -19,6 +19,7 @@ import {
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import { IngestionSourceService } from "../../services/ingestion-source.service.ts";
+import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
 
 export type IngestionSourcesTrpcContext = Readonly<{
   app: Readonly<{ governance: GovernanceService }>;
@@ -68,32 +69,36 @@ const validateOttlSchema = organizationScope.extend({
   statements: z.array(z.string()).min(0).max(64),
 });
 
-type IngestionSourceRow = Readonly<{
-  id: string;
-  organizationId: string;
-  teamId: string | null;
-  sourceType: string;
-  name: string;
-  description: string | null;
-  parserConfig: unknown;
-  // Required, not optional: if a future `select` clause stops fetching this,
-  // `hasPollerCursor` would silently answer false for every source and the
-  // edit form would offer a backfill start that cannot take effect.
-  pollerCursor: unknown;
-  // Required for the same reason: the edit form seeds its cadence field from
-  // this column, and dropping it would send the form back to the stale
-  // duplicate inside parserConfig — the bug this field was added to close.
-  pullSchedule: string | null;
-  status: string;
-  // Optional on the contract, never absent on a Prisma read: normalised to
-  // `null` below so the wire shape stays `string | null`.
-  traceProjectId?: string | null;
-  lastEventAt: Date | null;
-  archivedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  createdById: string | null;
-}>;
+/** The moments a source carries, on the contract's own wire types. */
+type IngestionSourceMoments = Pick<
+  GovernanceIngestionSource,
+  "lastEventAt" | "archivedAt" | "createdAt" | "updatedAt"
+>;
+
+type IngestionSourceRow = Readonly<
+  IngestionSourceMoments & {
+    id: string;
+    organizationId: string;
+    teamId: string | null;
+    sourceType: string;
+    name: string;
+    description: string | null;
+    parserConfig: unknown;
+    // Required, not optional: if a future `select` clause stops fetching this,
+    // `hasPollerCursor` would silently answer false for every source and the
+    // edit form would offer a backfill start that cannot take effect.
+    pollerCursor: unknown;
+    // Required for the same reason: the edit form seeds its cadence field from
+    // this column, and dropping it would send the form back to the stale
+    // duplicate inside parserConfig — the bug this field was added to close.
+    pullSchedule: string | null;
+    status: string;
+    // Optional on the contract, never absent on a Prisma read: normalised to
+    // `null` below so the wire shape stays `string | null`.
+    traceProjectId?: string | null;
+    createdById: string | null;
+  }
+>;
 
 /**
  * Strip the secret hash, private rotation slot and sealed credentials envelope before

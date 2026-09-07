@@ -10,6 +10,7 @@ import {
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
 } from "../../ports/subscription.port.ts";
+import { Temporal } from "@langwatch/time";
 
 const SUBSCRIPTION: BillingSubscriptionRecord = {
   id: "subscription-1",
@@ -17,7 +18,7 @@ const SUBSCRIPTION: BillingSubscriptionRecord = {
   status: "PENDING",
   plan: "LAUNCH",
   stripeSubscriptionId: "sub_1",
-  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  createdAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
   startDate: null,
   endDate: null,
   maxMembers: null,

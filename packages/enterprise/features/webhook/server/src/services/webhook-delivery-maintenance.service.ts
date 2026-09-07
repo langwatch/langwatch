@@ -15,6 +15,7 @@ import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
 } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDeliveryProcessDeps } from "./webhook-delivery.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:webhooks:delivery-process");
 
@@ -75,11 +76,11 @@ export class WebhookDeliveryMaintenanceService {
         processName: WEBHOOK_DELIVERY_PROCESS_NAME,
         before: now - OUTBOX_ROW_RETENTION_MS,
       });
-      await this.deps.endpoints.pruneDeliveries(new Date(now));
+      await this.deps.endpoints.pruneDeliveries(Temporal.Instant.fromEpochMilliseconds(now));
       // Receipts expire lazily, when their key is next presented, so a key that
       // is never retried is never revisited and its row never leaves. The
       // expiresAt index was built for a bulk sweep; this is it.
-      await this.deps.pruneExpiredIdempotencyReceipts(new Date(now));
+      await this.deps.pruneExpiredIdempotencyReceipts(Temporal.Instant.fromEpochMilliseconds(now));
     } catch (error) {
       logger.warn({ error }, "webhook delivery maintenance sweep failed");
     }

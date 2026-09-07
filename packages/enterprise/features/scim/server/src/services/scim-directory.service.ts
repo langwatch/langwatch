@@ -274,8 +274,8 @@ export class ScimDirectoryService {
           }),
       meta: {
         resourceType: "Group",
-        created: group.createdAt.toISOString(),
-        lastModified: group.updatedAt.toISOString(),
+        created: group.createdAt.toString({ fractionalSecondDigits: 3 }),
+        lastModified: group.updatedAt.toString({ fractionalSecondDigits: 3 }),
       },
     };
   }

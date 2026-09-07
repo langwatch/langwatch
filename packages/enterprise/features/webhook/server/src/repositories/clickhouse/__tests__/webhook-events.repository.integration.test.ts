@@ -179,8 +179,8 @@ describe("webhook emitted-events listing", () => {
     });
     expect(first.rows).toHaveLength(2);
     expect(first.nextCursor).not.toBeNull();
-    expect(first.rows[0]!.occurredAt.getTime()).toBeGreaterThanOrEqual(
-      first.rows[1]!.occurredAt.getTime(),
+    expect(first.rows[0]!.occurredAt.epochMilliseconds).toBeGreaterThanOrEqual(
+      first.rows[1]!.occurredAt.epochMilliseconds,
     );
 
     const second = await eventsRepo.readEmittedEventsPage({

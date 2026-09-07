@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * The in-process cooldown stopping one organization being alerted twice
  * during a burst. Deliberately per-process. The database's 30-day window is
@@ -30,7 +31,7 @@ export class BillingAlertCooldownService implements BillingCooldownCache {
 
   async tryGet(key: string): Promise<boolean | null> {
     const expiresAt = this.values.get(key);
-    if (!expiresAt || expiresAt <= Date.now()) {
+    if (!expiresAt || expiresAt <= nowInstant().epochMilliseconds) {
       this.values.delete(key);
 
       return null;
@@ -40,7 +41,7 @@ export class BillingAlertCooldownService implements BillingCooldownCache {
   }
 
   async set(key: string, _value: true): Promise<void> {
-    this.values.set(key, Date.now() + this.ttlMs);
+    this.values.set(key, nowInstant().epochMilliseconds + this.ttlMs);
   }
 
   async delete(key: string): Promise<void> {

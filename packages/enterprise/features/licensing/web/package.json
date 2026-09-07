@@ -36,6 +36,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",

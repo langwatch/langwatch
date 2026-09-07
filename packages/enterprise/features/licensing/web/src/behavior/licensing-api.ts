@@ -24,6 +24,7 @@
 
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import type { TimeInput } from "@langwatch/time";
 import type { PlanType } from "../model/plan-form-defaults.ts";
 
 /** The organization every license procedure is scoped to. */
@@ -34,7 +35,7 @@ export type LicenseMintInput = OrganizationScope & {
   privateKey: string;
   organizationName: string;
   email: string;
-  expiresAt: Date;
+  expiresAt: TimeInput;
   planType: PlanType;
   plan: Record<string, unknown>;
 };

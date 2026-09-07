@@ -18,6 +18,7 @@ import {
   type IndexedRow,
   type TranscriptRow,
 } from "../rules/copilot-transcript.rules.ts";
+import { toEpochMs } from "@langwatch/time";
 
 export class CopilotTranscriptGroupingService {
   private constructor() {}
@@ -67,7 +68,7 @@ export class CopilotTranscriptGroupingService {
     }
 
     if (typeof raw === "string") {
-      const parsed = Date.parse(raw);
+      const parsed = toEpochMs(raw);
       if (Number.isFinite(parsed)) {
         return parsed;
       }
