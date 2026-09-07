@@ -21,7 +21,7 @@ Feature: Retroactive retention changes
     Then a ClickHouse mutation is issued for each trace-category table
     And the mutation updates _retention_days = 91 for this tenant
     And the event_log mutation updates only trace-class rows
-    And the event_log mutation preserves every row classified as indefinite
+    And the event_log mutation preserves every security row classified as indefinite
 
   Scenario: Retroactive updates select the matching event-log category
     When the admin applies a retention change to existing scenario data
