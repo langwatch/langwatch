@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { error, prismaFake, resolveIdentityEmail, sendRequirementEmail } =
+const { error, prismaFake, resolveDeliveryEmail, sendRequirementEmail } =
   vi.hoisted(() => ({
     error: vi.fn(),
     prismaFake: {
@@ -8,7 +8,7 @@ const { error, prismaFake, resolveIdentityEmail, sendRequirementEmail } =
       user: { findUnique: vi.fn() },
       organizationUser: { findMany: vi.fn() },
     },
-    resolveIdentityEmail: vi.fn(),
+    resolveDeliveryEmail: vi.fn(),
     sendRequirementEmail: vi.fn(),
   }));
 
@@ -36,14 +36,16 @@ describe("EmailOrganizationMfaNotifier", () => {
       { userId: "olga", user: { email: "olga@example.com" } },
     ]);
     sendRequirementEmail.mockResolvedValue(undefined);
-    resolveIdentityEmail.mockResolvedValue(null);
+    resolveDeliveryEmail.mockImplementation(
+      async ({ legacyEmail }: { legacyEmail: string | null }) => legacyEmail,
+    );
   });
 
   /** @scenario "Turning the requirement on is recorded with who did it" */
   it("delivers the change to every active member returned for this organization", async () => {
     const notifier = new EmailOrganizationMfaNotifier(
       prisma,
-      resolveIdentityEmail,
+      resolveDeliveryEmail,
     );
 
     await notifier.requirementChanged({
@@ -82,7 +84,7 @@ describe("EmailOrganizationMfaNotifier", () => {
       .mockResolvedValueOnce(undefined);
     const notifier = new EmailOrganizationMfaNotifier(
       prisma,
-      resolveIdentityEmail,
+      resolveDeliveryEmail,
     );
 
     await expect(
@@ -111,10 +113,10 @@ describe("EmailOrganizationMfaNotifier", () => {
     prismaFake.organizationUser.findMany.mockResolvedValue([
       { userId: "ana", user: { email: "detached@example.com" } },
     ]);
-    resolveIdentityEmail.mockResolvedValue("primary@example.com");
+    resolveDeliveryEmail.mockResolvedValue("primary@example.com");
     const notifier = new EmailOrganizationMfaNotifier(
       prisma,
-      resolveIdentityEmail,
+      resolveDeliveryEmail,
     );
 
     await notifier.requirementChanged({
@@ -132,13 +134,85 @@ describe("EmailOrganizationMfaNotifier", () => {
     );
   });
 
+  it("does not revive a detached legacy mailbox for a latched member", async () => {
+    prismaFake.organizationUser.findMany.mockResolvedValue([
+      { userId: "ana", user: { email: "detached@example.com" } },
+    ]);
+    resolveDeliveryEmail.mockResolvedValue(null);
+    const notifier = new EmailOrganizationMfaNotifier(
+      prisma,
+      resolveDeliveryEmail,
+    );
+
+    await expect(
+      notifier.requirementChanged({
+        organizationId: "org-acme",
+        actorUserId: "ana",
+        required: true,
+        memberUserIds: ["ana"],
+      }),
+    ).rejects.toThrow("failed to notify 1 organization member");
+
+    expect(resolveDeliveryEmail).toHaveBeenCalledWith({
+      userId: "ana",
+      legacyEmail: "detached@example.com",
+    });
+    expect(sendRequirementEmail).not.toHaveBeenCalled();
+  });
+
+  it("delivers to the legacy mailbox when the resolver identifies an unlatched member", async () => {
+    const notifier = new EmailOrganizationMfaNotifier(
+      prisma,
+      resolveDeliveryEmail,
+    );
+
+    await notifier.requirementChanged({
+      organizationId: "org-acme",
+      actorUserId: "ana",
+      required: true,
+      memberUserIds: ["ana", "olga"],
+    });
+
+    expect(resolveDeliveryEmail).toHaveBeenCalledWith({
+      userId: "olga",
+      legacyEmail: "olga@example.com",
+    });
+    expect(sendRequirementEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "olga@example.com" }),
+    );
+  });
+
+  it("delivers to valid members when another identity lookup fails", async () => {
+    resolveDeliveryEmail
+      .mockRejectedValueOnce(new Error("identity read failed"))
+      .mockResolvedValueOnce("olga@example.com");
+    const notifier = new EmailOrganizationMfaNotifier(
+      prisma,
+      resolveDeliveryEmail,
+    );
+
+    await expect(
+      notifier.requirementChanged({
+        organizationId: "org-acme",
+        actorUserId: "ana",
+        required: true,
+        memberUserIds: ["ana", "olga"],
+      }),
+    ).rejects.toThrow("failed to notify 1 organization member");
+
+    expect(sendRequirementEmail).toHaveBeenCalledTimes(1);
+    expect(sendRequirementEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "olga@example.com" }),
+    );
+  });
+
   it("sends once when two members resolve to the same normalized destination", async () => {
-    resolveIdentityEmail
+    resolveDeliveryEmail
       .mockResolvedValueOnce("Shared@Example.com")
       .mockResolvedValueOnce(" shared@example.com ");
     const notifier = new EmailOrganizationMfaNotifier(
       prisma,
-      resolveIdentityEmail,
+      resolveDeliveryEmail,
     );
 
     await notifier.requirementChanged({
