@@ -69,7 +69,8 @@ function hasOnlyExportedAbstractPortClasses(path: string): boolean {
     const isValueDeclaration =
       ts.isFunctionDeclaration(statement) || ts.isEnumDeclaration(statement);
     const named = isTypeDeclaration || isValueDeclaration;
-    if (!named || !statement.name?.text.endsWith("Port")) {
+    const isPortDeclaration = named && statement.name?.text.endsWith("Port");
+    if (!isPortDeclaration) {
       continue;
     }
 
@@ -79,10 +80,10 @@ function hasOnlyExportedAbstractPortClasses(path: string): boolean {
     }
 
     hasPort = true;
-    if (
-      !ts.isClassDeclaration(statement) ||
-      !modifiers.some((modifier) => modifier.kind === ts.SyntaxKind.AbstractKeyword)
-    ) {
+    const isAbstractPortClass =
+      ts.isClassDeclaration(statement) &&
+      modifiers.some((modifier) => modifier.kind === ts.SyntaxKind.AbstractKeyword);
+    if (!isAbstractPortClass) {
       return false;
     }
   }
@@ -182,6 +183,71 @@ export function lintStrictPortBaseline(
   return { violations, bootstrapped: false };
 }
 
+/** Violation for one strict port module given whether it is baselined; `undefined` if clean. */
+function violationForPortFile(
+  file: string,
+  filePath: string,
+  baseline: Set<string>,
+): ArchitectureViolation | undefined {
+  const valid = hasOnlyExportedAbstractPortClasses(file);
+  if (baseline.has(filePath)) {
+    if (!valid) return undefined;
+
+    return {
+      policy: "strict-port-baseline",
+      file,
+      message: "Strict port baseline entry is stale.",
+      allowed: "Delete the entry after converting the port to an abstract Port class.",
+    };
+  }
+
+  if (valid) return undefined;
+
+  return {
+    policy: "strict-port-module",
+    file,
+    message: "A strict feature port module must export an abstract class whose name ends in Port.",
+    allowed:
+      "Keep portable supporting types, but model the runtime boundary as an abstract Port class.",
+  };
+}
+
+/** Violations plus the set of port-file paths actually seen, for one package's strict ports. */
+function violationsForPackagePorts(
+  root: string,
+  pkg: ClassifiedPackage,
+  baseline: Set<string>,
+): { violations: ArchitectureViolation[]; seen: string[] } {
+  if (pkg.kind !== "server" || pkg.layoutVersion !== 0) return { violations: [], seen: [] };
+
+  const seen: string[] = [];
+  const violations: ArchitectureViolation[] = [];
+  for (const file of walkFiles(pkg.root, isStrictPort)) {
+    const filePath = relative(root, file).replaceAll("\\", "/");
+    seen.push(filePath);
+    const violation = violationForPortFile(file, filePath, baseline);
+    if (violation) violations.push(violation);
+  }
+
+  return { violations, seen };
+}
+
+/** Baseline entries with no matching port module left, given the union of ports actually seen. */
+function staleBaselineEntries(
+  root: string,
+  baseline: Set<string>,
+  seen: Set<string>,
+): ArchitectureViolation[] {
+  return [...baseline]
+    .filter((port) => !seen.has(port))
+    .map((port) => ({
+      policy: "strict-port-baseline",
+      file: baselineFile(root),
+      message: `Strict port baseline entry ${port} no longer has a matching port module.`,
+      allowed: "Delete stale entries; the inventory only shrinks.",
+    }));
+}
+
 /**
  * Strict feature ports are nominal abstract classes. The temporary inventory
  * admits only pre-existing type-bag ports and becomes stale as each is fixed.
@@ -192,56 +258,14 @@ export function lintStrictPortModules(
 ): ArchitectureViolation[] {
   const baselineResult = readStrictPortBaselineFile(baselineFile(root));
   const baseline = new Set(baselineResult.ports);
-  const violations = [...baselineResult.violations];
-  const seen = new Set<string>();
+  const perPackage = packages.map((pkg) => violationsForPackagePorts(root, pkg, baseline));
+  const seen = new Set(perPackage.flatMap((result) => result.seen));
 
-  for (const pkg of packages) {
-    if (pkg.kind !== "server" || pkg.layoutVersion !== 0) {
-      continue;
-    }
-
-    for (const file of walkFiles(pkg.root, isStrictPort)) {
-      const filePath = relative(root, file).replaceAll("\\", "/");
-      seen.add(filePath);
-      const valid = hasOnlyExportedAbstractPortClasses(file);
-      if (baseline.has(filePath)) {
-        if (valid) {
-          violations.push({
-            policy: "strict-port-baseline",
-            file,
-            message: "Strict port baseline entry is stale.",
-            allowed: "Delete the entry after converting the port to an abstract Port class.",
-          });
-        }
-
-        continue;
-      }
-
-      if (!valid) {
-        violations.push({
-          policy: "strict-port-module",
-          file,
-          message:
-            "A strict feature port module must export an abstract class whose name ends in Port.",
-          allowed:
-            "Keep portable supporting types, but model the runtime boundary as an abstract Port class.",
-        });
-      }
-    }
-  }
-
-  for (const port of baseline) {
-    if (!seen.has(port)) {
-      violations.push({
-        policy: "strict-port-baseline",
-        file: baselineFile(root),
-        message: `Strict port baseline entry ${port} no longer has a matching port module.`,
-        allowed: "Delete stale entries; the inventory only shrinks.",
-      });
-    }
-  }
-
-  return violations;
+  return [
+    ...baselineResult.violations,
+    ...perPackage.flatMap((result) => result.violations),
+    ...staleBaselineEntries(root, baseline, seen),
+  ];
 }
 
 /** Collects the exact legacy port modules that still need nominal classes. */

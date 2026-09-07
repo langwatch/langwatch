@@ -183,6 +183,26 @@ function assertsType(node: ts.SignatureDeclaration): boolean {
   );
 }
 
+/** The name a function-declaration or variable-initializer assertion helper declares, if any. */
+function assertionHelperName(node: ts.Node): string | undefined {
+  if (ts.isFunctionDeclaration(node) && node.name && node.body) {
+    const isAssertionHelper = assertsType(node) || nodeContainsAssertion(node.body);
+
+    return isAssertionHelper ? node.name.text : undefined;
+  }
+
+  const isNamedVariable = ts.isVariableDeclaration(node) && ts.isIdentifier(node.name);
+  if (!isNamedVariable) return undefined;
+
+  const initializer = node.initializer;
+  const isFunctionLike =
+    initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer));
+  const isAssertionHelper =
+    isFunctionLike && (assertsType(initializer) || nodeContainsAssertion(initializer.body));
+
+  return isAssertionHelper ? node.name.text : undefined;
+}
+
 /**
  * Every assertion helper in the file, at any depth.
  *
@@ -202,18 +222,8 @@ function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
   const helpers = new Set<string>();
 
   const visit = (node: ts.Node): void => {
-    if (ts.isFunctionDeclaration(node) && node.name && node.body) {
-      if (assertsType(node) || nodeContainsAssertion(node.body)) helpers.add(node.name.text);
-    } else if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
-      const initializer = node.initializer;
-      if (
-        initializer &&
-        (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) &&
-        (assertsType(initializer) || nodeContainsAssertion(initializer.body))
-      ) {
-        helpers.add(node.name.text);
-      }
-    }
+    const name = assertionHelperName(node);
+    if (name) helpers.add(name);
 
     ts.forEachChild(node, visit);
   };
@@ -227,7 +237,8 @@ function nodeContainsAssertion(node: ts.Node): boolean {
   const visit = (child: ts.Node): void => {
     if (assertion) return;
 
-    if (ts.isCallExpression(child) && isAssertionCall(child)) assertion = true;
+    const isAssertion = ts.isCallExpression(child) && isAssertionCall(child);
+    if (isAssertion) assertion = true;
 
     ts.forEachChild(child, visit);
   };
@@ -339,7 +350,8 @@ function isSchemaLiteralEchoAssertion(node: ts.CallExpression): boolean {
 
   const schema = callee.expression;
   const input = actual.arguments[0];
-  if (!ts.isIdentifier(schema) || !/schema$/i.test(schema.text) || !input) {
+  const isSchemaParseCall = ts.isIdentifier(schema) && /schema$/i.test(schema.text) && input;
+  if (!isSchemaParseCall) {
     return false;
   }
 
@@ -367,30 +379,33 @@ function isEmptySnapshotAssertion(node: ts.CallExpression): boolean {
   return ts.isStringLiteral(snapshot) && ['""', "[]", "{}"].includes(snapshot.text);
 }
 
-function collectImportBindings(source: ts.SourceFile): ImportBinding[] {
+/** The bindings one import statement introduces, or an empty array when it declares none. */
+function importBindingsFromStatement(statement: ts.Statement): ImportBinding[] {
+  const isStringImport =
+    ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier);
+  if (!isStringImport) return [];
+
+  const clause = statement.importClause;
+  if (!clause || clause.isTypeOnly) return [];
+
+  const module = statement.moduleSpecifier.text;
   const bindings: ImportBinding[] = [];
-  for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
-      continue;
-    }
+  if (clause.name) bindings.push({ name: clause.name.text, module });
 
-    const clause = statement.importClause;
-    if (!clause || clause.isTypeOnly) continue;
+  const named = clause.namedBindings;
+  if (named && ts.isNamespaceImport(named)) bindings.push({ name: named.name.text, module });
 
-    const module = statement.moduleSpecifier.text;
-    if (clause.name) bindings.push({ name: clause.name.text, module });
-
-    const named = clause.namedBindings;
-    if (named && ts.isNamespaceImport(named)) bindings.push({ name: named.name.text, module });
-
-    if (named && ts.isNamedImports(named)) {
-      for (const element of named.elements) {
-        if (!element.isTypeOnly) bindings.push({ name: element.name.text, module });
-      }
+  if (named && ts.isNamedImports(named)) {
+    for (const element of named.elements) {
+      if (!element.isTypeOnly) bindings.push({ name: element.name.text, module });
     }
   }
 
   return bindings;
+}
+
+function collectImportBindings(source: ts.SourceFile): ImportBinding[] {
+  return source.statements.flatMap((statement) => importBindingsFromStatement(statement));
 }
 
 function isModuleMockCallee(callee: ts.Expression): boolean {
@@ -481,6 +496,162 @@ function canonicalCaseTable(source: ts.SourceFile, call: ts.CallExpression): str
     .join("|");
 }
 
+/** A recognised-assertion violation for one test call, or `undefined` when it asserts. */
+function missingAssertionViolation(
+  file: string,
+  source: ts.SourceFile,
+  test: TestCall,
+  assertionHelpers: Set<string>,
+): ArchitectureViolation | undefined {
+  if (containsAssertion(test.callback, assertionHelpers)) return undefined;
+
+  return {
+    policy: "test-quality",
+    file,
+    line: lineOf(source, test.call),
+    message: "Test callback has no recognised assertion.",
+    allowed: "Assert an observable behaviour, or use an explicit assertion helper.",
+  };
+}
+
+/**
+ * The duplicate-body violation for one test call, given the registry of bodies seen so far. Also
+ * registers this test's body, so the registry stays correct for the tests walked after it.
+ */
+function duplicateBodyViolation(
+  file: string,
+  source: ts.SourceFile,
+  test: TestCall,
+  duplicateBodies: Map<string, TestCall>,
+): ArchitectureViolation | undefined {
+  const bodyKey = [
+    test.scope,
+    canonicalCaseTable(source, test.call),
+    canonicalTestBody(source, test.callback),
+  ].join(":");
+  const duplicate = duplicateBodies.get(bodyKey);
+  if (!duplicate) {
+    duplicateBodies.set(bodyKey, test);
+
+    return undefined;
+  }
+
+  return {
+    policy: "test-quality",
+    file,
+    line: lineOf(source, test.call),
+    message: `Test body exactly duplicates the test at line ${lineOf(source, duplicate.call)}.`,
+    allowed: "Keep one behaviour test, or make the distinct behaviour observable.",
+  };
+}
+
+/** The mocked-subject-usage violation for one test call, or `undefined` when it uses none. */
+function mockedSubjectUsageViolation(
+  file: string,
+  source: ts.SourceFile,
+  test: TestCall,
+  imports: ImportBinding[],
+  mockedModules: Set<string>,
+): ArchitectureViolation | undefined {
+  const subjectStem = testSubjectStem(file);
+  const binding = imports.find((candidate) => {
+    const isSubject = moduleStem(candidate.module) === subjectStem;
+
+    return (
+      isSubject &&
+      mockedModules.has(candidate.module) &&
+      callbackUsesName(test.callback, candidate.name)
+    );
+  });
+  if (!binding) return undefined;
+
+  return {
+    policy: "test-quality",
+    file,
+    line: lineOf(source, test.call),
+    message: `Test uses ${JSON.stringify(binding.name)} from its mocked subject module ${JSON.stringify(binding.module)}.`,
+    allowed: "Mock collaborators, not the behaviour under test.",
+  };
+}
+
+/** Every violation for one test call. */
+function violationsForTestCall(options: {
+  file: string;
+  source: ts.SourceFile;
+  test: TestCall;
+  imports: ImportBinding[];
+  mockedModules: Set<string>;
+  assertionHelpers: Set<string>;
+  duplicateBodies: Map<string, TestCall>;
+}): ArchitectureViolation[] {
+  const { file, source, test, imports, mockedModules, assertionHelpers, duplicateBodies } = options;
+
+  return [
+    missingAssertionViolation(file, source, test, assertionHelpers),
+    duplicateBodyViolation(file, source, test, duplicateBodies),
+    mockedSubjectUsageViolation(file, source, test, imports, mockedModules),
+  ].filter((violation) => violation !== undefined);
+}
+
+type CallExpressionFinding = { message: string; allowed: string };
+
+function checkTautologicalAssertion(node: ts.CallExpression): CallExpressionFinding | null {
+  if (!isTautologicalAssertion(node)) return null;
+
+  return {
+    message: "Assertion compares a static literal with the same known result.",
+    allowed: "Assert a value derived from the behaviour under test.",
+  };
+}
+
+function checkSchemaLiteralEchoAssertion(node: ts.CallExpression): CallExpressionFinding | null {
+  if (!isSchemaLiteralEchoAssertion(node)) return null;
+
+  return {
+    message: "Assertion only echoes a static literal through a schema parser.",
+    allowed: "Assert a refinement, default, transform, error, or observable caller behaviour.",
+  };
+}
+
+function checkEmptySnapshotAssertion(node: ts.CallExpression): CallExpressionFinding | null {
+  if (!isEmptySnapshotAssertion(node)) return null;
+
+  return {
+    message: "Snapshot only records a statically empty value.",
+    allowed: "Assert behaviour derived from the unit under test instead.",
+  };
+}
+
+const CALL_EXPRESSION_CHECKS = [
+  checkTautologicalAssertion,
+  checkSchemaLiteralEchoAssertion,
+  checkEmptySnapshotAssertion,
+];
+
+/** Every static-assertion-shape violation among a source file's call expressions. */
+function callExpressionViolations(file: string, source: ts.SourceFile): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  const visit = (node: ts.Node): void => {
+    if (!ts.isCallExpression(node)) {
+      ts.forEachChild(node, visit);
+
+      return;
+    }
+
+    for (const check of CALL_EXPRESSION_CHECKS) {
+      const finding = check(node);
+      if (finding) {
+        violations.push({ policy: "test-quality", file, line: lineOf(source, node), ...finding });
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+
+  return violations;
+}
+
 function lintTestFile(file: string): ArchitectureViolation[] {
   const source = ts.createSourceFile(
     file,
@@ -488,7 +659,6 @@ function lintTestFile(file: string): ArchitectureViolation[] {
     ts.ScriptTarget.Latest,
     true,
   );
-  const violations: ArchitectureViolation[] = [];
   const imports = collectImportBindings(source);
   const mockedModules = collectMockedModules(source);
   const assertionHelpers = collectAssertionHelpers(source);
@@ -497,95 +667,19 @@ function lintTestFile(file: string): ArchitectureViolation[] {
   }
 
   const duplicateBodies = new Map<string, TestCall>();
+  const testCallViolations = collectTestCalls(source).flatMap((test) =>
+    violationsForTestCall({
+      file,
+      source,
+      test,
+      imports,
+      mockedModules,
+      assertionHelpers,
+      duplicateBodies,
+    }),
+  );
 
-  for (const test of collectTestCalls(source)) {
-    if (!containsAssertion(test.callback, assertionHelpers)) {
-      violations.push({
-        policy: "test-quality",
-        file,
-        line: lineOf(source, test.call),
-        message: "Test callback has no recognised assertion.",
-        allowed: "Assert an observable behaviour, or use an explicit assertion helper.",
-      });
-    }
-
-    const bodyKey = [
-      test.scope,
-      canonicalCaseTable(source, test.call),
-      canonicalTestBody(source, test.callback),
-    ].join(":");
-    const duplicate = duplicateBodies.get(bodyKey);
-    if (duplicate) {
-      violations.push({
-        policy: "test-quality",
-        file,
-        line: lineOf(source, test.call),
-        message: `Test body exactly duplicates the test at line ${lineOf(source, duplicate.call)}.`,
-        allowed: "Keep one behaviour test, or make the distinct behaviour observable.",
-      });
-    } else {
-      duplicateBodies.set(bodyKey, test);
-    }
-
-    for (const binding of imports) {
-      const isSubject = moduleStem(binding.module) === testSubjectStem(file);
-      if (!isSubject || !mockedModules.has(binding.module)) continue;
-
-      if (!callbackUsesName(test.callback, binding.name)) continue;
-
-      violations.push({
-        policy: "test-quality",
-        file,
-        line: lineOf(source, test.call),
-        message: `Test uses ${JSON.stringify(binding.name)} from its mocked subject module ${JSON.stringify(binding.module)}.`,
-        allowed: "Mock collaborators, not the behaviour under test.",
-      });
-      break;
-    }
-  }
-
-  const visit = (node: ts.Node): void => {
-    if (!ts.isCallExpression(node)) {
-      ts.forEachChild(node, visit);
-
-      return;
-    }
-
-    if (isTautologicalAssertion(node)) {
-      violations.push({
-        policy: "test-quality",
-        file,
-        line: lineOf(source, node),
-        message: "Assertion compares a static literal with the same known result.",
-        allowed: "Assert a value derived from the behaviour under test.",
-      });
-    }
-
-    if (isSchemaLiteralEchoAssertion(node)) {
-      violations.push({
-        policy: "test-quality",
-        file,
-        line: lineOf(source, node),
-        message: "Assertion only echoes a static literal through a schema parser.",
-        allowed: "Assert a refinement, default, transform, error, or observable caller behaviour.",
-      });
-    }
-
-    if (isEmptySnapshotAssertion(node)) {
-      violations.push({
-        policy: "test-quality",
-        file,
-        line: lineOf(source, node),
-        message: "Snapshot only records a statically empty value.",
-        allowed: "Assert behaviour derived from the unit under test instead.",
-      });
-    }
-
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-
-  return violations;
+  return [...testCallViolations, ...callExpressionViolations(file, source)];
 }
 
 export function lintTestQuality(

@@ -38,8 +38,110 @@ function sectionBody(content: string, section: string): string | undefined {
   return match?.[1];
 }
 
-export function lintArchitectureRecords(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+/** Required-section violations for one ownership root's boundary ADR. */
+function boundaryRecordSectionViolations(
+  boundaryRecord: string,
+  content: string,
+): ArchitectureViolation[] {
+  return REQUIRED_SECTIONS.filter((section) => sectionBody(content, section) === undefined).map(
+    (section) => ({
+      policy: "architecture-record",
+      file: boundaryRecord,
+      message: `Boundary ADR must contain a "${section}" section, even when the decision is that the concern does not apply.`,
+    }),
+  );
+}
+
+/** Status, spec-link, and index-registration violations for one ownership root's boundary ADR. */
+function boundaryRecordShapeViolations(options: {
+  boundaryRecord: string;
+  boundaryName: string;
+  content: string;
+  index: string;
+}): ArchitectureViolation[] {
+  const { boundaryRecord, boundaryName, content, index } = options;
   const violations: ArchitectureViolation[] = [];
+
+  if (!/\*\*Status:\*\*\s+\S+/.test(content)) {
+    violations.push({
+      policy: "architecture-record",
+      file: boundaryRecord,
+      message: "Boundary ADR must declare its status.",
+    });
+  }
+
+  if (!/\.feature(?:\)|\s|$)/.test(content)) {
+    violations.push({
+      policy: "architecture-record",
+      file: boundaryRecord,
+      message: "Boundary ADR must link to its executable .feature contract.",
+    });
+  }
+
+  const indexLinksBoundary =
+    existsSync(index) && readFileSync(index, "utf8").includes(boundaryName);
+  if (existsSync(index) && !indexLinksBoundary) {
+    violations.push({
+      policy: "architecture-record",
+      file: index,
+      message: `ADR index must link ${JSON.stringify(boundaryName)}.`,
+    });
+  }
+
+  return violations;
+}
+
+/** Every architecture-record violation for one non-application package ownership root. */
+function violationsForRoot(root: string): ArchitectureViolation[] {
+  const adrs = join(root, "adrs");
+  const specs = join(root, "specs");
+  const index = join(adrs, "README.md");
+  const records = markdownFiles(adrs);
+  const featureSpecs = existsSync(specs)
+    ? readdirSync(specs).filter((file) => file.endsWith(".feature"))
+    : [];
+  const violations: ArchitectureViolation[] = [];
+
+  if (!existsSync(index)) {
+    violations.push({
+      policy: "architecture-record",
+      file: index,
+      message: "Every governed package ownership root must have an ADR index.",
+    });
+  }
+
+  if (records.length === 0) {
+    violations.push({
+      policy: "architecture-record",
+      file: adrs,
+      message: "Every governed package ownership root must have a boundary ADR.",
+    });
+
+    return violations;
+  }
+
+  if (featureSpecs.length === 0) {
+    violations.push({
+      policy: "architecture-record",
+      file: specs,
+      message: "Every documented feature boundary must own at least one Gherkin spec.",
+    });
+  }
+
+  const boundaryName = records[0];
+  if (!boundaryName) return violations;
+
+  const boundaryRecord = join(adrs, boundaryName);
+  const content = readFileSync(boundaryRecord, "utf8");
+
+  return [
+    ...violations,
+    ...boundaryRecordSectionViolations(boundaryRecord, content),
+    ...boundaryRecordShapeViolations({ boundaryRecord, boundaryName, content, index }),
+  ];
+}
+
+export function lintArchitectureRecords(packages: ClassifiedPackage[]): ArchitectureViolation[] {
   // Applications are composition and deployment roots documented by the
   // repository-level application ADR/spec. Package-local records belong to
   // reusable ownership boundaries, not each executable wrapper.
@@ -51,83 +153,5 @@ export function lintArchitectureRecords(packages: ClassifiedPackage[]): Architec
     if (!roots.has(root)) roots.set(root, pkg.feature);
   }
 
-  for (const [root] of roots) {
-    const adrs = join(root, "adrs");
-    const specs = join(root, "specs");
-    const index = join(adrs, "README.md");
-    const records = markdownFiles(adrs);
-    const featureSpecs = existsSync(specs)
-      ? readdirSync(specs).filter((file) => file.endsWith(".feature"))
-      : [];
-
-    if (!existsSync(index)) {
-      violations.push({
-        policy: "architecture-record",
-        file: index,
-        message: "Every governed package ownership root must have an ADR index.",
-      });
-    }
-
-    if (records.length === 0) {
-      violations.push({
-        policy: "architecture-record",
-        file: adrs,
-        message: "Every governed package ownership root must have a boundary ADR.",
-      });
-      continue;
-    }
-
-    if (featureSpecs.length === 0) {
-      violations.push({
-        policy: "architecture-record",
-        file: specs,
-        message: "Every documented feature boundary must own at least one Gherkin spec.",
-      });
-    }
-
-    const boundaryName = records[0];
-    if (!boundaryName) continue;
-
-    const boundaryRecord = join(adrs, boundaryName);
-    const content = readFileSync(boundaryRecord, "utf8");
-    for (const section of REQUIRED_SECTIONS) {
-      const body = sectionBody(content, section);
-      if (body === undefined) {
-        violations.push({
-          policy: "architecture-record",
-          file: boundaryRecord,
-          message: `Boundary ADR must contain a "${section}" section, even when the decision is that the concern does not apply.`,
-        });
-      }
-    }
-
-    if (!/\*\*Status:\*\*\s+\S+/.test(content)) {
-      violations.push({
-        policy: "architecture-record",
-        file: boundaryRecord,
-        message: "Boundary ADR must declare its status.",
-      });
-    }
-
-    if (!/\.feature(?:\)|\s|$)/.test(content)) {
-      violations.push({
-        policy: "architecture-record",
-        file: boundaryRecord,
-        message: "Boundary ADR must link to its executable .feature contract.",
-      });
-    }
-
-    if (existsSync(index)) {
-      const indexContent = readFileSync(index, "utf8");
-      if (!indexContent.includes(boundaryName)) {
-        violations.push({
-          policy: "architecture-record",
-          file: index,
-          message: `ADR index must link ${JSON.stringify(boundaryName)}.`,
-        });
-      }
-    }
-  }
-
-  return violations;
+  return [...roots.keys()].flatMap((root) => violationsForRoot(root));
 }

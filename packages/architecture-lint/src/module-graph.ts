@@ -88,15 +88,72 @@ type ParsedSource = {
 const parsedSources = new Map<string, ParsedSource>();
 
 function scriptKind(file: string): ts.ScriptKind {
-  if (file.endsWith(".tsx") || file.endsWith(".jsx")) return ts.ScriptKind.TSX;
+  const isTsxLike = file.endsWith(".tsx") || file.endsWith(".jsx");
+  if (isTsxLike) return ts.ScriptKind.TSX;
 
-  if (file.endsWith(".mts") || file.endsWith(".mjs")) return ts.ScriptKind.TS;
+  const isEsmOrCjsTypeScript = file.endsWith(".mts") || file.endsWith(".mjs");
+  if (isEsmOrCjsTypeScript) return ts.ScriptKind.TS;
 
-  if (file.endsWith(".cts") || file.endsWith(".cjs")) return ts.ScriptKind.TS;
+  const isCommonJsTypeScript = file.endsWith(".cts") || file.endsWith(".cjs");
+  if (isCommonJsTypeScript) return ts.ScriptKind.TS;
 
   if (file.endsWith(".js")) return ts.ScriptKind.JS;
 
   return ts.ScriptKind.TS;
+}
+
+function isJsxNode(node: ts.Node): boolean {
+  return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
+}
+
+type ImportRecordInput = { node: ts.Node; specifier: ts.Expression | undefined; typeOnly: boolean };
+
+/**
+ * A dynamic `import(...)` in value position parses as a call; the two type
+ * forms — `typeof import("x")` and `import("x").Foo` — parse as an
+ * `ImportTypeNode` and never reach here. Deferring a heavy dependency behind
+ * `await import()` is precisely how it is kept out of a boot graph, so a walk
+ * blind to this edge would bless the one move most likely to smuggle the UI
+ * stack back in at runtime.
+ */
+function dynamicImportRecord(node: ts.CallExpression): ImportRecordInput | undefined {
+  const dynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+  const requireCall = ts.isIdentifier(node.expression) && node.expression.text === "require";
+  if (!dynamicImport && !requireCall) return undefined;
+
+  return { node, specifier: node.arguments[0], typeOnly: false };
+}
+
+/** The import-record input for one AST node, across every module-specifier-bearing form. */
+function importRecordFor(node: ts.Node): ImportRecordInput | undefined {
+  if (ts.isImportDeclaration(node)) {
+    return {
+      node: node.moduleSpecifier,
+      specifier: node.moduleSpecifier,
+      typeOnly: node.importClause?.isTypeOnly === true,
+    };
+  }
+
+  const isNamedExport = ts.isExportDeclaration(node) && node.moduleSpecifier;
+  if (isNamedExport) {
+    return {
+      node: node.moduleSpecifier,
+      specifier: node.moduleSpecifier,
+      typeOnly: node.isTypeOnly,
+    };
+  }
+
+  const isImportEquals =
+    ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference);
+  if (isImportEquals) {
+    return {
+      node: node.moduleReference,
+      specifier: node.moduleReference.expression,
+      typeOnly: node.isTypeOnly,
+    };
+  }
+
+  return ts.isCallExpression(node) ? dynamicImportRecord(node) : undefined;
 }
 
 function parseSource(file: string): ParsedSource {
@@ -116,11 +173,7 @@ function parseSource(file: string): ParsedSource {
   const imports: ModuleImport[] = [];
   let rendersJsx = false;
 
-  const record = (options: {
-    node: ts.Node;
-    specifier: ts.Expression | undefined;
-    typeOnly: boolean;
-  }): void => {
+  const record = (options: ImportRecordInput): void => {
     const literal =
       options.specifier !== void 0 && ts.isStringLiteralLike(options.specifier)
         ? options.specifier
@@ -135,44 +188,10 @@ function parseSource(file: string): ParsedSource {
   };
 
   const visit = (node: ts.Node): void => {
-    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)) {
-      rendersJsx = true;
-    }
+    if (isJsxNode(node)) rendersJsx = true;
 
-    if (ts.isImportDeclaration(node)) {
-      record({
-        node: node.moduleSpecifier,
-        specifier: node.moduleSpecifier,
-        typeOnly: node.importClause?.isTypeOnly === true,
-      });
-    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier) {
-      record({
-        node: node.moduleSpecifier,
-        specifier: node.moduleSpecifier,
-        typeOnly: node.isTypeOnly,
-      });
-    } else if (
-      ts.isImportEqualsDeclaration(node) &&
-      ts.isExternalModuleReference(node.moduleReference)
-    ) {
-      record({
-        node: node.moduleReference,
-        specifier: node.moduleReference.expression,
-        typeOnly: node.isTypeOnly,
-      });
-    } else if (ts.isCallExpression(node)) {
-      // A dynamic `import(...)` in value position parses as a call; the two
-      // type forms — `typeof import("x")` and `import("x").Foo` — parse as an
-      // `ImportTypeNode` and never reach here. Deferring a heavy dependency
-      // behind `await import()` is precisely how it is kept out of a boot
-      // graph, so a walk blind to this edge would bless the one move most
-      // likely to smuggle the UI stack back in at runtime.
-      const dynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-      const requireCall = ts.isIdentifier(node.expression) && node.expression.text === "require";
-      if (dynamicImport || requireCall) {
-        record({ node, specifier: node.arguments[0], typeOnly: false });
-      }
-    }
+    const importRecord = importRecordFor(node);
+    if (importRecord) record(importRecord);
 
     ts.forEachChild(node, visit);
   };
@@ -336,7 +355,8 @@ function collectManifests(options: {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
 
-    if (entry.name.startsWith(".") || IGNORED_DIRECTORIES.has(entry.name)) continue;
+    const isIgnoredDirectory = entry.name.startsWith(".") || IGNORED_DIRECTORIES.has(entry.name);
+    if (isIgnoredDirectory) continue;
 
     collectManifests({
       directory: join(options.directory, entry.name),
@@ -344,6 +364,109 @@ function collectManifests(options: {
       found: options.found,
     });
   }
+}
+
+function collectWorkspaceManifests(root: string): PackageManifestRecord[] {
+  const found: PackageManifestRecord[] = [];
+  for (const workspaceRoot of WORKSPACE_ROOTS) {
+    const directory = join(root, workspaceRoot);
+    if (!existsSync(directory)) continue;
+
+    collectManifests({ directory, depth: WORKSPACE_MANIFEST_DEPTH, found });
+  }
+
+  return found;
+}
+
+type OwningPackageLookup = (options: { file: string }) => PackageManifestRecord | undefined;
+
+function resolveWorkspacePackage(
+  specifier: string,
+  packages: ReadonlyMap<string, PackageManifestRecord>,
+): string | undefined {
+  const segments = specifier.split("/");
+  const scoped = specifier.startsWith("@");
+  const name = scoped ? segments.slice(0, 2).join("/") : segments[0];
+  if (!name) return void 0;
+
+  const manifest = packages.get(name);
+  if (!manifest) return void 0;
+
+  const rest = segments.slice(scoped ? 2 : 1);
+  const subpath = rest.length > 0 ? `./${rest.join("/")}` : ".";
+  const target = subpathTarget({ manifest, subpath });
+  if (!target) return void 0;
+
+  return resolveSourceCandidate({ candidate: resolve(manifest.directory, target) });
+}
+
+/** The `imports` entry a subpath import (`#foo`) resolves to, following one wildcard pattern. */
+function resolveWildcardSubpathImport(
+  specifier: string,
+  owner: PackageManifestRecord,
+  map: Record<string, unknown>,
+): string | undefined {
+  for (const [pattern, value] of Object.entries(map)) {
+    const star = pattern.indexOf("*");
+    if (star === -1) continue;
+
+    const prefix = pattern.slice(0, star);
+    const suffix = pattern.slice(star + 1);
+    const matchesWildcardPattern = specifier.startsWith(prefix) && specifier.endsWith(suffix);
+    if (!matchesWildcardPattern) continue;
+
+    const filled = specifier.slice(prefix.length, specifier.length - suffix.length);
+    const target = conditionTarget(value);
+    if (!target) continue;
+
+    return resolveSourceCandidate({
+      candidate: resolve(owner.directory, target.replace("*", filled)),
+    });
+  }
+
+  return void 0;
+}
+
+function resolveSubpathImport(
+  options: { specifier: string; file: string },
+  owningPackage: OwningPackageLookup,
+): string | undefined {
+  const owner = owningPackage({ file: options.file });
+  const map = owner?.imports;
+  if (!map || !owner) return void 0;
+
+  const exactTarget = conditionTarget(map[options.specifier]);
+  if (exactTarget) {
+    return resolveSourceCandidate({ candidate: resolve(owner.directory, exactTarget) });
+  }
+
+  return resolveWildcardSubpathImport(options.specifier, owner, map);
+}
+
+/** "\0" occurs in neither a path nor a specifier, so it separates the two halves of a cache key. */
+function resolutionCacheKey(
+  specifier: string,
+  file: string,
+  owningPackage: OwningPackageLookup,
+): string {
+  if (specifier.startsWith(".")) return `${dirname(file)}\0${specifier}`;
+
+  if (specifier.startsWith("#")) return `${owningPackage({ file })?.directory ?? ""}\0${specifier}`;
+
+  return specifier;
+}
+
+function resolveSpecifierUncached(
+  specifier: string,
+  file: string,
+  packages: ReadonlyMap<string, PackageManifestRecord>,
+  owningPackage: OwningPackageLookup,
+): string | undefined {
+  if (specifier.startsWith(".")) return resolveRelativeModule({ file, specifier });
+
+  if (specifier.startsWith("#")) return resolveSubpathImport({ specifier, file }, owningPackage);
+
+  return resolveWorkspacePackage(specifier, packages);
 }
 
 /**
@@ -357,13 +480,7 @@ function collectManifests(options: {
  * resolver ignorant of `imports` would silently drop.
  */
 export function createWorkspaceModuleResolver({ root }: { root: string }): WorkspaceModuleResolver {
-  const found: PackageManifestRecord[] = [];
-  for (const workspaceRoot of WORKSPACE_ROOTS) {
-    const directory = join(root, workspaceRoot);
-    if (!existsSync(directory)) continue;
-
-    collectManifests({ directory, depth: WORKSPACE_MANIFEST_DEPTH, found });
-  }
+  const found = collectWorkspaceManifests(root);
 
   const packages = new Map<string, PackageManifestRecord>();
   for (const record of found) {
@@ -374,72 +491,14 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
     (left, right) => right.directory.length - left.directory.length,
   );
 
-  const owningPackage = ({ file }: { file: string }): PackageManifestRecord | undefined =>
+  const owningPackage: OwningPackageLookup = ({ file }) =>
     byDirectory.find(
       (record) => file === record.directory || file.startsWith(`${record.directory}${sep}`),
     );
 
-  const resolveWorkspacePackage = (specifier: string): string | undefined => {
-    const segments = specifier.split("/");
-    const scoped = specifier.startsWith("@");
-    const name = scoped ? segments.slice(0, 2).join("/") : segments[0];
-    if (!name) return void 0;
-
-    const manifest = packages.get(name);
-    if (!manifest) return void 0;
-
-    const rest = segments.slice(scoped ? 2 : 1);
-    const subpath = rest.length > 0 ? `./${rest.join("/")}` : ".";
-    const target = subpathTarget({ manifest, subpath });
-    if (!target) return void 0;
-
-    return resolveSourceCandidate({ candidate: resolve(manifest.directory, target) });
-  };
-
-  const resolveSubpathImport = (options: {
-    specifier: string;
-    file: string;
-  }): string | undefined => {
-    const owner = owningPackage({ file: options.file });
-    const map = owner?.imports;
-    if (!map) return void 0;
-
-    const exact = map[options.specifier];
-    const exactTarget = conditionTarget(exact);
-    if (exactTarget) {
-      return resolveSourceCandidate({ candidate: resolve(owner.directory, exactTarget) });
-    }
-
-    for (const [pattern, value] of Object.entries(map)) {
-      const star = pattern.indexOf("*");
-      if (star === -1) continue;
-
-      const prefix = pattern.slice(0, star);
-      const suffix = pattern.slice(star + 1);
-      if (!options.specifier.startsWith(prefix) || !options.specifier.endsWith(suffix)) continue;
-
-      const filled = options.specifier.slice(
-        prefix.length,
-        options.specifier.length - suffix.length,
-      );
-      const target = conditionTarget(value);
-      if (!target) continue;
-
-      return resolveSourceCandidate({
-        candidate: resolve(owner.directory, target.replace("*", filled)),
-      });
-    }
-
-    return void 0;
-  };
-
-  /**
-   * Resolutions are cached, and that is load-bearing rather than a nicety. A
-   * miss costs a fistful of `statSync` calls — every candidate extension, twice
-   * — and a popular specifier is re-asked by hundreds of importers. Only a
-   * relative specifier depends on where it was written, so alias and workspace
-   * specifiers share one entry rather than one per importing directory.
-   */
+  // Resolutions are cached, and that is load-bearing rather than a nicety. A
+  // miss costs a fistful of `statSync` calls — every candidate extension,
+  // twice — and a popular specifier is re-asked by hundreds of importers.
   const resolutions = new Map<string, string | undefined>();
 
   const resolveSpecifier = ({
@@ -449,20 +508,10 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
     specifier: string;
     file: string;
   }): string | undefined => {
-    // "\0" occurs in neither a path nor a specifier, so it separates the two
-    // halves of the key unambiguously.
-    const key = specifier.startsWith(".")
-      ? `${dirname(file)}\0${specifier}`
-      : specifier.startsWith("#")
-        ? `${owningPackage({ file })?.directory ?? ""}\0${specifier}`
-        : specifier;
+    const key = resolutionCacheKey(specifier, file, owningPackage);
     if (resolutions.has(key)) return resolutions.get(key);
 
-    const resolved = specifier.startsWith(".")
-      ? resolveRelativeModule({ file, specifier })
-      : specifier.startsWith("#")
-        ? resolveSubpathImport({ specifier, file })
-        : resolveWorkspacePackage(specifier);
+    const resolved = resolveSpecifierUncached(specifier, file, packages, owningPackage);
     resolutions.set(key, resolved);
 
     return resolved;
@@ -487,19 +536,55 @@ export type ValueImportGraph = {
  * legitimately render with, but a file that reaches the terminal's neighbours
  * some other way still is.
  */
-export function walkValueImportGraph({
-  roots,
-  resolve: resolveSpecifier,
-  forbidden,
-  terminal,
-  emitted,
-}: {
-  roots: readonly string[];
+type ValueImportGraphOptions = {
   resolve: (options: { specifier: string; file: string }) => string | undefined;
   forbidden: (options: { specifier: string; file: string; target?: string }) => string | undefined;
   terminal?: (options: { file: string }) => boolean;
   emitted?: (options: { file: string }) => string | undefined;
-}): ValueImportGraph {
+};
+
+/**
+ * One file's outgoing edges, recording a forbidden or emitted reason into
+ * `seeds` (mutated in place) rather than returning it — a file can seed the
+ * graph without having any edges of its own.
+ */
+function edgesForFile(
+  file: string,
+  options: ValueImportGraphOptions,
+  seeds: Map<string, string>,
+): string[] {
+  const { resolve: resolveSpecifier, forbidden, terminal, emitted } = options;
+  const edges: string[] = [];
+  for (const entry of valueImports({ file })) {
+    const target = resolveSpecifier({ specifier: entry.specifier, file });
+    const reason = forbidden({ specifier: entry.specifier, file, target });
+    if (reason !== void 0) {
+      if (!seeds.has(file)) seeds.set(file, reason);
+
+      continue;
+    }
+
+    if (target === void 0) continue;
+
+    if (terminal?.({ file: target }) === true) continue;
+
+    edges.push(target);
+  }
+
+  // After the specifiers, so an explicit forbidden import stays the reported
+  // cause and a compiler-emitted edge is only the fallback.
+  if (!seeds.has(file)) {
+    const emittedReason = emitted?.({ file });
+    if (emittedReason !== void 0) seeds.set(file, emittedReason);
+  }
+
+  return edges;
+}
+
+export function walkValueImportGraph({
+  roots,
+  ...options
+}: { roots: readonly string[] } & ValueImportGraphOptions): ValueImportGraph {
   const children = new Map<string, readonly string[]>();
   const seeds = new Map<string, string>();
   const seen = new Set<string>(roots);
@@ -507,29 +592,7 @@ export function walkValueImportGraph({
 
   while (queue.length > 0) {
     const file = queue.pop()!;
-    const edges: string[] = [];
-    for (const entry of valueImports({ file })) {
-      const target = resolveSpecifier({ specifier: entry.specifier, file });
-      const reason = forbidden({ specifier: entry.specifier, file, target });
-      if (reason !== void 0) {
-        if (!seeds.has(file)) seeds.set(file, reason);
-
-        continue;
-      }
-
-      if (target === void 0) continue;
-
-      if (terminal?.({ file: target }) === true) continue;
-
-      edges.push(target);
-    }
-
-    // After the specifiers, so an explicit forbidden import stays the reported
-    // cause and a compiler-emitted edge is only the fallback.
-    if (!seeds.has(file)) {
-      const emittedReason = emitted?.({ file });
-      if (emittedReason !== void 0) seeds.set(file, emittedReason);
-    }
+    const edges = edgesForFile(file, options, seeds);
 
     children.set(file, edges);
     for (const edge of edges) {
@@ -554,13 +617,8 @@ export function walkValueImportGraph({
  * seeds makes a cycle a non-event — it yields a chain only if something inside
  * it does — and settles every node exactly once, in O(files + imports).
  */
-export function chainsToSeeds({
-  roots,
-  graph,
-}: {
-  roots: readonly string[];
-  graph: ValueImportGraph;
-}): Map<string, string[]> {
+/** Every edge's target mapped back to the files that reach it, the reverse of `graph.children`. */
+function parentsIndex(graph: ValueImportGraph): Map<string, string[]> {
   const parents = new Map<string, string[]>();
   for (const [file, edges] of graph.children) {
     for (const edge of edges) {
@@ -570,6 +628,14 @@ export function chainsToSeeds({
     }
   }
 
+  return parents;
+}
+
+/** Each node's next hop toward a seed, flooded backwards from the seeds so a cycle settles once. */
+function floodViaFromSeeds(
+  graph: ValueImportGraph,
+  parents: Map<string, string[]>,
+): Map<string, string | undefined> {
   const via = new Map<string, string | undefined>();
   const work: string[] = [];
   for (const file of graph.seeds.keys()) {
@@ -587,26 +653,49 @@ export function chainsToSeeds({
     }
   }
 
-  const chains = new Map<string, string[]>();
-  for (const root of roots) {
-    if (!via.has(root)) continue;
+  return via;
+}
 
-    const chain: string[] = [];
-    const guard = new Set<string>();
-    let cursor: string | undefined = root;
-    while (cursor !== void 0 && !guard.has(cursor)) {
-      guard.add(cursor);
-      chain.push(cursor);
-      const next: string | undefined = via.get(cursor);
-      if (next === void 0) {
-        chain.push(graph.seeds.get(cursor)!);
-        break;
-      }
+/** The chain from `root` to whatever seeded the graph, or `undefined` when it never reaches one. */
+function chainFromRoot(
+  root: string,
+  via: Map<string, string | undefined>,
+  graph: ValueImportGraph,
+): string[] | undefined {
+  if (!via.has(root)) return undefined;
 
-      cursor = next;
+  const chain: string[] = [];
+  const guard = new Set<string>();
+  let cursor: string | undefined = root;
+  while (cursor !== void 0 && !guard.has(cursor)) {
+    guard.add(cursor);
+    chain.push(cursor);
+    const next: string | undefined = via.get(cursor);
+    if (next === void 0) {
+      chain.push(graph.seeds.get(cursor)!);
+      break;
     }
 
-    chains.set(root, chain);
+    cursor = next;
+  }
+
+  return chain;
+}
+
+export function chainsToSeeds({
+  roots,
+  graph,
+}: {
+  roots: readonly string[];
+  graph: ValueImportGraph;
+}): Map<string, string[]> {
+  const parents = parentsIndex(graph);
+  const via = floodViaFromSeeds(graph, parents);
+
+  const chains = new Map<string, string[]>();
+  for (const root of roots) {
+    const chain = chainFromRoot(root, via, graph);
+    if (chain) chains.set(root, chain);
   }
 
   return chains;

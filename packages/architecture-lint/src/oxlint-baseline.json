@@ -378,39 +378,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/architecture-records.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/architecture-lint/src/check-feature-parity.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/comment-blocks.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/contract-build-config.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/declarations.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/eventing-roles.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/feature-catalogue.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/architecture-lint/src/feature-layout.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/filename-migration.ts",
       "measured": "2026-09-06"
     },
     {
@@ -426,31 +398,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/manifests.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/module-graph.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/port-modules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/test-colocation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/test-quality.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/architecture-lint/src/workspace-package-rename.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/workspace.ts",
       "measured": "2026-09-06"
     },
     {
@@ -583,10 +531,6 @@
     },
     {
       "key": "cognitive-complexity|packages/enterprise/features/scim/server/src/transport/api-rest/scim-webhook-intake.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/enterprise/features/webhook/server/src/transport/api-rest/webhook.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3226,6 +3170,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|packages/features/webhook/server/src/transport/api-rest/webhook.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
       "key": "cognitive-complexity|packages/features/workflow/contract/src/workflow-dsl-migration.ts",
       "measured": "2026-09-06"
     },
@@ -3882,10 +3830,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/architecture-lint/src/eventing-roles.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|packages/architecture-lint/src/feature-layout.ts",
       "measured": "2026-09-06"
     },
@@ -3895,14 +3839,6 @@
     },
     {
       "key": "complexity|packages/architecture-lint/src/global-app-access.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/architecture-lint/src/manifests.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/architecture-lint/src/workspace.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4798,23 +4734,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/contract-build-config.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/declarations.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/eventing-roles.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/architecture-lint/src/feature-layout.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/filename-migration.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4834,35 +4754,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/manifests.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/module-graph.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/port-modules.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/architecture-lint/src/service-projection-boundaries.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/test-colocation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/test-quality.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/architecture-lint/src/workspace-package-rename.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/workspace.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5079,18 +4975,6 @@
     },
     {
       "key": "condition-shape|packages/enterprise/features/sso/server/src/transport/api-trpc/sso-connection.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/enterprise/features/webhook/server/src/adapters/sqs.webhook-destination.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/enterprise/features/webhook/server/src/repositories/prisma/prisma.webhook-endpoint.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/enterprise/features/webhook/server/src/services/__tests__/webhook-delivery.process.integration.test.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6574,6 +6458,18 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "condition-shape|packages/features/webhook/server/src/adapters/sqs.webhook-destination.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/webhook/server/src/repositories/prisma/prisma.webhook-endpoint.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/features/webhook/server/src/services/__tests__/webhook-delivery.process.integration.test.ts",
+      "measured": "2026-09-06"
+    },
+    {
       "key": "condition-shape|packages/features/workflow/contract/src/workflow-dsl-migration.ts",
       "measured": "2026-09-06"
     },
@@ -7054,14 +6950,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/architecture-lint/src/module-graph.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/architecture-lint/src/test-colocation.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/design-system/src/components/delayed.tsx",
       "measured": "2026-09-06"
     },
@@ -7179,10 +7067,6 @@
     },
     {
       "key": "nested-ternary|packages/enterprise/features/scim/server/src/transport/api-rest/__tests__/scim-webhook-intake.api.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/enterprise/features/webhook/server/src/transport/api-rest/__tests__/webhook-events.api.integration.test.ts",
       "measured": "2026-09-06"
     },
     {
@@ -8075,6 +7959,10 @@
     },
     {
       "key": "nested-ternary|packages/features/user/web/src/ui/sections/personal-otlp-endpoint-panel.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/features/webhook/server/src/transport/api-rest/__tests__/webhook-events.api.integration.test.ts",
       "measured": "2026-09-06"
     },
     {

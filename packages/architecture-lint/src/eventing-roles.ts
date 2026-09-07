@@ -58,7 +58,9 @@ function roleOf(file: string): EventingRole | null {
 
   if (SUBSCRIBER_FILE.test(file)) return "subscriber";
 
-  if (PROCESS_MANAGER_FILE.test(file) || PROCESS_SERVICE_MASQUERADE.test(file)) return "process";
+  const isProcessManagerFile =
+    PROCESS_MANAGER_FILE.test(file) || PROCESS_SERVICE_MASQUERADE.test(file);
+  if (isProcessManagerFile) return "process";
 
   return null;
 }
@@ -70,7 +72,9 @@ function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
 function callName(expression: ts.LeftHandSideExpression): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
 
-  if (ts.isPropertyAccessExpression(expression) || ts.isPropertyAccessChain(expression)) {
+  const isPropertyAccess =
+    ts.isPropertyAccessExpression(expression) || ts.isPropertyAccessChain(expression);
+  if (isPropertyAccess) {
     return expression.name.text;
   }
 
@@ -82,6 +86,118 @@ function isIoModule(specifier: string): boolean {
     IO_MODULES.has(specifier) || IO_MODULE_PREFIXES.some((prefix) => specifier.startsWith(prefix))
   );
 }
+
+type RoleFinding = { policy: string; message: string; allowed: string };
+
+function roleLabel(role: EventingRole): string {
+  return role === "projection" ? "Projection" : "Process definition";
+}
+
+function checkIoImport(node: ts.Node, role: EventingRole): RoleFinding | null {
+  if (!ts.isImportDeclaration(node)) return null;
+
+  const isStringModuleSpecifier = ts.isStringLiteral(node.moduleSpecifier);
+  if (!isStringModuleSpecifier) return null;
+
+  const specifier = node.moduleSpecifier.text;
+  const isPurityRole = role === "projection" || role === "process";
+  if (!isIoModule(specifier) || !isPurityRole) return null;
+
+  return {
+    policy: `eventing-${role}-purity`,
+    message: `${roleLabel(role)} source cannot import I/O module ${JSON.stringify(specifier)}.`,
+    allowed:
+      role === "projection"
+        ? "Return a deterministic projection write and let the projection store perform persistence."
+        : "Keep evolution in the process definition and move external work into a retry-safe intent executor.",
+  };
+}
+
+function checkAwait(node: ts.Node, role: EventingRole): RoleFinding | null {
+  if (!ts.isAwaitExpression(node) || !(role === "projection" || role === "process")) return null;
+
+  return {
+    policy: `eventing-${role}-purity`,
+    message: `${roleLabel(role)} source cannot await work.`,
+    allowed:
+      role === "projection"
+        ? "Keep projection evolution synchronous; the Eventing executor owns store I/O."
+        : "Keep process evolution synchronous and emit a durable intent for external work.",
+  };
+}
+
+function checkAsyncDeclaration(node: ts.Node, role: EventingRole): RoleFinding | null {
+  const isPurityRole = role === "projection" || role === "process";
+  const isFunctionDeclaration = ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node);
+  const isCallableDeclaration = ts.isArrowFunction(node) || ts.isMethodDeclaration(node);
+  const isAsyncDeclaration =
+    (isFunctionDeclaration || isCallableDeclaration) &&
+    node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword);
+  if (!isAsyncDeclaration || !isPurityRole) return null;
+
+  return {
+    policy: `eventing-${role}-purity`,
+    message: `${roleLabel(role)} source cannot declare async work.`,
+    allowed:
+      role === "projection"
+        ? "Keep projection evolution synchronous; the Eventing executor owns store I/O."
+        : "Move the async operation into src/intents/<subject>.intent.ts and register it by dependency.",
+  };
+}
+
+function checkSideEffectCall(node: ts.Node, role: EventingRole): RoleFinding | null {
+  if (!ts.isCallExpression(node)) return null;
+
+  const isPurityRole = role === "projection" || role === "process";
+  const name = callName(node.expression);
+  if (!name || !SIDE_EFFECT_CALLS.has(name) || !isPurityRole) return null;
+
+  return {
+    policy: `eventing-${role}-purity`,
+    message: `${roleLabel(role)} source cannot call ${name}().`,
+    allowed:
+      role === "projection"
+        ? "Keep projection evolution deterministic and bounded."
+        : "Represent delayed or external work as a durable wake or intent.",
+  };
+}
+
+function checkDurableEventCall(node: ts.Node, role: EventingRole): RoleFinding | null {
+  if (!ts.isCallExpression(node)) return null;
+
+  const name = callName(node.expression);
+  if (!name || !DURABLE_EVENT_CALLS.has(name)) return null;
+
+  return {
+    policy: "eventing-durable-event-path",
+    message: `${role[0]!.toUpperCase()}${role.slice(1)} source cannot fabricate or append durable events with ${name}().`,
+    allowed:
+      role === "process"
+        ? "Emit a deterministic process intent whose executor invokes the owning feature command."
+        : "Invoke the owning feature command/pipeline; only command handlers append new durable events.",
+  };
+}
+
+function checkDynamicImport(node: ts.Node, role: EventingRole): RoleFinding | null {
+  const isDynamicImport =
+    ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword;
+  if (!isDynamicImport || !(role === "projection" || role === "process")) return null;
+
+  return {
+    policy: `eventing-${role}-purity`,
+    message: `${roleLabel(role)} source cannot dynamically import dependencies.`,
+    allowed: "Resolve dependencies at composition time and inject the narrow role contract.",
+  };
+}
+
+const ROLE_FILE_CHECKS = [
+  checkIoImport,
+  checkAwait,
+  checkAsyncDeclaration,
+  checkSideEffectCall,
+  checkDurableEventCall,
+  checkDynamicImport,
+];
 
 function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[] {
   const source = readFileSync(file, "utf8");
@@ -105,84 +221,9 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
   };
 
   const visit = (node: ts.Node): void => {
-    const isPurityRole = role === "projection" || role === "process";
-    const isIoImport =
-      ts.isImportDeclaration(node) &&
-      ts.isStringLiteral(node.moduleSpecifier) &&
-      isIoModule(node.moduleSpecifier.text);
-    if (isIoImport && isPurityRole) {
-      add(
-        `eventing-${role}-purity`,
-        node,
-        `${role === "projection" ? "Projection" : "Process definition"} source cannot import I/O module ${JSON.stringify(node.moduleSpecifier.text)}.`,
-        role === "projection"
-          ? "Return a deterministic projection write and let the projection store perform persistence."
-          : "Keep evolution in the process definition and move external work into a retry-safe intent executor.",
-      );
-    }
-
-    if (ts.isAwaitExpression(node) && (role === "projection" || role === "process")) {
-      add(
-        `eventing-${role}-purity`,
-        node,
-        `${role === "projection" ? "Projection" : "Process definition"} source cannot await work.`,
-        role === "projection"
-          ? "Keep projection evolution synchronous; the Eventing executor owns store I/O."
-          : "Keep process evolution synchronous and emit a durable intent for external work.",
-      );
-    }
-
-    const isFunctionDeclaration = ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node);
-    const isCallableDeclaration = ts.isArrowFunction(node) || ts.isMethodDeclaration(node);
-    const isAsyncDeclaration =
-      (isFunctionDeclaration || isCallableDeclaration) &&
-      node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword);
-    if (isAsyncDeclaration && isPurityRole) {
-      add(
-        `eventing-${role}-purity`,
-        node,
-        `${role === "projection" ? "Projection" : "Process definition"} source cannot declare async work.`,
-        role === "projection"
-          ? "Keep projection evolution synchronous; the Eventing executor owns store I/O."
-          : "Move the async operation into src/intents/<subject>.intent.ts and register it by dependency.",
-      );
-    }
-
-    if (ts.isCallExpression(node)) {
-      const name = callName(node.expression);
-      if (name && SIDE_EFFECT_CALLS.has(name) && isPurityRole) {
-        add(
-          `eventing-${role}-purity`,
-          node,
-          `${role === "projection" ? "Projection" : "Process definition"} source cannot call ${name}().`,
-          role === "projection"
-            ? "Keep projection evolution deterministic and bounded."
-            : "Represent delayed or external work as a durable wake or intent.",
-        );
-      }
-
-      if (name && DURABLE_EVENT_CALLS.has(name)) {
-        add(
-          "eventing-durable-event-path",
-          node,
-          `${role[0]!.toUpperCase()}${role.slice(1)} source cannot fabricate or append durable events with ${name}().`,
-          role === "process"
-            ? "Emit a deterministic process intent whose executor invokes the owning feature command."
-            : "Invoke the owning feature command/pipeline; only command handlers append new durable events.",
-        );
-      }
-
-      if (
-        node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-        (role === "projection" || role === "process")
-      ) {
-        add(
-          `eventing-${role}-purity`,
-          node,
-          `${role === "projection" ? "Projection" : "Process definition"} source cannot dynamically import dependencies.`,
-          "Resolve dependencies at composition time and inject the narrow role contract.",
-        );
-      }
+    for (const check of ROLE_FILE_CHECKS) {
+      const finding = check(node, role);
+      if (finding) add(finding.policy, node, finding.message, finding.allowed);
     }
 
     ts.forEachChild(node, visit);
@@ -228,43 +269,50 @@ function lintStrictSubscriberTest(file: string, pkg: ClassifiedPackage): Archite
   ];
 }
 
-export function lintEventingRoles(
-  root: string,
-  packages: readonly ClassifiedPackage[],
-): ArchitectureViolation[] {
-  const violations: ArchitectureViolation[] = [];
+function eventingScanRoots(root: string, packages: readonly ClassifiedPackage[]): string[] {
   const scanRoots = [
     join(root, "apps/api/src"),
     join(root, "apps/worker/src"),
     join(root, "packages/enterprise/composition/api/src"),
     join(root, "packages/enterprise/composition/worker/src"),
+    ...packages.filter((pkg) => pkg.kind === "server").map((pkg) => join(pkg.root, "src")),
   ];
-  for (const pkg of packages) {
-    if (pkg.kind === "server") scanRoots.push(join(pkg.root, "src"));
-  }
 
+  return [...new Set(scanRoots)];
+}
+
+/** Violations for one role file: purity findings plus a strict subscriber's test pairing. */
+function violationsForRoleFile(
+  file: string,
+  role: EventingRole,
+  packageByFile: readonly ClassifiedPackage[],
+): ArchitectureViolation[] {
+  const violations = lintRoleFile(file, role);
+  if (role !== "subscriber") return violations;
+
+  const pkg = packageByFile.find(
+    (candidate) => file === candidate.root || file.startsWith(`${candidate.root}${sep}`),
+  );
+  if (pkg?.layoutVersion !== 0) return violations;
+
+  return [...violations, ...lintStrictSubscriberTest(file, pkg)];
+}
+
+export function lintEventingRoles(
+  root: string,
+  packages: readonly ClassifiedPackage[],
+): ArchitectureViolation[] {
   const packageByFile = packages
     .filter((pkg) => pkg.kind === "server")
     .sort((left, right) => right.root.length - left.root.length);
 
-  for (const scanRoot of new Set(scanRoots)) {
-    for (const file of walkFiles(scanRoot, (candidate) => candidate.endsWith(".ts"))) {
-      if (/(?:^|\/)(?:__tests__|tests|fixtures)(?:\/|$)/.test(file)) continue;
+  return eventingScanRoots(root, packages).flatMap((scanRoot) =>
+    walkFiles(scanRoot, (candidate) => candidate.endsWith(".ts"))
+      .filter((file) => !/(?:^|\/)(?:__tests__|tests|fixtures)(?:\/|$)/.test(file))
+      .flatMap((file) => {
+        const role = roleOf(file);
 
-      const role = roleOf(file);
-      if (!role) continue;
-
-      violations.push(...lintRoleFile(file, role));
-      if (role !== "subscriber") continue;
-
-      const pkg = packageByFile.find(
-        (candidate) => file === candidate.root || file.startsWith(`${candidate.root}${sep}`),
-      );
-      if (pkg?.layoutVersion === 0) {
-        violations.push(...lintStrictSubscriberTest(file, pkg));
-      }
-    }
-  }
-
-  return violations;
+        return role ? violationsForRoleFile(file, role, packageByFile) : [];
+      }),
+  );
 }

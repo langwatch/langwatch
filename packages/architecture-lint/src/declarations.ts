@@ -46,7 +46,10 @@ function reachableDeclarations(roots: Set<string>, outputs: Map<string, string>)
   const pending = [...roots];
   while (pending.length > 0) {
     const file = pending.pop();
-    if (!file || reachable.has(file) || !outputs.has(file)) continue;
+    if (!file) continue;
+
+    const alreadyDone = reachable.has(file) || !outputs.has(file);
+    if (alreadyDone) continue;
 
     reachable.add(file);
     const source = outputs.get(file) ?? "";
@@ -61,46 +64,50 @@ function reachableDeclarations(roots: Set<string>, outputs: Map<string, string>)
   return reachable;
 }
 
-export function lintDeclarations(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+/** Emitted `.d.ts` violations for one package, or `undefined` when it has no tsconfig. */
+function violationsForPackage(pkg: ClassifiedPackage): ArchitectureViolation[] | undefined {
+  const tsconfigPath = join(pkg.root, "tsconfig.json");
+  if (!existsSync(tsconfigPath)) return undefined;
+
+  const read = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
+  if (read.error) return undefined;
+
+  const parsed = ts.parseJsonConfigFileContent(
+    read.config,
+    ts.sys,
+    dirname(tsconfigPath),
+    {
+      declaration: true,
+      emitDeclarationOnly: true,
+      noEmit: false,
+      noEmitOnError: false,
+    },
+    tsconfigPath,
+  );
+  const program = ts.createProgram(parsed.fileNames, parsed.options);
+  const publicFiles = publicDeclarationFiles(pkg);
+  const outputs = new Map<string, string>();
+  program.emit(undefined, (file, text) => {
+    if (file.endsWith(".d.ts")) outputs.set(file, text);
+  });
+
   const violations: ArchitectureViolation[] = [];
-  for (const pkg of packages) {
-    const tsconfigPath = join(pkg.root, "tsconfig.json");
-    if (!existsSync(tsconfigPath)) continue;
-
-    const read = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
-    if (read.error) continue;
-
-    const parsed = ts.parseJsonConfigFileContent(
-      read.config,
-      ts.sys,
-      dirname(tsconfigPath),
-      {
-        declaration: true,
-        emitDeclarationOnly: true,
-        noEmit: false,
-        noEmitOnError: false,
-      },
-      tsconfigPath,
-    );
-    const program = ts.createProgram(parsed.fileNames, parsed.options);
-    const publicFiles = publicDeclarationFiles(pkg);
-    const outputs = new Map<string, string>();
-    program.emit(undefined, (file, text) => {
-      if (file.endsWith(".d.ts")) outputs.set(file, text);
-    });
-    for (const file of reachableDeclarations(publicFiles, outputs)) {
-      const source = outputs.get(file) ?? "";
-      for (const forbidden of FORBIDDEN_DECLARATION) {
-        if (forbidden.pattern.test(source)) {
-          violations.push({
-            policy: "public-declarations",
-            file,
-            message: `Public declaration leaks ${forbidden.name}.`,
-          });
-        }
+  for (const file of reachableDeclarations(publicFiles, outputs)) {
+    const source = outputs.get(file) ?? "";
+    for (const forbidden of FORBIDDEN_DECLARATION) {
+      if (forbidden.pattern.test(source)) {
+        violations.push({
+          policy: "public-declarations",
+          file,
+          message: `Public declaration leaks ${forbidden.name}.`,
+        });
       }
     }
   }
 
   return violations;
+}
+
+export function lintDeclarations(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+  return packages.flatMap((pkg) => violationsForPackage(pkg) ?? []);
 }

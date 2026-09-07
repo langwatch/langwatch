@@ -107,104 +107,150 @@ function directories(path: string): string[] {
     .sort();
 }
 
-export function discoverClassifiedPackages(root: string): {
-  packages: ClassifiedPackage[];
-  catalogue: FeatureCatalogueEntry[];
+/** One feature role directory (`contract`/`server`/`web`) under one feature's ownership root. */
+function discoverFeatureRole(options: {
+  featureRoot: string;
+  feature: string;
+  roleName: string;
+  enterprise: boolean;
+  layoutVersion: FeatureLayoutVersion | undefined;
+  subjects: FeatureCatalogueEntry["subjects"] | undefined;
   violations: ArchitectureViolation[];
-} {
-  const packages: ClassifiedPackage[] = [];
-  const violations: ArchitectureViolation[] = [];
-  const catalogue = readFeatureCatalogue(root, violations);
-  const catalogueByRoot = new Map(catalogue.map((entry) => [join(root, entry.root), entry]));
+  packages: ClassifiedPackage[];
+}): void {
+  const {
+    featureRoot,
+    feature,
+    roleName,
+    enterprise,
+    layoutVersion,
+    subjects,
+    violations,
+    packages,
+  } = options;
+  const manifestPath = join(featureRoot, roleName, "package.json");
+  if (!existsSync(manifestPath)) return;
 
-  const discoverFeatures = (featuresRoot: string, enterprise: boolean) => {
-    for (const feature of directories(featuresRoot)) {
-      const featureRoot = join(featuresRoot, feature);
-      const { layoutVersion } = readFeatureConfiguration(featureRoot, violations);
-      const catalogueEntry = catalogueByRoot.get(featureRoot);
-      if (!catalogueEntry) {
-        violations.push({
-          policy: "feature-catalogue",
-          file: featureRoot,
-          message: `Feature root ${JSON.stringify(feature)} is not registered in packages/features/catalogue.json.`,
-          allowed:
-            "Use the singular catalogue identifier and record new ownership in its ADR and specification.",
-        });
-      } else if ((catalogueEntry.classification === "enterprise") !== enterprise) {
-        violations.push({
-          policy: "feature-catalogue",
-          file: featureRoot,
-          message: `Feature ${JSON.stringify(feature)} is in the wrong core/Enterprise tree for its catalogue classification.`,
-        });
-      }
-
-      const featureManifest = join(featureRoot, "package.json");
-      if (existsSync(featureManifest)) {
-        violations.push({
-          policy: "feature-layout",
-          file: featureManifest,
-          message: "A feature ownership directory cannot itself be a package.",
-          allowed: "Put package.json inside contract, server, or web.",
-        });
-      }
-
-      for (const roleName of directories(featureRoot)) {
-        const manifestPath = join(featureRoot, roleName, "package.json");
-        if (!existsSync(manifestPath)) continue;
-
-        if (!FEATURE_ROLES.has(roleName as FeaturePackageRole)) {
-          violations.push({
-            policy: "feature-layout",
-            file: manifestPath,
-            message: `Unknown feature package role "${roleName}".`,
-            allowed: "Use contract, server, or web; documentation belongs at the feature root.",
-          });
-          continue;
-        }
-
-        const role = roleName as FeaturePackageRole;
-        const manifest = readManifest(manifestPath);
-        const expectedName = enterprise
-          ? `@langwatch/enterprise-${feature}-${role}`
-          : `@langwatch/${feature}-${role}`;
-        if (manifest.name !== expectedName) {
-          violations.push({
-            policy: "feature-layout",
-            file: manifestPath,
-            message: `Package name must be "${expectedName}", found ${JSON.stringify(manifest.name)}.`,
-          });
-        }
-
-        packages.push({
-          name: manifest.name ?? expectedName,
-          root: join(featureRoot, role),
-          manifestPath,
-          manifest,
-          kind: role,
-          feature,
-          featureRoot,
-          layoutVersion,
-          subjects: catalogueEntry?.subjects,
-          enterprise,
-        });
-      }
-    }
-  };
-
-  discoverFeatures(join(root, "packages", "features"), false);
-  discoverFeatures(join(root, "packages", "enterprise", "features"), true);
-
-  const sharedApplicationRoot = join(root, "apps", "shared");
-  if (existsSync(sharedApplicationRoot)) {
+  if (!FEATURE_ROLES.has(roleName as FeaturePackageRole)) {
     violations.push({
-      policy: "application-layout",
-      file: sharedApplicationRoot,
-      message: "apps/shared is not an application or a reusable package boundary.",
-      allowed:
-        "Put product behaviour in its feature package and shared infrastructure in a deliberately named package.",
+      policy: "feature-layout",
+      file: manifestPath,
+      message: `Unknown feature package role "${roleName}".`,
+      allowed: "Use contract, server, or web; documentation belongs at the feature root.",
+    });
+
+    return;
+  }
+
+  const role = roleName as FeaturePackageRole;
+  const manifest = readManifest(manifestPath);
+  const expectedName = enterprise
+    ? `@langwatch/enterprise-${feature}-${role}`
+    : `@langwatch/${feature}-${role}`;
+  if (manifest.name !== expectedName) {
+    violations.push({
+      policy: "feature-layout",
+      file: manifestPath,
+      message: `Package name must be "${expectedName}", found ${JSON.stringify(manifest.name)}.`,
     });
   }
 
+  packages.push({
+    name: manifest.name ?? expectedName,
+    root: join(featureRoot, role),
+    manifestPath,
+    manifest,
+    kind: role,
+    feature,
+    featureRoot,
+    layoutVersion,
+    subjects,
+    enterprise,
+  });
+}
+
+/** One feature ownership directory: `feature.json`, catalogue registration, and role packages. */
+function discoverFeature(options: {
+  featuresRoot: string;
+  feature: string;
+  enterprise: boolean;
+  catalogueByRoot: Map<string, FeatureCatalogueEntry>;
+  violations: ArchitectureViolation[];
+  packages: ClassifiedPackage[];
+}): void {
+  const { featuresRoot, feature, enterprise, catalogueByRoot, violations, packages } = options;
+  const featureRoot = join(featuresRoot, feature);
+  const { layoutVersion } = readFeatureConfiguration(featureRoot, violations);
+  const catalogueEntry = catalogueByRoot.get(featureRoot);
+  if (!catalogueEntry) {
+    violations.push({
+      policy: "feature-catalogue",
+      file: featureRoot,
+      message: `Feature root ${JSON.stringify(feature)} is not registered in packages/features/catalogue.json.`,
+      allowed:
+        "Use the singular catalogue identifier and record new ownership in its ADR and specification.",
+    });
+  } else if ((catalogueEntry.classification === "enterprise") !== enterprise) {
+    violations.push({
+      policy: "feature-catalogue",
+      file: featureRoot,
+      message: `Feature ${JSON.stringify(feature)} is in the wrong core/Enterprise tree for its catalogue classification.`,
+    });
+  }
+
+  const featureManifest = join(featureRoot, "package.json");
+  if (existsSync(featureManifest)) {
+    violations.push({
+      policy: "feature-layout",
+      file: featureManifest,
+      message: "A feature ownership directory cannot itself be a package.",
+      allowed: "Put package.json inside contract, server, or web.",
+    });
+  }
+
+  for (const roleName of directories(featureRoot)) {
+    discoverFeatureRole({
+      featureRoot,
+      feature,
+      roleName,
+      enterprise,
+      layoutVersion,
+      subjects: catalogueEntry?.subjects,
+      violations,
+      packages,
+    });
+  }
+}
+
+function discoverFeaturePackages(
+  featuresRoot: string,
+  enterprise: boolean,
+  catalogueByRoot: Map<string, FeatureCatalogueEntry>,
+  violations: ArchitectureViolation[],
+  packages: ClassifiedPackage[],
+): void {
+  for (const feature of directories(featuresRoot)) {
+    discoverFeature({ featuresRoot, feature, enterprise, catalogueByRoot, violations, packages });
+  }
+}
+
+function checkSharedApplicationRoot(root: string, violations: ArchitectureViolation[]): void {
+  const sharedApplicationRoot = join(root, "apps", "shared");
+  if (!existsSync(sharedApplicationRoot)) return;
+
+  violations.push({
+    policy: "application-layout",
+    file: sharedApplicationRoot,
+    message: "apps/shared is not an application or a reusable package boundary.",
+    allowed:
+      "Put product behaviour in its feature package and shared infrastructure in a deliberately named package.",
+  });
+}
+
+function checkUnknownApplicationWorkspaces(
+  root: string,
+  violations: ArchitectureViolation[],
+): void {
   const applicationsRoot = join(root, "apps");
   for (const directory of directories(applicationsRoot)) {
     if (APPLICATION_PACKAGES.some(({ path }) => path === directory)) continue;
@@ -219,7 +265,13 @@ export function discoverClassifiedPackages(root: string): {
       allowed: "The fixed application roots are ui, api, worker, and server.",
     });
   }
+}
 
+function discoverApplicationPackages(
+  root: string,
+  violations: ArchitectureViolation[],
+  packages: ClassifiedPackage[],
+): void {
   for (const application of APPLICATION_PACKAGES) {
     const applicationRoot = join(root, "apps", application.path);
     const manifestPath = join(applicationRoot, "package.json");
@@ -244,30 +296,42 @@ export function discoverClassifiedPackages(root: string): {
       enterprise: false,
     });
   }
+}
 
+function discoverDevRuntimePackage(
+  root: string,
+  violations: ArchitectureViolation[],
+  packages: ClassifiedPackage[],
+): void {
   const devRuntimeRoot = join(root, "tools", "dev-runtime");
   const devRuntimeManifest = join(devRuntimeRoot, "package.json");
-  if (existsSync(devRuntimeManifest)) {
-    const manifest = readManifest(devRuntimeManifest);
-    if (manifest.private !== true) {
-      violations.push({
-        policy: "application-layout",
-        file: devRuntimeManifest,
-        message: "tools/dev-runtime must be a private contributor package.",
-        allowed: 'Set "private": true; the combined runtime is never shipped.',
-      });
-    }
+  if (!existsSync(devRuntimeManifest)) return;
 
-    packages.push({
-      name: manifest.name ?? "@langwatch/dev-runtime",
-      root: devRuntimeRoot,
-      manifestPath: devRuntimeManifest,
-      manifest,
-      kind: "dev-runtime",
-      enterprise: false,
+  const manifest = readManifest(devRuntimeManifest);
+  if (manifest.private !== true) {
+    violations.push({
+      policy: "application-layout",
+      file: devRuntimeManifest,
+      message: "tools/dev-runtime must be a private contributor package.",
+      allowed: 'Set "private": true; the combined runtime is never shipped.',
     });
   }
 
+  packages.push({
+    name: manifest.name ?? "@langwatch/dev-runtime",
+    root: devRuntimeRoot,
+    manifestPath: devRuntimeManifest,
+    manifest,
+    kind: "dev-runtime",
+    enterprise: false,
+  });
+}
+
+function discoverEnterpriseRootPackage(
+  root: string,
+  violations: ArchitectureViolation[],
+  packages: ClassifiedPackage[],
+): void {
   const enterpriseRoot = join(root, "packages", "enterprise");
   const enterpriseLicense = join(enterpriseRoot, "LICENSE.md");
   const enterpriseReadme = join(enterpriseRoot, "README.md");
@@ -297,10 +361,11 @@ export function discoverClassifiedPackages(root: string): {
     });
   }
 
-  if (
-    existsSync(enterpriseLicense) &&
-    !/^#\s+LangWatch Enterprise License\s*$/m.test(readFileSync(enterpriseLicense, "utf8"))
-  ) {
+  const licenseExists = existsSync(enterpriseLicense);
+  const hasEnterpriseLicenseHeading =
+    licenseExists &&
+    /^#\s+LangWatch Enterprise License\s*$/m.test(readFileSync(enterpriseLicense, "utf8"));
+  if (licenseExists && !hasEnterpriseLicenseHeading) {
     violations.push({
       policy: "enterprise-license",
       file: enterpriseLicense,
@@ -308,40 +373,47 @@ export function discoverClassifiedPackages(root: string): {
     });
   }
 
-  if (existsSync(enterpriseManifest)) {
-    const manifest = readManifest(enterpriseManifest);
-    if (manifest.name !== "@langwatch/enterprise") {
-      violations.push({
-        policy: "enterprise-layout",
-        file: enterpriseManifest,
-        message: 'The portable Enterprise catalogue package must be named "@langwatch/enterprise".',
-      });
-    }
+  if (!existsSync(enterpriseManifest)) return;
 
-    if (
-      typeof manifest.license !== "string" ||
-      !/LICENSE\.md/i.test(manifest.license) ||
-      /Apache-2\.0/i.test(manifest.license)
-    ) {
-      violations.push({
-        policy: "enterprise-license",
-        file: enterpriseManifest,
-        message:
-          "The Enterprise root manifest must identify packages/enterprise/LICENSE.md rather than an Apache license.",
-        allowed: 'Use "license": "SEE LICENSE IN LICENSE.md".',
-      });
-    }
-
-    packages.push({
-      name: manifest.name ?? "@langwatch/enterprise",
-      root: enterpriseRoot,
-      manifestPath: enterpriseManifest,
-      manifest,
-      kind: "enterprise-root",
-      enterprise: true,
+  const manifest = readManifest(enterpriseManifest);
+  if (manifest.name !== "@langwatch/enterprise") {
+    violations.push({
+      policy: "enterprise-layout",
+      file: enterpriseManifest,
+      message: 'The portable Enterprise catalogue package must be named "@langwatch/enterprise".',
     });
   }
 
+  const hasValidLicenseField =
+    typeof manifest.license === "string" &&
+    /LICENSE\.md/i.test(manifest.license) &&
+    !/Apache-2\.0/i.test(manifest.license);
+  if (!hasValidLicenseField) {
+    violations.push({
+      policy: "enterprise-license",
+      file: enterpriseManifest,
+      message:
+        "The Enterprise root manifest must identify packages/enterprise/LICENSE.md rather than an Apache license.",
+      allowed: 'Use "license": "SEE LICENSE IN LICENSE.md".',
+    });
+  }
+
+  packages.push({
+    name: manifest.name ?? "@langwatch/enterprise",
+    root: enterpriseRoot,
+    manifestPath: enterpriseManifest,
+    manifest,
+    kind: "enterprise-root",
+    enterprise: true,
+  });
+}
+
+function discoverEnterpriseCompositionPackages(
+  root: string,
+  violations: ArchitectureViolation[],
+  packages: ClassifiedPackage[],
+): void {
+  const enterpriseRoot = join(root, "packages", "enterprise");
   for (const composition of ENTERPRISE_COMPOSITION_PACKAGES) {
     const compositionRoot = join(enterpriseRoot, "composition", composition.role);
     const manifestPath = join(compositionRoot, "package.json");
@@ -366,41 +438,49 @@ export function discoverClassifiedPackages(root: string): {
       enterprise: true,
     });
   }
+}
 
-  if (existsSync(enterpriseRoot)) {
-    for (const directory of directories(enterpriseRoot)) {
-      if (directory === "composition" || directory === "features") continue;
+function checkEnterpriseLayoutStrays(root: string, violations: ArchitectureViolation[]): void {
+  const enterpriseRoot = join(root, "packages", "enterprise");
+  if (!existsSync(enterpriseRoot)) return;
 
-      const unexpectedManifest = join(enterpriseRoot, directory, "package.json");
-      if (!existsSync(unexpectedManifest)) continue;
+  for (const directory of directories(enterpriseRoot)) {
+    if (directory === "composition" || directory === "features") continue;
 
-      violations.push({
-        policy: "enterprise-layout",
-        file: unexpectedManifest,
-        message: `Enterprise aggregate package at packages/enterprise/${directory} is outside the fixed package layout.`,
-        allowed:
-          "Use the portable root, composition/{api,worker,web}, or features/<feature>/{contract,server,web}.",
-      });
-    }
+    const unexpectedManifest = join(enterpriseRoot, directory, "package.json");
+    if (!existsSync(unexpectedManifest)) continue;
 
-    const compositionRoot = join(enterpriseRoot, "composition");
-    for (const directory of directories(compositionRoot)) {
-      if (ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) => role === directory)) {
-        continue;
-      }
-
-      const unexpectedManifest = join(compositionRoot, directory, "package.json");
-      if (!existsSync(unexpectedManifest)) continue;
-
-      violations.push({
-        policy: "enterprise-layout",
-        file: unexpectedManifest,
-        message: `Unknown Enterprise composition role "${directory}".`,
-        allowed: "Use api, worker, or web.",
-      });
-    }
+    violations.push({
+      policy: "enterprise-layout",
+      file: unexpectedManifest,
+      message: `Enterprise aggregate package at packages/enterprise/${directory} is outside the fixed package layout.`,
+      allowed:
+        "Use the portable root, composition/{api,worker,web}, or features/<feature>/{contract,server,web}.",
+    });
   }
 
+  const compositionRoot = join(enterpriseRoot, "composition");
+  for (const directory of directories(compositionRoot)) {
+    if (ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) => role === directory)) {
+      continue;
+    }
+
+    const unexpectedManifest = join(compositionRoot, directory, "package.json");
+    if (!existsSync(unexpectedManifest)) continue;
+
+    violations.push({
+      policy: "enterprise-layout",
+      file: unexpectedManifest,
+      message: `Unknown Enterprise composition role "${directory}".`,
+      allowed: "Use api, worker, or web.",
+    });
+  }
+}
+
+function checkEnterpriseAggregatesOutsideEnterpriseRoot(
+  root: string,
+  violations: ArchitectureViolation[],
+): void {
   for (const directory of directories(join(root, "packages"))) {
     if (directory === "enterprise") continue;
 
@@ -418,7 +498,12 @@ export function discoverClassifiedPackages(root: string): {
         "Use the portable root, composition/{api,worker,web}, or features/<feature>/{contract,server,web}.",
     });
   }
+}
 
+function checkEnterpriseLicenseOnDescendants(
+  packages: ClassifiedPackage[],
+  violations: ArchitectureViolation[],
+): void {
   for (const pkg of packages) {
     if (!pkg.enterprise || pkg.kind === "enterprise-root") continue;
 
@@ -432,57 +517,72 @@ export function discoverClassifiedPackages(root: string): {
       });
     }
   }
+}
 
+function discoverDesignSystemPackage(
+  root: string,
+  violations: ArchitectureViolation[],
+  packages: ClassifiedPackage[],
+): void {
   const designSystemRoot = join(root, "packages", "design-system");
   const designSystemManifest = join(designSystemRoot, "package.json");
-  if (existsSync(designSystemManifest)) {
-    const manifest = readManifest(designSystemManifest);
-    if (manifest.name !== "@langwatch/design-system") {
-      violations.push({
-        policy: "feature-layout",
-        file: designSystemManifest,
-        message: 'The design-system package must be named "@langwatch/design-system".',
-      });
-    }
+  if (!existsSync(designSystemManifest)) return;
 
-    packages.push({
-      name: manifest.name ?? "@langwatch/design-system",
-      root: designSystemRoot,
-      manifestPath: designSystemManifest,
-      manifest,
-      kind: "design-system",
-      enterprise: false,
+  const manifest = readManifest(designSystemManifest);
+  if (manifest.name !== "@langwatch/design-system") {
+    violations.push({
+      policy: "feature-layout",
+      file: designSystemManifest,
+      message: 'The design-system package must be named "@langwatch/design-system".',
     });
   }
 
+  packages.push({
+    name: manifest.name ?? "@langwatch/design-system",
+    root: designSystemRoot,
+    manifestPath: designSystemManifest,
+    manifest,
+    kind: "design-system",
+    enterprise: false,
+  });
+}
+
+function discoverArchitectureLintPackage(root: string, packages: ClassifiedPackage[]): void {
   const architectureLintRoot = join(root, "packages", "architecture-lint");
   const architectureLintManifest = join(architectureLintRoot, "package.json");
-  if (existsSync(architectureLintManifest)) {
-    const manifest = readManifest(architectureLintManifest);
-    packages.push({
-      name: manifest.name ?? "@langwatch/architecture-lint",
-      root: architectureLintRoot,
-      manifestPath: architectureLintManifest,
-      manifest,
-      kind: "tooling",
-      enterprise: false,
-    });
-  }
+  if (!existsSync(architectureLintManifest)) return;
 
+  const manifest = readManifest(architectureLintManifest);
+  packages.push({
+    name: manifest.name ?? "@langwatch/architecture-lint",
+    root: architectureLintRoot,
+    manifestPath: architectureLintManifest,
+    manifest,
+    kind: "tooling",
+    enterprise: false,
+  });
+}
+
+function discoverConfigPackage(root: string, packages: ClassifiedPackage[]): void {
   const configRoot = join(root, "packages", "config");
   const configManifest = join(configRoot, "package.json");
-  if (existsSync(configManifest)) {
-    const manifest = readManifest(configManifest);
-    packages.push({
-      name: manifest.name ?? "@langwatch/config",
-      root: configRoot,
-      manifestPath: configManifest,
-      manifest,
-      kind: "config",
-      enterprise: false,
-    });
-  }
+  if (!existsSync(configManifest)) return;
 
+  const manifest = readManifest(configManifest);
+  packages.push({
+    name: manifest.name ?? "@langwatch/config",
+    root: configRoot,
+    manifestPath: configManifest,
+    manifest,
+    kind: "config",
+    enterprise: false,
+  });
+}
+
+function checkDuplicatePackageNames(
+  packages: ClassifiedPackage[],
+  violations: ArchitectureViolation[],
+): void {
   const names = new Map<string, string>();
   for (const pkg of packages) {
     const existing = names.get(pkg.name);
@@ -496,6 +596,46 @@ export function discoverClassifiedPackages(root: string): {
       names.set(pkg.name, pkg.manifestPath);
     }
   }
+}
+
+export function discoverClassifiedPackages(root: string): {
+  packages: ClassifiedPackage[];
+  catalogue: FeatureCatalogueEntry[];
+  violations: ArchitectureViolation[];
+} {
+  const packages: ClassifiedPackage[] = [];
+  const violations: ArchitectureViolation[] = [];
+  const catalogue = readFeatureCatalogue(root, violations);
+  const catalogueByRoot = new Map(catalogue.map((entry) => [join(root, entry.root), entry]));
+
+  discoverFeaturePackages(
+    join(root, "packages", "features"),
+    false,
+    catalogueByRoot,
+    violations,
+    packages,
+  );
+  discoverFeaturePackages(
+    join(root, "packages", "enterprise", "features"),
+    true,
+    catalogueByRoot,
+    violations,
+    packages,
+  );
+
+  checkSharedApplicationRoot(root, violations);
+  checkUnknownApplicationWorkspaces(root, violations);
+  discoverApplicationPackages(root, violations, packages);
+  discoverDevRuntimePackage(root, violations, packages);
+  discoverEnterpriseRootPackage(root, violations, packages);
+  discoverEnterpriseCompositionPackages(root, violations, packages);
+  checkEnterpriseLayoutStrays(root, violations);
+  checkEnterpriseAggregatesOutsideEnterpriseRoot(root, violations);
+  checkEnterpriseLicenseOnDescendants(packages, violations);
+  discoverDesignSystemPackage(root, violations, packages);
+  discoverArchitectureLintPackage(root, packages);
+  discoverConfigPackage(root, packages);
+  checkDuplicatePackageNames(packages, violations);
 
   return { packages, catalogue, violations };
 }

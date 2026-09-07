@@ -359,6 +359,40 @@ function commentRanges(source: string, file: ts.SourceFile): Array<{ pos: number
   return [...ranges.values()].sort((left, right) => left.pos - right.pos || left.end - right.end);
 }
 
+/** Reviews for the 4-5 line blocks in one file, or `undefined` when the file is out of scope. */
+function reviewsForFile(file: string, resolvedRoot: string): CommentBlockReview[] | undefined {
+  if (!existsSync(file)) return undefined;
+
+  const source = readFileSync(file, "utf8");
+  if (marksGeneratedHeader(source) || marksLicenseHeader(source)) return undefined;
+
+  if (!mayContainReviewBlock(source)) return undefined;
+
+  const relativePath = relative(resolvedRoot, file) || file;
+  const rawLines = source.split(/\r?\n/);
+  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  const ranges = commentRanges(source, parsed);
+  const reviews: CommentBlockReview[] = [];
+
+  for (const block of collectCommentBlocks({ source, ranges })) {
+    const blockText = rawLines.slice(block.line - 1, block.line - 1 + block.lines).join("\n");
+    if (isExemptBlock(blockText)) continue;
+
+    // 4-5 lines only: 6 and above is `langwatch/comment-block-size`.
+    if (block.lines < REVIEW_LINE_COUNT || block.lines > MAX_COMMENT_BLOCK_LINES) continue;
+
+    reviews.push({
+      category: "comment-blocks",
+      file: relativePath,
+      line: block.line,
+      lines: block.lines,
+      message: `Comment block has ${block.lines} lines and should receive review attention.`,
+    });
+  }
+
+  return reviews;
+}
+
 /**
  * The 4-5 line review queue. Anything longer is the oxlint rule
  * `langwatch/comment-block-size`'s business, which reports it in the editor
@@ -369,37 +403,8 @@ export function lintCommentBlocks(
   options: CommentBlockLintOptions = {},
 ): CommentBlockLintResult {
   const resolvedRoot = resolve(root);
-  const reviews: CommentBlockReview[] = [];
   const scanFiles = sourceFiles(resolvedRoot, options.files ?? options.changedFiles);
-
-  for (const file of scanFiles) {
-    if (!existsSync(file)) continue;
-
-    const source = readFileSync(file, "utf8");
-    if (marksGeneratedHeader(source) || marksLicenseHeader(source)) continue;
-
-    if (!mayContainReviewBlock(source)) continue;
-
-    const relativePath = relative(resolvedRoot, file) || file;
-    const rawLines = source.split(/\r?\n/);
-    const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-    const ranges = commentRanges(source, parsed);
-    for (const block of collectCommentBlocks({ source, ranges })) {
-      const blockText = rawLines.slice(block.line - 1, block.line - 1 + block.lines).join("\n");
-      if (isExemptBlock(blockText)) continue;
-
-      // 4-5 lines only: 6 and above is `langwatch/comment-block-size`.
-      if (block.lines < REVIEW_LINE_COUNT || block.lines > MAX_COMMENT_BLOCK_LINES) continue;
-
-      reviews.push({
-        category: "comment-blocks",
-        file: relativePath,
-        line: block.line,
-        lines: block.lines,
-        message: `Comment block has ${block.lines} lines and should receive review attention.`,
-      });
-    }
-  }
+  const reviews = scanFiles.flatMap((file) => reviewsForFile(file, resolvedRoot) ?? []);
 
   return { reviews };
 }

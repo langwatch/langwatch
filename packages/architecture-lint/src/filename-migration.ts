@@ -297,7 +297,8 @@ export function collectFilenameMigrationMappings(rootInput: string): FilenameRen
   const mappings: FilenameRename[] = [];
   for (const file of files) {
     const name = basename(file);
-    if (name.endsWith(".d.ts") || isLowerKebabFilename(name)) continue;
+    const alreadyCanonical = name.endsWith(".d.ts") || isLowerKebabFilename(name);
+    if (alreadyCanonical) continue;
 
     const target = resolve(dirname(file), canonicalFilename(name));
     if (target !== file) mappings.push({ from: file, to: target });
@@ -306,11 +307,11 @@ export function collectFilenameMigrationMappings(rootInput: string): FilenameRen
   return mappings;
 }
 
-export function planFilenameMigration(rootInput: string): FilenameMigrationPlan {
-  const root = resolve(rootInput);
-  const mappings = collectFilenameMigrationMappings(root);
-
-  const mappingBySource = new Map(mappings.map((mapping) => [mapping.from, mapping.to]));
+/** Rename collisions: two sources targeting the same file, or a target that already exists. */
+function collectCollisions(
+  mappings: FilenameRename[],
+  mappingBySource: Map<string, string>,
+): string[] {
   const targetOwners = new Map<string, string>();
   const collisions: string[] = [];
   for (const mapping of mappings) {
@@ -326,20 +327,36 @@ export function planFilenameMigration(rootInput: string): FilenameMigrationPlan 
     }
   }
 
+  return collisions;
+}
+
+/** Rewrites module specifiers in every source file that could name a renamed file. */
+function editSourceFiles(
+  root: string,
+  mappingBySource: Map<string, string>,
+  sourceNeedles: string[],
+): Map<string, string> {
   const edits = new Map<string, string>();
-  const unresolved: string[] = [];
   const sourceFiles = repositoryFiles(root, (path) => SOURCE_FILE.test(path));
-  const sourceNeedles = mappings.map((mapping) =>
-    basename(mapping.from).replace(/\.[cm]?[jt]sx?$/, ""),
-  );
   for (const file of sourceFiles) {
     const source = readFileSync(file, "utf8");
-    if (!sourceNeedles.some((needle) => source.includes(needle))) continue;
+    const mayReference = sourceNeedles.some((needle) => source.includes(needle));
+    if (!mayReference) continue;
 
     const output = replaceModuleSpecifiers(file, source, mappingBySource);
     if (output !== source) edits.set(file, output);
   }
 
+  return edits;
+}
+
+/** Rewrites path fields in every package.json/tsconfig that could name a renamed file. */
+function editJsonFiles(
+  root: string,
+  mappings: FilenameRename[],
+  sourceNeedles: string[],
+): Map<string, string> {
+  const edits = new Map<string, string>();
   const jsonFiles = repositoryFiles(root, (path) => {
     const name = basename(path);
 
@@ -347,12 +364,22 @@ export function planFilenameMigration(rootInput: string): FilenameMigrationPlan 
   });
   for (const file of jsonFiles) {
     const source = readFileSync(file, "utf8");
-    if (!sourceNeedles.some((needle) => source.includes(needle))) continue;
+    const mayReference = sourceNeedles.some((needle) => source.includes(needle));
+    if (!mayReference) continue;
 
     const output = replaceJsonPaths(file, source, mappings);
     if (output !== source) edits.set(file, output);
   }
 
+  return edits;
+}
+
+/** Rewrites documentation paths, and reports what a rewrite could not resolve. */
+function editDocumentationFiles(
+  root: string,
+  mappings: FilenameRename[],
+): { edits: Map<string, string>; remainingTextualReferences: string[] } {
+  const edits = new Map<string, string>();
   const remainingTextualReferences: string[] = [];
   for (const file of documentationPathFiles(root)) {
     const source = readFileSync(file, "utf8");
@@ -362,11 +389,36 @@ export function planFilenameMigration(rootInput: string): FilenameMigrationPlan 
     remainingTextualReferences.push(...documentationPathReferences(root, output, file, mappings));
   }
 
-  for (const mapping of mappings) {
-    if (!existsSync(mapping.from) || !mapping.to) unresolved.push(mapping.from);
-  }
+  return { edits, remainingTextualReferences };
+}
 
-  return { mappings, edits, collisions, unresolved, remainingTextualReferences };
+export function planFilenameMigration(rootInput: string): FilenameMigrationPlan {
+  const root = resolve(rootInput);
+  const mappings = collectFilenameMigrationMappings(root);
+  const mappingBySource = new Map(mappings.map((mapping) => [mapping.from, mapping.to]));
+  const sourceNeedles = mappings.map((mapping) =>
+    basename(mapping.from).replace(/\.[cm]?[jt]sx?$/, ""),
+  );
+
+  const collisions = collectCollisions(mappings, mappingBySource);
+  const documentation = editDocumentationFiles(root, mappings);
+  const edits = new Map([
+    ...editSourceFiles(root, mappingBySource, sourceNeedles),
+    ...editJsonFiles(root, mappings, sourceNeedles),
+    ...documentation.edits,
+  ]);
+
+  const unresolved = mappings
+    .filter((mapping) => !existsSync(mapping.from) || !mapping.to)
+    .map((mapping) => mapping.from);
+
+  return {
+    mappings,
+    edits,
+    collisions,
+    unresolved,
+    remainingTextualReferences: documentation.remainingTextualReferences,
+  };
 }
 
 export function applyFilenameMigration(plan: FilenameMigrationPlan): void {

@@ -94,13 +94,18 @@ function moduleSpecifierNodes(sourceFile: ts.SourceFile): ts.StringLiteral[] {
       ["mock", "doMock", "unmock", "importActual", "importMock"].includes(
         parent.expression.name.text,
       );
-    if (isImport || isExport || isImportType || isDynamic || isMockPath) literals.push(node);
+    const isModuleSpecifier = isImport || isExport || isImportType || isDynamic || isMockPath;
+    if (isModuleSpecifier) literals.push(node);
 
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(sourceFile, visit);
 
   return literals;
+}
+
+function isExistingFile(path: string): boolean {
+  return existsSync(path) && statSync(path).isFile();
 }
 
 /** The file a relative specifier names, if one exists on disk. */
@@ -118,10 +123,22 @@ function relativeModuleTarget(file: string, specifier: string): string | undefin
     ...[".ts", ".tsx", ".js", ".jsx"].map((extension) => `${base}/index${extension}`),
   ];
   for (const candidate of candidates) {
-    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+    if (isExistingFile(candidate)) return candidate;
   }
 
   return void 0;
+}
+
+/** The file path an `exports` map entry resolves to, whether a string or a conditions object. */
+function declaredExportsTarget(declared: unknown): string | undefined {
+  if (typeof declared === "string") return declared;
+
+  if (typeof declared !== "object" || declared === null) return void 0;
+
+  const conditions = declared as Record<string, unknown>;
+  const target = conditions.default ?? conditions.types;
+
+  return typeof target === "string" ? target : void 0;
 }
 
 /**
@@ -151,16 +168,10 @@ function selfReferenceTarget(input: {
   const subpath = specifier === packageName ? "." : `.${specifier.slice(packageName.length)}`;
 
   const declared = exportsMap?.[subpath];
-  const fromExports =
-    typeof declared === "string"
-      ? declared
-      : typeof declared === "object" && declared !== null
-        ? ((declared as Record<string, unknown>).default ??
-          (declared as Record<string, unknown>).types)
-        : void 0;
+  const fromExports = declaredExportsTarget(declared);
   if (typeof fromExports === "string") {
     const resolved = resolve(packageRoot, fromExports);
-    if (existsSync(resolved) && statSync(resolved).isFile()) return resolved;
+    if (isExistingFile(resolved)) return resolved;
   }
 
   const base =
@@ -170,7 +181,7 @@ function selfReferenceTarget(input: {
     ...[".ts", ".tsx", ".mts", ".cts"].map((extension) => `${base}${extension}`),
     ...[".ts", ".tsx"].map((extension) => `${base}/index${extension}`),
   ]) {
-    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+    if (isExistingFile(candidate)) return candidate;
   }
 
   return void 0;
@@ -433,8 +444,33 @@ function packagesWithMirroredTests(root: string): MirroredPackage[] {
     .sort((left, right) => left.root.localeCompare(right.root));
 }
 
-export function planTestColocation(rootInput: string): TestColocationPlan {
-  const root = resolve(rootInput);
+/**
+ * Where each test-mirror helper lands: the `__tests__` of the first mirrored
+ * test that imports it. Deterministic because `moves` is walked in sorted
+ * path order.
+ */
+function helperDestinationsFor(moves: TestMove[], testsRoot: string): Map<string, string> {
+  const helperDestinations = new Map<string, string>();
+  for (const { from, to } of moves) {
+    const source = readFileSync(from, "utf8");
+    const sourceFile = ts.createSourceFile(from, source, ts.ScriptTarget.Latest, true);
+    for (const literal of moduleSpecifierNodes(sourceFile)) {
+      const target = relativeModuleTarget(from, literal.text);
+      const isMirroredHelper = target && resolve(target).startsWith(`${testsRoot}${sep}`);
+      if (!isMirroredHelper) continue;
+
+      if (!helperDestinations.has(target)) helperDestinations.set(target, dirname(to));
+    }
+  }
+
+  return helperDestinations;
+}
+
+/** Every package's moves and unresolved files, in the two-pass helper-placement scheme. */
+function planEveryPackage(root: string): {
+  moves: TestMove[];
+  unresolved: Array<{ file: string; reason: string }>;
+} {
   const moves: TestMove[] = [];
   const unresolved: Array<{ file: string; reason: string }> = [];
 
@@ -443,25 +479,17 @@ export function planTestColocation(rootInput: string): TestColocationPlan {
     // whose own imports said nothing beside the tests that import it.
     const first = planPackage(packageRoot, name, exportsMap, new Map());
     const testsRoot = `${resolve(packageRoot)}/tests`;
-    const helperDestinations = new Map<string, string>();
-    for (const { from, to } of first.moves) {
-      const source = readFileSync(from, "utf8");
-      const sourceFile = ts.createSourceFile(from, source, ts.ScriptTarget.Latest, true);
-      for (const literal of moduleSpecifierNodes(sourceFile)) {
-        const target = relativeModuleTarget(from, literal.text);
-        if (!target || !resolve(target).startsWith(`${testsRoot}${sep}`)) continue;
-
-        // The helper lands in the __tests__ of the first test that uses it.
-        // Deterministic because `first.moves` is walked in sorted path order.
-        if (!helperDestinations.has(target)) helperDestinations.set(target, dirname(to));
-      }
-    }
+    const helperDestinations = helperDestinationsFor(first.moves, testsRoot);
 
     const second = planPackage(packageRoot, name, exportsMap, helperDestinations);
     moves.push(...second.moves);
     unresolved.push(...second.unresolved);
   }
 
+  return { moves, unresolved };
+}
+
+function collisionsAmong(moves: TestMove[]): string[] {
   const byDestination = new Map<string, string>();
   const collisions: string[] = [];
   for (const move of moves) {
@@ -470,6 +498,10 @@ export function planTestColocation(rootInput: string): TestColocationPlan {
     else byDestination.set(move.to, move.from);
   }
 
+  return collisions;
+}
+
+function editsFor(moves: TestMove[]): Map<string, string> {
   const moved = new Map(moves.map((move) => [move.from, move.to]));
   const edits = new Map<string, string>();
   for (const move of moves) {
@@ -482,5 +514,17 @@ export function planTestColocation(rootInput: string): TestColocationPlan {
     edits.set(move.from, output);
   }
 
-  return { moves, unresolved, collisions, edits };
+  return edits;
+}
+
+export function planTestColocation(rootInput: string): TestColocationPlan {
+  const root = resolve(rootInput);
+  const { moves, unresolved } = planEveryPackage(root);
+
+  return {
+    moves,
+    unresolved,
+    collisions: collisionsAmong(moves),
+    edits: editsFor(moves),
+  };
 }
