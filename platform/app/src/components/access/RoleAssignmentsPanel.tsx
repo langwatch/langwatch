@@ -86,6 +86,36 @@ export function RoleAssignmentsPanel({
   }
 
   return (
+    <RoleAssignmentsContent
+      scopeFilter={scopeFilter}
+      onScopeFilterChange={setScopeFilter}
+      counts={counts}
+      holders={holders}
+      loaded={assignments.data !== undefined}
+      loading={assignments.isLoading}
+      onOpenPerson={onOpenPerson}
+    />
+  );
+}
+
+function RoleAssignmentsContent({
+  scopeFilter,
+  onScopeFilterChange,
+  counts,
+  holders,
+  loaded,
+  loading,
+  onOpenPerson,
+}: {
+  scopeFilter: ScopeFilter;
+  onScopeFilterChange: (filter: ScopeFilter) => void;
+  counts: ReturnType<typeof scopeCounts>;
+  holders: Holder[];
+  loaded: boolean;
+  loading: boolean;
+  onOpenPerson?: (userId: string) => void;
+}) {
+  return (
     <Box width="full">
       <HStack width="full" marginBottom={4}>
         {/* A ZERO IS AN ANSWER. Every cut carries its number whether or not
@@ -95,7 +125,7 @@ export function RoleAssignmentsPanel({
             blue this cluster speaks nowhere else. */}
         <FilterChips
           value={scopeFilter}
-          onChange={(next) => setScopeFilter(next as ScopeFilter)}
+          onChange={(next) => onScopeFilterChange(next as ScopeFilter)}
           groupLabel="Filter role assignments by scope"
           countNoun={{
             singular: "role assignment",
@@ -108,7 +138,7 @@ export function RoleAssignmentsPanel({
           }))}
         />
         <Spacer />
-        {assignments.data && (
+        {loaded && (
           <Text fontSize="sm" color="fg.muted">
             {holders.length}{" "}
             {holders.length === 1 ? "member or group" : "members and groups"}
@@ -116,7 +146,7 @@ export function RoleAssignmentsPanel({
         )}
       </HStack>
 
-      {assignments.isLoading ? (
+      {loading ? (
         /* A spinner says "wait"; a skeleton says what for. Five rows is what
            the list usually holds, so nothing jumps when the answer lands. */
         <SettingsRowsSkeleton rows={5} />

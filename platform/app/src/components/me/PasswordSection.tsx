@@ -195,59 +195,15 @@ export function PasswordSection() {
       >
         {accounts.isLoading ? <SettingsRowsSkeleton rows={1} /> : null}
 
-        {hasPassword ? (
-          // The same row a passkey and an authenticator get: one thing this
-          // account holds, with a mark, a name and what can be done to it.
-          <SettingsSectionRow testId="password-row">
-            <Box color="fg.muted" display="flex">
-              <KeyRound size={16} />
-            </Box>
-            <VStack align="start" gap={0} minWidth={0}>
-              <Text fontSize="sm" fontWeight={500}>
-                Password
-              </Text>
-              <Text fontSize="xs" color="fg.muted">
-                Used on the screens that ask for one.
-              </Text>
-            </VStack>
-            <Spacer />
-            <HStack gap={2}>
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => setDialogOpen(true)}
-                data-testid="password-action"
-              >
-                Change Password
-              </Button>
-              <RemovePasswordButton
-                // Nothing to give up until there IS one, and nothing to ask
-                // the guard about until a row carries it.
-                offered={canGiveUp}
-                verdict={verdict}
-                isPending={removal.isRemoving}
-                onAsk={removal.ask}
-                accountId={passwordAccount?.id ?? null}
-              />
-            </HStack>
-          </SettingsSectionRow>
-        ) : (
-          <SettingsEmptyState
-            icon={<KeyRound size={20} />}
-            title="No password set"
-            description="You sign in without one. Setting a password gives you a second way in, for a browser or a device your passkey provider does not reach."
-            testId="password-empty"
-            action={
-              <Button
-                variant="outline"
-                onClick={() => setDialogOpen(true)}
-                data-testid="password-action"
-              >
-                Set a password
-              </Button>
-            }
-          />
-        )}
+        <PasswordOfferContent
+          hasPassword={hasPassword}
+          canGiveUp={canGiveUp}
+          verdict={verdict}
+          isRemoving={removal.isRemoving}
+          accountId={passwordAccount?.id ?? null}
+          onAsk={removal.ask}
+          onOpenDialog={() => setDialogOpen(true)}
+        />
 
         <RemovalVerdictAlert
           offered={canGiveUp}
@@ -272,5 +228,77 @@ export function PasswordSection() {
         />
       </VStack>
     </SettingsSection>
+  );
+}
+
+function PasswordOfferContent({
+  hasPassword,
+  canGiveUp,
+  verdict,
+  isRemoving,
+  accountId,
+  onAsk,
+  onOpenDialog,
+}: {
+  hasPassword: boolean;
+  canGiveUp: boolean;
+  verdict: AccountIdentifier | null;
+  isRemoving: boolean;
+  accountId: string | null;
+  onAsk: (target: SignInMethodRemovalTarget) => void;
+  onOpenDialog: () => void;
+}) {
+  if (!hasPassword) {
+    return (
+      <SettingsEmptyState
+        icon={<KeyRound size={20} />}
+        title="No password set"
+        description="You sign in without one. Setting a password gives you a second way in, for a browser or a device your passkey provider does not reach."
+        testId="password-empty"
+        action={
+          <Button
+            variant="outline"
+            onClick={onOpenDialog}
+            data-testid="password-action"
+          >
+            Set a password
+          </Button>
+        }
+      />
+    );
+  }
+
+  return (
+    <SettingsSectionRow testId="password-row">
+      <Box color="fg.muted" display="flex">
+        <KeyRound size={16} />
+      </Box>
+      <VStack align="start" gap={0} minWidth={0}>
+        <Text fontSize="sm" fontWeight={500}>
+          Password
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          Used on the screens that ask for one.
+        </Text>
+      </VStack>
+      <Spacer />
+      <HStack gap={2}>
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={onOpenDialog}
+          data-testid="password-action"
+        >
+          Change Password
+        </Button>
+        <RemovePasswordButton
+          offered={canGiveUp}
+          verdict={verdict}
+          isPending={isRemoving}
+          onAsk={onAsk}
+          accountId={accountId}
+        />
+      </HStack>
+    </SettingsSectionRow>
   );
 }

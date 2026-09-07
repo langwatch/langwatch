@@ -20,6 +20,7 @@ const {
   publicEnvRef,
   routeMock,
   requestVerificationMock,
+  enrollmentMock,
   completeVerificationMock,
   registerMock,
   signInMock,
@@ -34,6 +35,7 @@ const {
   },
   routeMock: vi.fn(),
   requestVerificationMock: vi.fn(),
+  enrollmentMock: vi.fn(),
   completeVerificationMock: vi.fn(),
   registerMock: vi.fn(),
   signInMock: vi.fn(),
@@ -65,6 +67,13 @@ vi.mock("~/utils/api", () => ({
       requestSignUpVerification: {
         useMutation: () => ({
           mutateAsync: requestVerificationMock,
+          isPending: false,
+          error: null,
+        }),
+      },
+      signUpEnrollment: {
+        useMutation: () => ({
+          mutateAsync: enrollmentMock,
           isPending: false,
           error: null,
         }),
@@ -150,6 +159,11 @@ describe("given the identifier-first auth screens", () => {
       HAS_EMAIL_PROVIDER_KEY: true,
     };
     routeMock.mockResolvedValue(federatedPicker);
+    enrollmentMock.mockResolvedValue({
+      outcome: "enroll",
+      methodSet: federatedPicker.methodSet,
+      reasonCode: "identifier_unknown",
+    });
     requestPasswordResetMock.mockResolvedValue({});
   });
 

@@ -67,13 +67,7 @@ export function TwoFactorSection() {
       icon={<Smartphone size={18} />}
       title="Two-step verification"
       description="Ask for a code from your phone as well as your password. Somebody who learns your password still cannot sign in as you."
-      badge={
-        enabled ? (
-          <Badge colorPalette="green" data-testid="two-factor-status">
-            On
-          </Badge>
-        ) : null
-      }
+      badge={<TwoFactorStatus enabled={enabled} />}
       testId="two-factor-settings-section"
     >
       <VStack
@@ -133,57 +127,17 @@ export function TwoFactorSection() {
           </SettingsSectionRow>
         ) : null}
 
-        <Dialog.Root
-          open={isSettingUp}
-          onOpenChange={(details) => {
-            if (!details.open) setIsSettingUp(false);
+        <TwoFactorDialogs
+          isSettingUp={isSettingUp}
+          regenerated={regenerated}
+          onCloseSetup={() => setIsSettingUp(false)}
+          onFinishedSetup={() => {
+            setIsSettingUp(false);
+            void account.refetch();
+            toaster.success({ title: "Two-step verification is on" });
           }}
-          placement="center"
-        >
-          <Dialog.Content bg="bg">
-            <Dialog.CloseTrigger />
-            <Dialog.Header>
-              <Dialog.Title fontSize="md" fontWeight="500">
-                Set up two-step verification
-              </Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body paddingBottom={6}>
-              <TwoFactorSetupFlow
-                onFinished={() => {
-                  setIsSettingUp(false);
-                  void account.refetch();
-                  toaster.success({ title: "Two-step verification is on" });
-                }}
-                onCancel={() => setIsSettingUp(false)}
-              />
-            </Dialog.Body>
-          </Dialog.Content>
-        </Dialog.Root>
-
-        <Dialog.Root
-          open={regenerated !== null}
-          onOpenChange={(details) => {
-            if (!details.open) setRegenerated(null);
-          }}
-          placement="center"
-        >
-          <Dialog.Content bg="bg">
-            <Dialog.CloseTrigger />
-            <Dialog.Header>
-              <Dialog.Title fontSize="md" fontWeight="500">
-                Your new backup codes
-              </Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body paddingBottom={6}>
-              {regenerated ? (
-                <BackupCodesPanel
-                  codes={regenerated}
-                  onDone={() => setRegenerated(null)}
-                />
-              ) : null}
-            </Dialog.Body>
-          </Dialog.Content>
-        </Dialog.Root>
+          onCloseCodes={() => setRegenerated(null)}
+        />
 
         <TurnOffDialog
           open={isTurningOff}
@@ -195,6 +149,73 @@ export function TwoFactorSection() {
         />
       </VStack>
     </SettingsSection>
+  );
+}
+
+function TwoFactorStatus({ enabled }: { enabled: boolean }) {
+  if (!enabled) return null;
+  return (
+    <Badge colorPalette="green" data-testid="two-factor-status">
+      On
+    </Badge>
+  );
+}
+
+function TwoFactorDialogs({
+  isSettingUp,
+  regenerated,
+  onCloseSetup,
+  onFinishedSetup,
+  onCloseCodes,
+}: {
+  isSettingUp: boolean;
+  regenerated: readonly string[] | null;
+  onCloseSetup: () => void;
+  onFinishedSetup: () => void;
+  onCloseCodes: () => void;
+}) {
+  return (
+    <>
+      <Dialog.Root
+        open={isSettingUp}
+        onOpenChange={({ open }) => !open && onCloseSetup()}
+        placement="center"
+      >
+        <Dialog.Content bg="bg">
+          <Dialog.CloseTrigger />
+          <Dialog.Header>
+            <Dialog.Title fontSize="md" fontWeight="500">
+              Set up two-step verification
+            </Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body paddingBottom={6}>
+            <TwoFactorSetupFlow
+              onFinished={onFinishedSetup}
+              onCancel={onCloseSetup}
+            />
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Root>
+      <Dialog.Root
+        open={regenerated !== null}
+        onOpenChange={({ open }) => !open && onCloseCodes()}
+        placement="center"
+      >
+        <Dialog.Content bg="bg">
+          <Dialog.CloseTrigger />
+          <Dialog.Header>
+            <Dialog.Title fontSize="md" fontWeight="500">
+              Your new backup codes
+            </Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body paddingBottom={6}>
+            {regenerated ? (
+              <BackupCodesPanel codes={regenerated} onDone={onCloseCodes} />
+            ) : null}
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Root>
+    </>
   );
 }
 

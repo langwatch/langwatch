@@ -26,6 +26,19 @@ interface RoleFormValues {
   permissions: AuthzPermission[];
 }
 
+interface RoleDialogProps {
+  open: boolean;
+  organizationId: string;
+  organizationName?: string;
+  editing: {
+    id: string;
+    name: string;
+    description: string | null;
+    permissions: string[];
+  } | null;
+  onClose: () => void;
+}
+
 /**
  * Writing a role, with the answer on screen while you write it.
  *
@@ -38,25 +51,46 @@ interface RoleFormValues {
  * of two mutations it calls and what it says on the button, and pretending
  * otherwise would be two screens to keep in step.
  */
-export function RoleDialog({
+export function RoleDialog(props: RoleDialogProps) {
+  const form = useRoleForm(props);
+
+  return (
+    <Dialog.Root
+      open={props.open}
+      onOpenChange={({ open }) => !open && props.onClose()}
+    >
+      <Dialog.Content
+        bg="bg"
+        maxWidth="1040px"
+        maxHeight="90vh"
+        overflowY="auto"
+      >
+        <Dialog.Header>
+          <Dialog.Title>
+            {props.editing ? "Edit role" : "New role"}
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <RoleFormBody {...props} {...form} />
+        </Dialog.Body>
+        <RoleFormFooter
+          editing={!!props.editing}
+          permissions={form.permissions}
+          saving={form.saving}
+          onClose={props.onClose}
+        />
+        <Dialog.CloseTrigger />
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
+
+function useRoleForm({
   open,
   organizationId,
-  organizationName,
   editing,
   onClose,
-}: {
-  open: boolean;
-  organizationId: string;
-  organizationName?: string;
-  editing: {
-    id: string;
-    name: string;
-    description: string | null;
-    permissions: string[];
-  } | null;
-  onClose: () => void;
-}) {
-  const apiContext = api.useUtils();
+}: RoleDialogProps) {
   const [previewScope, setPreviewScope] = useState<ScopeTriadEntry[]>([
     { scopeType: "ORGANIZATION", scopeId: organizationId },
   ]);
@@ -84,15 +118,31 @@ export function RoleDialog({
     setPreviewScope([{ scopeType: "ORGANIZATION", scopeId: organizationId }]);
   }, [open, editing, organizationId, reset]);
 
-  const teams = api.apiKey.orgTeams.useQuery(
-    { organizationId },
-    { enabled: open },
-  );
-  const projects = api.apiKey.orgProjects.useQuery(
-    { organizationId },
-    { enabled: open },
-  );
+  const { saving, save } = useRoleMutations({
+    organizationId,
+    editing,
+    onClose,
+  });
+  const submit = handleSubmit(save);
 
+  return {
+    errors,
+    permissions,
+    previewScope,
+    register,
+    saving,
+    setPreviewScope,
+    setValue,
+    submit,
+  };
+}
+
+function useRoleMutations({
+  organizationId,
+  editing,
+  onClose,
+}: Pick<RoleDialogProps, "organizationId" | "editing" | "onClose">) {
+  const apiContext = api.useUtils();
   const onSaved = (title: string) => {
     void apiContext.role.getAll.invalidate();
     void apiContext.roleBinding.listForOrg.invalidate();
@@ -111,7 +161,7 @@ export function RoleDialog({
       showErrorToast({ error, fallbackTitle: "Couldn't save this role" }),
   });
 
-  const submit = handleSubmit(async (values) => {
+  const save = async (values: RoleFormValues) => {
     if (editing) {
       await updateRole.mutateAsync({
         roleId: editing.id,
@@ -121,99 +171,125 @@ export function RoleDialog({
       });
       return;
     }
+
     await createRole.mutateAsync({
       organizationId,
       name: values.name,
       description: values.description,
       permissions: values.permissions,
     });
-  });
+  };
 
-  const saving = createRole.isPending || updateRole.isPending;
+  return {
+    saving: createRole.isPending || updateRole.isPending,
+    save,
+  };
+}
+
+function RoleFormBody({
+  organizationId,
+  organizationName,
+  open,
+  errors,
+  permissions,
+  previewScope,
+  register,
+  setPreviewScope,
+  setValue,
+  submit,
+}: RoleDialogProps & ReturnType<typeof useRoleForm>) {
+  const teams = api.apiKey.orgTeams.useQuery(
+    { organizationId },
+    { enabled: open },
+  );
+  const projects = api.apiKey.orgProjects.useQuery(
+    { organizationId },
+    { enabled: open },
+  );
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content
-        bg="bg"
-        maxWidth="1040px"
-        maxHeight="90vh"
-        overflowY="auto"
+    <form id="role-form" onSubmit={(event) => void submit(event)}>
+      <Grid
+        templateColumns={{ base: "1fr", lg: "1.4fr 1fr" }}
+        gap={8}
+        alignItems="start"
       >
-        <Dialog.Header>
-          <Dialog.Title>{editing ? "Edit role" : "New role"}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <form id="role-form" onSubmit={(event) => void submit(event)}>
-            <Grid
-              templateColumns={{ base: "1fr", lg: "1.4fr 1fr" }}
-              gap={8}
-              alignItems="start"
-            >
-              <VStack align="stretch" gap={5}>
-                <RoleIdentityFields register={register} errors={errors} />
+        <VStack align="stretch" gap={5}>
+          <RoleIdentityFields register={register} errors={errors} />
 
-                <Box>
-                  <Text fontSize="sm" fontWeight="semibold">
-                    What it can reach
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    Read means look and never change. Full access means create,
-                    change and delete as well.
-                  </Text>
-                </Box>
-
-                <RolePermissionComposer
-                  selected={permissions}
-                  onChange={(next) =>
-                    setValue("permissions", next, { shouldDirty: true })
-                  }
-                />
-              </VStack>
-
-              <Box
-                position={{ base: "static", lg: "sticky" }}
-                top={0}
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="md"
-                padding={4}
-                background="bg.subtle"
-              >
-                <RoleEffectPreview
-                  permissions={permissions}
-                  previewScope={previewScope}
-                  onPreviewScopeChange={setPreviewScope}
-                  organizationId={organizationId}
-                  organizationName={organizationName}
-                  availableTeams={teams.data ?? []}
-                  availableProjects={projects.data ?? []}
-                />
-              </Box>
-            </Grid>
-          </form>
-        </Dialog.Body>
-        <Dialog.Footer>
-          {permissions.length === 0 && (
-            <Text fontSize="xs" color="fg.muted" marginRight="auto">
-              Choose at least one permission before saving.
+          <Box>
+            <Text fontSize="sm" fontWeight="semibold">
+              What it can reach
             </Text>
-          )}
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="role-form"
-            colorPalette="orange"
-            loading={saving}
-            disabled={permissions.length === 0}
-          >
-            {editing ? "Save role" : "Create role"}
-          </Button>
-        </Dialog.Footer>
-        <Dialog.CloseTrigger />
-      </Dialog.Content>
-    </Dialog.Root>
+            <Text fontSize="xs" color="fg.muted">
+              Read means look and never change. Full access means create, change
+              and delete as well.
+            </Text>
+          </Box>
+
+          <RolePermissionComposer
+            selected={permissions}
+            onChange={(next) =>
+              setValue("permissions", next, { shouldDirty: true })
+            }
+          />
+        </VStack>
+
+        <Box
+          position={{ base: "static", lg: "sticky" }}
+          top={0}
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="md"
+          padding={4}
+          background="bg.subtle"
+        >
+          <RoleEffectPreview
+            permissions={permissions}
+            previewScope={previewScope}
+            onPreviewScopeChange={setPreviewScope}
+            organizationId={organizationId}
+            organizationName={organizationName}
+            availableTeams={teams.data ?? []}
+            availableProjects={projects.data ?? []}
+          />
+        </Box>
+      </Grid>
+    </form>
+  );
+}
+
+function RoleFormFooter({
+  editing,
+  permissions,
+  saving,
+  onClose,
+}: {
+  editing: boolean;
+  permissions: AuthzPermission[];
+  saving: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog.Footer>
+      {permissions.length === 0 && (
+        <Text fontSize="xs" color="fg.muted" marginRight="auto">
+          Choose at least one permission before saving.
+        </Text>
+      )}
+      <Button variant="outline" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button
+        type="submit"
+        form="role-form"
+        colorPalette="orange"
+        loading={saving}
+        disabled={permissions.length === 0}
+      >
+        {editing ? "Save role" : "Create role"}
+      </Button>
+    </Dialog.Footer>
   );
 }
 
