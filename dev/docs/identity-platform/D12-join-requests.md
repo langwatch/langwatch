@@ -2,7 +2,7 @@
 
 Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D03 (router) + D13 (sign-up interstitial hook) · Flag: `JOIN_REQUESTS`
 
-> **D05 is not a dependency.** Approvals land in the existing `/settings/members` UI beside D11's invitation management, which D05 later absorbs anyway. They need no new permission either: every invite procedure in `platform/app/src/server/api/routers/organization.ts` is already gated on `organization:manage`, an existing registered permission, and answering a request is the same authority pointed the other way. Nothing from the authz precondition checklist is required.
+> **D05 is not a dependency.** Approvals land in the existing `/settings/members` UI beside D11's invitation management, which D05 later absorbs anyway. They need no new permission either: invite administration in `platform/app/src/server/api/routers/invite.ts` is gated on `organization:manage`, while `invite.acceptInvite` is authenticated but intentionally has no organization permission because acceptance precedes membership. Answering a join request uses the same `organization:manage` authority as invitation administration. Nothing from the authz precondition checklist is required.
 
 # Overview
 

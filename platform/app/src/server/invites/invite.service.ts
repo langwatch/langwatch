@@ -339,7 +339,7 @@ interface CreatePaymentPendingInviteInput {
 
 /**
  * Service that encapsulates invite creation, validation, and acceptance
- * logic, extracted from the organization router.
+ * logic used by the invite router and other application adapters.
  *
  * Dependencies are injected to follow DIP and enable testability.
  */
