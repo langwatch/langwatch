@@ -636,7 +636,11 @@ describe("given the sign-up screen", () => {
 
       await waitFor(() => {
         expect(addPasskeyMock).toHaveBeenCalledWith(
-          expect.objectContaining({ context: "sam@acme.com" }),
+          expect.objectContaining({
+            context: expect.stringContaining('"email":"sam@acme.com"'),
+            createSession: false,
+            name: "sam@acme.com",
+          }),
         );
       });
     });
