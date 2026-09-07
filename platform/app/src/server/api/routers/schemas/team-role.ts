@@ -3,7 +3,10 @@ import { TeamUserRole } from "~/generated/prisma/client";
 
 export const customTeamRoleInputSchema = z
   .string()
-  .regex(/^custom:[a-zA-Z0-9_-]+$/, "Custom role must be in format 'custom:{roleId}'");
+  .regex(
+    /^custom:[a-zA-Z0-9_-]+$/,
+    "Custom role must be in format 'custom:{roleId}'",
+  );
 
 export const builtInTeamRoleInputSchema = z.enum([
   TeamUserRole.ADMIN,
@@ -11,4 +14,7 @@ export const builtInTeamRoleInputSchema = z.enum([
   TeamUserRole.VIEWER,
 ]);
 
-export const teamRoleInputSchema = z.union([builtInTeamRoleInputSchema, customTeamRoleInputSchema]);
+export const teamRoleInputSchema = z.union([
+  builtInTeamRoleInputSchema,
+  customTeamRoleInputSchema,
+]);

@@ -579,11 +579,9 @@ describe("Invite router integration", () => {
             expires: "1",
           },
         });
-        const result = await appRouter
-          .createCaller(ctx)
-          .invite.acceptInvite({
-            inviteCode: resent.invite.inviteCode,
-          });
+        const result = await appRouter.createCaller(ctx).invite.acceptInvite({
+          inviteCode: resent.invite.inviteCode,
+        });
 
         expect(result.success).toBe(true);
         const membership = await prisma.organizationUser.findUnique({
@@ -706,10 +704,9 @@ describe("Invite router integration", () => {
           },
         });
 
-        const invites =
-          await adminCaller.invite.getOrganizationPendingInvites({
-            organizationId,
-          });
+        const invites = await adminCaller.invite.getOrganizationPendingInvites({
+          organizationId,
+        });
 
         const byEmail = Object.fromEntries(
           invites.map((invite) => [invite.email, invite]),
