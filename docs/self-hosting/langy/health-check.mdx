@@ -17,7 +17,7 @@ keywords:
 | Method and URL | `GET https://<your-langwatch-host>/api/langy/health` |
 | Header | `X-Auth-Token: <project API key>` |
 | Expected status | `200` |
-| Request timeout | 60 seconds (the check itself gives up at 55) |
+| Request timeout | 75 seconds or more (the check itself gives up at 55, after the key has been authenticated) |
 | Check interval | 3 minutes or longer |
 
 The API key must belong to a user who has Langy access, and must carry the `langy:create` permission. The turn runs as that user, so create a dedicated user and key for the monitor rather than reusing a person's. The [Langy API surface flag](/self-hosting/langy/setup#staged-rollout) must be on for the key's project; while it is off, the endpoint answers `404` like any unmounted path.
@@ -32,6 +32,8 @@ The API key must belong to a user who has Langy access, and must carry the `lang
 | `401` / `403` | error envelope | The key is missing, unknown, lacks `langy:create`, or its owner has no Langy access. |
 
 Every response carries `Cache-Control: no-store`.
+
+The 55-second budget starts once the key is authenticated, so a slow database adds to the wall clock. If a reverse proxy in front of LangWatch has its own read timeout (ingress-nginx defaults to 60 seconds), raise it above the monitor's timeout, or a stalled check reaches the monitor as a `504` from the proxy instead of a `503` with `reason: "timeout"`. Either one still fails the check.
 
 ## What each check costs
 
