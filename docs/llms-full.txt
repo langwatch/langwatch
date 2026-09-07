@@ -56256,7 +56256,7 @@ Langy sets these up with `langwatch monitor create` and `langwatch trigger creat
 
 ---
 title: Local development
-description: "Share a folder on your machine with Langy: it edits your code there, runs your own toolchain, and opens the pull request from your git identity, with the commands that need approval answered by you in the terminal or in the chat."
+description: "Share a folder on your machine with Langy: it edits your code there, runs your own tests, and opens the pull request for you"
 sidebarTitle: Local development
 keywords:
   - langy share control
