@@ -1,10 +1,116 @@
 {
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/trace-server.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2022"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../csv/tsconfig.build.json"
+    },
+    {
+      "path": "../../../eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../otlp/tsconfig.build.json"
+    },
+    {
+      "path": "../../../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../annotation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../coding-agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-privacy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-privacy/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-retention/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-retention/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../monitor/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../share/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../stored-object/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../topic/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    }
+  ]
 }

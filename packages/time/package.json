@@ -9,24 +9,24 @@
     "time"
   ],
   "license": "MIT",
-  "type": "module",
   "files": [
     "src"
   ],
+  "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./polyfill": {
-      "types": "./src/polyfill.ts",
+      "types": "./dist/polyfill.d.ts",
       "default": "./src/polyfill.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/time/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

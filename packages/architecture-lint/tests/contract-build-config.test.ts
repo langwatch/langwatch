@@ -48,6 +48,32 @@ describe("strict contract declaration build configs", () => {
     expect(lintStrictContractBuildConfigs(root, [contractPackage("future-feature")])).toEqual([]);
   });
 
+  it("accepts recursive test-root exclusions used by canonical contracts", () => {
+    root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
+    writeConfig("recursive-feature", {
+      compilerOptions: { rootDir: "src" },
+      include: ["src/**/*.ts"],
+      exclude: ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
+    });
+
+    expect(lintStrictContractBuildConfigs(root, [contractPackage("recursive-feature")])).toEqual(
+      [],
+    );
+  });
+
+  it("rejects an exclusion scoped only below src", () => {
+    root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
+    writeConfig("nested-feature", {
+      compilerOptions: { rootDir: "src" },
+      include: ["src/**/*.ts"],
+      exclude: ["src/tests/**"],
+    });
+
+    expect(lintStrictContractBuildConfigs(root, [contractPackage("nested-feature")])).toMatchObject(
+      [{ policy: "contract-build-config" }],
+    );
+  });
+
   /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
   it("rejects a config that can include a package test root", () => {
     root = mkdtempSync(join(tmpdir(), "contract-build-config-"));

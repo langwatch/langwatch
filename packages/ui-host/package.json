@@ -8,71 +8,71 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./compat/next-dynamic": {
-      "types": "./src/compat/next-dynamic.ts",
+      "types": "./dist/compat/next-dynamic.d.ts",
       "default": "./src/compat/next-dynamic.ts"
     },
     "./slots": {
-      "types": "./src/slots.tsx",
+      "types": "./dist/slots.d.ts",
       "default": "./src/slots.tsx"
     },
     "./capabilities": {
-      "types": "./src/capabilities.ts",
+      "types": "./dist/capabilities.d.ts",
       "default": "./src/capabilities.ts"
     },
     "./use-router": {
-      "types": "./src/use-router.ts",
+      "types": "./dist/use-router.d.ts",
       "default": "./src/use-router.ts"
     },
     "./toaster": {
-      "types": "./src/toaster.ts",
+      "types": "./dist/toaster.d.ts",
       "default": "./src/toaster.ts"
     },
     "./storage": {
-      "types": "./src/storage.ts",
+      "types": "./dist/storage.d.ts",
       "default": "./src/storage.ts"
     },
     "./errors": {
-      "types": "./src/errors.ts",
+      "types": "./dist/errors.d.ts",
       "default": "./src/errors.ts"
     },
     "./query-retry": {
-      "types": "./src/query-retry.ts",
+      "types": "./dist/query-retry.d.ts",
       "default": "./src/query-retry.ts"
     },
     "./testing": {
-      "types": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     },
     "./link": {
-      "types": "./src/link.tsx",
+      "types": "./dist/link.d.ts",
       "default": "./src/link.tsx"
     },
     "./use-drawer": {
-      "types": "./src/use-drawer.ts",
+      "types": "./dist/use-drawer.d.ts",
       "default": "./src/use-drawer.ts"
     },
     "./upgrade-modal-store": {
-      "types": "./src/upgrade-modal-store.ts",
+      "types": "./dist/upgrade-modal-store.d.ts",
       "default": "./src/upgrade-modal-store.ts"
     },
     "./use-organization-team-project": {
-      "types": "./src/use-organization-team-project.ts",
+      "types": "./dist/use-organization-team-project.d.ts",
       "default": "./src/use-organization-team-project.ts"
     },
     "./format-time-ago": {
-      "types": "./src/format-time-ago.ts",
+      "types": "./dist/format-time-ago.d.ts",
       "default": "./src/format-time-ago.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/ui-host/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

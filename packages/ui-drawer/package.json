@@ -8,15 +8,15 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/ui-drawer/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

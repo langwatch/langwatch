@@ -1,10 +1,36 @@
 {
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/notification-server.tsbuildinfo",
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
     "lib": ["es2022"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../runtime-composition/tsconfig.build.json"
+    }
+  ]
 }

@@ -1,20 +1,25 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    // This package emits: `noEmit` from the shared base is turned back off
-    // here so a `tsc -p` build still writes its declarations.
-    "noEmit": false,
+    "rootDir": "src",
+    "noEmit": true,
     "target": "es2020",
     "lib": ["es2020"],
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/redis-client.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
-  // Exclude Vitest tests from the source typecheck and declaration build;
-  // Vitest is a test-only dependency.
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    }
+  ]
 }

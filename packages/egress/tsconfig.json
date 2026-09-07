@@ -1,11 +1,36 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/egress.tsbuildinfo",
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2022"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../features/automation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../task/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
 }

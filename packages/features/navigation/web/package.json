@@ -9,24 +9,24 @@
   "type": "module",
   "exports": {
     "./chrome": {
-      "types": "./src/ui/index.ts",
+      "types": "./dist/ui/index.d.ts",
       "default": "./src/ui/index.ts"
     },
     "./surfaces/command-bar": {
-      "types": "./src/surfaces/command-bar/index.ts",
+      "types": "./dist/surfaces/command-bar/index.d.ts",
       "default": "./src/surfaces/command-bar/index.ts"
     },
     "./screens/navigation": {
-      "types": "./src/screens/navigation/index.ts",
+      "types": "./dist/screens/navigation/index.d.ts",
       "default": "./src/screens/navigation/index.ts"
     },
     "./testing": {
-      "types": "./src/testing.tsx",
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.tsx"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/navigation/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

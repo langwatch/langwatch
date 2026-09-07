@@ -15,31 +15,19 @@
   "main": "src/index.ts",
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/src/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./rest": {
-      "types": {
-        "langwatch-declarations": "./dist/src/rest/index.d.ts",
-        "default": "./src/rest/index.ts"
-      },
+      "types": "./dist/rest/index.d.ts",
       "default": "./src/rest/index.ts"
     },
     "./trpc": {
-      "types": {
-        "langwatch-declarations": "./dist/src/trpc/index.d.ts",
-        "default": "./src/trpc/index.ts"
-      },
+      "types": "./dist/trpc/index.d.ts",
       "default": "./src/trpc/index.ts"
     },
     "./composition": {
-      "types": {
-        "langwatch-declarations": "./dist/src/composition.d.ts",
-        "default": "./src/composition.ts"
-      },
+      "types": "./dist/composition.d.ts",
       "default": "./src/composition.ts"
     }
   },

@@ -8,23 +8,23 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./workflow-evaluation": {
-      "types": "./src/adapters/workflow-evaluation.adapter.ts",
+      "types": "./dist/adapters/workflow-evaluation.adapter.d.ts",
       "default": "./src/adapters/workflow-evaluation.adapter.ts"
     },
     "./internal": {
-      "types": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/evaluation/server/tsconfig.json && tsc --noEmit",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"

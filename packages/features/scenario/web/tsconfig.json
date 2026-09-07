@@ -1,12 +1,77 @@
 {
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/scenario-web.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "target": "es2023",
     "jsx": "react-jsx",
     "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "noEmit": true,
+
+    "rootDir": ".",
+
+    "outDir": "dist",
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"],
+
+  "references": [
+    {
+      "path": "../../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../platform-api-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../ui-drawer/tsconfig.build.json"
+    },
+    {
+      "path": "../../../ui-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../agent/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../suite/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../suite/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    }
+  ]
 }

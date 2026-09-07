@@ -10,12 +10,12 @@
   "type": "module",
   "exports": {
     "./screens/scim": {
-      "types": "./src/screens/scim/index.ts",
+      "types": "./dist/screens/scim/index.d.ts",
       "default": "./src/screens/scim/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/enterprise/features/scim/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

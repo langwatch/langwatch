@@ -1,11 +1,15 @@
 {
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
     "jsx": "react-jsx",
     "lib": ["es2022", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/user-web.tsbuildinfo",
     "verbatimModuleSyntax": true,
     "paths": {
       "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
@@ -19,7 +23,47 @@
         "../../gateway/web/src/surfaces/budget-overview/index.ts"
       ],
       "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"]
-    }
+    },
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../../config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../platform-api-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../coding-agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../gateway/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    }
+  ]
 }

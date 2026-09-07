@@ -8,29 +8,29 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./visualization": {
-      "types": "./src/visualization/index.ts",
+      "types": "./dist/visualization/index.d.ts",
       "default": "./src/visualization/index.ts"
     },
     "./visualization/validation": {
-      "types": "./src/visualization/validation.ts",
+      "types": "./dist/visualization/validation.d.ts",
       "default": "./src/visualization/validation.ts"
     },
     "./testing": {
-      "types": "./src/visualization/__tests__/fixtures/index.ts",
+      "types": "./dist/visualization/__tests__/fixtures/index.d.ts",
       "default": "./src/visualization/__tests__/fixtures/index.ts"
     }
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
     "generate:vega-validator": "node --experimental-transform-types scripts/generate-vega-lite-validator.ts",
-    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/analytics/contract/tsconfig.json && tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

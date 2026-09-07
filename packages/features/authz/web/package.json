@@ -9,16 +9,16 @@
   "type": "module",
   "exports": {
     "./screens/authz": {
-      "types": "./src/screens/authz/index.ts",
+      "types": "./dist/screens/authz/index.d.ts",
       "default": "./src/screens/authz/index.ts"
     },
     "./surfaces/scope-picker": {
-      "types": "./src/surfaces/scope-picker/index.ts",
+      "types": "./dist/surfaces/scope-picker/index.d.ts",
       "default": "./src/surfaces/scope-picker/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/authz/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

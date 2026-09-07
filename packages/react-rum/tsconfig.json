@@ -1,13 +1,25 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "outDir": "dist",
+    "noEmit": true,
     "module": "ESNext",
     "lib": ["ES2022", "DOM"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "rootDir": "src",
     "types": ["node"],
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/react-rum.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
 }

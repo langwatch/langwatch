@@ -1,14 +1,30 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "composite": true,
     "declaration": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/share-contract-build.tsbuildinfo",
     "declarationMap": true,
     "emitDeclarationOnly": true,
     "noEmit": false,
+    "noEmitOnError": true,
+    "rootDir": "src",
     "outDir": "dist",
-    "rootDir": "src"
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/__tests__/**", "tests"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**"
+  ],
+  "references": [
+    {
+      "path": "../../../handled-error/tsconfig.build.json"
+    }
+  ]
 }

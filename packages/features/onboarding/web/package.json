@@ -9,76 +9,93 @@
   "type": "module",
   "exports": {
     "./hooks/useAttributionCapture": {
-      "types": "./src/behavior/use-attribution-capture.ts",
+      "langwatch-declaration-source": "./src/behavior/use-attribution-capture.ts",
+      "types": "./dist/behavior/use-attribution-capture.d.ts",
       "default": "./src/behavior/use-attribution-capture.ts"
     },
     "./screens/onboarding": {
-      "types": "./src/screens/onboarding/index.ts",
+      "langwatch-declaration-source": "./src/screens/onboarding/index.ts",
+      "types": "./dist/screens/onboarding/index.d.ts",
       "default": "./src/screens/onboarding/index.ts"
     },
     "./surfaces/onboarding-mesh-background": {
-      "types": "./src/ui/elements/onboarding-mesh-background.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/onboarding-mesh-background.tsx",
+      "types": "./dist/ui/elements/onboarding-mesh-background.d.ts",
       "default": "./src/ui/elements/onboarding-mesh-background.tsx"
     },
     "./surfaces/via-claude-code-screen": {
-      "types": "./src/ui/sections/via-claude-code-screen.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/via-claude-code-screen.tsx",
+      "types": "./dist/ui/sections/via-claude-code-screen.d.ts",
       "default": "./src/ui/sections/via-claude-code-screen.tsx"
     },
     "./surfaces/via-claude-desktop-screen": {
-      "types": "./src/ui/sections/via-claude-desktop-screen.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/via-claude-desktop-screen.tsx",
+      "types": "./dist/ui/sections/via-claude-desktop-screen.d.ts",
       "default": "./src/ui/sections/via-claude-desktop-screen.tsx"
     },
     "./surfaces/code-preview": {
-      "types": "./src/ui/sections/observability/code-preview.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/observability/code-preview.tsx",
+      "types": "./dist/ui/sections/observability/code-preview.d.ts",
       "default": "./src/ui/sections/observability/code-preview.tsx"
     },
     "./surfaces/docs-links": {
-      "types": "./src/ui/blocks/observability/docs-links.tsx",
+      "langwatch-declaration-source": "./src/ui/blocks/observability/docs-links.tsx",
+      "types": "./dist/ui/blocks/observability/docs-links.d.ts",
       "default": "./src/ui/blocks/observability/docs-links.tsx"
     },
     "./surfaces/framework-grid": {
-      "types": "./src/ui/sections/observability/framework-grid.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/observability/framework-grid.tsx",
+      "types": "./dist/ui/sections/observability/framework-grid.d.ts",
       "default": "./src/ui/sections/observability/framework-grid.tsx"
     },
     "./surfaces/framework-integration-code": {
-      "types": "./src/ui/sections/observability/framework-integration-code.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/observability/framework-integration-code.tsx",
+      "types": "./dist/ui/sections/observability/framework-integration-code.d.ts",
       "default": "./src/ui/sections/observability/framework-integration-code.tsx"
     },
     "./surfaces/install-preview": {
-      "types": "./src/ui/sections/observability/install-preview.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/observability/install-preview.tsx",
+      "types": "./dist/ui/sections/observability/install-preview.d.ts",
       "default": "./src/ui/sections/observability/install-preview.tsx"
     },
     "./surfaces/platform-grid": {
-      "types": "./src/ui/sections/observability/platform-grid.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/observability/platform-grid.tsx",
+      "types": "./dist/ui/sections/observability/platform-grid.d.ts",
       "default": "./src/ui/sections/observability/platform-grid.tsx"
     },
     "./surfaces/inline-copy-button": {
-      "types": "./src/ui/sections/shared/inline-copy-button.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/shared/inline-copy-button.tsx",
+      "types": "./dist/ui/sections/shared/inline-copy-button.d.ts",
       "default": "./src/ui/sections/shared/inline-copy-button.tsx"
     },
     "./surfaces/build-mcp-config": {
-      "types": "./src/model/shared/build-mcp-config.ts",
+      "langwatch-declaration-source": "./src/model/shared/build-mcp-config.ts",
+      "types": "./dist/model/shared/build-mcp-config.d.ts",
       "default": "./src/model/shared/build-mcp-config.ts"
     },
     "./surfaces/active-project-context": {
-      "types": "./src/ui/sections/active-project-context.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/active-project-context.tsx",
+      "types": "./dist/ui/sections/active-project-context.d.ts",
       "default": "./src/ui/sections/active-project-context.tsx"
     },
     "./surfaces/observability-codegen": {
-      "types": "./src/ui/sections/observability/codegen/registry.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/observability/codegen/registry.tsx",
+      "types": "./dist/ui/sections/observability/codegen/registry.d.ts",
       "default": "./src/ui/sections/observability/codegen/registry.tsx"
     },
     "./surfaces/observability-types": {
-      "types": "./src/model/observability/types.ts",
+      "langwatch-declaration-source": "./src/model/observability/types.ts",
+      "types": "./dist/model/observability/types.d.ts",
       "default": "./src/model/observability/types.ts"
     },
     "./surfaces/observability-options": {
-      "types": "./src/ui/sections/observability/ui-options.ts",
+      "langwatch-declaration-source": "./src/ui/sections/observability/ui-options.ts",
+      "types": "./dist/ui/sections/observability/ui-options.d.ts",
       "default": "./src/ui/sections/observability/ui-options.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/onboarding/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

@@ -1,15 +1,50 @@
 {
   "extends": "../../../../../tsconfig.base.json",
   "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+
     "jsx": "react-jsx",
     "lib": ["es2022", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/enterprise-licensing-web.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "paths": {
       "@langwatch/enterprise-licensing-contract": ["../contract/src/index.ts"],
       "@langwatch/authz-contract": ["../../../../features/authz/contract/src/index.ts"]
-    }
+    },
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../../../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../features/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../plans/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../platform-api-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../ui-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../time/tsconfig.build.json"
+    }
+  ]
 }

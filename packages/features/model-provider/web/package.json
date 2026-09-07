@@ -9,72 +9,88 @@
   "type": "module",
   "exports": {
     "./surfaces/edit-model-provider-form": {
-      "types": "./src/ui/sections/model-provider-form.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/model-provider-form.tsx",
+      "types": "./dist/ui/sections/model-provider-form.d.ts",
       "default": "./src/ui/sections/model-provider-form.tsx"
     },
     "./surfaces/model-selector": {
-      "types": "./src/ui/elements/model-selector.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/model-selector.tsx",
+      "types": "./dist/ui/elements/model-selector.d.ts",
       "default": "./src/ui/elements/model-selector.tsx"
     },
     "./surfaces/no-models-configured-callout": {
-      "types": "./src/ui/elements/no-models-configured-callout.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/no-models-configured-callout.tsx",
+      "types": "./dist/ui/elements/no-models-configured-callout.d.ts",
       "default": "./src/ui/elements/no-models-configured-callout.tsx"
     },
     "./surfaces/provider-model-selector": {
-      "types": "./src/ui/elements/provider-model-selector.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/provider-model-selector.tsx",
+      "types": "./dist/ui/elements/provider-model-selector.d.ts",
       "default": "./src/ui/elements/provider-model-selector.tsx"
     },
     "./surfaces/ai-sparkles-loader": {
-      "types": "./src/ui/elements/icons/ai-sparkles-loader.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/icons/ai-sparkles-loader.tsx",
+      "types": "./dist/ui/elements/icons/ai-sparkles-loader.d.ts",
       "default": "./src/ui/elements/icons/ai-sparkles-loader.tsx"
     },
     "./surfaces/copy-icon": {
-      "types": "./src/ui/elements/icons/copy.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/icons/copy.tsx",
+      "types": "./dist/ui/elements/icons/copy.d.ts",
       "default": "./src/ui/elements/icons/copy.tsx"
     },
     "./surfaces/history-icon": {
-      "types": "./src/ui/elements/icons/history.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/icons/history.tsx",
+      "types": "./dist/ui/elements/icons/history.d.ts",
       "default": "./src/ui/elements/icons/history.tsx"
     },
     "./surfaces/provider-icons": {
-      "types": "./src/ui/elements/modelProviders/icons-map.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/modelProviders/icons-map.tsx",
+      "types": "./dist/ui/elements/modelProviders/icons-map.d.ts",
       "default": "./src/ui/elements/modelProviders/icons-map.tsx"
     },
     "./drawers": {
-      "types": "./src/ui/sections/drawers.ts",
+      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
+      "types": "./dist/ui/sections/drawers.d.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
     "./surfaces/model-limits": {
-      "types": "./src/behavior/use-model-limits.ts",
+      "langwatch-declaration-source": "./src/behavior/use-model-limits.ts",
+      "types": "./dist/behavior/use-model-limits.d.ts",
       "default": "./src/behavior/use-model-limits.ts"
     },
     "./surfaces/model-provider-settings": {
-      "types": "./src/behavior/use-model-providers-settings.ts",
+      "langwatch-declaration-source": "./src/behavior/use-model-providers-settings.ts",
+      "types": "./dist/behavior/use-model-providers-settings.d.ts",
       "default": "./src/behavior/use-model-providers-settings.ts"
     },
     "./screens/model-provider": {
-      "types": "./src/screens/model-provider/index.ts",
+      "langwatch-declaration-source": "./src/screens/model-provider/index.ts",
+      "types": "./dist/screens/model-provider/index.d.ts",
       "default": "./src/screens/model-provider/index.ts"
     },
     "./surfaces/clamp-max-tokens": {
-      "types": "./src/model/clamp-max-tokens.ts",
+      "langwatch-declaration-source": "./src/model/clamp-max-tokens.ts",
+      "types": "./dist/model/clamp-max-tokens.d.ts",
       "default": "./src/model/clamp-max-tokens.ts"
     },
     "./surfaces/missing-model-toast": {
-      "types": "./src/ui/sections/missing-model-toast.ts",
+      "langwatch-declaration-source": "./src/ui/sections/missing-model-toast.ts",
+      "types": "./dist/ui/sections/missing-model-toast.d.ts",
       "default": "./src/ui/sections/missing-model-toast.ts"
     },
     "./surfaces/model-error": {
-      "types": "./src/model/model-error.ts",
+      "langwatch-declaration-source": "./src/model/model-error.ts",
+      "types": "./dist/model/model-error.d.ts",
       "default": "./src/model/model-error.ts"
     },
     "./surfaces/model-error-interceptor": {
-      "types": "./src/ui/sections/model-error-interceptor.ts",
+      "langwatch-declaration-source": "./src/ui/sections/model-error-interceptor.ts",
+      "types": "./dist/ui/sections/model-error-interceptor.d.ts",
       "default": "./src/ui/sections/model-error-interceptor.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/model-provider/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

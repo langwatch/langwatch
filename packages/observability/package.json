@@ -13,18 +13,45 @@
   "type": "module",
   "main": "src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./constants": "./src/constants.ts",
-    "./context": "./src/context/index.ts",
-    "./node": "./src/node/index.ts",
-    "./request": "./src/request/requestLogging.ts",
-    "./tracing": "./src/trace/traceContext.ts",
-    "./metrics": "./src/metrics/index.ts",
-    "./metrics/testing": "./src/metrics/testing.ts",
-    "./grafana-links": "./src/trace/grafana-links.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "default": "./src/constants.ts"
+    },
+    "./context": {
+      "types": "./dist/context/index.d.ts",
+      "default": "./src/context/index.ts"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "default": "./src/node/index.ts"
+    },
+    "./request": {
+      "types": "./dist/request/requestLogging.d.ts",
+      "default": "./src/request/requestLogging.ts"
+    },
+    "./tracing": {
+      "types": "./dist/trace/traceContext.d.ts",
+      "default": "./src/trace/traceContext.ts"
+    },
+    "./metrics": {
+      "types": "./dist/metrics/index.d.ts",
+      "default": "./src/metrics/index.ts"
+    },
+    "./metrics/testing": {
+      "types": "./dist/metrics/testing.d.ts",
+      "default": "./src/metrics/testing.ts"
+    },
+    "./grafana-links": {
+      "types": "./dist/trace/grafana-links.d.ts",
+      "default": "./src/trace/grafana-links.ts"
+    }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/observability/tsconfig.json && tsc --noEmit",
     "test": "vitest",
     "test:unit": "vitest run"
   },

@@ -9,22 +9,16 @@
   "type": "module",
   "exports": {
     "./screens/api-key": {
-      "types": {
-        "langwatch-declarations": "./dist/screens/api-key/index.d.ts",
-        "default": "./src/screens/api-key/index.ts"
-      },
+      "types": "./dist/screens/api-key/index.d.ts",
       "default": "./src/screens/api-key/index.ts"
     },
     "./screens/authorize": {
-      "types": {
-        "langwatch-declarations": "./dist/screens/authorize/index.d.ts",
-        "default": "./src/screens/authorize/index.ts"
-      },
+      "types": "./dist/screens/authorize/index.d.ts",
       "default": "./src/screens/authorize/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/api-key/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

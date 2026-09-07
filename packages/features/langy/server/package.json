@@ -8,104 +8,65 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "imports": {
     "#*": {
-      "types": {
-        "langwatch-declarations": "./dist/*.d.ts",
-        "default": "./src/*.ts"
-      },
+      "types": "./dist/*.d.ts",
       "default": "./src/*.ts"
     }
   },
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./streaming/langy-frame-auth": {
-      "types": {
-        "langwatch-declarations": "./dist/ports/langy-frame-auth.port.d.ts",
-        "default": "./src/ports/langy-frame-auth.port.ts"
-      },
+      "types": "./dist/ports/langy-frame-auth.port.d.ts",
       "default": "./src/ports/langy-frame-auth.port.ts"
     },
     "./rules/langy-capability-progress": {
-      "types": {
-        "langwatch-declarations": "./dist/rules/langy-capability-progress.rules.d.ts",
-        "default": "./src/rules/langy-capability-progress.rules.ts"
-      },
+      "types": "./dist/rules/langy-capability-progress.rules.d.ts",
       "default": "./src/rules/langy-capability-progress.rules.ts"
     },
     "./rules/langy-turn-settlement": {
-      "types": {
-        "langwatch-declarations": "./dist/rules/langy-turn-settlement.rules.d.ts",
-        "default": "./src/rules/langy-turn-settlement.rules.ts"
-      },
+      "types": "./dist/rules/langy-turn-settlement.rules.d.ts",
       "default": "./src/rules/langy-turn-settlement.rules.ts"
     },
     "./langy.ids": {
-      "types": {
-        "langwatch-declarations": "./dist/ports/langy-ids.port.d.ts",
-        "default": "./src/ports/langy-ids.port.ts"
-      },
+      "types": "./dist/ports/langy-ids.port.d.ts",
       "default": "./src/ports/langy-ids.port.ts"
     },
     "./testing": {
-      "types": {
-        "langwatch-declarations": "./dist/testing.d.ts",
-        "default": "./src/testing.ts"
-      },
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     },
     "./services/langy-cli-envelope.service": {
-      "types": {
-        "langwatch-declarations": "./dist/services/langy-cli-envelope.service.d.ts",
-        "default": "./src/services/langy-cli-envelope.service.ts"
-      },
+      "types": "./dist/services/langy-cli-envelope.service.d.ts",
       "default": "./src/services/langy-cli-envelope.service.ts"
     },
     "./services/langy-final-parts.service": {
-      "types": {
-        "langwatch-declarations": "./dist/services/langy-final-parts.service.d.ts",
-        "default": "./src/services/langy-final-parts.service.ts"
-      },
+      "types": "./dist/services/langy-final-parts.service.d.ts",
       "default": "./src/services/langy-final-parts.service.ts"
     },
     "./services/langy-message.service": {
-      "types": {
-        "langwatch-declarations": "./dist/services/langy-message.service.d.ts",
-        "default": "./src/services/langy-message.service.ts"
-      },
+      "types": "./dist/services/langy-message.service.d.ts",
       "default": "./src/services/langy-message.service.ts"
     },
     "./services/langy-turn.service": {
-      "types": {
-        "langwatch-declarations": "./dist/services/langy-turn.service.d.ts",
-        "default": "./src/services/langy-turn.service.ts"
-      },
+      "types": "./dist/services/langy-turn.service.d.ts",
       "default": "./src/services/langy-turn.service.ts"
     },
     "./ports/langy-turn-runtime": {
-      "types": {
-        "langwatch-declarations": "./dist/ports/langy-turn-runtime.port.d.ts",
-        "default": "./src/ports/langy-turn-runtime.port.ts"
-      },
+      "types": "./dist/ports/langy-turn-runtime.port.d.ts",
       "default": "./src/ports/langy-turn-runtime.port.ts"
     },
     "./subscribers/langy-conversation": {
-      "types": {
-        "langwatch-declarations": "./dist/subscribers/langy-conversation.subscriber.d.ts",
-        "default": "./src/subscribers/langy-conversation.subscriber.ts"
-      },
+      "types": "./dist/subscribers/langy-conversation.subscriber.d.ts",
       "default": "./src/subscribers/langy-conversation.subscriber.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/langy/server/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",

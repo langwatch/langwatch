@@ -1,0 +1,260 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "../../packages/aws-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/egress/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/composition/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/composition/worker/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/billing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/billing/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/governance/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/governance/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/licensing/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/managed-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/managed-provider/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/webhook/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/agent/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/analytics/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/analytics/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/annotation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/annotation/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/api-key/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/authz/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/automation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/automation/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/coding-agent/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/data-privacy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/data-privacy/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/data-retention/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/dataset/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/entitlement/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/evaluation/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/experiment/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/feature-flag/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/gateway/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/gateway/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/github/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/identity/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/langy/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/log/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/metric/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/metric/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/model-provider/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/monitor/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/monitor/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/notification/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/ops/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/ops/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/organization/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/project/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/prompt/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/scenario/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/secret/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/secret/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/stored-object/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/stored-object/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/suite/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/topic/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/topic/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/trace/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/workflow/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/group-queue/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/mail/tsconfig.declarations.json"
+    },
+    {
+      "path": "../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/redaction/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/time/tsconfig.build.json"
+    }
+  ]
+}

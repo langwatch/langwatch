@@ -9,24 +9,24 @@
   "type": "module",
   "exports": {
     "./screens/agent-management": {
-      "types": "./src/screens/agent-management/index.ts",
+      "types": "./dist/screens/agent-management/index.d.ts",
       "default": "./src/screens/agent-management/index.ts"
     },
     "./surfaces/connected-agents": {
-      "types": "./src/surfaces/connected-agents/index.ts",
+      "types": "./dist/surfaces/connected-agents/index.d.ts",
       "default": "./src/surfaces/connected-agents/index.ts"
     },
     "./surfaces/agent-http-editor": {
-      "types": "./src/surfaces/agent-http-editor/index.ts",
+      "types": "./dist/surfaces/agent-http-editor/index.d.ts",
       "default": "./src/surfaces/agent-http-editor/index.ts"
     },
     "./surfaces/browser-port": {
-      "types": "./src/surfaces/browser-port/index.ts",
+      "types": "./dist/surfaces/browser-port/index.d.ts",
       "default": "./src/surfaces/browser-port/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/agent/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

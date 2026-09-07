@@ -8,46 +8,81 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "imports": {
-    "#*": "./src/*.ts"
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
   },
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     },
     "./composition/scenario-failure-handler": {
-      "types": "./src/services/scenario-failure-handler.service.ts",
+      "types": "./dist/services/scenario-failure-handler.service.d.ts",
       "default": "./src/services/scenario-failure-handler.service.ts"
     },
     "./composition/simulation-clickhouse": {
-      "types": "./src/adapters/simulation.clickhouse.adapter.ts",
+      "types": "./dist/adapters/simulation.clickhouse.adapter.d.ts",
       "default": "./src/adapters/simulation.clickhouse.adapter.ts"
     },
     "./composition/simulation-eventing": {
-      "types": "./src/adapters/simulation-eventing.adapter.ts",
+      "types": "./dist/adapters/simulation-eventing.adapter.d.ts",
       "default": "./src/adapters/simulation-eventing.adapter.ts"
     },
     "./composition/simulation-execution-port": {
-      "types": "./src/ports/simulation-execution.port.ts",
+      "types": "./dist/ports/simulation-execution.port.d.ts",
       "default": "./src/ports/simulation-execution.port.ts"
     },
     "./composition/simulation-processing-producer": {
-      "types": "./src/adapters/simulation-processing-producer.adapter.ts",
+      "types": "./dist/adapters/simulation-processing-producer.adapter.d.ts",
       "default": "./src/adapters/simulation-processing-producer.adapter.ts"
     },
     "./composition/stalled-runs-backfill": {
-      "types": "./src/tasks/stalled-runs-backfill.task.ts",
+      "types": "./dist/tasks/stalled-runs-backfill.task.d.ts"
+    },
+    "./api-trpc/scenario": {
+      "types": "./dist/transport/api-trpc/scenario.api.d.ts",
+      "default": "./src/transport/api-trpc/scenario.api.ts"
+    },
+    "./api-trpc/scenario-events": {
+      "types": "./dist/transport/api-trpc/scenario-events.api.d.ts",
+      "default": "./src/transport/api-trpc/scenario-events.api.ts"
+    },
+    "./api-trpc/simulation-runner": {
+      "types": "./dist/transport/api-trpc/simulation-runner.api.d.ts",
+      "default": "./src/transport/api-trpc/simulation-runner.api.ts"
+    },
+    "./api-rest/scenario-event": {
+      "types": "./dist/transport/api-rest/scenario-event.api.d.ts",
+      "default": "./src/transport/api-rest/scenario-event.api.ts"
+    },
+    "./api-rest/scenario-run-export": {
+      "types": "./dist/transport/api-rest/scenario-run-export.api.d.ts",
+      "default": "./src/transport/api-rest/scenario-run-export.api.ts"
+    },
+    "./api-rest/scenario": {
+      "types": "./dist/transport/api-rest/scenario.api.d.ts",
+      "default": "./src/transport/api-rest/scenario.api.ts"
+    },
+    "./api-rest/simulation-run": {
+      "types": "./dist/transport/api-rest/simulation-run.api.d.ts",
+      "default": "./src/transport/api-rest/simulation-run.api.ts"
+    },
+    "./api-rest/scenario-generate": {
+      "types": "./dist/transport/api-rest/scenario-generate.api.d.ts",
+      "default": "./src/transport/api-rest/scenario-generate.api.ts",
       "default": "./src/tasks/stalled-runs-backfill.task.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/scenario/server/tsconfig.json && tsc --noEmit",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"

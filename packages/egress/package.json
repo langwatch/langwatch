@@ -13,25 +13,19 @@
   "license": "MIT",
   "type": "module",
   "main": "src/index.ts",
-  "types": "src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./ssrf": {
-      "types": {
-        "langwatch-declarations": "./dist/ssrf/address.d.ts",
-        "default": "./src/ssrf/address.ts"
-      },
+      "types": "./dist/ssrf/address.d.ts",
       "default": "./src/ssrf/address.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/egress/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

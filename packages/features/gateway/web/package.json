@@ -11,20 +11,20 @@
   "types": "./src/index.ts",
   "exports": {
     "./screens/gateway": {
-      "types": "./src/screens/gateway/index.ts",
+      "types": "./dist/screens/gateway/index.d.ts",
       "default": "./src/screens/gateway/index.ts"
     },
     "./drawers": {
-      "types": "./src/screens/drawers.ts",
+      "types": "./dist/screens/drawers.d.ts",
       "default": "./src/screens/drawers.ts"
     },
     "./surfaces/budget-overview": {
-      "types": "./src/surfaces/budget-overview/index.ts",
+      "types": "./dist/surfaces/budget-overview/index.d.ts",
       "default": "./src/surfaces/budget-overview/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/gateway/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

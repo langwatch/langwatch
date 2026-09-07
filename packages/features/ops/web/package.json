@@ -8,31 +8,31 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/impersonation": {
-      "types": "./src/surfaces/impersonation/index.ts",
+      "types": "./dist/surfaces/impersonation/index.d.ts",
       "default": "./src/surfaces/impersonation/index.ts"
     },
     "./screens/ops": {
-      "types": "./src/screens/ops/index.ts",
+      "types": "./dist/screens/ops/index.d.ts",
       "default": "./src/screens/ops/index.ts"
     },
     "./drawers": {
-      "types": "./src/screens/drawers.ts",
+      "types": "./dist/screens/drawers.d.ts",
       "default": "./src/screens/drawers.ts"
     },
     "./surfaces/keyboard-key": {
-      "types": "./src/surfaces/keyboard-key/index.ts",
+      "types": "./dist/surfaces/keyboard-key/index.d.ts",
       "default": "./src/surfaces/keyboard-key/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/ops/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

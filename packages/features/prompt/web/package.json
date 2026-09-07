@@ -9,72 +9,88 @@
   "type": "module",
   "exports": {
     "./surfaces/llm-config-constants": {
-      "types": "./src/model/llmPromptConfigs/constants.ts",
+      "langwatch-declaration-source": "./src/model/llmPromptConfigs/constants.ts",
+      "types": "./dist/model/llmPromptConfigs/constants.d.ts",
       "default": "./src/model/llmPromptConfigs/constants.ts"
     },
     "./surfaces/llm-config-field": {
-      "types": "./src/ui/elements/llmPromptConfigs/llm-config-field.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/llmPromptConfigs/llm-config-field.tsx",
+      "types": "./dist/ui/elements/llmPromptConfigs/llm-config-field.d.ts",
       "default": "./src/ui/elements/llmPromptConfigs/llm-config-field.tsx"
     },
     "./surfaces/llm-config-popover": {
-      "types": "./src/ui/elements/llmPromptConfigs/llm-config-popover.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/llmPromptConfigs/llm-config-popover.tsx",
+      "types": "./dist/ui/elements/llmPromptConfigs/llm-config-popover.d.ts",
       "default": "./src/ui/elements/llmPromptConfigs/llm-config-popover.tsx"
     },
     "./surfaces/llm-model-display": {
-      "types": "./src/ui/elements/llmPromptConfigs/llm-model-display.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/llmPromptConfigs/llm-model-display.tsx",
+      "types": "./dist/ui/elements/llmPromptConfigs/llm-model-display.d.ts",
       "default": "./src/ui/elements/llmPromptConfigs/llm-model-display.tsx"
     },
     "./surfaces/outputs-section": {
-      "types": "./src/ui/elements/outputs/outputs-section.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/outputs/outputs-section.tsx",
+      "types": "./dist/ui/elements/outputs/outputs-section.d.ts",
       "default": "./src/ui/elements/outputs/outputs-section.tsx"
     },
     "./surfaces/prompt-editor-drawer": {
-      "types": "./src/ui/sections/prompts/prompt-editor-drawer.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/prompts/prompt-editor-drawer.tsx",
+      "types": "./dist/ui/sections/prompts/prompt-editor-drawer.d.ts",
       "default": "./src/ui/sections/prompts/prompt-editor-drawer.tsx"
     },
     "./drawers": {
-      "types": "./src/ui/sections/drawers.ts",
+      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
+      "types": "./dist/ui/sections/drawers.d.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
     "./surfaces/latest-prompt-version": {
-      "types": "./src/behavior/prompts/use-latest-prompt-version.ts",
+      "langwatch-declaration-source": "./src/behavior/prompts/use-latest-prompt-version.ts",
+      "types": "./dist/behavior/prompts/use-latest-prompt-version.d.ts",
       "default": "./src/behavior/prompts/use-latest-prompt-version.ts"
     },
     "./surfaces/llm-prompt-config-utils": {
-      "types": "./src/behavior/prompts/llm-prompt-config-utils.ts",
+      "langwatch-declaration-source": "./src/behavior/prompts/llm-prompt-config-utils.ts",
+      "types": "./dist/behavior/prompts/llm-prompt-config-utils.d.ts",
       "default": "./src/behavior/prompts/llm-prompt-config-utils.ts"
     },
     "./screens/prompt-studio": {
-      "types": "./src/screens/prompt-studio/index.ts",
+      "langwatch-declaration-source": "./src/screens/prompt-studio/index.ts",
+      "types": "./dist/screens/prompt-studio/index.d.ts",
       "default": "./src/screens/prompt-studio/index.ts"
     },
     "./surfaces/api-snippet": {
-      "types": "./src/surfaces/api-snippet/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/api-snippet/index.ts",
+      "types": "./dist/surfaces/api-snippet/index.d.ts",
       "default": "./src/surfaces/api-snippet/index.ts"
     },
     "./surfaces/llm-parameters": {
-      "types": "./src/surfaces/llm-parameters/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/llm-parameters/index.ts",
+      "types": "./dist/surfaces/llm-parameters/index.d.ts",
       "default": "./src/surfaces/llm-parameters/index.ts"
     },
     "./surfaces/prompt-form": {
-      "types": "./src/surfaces/prompt-form/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/prompt-form/index.ts",
+      "types": "./dist/surfaces/prompt-form/index.d.ts",
       "default": "./src/surfaces/prompt-form/index.ts"
     },
     "./surfaces/prompt-reference": {
-      "types": "./src/surfaces/prompt-reference/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/prompt-reference/index.ts",
+      "types": "./dist/surfaces/prompt-reference/index.d.ts",
       "default": "./src/surfaces/prompt-reference/index.ts"
     },
     "./surfaces/prompt-version": {
-      "types": "./src/surfaces/prompt-version/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/prompt-version/index.ts",
+      "types": "./dist/surfaces/prompt-version/index.d.ts",
       "default": "./src/surfaces/prompt-version/index.ts"
     },
     "./surfaces/variables": {
-      "types": "./src/surfaces/variables/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/variables/index.ts",
+      "types": "./dist/surfaces/variables/index.d.ts",
       "default": "./src/surfaces/variables/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/prompt/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

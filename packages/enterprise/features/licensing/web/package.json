@@ -10,28 +10,28 @@
   "type": "module",
   "exports": {
     "./screens/licensing": {
-      "types": "./src/screens/licensing/index.ts",
+      "types": "./dist/screens/licensing/index.d.ts",
       "default": "./src/screens/licensing/index.ts"
     },
     "./surfaces/global-upgrade-modal": {
-      "types": "./src/surfaces/global-upgrade-modal/index.ts",
+      "types": "./dist/surfaces/global-upgrade-modal/index.d.ts",
       "default": "./src/surfaces/global-upgrade-modal/index.ts"
     },
     "./surfaces/license-error-interceptor": {
-      "types": "./src/surfaces/license-error-interceptor/index.ts",
+      "types": "./dist/surfaces/license-error-interceptor/index.d.ts",
       "default": "./src/surfaces/license-error-interceptor/index.ts"
     },
     "./surfaces/resource-limits": {
-      "types": "./src/surfaces/resource-limits/index.ts",
+      "types": "./dist/surfaces/resource-limits/index.d.ts",
       "default": "./src/surfaces/resource-limits/index.ts"
     },
     "./surfaces/seat-types": {
-      "types": "./src/surfaces/seat-types/index.ts",
+      "types": "./dist/surfaces/seat-types/index.d.ts",
       "default": "./src/surfaces/seat-types/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/enterprise/features/licensing/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

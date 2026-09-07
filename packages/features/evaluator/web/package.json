@@ -8,63 +8,76 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/dynamic-zod-form": {
-      "types": "./src/ui/sections/checks/dynamic-zod-form.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/checks/dynamic-zod-form.tsx",
+      "types": "./dist/ui/sections/checks/dynamic-zod-form.d.ts",
       "default": "./src/ui/sections/checks/dynamic-zod-form.tsx"
     },
     "./surfaces/evaluator-editor-content": {
-      "types": "./src/ui/sections/evaluators/evaluator-editor-content.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/evaluators/evaluator-editor-content.tsx",
+      "types": "./dist/ui/sections/evaluators/evaluator-editor-content.d.ts",
       "default": "./src/ui/sections/evaluators/evaluator-editor-content.tsx"
     },
     "./surfaces/evaluator-editor-shared": {
-      "types": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx",
+      "types": "./dist/ui/sections/evaluators/evaluator-editor-shared.d.ts",
       "default": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx"
     },
     "./surfaces/evaluator-result-chip": {
-      "types": "./src/ui/elements/shared/evaluator-result-chip.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/shared/evaluator-result-chip.tsx",
+      "types": "./dist/ui/elements/shared/evaluator-result-chip.d.ts",
       "default": "./src/ui/elements/shared/evaluator-result-chip.tsx"
     },
     "./drawers": {
-      "types": "./src/ui/sections/drawers.ts",
+      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
+      "types": "./dist/ui/sections/drawers.d.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
     "./editor-drawers": {
-      "types": "./src/ui/sections/editor-drawers.ts",
+      "langwatch-declaration-source": "./src/ui/sections/editor-drawers.ts",
+      "types": "./dist/ui/sections/editor-drawers.d.ts",
       "default": "./src/ui/sections/editor-drawers.ts"
     },
     "./surfaces/available-evaluators": {
-      "types": "./src/behavior/use-available-evaluators.ts",
+      "langwatch-declaration-source": "./src/behavior/use-available-evaluators.ts",
+      "types": "./dist/behavior/use-available-evaluators.d.ts",
       "default": "./src/behavior/use-available-evaluators.ts"
     },
     "./screens/evaluation-edit": {
-      "types": "./src/screens/evaluation-edit/index.ts",
+      "langwatch-declaration-source": "./src/screens/evaluation-edit/index.ts",
+      "types": "./dist/screens/evaluation-edit/index.d.ts",
       "default": "./src/screens/evaluation-edit/index.ts"
     },
     "./screens/evaluators": {
-      "types": "./src/screens/evaluators/index.ts",
+      "langwatch-declaration-source": "./src/screens/evaluators/index.ts",
+      "types": "./dist/screens/evaluators/index.d.ts",
       "default": "./src/screens/evaluators/index.ts"
     },
     "./surfaces/evaluation-types": {
-      "types": "./src/model/evaluations/types.ts",
+      "langwatch-declaration-source": "./src/model/evaluations/types.ts",
+      "types": "./dist/model/evaluations/types.d.ts",
       "default": "./src/model/evaluations/types.ts"
     },
     "./surfaces/evaluation-results": {
-      "types": "./src/model/evaluation-results.ts",
+      "langwatch-declaration-source": "./src/model/evaluation-results.ts",
+      "types": "./dist/model/evaluation-results.d.ts",
       "default": "./src/model/evaluation-results.ts"
     },
     "./surfaces/evaluation-status": {
-      "types": "./src/surfaces/evaluation-status/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/evaluation-status/index.ts",
+      "types": "./dist/surfaces/evaluation-status/index.d.ts",
       "default": "./src/surfaces/evaluation-status/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/evaluator/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

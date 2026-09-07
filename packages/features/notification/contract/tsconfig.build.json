@@ -1,13 +1,24 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/notification-contract-build.tsbuildinfo",
-    "noEmit": false,
-    "rootDir": "src",
+    "composite": true,
     "declaration": true,
+    "declarationMap": true,
     "emitDeclarationOnly": true,
-    "outDir": "dist"
+    "noEmit": false,
+    "noEmitOnError": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/__tests__/**", "tests"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
+  "references": [
+    {
+      "path": "../../../config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../runtime-composition/tsconfig.build.json"
+    }
+  ]
 }

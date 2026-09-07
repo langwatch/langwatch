@@ -1,13 +1,23 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/observability.tsbuildinfo",
+    "outDir": "dist",
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node"],
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    }
+  ]
 }

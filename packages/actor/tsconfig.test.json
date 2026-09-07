@@ -3,11 +3,17 @@
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"],
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/actor-tests.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
   },
   // The suite, plus the sources it exercises. `vitest` resolves from the
   // package's own devDependency, so the test types are checked here and
   // nowhere else.
   "include": ["src/**/*.ts", "src/__tests__/**/*.ts"],
-  "exclude": []
+  "exclude": [],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    }
+  ]
 }

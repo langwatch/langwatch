@@ -1,12 +1,32 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/group-queue-type-tests.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.type-tests.tsbuildinfo",
     "declaration": false,
     "emitDeclarationOnly": false,
     "noEmit": true,
     "rootDir": "."
   },
   "include": ["type-tests/**/*.ts"],
-  "exclude": []
+  "exclude": [],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../features/stored-object/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../task/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
 }

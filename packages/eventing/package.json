@@ -9,32 +9,23 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": {
-        "langwatch-declarations": "./dist/testing.d.ts",
-        "default": "./src/testing.ts"
-      },
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     },
     "./server": {
-      "types": {
-        "langwatch-declarations": "./dist/server/index.d.ts",
-        "default": "./src/server/index.ts"
-      },
+      "types": "./dist/server/index.d.ts",
       "default": "./src/server/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/eventing/tsconfig.json && tsc --noEmit && tsc -p tsconfig.tests.json",
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"

@@ -8,27 +8,27 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/presence-indicators": {
-      "types": "./src/surfaces/presence-indicators.ts",
+      "types": "./dist/surfaces/presence-indicators.d.ts",
       "default": "./src/surfaces/presence-indicators.ts"
     },
     "./surfaces/presence-state": {
-      "types": "./src/surfaces/presence-state.ts",
+      "types": "./dist/surfaces/presence-state.d.ts",
       "default": "./src/surfaces/presence-state.ts"
     },
     "./surfaces/presence-availability": {
-      "types": "./src/presence-availability.ts",
+      "types": "./dist/presence-availability.d.ts",
       "default": "./src/presence-availability.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/presence/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

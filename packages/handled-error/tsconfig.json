@@ -1,9 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    // This package emits: `noEmit` from the shared base is turned back off
-    // here so a `tsc -p` build still writes its declarations.
-    "noEmit": false,
+    "rootDir": "src",
+    "noEmit": true,
     // `dom` for the `URL` parser the docs-origin allowlist in
     // `read-handled-error` is built on, and `es2022` for `Object.hasOwn`, which
     // is how the presentation registry looks a code up without inheriting from
@@ -11,14 +10,24 @@
     // affordance; this package still imports nothing from either runtime.
     "lib": ["es2022", "dom"],
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/handled-error.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   // Tests run via vitest (`pnpm test`), which provides the `vitest` module and
   // its types at runtime; the declaration build must not require them.
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../config/tsconfig.build.json"
+    }
+  ]
 }

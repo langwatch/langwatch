@@ -1,0 +1,155 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/billing/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/governance/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/licensing/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/managed-provider/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/enterprise/features/scim/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/agent/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/analytics/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/annotation/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/api-key/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/auth/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/authz/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/automation/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/data-privacy/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/data-retention/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/dataset/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/evaluator/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/experiment/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/gateway/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/github/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/langy/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/model-provider/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/monitor/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/navigation/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/notification/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/onboarding/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/ops/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/organization/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/project/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/prompt/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/scenario/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/scenario/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/secret/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/topic/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/trace/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/user/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/features/workflow/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/platform-api-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/react-rum/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/ui-drawer/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/ui-host/tsconfig.build.json"
+    }
+  ]
+}

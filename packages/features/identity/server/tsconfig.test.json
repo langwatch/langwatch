@@ -3,8 +3,47 @@
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"],
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/identity-server-tests.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "exclude": []
+  "exclude": [],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../actor/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../ops/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../system-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../test-harness/tsconfig.build.json"
+    }
+  ]
 }

@@ -6,20 +6,20 @@
   "type": "module",
   "exports": {
     "./feature-api": {
-      "types": "./src/feature-api.ts",
+      "types": "./dist/feature-api.d.ts",
       "default": "./src/feature-api.ts"
     },
     "./query-key": {
-      "types": "./src/trpc-query-key.ts",
+      "types": "./dist/trpc-query-key.d.ts",
       "default": "./src/trpc-query-key.ts"
     },
     "./invalidate": {
-      "types": "./src/use-invalidate-procedure.ts",
+      "types": "./dist/use-invalidate-procedure.d.ts",
       "default": "./src/use-invalidate-procedure.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/platform-api-client/tsconfig.json && tsc --noEmit",
     "test:unit": "vitest run"
   },
   "dependencies": {

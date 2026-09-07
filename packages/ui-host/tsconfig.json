@@ -1,11 +1,37 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/ui-host.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "jsx": "react-jsx",
     "lib": ["es2022", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "noEmit": true,
+
+    "rootDir": ".",
+
+    "outDir": "dist",
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../enterprise/features/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../ui-drawer/tsconfig.build.json"
+    }
+  ]
 }

@@ -8,160 +8,197 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     "./surfaces/trace-host": {
-      "types": "./src/behavior/trace-host.ts",
+      "langwatch-declaration-source": "./src/behavior/trace-host.ts",
+      "types": "./dist/behavior/trace-host.d.ts",
       "default": "./src/behavior/trace-host.ts"
     },
     "./surfaces/trace-drawer-store": {
-      "types": "./src/behavior/drawer.store.ts",
+      "langwatch-declaration-source": "./src/behavior/drawer.store.ts",
+      "types": "./dist/behavior/drawer.store.d.ts",
       "default": "./src/behavior/drawer.store.ts"
     },
     "./surfaces/trace-view-state": {
-      "types": "./src/surfaces/trace-view-state/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/trace-view-state/index.ts",
+      "types": "./dist/surfaces/trace-view-state/index.d.ts",
       "default": "./src/surfaces/trace-view-state/index.ts"
     },
     ".": {
-      "types": "./src/index.ts",
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/setup-with-agent-button": {
-      "types": "./src/ui/sections/setup-with-agent-button.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/setup-with-agent-button.tsx",
+      "types": "./dist/ui/sections/setup-with-agent-button.d.ts",
       "default": "./src/ui/sections/setup-with-agent-button.tsx"
     },
     "./surfaces/render-input-output": {
-      "types": "./src/ui/sections/traces/render-input-output.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/traces/render-input-output.tsx",
+      "types": "./dist/ui/sections/traces/render-input-output.d.ts",
       "default": "./src/ui/sections/traces/render-input-output.tsx"
     },
     "./surfaces/span-details": {
-      "types": "./src/ui/sections/traces/span-details.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/traces/span-details.tsx",
+      "types": "./dist/ui/sections/traces/span-details.d.ts",
       "default": "./src/ui/sections/traces/span-details.tsx"
     },
     "./surfaces/traces-mapping": {
-      "types": "./src/ui/sections/traces/traces-mapping.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/traces/traces-mapping.tsx",
+      "types": "./dist/ui/sections/traces/traces-mapping.d.ts",
       "default": "./src/ui/sections/traces/traces-mapping.tsx"
     },
     "./surfaces/isolated-error-boundary": {
-      "types": "./src/ui/sections/isolated-error-boundary.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/isolated-error-boundary.tsx",
+      "types": "./dist/ui/sections/isolated-error-boundary.d.ts",
       "default": "./src/ui/sections/isolated-error-boundary.tsx"
     },
     "./drawer.store": {
-      "types": "./src/behavior/drawer.store.ts",
+      "langwatch-declaration-source": "./src/behavior/drawer.store.ts",
+      "types": "./dist/behavior/drawer.store.d.ts",
       "default": "./src/behavior/drawer.store.ts"
     },
     "./drawers": {
-      "types": "./src/ui/sections/drawers.ts",
+      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
+      "types": "./dist/ui/sections/drawers.d.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
     "./surfaces/presence-menu-item": {
-      "types": "./src/ui/sections/presence/presence-menu-item.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/presence/presence-menu-item.tsx",
+      "types": "./dist/ui/sections/presence/presence-menu-item.d.ts",
       "default": "./src/ui/sections/presence/presence-menu-item.tsx"
     },
     "./surfaces/suggestion-dropdown": {
-      "types": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx",
+      "types": "./dist/ui/sections/explorer/search-bar/suggestion-dropdown.d.ts",
       "default": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx"
     },
     "./surfaces/suggestion-state": {
-      "types": "./src/model/get-suggestion-state.ts",
+      "langwatch-declaration-source": "./src/model/get-suggestion-state.ts",
+      "types": "./dist/model/get-suggestion-state.d.ts",
       "default": "./src/model/get-suggestion-state.ts"
     },
     "./surfaces/suggestion-items": {
-      "types": "./src/model/explorer/search-bar/suggestion-items.ts",
+      "langwatch-declaration-source": "./src/model/explorer/search-bar/suggestion-items.ts",
+      "types": "./dist/model/explorer/search-bar/suggestion-items.d.ts",
       "default": "./src/model/explorer/search-bar/suggestion-items.ts"
     },
     "./surfaces/suggestion-ui": {
-      "types": "./src/ui/sections/explorer/search-bar/suggestion-ui.ts",
+      "langwatch-declaration-source": "./src/ui/sections/explorer/search-bar/suggestion-ui.ts",
+      "types": "./dist/ui/sections/explorer/search-bar/suggestion-ui.d.ts",
       "default": "./src/ui/sections/explorer/search-bar/suggestion-ui.ts"
     },
     "./surfaces/trace-drawer-chip": {
-      "types": "./src/ui/elements/explorer/trace-drawer/chip.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/explorer/trace-drawer/chip.tsx",
+      "types": "./dist/ui/elements/explorer/trace-drawer/chip.d.ts",
       "default": "./src/ui/elements/explorer/trace-drawer/chip.tsx"
     },
     "./surfaces/conversation-view": {
-      "types": "./src/ui/sections/explorer/trace-drawer/conversation-view/index.ts",
+      "langwatch-declaration-source": "./src/ui/sections/explorer/trace-drawer/conversation-view/index.ts",
+      "types": "./dist/ui/sections/explorer/trace-drawer/conversation-view/index.d.ts",
       "default": "./src/ui/sections/explorer/trace-drawer/conversation-view/index.ts"
     },
     "./surfaces/conversation-expand-context": {
-      "types": "./src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts",
+      "langwatch-declaration-source": "./src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts",
+      "types": "./dist/behavior/explorer/trace-drawer/conversation-view/expand-context.d.ts",
       "default": "./src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts"
     },
     "./surfaces/trace-id-peek": {
-      "types": "./src/ui/sections/explorer/trace-id-peek.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/explorer/trace-id-peek.tsx",
+      "types": "./dist/ui/sections/explorer/trace-id-peek.d.ts",
       "default": "./src/ui/sections/explorer/trace-id-peek.tsx"
     },
     "./surfaces/conversation-bubble": {
-      "types": "./src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
+      "types": "./dist/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.d.ts",
       "default": "./src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx"
     },
     "./surfaces/conversation-turns": {
-      "types": "./src/ui/sections/explorer/hooks/use-conversation-turns.ts",
+      "langwatch-declaration-source": "./src/ui/sections/explorer/hooks/use-conversation-turns.ts",
+      "types": "./dist/ui/sections/explorer/hooks/use-conversation-turns.d.ts",
       "default": "./src/ui/sections/explorer/hooks/use-conversation-turns.ts"
     },
     "./surfaces/explorer-trace-types": {
-      "types": "./src/ui/sections/explorer/types/trace.ts",
+      "langwatch-declaration-source": "./src/ui/sections/explorer/types/trace.ts",
+      "types": "./dist/ui/sections/explorer/types/trace.d.ts",
       "default": "./src/ui/sections/explorer/types/trace.ts"
     },
     "./surfaces/legacy-trace-to-turn": {
-      "types": "./src/ui/sections/explorer/utils/legacy-trace-to-turn.ts",
+      "langwatch-declaration-source": "./src/ui/sections/explorer/utils/legacy-trace-to-turn.ts",
+      "types": "./dist/ui/sections/explorer/utils/legacy-trace-to-turn.d.ts",
       "default": "./src/ui/sections/explorer/utils/legacy-trace-to-turn.ts"
     },
     "./surfaces/trace-edit-mode": {
-      "types": "./src/ui/sections/explorer/utils/trace-edit-mode.ts",
+      "langwatch-declaration-source": "./src/ui/sections/explorer/utils/trace-edit-mode.ts",
+      "types": "./dist/ui/sections/explorer/utils/trace-edit-mode.d.ts",
       "default": "./src/ui/sections/explorer/utils/trace-edit-mode.ts"
     },
     "./surfaces/page-visibility": {
-      "types": "./src/behavior/use-page-visibility.ts",
+      "langwatch-declaration-source": "./src/behavior/use-page-visibility.ts",
+      "types": "./dist/behavior/use-page-visibility.d.ts",
       "default": "./src/behavior/use-page-visibility.ts"
     },
     "./surfaces/project-span-names": {
-      "types": "./src/ui/sections/use-project-span-names.ts",
+      "langwatch-declaration-source": "./src/ui/sections/use-project-span-names.ts",
+      "types": "./dist/ui/sections/use-project-span-names.d.ts",
       "default": "./src/ui/sections/use-project-span-names.ts"
     },
     "./surfaces/sse-subscription": {
-      "types": "./src/behavior/use-sse-subscription.ts",
+      "langwatch-declaration-source": "./src/behavior/use-sse-subscription.ts",
+      "types": "./dist/behavior/use-sse-subscription.d.ts",
       "default": "./src/behavior/use-sse-subscription.ts"
     },
     "./surfaces/export-types": {
-      "types": "./src/model/export-types.ts",
+      "langwatch-declaration-source": "./src/model/export-types.ts",
+      "types": "./dist/model/export-types.d.ts",
       "default": "./src/model/export-types.ts"
     },
     "./surfaces/scenario-role": {
-      "types": "./src/ui/elements/scenario-role.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/scenario-role.tsx",
+      "types": "./dist/ui/elements/scenario-role.d.ts",
       "default": "./src/ui/elements/scenario-role.tsx"
     },
     "./screens/traces": {
-      "types": "./src/screens/traces/index.ts",
+      "langwatch-declaration-source": "./src/screens/traces/index.ts",
+      "types": "./dist/screens/traces/index.d.ts",
       "default": "./src/screens/traces/index.ts"
     },
     "./surfaces/format-milliseconds": {
-      "types": "./src/model/format-milliseconds.ts",
+      "langwatch-declaration-source": "./src/model/format-milliseconds.ts",
+      "types": "./dist/model/format-milliseconds.d.ts",
       "default": "./src/model/format-milliseconds.ts"
     },
     "./surfaces/trace-selection": {
-      "types": "./src/surfaces/trace-selection/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/trace-selection/index.ts",
+      "types": "./dist/surfaces/trace-selection/index.d.ts",
       "default": "./src/surfaces/trace-selection/index.ts"
     },
     "./surfaces/trace-filters": {
-      "types": "./src/surfaces/trace-filters/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/trace-filters/index.ts",
+      "types": "./dist/surfaces/trace-filters/index.d.ts",
       "default": "./src/surfaces/trace-filters/index.ts"
     },
     "./surfaces/trace-origins": {
-      "types": "./src/surfaces/trace-origins/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/trace-origins/index.ts",
+      "types": "./dist/surfaces/trace-origins/index.d.ts",
       "default": "./src/surfaces/trace-origins/index.ts"
     },
     "./surfaces/annotation-queue-session": {
-      "types": "./src/surfaces/annotation-queue-session/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/annotation-queue-session/index.ts",
+      "types": "./dist/surfaces/annotation-queue-session/index.d.ts",
       "default": "./src/surfaces/annotation-queue-session/index.ts"
     },
     "./surfaces/conversation": {
-      "types": "./src/ui/sections/conversation/index.ts",
+      "langwatch-declaration-source": "./src/ui/sections/conversation/index.ts",
+      "types": "./dist/ui/sections/conversation/index.d.ts",
       "default": "./src/ui/sections/conversation/index.ts"
     }
   },
   "scripts": {
     "test:unit": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/trace/web/tsconfig.json && tsc --noEmit"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",

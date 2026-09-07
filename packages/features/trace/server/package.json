@@ -8,30 +8,89 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "imports": {
-    "#*": "./src/*.ts"
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
   },
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     },
     "./composition/trace-edit-overlay": {
-      "types": "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.trace-edit-overlay.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts"
     },
     "./composition/trace-processing-producer": {
-      "types": "./src/adapters/trace-processing-producer.adapter.ts",
+      "types": "./dist/adapters/trace-processing-producer.adapter.d.ts"
+    },
+    "./api-trpc/spans": {
+      "types": "./dist/transport/api-trpc/spans.api.d.ts",
+      "default": "./src/transport/api-trpc/spans.api.ts"
+    },
+    "./api-trpc/trace-edit-overlay": {
+      "types": "./dist/transport/api-trpc/trace-edit-overlay.api.d.ts",
+      "default": "./src/transport/api-trpc/trace-edit-overlay.api.ts"
+    },
+    "./api-trpc/traces": {
+      "types": "./dist/transport/api-trpc/traces.api.d.ts",
+      "default": "./src/transport/api-trpc/traces.api.ts"
+    },
+    "./api-trpc/trace-read-mappers": {
+      "types": "./dist/transport/api-trpc/trace-read-mappers.api.d.ts",
+      "default": "./src/transport/api-trpc/trace-read-mappers.api.ts"
+    },
+    "./api-trpc/traces-v2": {
+      "types": "./dist/transport/api-trpc/traces-v2.api.d.ts",
+      "default": "./src/transport/api-trpc/traces-v2.api.ts"
+    },
+    "./api-trpc/shared-trace": {
+      "types": "./dist/transport/api-trpc/shared-trace.api.d.ts",
+      "default": "./src/transport/api-trpc/shared-trace.api.ts"
+    },
+    "./api-trpc/trace-view-gates": {
+      "types": "./dist/transport/api-trpc/trace-view-gates.api.d.ts",
+      "default": "./src/transport/api-trpc/trace-view-gates.api.ts"
+    },
+    "./api-rest/tracked-event": {
+      "types": "./dist/transport/api-rest/tracked-event.api.d.ts",
+      "default": "./src/transport/api-rest/tracked-event.api.ts"
+    },
+    "./api-rest/trace-export": {
+      "types": "./dist/transport/api-rest/trace-export.api.d.ts",
+      "default": "./src/transport/api-rest/trace-export.api.ts"
+    },
+    "./api-rest/otlp-ingest": {
+      "types": "./dist/transport/api-rest/otlp-ingest.api.d.ts",
+      "default": "./src/transport/api-rest/otlp-ingest.api.ts"
+    },
+    "./api-rest/otlp-path-alias": {
+      "types": "./dist/transport/api-rest/otlp-path-alias.api.d.ts",
+      "default": "./src/transport/api-rest/otlp-path-alias.api.ts"
+    },
+    "./api-rest/traces": {
+      "types": "./dist/transport/api-rest/traces.api.d.ts",
+      "default": "./src/transport/api-rest/traces.api.ts"
+    },
+    "./api-rest/trace-legacy": {
+      "types": "./dist/transport/api-rest/trace-legacy.api.d.ts",
+      "default": "./src/transport/api-rest/trace-legacy.api.ts"
+    },
+    "./api-rest/collector": {
+      "types": "./dist/transport/api-rest/collector.api.d.ts",
+      "default": "./src/transport/api-rest/collector.api.ts",
       "default": "./src/adapters/trace-processing-producer.adapter.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/trace/server/tsconfig.json && tsc --noEmit",
     "test": "vitest run --exclude '**/*.integration.test.ts'",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
     "test:integration": "vitest run --config vitest.integration.config.ts"

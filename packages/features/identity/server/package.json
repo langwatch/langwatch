@@ -9,39 +9,27 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./adapters/better-auth-identity-birth": {
-      "types": {
-        "langwatch-declarations": "./dist/adapters/better-auth.identity-birth.adapter.d.ts",
-        "default": "./src/adapters/better-auth.identity-birth.adapter.ts"
-      },
+      "types": "./dist/adapters/better-auth.identity-birth.adapter.d.ts",
       "default": "./src/adapters/better-auth.identity-birth.adapter.ts"
     },
     "./testing": {
-      "types": {
-        "langwatch-declarations": "./dist/testing.d.ts",
-        "default": "./src/testing.ts"
-      },
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     },
     "./composition/sso-connection-backoffice": {
-      "types": {
-        "langwatch-declarations": "./dist/repositories/prisma/prisma.sso-connection-backoffice.repository.d.ts",
-        "default": "./src/repositories/prisma/prisma.sso-connection-backoffice.repository.ts"
-      },
+      "types": "./dist/repositories/prisma/prisma.sso-connection-backoffice.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.sso-connection-backoffice.repository.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/identity/server/tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run"
   },
   "dependencies": {

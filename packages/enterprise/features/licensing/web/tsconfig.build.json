@@ -1,0 +1,51 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "noEmitOnError": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
+  },
+  "files": [
+    "./src/screens/licensing/index.ts",
+    "./src/surfaces/global-upgrade-modal/index.ts",
+    "./src/surfaces/license-error-interceptor/index.ts",
+    "./src/surfaces/resource-limits/index.ts",
+    "./src/surfaces/seat-types/index.ts"
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../../../../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../plans/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../platform-api-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../ui-host/tsconfig.build.json"
+    }
+  ]
+}

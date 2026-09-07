@@ -9,23 +9,23 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./governance/spend-spike-anomaly.worker": {
-      "types": "./src/governance/spend-spike-anomaly.worker.ts",
+      "types": "./dist/governance/spend-spike-anomaly.worker.d.ts",
       "default": "./src/governance/spend-spike-anomaly.worker.ts"
     },
     "./governance/ingestion-pull-host": {
-      "types": "./src/governance/governance-ingestion-pull.host.ts",
+      "types": "./dist/governance/governance-ingestion-pull.host.d.ts",
       "default": "./src/governance/governance-ingestion-pull.host.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/enterprise/composition/worker/tsconfig.json && tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {

@@ -12,12 +12,12 @@
   "types": "./src/index.ts",
   "exports": {
     "./screens/governance": {
-      "types": "./src/screens/governance/index.ts",
+      "types": "./dist/screens/governance/index.d.ts",
       "default": "./src/screens/governance/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/enterprise/features/governance/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

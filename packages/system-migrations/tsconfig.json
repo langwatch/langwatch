@@ -1,18 +1,30 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
     "target": "es2020",
     "lib": ["es2020"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/system-migrations.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     // Consumers import the TypeScript sources directly (see the package's
     // `exports`), so this project only ever type-checks - nothing is built.
     "noEmit": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   // Tests are checked by tsconfig.test.json, which adds the vitest globals
   // this project does not need.
-  "exclude": ["src/__tests__/**"]
+  "exclude": ["src/__tests__/**"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    }
+  ]
 }

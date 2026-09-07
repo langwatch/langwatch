@@ -13,11 +13,17 @@
   "type": "module",
   "main": "src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./pii": "./src/pii.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./pii": {
+      "types": "./dist/pii.d.ts",
+      "default": "./src/pii.ts"
+    }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/redaction/tsconfig.json && tsc --noEmit",
     "test": "vitest",
     "test:unit": "vitest run",
     "bench": "vitest bench --run"

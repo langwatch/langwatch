@@ -8,43 +8,51 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/activity": {
-      "types": "./src/activity.ts",
+      "langwatch-declaration-source": "./src/activity.ts",
+      "types": "./dist/activity.d.ts",
       "default": "./src/activity.ts"
     },
     "./testing": {
-      "types": "./src/testing.tsx",
+      "langwatch-declaration-source": "./src/testing.tsx",
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.tsx"
     },
     "./surfaces/session-table": {
-      "types": "./src/surfaces/session-table.ts",
+      "langwatch-declaration-source": "./src/surfaces/session-table.ts",
+      "types": "./dist/surfaces/session-table.d.ts",
       "default": "./src/surfaces/session-table.ts"
     },
     "./surfaces/pull-requests": {
-      "types": "./src/surfaces/pull-requests.ts",
+      "langwatch-declaration-source": "./src/surfaces/pull-requests.ts",
+      "types": "./dist/surfaces/pull-requests.d.ts",
       "default": "./src/surfaces/pull-requests.ts"
     },
     "./surfaces/agent-identity": {
-      "types": "./src/surfaces/agent-identity.ts",
+      "langwatch-declaration-source": "./src/surfaces/agent-identity.ts",
+      "types": "./dist/surfaces/agent-identity.d.ts",
       "default": "./src/surfaces/agent-identity.ts"
     },
     "./surfaces/agent-metrics": {
-      "types": "./src/surfaces/agent-metrics.ts",
+      "langwatch-declaration-source": "./src/surfaces/agent-metrics.ts",
+      "types": "./dist/surfaces/agent-metrics.d.ts",
       "default": "./src/surfaces/agent-metrics.ts"
     },
     "./surfaces/agent-traces": {
-      "types": "./src/surfaces/agent-traces.ts",
+      "langwatch-declaration-source": "./src/surfaces/agent-traces.ts",
+      "types": "./dist/surfaces/agent-traces.d.ts",
       "default": "./src/surfaces/agent-traces.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/coding-agent/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

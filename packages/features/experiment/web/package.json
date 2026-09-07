@@ -9,71 +9,86 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/batch-evaluation-state": {
-      "types": "./src/ui/elements/experiments/batch-evaluation-v2.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/experiments/batch-evaluation-v2.tsx",
+      "types": "./dist/ui/elements/experiments/batch-evaluation-v2.d.ts",
       "default": "./src/ui/elements/experiments/batch-evaluation-v2.tsx"
     },
     "./surfaces/evaluation-progress-bar": {
-      "types": "./src/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx",
+      "types": "./dist/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.d.ts",
       "default": "./src/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx"
     },
     "./drawers": {
-      "types": "./src/ui/sections/drawers.ts",
+      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
+      "types": "./dist/ui/sections/drawers.d.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
     "./surfaces/comparison-config-form": {
-      "types": "./src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx",
+      "types": "./dist/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.d.ts",
       "default": "./src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx"
     },
     "./surfaces/evaluation-mappings": {
-      "types": "./src/behavior/experiments-v3/use-evaluation-mappings.ts",
+      "langwatch-declaration-source": "./src/behavior/experiments-v3/use-evaluation-mappings.ts",
+      "types": "./dist/behavior/experiments-v3/use-evaluation-mappings.d.ts",
       "default": "./src/behavior/experiments-v3/use-evaluation-mappings.ts"
     },
     "./surfaces/workbench-types": {
-      "types": "./src/model/experiments-v3/types.ts",
+      "langwatch-declaration-source": "./src/model/experiments-v3/types.ts",
+      "types": "./dist/model/experiments-v3/types.d.ts",
       "default": "./src/model/experiments-v3/types.ts"
     },
     "./surfaces/cell-failure": {
-      "types": "./src/model/experiments-v3/cell-failure.ts",
+      "langwatch-declaration-source": "./src/model/experiments-v3/cell-failure.ts",
+      "types": "./dist/model/experiments-v3/cell-failure.d.ts",
       "default": "./src/model/experiments-v3/cell-failure.ts"
     },
     "./surfaces/evaluator-editor-callbacks": {
-      "types": "./src/model/experiments-v3/evaluator-editor-callbacks.ts",
+      "langwatch-declaration-source": "./src/model/experiments-v3/evaluator-editor-callbacks.ts",
+      "types": "./dist/model/experiments-v3/evaluator-editor-callbacks.d.ts",
       "default": "./src/model/experiments-v3/evaluator-editor-callbacks.ts"
     },
     "./surfaces/mapping-validation": {
-      "types": "./src/model/experiments-v3/mapping-validation.ts",
+      "langwatch-declaration-source": "./src/model/experiments-v3/mapping-validation.ts",
+      "types": "./dist/model/experiments-v3/mapping-validation.d.ts",
       "default": "./src/model/experiments-v3/mapping-validation.ts"
     },
     "./screens/experiments": {
-      "types": "./src/screens/experiments/index.ts",
+      "langwatch-declaration-source": "./src/screens/experiments/index.ts",
+      "types": "./dist/screens/experiments/index.d.ts",
       "default": "./src/screens/experiments/index.ts"
     },
     "./surfaces/batch-results": {
-      "types": "./src/surfaces/batch-results/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/batch-results/index.ts",
+      "types": "./dist/surfaces/batch-results/index.d.ts",
       "default": "./src/surfaces/batch-results/index.ts"
     },
     "./surfaces/workbench-store": {
-      "types": "./src/behavior/experiments-v3/use-evaluations-v3-store.ts",
+      "langwatch-declaration-source": "./src/behavior/experiments-v3/use-evaluations-v3-store.ts",
+      "types": "./dist/behavior/experiments-v3/use-evaluations-v3-store.d.ts",
       "default": "./src/behavior/experiments-v3/use-evaluations-v3-store.ts"
     },
     "./surfaces/workbench-results-fold": {
-      "types": "./src/model/experiments-v3/execution/results-fold.ts",
+      "langwatch-declaration-source": "./src/model/experiments-v3/execution/results-fold.ts",
+      "types": "./dist/model/experiments-v3/execution/results-fold.d.ts",
       "default": "./src/model/experiments-v3/execution/results-fold.ts"
     },
     "./surfaces/workbench-run-identification": {
-      "types": "./src/model/experiments-v3/execution/run-identification.ts",
+      "langwatch-declaration-source": "./src/model/experiments-v3/execution/run-identification.ts",
+      "types": "./dist/model/experiments-v3/execution/run-identification.d.ts",
       "default": "./src/model/experiments-v3/execution/run-identification.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/experiment/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:unit": "vitest run"

@@ -1,11 +1,52 @@
 {
   "extends": "../../../../../tsconfig.base.json",
   "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+
     "lib": ["es2022", "dom", "dom.iterable"],
     "jsx": "react-jsx",
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/enterprise-billing-web.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../licensing/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../features/entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../plans/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../platform-api-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../ui-host/tsconfig.build.json"
+    }
+  ]
 }

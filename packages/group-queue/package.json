@@ -9,25 +9,19 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./operational": {
-      "types": {
-        "langwatch-declarations": "./dist/operational.d.ts",
-        "default": "./src/operational.ts"
-      },
+      "types": "./dist/operational.d.ts",
       "default": "./src/operational.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.type-tests.json",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/group-queue/tsconfig.json && tsc --noEmit && tsc -p tsconfig.type-tests.json",
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"

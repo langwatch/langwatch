@@ -1,12 +1,34 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/mail-preview.tsbuildinfo",
+    "tsBuildInfoFile": "../dist/tsconfig.preview.tsbuildinfo",
     "lib": ["es2022", "dom", "dom.iterable"],
     "jsx": "react-jsx",
     "noEmit": true,
     "noUncheckedIndexedAccess": true,
-    "types": ["node"]
+    "types": ["node"],
+
+    "rootDir": "..",
+
+    "outDir": "../dist/typecheck"
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["**/*.ts", "**/*.tsx"],
+
+  "references": [
+    {
+      "path": "../tsconfig.declarations.json"
+    },
+    {
+      "path": "../../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../egress/tsconfig.build.json"
+    },
+    {
+      "path": "../../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../time/tsconfig.build.json"
+    }
+  ]
 }

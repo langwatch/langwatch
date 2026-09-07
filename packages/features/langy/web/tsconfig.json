@@ -6,9 +6,59 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "jsx": "react-jsx",
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/langy-web.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "types": ["vitest/globals", "@testing-library/jest-dom"],
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+
+    "noEmit": true,
+
+    "rootDir": ".",
+
+    "outDir": "dist",
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "scripts/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "scripts/**/*.ts"],
+
+  "references": [
+    {
+      "path": "../../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../platform-api-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../ui-drawer/tsconfig.build.json"
+    },
+    {
+      "path": "../../../ui-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../github/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../ops/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    }
+  ]
 }

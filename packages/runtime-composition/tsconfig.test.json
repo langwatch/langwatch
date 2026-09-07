@@ -2,8 +2,14 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": ["node"],
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/runtime-composition-tests.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
-  "exclude": []
+  "exclude": [],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    }
+  ]
 }

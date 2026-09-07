@@ -27,7 +27,10 @@ function sourceOnlyInclude(value: unknown): boolean {
 function excludesTests(value: unknown): boolean {
   return (
     Array.isArray(value) &&
-    value.some((pattern) => typeof pattern === "string" && pattern.startsWith("tests"))
+    value.some(
+      (pattern) =>
+        typeof pattern === "string" && /^(?:\*\*\/)?tests(?:\/\*\*(?:\/\*)?)?$/.test(pattern),
+    )
   );
 }
 

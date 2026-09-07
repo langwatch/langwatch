@@ -9,63 +9,76 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/analytics-registry": {
-      "types": "./src/model/analytics-registry.ts",
+      "langwatch-declaration-source": "./src/model/analytics-registry.ts",
+      "types": "./dist/model/analytics-registry.d.ts",
       "default": "./src/model/analytics-registry.ts"
     },
     "./surfaces/custom-graph": {
-      "types": "./src/ui/sections/custom-graph.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/custom-graph.tsx",
+      "types": "./dist/ui/sections/custom-graph.d.ts",
       "default": "./src/ui/sections/custom-graph.tsx"
     },
     "./surfaces/period-selector": {
-      "types": "./src/ui/elements/period-selector.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/period-selector.tsx",
+      "types": "./dist/ui/elements/period-selector.d.ts",
       "default": "./src/ui/elements/period-selector.tsx"
     },
     "./surfaces/filter-sidebar": {
-      "types": "./src/ui/sections/filters/filter-sidebar.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/filters/filter-sidebar.tsx",
+      "types": "./dist/ui/sections/filters/filter-sidebar.d.ts",
       "default": "./src/ui/sections/filters/filter-sidebar.tsx"
     },
     "./surfaces/filter-toggle": {
-      "types": "./src/ui/sections/filters/filter-toggle.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/filters/filter-toggle.tsx",
+      "types": "./dist/ui/sections/filters/filter-toggle.d.ts",
       "default": "./src/ui/sections/filters/filter-toggle.tsx"
     },
     "./surfaces/filter-params": {
-      "types": "./src/ui/sections/use-filter-params.ts",
+      "langwatch-declaration-source": "./src/ui/sections/use-filter-params.ts",
+      "types": "./dist/ui/sections/use-filter-params.d.ts",
       "default": "./src/ui/sections/use-filter-params.ts"
     },
     "./screens/analytics": {
-      "types": "./src/screens/analytics/index.ts",
+      "langwatch-declaration-source": "./src/screens/analytics/index.ts",
+      "types": "./dist/screens/analytics/index.d.ts",
       "default": "./src/screens/analytics/index.ts"
     },
     "./surfaces/analytics-host": {
-      "types": "./src/model/analytics-host.ts",
+      "langwatch-declaration-source": "./src/model/analytics-host.ts",
+      "types": "./dist/model/analytics-host.d.ts",
       "default": "./src/model/analytics-host.ts"
     },
     "./surfaces/precondition-matchers": {
-      "types": "./src/model/filters/precondition-matchers.ts",
+      "langwatch-declaration-source": "./src/model/filters/precondition-matchers.ts",
+      "types": "./dist/model/filters/precondition-matchers.d.ts",
       "default": "./src/model/filters/precondition-matchers.ts"
     },
     "./surfaces/filter-registry": {
-      "types": "./src/model/filters/registry.ts",
+      "langwatch-declaration-source": "./src/model/filters/registry.ts",
+      "types": "./dist/model/filters/registry.d.ts",
       "default": "./src/model/filters/registry.ts"
     },
     "./surfaces/filter-types": {
-      "types": "./src/model/filters/types.ts",
+      "langwatch-declaration-source": "./src/model/filters/types.ts",
+      "types": "./dist/model/filters/types.d.ts",
       "default": "./src/model/filters/types.ts"
     },
     "./testing": {
-      "types": "./src/__tests__/lwql-fixtures.ts",
+      "langwatch-declaration-source": "./src/__tests__/lwql-fixtures.ts",
+      "types": "./dist/__tests__/lwql-fixtures.d.ts",
       "default": "./src/__tests__/lwql-fixtures.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/analytics/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:browser": "vitest run -c vitest.browser.config.ts"

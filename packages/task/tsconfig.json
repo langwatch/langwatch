@@ -1,13 +1,32 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": true,
     "lib": ["es2022"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/task.tsbuildinfo",
-    "verbatimModuleSyntax": true
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/__tests__/**"]
+  "exclude": ["src/__tests__/**"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
 }

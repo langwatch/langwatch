@@ -8,52 +8,62 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/asaplangy": {
-      "types": "./src/surfaces/asaplangy/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/asaplangy/index.ts",
+      "types": "./dist/surfaces/asaplangy/index.d.ts",
       "default": "./src/surfaces/asaplangy/index.ts"
     },
     "./surfaces/langy-page-registration": {
-      "types": "./src/surfaces/langy-page-registration/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/langy-page-registration/index.ts",
+      "types": "./dist/surfaces/langy-page-registration/index.d.ts",
       "default": "./src/surfaces/langy-page-registration/index.ts"
     },
     "./surfaces/langy-theme.css": "./src/ui/elements/langy-theme.css",
     "./screens/langy": {
-      "types": "./src/screens/langy/index.ts",
+      "langwatch-declaration-source": "./src/screens/langy/index.ts",
+      "types": "./dist/screens/langy/index.d.ts",
       "default": "./src/screens/langy/index.ts"
     },
     "./surfaces/langy-store": {
-      "types": "./src/surfaces/langy-store/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/langy-store/index.ts",
+      "types": "./dist/surfaces/langy-store/index.d.ts",
       "default": "./src/surfaces/langy-store/index.ts"
     },
     "./surfaces/langy-context": {
-      "types": "./src/surfaces/langy-context/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/langy-context/index.ts",
+      "types": "./dist/surfaces/langy-context/index.d.ts",
       "default": "./src/surfaces/langy-context/index.ts"
     },
     "./surfaces/langy-mark": {
-      "types": "./src/surfaces/langy-mark/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/langy-mark/index.ts",
+      "types": "./dist/surfaces/langy-mark/index.d.ts",
       "default": "./src/surfaces/langy-mark/index.ts"
     },
     "./surfaces/langy-panel-layout": {
-      "types": "./src/surfaces/langy-panel-layout/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/langy-panel-layout/index.ts",
+      "types": "./dist/surfaces/langy-panel-layout/index.d.ts",
       "default": "./src/surfaces/langy-panel-layout/index.ts"
     },
     "./surfaces/langy-ui-actions": {
-      "types": "./src/surfaces/langy-ui-actions/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/langy-ui-actions/index.ts",
+      "types": "./dist/surfaces/langy-ui-actions/index.d.ts",
       "default": "./src/surfaces/langy-ui-actions/index.ts"
     },
     "./surfaces/langy-code-access-preference": {
-      "types": "./src/ui/sections/langy-code-access-preference.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/langy-code-access-preference.tsx",
+      "types": "./dist/ui/sections/langy-code-access-preference.d.ts",
       "default": "./src/ui/sections/langy-code-access-preference.tsx"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/langy/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
     "generate:langy-skills": "node --experimental-transform-types scripts/generate-langy-skills.ts",

@@ -9,13 +9,10 @@
   ],
   "type": "module",
   "main": "./dist/index.js",
-  "types": "./src/index.ts",
+  "types": "./dist/typecheck/index.d.ts",
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/typecheck/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/typecheck/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
@@ -23,7 +20,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "dev": "vite --config preview/vite.config.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p preview/tsconfig.json",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/mail/tsconfig.json && tsc --noEmit && tsc --noEmit -p preview/tsconfig.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

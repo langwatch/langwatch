@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "../../../../dev/tsconfig.web-declarations.json"
+    }
+  ]
+}

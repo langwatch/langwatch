@@ -9,15 +9,12 @@
   "type": "module",
   "exports": {
     "./screens/topic-clustering": {
-      "types": {
-        "langwatch-declarations": "./dist/screens/topic-clustering/index.d.ts",
-        "default": "./src/screens/topic-clustering/index.ts"
-      },
+      "types": "./dist/screens/topic-clustering/index.d.ts",
       "default": "./src/screens/topic-clustering/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/topic/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

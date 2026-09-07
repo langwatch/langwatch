@@ -95,6 +95,48 @@ function install(env: Record<string, string> = {}): {
   return { stderr: result.stderr, status: result.status };
 }
 
+function removeShims() {
+  return spawnSync(process.execPath, [INSTALLER, "--remove", binDir], {
+    encoding: "utf8",
+  });
+}
+
+describe("retiring automatic check shims", () => {
+  it("restores the original executable and can run twice", () => {
+    writeLauncher("tsc");
+    install();
+
+    expect(removeShims().status).toBe(0);
+    const run = spawnSync(path.join(binDir, "tsc"), ["--version"], {
+      encoding: "utf8",
+    });
+    expect(run.status).toBe(0);
+    expect(run.stdout).toBe("real --version\n");
+    expect(existsSync(path.join(binDir, "tsc.real"))).toBe(false);
+    expect(removeShims().stderr).toBe("");
+    expect(readFileSync(path.join(binDir, "tsc"), "utf8")).toBe(LAUNCHER);
+  });
+
+  it("keeps a regenerated pnpm launcher even with a stale backup", () => {
+    writeLauncher("tsc");
+    install();
+    const regenerated = "#!/bin/sh\necho new-compiler\n";
+    writeLauncher("tsc", regenerated);
+
+    expect(removeShims().status).toBe(0);
+    expect(readFileSync(path.join(binDir, "tsc"), "utf8")).toBe(regenerated);
+  });
+
+  it("reports a missing backup without removing the current entry", () => {
+    writeLauncher("tsc");
+    install();
+    rmSync(path.join(binDir, "tsc.real"));
+
+    expect(removeShims().stderr).toContain("could not restore tsc");
+    expect(readFileSync(path.join(binDir, "tsc"), "utf8")).toContain("langwatch-check-queue-shim");
+  });
+});
+
 function runCheck({ name, args }: { name: string; args: string[] }): {
   stdout: string;
   status: number | null;

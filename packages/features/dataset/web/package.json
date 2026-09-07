@@ -8,59 +8,71 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/dataset-drawer": {
-      "types": "./src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx",
+      "types": "./dist/ui/sections/datasets/add-or-edit-dataset-drawer.d.ts",
       "default": "./src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx"
     },
     "./surfaces/dataset-picker-list": {
-      "types": "./src/ui/sections/dataset-picker-list.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/dataset-picker-list.tsx",
+      "types": "./dist/ui/sections/dataset-picker-list.d.ts",
       "default": "./src/ui/sections/dataset-picker-list.tsx"
     },
     "./surfaces/dataset-editor-table": {
-      "types": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+      "types": "./dist/ui/sections/datasets/editor/dataset-editor-table.d.ts",
       "default": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx"
     },
     "./surfaces/render-dataset-image": {
-      "types": "./src/ui/elements/datasets/editor/render-dataset-image.tsx",
+      "langwatch-declaration-source": "./src/ui/elements/datasets/editor/render-dataset-image.tsx",
+      "types": "./dist/ui/elements/datasets/editor/render-dataset-image.d.ts",
       "default": "./src/ui/elements/datasets/editor/render-dataset-image.tsx"
     },
     "./surfaces/dataset-record-sync": {
-      "types": "./src/behavior/datasets/editor/use-dataset-record-sync.ts",
+      "langwatch-declaration-source": "./src/behavior/datasets/editor/use-dataset-record-sync.ts",
+      "types": "./dist/behavior/datasets/editor/use-dataset-record-sync.d.ts",
       "default": "./src/behavior/datasets/editor/use-dataset-record-sync.ts"
     },
     "./surfaces/upload-csv-drawer": {
-      "types": "./src/ui/sections/datasets/upload-csv-drawer.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/datasets/upload-csv-drawer.tsx",
+      "types": "./dist/ui/sections/datasets/upload-csv-drawer.d.ts",
       "default": "./src/ui/sections/datasets/upload-csv-drawer.tsx"
     },
     "./drawers": {
-      "types": "./src/ui/sections/drawers.ts",
+      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
+      "types": "./dist/ui/sections/drawers.d.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
     "./screens/datasets": {
-      "types": "./src/screens/datasets/index.ts",
+      "langwatch-declaration-source": "./src/screens/datasets/index.ts",
+      "types": "./dist/screens/datasets/index.d.ts",
       "default": "./src/screens/datasets/index.ts"
     },
     "./surfaces/dataset-table": {
-      "types": "./src/surfaces/dataset-table/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/dataset-table/index.ts",
+      "types": "./dist/surfaces/dataset-table/index.d.ts",
       "default": "./src/surfaces/dataset-table/index.ts"
     },
     "./surfaces/dataset-preview-table": {
-      "types": "./src/ui/blocks/dataset-preview-table.tsx",
+      "langwatch-declaration-source": "./src/ui/blocks/dataset-preview-table.tsx",
+      "types": "./dist/ui/blocks/dataset-preview-table.d.ts",
       "default": "./src/ui/blocks/dataset-preview-table.tsx"
     },
     "./surfaces/dataset-image-preview-table": {
-      "types": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx",
+      "langwatch-declaration-source": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx",
+      "types": "./dist/ui/blocks/datasets/editor/dataset-preview-table.d.ts",
       "default": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/dataset/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

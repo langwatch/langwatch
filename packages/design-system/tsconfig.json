@@ -1,11 +1,19 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/design-system.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2022", "dom", "dom.iterable"],
     "jsx": "react-jsx",
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "noEmit": true,
+
+    "rootDir": ".",
+
+    "outDir": "dist",
+
+    "rewriteRelativeImportExtensions": false
   },
   "include": [
     ".storybook/**/*.ts",
@@ -16,5 +24,11 @@
     "stories/**/*.tsx",
     "tests/**/*.ts",
     "tests/**/*.tsx"
+  ],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    }
   ]
 }

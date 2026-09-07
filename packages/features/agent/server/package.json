@@ -8,41 +8,29 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "imports": {
     "#*": {
-      "types": {
-        "langwatch-declarations": "./dist/*.d.ts",
-        "default": "./src/*.ts"
-      },
+      "types": "./dist/*.d.ts",
       "default": "./src/*.ts"
     }
   },
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./legacy-rest": {
-      "types": {
-        "langwatch-declarations": "./dist/transport/api-rest/agent-legacy-facade.api.d.ts",
-        "default": "./src/transport/api-rest/agent-legacy-facade.api.ts"
-      },
+      "types": "./dist/transport/api-rest/agent-legacy-facade.api.d.ts",
       "default": "./src/transport/api-rest/agent-legacy-facade.api.ts"
     },
     "./testing": {
-      "types": {
-        "langwatch-declarations": "./dist/testing.d.ts",
-        "default": "./src/testing.ts"
-      },
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/agent/server/tsconfig.json && tsc --noEmit",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"

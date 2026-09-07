@@ -9,24 +9,24 @@
   "type": "module",
   "exports": {
     "./surfaces/department-picker": {
-      "types": "./src/surfaces/department-picker/index.ts",
+      "types": "./dist/surfaces/department-picker/index.d.ts",
       "default": "./src/surfaces/department-picker/index.ts"
     },
     "./drawers": {
-      "types": "./src/screens/drawers.ts",
+      "types": "./dist/screens/drawers.d.ts",
       "default": "./src/screens/drawers.ts"
     },
     "./drawers/project": {
-      "types": "./src/ui/sections/project-drawers.ts",
+      "types": "./dist/ui/sections/project-drawers.d.ts",
       "default": "./src/ui/sections/project-drawers.ts"
     },
     "./screens/organization": {
-      "types": "./src/screens/organization/index.ts",
+      "types": "./dist/screens/organization/index.d.ts",
       "default": "./src/screens/organization/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/organization/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

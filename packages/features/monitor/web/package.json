@@ -9,12 +9,12 @@
   "type": "module",
   "exports": {
     "./screens/online-evaluations": {
-      "types": "./src/screens/online-evaluations/index.ts",
+      "types": "./dist/screens/online-evaluations/index.d.ts",
       "default": "./src/screens/online-evaluations/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/monitor/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

@@ -8,34 +8,25 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "imports": {
     "#*": {
-      "types": {
-        "langwatch-declarations": "./dist/*.d.ts",
-        "default": "./src/*.ts"
-      },
+      "types": "./dist/*.d.ts",
       "default": "./src/*.ts"
     }
   },
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./composition/dataset-content": {
-      "types": {
-        "langwatch-declarations": "./dist/repositories/prisma/prisma.dataset-content.repository.d.ts",
-        "default": "./src/repositories/prisma/prisma.dataset-content.repository.ts"
-      },
+      "types": "./dist/repositories/prisma/prisma.dataset-content.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.dataset-content.repository.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/dataset/server/tsconfig.json && tsc --noEmit",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"

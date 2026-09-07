@@ -9,15 +9,12 @@
   "type": "module",
   "exports": {
     "./screens/auth": {
-      "types": {
-        "langwatch-declarations": "./dist/screens/auth/index.d.ts",
-        "default": "./src/screens/auth/index.ts"
-      },
+      "types": "./dist/screens/auth/index.d.ts",
       "default": "./src/screens/auth/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/auth/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

@@ -9,12 +9,12 @@
   "type": "module",
   "exports": {
     "./screens/email-suppressions": {
-      "types": "./src/screens/email-suppressions/index.ts",
+      "types": "./dist/screens/email-suppressions/index.d.ts",
       "default": "./src/screens/email-suppressions/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/notification/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

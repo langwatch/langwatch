@@ -9,20 +9,23 @@
   "type": "module",
   "exports": {
     "./screens/home": {
-      "types": "./src/screens/home/index.ts",
+      "langwatch-declaration-source": "./src/screens/home/index.ts",
+      "types": "./dist/screens/home/index.d.ts",
       "default": "./src/screens/home/index.ts"
     },
     "./screens/project-settings": {
-      "types": "./src/screens/project-settings/index.ts",
+      "langwatch-declaration-source": "./src/screens/project-settings/index.ts",
+      "types": "./dist/screens/project-settings/index.d.ts",
       "default": "./src/screens/project-settings/index.ts"
     },
     "./surfaces/tech-stack": {
-      "types": "./src/ui/blocks/tech-stack.tsx",
+      "langwatch-declaration-source": "./src/ui/blocks/tech-stack.tsx",
+      "types": "./dist/ui/blocks/tech-stack.d.ts",
       "default": "./src/ui/blocks/tech-stack.tsx"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/project/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

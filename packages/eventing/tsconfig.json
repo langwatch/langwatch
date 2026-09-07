@@ -1,19 +1,41 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    // This package emits: `noEmit` from the shared base is turned back off
-    // here so a `tsc -p` build still writes its declarations.
-    "noEmit": false,
+    "rootDir": "src",
+    "noEmit": true,
     "lib": ["es2022"],
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/eventing.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
-  // Exclude Vitest tests from the source typecheck and declaration build;
-  // Vitest is a test-only dependency.
-  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts"]
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../group-queue/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
 }

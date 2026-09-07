@@ -1,10 +1,54 @@
 {
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/enterprise-worker.tsbuildinfo",
+    "noEmit": true,
+    "rootDir": ".",
+    "outDir": "dist",
+
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2022"],
     "types": [],
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
+      "path": "../../tsconfig.build.json"
+    },
+    {
+      "path": "../../features/governance/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/managed-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/managed-provider/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
+    }
+  ]
 }

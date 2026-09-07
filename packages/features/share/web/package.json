@@ -8,23 +8,23 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/share-link-views": {
-      "types": "./src/surfaces/share-link-views.ts",
+      "types": "./dist/surfaces/share-link-views.d.ts",
       "default": "./src/surfaces/share-link-views.ts"
     },
     "./surfaces/share-links": {
-      "types": "./src/surfaces/share-links.ts",
+      "types": "./dist/surfaces/share-links.d.ts",
       "default": "./src/surfaces/share-links.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/share/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

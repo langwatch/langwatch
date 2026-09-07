@@ -1,18 +1,57 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    // This package emits: `noEmit` from the shared base is turned back off
-    // here so a `tsc -p` build still writes its declarations.
-    "noEmit": false,
+    "rootDir": "src",
+    "noEmit": true,
     "lib": ["es2022"],
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/prisma-client.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
     "verbatimModuleSyntax": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../features/api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../features/api-key/server/tsconfig.build.json"
+    },
+    {
+      "path": "../enterprise/features/licensing/server/tsconfig.build.json"
+    },
+    {
+      "path": "../features/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../features/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../features/role/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../features/secret/server/tsconfig.build.json"
+    },
+    {
+      "path": "../secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../features/workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
 }

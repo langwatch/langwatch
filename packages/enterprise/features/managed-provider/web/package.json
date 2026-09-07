@@ -10,12 +10,12 @@
   "type": "module",
   "exports": {
     "./surfaces/managed-provider-alert": {
-      "types": "./src/surfaces/managed-provider-alert/index.ts",
+      "types": "./dist/surfaces/managed-provider-alert/index.d.ts",
       "default": "./src/surfaces/managed-provider-alert/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/enterprise/features/managed-provider/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

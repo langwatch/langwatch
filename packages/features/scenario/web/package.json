@@ -8,31 +8,36 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     "./surfaces/media-part": {
-      "types": "./src/ui/sections/media-part.tsx",
+      "langwatch-declaration-source": "./src/ui/sections/media-part.tsx",
+      "types": "./dist/ui/sections/media-part.d.ts",
       "default": "./src/ui/sections/media-part.tsx"
     },
     ".": {
-      "types": "./src/index.ts",
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/simulations-preference": {
-      "types": "./src/surfaces/simulations-preference/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/simulations-preference/index.ts",
+      "types": "./dist/surfaces/simulations-preference/index.d.ts",
       "default": "./src/surfaces/simulations-preference/index.ts"
     },
     "./screens/simulations": {
-      "types": "./src/screens/simulations/index.ts",
+      "langwatch-declaration-source": "./src/screens/simulations/index.ts",
+      "types": "./dist/screens/simulations/index.d.ts",
       "default": "./src/screens/simulations/index.ts"
     },
     "./drawers": {
-      "types": "./src/screens/drawers.ts",
+      "langwatch-declaration-source": "./src/screens/drawers.ts",
+      "types": "./dist/screens/drawers.d.ts",
       "default": "./src/screens/drawers.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/scenario/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

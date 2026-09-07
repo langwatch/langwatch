@@ -1,7 +1,11 @@
 {
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/analytics-contract.tsbuildinfo",
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
     // `dom` for the WHATWG globals a browser-loaded contract may name — the
     // spec-size measurement encodes with `TextEncoder`, which every runtime
     // this package loads in has and only `lib.dom` declares. It is NOT licence
@@ -16,8 +20,21 @@
     // vocabulary from it — so a `node:*` import or a `Buffer` reference must
     // not compile here. Tests are checked by tsconfig.test.json, which
     // supplies the node types the import-free guard needs to read its subject.
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
+
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/__tests__/**"]
+  "exclude": ["src/**/__tests__/**"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../handled-error/tsconfig.build.json"
+    }
+  ]
 }

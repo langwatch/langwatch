@@ -15,22 +15,16 @@
   "main": "src/index.ts",
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./constants": {
-      "types": {
-        "langwatch-declarations": "./dist/constants.d.ts",
-        "default": "./src/constants.ts"
-      },
+      "types": "./dist/constants.d.ts",
       "default": "./src/constants.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/react-rum/tsconfig.json && tsc --noEmit",
     "test": "vitest",
     "test:unit": "vitest run"
   },

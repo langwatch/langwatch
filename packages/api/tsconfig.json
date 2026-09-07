@@ -1,13 +1,46 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "outDir": "dist",
+    "noEmit": true,
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/api.tsbuildinfo",
-    "rootDir": "src",
-    "types": ["node"]
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "rootDir": ".",
+    "types": ["node"],
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../actor/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../features/api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../features/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../features/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../features/stored-object/contract/tsconfig.build.json"
+    }
+  ]
 }

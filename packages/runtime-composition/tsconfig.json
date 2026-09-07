@@ -5,9 +5,23 @@
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/runtime-composition.tsbuildinfo",
-    "verbatimModuleSyntax": true
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "verbatimModuleSyntax": true,
+
+    "noEmit": true,
+
+    "rootDir": ".",
+
+    "outDir": "dist",
+
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["tests/**/*.ts"]
+  "exclude": ["tests/**/*.ts"],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    }
+  ]
 }

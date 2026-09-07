@@ -2,7 +2,36 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": ".",
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/api-type-tests.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.type-tests.tsbuildinfo"
   },
-  "include": ["src/**/*", "type-tests/**/*"]
+  "include": ["src/**/*", "type-tests/**/*"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../actor/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../features/api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../features/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../features/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../features/stored-object/contract/tsconfig.build.json"
+    }
+  ]
 }

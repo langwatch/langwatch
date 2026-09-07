@@ -1,0 +1,497 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "noEmitOnError": true,
+    "strict": true,
+    "jsx": "react-jsx",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": [
+      "node",
+      "react",
+      "react-dom",
+      "vite/client",
+      "vitest/globals",
+      "@testing-library/jest-dom"
+    ],
+    "rootDir": "..",
+    "outDir": ".cache/web-declarations",
+    "tsBuildInfoFile": ".cache/web-declarations/tsconfig.build.tsbuildinfo",
+    "customConditions": ["langwatch-declaration-source"],
+    "noUncheckedIndexedAccess": true,
+    "target": "es2023",
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "../packages/features/scenario/web/src/**/*.ts",
+    "../packages/features/scenario/web/src/**/*.tsx",
+    "../packages/features/scenario/web/src/**/*.json",
+    "../packages/features/coding-agent/web/src/**/*.ts",
+    "../packages/features/coding-agent/web/src/**/*.tsx",
+    "../packages/features/coding-agent/web/src/**/*.json",
+    "../packages/features/annotation/web/src/**/*.ts",
+    "../packages/features/annotation/web/src/**/*.tsx",
+    "../packages/features/annotation/web/src/**/*.json",
+    "../packages/features/trace/web/src/**/*.ts",
+    "../packages/features/trace/web/src/**/*.tsx",
+    "../packages/features/trace/web/src/**/*.json",
+    "../packages/features/langy/web/src/**/*.ts",
+    "../packages/features/langy/web/src/**/*.tsx",
+    "../packages/features/langy/web/src/**/*.json",
+    "../packages/features/project/web/src/**/*.ts",
+    "../packages/features/project/web/src/**/*.tsx",
+    "../packages/features/project/web/src/**/*.json",
+    "../packages/features/onboarding/web/src/**/*.ts",
+    "../packages/features/onboarding/web/src/**/*.tsx",
+    "../packages/features/onboarding/web/src/**/*.json",
+    "../packages/features/prompt/web/src/**/*.ts",
+    "../packages/features/prompt/web/src/**/*.tsx",
+    "../packages/features/prompt/web/src/**/*.json",
+    "../packages/features/model-provider/web/src/**/*.ts",
+    "../packages/features/model-provider/web/src/**/*.tsx",
+    "../packages/features/model-provider/web/src/**/*.json",
+    "../packages/features/workflow/web/src/**/*.ts",
+    "../packages/features/workflow/web/src/**/*.tsx",
+    "../packages/features/workflow/web/src/**/*.json",
+    "../packages/features/dataset/web/src/**/*.ts",
+    "../packages/features/dataset/web/src/**/*.tsx",
+    "../packages/features/dataset/web/src/**/*.json",
+    "../packages/features/experiment/web/src/**/*.ts",
+    "../packages/features/experiment/web/src/**/*.tsx",
+    "../packages/features/experiment/web/src/**/*.json",
+    "../packages/features/evaluator/web/src/**/*.ts",
+    "../packages/features/evaluator/web/src/**/*.tsx",
+    "../packages/features/evaluator/web/src/**/*.json",
+    "../packages/features/analytics/web/src/**/*.ts",
+    "../packages/features/analytics/web/src/**/*.tsx",
+    "../packages/features/analytics/web/src/**/*.json"
+  ],
+  "files": [
+    "../packages/features/analytics/web/src/__tests__/lwql-fixtures.ts",
+    "../packages/features/analytics/web/src/index.ts",
+    "../packages/features/analytics/web/src/model/analytics-host.ts",
+    "../packages/features/analytics/web/src/model/analytics-registry.ts",
+    "../packages/features/analytics/web/src/model/filters/precondition-matchers.ts",
+    "../packages/features/analytics/web/src/model/filters/registry.ts",
+    "../packages/features/analytics/web/src/model/filters/types.ts",
+    "../packages/features/analytics/web/src/screens/analytics/index.ts",
+    "../packages/features/analytics/web/src/testing.tsx",
+    "../packages/features/analytics/web/src/ui/elements/period-selector.tsx",
+    "../packages/features/analytics/web/src/ui/sections/custom-graph.tsx",
+    "../packages/features/analytics/web/src/ui/sections/filters/filter-sidebar.tsx",
+    "../packages/features/analytics/web/src/ui/sections/filters/filter-toggle.tsx",
+    "../packages/features/analytics/web/src/ui/sections/use-filter-params.ts",
+    "../packages/features/annotation/web/src/index.ts",
+    "../packages/features/annotation/web/src/screens/annotation-scores/index.ts",
+    "../packages/features/annotation/web/src/screens/annotations/index.ts",
+    "../packages/features/annotation/web/src/surfaces/annotation-card/index.ts",
+    "../packages/features/annotation/web/src/surfaces/annotation-chips/index.ts",
+    "../packages/features/annotation/web/src/surfaces/annotation-form/index.ts",
+    "../packages/features/coding-agent/web/src/activity.ts",
+    "../packages/features/coding-agent/web/src/index.ts",
+    "../packages/features/coding-agent/web/src/surfaces/agent-identity.ts",
+    "../packages/features/coding-agent/web/src/surfaces/agent-metrics.ts",
+    "../packages/features/coding-agent/web/src/surfaces/agent-traces.ts",
+    "../packages/features/coding-agent/web/src/surfaces/pull-requests.ts",
+    "../packages/features/coding-agent/web/src/surfaces/session-table.ts",
+    "../packages/features/coding-agent/web/src/testing.tsx",
+    "../packages/features/dataset/web/src/behavior/datasets/editor/use-dataset-record-sync.ts",
+    "../packages/features/dataset/web/src/index.ts",
+    "../packages/features/dataset/web/src/screens/datasets/index.ts",
+    "../packages/features/dataset/web/src/surfaces/dataset-table/index.ts",
+    "../packages/features/dataset/web/src/ui/blocks/dataset-preview-table.tsx",
+    "../packages/features/dataset/web/src/ui/blocks/datasets/editor/dataset-preview-table.tsx",
+    "../packages/features/dataset/web/src/ui/elements/datasets/editor/render-dataset-image.tsx",
+    "../packages/features/dataset/web/src/ui/sections/dataset-picker-list.tsx",
+    "../packages/features/dataset/web/src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx",
+    "../packages/features/dataset/web/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+    "../packages/features/dataset/web/src/ui/sections/datasets/upload-csv-drawer.tsx",
+    "../packages/features/dataset/web/src/ui/sections/drawers.ts",
+    "../packages/features/evaluator/web/src/behavior/use-available-evaluators.ts",
+    "../packages/features/evaluator/web/src/index.ts",
+    "../packages/features/evaluator/web/src/model/evaluation-results.ts",
+    "../packages/features/evaluator/web/src/model/evaluations/types.ts",
+    "../packages/features/evaluator/web/src/screens/evaluation-edit/index.ts",
+    "../packages/features/evaluator/web/src/screens/evaluators/index.ts",
+    "../packages/features/evaluator/web/src/surfaces/evaluation-status/index.ts",
+    "../packages/features/evaluator/web/src/ui/elements/shared/evaluator-result-chip.tsx",
+    "../packages/features/evaluator/web/src/ui/sections/checks/dynamic-zod-form.tsx",
+    "../packages/features/evaluator/web/src/ui/sections/drawers.ts",
+    "../packages/features/evaluator/web/src/ui/sections/editor-drawers.ts",
+    "../packages/features/evaluator/web/src/ui/sections/evaluators/evaluator-editor-content.tsx",
+    "../packages/features/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx",
+    "../packages/features/experiment/web/src/behavior/experiments-v3/use-evaluation-mappings.ts",
+    "../packages/features/experiment/web/src/behavior/experiments-v3/use-evaluations-v3-store.ts",
+    "../packages/features/experiment/web/src/index.ts",
+    "../packages/features/experiment/web/src/model/experiments-v3/cell-failure.ts",
+    "../packages/features/experiment/web/src/model/experiments-v3/evaluator-editor-callbacks.ts",
+    "../packages/features/experiment/web/src/model/experiments-v3/execution/results-fold.ts",
+    "../packages/features/experiment/web/src/model/experiments-v3/execution/run-identification.ts",
+    "../packages/features/experiment/web/src/model/experiments-v3/mapping-validation.ts",
+    "../packages/features/experiment/web/src/model/experiments-v3/types.ts",
+    "../packages/features/experiment/web/src/screens/experiments/index.ts",
+    "../packages/features/experiment/web/src/surfaces/batch-results/index.ts",
+    "../packages/features/experiment/web/src/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx",
+    "../packages/features/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
+    "../packages/features/experiment/web/src/ui/sections/drawers.ts",
+    "../packages/features/experiment/web/src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx",
+    "../packages/features/langy/web/src/index.ts",
+    "../packages/features/langy/web/src/screens/langy/index.ts",
+    "../packages/features/langy/web/src/surfaces/asaplangy/index.ts",
+    "../packages/features/langy/web/src/surfaces/langy-context/index.ts",
+    "../packages/features/langy/web/src/surfaces/langy-mark/index.ts",
+    "../packages/features/langy/web/src/surfaces/langy-page-registration/index.ts",
+    "../packages/features/langy/web/src/surfaces/langy-panel-layout/index.ts",
+    "../packages/features/langy/web/src/surfaces/langy-store/index.ts",
+    "../packages/features/langy/web/src/surfaces/langy-ui-actions/index.ts",
+    "../packages/features/langy/web/src/ui/sections/langy-code-access-preference.tsx",
+    "../packages/features/model-provider/web/src/behavior/use-model-limits.ts",
+    "../packages/features/model-provider/web/src/behavior/use-model-providers-settings.ts",
+    "../packages/features/model-provider/web/src/model/clamp-max-tokens.ts",
+    "../packages/features/model-provider/web/src/model/model-error.ts",
+    "../packages/features/model-provider/web/src/screens/model-provider/index.ts",
+    "../packages/features/model-provider/web/src/ui/elements/icons/ai-sparkles-loader.tsx",
+    "../packages/features/model-provider/web/src/ui/elements/icons/copy.tsx",
+    "../packages/features/model-provider/web/src/ui/elements/icons/history.tsx",
+    "../packages/features/model-provider/web/src/ui/elements/model-selector.tsx",
+    "../packages/features/model-provider/web/src/ui/elements/modelProviders/icons-map.tsx",
+    "../packages/features/model-provider/web/src/ui/elements/no-models-configured-callout.tsx",
+    "../packages/features/model-provider/web/src/ui/elements/provider-model-selector.tsx",
+    "../packages/features/model-provider/web/src/ui/sections/drawers.ts",
+    "../packages/features/model-provider/web/src/ui/sections/missing-model-toast.ts",
+    "../packages/features/model-provider/web/src/ui/sections/model-error-interceptor.ts",
+    "../packages/features/model-provider/web/src/ui/sections/model-provider-form.tsx",
+    "../packages/features/onboarding/web/src/behavior/use-attribution-capture.ts",
+    "../packages/features/onboarding/web/src/model/observability/types.ts",
+    "../packages/features/onboarding/web/src/model/shared/build-mcp-config.ts",
+    "../packages/features/onboarding/web/src/screens/onboarding/index.ts",
+    "../packages/features/onboarding/web/src/ui/blocks/observability/docs-links.tsx",
+    "../packages/features/onboarding/web/src/ui/elements/onboarding-mesh-background.tsx",
+    "../packages/features/onboarding/web/src/ui/sections/active-project-context.tsx",
+    "../packages/features/onboarding/web/src/ui/sections/observability/code-preview.tsx",
+    "../packages/features/onboarding/web/src/ui/sections/observability/codegen/registry.tsx",
+    "../packages/features/onboarding/web/src/ui/sections/observability/framework-grid.tsx",
+    "../packages/features/onboarding/web/src/ui/sections/observability/framework-integration-code.tsx",
+    "../packages/features/onboarding/web/src/ui/sections/observability/install-preview.tsx",
+    "../packages/features/onboarding/web/src/ui/sections/observability/platform-grid.tsx",
+    "../packages/features/onboarding/web/src/ui/sections/observability/ui-options.ts",
+    "../packages/features/onboarding/web/src/ui/sections/shared/inline-copy-button.tsx",
+    "../packages/features/onboarding/web/src/ui/sections/via-claude-code-screen.tsx",
+    "../packages/features/onboarding/web/src/ui/sections/via-claude-desktop-screen.tsx",
+    "../packages/features/project/web/src/screens/home/index.ts",
+    "../packages/features/project/web/src/screens/project-settings/index.ts",
+    "../packages/features/project/web/src/ui/blocks/tech-stack.tsx",
+    "../packages/features/prompt/web/src/behavior/prompts/llm-prompt-config-utils.ts",
+    "../packages/features/prompt/web/src/behavior/prompts/use-latest-prompt-version.ts",
+    "../packages/features/prompt/web/src/model/llmPromptConfigs/constants.ts",
+    "../packages/features/prompt/web/src/screens/prompt-studio/index.ts",
+    "../packages/features/prompt/web/src/surfaces/api-snippet/index.ts",
+    "../packages/features/prompt/web/src/surfaces/llm-parameters/index.ts",
+    "../packages/features/prompt/web/src/surfaces/prompt-form/index.ts",
+    "../packages/features/prompt/web/src/surfaces/prompt-reference/index.ts",
+    "../packages/features/prompt/web/src/surfaces/prompt-version/index.ts",
+    "../packages/features/prompt/web/src/surfaces/variables/index.ts",
+    "../packages/features/prompt/web/src/ui/elements/llmPromptConfigs/llm-config-field.tsx",
+    "../packages/features/prompt/web/src/ui/elements/llmPromptConfigs/llm-config-popover.tsx",
+    "../packages/features/prompt/web/src/ui/elements/llmPromptConfigs/llm-model-display.tsx",
+    "../packages/features/prompt/web/src/ui/elements/outputs/outputs-section.tsx",
+    "../packages/features/prompt/web/src/ui/sections/drawers.ts",
+    "../packages/features/prompt/web/src/ui/sections/prompts/prompt-editor-drawer.tsx",
+    "../packages/features/scenario/web/src/index.ts",
+    "../packages/features/scenario/web/src/screens/drawers.ts",
+    "../packages/features/scenario/web/src/screens/simulations/index.ts",
+    "../packages/features/scenario/web/src/surfaces/simulations-preference/index.ts",
+    "../packages/features/scenario/web/src/ui/sections/media-part.tsx",
+    "../packages/features/trace/web/src/behavior/drawer.store.ts",
+    "../packages/features/trace/web/src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts",
+    "../packages/features/trace/web/src/behavior/trace-host.ts",
+    "../packages/features/trace/web/src/behavior/use-page-visibility.ts",
+    "../packages/features/trace/web/src/behavior/use-sse-subscription.ts",
+    "../packages/features/trace/web/src/index.ts",
+    "../packages/features/trace/web/src/model/explorer/search-bar/suggestion-items.ts",
+    "../packages/features/trace/web/src/model/export-types.ts",
+    "../packages/features/trace/web/src/model/format-milliseconds.ts",
+    "../packages/features/trace/web/src/model/get-suggestion-state.ts",
+    "../packages/features/trace/web/src/screens/traces/index.ts",
+    "../packages/features/trace/web/src/surfaces/annotation-queue-session/index.ts",
+    "../packages/features/trace/web/src/surfaces/trace-filters/index.ts",
+    "../packages/features/trace/web/src/surfaces/trace-origins/index.ts",
+    "../packages/features/trace/web/src/surfaces/trace-selection/index.ts",
+    "../packages/features/trace/web/src/surfaces/trace-view-state/index.ts",
+    "../packages/features/trace/web/src/ui/elements/explorer/trace-drawer/chip.tsx",
+    "../packages/features/trace/web/src/ui/elements/scenario-role.tsx",
+    "../packages/features/trace/web/src/ui/sections/conversation/index.ts",
+    "../packages/features/trace/web/src/ui/sections/drawers.ts",
+    "../packages/features/trace/web/src/ui/sections/explorer/hooks/use-conversation-turns.ts",
+    "../packages/features/trace/web/src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx",
+    "../packages/features/trace/web/src/ui/sections/explorer/search-bar/suggestion-ui.ts",
+    "../packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/index.ts",
+    "../packages/features/trace/web/src/ui/sections/explorer/trace-id-peek.tsx",
+    "../packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
+    "../packages/features/trace/web/src/ui/sections/explorer/types/trace.ts",
+    "../packages/features/trace/web/src/ui/sections/explorer/utils/legacy-trace-to-turn.ts",
+    "../packages/features/trace/web/src/ui/sections/explorer/utils/trace-edit-mode.ts",
+    "../packages/features/trace/web/src/ui/sections/isolated-error-boundary.tsx",
+    "../packages/features/trace/web/src/ui/sections/presence/presence-menu-item.tsx",
+    "../packages/features/trace/web/src/ui/sections/setup-with-agent-button.tsx",
+    "../packages/features/trace/web/src/ui/sections/traces/render-input-output.tsx",
+    "../packages/features/trace/web/src/ui/sections/traces/span-details.tsx",
+    "../packages/features/trace/web/src/ui/sections/traces/traces-mapping.tsx",
+    "../packages/features/trace/web/src/ui/sections/use-project-span-names.ts",
+    "../packages/features/workflow/web/src/behavior/crisp-bubble-policy.ts",
+    "../packages/features/workflow/web/src/behavior/studio-host/use-organization-team-project.ts",
+    "../packages/features/workflow/web/src/behavior/use-deja-view-link.ts",
+    "../packages/features/workflow/web/src/behavior/use-feature-flag.ts",
+    "../packages/features/workflow/web/src/index.ts",
+    "../packages/features/workflow/web/src/model/constants.ts",
+    "../packages/features/workflow/web/src/model/evaluate-api-snippet.ts",
+    "../packages/features/workflow/web/src/model/routes.ts",
+    "../packages/features/workflow/web/src/model/run-via-api/run-snippets.ts",
+    "../packages/features/workflow/web/src/model/sse/fetch-sse.ts",
+    "../packages/features/workflow/web/src/model/types.ts",
+    "../packages/features/workflow/web/src/model/workflow-api-client.ts",
+    "../packages/features/workflow/web/src/model/workflow-host.ts",
+    "../packages/features/workflow/web/src/screens/workflows/index.ts",
+    "../packages/features/workflow/web/src/surfaces/code-agent/index.ts",
+    "../packages/features/workflow/web/src/surfaces/studio-dataset-columns/index.ts",
+    "../packages/features/workflow/web/src/surfaces/studio-drawer-footer/index.ts",
+    "../packages/features/workflow/web/src/surfaces/workflow-card/index.ts",
+    "../packages/features/workflow/web/src/surfaces/workflow-icons/index.ts",
+    "../packages/features/workflow/web/src/surfaces/workflow-templates/index.ts",
+    "../packages/features/workflow/web/src/ui/elements/code/workflow-code-editor.tsx",
+    "../packages/features/workflow/web/src/ui/elements/compat/next-link.tsx",
+    "../packages/features/workflow/web/src/ui/elements/isolated-error-boundary.tsx",
+    "../packages/features/workflow/web/src/ui/elements/optimization_studio/add-model-provider-key.tsx",
+    "../packages/features/workflow/web/src/ui/elements/optimization_studio/format-money.tsx",
+    "../packages/features/workflow/web/src/ui/elements/run-via-api/data-source-picker.tsx",
+    "../packages/features/workflow/web/src/ui/elements/studio-host/errors.tsx",
+    "../packages/features/workflow/web/src/ui/sections/blocks/code-block-editor.tsx",
+    "../packages/features/workflow/web/src/ui/sections/code/render-code.tsx",
+    "../packages/features/workflow/web/src/ui/sections/copy-button.tsx",
+    "../packages/features/workflow/web/src/ui/sections/generate-api-snippet-dialog.tsx",
+    "../packages/features/workflow/web/src/ui/sections/hoverable-big-text.tsx",
+    "../packages/features/workflow/web/src/ui/sections/markdown.tsx",
+    "../packages/features/workflow/web/src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx",
+    "../packages/features/workflow/web/src/ui/sections/optimization_studio/execution-state-error.ts",
+    "../packages/features/workflow/web/src/ui/sections/optimization_studio/history.tsx",
+    "../packages/features/workflow/web/src/ui/sections/optimization_studio/properties/modals/emoji-picker-modal.tsx",
+    "../packages/features/workflow/web/src/ui/sections/redacted-field.tsx",
+    "../packages/features/workflow/web/src/ui/sections/run-via-api/use-run-via-api-tabs.ts"
+  ],
+  "exclude": [
+    "../packages/features/*/web/src/**/__tests__/**",
+    "../packages/features/*/web/src/**/__mocks__/**",
+    "../packages/features/*/web/src/**/tests/**",
+    "../packages/features/*/web/src/**/*.test.*",
+    "../packages/features/*/web/src/**/*.spec.*",
+    "../packages/features/*/web/src/**/*.stories.*",
+    "../packages/features/*/web/src/**/*.bench.*",
+    "../packages/features/*/web/src/**/__bench__/**",
+    "../packages/features/*/web/src/testing.ts",
+    "../packages/features/*/web/src/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../packages/csv/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/agent/web/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/analytics/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/annotation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/authz/web/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/coding-agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/dashboard/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/data-privacy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/github/web/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/navigation/web/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/ops/web/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/organization/web/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/presence/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/presence/web/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/share/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/share/web/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/suite/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/suite/web/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/topic/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/features/workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/platform-api-client/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/redaction/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/ui-drawer/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/ui-host/tsconfig.build.json"
+    }
+  ],
+  "langwatchDeclarationGroup": {
+    "members": [
+      {
+        "directory": "../packages/features/scenario/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/coding-agent/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/annotation/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/trace/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/langy/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/project/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/onboarding/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/prompt/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/model-provider/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/workflow/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/dataset/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/experiment/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/evaluator/web",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../packages/features/analytics/web",
+        "source": "src",
+        "output": "dist"
+      }
+    ]
+  }
+}

@@ -1,5 +1,4 @@
 import { lintBoundarySignatureMirrors } from "./boundary-signature-mirrors.ts";
-import { lintEnterpriseSourceLicense } from "./enterprise-source-license.ts";
 import { relative, resolve } from "node:path";
 import { lintApplicationBoundaries } from "./application-boundaries.ts";
 import { lintApiTransportBoundaries } from "./api-transport-boundaries.ts";
@@ -8,8 +7,10 @@ import { lintArchitectureRecords } from "./architecture-records.ts";
 import { lintCycles } from "./cycles.ts";
 import { changedSourceFiles } from "./comment-blocks.ts";
 import { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
+import { lintDeclarationProjectReferences } from "./declaration-project-references.ts";
 import { lintDeclarations } from "./declarations.ts";
 import { lintEventingRoles } from "./eventing-roles.ts";
+import { lintEnterpriseSourceLicense } from "./enterprise-source-license.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
@@ -96,6 +97,7 @@ export { lintServiceCeilingsBaseline } from "./service-ceilings.ts";
 export { lintServiceCeilings } from "./service-ceilings.ts";
 export { lintServiceCeilingsFile } from "./service-ceilings.ts";
 export { lintServiceProjectionBoundaries } from "./service-projection-boundaries.ts";
+export { lintDeclarationProjectReferences } from "./declaration-project-references.ts";
 export { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
 export { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
 export type {
@@ -169,6 +171,7 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
       : lintLegacyFeatureFragments(root, discovery.catalogue, discovery.packages)),
     ...lintEventingRoles(root, discovery.packages),
     ...lintArchitectureRecords(discovery.packages),
+    ...lintDeclarationProjectReferences(root, discovery.packages),
     ...lintStrictContractBuildConfigs(root, discovery.packages),
     ...lintStrictPortModules(root, discovery.packages),
     ...lintManifests(discovery.packages),

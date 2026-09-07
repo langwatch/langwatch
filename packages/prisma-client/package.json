@@ -10,33 +10,28 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": {
-        "langwatch-declarations": "./dist/index.d.ts",
-        "default": "./src/index.ts"
-      },
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./generated": {
-      "types": {
-        "langwatch-declarations": "./dist/generated/client.d.ts",
-        "default": "./src/generated/client.ts"
-      },
+      "types": "./dist/generated/client.d.ts",
       "default": "./src/generated/client.ts"
     },
     "./errors": {
-      "types": {
-        "langwatch-declarations": "./dist/prisma-error-codes.d.ts",
-        "default": "./src/prisma-error-codes.ts"
-      },
+      "types": "./dist/prisma-error-codes.d.ts",
       "default": "./src/prisma-error-codes.ts"
+    },
+    "./ownership": {
+      "types": "./dist/ownership.d.ts",
+      "default": "./src/ownership.ts"
     }
   },
   "scripts": {
-    "prisma:generate": "prisma generate --config ./prisma.config.ts",
-    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate --config ./prisma.config.ts && node scripts/generate-table-catalogue.mjs",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/prisma-client/tsconfig.json && tsc --noEmit",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts",

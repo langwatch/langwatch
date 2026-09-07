@@ -8,27 +8,27 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./surfaces/anonymous-id": {
-      "types": "./src/surfaces/anonymous-id.ts",
+      "types": "./dist/surfaces/anonymous-id.d.ts",
       "default": "./src/surfaces/anonymous-id.ts"
     },
     "./surfaces/experiment-catalogue": {
-      "types": "./src/surfaces/experiment-catalogue.ts",
+      "types": "./dist/surfaces/experiment-catalogue.d.ts",
       "default": "./src/surfaces/experiment-catalogue.ts"
     },
     "./surfaces/rule-editing": {
-      "types": "./src/surfaces/rule-editing.ts",
+      "types": "./dist/surfaces/rule-editing.d.ts",
       "default": "./src/surfaces/rule-editing.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/feature-flag/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

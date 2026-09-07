@@ -1,0 +1,112 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "noEmitOnError": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
+  },
+  "files": [
+    "./src/index.ts",
+    "./src/testing.ts",
+    "./src/services/gateway-realtime-session-reconciliation.service.ts",
+    "./src/repositories/prisma/prisma.gateway-change-event.repository.ts",
+    "./src/repositories/prisma/prisma.gateway-audit.repository.ts",
+    "./src/repositories/prisma/prisma.virtual-key.repository.ts",
+    "./src/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts",
+    "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
+    "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts",
+    "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts",
+    "./src/adapters/postgres.gateway-transaction.adapter.ts",
+    "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts",
+    "./src/repositories/prisma/prisma.gateway-realtime-session.repository.ts",
+    "./src/repositories/prisma/prisma.virtual-key-authorization.repository.ts",
+    "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts",
+    "./src/projections/gateway-spend.projection.ts",
+    "./src/transport/api-trpc/gateway-budget.api.ts",
+    "./src/transport/api-trpc/gateway-cache-rule.api.ts",
+    "./src/transport/api-trpc/gateway-guardrail.api.ts",
+    "./src/transport/api-trpc/gateway-spend-event.api.ts",
+    "./src/transport/api-trpc/gateway-usage.api.ts",
+    "./src/transport/api-trpc/virtual-key.api.ts",
+    "./src/transport/api-rest/gateway-platform.api.ts",
+    "./src/transport/api-rest/gateway-internal.api.ts",
+    "./src/transport/api-rest/gateway-spend.api.ts",
+    "./src/transport/api-rest/elevenlabs-webhook.api.ts",
+    "src/__tests__/support/test-project-service.ts"
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../../../api/tsconfig.build.json"
+    },
+    {
+      "path": "../../api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../monitor/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../task/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
+    }
+  ]
+}

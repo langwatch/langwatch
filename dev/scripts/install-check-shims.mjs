@@ -1,49 +1,14 @@
 #!/usr/bin/env node
 /**
- * Routes direct tsgo / tsc / oxlint / oxfmt invocations through the check queue.
+ * Postinstall retires legacy queue shims; optional Haven hooks own admission.
+ * Removal restores only marked entries with intact executable backups, leaving
+ * fresh pnpm launchers untouched even when an older backup remains beside them.
  *
- * The queue only ever saw the package scripts. Anything that reached the
- * binary another way (`pnpm exec tsgo --noEmit -p tsconfig.tsgo.json`,
- * `./node_modules/.bin/tsgo`, an agent following the "iterate with targeted
- * checks" advice and then widening it to the whole project) was a 4 GiB run
- * the counter never knew about. Three tsgo processes on an 18 GB laptop with
- * the limit set to 2 is what that looks like.
+ * Explicit installation is retained for legacy users. Whole-project checks
+ * queue; named files, watch mode and language servers run directly. The SDK's
+ * compiler stays untouched because it runs while starting the dev server.
  *
- * So the bin entries themselves become the boundary. `pnpm` generates
- * `node_modules/.bin/<tool>` as a small launcher; this moves that launcher to
- * `<tool>.real` and puts a shim in its place that runs it either directly or
- * under dev/scripts/check-queue.mjs, depending on the arguments.
- *
- * WHOLE-TREE runs queue: `-p`/`--project`, a directory argument, or nothing
- * that names an existing file (every one of these walks the whole project).
- * A positional argument only counts as a target if it exists, because a
- * subcommand and a flag's value (`--pretty false`) are positional too, and
- * reading either as a named file would let a whole-tree run through
- * uncounted.
- * TARGETED runs do not queue: `tsgo --noEmit src/foo.ts`, `tsc --noEmit a.ts
- * b.ts`. Those finish in a moment and are the entire point of the
- * iterate-fast loop, so making them wait behind a full typecheck would be a
- * worse trade than the pile-up this prevents.
- * LONG-LIVED runs do not queue either: `--watch` and `--lsp` would hold a slot
- * for the whole session.
- *
- * EVERY workspace member's bin dir is shimmed, not only the root's. A member
- * that declares `typescript` itself gets its own `node_modules/.bin/tsc`, and
- * `pnpm --filter <pkg> typecheck` resolves THAT one — so shimming only the root
- * left the applications' own typechecks, the heaviest runs on the machine,
- * entirely uncounted. `sdks/typescript` is the one exclusion: its build runs
- * `tsc --noEmit` on the way to `pnpm dev`, and a dev server that waits for a
- * typecheck slot before it boots is not an improvement.
- *
- * pnpm regenerates the bin entries on every install, so this runs from the
- * workspace root's postinstall and is idempotent: an entry that is already a
- * shim is left alone, and one that pnpm has overwritten is re-shimmed. It
- * never fails an install. A missing shim only costs the queue its accounting.
- *
- * Installs on CI (`CI` set to anything but `0` or `false`) and in production
- * are left alone entirely, see `skipReason`.
- *
- *   node dev/scripts/install-check-shims.mjs [binDir...]
+ *   node dev/scripts/install-check-shims.mjs [--remove] [binDir...]
  */
 
 import fs from "node:fs";
@@ -291,8 +256,40 @@ function installAll(binDirs) {
   return installed;
 }
 
+function removeAll(binDirs) {
+  const removed = [];
+  for (const binDir of binDirs) {
+    for (const name of TOOLS) {
+      const entry = path.join(binDir, name);
+      if (!readIfText(entry)?.includes(MARKER)) continue;
+
+      const real = `${entry}.real`;
+      try {
+        fs.accessSync(real, fs.constants.X_OK);
+        if (readIfText(real)?.includes(MARKER)) {
+          throw new Error("launcher backup is itself a shim; run pnpm install");
+        }
+        fs.renameSync(real, entry);
+        removed.push(name);
+      } catch (err) {
+        process.stderr.write(`check-queue: could not restore ${name} (${err.message})\n`);
+      }
+    }
+  }
+  return removed;
+}
+
 function main(argv, env) {
   if (process.platform === "win32") return 0;
+
+  if (argv[0] === "--remove") {
+    const binDirs = argv.length > 1 ? argv.slice(1) : DEFAULT_BIN_DIRS;
+    const removed = removeAll(binDirs);
+    if (removed.length > 0) {
+      process.stderr.write(`check-queue: restored ${removed.length} original tool launchers\n`);
+    }
+    return 0;
+  }
 
   const skip = skipReason(env);
   if (skip !== null) {

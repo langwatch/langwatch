@@ -8,118 +8,121 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "imports": {
-    "#*": "./src/*.ts"
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
   },
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     },
     "./realtime-session-reconciliation": {
-      "types": "./src/services/gateway-realtime-session-reconciliation.service.ts",
+      "types": "./dist/services/gateway-realtime-session-reconciliation.service.d.ts",
       "default": "./src/services/gateway-realtime-session-reconciliation.service.ts"
     },
     "./composition/gateway-change-events": {
-      "types": "./src/repositories/prisma/prisma.gateway-change-event.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.gateway-change-event.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.gateway-change-event.repository.ts"
     },
     "./composition/gateway-audit": {
-      "types": "./src/repositories/prisma/prisma.gateway-audit.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.gateway-audit.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.gateway-audit.repository.ts"
     },
     "./composition/gateway-virtual-keys": {
-      "types": "./src/repositories/prisma/prisma.virtual-key.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.virtual-key.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.virtual-key.repository.ts"
     },
     "./composition/gateway-elevenlabs-credentials": {
-      "types": "./src/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts"
     },
     "./composition/gateway-guardrails": {
-      "types": "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.gateway-guardrail.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts"
     },
     "./composition/gateway-scope-resolution": {
-      "types": "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.gateway-scope-resolution.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts"
     },
     "./composition/gateway-key-budgets": {
-      "types": "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.gateway-key-budget.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts"
     },
     "./composition/gateway-transactions": {
-      "types": "./src/adapters/postgres.gateway-transaction.adapter.ts",
+      "types": "./dist/adapters/postgres.gateway-transaction.adapter.d.ts",
       "default": "./src/adapters/postgres.gateway-transaction.adapter.ts"
     },
     "./composition/gateway-virtual-key-direct-budgets": {
-      "types": "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts"
     },
     "./composition/gateway-realtime-sessions": {
-      "types": "./src/repositories/prisma/prisma.gateway-realtime-session.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.gateway-realtime-session.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.gateway-realtime-session.repository.ts"
     },
     "./composition/gateway-virtual-key-authorization": {
-      "types": "./src/repositories/prisma/prisma.virtual-key-authorization.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.virtual-key-authorization.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.virtual-key-authorization.repository.ts"
     },
     "./composition/gateway-provider-labels": {
-      "types": "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts",
+      "types": "./dist/repositories/prisma/prisma.gateway-provider-label.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts"
     },
     "./composition/gateway-spend-fold": {
-      "types": "./src/projections/gateway-spend.projection.ts",
+      "types": "./dist/projections/gateway-spend.projection.d.ts",
       "default": "./src/projections/gateway-spend.projection.ts"
     },
     "./api-trpc/gateway-budget": {
-      "types": "./src/transport/api-trpc/gateway-budget.api.ts",
+      "types": "./dist/transport/api-trpc/gateway-budget.api.d.ts",
       "default": "./src/transport/api-trpc/gateway-budget.api.ts"
     },
     "./api-trpc/gateway-cache-rule": {
-      "types": "./src/transport/api-trpc/gateway-cache-rule.api.ts",
+      "types": "./dist/transport/api-trpc/gateway-cache-rule.api.d.ts",
       "default": "./src/transport/api-trpc/gateway-cache-rule.api.ts"
     },
     "./api-trpc/gateway-guardrail": {
-      "types": "./src/transport/api-trpc/gateway-guardrail.api.ts",
+      "types": "./dist/transport/api-trpc/gateway-guardrail.api.d.ts",
       "default": "./src/transport/api-trpc/gateway-guardrail.api.ts"
     },
     "./api-trpc/gateway-spend-event": {
-      "types": "./src/transport/api-trpc/gateway-spend-event.api.ts",
+      "types": "./dist/transport/api-trpc/gateway-spend-event.api.d.ts",
       "default": "./src/transport/api-trpc/gateway-spend-event.api.ts"
     },
     "./api-trpc/gateway-usage": {
-      "types": "./src/transport/api-trpc/gateway-usage.api.ts",
+      "types": "./dist/transport/api-trpc/gateway-usage.api.d.ts",
       "default": "./src/transport/api-trpc/gateway-usage.api.ts"
     },
     "./api-trpc/virtual-key": {
-      "types": "./src/transport/api-trpc/virtual-key.api.ts",
+      "types": "./dist/transport/api-trpc/virtual-key.api.d.ts",
       "default": "./src/transport/api-trpc/virtual-key.api.ts"
     },
     "./api-rest/gateway-platform": {
-      "types": "./src/transport/api-rest/gateway-platform.api.ts",
+      "types": "./dist/transport/api-rest/gateway-platform.api.d.ts",
       "default": "./src/transport/api-rest/gateway-platform.api.ts"
     },
     "./api-rest/gateway-internal": {
-      "types": "./src/transport/api-rest/gateway-internal.api.ts",
+      "types": "./dist/transport/api-rest/gateway-internal.api.d.ts",
       "default": "./src/transport/api-rest/gateway-internal.api.ts"
     },
     "./api-rest/gateway-spend": {
-      "types": "./src/transport/api-rest/gateway-spend.api.ts",
+      "types": "./dist/transport/api-rest/gateway-spend.api.d.ts",
       "default": "./src/transport/api-rest/gateway-spend.api.ts"
     },
     "./api-rest/elevenlabs-webhook": {
-      "types": "./src/transport/api-rest/elevenlabs-webhook.api.ts",
+      "types": "./dist/transport/api-rest/elevenlabs-webhook.api.d.ts",
       "default": "./src/transport/api-rest/elevenlabs-webhook.api.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/gateway/server/tsconfig.json && tsc --noEmit",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"

@@ -1,10 +1,99 @@
 {
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/enterprise-api.tsbuildinfo",
+    "noEmit": true,
+    "rootDir": ".",
+    "outDir": "dist",
+
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2022"],
     "types": ["node"],
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/automation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/audit-log/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/billing/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/governance/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/governance/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/licensing/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../plan-gate/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/scim/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/scim/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/sso/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../features/sso/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/webhook/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/webhook/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/gateway/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/gateway/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/project/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
+    }
+  ]
 }

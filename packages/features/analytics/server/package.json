@@ -8,22 +8,49 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "imports": {
-    "#*": "./src/*.ts"
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
   },
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./src/testing.ts",
+      "types": "./dist/testing.d.ts"
+    },
+    "./api-trpc/analytics": {
+      "types": "./dist/transport/api-trpc/analytics.api.d.ts",
+      "default": "./src/transport/api-trpc/analytics.api.ts"
+    },
+    "./api-trpc/langwatch-ql": {
+      "types": "./dist/transport/api-trpc/langwatch-ql.api.d.ts",
+      "default": "./src/transport/api-trpc/langwatch-ql.api.ts"
+    },
+    "./api-rest/analytics": {
+      "types": "./dist/transport/api-rest/analytics.api.d.ts",
+      "default": "./src/transport/api-rest/analytics.api.ts"
+    },
+    "./api-rest/analytics-legacy": {
+      "types": "./dist/transport/api-rest/analytics-legacy.api.d.ts",
+      "default": "./src/transport/api-rest/analytics-legacy.api.ts"
+    },
+    "./api-rest/langwatch-ql": {
+      "types": "./dist/transport/api-rest/langwatch-ql.api.d.ts",
+      "default": "./src/transport/api-rest/langwatch-ql.api.ts"
+    },
+    "./api-rest/query": {
+      "types": "./dist/transport/api-rest/query.api.d.ts",
+      "default": "./src/transport/api-rest/query.api.ts",
       "default": "./src/testing.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/analytics/server/tsconfig.json && tsc --noEmit",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"

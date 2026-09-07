@@ -10,29 +10,20 @@
   "type": "module",
   "exports": {
     "./screens/billing": {
-      "types": {
-        "langwatch-declarations": "./dist/screens/billing/index.d.ts",
-        "default": "./src/screens/billing/index.ts"
-      },
+      "types": "./dist/screens/billing/index.d.ts",
       "default": "./src/screens/billing/index.ts"
     },
     "./surfaces/contact-sales": {
-      "types": {
-        "langwatch-declarations": "./dist/surfaces/contact-sales/index.d.ts",
-        "default": "./src/surfaces/contact-sales/index.ts"
-      },
+      "types": "./dist/surfaces/contact-sales/index.d.ts",
       "default": "./src/surfaces/contact-sales/index.ts"
     },
     "./surfaces/seat-proration-preview": {
-      "types": {
-        "langwatch-declarations": "./dist/surfaces/seat-proration-preview/index.d.ts",
-        "default": "./src/surfaces/seat-proration-preview/index.ts"
-      },
+      "types": "./dist/surfaces/seat-proration-preview/index.d.ts",
       "default": "./src/surfaces/seat-proration-preview/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/enterprise/features/billing/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

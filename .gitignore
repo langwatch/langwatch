@@ -25,6 +25,7 @@ quickwit-*
 /data/
 /metadata/
 __pycache__
+/dev/.cache/
 dist/
 
 langwatch_server/

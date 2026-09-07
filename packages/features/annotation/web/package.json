@@ -8,35 +8,41 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
     "./screens/annotation-scores": {
-      "types": "./src/screens/annotation-scores/index.ts",
+      "langwatch-declaration-source": "./src/screens/annotation-scores/index.ts",
+      "types": "./dist/screens/annotation-scores/index.d.ts",
       "default": "./src/screens/annotation-scores/index.ts"
     },
     "./screens/annotations": {
-      "types": "./src/screens/annotations/index.ts",
+      "langwatch-declaration-source": "./src/screens/annotations/index.ts",
+      "types": "./dist/screens/annotations/index.d.ts",
       "default": "./src/screens/annotations/index.ts"
     },
     "./surfaces/annotation-form": {
-      "types": "./src/surfaces/annotation-form/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/annotation-form/index.ts",
+      "types": "./dist/surfaces/annotation-form/index.d.ts",
       "default": "./src/surfaces/annotation-form/index.ts"
     },
     "./surfaces/annotation-chips": {
-      "types": "./src/surfaces/annotation-chips/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/annotation-chips/index.ts",
+      "types": "./dist/surfaces/annotation-chips/index.d.ts",
       "default": "./src/surfaces/annotation-chips/index.ts"
     },
     "./surfaces/annotation-card": {
-      "types": "./src/surfaces/annotation-card/index.ts",
+      "langwatch-declaration-source": "./src/surfaces/annotation-card/index.ts",
+      "types": "./dist/surfaces/annotation-card/index.d.ts",
       "default": "./src/surfaces/annotation-card/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project packages/features/annotation/web/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
