@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { passkeySignUpClaimMatches } from "../credential-account.prisma.repository";
 
@@ -35,4 +36,3 @@ describe("unfinished passkey sign-up claims", () => {
     ).toBe(false);
   });
 });
-import { createHash } from "node:crypto";

@@ -9,7 +9,10 @@ import { isUsableCredential } from "../../../users/credential-user";
 const MAX_SERIALIZATION_ATTEMPTS = 4;
 
 function isSerializationConflict(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2034"
+  );
 }
 
 export interface PrismaPasskeyRemovalRepositoryDeps {
@@ -23,9 +26,13 @@ export interface PrismaPasskeyRemovalRepositoryDeps {
  * removals cannot both decide from the same stale set of passkeys.
  */
 export class PrismaPasskeyRemovalRepository implements PasskeyRemovalPort {
-  private constructor(private readonly deps: PrismaPasskeyRemovalRepositoryDeps) {}
+  private constructor(
+    private readonly deps: PrismaPasskeyRemovalRepositoryDeps,
+  ) {}
 
-  static create(deps: PrismaPasskeyRemovalRepositoryDeps): PrismaPasskeyRemovalRepository {
+  static create(
+    deps: PrismaPasskeyRemovalRepositoryDeps,
+  ): PrismaPasskeyRemovalRepository {
     return new PrismaPasskeyRemovalRepository(deps);
   }
 
@@ -76,7 +83,10 @@ export class PrismaPasskeyRemovalRepository implements PasskeyRemovalPort {
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         );
       } catch (error) {
-        if (attempt + 1 < MAX_SERIALIZATION_ATTEMPTS && isSerializationConflict(error)) {
+        if (
+          attempt + 1 < MAX_SERIALIZATION_ATTEMPTS &&
+          isSerializationConflict(error)
+        ) {
           continue;
         }
         throw error;
