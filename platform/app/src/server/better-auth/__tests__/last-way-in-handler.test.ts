@@ -162,11 +162,12 @@ function buildHarness() {
 
 async function signUpCookie(
   harness: ReturnType<typeof buildHarness>,
+  assertSuccessful: (status: number) => void,
 ): Promise<{ cookie: string; userId: string }> {
   const response = await harness.setupAuth.handler(
     post("/sign-up/email", { email, name: "Last Way User", password }),
   );
-  expect(response.status).toBe(200);
+  assertSuccessful(response.status);
   return {
     cookie: responseCookie(response),
     userId: signUpSchema.parse(await response.json()).user.id,
@@ -206,7 +207,9 @@ describe("BetterAuth last-way request hooks", () => {
   /** @scenario Removing the last way in is refused */
   it("refuses sole passkey deletion before changing memory rows", async () => {
     const harness = buildHarness();
-    const { cookie, userId } = await signUpCookie(harness);
+    const { cookie, userId } = await signUpCookie(harness, (status) => {
+      expect(status).toBe(200);
+    });
     removeCredentialPassword(harness.db, userId);
     addPasskey(harness.db, userId, "passkey_only");
     const passkeysBefore = structuredClone(rows(harness.db, "passkey"));
@@ -228,7 +231,9 @@ describe("BetterAuth last-way request hooks", () => {
   /** @scenario Turning it off is refused while an organization requires it */
   it("refuses required MFA disable before changing user, factor, or session rows", async () => {
     const harness = buildHarness();
-    const { cookie, userId } = await signUpCookie(harness);
+    const { cookie, userId } = await signUpCookie(harness, (status) => {
+      expect(status).toBe(200);
+    });
     harness.db.organization = [
       { id: "org_required", slug: "required", mfaRequired: true },
     ];
@@ -277,7 +282,9 @@ describe("BetterAuth last-way request hooks", () => {
 
   it("deletes exactly the requested passkey when a password survives", async () => {
     const harness = buildHarness();
-    const { cookie, userId } = await signUpCookie(harness);
+    const { cookie, userId } = await signUpCookie(harness, (status) => {
+      expect(status).toBe(200);
+    });
     addPasskey(harness.db, userId, "passkey_target");
 
     const response = await callRoute({
