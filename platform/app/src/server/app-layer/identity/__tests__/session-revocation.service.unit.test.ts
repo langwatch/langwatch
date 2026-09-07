@@ -201,6 +201,7 @@ describe("given a person with sessions in both stores", () => {
 
   describe("when every session is revoked and somebody else holds sessions too", () => {
     /** @scenario "Resetting a password still ends every session" */
+    /** @scenario "Sessions can be ended for a person or for one of their sign-in methods" */
     it("ends every session of theirs and nobody else's", async () => {
       const stores = revocationOver({
         sessions: [
@@ -326,6 +327,7 @@ describe("given a person signed in through two different methods", () => {
   describe("when the sessions one method minted are revoked", () => {
     /** @scenario "Ending the sessions one sign-in method minted leaves the others alone" */
     /** @scenario "A session can be ended for one sign-in method alone" */
+    /** @scenario "Sessions can be ended for a person or for one of their sign-in methods" */
     it("ends that method's sessions and leaves the others listed in the cache", async () => {
       const stores = revocationOver({
         sessions: [
