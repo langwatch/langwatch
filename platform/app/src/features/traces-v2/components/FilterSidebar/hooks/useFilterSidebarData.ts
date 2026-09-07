@@ -29,6 +29,7 @@ import {
   EVENT_ATTRIBUTES_SECTION_KEY,
   FACET_COLORS,
   FACET_DEFAULTS,
+  FACET_VALUE_ORDER,
   METADATA_DOCS_URL,
   METADATA_SECTION_KEY,
   RANGE_DEFAULTS,
@@ -320,7 +321,10 @@ export function useFilterSidebarData() {
   const facetItems = useMemo(() => {
     const map = new Map<string, FacetItem[]>();
     for (const cat of categoricals) {
-      const baseItems = buildFacetItems(cat, cat.synthetic ?? isSynthetic);
+      const baseItems = buildFacetItems({
+        cat,
+        isSynthetic: cat.synthetic ?? isSynthetic,
+      });
       // Surface values that the user typed in the search bar but that
       // discover didn't return (rare value, custom label, paste from
       // another query). Without this, an active filter like
@@ -656,10 +660,19 @@ function buildDiscreteFacetItems(
   }));
 }
 
-function buildFacetItems(
-  cat: CategoricalSection,
-  synthetic: boolean,
-): FacetItem[] {
+/**
+ * Exported for direct unit coverage. This is where a facet's curated colour
+ * and order rules actually reach the rows — `FACET_COLORS` being correct
+ * proves nothing if `dotColorFor` stops consulting it, and that wiring is
+ * otherwise only observable through the whole sidebar.
+ */
+export function buildFacetItems({
+  cat,
+  isSynthetic,
+}: {
+  cat: CategoricalSection;
+  isSynthetic: boolean;
+}): FacetItem[] {
   const curatedColors = FACET_COLORS[cat.key];
   const dimmed = !VIBRANT_FIELDS.has(cat.key);
   const counts = new Map(cat.topValues.map((v) => [v.value, v.count]));
@@ -683,6 +696,7 @@ function buildFacetItems(
   );
   const orderedValues = orderValues({
     defaults: FACET_DEFAULTS[cat.key],
+    order: FACET_VALUE_ORDER[cat.key],
     fallback: cat.topValues.map((v) => v.value),
     keys: [...counts.keys()],
   });
@@ -696,22 +710,40 @@ function buildFacetItems(
     count: counts.get(value) ?? 0,
     dotColor: dotColorFor(value),
     dimmed,
-    synthetic,
+    synthetic: isSynthetic,
     aggregates: aggregates.get(value),
     eventMetrics: eventMetrics.get(value),
   }));
 }
 
-function orderValues({
+/**
+ * Exported for direct unit coverage: the ordering rule (rank what is present,
+ * seed nothing) is invisible from the rendered sidebar, which sorts by count
+ * often enough to look right by accident.
+ */
+export function orderValues({
   defaults,
+  order,
   fallback,
   keys,
 }: {
   defaults: string[] | undefined;
+  order: readonly string[] | undefined;
   fallback: string[];
   keys: string[];
 }): string[] {
-  if (!defaults) return fallback;
-  const defaultSet = new Set(defaults);
-  return [...defaults, ...keys.filter((v) => !defaultSet.has(v))];
+  const base = defaults
+    ? [...defaults, ...keys.filter((v) => !new Set(defaults).has(v))]
+    : fallback;
+  if (!order) return base;
+  // Rank-sort rather than prepend: `defaults` may introduce values, `order`
+  // must not — a facet can be given a reading order without also being given
+  // rows for values it has never seen. Sort is stable, so anything outside
+  // the ranked list keeps the count-sorted position it arrived with.
+  const rank = new Map(order.map((value, i) => [value, i]));
+  return [...base].sort(
+    (a, b) =>
+      (rank.get(a) ?? Number.POSITIVE_INFINITY) -
+      (rank.get(b) ?? Number.POSITIVE_INFINITY),
+  );
 }

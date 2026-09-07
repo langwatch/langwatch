@@ -9,7 +9,7 @@ import {
   type LwqlKeyMapRow,
   lwqlKeyMapTableQualifiedName,
   productionLangWatchQLNames,
-} from "~/server/analytics/lwql/productionProvisioning";
+} from "~/server/analytics/lwql/provisioning";
 import { parseConnectionUrl } from "~/server/clickhouse/goose";
 import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";

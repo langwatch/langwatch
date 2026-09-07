@@ -183,6 +183,6 @@ proving it cannot be probed.
 
 - Issue: [#6480](https://github.com/langwatch/langwatch/issues/6480)
 - `platform/app/src/server/analytics/lwql/catalog/postgresViews.ts` — the six entries
-- `platform/app/src/server/analytics/lwql/views.ts` — `postgresTenantPredicate`
-- `platform/app/src/server/analytics/lwql/provisioning.ts` — approved views, engine tables, reader role
+- `platform/app/src/server/analytics/lwql/provisioning/catalogStatements.ts` — `postgresTenantPredicate`
+- `platform/app/src/server/analytics/lwql/provisioning/accessModel.ts` — approved views, engine tables, reader role
 - `platform/app/src/server/analytics/lwql/__tests__/postgresEngineIsolation.integration.test.ts` — the proof and the measurements
