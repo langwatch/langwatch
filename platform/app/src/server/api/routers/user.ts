@@ -22,6 +22,7 @@ import {
   AuthRateLimitedError,
   DirectRegistrationUnavailableError,
 } from "~/server/auth/errors";
+import { getAuthRateLimitClientIp } from "~/server/auth/rate-limit-client-ip";
 import { Auth0ApiError } from "~/server/auth0/passwordService";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
@@ -32,7 +33,6 @@ import { rateLimit } from "~/server/rateLimit";
 import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
 import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { UserService } from "~/server/users/user.service";
-import { getDirectPeerIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { env } from "../../../env.mjs";
 import type { Session } from "../../auth";
@@ -273,10 +273,10 @@ export const userRouter = createTRPCRouter({
         throw new DirectRegistrationUnavailableError();
       }
 
-      // Direct-peer rate limit. Mirrors BetterAuth's `/sign-up/email`
-      // 20-per-hour limit so the tRPC path can't be used as a side-channel for
-      // spam signups (iter 45/46 of the migration audit).
-      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
+      // Mirrors BetterAuth's `/sign-up/email` 20-per-hour limit so the tRPC
+      // path cannot be used as a side-channel for spam signups. A trusted
+      // ingress may identify the caller; an arbitrary peer may not.
+      const peerIp = getAuthRateLimitClientIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
         key: `user.register:${peerIp}`,
         windowSeconds: 60 * 60,

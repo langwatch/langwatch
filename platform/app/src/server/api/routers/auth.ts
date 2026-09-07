@@ -9,6 +9,7 @@ import {
   AuthRateLimitedError,
   NoAddressToConfirmError,
 } from "~/server/auth/errors";
+import { getAuthRateLimitClientIp } from "~/server/auth/rate-limit-client-ip";
 import {
   InviteExpiredError,
   InviteNotFoundError,
@@ -20,7 +21,6 @@ import {
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import { rateLimit } from "~/server/rateLimit";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
-import { getDirectPeerIp } from "~/utils/getClientIp";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 /**
@@ -90,7 +90,7 @@ export const authRouter = createTRPCRouter({
         "reads whether an account exists and which credential kinds it holds so a signed-out visitor can be routed; reads no credential secrets and is deliberately address-throttled",
     })
     .mutation(async ({ ctx, input }) => {
-      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
+      const peerIp = getAuthRateLimitClientIp(ctx.req) ?? "unknown";
       // 200 an hour was a generous budget for a routing question nobody could
       // learn anything from. This one answers whether an address has an
       // account, so the budget is sized for a PERSON signing in — a handful of
@@ -175,7 +175,7 @@ export const authRouter = createTRPCRouter({
         "starts a signed-out visitor's own sign-up; no tenant scope exists before an account does",
     })
     .mutation(async ({ ctx, input }) => {
-      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
+      const peerIp = getAuthRateLimitClientIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
         key: `auth.requestSignUpVerification:${peerIp}`,
         windowSeconds: 60 * 60,
@@ -319,7 +319,7 @@ export const authRouter = createTRPCRouter({
         "reads the invitation the caller holds the code for; the code is the authorization, and the answer names no person and no address",
     })
     .query(async ({ ctx, input }) => {
-      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
+      const peerIp = getAuthRateLimitClientIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
         key: `auth.inviteLanding:${peerIp}`,
         windowSeconds: 60 * 60,
@@ -381,7 +381,7 @@ export const authRouter = createTRPCRouter({
         "asks the holder of an expired code's organization to send a new one; mints nothing, names nobody, and is throttled per code and per IP",
     })
     .mutation(async ({ ctx, input }) => {
-      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
+      const peerIp = getAuthRateLimitClientIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
         key: `auth.requestFreshInvite:${peerIp}`,
         windowSeconds: 60 * 60,

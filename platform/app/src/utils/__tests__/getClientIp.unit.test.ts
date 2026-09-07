@@ -22,6 +22,8 @@ import {
   getClientIp,
   getClientIpFromHonoContext,
   getDirectPeerIp,
+  getTrustedProxyClientIp,
+  parseTrustedProxyAddresses,
 } from "../getClientIp";
 
 beforeEach(() => {
@@ -96,6 +98,74 @@ describe("getDirectPeerIp()", () => {
     };
 
     expect(getDirectPeerIp(req)).toBe("::1");
+  });
+});
+
+describe("getTrustedProxyClientIp()", () => {
+  /** @scenario Two callers behind one trusted proxy keep separate budgets */
+  it("resolves two forwarded clients behind the same trusted peer separately", () => {
+    const from = (forwardedFor: string) =>
+      getTrustedProxyClientIp(
+        {
+          headers: { "x-forwarded-for": forwardedFor },
+          socket: { remoteAddress: "10.0.0.9" },
+        },
+        ["10.0.0.0/24"],
+      );
+
+    expect(from("198.51.100.11, 10.0.0.9")).toBe("198.51.100.11");
+    expect(from("198.51.100.12, 10.0.0.9")).toBe("198.51.100.12");
+  });
+
+  /** @scenario A forwarding header from an untrusted peer is ignored */
+  it("uses the socket peer when an untrusted caller forges forwarding headers", () => {
+    expect(
+      getTrustedProxyClientIp(
+        {
+          headers: {
+            "cf-connecting-ip": "203.0.113.7",
+            "x-forwarded-for": "203.0.113.8",
+          },
+          socket: { remoteAddress: "198.51.100.4" },
+        },
+        ["10.0.0.0/8"],
+      ),
+    ).toBe("198.51.100.4");
+  });
+
+  it("walks a trusted forwarding chain from the right", () => {
+    expect(
+      getTrustedProxyClientIp(
+        {
+          headers: {
+            "x-forwarded-for": "192.0.2.100, 198.51.100.23, 10.0.0.8",
+          },
+          socket: { remoteAddress: "10.0.0.9" },
+        },
+        ["10.0.0.0/24"],
+      ),
+    ).toBe("198.51.100.23");
+  });
+
+  it("ignores a forged Cloudflare header passed through a generic trusted proxy", () => {
+    expect(
+      getTrustedProxyClientIp(
+        {
+          headers: {
+            "cf-connecting-ip": "192.0.2.100",
+            "x-forwarded-for": "198.51.100.23, 10.0.0.8",
+          },
+          socket: { remoteAddress: "10.0.0.9" },
+        },
+        ["10.0.0.0/24"],
+      ),
+    ).toBe("198.51.100.23");
+  });
+
+  it("parses the operator allow-list once into trimmed entries", () => {
+    expect(
+      parseTrustedProxyAddresses(" 10.0.0.9, 172.16.0.0/12, ,::1 "),
+    ).toEqual(["10.0.0.9", "172.16.0.0/12", "::1"]);
   });
 });
 

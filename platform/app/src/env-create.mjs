@@ -425,6 +425,7 @@ export function createEnvConfig() {
       // blocked). Default: false.
       BLOCK_LOCAL_HTTP_CALLS: z.boolean().optional(),
       ALLOWED_PROXY_HOSTS: z.string().optional(),
+      TRUSTED_PROXY_ADDRESSES: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
       // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
       // bypass the subscriber depth check; emergency rollback only.
@@ -731,6 +732,7 @@ export function createEnvConfig() {
         process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
         process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
       ALLOWED_PROXY_HOSTS: process.env.ALLOWED_PROXY_HOSTS,
+      TRUSTED_PROXY_ADDRESSES: process.env.TRUSTED_PROXY_ADDRESSES,
       SHOW_OPS_IN_MAIN_SIDEBAR: process.env.SHOW_OPS_IN_MAIN_SIDEBAR,
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
         process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
