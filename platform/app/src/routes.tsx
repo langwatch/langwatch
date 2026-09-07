@@ -158,6 +158,9 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/security")),
       },
       {
+        // Groups became the second tab of Directory. Same shape as
+        // role-bindings above: the address keeps resolving, and the page it
+        // loads renders <Navigate> rather than a `loader` redirect.
         path: "/settings/groups",
         ...page(() => import("./pages/settings/groups")),
       },
@@ -190,12 +193,33 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/api-keys")),
       },
       {
+        path: "/settings/directory",
+        ...page(() => import("./pages/settings/directory")),
+      },
+      {
+        // The old protocol-named address, forwarding onto the page it became.
         path: "/settings/scim",
         ...page(() => import("./pages/settings/scim")),
       },
       {
         path: "/settings/secrets",
         ...page(() => import("./pages/settings/secrets")),
+      },
+      {
+        path: "/settings/access",
+        ...page(() => import("./pages/settings/access")),
+      },
+      {
+        // The identity provider's own journey and the connectors that
+        // provision people are routes rather than modes of the overview —
+        // see `AuthenticationLayout`. Registered before the index so the
+        // more specific path is matched first.
+        path: "/settings/authentication/provider",
+        ...page(() => import("./pages/settings/authentication/provider")),
+      },
+      {
+        path: "/settings/authentication/connectors",
+        ...page(() => import("./pages/settings/authentication/connectors")),
       },
       {
         path: "/settings/authentication",
@@ -729,6 +753,10 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/identity-lookup",
     ...page(() => import("./pages/ops/backoffice/identity-lookup")),
+  },
+  {
+    path: "/ops/backoffice/directory-sync",
+    ...page(() => import("./pages/ops/backoffice/directory-sync")),
   },
 
   // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path

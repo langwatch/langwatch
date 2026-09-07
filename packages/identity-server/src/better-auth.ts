@@ -59,6 +59,7 @@ export type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccountsPort,
+  IdentityConnectionIssuersPort,
   IdentityResolution,
   IdentityResolutionPort,
 } from "./better-auth/storage-ports";

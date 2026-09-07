@@ -10,15 +10,26 @@
  * is a closure passed from here — the packages read no env of their own.
  */
 
+import { fireActivityTrackingNurturing } from "@ee/billing/nurturing/hooks/activityTracking";
+import { fireSsoAutoAddNurturingCalls } from "@ee/billing/nurturing/hooks/ssoAutoAdd";
+import { ensureUserSyncedToCio } from "@ee/billing/nurturing/hooks/userSync";
 import { PlanTypes } from "@ee/billing/planTypes";
+import { ScimDeprovisionService } from "@ee/scim/scim-deprovision.service";
+import { ScimRequestLogService } from "@ee/scim/scim-request-log.service";
+import { scimSyncLifecycle } from "@ee/scim/scim-sync.runtime";
+import type { ScimSyncLifecycle } from "@ee/scim/scim-sync.service";
 import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
+import { SsoLicenseRepository } from "@ee/sso/sso-license.repository";
 import {
   normalizeIdentifierValue,
+  SSO_DNS_REPROOF_GRACE_MS,
   type SignInMethod,
   type SignInRoutingReasonCode,
+  type SsoConnectionState,
 } from "@langwatch/identity";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import {
+  engineProviderFor,
   IdentityBackfillService,
   IdentityEmailService,
   IdentityGuards,
@@ -31,11 +42,17 @@ import {
   MfaGuards,
   MfaService,
   newIdentityCommandId,
+  newSsoConnectionCommandId,
   ShadowComparingDomainRoutingRepository,
   SignInRouterService,
+  newSsoBreakGlassBindingId,
+  SsoBreakGlassService,
   SsoConnectionGrandfatherService,
   SsoConnectionGuards,
   SsoConnectionService,
+  SsoDomainReproofService,
+  SsoMigrationFinalizationService,
+  SsoSelfServeService,
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
 import type { IdentityAccountCeremonies } from "@langwatch/identity-server/better-auth";
@@ -55,31 +72,39 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { changeAuth0Password } from "../../auth0/passwordService";
 import {
   BORN_FINALIZED_SIGNUP_FLAG,
   BornFinalizedOptIn,
 } from "../../better-auth/bornFinalizedOptIn";
 import type { SecondaryStorageDeps } from "../../better-auth/config/secondary-storage";
+import { BetterAuthDatabaseHooks } from "../../better-auth/hooks";
 import { LastWayInGuard } from "../../better-auth/last-way-in";
 import { PasskeySignUpRegistration } from "../../better-auth/passkey-signup";
 import { PasswordResetSessionBridge } from "../../better-auth/password-reset-session";
+import { RegisteredIssuers } from "../../better-auth/registeredIssuers";
 import { BetterAuthSessionMinter } from "../../better-auth/session-minter";
 import { SignUpConfirmationEndpoint } from "../../better-auth/sign-up-confirmation";
 import { prisma } from "../../db";
 import { featureFlagService } from "../../featureFlag";
 import { NOT_TARGETED } from "../../featureFlag/targeting";
+import { InviteService } from "../../invites/invite.service";
 import { sendAddressConfirmationEmail } from "../../mailer/addressConfirmationEmail";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
 import { trackServerEvent } from "../../posthog";
 import { getApp, tryGetApp } from "../app";
 import { grantsLedgerWriter } from "../authz/ledger";
+import { grantsService } from "../authz/runtime";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { AccountIdentifiersService } from "./account-identifiers.service";
 import { buildAddressConfirmationUrl } from "./address-confirmation-link";
 import { BetterAuthInstanceHandle } from "./better-auth-instance.adapter";
 import { IdentityBirthService } from "./birth";
-import { LocalDoorBreakGlassBinding } from "./break-glass-binding";
+import {
+  LocalDoorBreakGlassBinding,
+  RequiresLocalDoorAndBinding,
+} from "./break-glass-binding";
 import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
 import { IdentitySsoConnectionGrandfatherMigration } from "./connection-grandfather.migration";
 import { CredentialAccountService } from "./credential-account.service";
@@ -94,12 +119,14 @@ import {
 import {
   EmailJoinRequestNotifier,
   PrismaJoinMembership,
+  PrismaJoinOfferDismissals,
   PrismaJoinSettings,
 } from "./join-request-adapters";
 import { JoinRequestLedgerWriter } from "./join-request-ledger";
 import { JoinRequestsService } from "./join-requests.service";
 import { LastWayInService } from "./last-way-in.service";
 import { IdentityLedgerWriter } from "./ledger";
+import { MemberProvenanceService } from "./member-provenance.service";
 import { MfaLedgerWriter } from "./mfa-ledger";
 import { IdentityNewbornReconciliationService } from "./newborn-reconciliation";
 import { OrganizationMfaService } from "./organization-mfa.service";
@@ -132,20 +159,39 @@ import { PrismaJoinRequestProjectionRepository } from "./repositories/join-reque
 import { PrismaLastWayInRepository } from "./repositories/last-way-in.prisma.repository";
 import { LegacySsoDomainRoutingRepository } from "./repositories/legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "./repositories/legacy-sso-organization.prisma.repository";
+import { PrismaMemberProvenanceRepository } from "./repositories/member-provenance.prisma.repository";
 import { PrismaMfaEnrollmentRepository } from "./repositories/mfa-enrollment.prisma.repository";
 import { PrismaMfaEnrollmentProjectionRepository } from "./repositories/mfa-enrollment-projection.prisma.repository";
 import { PrismaPasskeyRemovalRepository } from "./repositories/passkey-removal.prisma.repository";
+import { PrismaScimReconciliationRepository } from "./repositories/scim-reconciliation.prisma.repository";
+import { EventLogScimSyncActivityRepository } from "./repositories/scim-sync-event-log.repository";
 import { PrismaSignUpHealthRepository } from "./repositories/sign-up-health.prisma.repository";
 import {
   PrismaSignUpAccountDirectory,
   PrismaSignUpVerificationTokenStore,
 } from "./repositories/signup-verification.prisma.repository";
+import { PrismaSsoAccountReconciliationRepository } from "./repositories/sso-account-reconciliation.prisma.repository";
+import { PrismaSsoBreakGlassRepository } from "./repositories/sso-break-glass.prisma.repository";
+import { PrismaSsoConnectionIssuers } from "./repositories/sso-connection-issuers.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./repositories/sso-connection-projection.prisma.repository";
+import { PrismaSsoConnectionRegistrationRepository } from "./repositories/sso-connection-registration.prisma.repository";
 import {
   PrismaSsoConnectionReadRepository,
   PrismaSsoConnectionStrandingRepository,
+  PrismaSsoDomainClaimQueueRepository,
 } from "./repositories/sso-connection-reads.prisma.repository";
 import { SsoConnectionDomainRoutingRepository } from "./repositories/sso-connection-routing.prisma.repository";
+import { PrismaSsoCredentialStore } from "./repositories/sso-credential.prisma.repository";
+import { PrismaSsoMembershipRepository } from "./repositories/sso-membership.prisma.repository";
+import { PrismaSsoMigrationProgressRepository } from "./repositories/sso-migration-progress.prisma.repository";
+import { PrismaSsoMigrationCallbackPolicy } from "./repositories/sso-migration-callback-policy.prisma.repository";
+import { PrismaSsoMigrationFinalizationRepository } from "./repositories/sso-migration-finalization.prisma.repository";
+import { ConnectionFirstDomainRoutingRepository } from "./repositories/sso-routing-connection-first.repository";
+import {
+  ScimOversightService,
+  type ScimRedriveApplyPort,
+} from "./scim-oversight.service";
+import { ScimReconciliationService } from "./scim-reconciliation.service";
 import { IdentitySecretHealMigration } from "./secret-heal.migration";
 import {
   PrismaSessionIdentifiers,
@@ -168,7 +214,25 @@ import {
 } from "./signin-method-policy";
 import { SignUpVerificationService } from "./signup-verification.service";
 import { buildSignUpVerificationUrl } from "./signup-verification-link";
+import { SsoArrivalService } from "./sso-arrival.service";
+import { SsoAssertionService } from "./sso-assertion.service";
 import { SsoConnectionLedgerWriter } from "./sso-connection-ledger";
+import { HttpsDomainProofFileLookup } from "./sso-domain-file-lookup";
+import { HttpSsoIssuerDiscovery } from "./sso-issuer-discovery";
+import { ssoMethodIsConfiguredWith } from "./sso-method-configured";
+import { PrismaSsoLegacyIdentityRetirement } from "./sso-migration-legacy-retirement";
+import { ssoProviderConfigCipher } from "./sso-provider-config-cipher";
+import {
+  DnsDomainProofLookup,
+  EmailSsoDomainReproofNotifier,
+  InstanceLicenseProof,
+  LicenseDomainClaimAuthority,
+  LoggingBreakGlassWarningNotifier,
+  PrismaSsoDomainReproofTargets,
+  PrismaSsoOrganizationMemberLookup,
+  PrismaSsoTestSignInLookup,
+  SsoSelfServeContextResolver,
+} from "./sso-self-serve-adapters";
 import { PrismaTwoStepAccount } from "./two-step-account.adapter";
 import { TwoStepVerificationService } from "./two-step-verification.service";
 import { BetterAuthTwoStepProtocol } from "./two-step-verification-adapters";
@@ -178,6 +242,13 @@ import {
   isUserOnIdentityWrites,
 } from "./write-gate";
 
+/**
+ * The connection-id predicate, re-stated for the same reason: it composes
+ * nothing, but it lives in `@langwatch/identity-server`, and that package is
+ * one of the two the boundary test says better-auth may reach only through
+ * here.
+ */
+export { looksLikeSsoConnectionId } from "@langwatch/identity-server";
 /**
  * The method-set policy, re-stated on the runtime because the runtime is the
  * app's ONE door into app-layer identity (ADR-115) — and better-auth is the
@@ -395,55 +466,74 @@ const legacySsoDomainRouting = new LegacySsoDomainRoutingRepository(
 );
 
 /**
- * The projection-backed domain lookup (D04). `configured` still means what it
- * meant before the aggregate existed: whether this deployment actually
- * mounted the method the connection names.
+ * Whether a connection can actually be dialed (D09) — the seam where the two
+ * engines coexist, composed from its two ports. The decision itself is
+ * `sso-method-configured.ts`; what lives here is where each answer comes
+ * from.
+ */
+const ssoConnectionIssuers = new PrismaSsoConnectionIssuers(prisma);
+
+const ssoMethodIsConfigured = ssoMethodIsConfiguredWith({
+  mountedMethodId: async () => (await resolveFederatedMethod())?.id ?? null,
+  engineHoldsProvider: async ({ connectionId }) =>
+    (await ssoConnectionIssuers.findRegisteredProvider({ connectionId })) !==
+    null,
+});
+
+/**
+ * The projection-backed domain lookup (D04, D09). `configured` means what it
+ * has always meant — whether a sign-in sent here would ARRIVE anywhere — and
+ * since D09 there are two ways for that to be true: the provider this
+ * deployment mounts from its environment, and a provider this organization
+ * registered for itself. `ssoMethodIsConfigured` is the seam where both
+ * answer, and it is what makes the two engines coexist rather than take
+ * turns.
  */
 const ssoConnectionDomainRouting = new SsoConnectionDomainRoutingRepository(
   prisma,
-  async (methodId) => (await resolveFederatedMethod())?.id === methodId,
+  ssoMethodIsConfigured,
 );
 
 /**
- * Which lookup the router gets (ADR-117 §5). Keep the current rollout switch
- * and legacy string-backed read path in this slice; the connection-first
- * cutover belongs to the SSO rollout.
+ * Which lookup the router gets (ADR-117 §5, revised by D09).
+ *
+ * TURNING THE CONNECTION ON IS THE DECISION. An administrator who proves a
+ * domain, tests a sign-in, holds a way back in and presses go-live has said
+ * what they want as plainly as it can be said. D04 staged this on an
+ * environment variable and D09 on a per-organization feature flag; both were
+ * a second lever the person who made the decision could not reach, and a
+ * connection reading "on" while it carried nobody is a screen disagreeing
+ * with itself.
+ *
+ * So a connection that is live decides the domains it proved, and every
+ * organization without one is answered by the legacy `Organization.ssoDomain`
+ * / `ssoProvider` columns exactly as before. Rolling a customer back is
+ * turning their connection off, which is the control they already have.
  */
 export function signInDomainRoutingPort(): SignInDomainRoutingPort {
-  switch (env.SSOCONN_ROUTING) {
-    case "enforce":
-      return ssoConnectionDomainRouting;
-    case "shadow":
-      return new ShadowComparingDomainRoutingRepository({
-        deciding: legacySsoDomainRouting,
-        shadow: ssoConnectionDomainRouting,
-      });
-    default:
-      return legacySsoDomainRouting;
-  }
+  return new ConnectionFirstDomainRoutingRepository({
+    legacy: legacySsoDomainRouting,
+    connections: ssoConnectionDomainRouting,
+  });
 }
 
 /**
  * The identifier-first sign-in router (D03, ADR-117), composed here from its
- * ports: the selected domain lookup, the instance method
+ * ports: the connection-first domain lookup, the instance method
  * policy that owns ADR-027's frozen license gate, and — since the revision of
  * 2026-08-25 — what the submitted address's account holds.
  *
  * A singleton rather than a per-call composition: it holds no request state,
  * and the break-glass budget above must not be reset by composing it again.
  * The flag is read once, here, for the same reason ADR-027's license gate is
- * a per-process memo — a front door that changes which store it reads
+ * a per-process memo — a auth screens that changes which store it reads
  * mid-flight is not something anyone can reason about during an incident.
  */
 const signInRouterService = new SignInRouterService({
   domains: signInDomainRoutingPort(),
   policy: signInMethodPolicyPort,
   breakGlass: breakGlassLimiter,
-  accounts: new ProjectionSignInAccountLookup(
-    identityHeads,
-    identityUsers,
-    isLatched,
-  ),
+  accounts: new ProjectionSignInAccountLookup(identityHeads),
 });
 
 export function signInRouter(): SignInRouterService {
@@ -564,14 +654,169 @@ export function ssoConnections(): SsoConnectionService {
   return new SsoConnectionService(
     new SsoConnectionGuards({
       connections: new PrismaSsoConnectionReadRepository(prisma),
-      breakGlass: new LocalDoorBreakGlassBinding(),
+      registrationSlots: new PrismaSsoConnectionRegistrationRepository(prisma),
+      breakGlass: activationBreakGlassPort(),
       stranding: new PrismaSsoConnectionStrandingRepository(prisma),
       platformOperators: new AdminEmailPlatformOperators(identityUsers),
+      licenseAuthority: new LicenseDomainClaimAuthority(),
     }),
     new SsoConnectionLedgerWriter({
-      projectionStore: new PrismaSsoConnectionProjectionRepository(prisma),
+      projectionStore: new PrismaSsoConnectionProjectionRepository(
+        prisma,
+        ssoEngineProviderDerivation,
+      ),
     }),
   );
+}
+
+/**
+ * The credential vault the connection's references point at (D09 — see
+ * specs/identity/sso-idp-termination.feature). A module singleton because it
+ * holds nothing but the Prisma handle and both the command path and the fold
+ * need the same one.
+ */
+const ssoCredentials = new PrismaSsoCredentialStore(prisma);
+
+/**
+ * How the engine's provider row is derived from a connection's folded state.
+ *
+ * Exported as one function, given to BOTH projection-store construction sites
+ * (the ledger writer's and the pipeline registry's), because the two are the
+ * same projection reached two ways and a derivation that differed between
+ * them would be two answers to "what is registered".
+ */
+export const ssoEngineProviderDerivation = ({
+  connection,
+}: {
+  connection: SsoConnectionState;
+}) =>
+  engineProviderFor({
+    connection,
+    credentials: ssoCredentials,
+    baseUrl: env.NEXTAUTH_URL ?? "",
+    providerConfig: ssoProviderConfigCipher,
+  });
+
+/**
+ * The ways back in (D05). Composed per call, holds no state.
+ *
+ * This service IS the port activation has been asking since D04, which is
+ * what "the requirement ships before the mechanism" was for: no guard,
+ * command or test changed to start enforcing real bindings.
+ */
+export function ssoBreakGlass(): SsoBreakGlassService {
+  const connections = new PrismaSsoConnectionReadRepository(prisma);
+  const memberships = new PrismaSsoMembershipRepository(prisma);
+  return new SsoBreakGlassService({
+    bindings: new PrismaSsoBreakGlassRepository(prisma),
+    notifier: new LoggingBreakGlassWarningNotifier(),
+    newBindingId: newSsoBreakGlassBindingId,
+    // The revoke guard's one outside fact: whether an ACTIVE connection is
+    // deciding this organization's sign-in right now.
+    organizationHasActiveConnection: async ({ organizationId }) =>
+      (await connections.countActiveConnections({ organizationId })) > 0,
+    // The same people `breakGlassCandidates` lists, asked on the write path.
+    // A grant naming anybody else satisfies activation's precondition and
+    // opens no door.
+    holderIsEligible: async ({ organizationId, userId }) =>
+      (await memberships.countEligibleAdministrator({
+        organizationId,
+        userId,
+      })) > 0,
+  });
+}
+
+/**
+ * Activation's break-glass precondition, as of D05: a live binding AND a
+ * local door for it to be a way in through.
+ *
+ * Both, because they answer different halves of the same question. A binding
+ * on an installation that mounts no local method names somebody who cannot
+ * actually sign in; a local door with nobody named is the pre-D05 answer,
+ * which activation was always going to outgrow. Requiring both is the only
+ * reading under which "somebody can still get in" is true.
+ */
+function activationBreakGlassPort(): RequiresLocalDoorAndBinding {
+  return new RequiresLocalDoorAndBinding({
+    localDoor: new LocalDoorBreakGlassBinding(),
+    bindings: ssoBreakGlass(),
+  });
+}
+
+/**
+ * The operator queue's read (D05), which is disputes only: a published
+ * record decides every uncontested claim, so what is left for a person is a
+ * domain two organizations both claim.
+ */
+export function ssoDomainClaimQueue(): PrismaSsoDomainClaimQueueRepository {
+  return new PrismaSsoDomainClaimQueueRepository(prisma);
+}
+
+/**
+ * Self-serve single sign-on setup, tiers 2 and 3 (D05). Composed per call
+ * like the write surfaces it drives, and every verb on it is one of theirs.
+ */
+export function ssoSelfServe(): SsoSelfServeService {
+  const licenseProof = new InstanceLicenseProof(
+    new SsoLicenseRepository(prisma),
+  );
+  return new SsoSelfServeService({
+    connections: ssoConnections,
+    reads: new PrismaSsoConnectionReadRepository(prisma),
+    context: new SsoSelfServeContextResolver({
+      featureFlags: featureFlagService,
+      licenseProof,
+    }),
+    proofs: new DnsDomainProofLookup(),
+    files: new HttpsDomainProofFileLookup(),
+    license: licenseProof,
+    credentials: ssoCredentials,
+    discovery: new HttpSsoIssuerDiscovery(),
+    baseUrl: env.NEXTAUTH_URL ?? "",
+    // The evidence a test sign-in happened is the account the engine wrote,
+    // read here rather than recorded anywhere: activation carries the id of
+    // an account that exists, or it is refused.
+    testSignIns: new PrismaSsoTestSignInLookup(prisma),
+    // The READ half of break glass only. Granting and renewing stay on
+    // `ssoBreakGlass()`, which the setup service never holds — this surface
+    // lists the ways back in and never writes one.
+    breakGlass: ssoBreakGlass(),
+    members: new PrismaSsoOrganizationMemberLookup(prisma),
+    migrations: new PrismaSsoMigrationProgressRepository(prisma),
+    finalization: new SsoMigrationFinalizationService({
+      connections: ssoConnections,
+      evidence: new PrismaSsoMigrationFinalizationRepository(
+        prisma,
+        activationBreakGlassPort(),
+      ),
+      retirement: new PrismaSsoLegacyIdentityRetirement({
+        prisma,
+        identity: identityService(),
+        accounts: identityCeremonies(),
+        now: Date.now,
+        newCommandId: newIdentityCommandId,
+      }),
+      newCommandId: newSsoConnectionCommandId,
+    }),
+  });
+}
+
+/**
+ * The sweep that re-reads the records proving domains (ADR-123). Composed per
+ * call like every write surface here, and the grace window is stated once,
+ * HERE, rather than read inside the package: how long a customer keeps
+ * vouching after their record goes missing is a product decision this
+ * composition root owns.
+ */
+export function ssoDomainReproof(): SsoDomainReproofService {
+  return new SsoDomainReproofService({
+    connections: ssoConnections,
+    targets: new PrismaSsoDomainReproofTargets(prisma),
+    proofs: new DnsDomainProofLookup(),
+    files: new HttpsDomainProofFileLookup(),
+    notifier: new EmailSsoDomainReproofNotifier(prisma),
+    graceMs: SSO_DNS_REPROOF_GRACE_MS,
+  });
 }
 
 /**
@@ -612,6 +857,7 @@ export function joinRequestsService(): JoinRequestsService {
     membership: new PrismaJoinMembership(prisma, grantsLedgerWriter()),
     notifier: new EmailJoinRequestNotifier(prisma),
     settings: new PrismaJoinSettings(prisma),
+    dismissals: new PrismaJoinOfferDismissals(prisma),
     // The licence asymmetry, stated once: the gate that has always held
     // single sign-on holds AUTOMATIC joining, because that is federation —
     // the deployment decides who counts as a colleague and admits them with
@@ -619,12 +865,28 @@ export function joinRequestsService(): JoinRequestsService {
     // which is what keeps "my company is invisible" fixed on precisely the
     // self-hosted deployments that have no other way out.
     autoJoinLicensed: () => platformSSOAllowed(),
-    enabled: ({ userId }) =>
-      featureFlagService.isEnabled("join_requests", {
-        distinctId: userId,
-        projectId: NOT_TARGETED,
-        organizationId: NOT_TARGETED,
-      }),
+    // The organization's own plan, resolved the one way the app resolves
+    // plans — the provider that answers for a subscription row on Cloud and
+    // for a signed license self-hosted. Read per call rather than captured,
+    // so an organization that upgrades this morning can open its door this
+    // morning. Closing it never reaches here.
+    joinPolicyEntitled: async ({ organizationId }) =>
+      (await getApp().planProvider.getActivePlan({ organizationId })).type ===
+      PlanTypes.ENTERPRISE,
+  });
+}
+
+/**
+ * Why each member of an organization is here, for the members list.
+ *
+ * Reads only facts written for other reasons — the directory's identifier
+ * mapping, the join-request projection and the invitation table — so a
+ * member's provenance is answerable for people who joined long before the
+ * chip that shows it existed.
+ */
+export function memberProvenance(): MemberProvenanceService {
+  return new MemberProvenanceService({
+    reads: new PrismaMemberProvenanceRepository(prisma),
   });
 }
 
@@ -886,10 +1148,12 @@ const identityStorage = createIdentityStorageAdapter({
   }),
   accounts: identityAccounts,
   resolution: identityResolution,
+  connectionIssuers: new PrismaSsoConnectionIssuers(prisma),
   ceremonies: identityCeremonies(),
   isUserOnIdentityWrites: isLatched,
   isAnyoneOnIdentityWrites: isAnyoneLatched,
   birth: identityBirth(),
+  providerConfig: ssoProviderConfigCipher,
 });
 
 export function identityStorageAdapter(): AdapterFactory<BetterAuthOptions> {
@@ -913,6 +1177,25 @@ export function identityStorageAdapter(): AdapterFactory<BetterAuthOptions> {
 /** Opening the first session of an account's life, and setting its cookie. */
 export function sessionMinter(): BetterAuthSessionMinter {
   return new BetterAuthSessionMinter();
+}
+
+/**
+ * The trusted-origin allowlist for a single sign-on request.
+ *
+ * A memoized singleton, because the instance IS the few-second cache: a new
+ * one per request would collapse nothing and turn one ceremony back into a
+ * burst of identical queries. Its reads bypass the connection-issuer port's
+ * own memo deliberately — see the repository for why a named connection is
+ * read fresh.
+ */
+let registeredIssuersInstance: RegisteredIssuers | null = null;
+
+export function ssoRegisteredIssuers(): RegisteredIssuers {
+  registeredIssuersInstance ??= new RegisteredIssuers({
+    issuers: new PrismaSsoConnectionIssuers(prisma),
+    now: Date.now,
+  });
+  return registeredIssuersInstance;
 }
 
 /**
@@ -1084,6 +1367,99 @@ export function credentialAccounts(): CredentialAccountService {
 }
 
 /**
+ * Whether an assertion from a customer's identity provider may become a
+ * session (ADR-129), over the connection projection and the membership rows.
+ *
+ * Composed per call like every other read surface here: it holds no state,
+ * and better-auth reaches it from a plugin callback rather than at module
+ * load.
+ */
+export function ssoAssertion(): SsoAssertionService {
+  return new SsoAssertionService({
+    connections: new PrismaSsoConnectionReadRepository(prisma),
+    memberships: new PrismaSsoMembershipRepository(prisma),
+  });
+}
+
+/**
+ * What happens to somebody arriving through a single sign-on connection, and
+ * to somebody whose address domain a legacy `Organization.ssoDomain` claims
+ * (ADR-129).
+ *
+ * The join-request service and the grant writer are reached through closures
+ * rather than captured: both resolve the pipeline handle when they run, so a
+ * service composed before the App exists still appends once one does.
+ */
+export function ssoArrival(): SsoArrivalService {
+  return new SsoArrivalService({
+    connections: new PrismaSsoConnectionReadRepository(prisma),
+    memberships: new PrismaSsoMembershipRepository(prisma),
+    invites: {
+      // Find-then-apply is one decision, so it is one port call: an invite
+      // that exists is the invite that wins, and its role and team
+      // assignments replace the default membership entirely.
+      applyPendingInvite: async ({ userId, organizationId, email }) => {
+        const invites = InviteService.create(prisma);
+        const pending = await invites.findPendingByOrgAndEmail({
+          organizationId,
+          email,
+        });
+        if (!pending) return null;
+        await invites.applyInvite({ userId, invite: pending });
+        return { inviteId: pending.id };
+      },
+    },
+    joinRequests: {
+      requestFromSsoArrival: (args) =>
+        joinRequestsService().requestFromSsoArrival(args),
+    },
+    grants: {
+      attachBindings: (args) => grantsLedgerWriter().attachBindings(args),
+    },
+    notifications: {
+      announceSignup: (args) => {
+        void getApp()
+          .notifications.sendSlackSignupEvent(args)
+          .catch(captureException);
+      },
+      startNurturing: (args) => fireSsoAutoAddNurturingCalls(args),
+    },
+  });
+}
+
+/**
+ * better-auth's whole `databaseHooks:` entry as one class (ADR-129).
+ *
+ * The hooks decide nothing about the data: each one translates better-auth's
+ * row into a call on a service above, which is what makes "a hook that wants
+ * a row has nothing to ask but a service" a property of the type rather than
+ * a review comment.
+ */
+export function databaseHooks(): BetterAuthDatabaseHooks {
+  return new BetterAuthDatabaseHooks({
+    users: identityUsers,
+    organizations: new PrismaLegacySsoOrganizationRepository(prisma),
+    accounts: new PrismaSsoAccountReconciliationRepository(prisma),
+    ssoArrival: ssoArrival(),
+    ssoMigration: new PrismaSsoMigrationCallbackPolicy(
+      prisma,
+      newIdentityCommandId,
+    ),
+    federationAllowed: () => platformSSOAllowed(),
+    analytics: {
+      // The same distinct id posthog-js identifies with client-side, so this
+      // server event joins the browser person.
+      trackSignUp: ({ userId }) =>
+        trackServerEvent({ userId, event: "signed_up" }),
+    },
+    nurturing: {
+      trackActivity: (args) => fireActivityTrackingNurturing(args),
+      syncProfile: (args) => ensureUserSyncedToCio(args),
+    },
+  });
+}
+
+/**
  * The three compositions that used to live in satellite `*-runtime.ts` files
  * beside this one, and now do not (ADR-129).
  *
@@ -1152,6 +1528,51 @@ export function identityLookup(): IdentityLookupService {
     links: linkProposals,
     sessions: new BetterAuthOperatorSessions(sessionRevocation()),
     invitations: new InviteServiceOperatorInvitations(prisma),
+  });
+}
+
+function scimReconciliationReads(): PrismaScimReconciliationRepository {
+  return new PrismaScimReconciliationRepository(prisma);
+}
+
+function scimLifecycle(): ScimSyncLifecycle {
+  return scimSyncLifecycle(prisma);
+}
+
+/**
+ * The re-drive's apply arm: the same deprovision service the SCIM request
+ * path uses, so a re-driven removal runs the identical proof a directory's
+ * own removal does. A second implementation "for operators" would be a
+ * second set of postconditions.
+ */
+function scimRedriveApply(): ScimRedriveApplyPort {
+  return new ScimDeprovisionService({
+    grants: grantsService(),
+    syncLifecycle: scimLifecycle(),
+  });
+}
+
+/** The organization's own read of its directory sync (ADR-122). */
+export function scimReconciliation(): ScimReconciliationService {
+  return new ScimReconciliationService({
+    reads: scimReconciliationReads(),
+    // The log, read as a sequence (ADR-126). It resolves the App's event
+    // store lazily for the same reason everything else here is built per
+    // call: there may not be an App yet at module scope.
+    activity: new EventLogScimSyncActivityRepository(),
+    // The requests table (ADR-126). The service holds a port rather than the
+    // enterprise service itself, so the organization view never learns where
+    // the evidence is stored to render it.
+    requests: ScimRequestLogService.create(prisma),
+  });
+}
+
+/** The cross-customer operator surface, and its one guarded write. */
+export function scimOversight(): ScimOversightService {
+  return new ScimOversightService({
+    reads: scimReconciliationReads(),
+    lifecycle: scimLifecycle,
+    deprovision: scimRedriveApply,
   });
 }
 

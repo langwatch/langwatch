@@ -7,7 +7,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
  * `Organization.ssoDomain` / `ssoProvider`, two staff-set strings.
  *
  * D04 replaces this implementation with one over the `SsoConnection`
- * projection, behind `SSOCONN_ROUTING`. That is why the port exists at all:
+ * projection for every organization that has one. That is why the port exists:
  * the router and the service above it never learn which side of the flip they
  * are on, so the swap is a line in `runtime.ts` (ADR-117 §1, §5).
  *

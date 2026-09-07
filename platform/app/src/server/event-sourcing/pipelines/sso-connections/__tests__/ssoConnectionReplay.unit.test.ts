@@ -8,6 +8,10 @@ import {
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
+  MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
+  MIGRATION_FINALIZED_EVENT_TYPE,
+  MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
+  REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
   TEARDOWN_REQUESTED_EVENT_TYPE,
 } from "@langwatch/identity";
 import { describe, expect, it } from "vitest";
@@ -67,7 +71,7 @@ function lifecycle(): SsoConnectionEvent[] {
         organizationId: ORG,
         type: "oidc",
         idp: IDP,
-        allowsJit: true,
+        arrivalPolicy: "admit",
       },
       0,
     ),
@@ -105,6 +109,53 @@ function lifecycle(): SsoConnectionEvent[] {
         tearDownAfterMs: T0 + 100_000,
       },
       7_000,
+    ),
+  ];
+}
+
+function migrationLifecycle(): SsoConnectionEvent[] {
+  return [
+    event(
+      REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
+      {
+        connectionId: CONNECTION,
+        organizationId: ORG,
+        type: "oidc",
+        idp: IDP,
+        arrivalPolicy: "refuse",
+        replacesConnectionId: "ssoc_legacy",
+      },
+      0,
+    ),
+    event(
+      MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
+      { connectionId: CONNECTION, route: "legacy" },
+      1_000,
+    ),
+    event(
+      MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
+      { connectionId: CONNECTION, route: "direct" },
+      2_000,
+    ),
+    event(
+      MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
+      { connectionId: CONNECTION, route: "legacy" },
+      3_000,
+    ),
+    event(
+      MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
+      { connectionId: CONNECTION, route: "direct" },
+      4_000,
+    ),
+    event(
+      MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
+      { connectionId: CONNECTION },
+      5_000,
+    ),
+    event(
+      MIGRATION_FINALIZED_EVENT_TYPE,
+      { connectionId: CONNECTION },
+      6_000,
     ),
   ];
 }
@@ -231,6 +282,25 @@ describe("the sso connection projection", () => {
       const inTwoHalves = await fold(events, true);
 
       expect(persistedRow(inTwoHalves)).toEqual(persistedRow(wholeLog));
+    });
+  });
+
+  describe("given a grandfathered-to-direct migration", () => {
+    it("replays the explicit route and rollback decisions without consulting timestamps", async () => {
+      const events = migrationLifecycle();
+
+      const live = await fold(events, true);
+      const rebuilt = await fold(events, false);
+
+      expect(persistedRow(rebuilt)).toEqual(persistedRow(live));
+      expect(persistedRow(rebuilt)).toMatchObject({
+        replacesConnectionId: "ssoc_legacy",
+        migrationPhase: "FINALIZED",
+        graceStartedAtMs: T0 + 1_000,
+        routeChangedAtMs: T0 + 4_000,
+        finalizationRequestedAtMs: T0 + 5_000,
+        finalizedAtMs: T0 + 6_000,
+      });
     });
   });
 });

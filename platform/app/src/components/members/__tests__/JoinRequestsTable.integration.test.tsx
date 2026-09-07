@@ -83,9 +83,11 @@ describe("given an organization with a pending request", () => {
       );
 
       // Both directions, one place: somebody reaching in and the organization
-      // reaching out.
-      expect(screen.getByText("Requests to join")).toBeInTheDocument();
-      expect(screen.getByText("Invites")).toBeInTheDocument();
+      // reaching out. They are two tabs of the members area now, so the
+      // headings belong to the tabs and each list is just its rows.
+      expect(screen.getByTestId("join-requests-list")).toBeInTheDocument();
+      expect(screen.getByTestId("invites-list")).toBeInTheDocument();
+      expect(screen.getByText("dana@acme.com")).toBeInTheDocument();
 
       // Who is asking, and when they asked. The date is matched loosely on
       // purpose: it is rendered in the reader's own locale, and pinning one
@@ -156,13 +158,17 @@ describe("given nothing is waiting", () => {
   afterEach(() => cleanup());
 
   describe("when the members area renders", () => {
-    /** @scenario With the flag off nothing here exists */
-    it("renders no panel at all", () => {
-      // The flag being off looks exactly like this from the browser: the
-      // procedure answers an empty list and the section does not appear.
-      const { container } = renderPanel([]);
+    /** @scenario An empty request list says it is empty */
+    it("says so rather than leaving the tab blank", () => {
+      // A tab a reader opened on purpose has to say it is empty — a blank
+      // panel reads as a page that failed to load, and there is nothing to
+      // approve either way.
+      renderPanel([]);
 
-      expect(container.innerHTML).toBe("");
+      expect(screen.getByTestId("join-requests-list").textContent).toContain(
+        "Nobody is waiting to join",
+      );
+      expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     });
   });
 });

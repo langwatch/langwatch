@@ -6,6 +6,7 @@ import {
   type JoinLookupDecision,
   type JoinOffer,
   joinDomainOf,
+  organizationAdmitsDomain,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
   resolveJoinLookup,
@@ -46,6 +47,7 @@ const acme: JoinCandidateOrganization = {
   verifiedMembersOnDomain: 3,
   memberCount: 117,
   autoJoinDomains: [],
+  domainProved: false,
 };
 
 const lookup = (
@@ -168,6 +170,56 @@ describe("given an address a public email provider issued", () => {
       // through would be the same mistake as matching one.
       expect(isPublicEmailDomain("mail.gmail.com")).toBe(false);
     });
+
+    it("covers the country variants of every provider it lists", () => {
+      // A HAND-TYPED LIST DRIFTS, and each gap is a directory of who works
+      // where: an address on a missed variant is treated as a work address,
+      // so a stranger who verifies one is told an organization's real name
+      // and roughly how many people are in it. `gmx.de` was listed and
+      // `web.de` was not; `hotmail.fr` was and `hotmail.de` was not.
+      //
+      // Pinned by brand rather than by counting, so adding a provider means
+      // adding its variants and nothing silently half-lands.
+      const variantsOf: Record<string, string[]> = {
+        hotmail: ["com", "co.uk", "fr", "de", "it", "es", "nl", "be"],
+        live: ["com", "co.uk", "de", "fr", "it", "nl", "be"],
+        outlook: ["com", "de", "fr", "es", "it"],
+        yahoo: [
+          "com",
+          "co.uk",
+          "co.jp",
+          "de",
+          "fr",
+          "it",
+          "es",
+          "ca",
+          "com.au",
+          "com.br",
+        ],
+        gmx: ["com", "de", "net", "at", "ch"],
+      };
+
+      const missing: string[] = [];
+      for (const [brand, suffixes] of Object.entries(variantsOf)) {
+        for (const suffix of suffixes) {
+          const domain = `${brand}.${suffix}`;
+          if (!isPublicEmailDomain(domain)) missing.push(domain);
+        }
+      }
+      expect(missing).toEqual([]);
+    });
+
+    it("lists no domain twice and no domain that cannot be one", () => {
+      // `prontonmail.com` sat three lines above `protonmail.com` and matched
+      // nothing at all — the tell that the list was typed rather than
+      // checked.
+      expect(new Set(PUBLIC_EMAIL_DOMAINS).size).toBe(
+        PUBLIC_EMAIL_DOMAINS.length,
+      );
+      for (const domain of PUBLIC_EMAIL_DOMAINS) {
+        expect(domain).toMatch(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/);
+      }
+    });
   });
 });
 
@@ -225,7 +277,7 @@ describe("given a work organization with a single member", () => {
       });
     });
 
-    it("never lets a one-person organization admit anybody automatically", () => {
+    it("never lets an unproven organization admit anybody automatically", () => {
       const solo: JoinCandidateOrganization = {
         ...acme,
         domainJoin: "auto",
@@ -234,9 +286,9 @@ describe("given a work organization with a single member", () => {
         memberCount: 1,
       };
 
-      // The corroboration threshold is what makes the automatic path safe
-      // without a personal-organization predicate: two verified members is
-      // something one person cannot be.
+      // The proof requirement is what makes the automatic path safe without
+      // a personal-organization predicate: however many accounts receive
+      // mail on a domain, only whoever controls it can prove it.
       expect(lookup([solo]).outcome).toBe("ask");
       expect(
         organizationAdmitsDomainAutomatically({
@@ -265,7 +317,7 @@ describe("given an organization that admits its domain automatically", () => {
           ...acme,
           domainJoin: "auto",
           autoJoinDomains: ["acme.com"],
-          verifiedMembersOnDomain: 2,
+          domainProved: true,
         },
       ]);
 
@@ -279,16 +331,19 @@ describe("given an organization that admits its domain automatically", () => {
       });
     });
 
-    it("falls back to asking when only one member has verified the domain", () => {
-      // Nobody gates the automatic path, so one colleague with a
-      // company-looking address is not evidence a company owns a domain.
+    it("falls back to asking when the domain is not proved", () => {
+      // Nobody gates the automatic path, so members' addresses are not
+      // evidence here, however many there are: any two accounts on an
+      // unlisted consumer mail host can receive mail on a domain. Proof of
+      // control is what opens this door.
       expect(
         lookup([
           {
             ...acme,
             domainJoin: "auto",
             autoJoinDomains: ["acme.com"],
-            verifiedMembersOnDomain: 1,
+            verifiedMembersOnDomain: 4,
+            domainProved: false,
           },
         ]).outcome,
       ).toBe("ask");
@@ -307,7 +362,7 @@ describe("given an organization that admits its domain automatically", () => {
         ...acme,
         domainJoin: "auto" as const,
         autoJoinDomains: ["acme.com"],
-        verifiedMembersOnDomain: 4,
+        domainProved: true,
       };
       const decision = lookup([
         automatic,
@@ -327,7 +382,7 @@ describe("given an organization that admits its domain automatically", () => {
             ...acme,
             domainJoin: "auto",
             autoJoinDomains: ["acme.com"],
-            verifiedMembersOnDomain: 4,
+            domainProved: true,
           },
         ],
         { licensed: false },
@@ -363,12 +418,12 @@ describe("given the pure helpers the rules are built from", () => {
   });
 
   describe("when the automatic rule is asked about one organization", () => {
-    it("requires the named domain, the corroboration and an open door", () => {
+    it("requires the named domain, the proof and an open door", () => {
       const automatic: JoinCandidateOrganization = {
         ...acme,
         domainJoin: "auto",
         autoJoinDomains: ["acme.com"],
-        verifiedMembersOnDomain: 2,
+        domainProved: true,
       };
 
       expect(
@@ -389,6 +444,33 @@ describe("given the pure helpers the rules are built from", () => {
           domain: "acme.com",
         }),
       ).toBe(false);
+    });
+
+    /** @scenario "A lapse stops new people and stops nobody who is already here" */
+    it("refuses to admit automatically on a domain whose record stopped being published", () => {
+      // A lapsed proof reaches this seam as no proof at all: the repository
+      // reads a LAPSED domain as unproved, and the rule needs no second
+      // field to treat it that way.
+      const automatic: JoinCandidateOrganization = {
+        ...acme,
+        domainJoin: "auto",
+        autoJoinDomains: ["acme.com"],
+        verifiedMembersOnDomain: 2,
+        domainProved: false,
+      };
+
+      expect(
+        organizationAdmitsDomainAutomatically({
+          organization: automatic,
+          domain: "acme.com",
+        }),
+      ).toBe(false);
+      // Asking is still open, and deliberately: a request reaches somebody at
+      // the company, who is exactly the person able to tell a colleague from
+      // whoever now owns a domain this company let go.
+      expect(
+        organizationAdmitsDomain({ organization: automatic, domain: "acme.com" }),
+      ).toBe(true);
     });
   });
 });

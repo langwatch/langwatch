@@ -3,15 +3,18 @@ import {
   type RecordScimApplyFailureCommandData,
   type RecordScimGroupMappingCommandData,
   type RecordScimUserPushCommandData,
+  type RedriveScimApplyCommandData,
   type RevokeScimSyncCommandData,
   SCIM_APPLY_FAILED_EVENT_TYPE,
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
+  SCIM_APPLY_REDRIVEN_EVENT_TYPE,
   SCIM_APPLY_RETIRED_EVENT_TYPE,
   SCIM_GROUP_MAPPED_EVENT_TYPE,
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
   SCIM_TOKEN_REVOKED_EVENT_TYPE,
   SCIM_USER_PUSHED_EVENT_TYPE,
   type ScimSyncFactInput,
+  type ScimSyncFailure,
   type ScimSyncState,
 } from "@langwatch/identity";
 import type { ScimSyncReadRepository } from "./scim-sync.repository";
@@ -173,6 +176,40 @@ export class ScimSyncGuards {
     return facts;
   }
 
+  /**
+   * A platform operator sends a retired apply through again (ADR-122).
+   *
+   * States a fact only when the named dead letter is genuinely retired and
+   * has not already been re-driven. Both refusals are the same silence on
+   * purpose: the SURFACE says why (`scim_apply_not_retired`), and the guard's
+   * job is to make sure the second press of a control appends nothing —
+   * "re-driving twice applies once" is a property of the history here, not of
+   * whatever the caller remembered to check.
+   */
+  async redriveScimApply(
+    data: RedriveScimApplyCommandData,
+  ): Promise<ScimSyncFactInput[]> {
+    const state = await this.load(data);
+    if (!state || state.state === "REVOKED") return [];
+    const letter = retiredLetter({ state, retiredAtMs: data.retiredAtMs });
+    if (!letter) return [];
+    return [
+      {
+        type: SCIM_APPLY_REDRIVEN_EVENT_TYPE,
+        data: {
+          scimSyncId: data.scimSyncId,
+          connectionId: data.connectionId,
+          organizationId: data.organizationId,
+          op: letter.op,
+          errorCode: letter.errorCode,
+          userId: letter.userId,
+          retiredAtMs: data.retiredAtMs,
+          actor: data.actor,
+        },
+      },
+    ];
+  }
+
   /** The connection's sync ends. Idempotent: a second revoke states nothing. */
   async revokeScimSync(
     data: RevokeScimSyncCommandData,
@@ -241,4 +278,27 @@ export class ScimSyncGuards {
       standing.userId === data.userId;
     return continues ? standing.attempts + 1 : 1;
   }
+}
+
+/**
+ * The dead letter a re-drive names, when it is one that may be re-driven.
+ *
+ * Exported because the surface asks the same question before it refuses:
+ * `undefined` here is what the operator reads as "that apply is not retired",
+ * and having one predicate answer both keeps the refusal and the guard's
+ * silence from drifting apart. A letter already carrying `redrivenAtMs` is
+ * not re-drivable a second time — the first act stands, and the apply ran
+ * once.
+ */
+export function retiredLetter({
+  state,
+  retiredAtMs,
+}: {
+  state: ScimSyncState;
+  retiredAtMs: number;
+}): ScimSyncFailure | undefined {
+  return state.deadLetters.find(
+    (failure) =>
+      failure.retiredAtMs === retiredAtMs && failure.redrivenAtMs === null,
+  );
 }

@@ -70,7 +70,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
   # Needs Postgres: a stored token row read back through verifyEntitled,
   # and a push authenticated with it landing a sync fact that names the
   # connection. Attribution cannot be observed without a real push.
-  @integration @unimplemented
+  @integration
   Scenario: A token is issued against exactly one connection
     When a directory token is minted for "okta-primary"
     Then the token names "okta-primary" as the connection it was issued for
@@ -100,7 +100,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   # Needs Postgres: the connection's ScimToken rows gone, its ScimSyncState
   # folded to REVOKED, and the other connection's token still verifying.
-  @integration @unimplemented
+  @integration
   Scenario: Tearing a connection down ends its tokens
     Given "okta-primary" has a working directory token
     When "okta-primary" is torn down
@@ -109,6 +109,14 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And "entra-contractors" keeps syncing untouched
 
   # ── Who the directory means ────────────────────────────────────────────
+
+  @unit
+  Scenario: A blank external identifier is read as none rather than refused
+    Given a provisioning client that has no external identifier for a person
+    And it sends the field anyway, empty
+    When it pushes that person
+    Then the person is accepted with no external identifier
+    And the push is not refused over a field nothing required
 
   @unit
   Scenario: A person keeps their place when their address changes
@@ -165,7 +173,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the role they hold is the one the directory's mapping asserts
     And no membership is created with a role nothing asserted
 
-  @unit @unimplemented
+  @unit
   Scenario: Every membership a directory push causes is explained by an event
     Given "acme" has been synced through a full push, group and removal cycle
     When "acme"'s memberships are read back against the events that caused them
@@ -179,7 +187,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And the membership fact's actor is the one directory principal, the same on every connection
     And no per-customer value is used as an actor
 
-  @unit @unimplemented
+  @unit
   Scenario: Directory-sourced membership changes stay on the customer's audit page
     When "okta-primary" pushes people in and out of "acme"
     Then each change appears on "acme"'s audit page
@@ -315,3 +323,59 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     When "okta-primary" pushes people into "acme"
     Then membership lands the way it did before the flip
     And the tokens keep working throughout
+
+  # ── What a push does about the person on the other end ─────────────────
+  #
+  # The arrival matrix: every combination of "do they already have an
+  # account here" and "are they already a member", plus what a removal
+  # leaves behind and what a re-push does. The directory has already made
+  # the access decision, so a push does not ask the joining policy that a
+  # self-serve arrival would - which is exactly why the matrix is written
+  # down rather than left to be inferred.
+  #
+  # OPEN, and deliberately not stated as behaviour below: adoption today
+  # matches on the User.email column alone, so it will adopt an account
+  # holding an address nobody ever proved. The scenario says "adopts rather
+  # than duplicates", which is right in every case; whether the account must
+  # have PROVED the address first is the open question, and the answer
+  # narrows the match rather than changing the shape.
+
+  @integration
+  Scenario: A directory push provisions whatever the sign-in door would do
+    Given "okta-primary" pushes somebody who has no account here
+    Then the account is created and the membership lands
+    And the joining policy is not consulted, because the administrator already decided
+
+  @integration
+  Scenario: A directory adopts a member who already had an account
+    Given somebody already has an account but no membership in "acme"
+    When "okta-primary" pushes them
+    Then their existing account gains the membership
+    And no second account is created for the same address
+
+  @integration
+  Scenario: A directory push that changes nothing changes nothing
+    Given somebody the directory has already pushed into "acme"
+    When the same push arrives again
+    Then it is refused with status 409
+    And they still hold exactly one membership
+
+  @integration
+  Scenario: A directory push follows the person, not the address
+    Given somebody provisioned through "okta-primary"
+    When the directory pushes them again under a changed address
+    Then the directory's own identifier is what resolves them
+    And no account is created for the new address
+
+  @integration
+  Scenario: A removed person the directory pushes again comes back
+    Given somebody the directory removed from "acme"
+    When the directory pushes them again
+    Then the membership is restored
+    And they still hold exactly one account
+
+  @integration
+  Scenario: A removal leaves nothing behind in the organization
+    Given somebody the directory removed from "acme"
+    Then they hold no membership and no role binding there
+    And their account itself survives, because it is theirs and not the organization's

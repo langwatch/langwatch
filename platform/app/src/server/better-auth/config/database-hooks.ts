@@ -1,5 +1,6 @@
 import type { BetterAuthOptions } from "better-auth";
 import { z } from "zod";
+import type { BetterAuthDatabaseHooks } from "../hooks";
 import type { SessionClaimsPort } from "../session-claims-hook";
 import { sessionClaimsData } from "../session-claims-hook";
 
@@ -8,31 +9,6 @@ const hookContextSchema = z.object({ path: z.string().optional() });
 function hookPath(context: unknown): string | null {
   const parsed = hookContextSchema.safeParse(context);
   return parsed.success ? (parsed.data.path ?? null) : null;
-}
-
-export interface LegacyDatabaseHooksPort {
-  beforeUserCreate(args: {
-    user: { email: string; deactivatedAt?: Date | null } & Record<
-      string,
-      unknown
-    >;
-  }): Promise<boolean | void>;
-  afterUserCreate(args: {
-    user: { id: string; email: string; name: string };
-  }): Promise<void>;
-  beforeAccountCreate(args: {
-    account: { userId: string; providerId: string; accountId: string };
-  }): Promise<void>;
-  afterAccountCreate(args: {
-    account: { userId: string; providerId: string; accountId: string };
-  }): Promise<void>;
-  afterAccountUpdate(args: {
-    account: { userId: string; providerId: string; accountId: string };
-  }): Promise<void>;
-  beforeSessionCreate(args: {
-    session: { userId: string };
-  }): Promise<boolean | void>;
-  afterSessionCreate(args: { userId: string }): Promise<void>;
 }
 
 /** ADR-101 §2's erasure, taken before the user row goes. */
@@ -84,7 +60,7 @@ export interface DatabaseHooksDeps {
    * pipeline handle when they run, and better-auth builds its options at
    * module load, before any App exists.
    */
-  hooks: () => LegacyDatabaseHooksPort;
+  hooks: () => BetterAuthDatabaseHooks;
   /** The erasure a user delete is (ADR-101 §2). */
   userErasure: () => UserErasureCeremonyPort;
   /**

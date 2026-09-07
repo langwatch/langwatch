@@ -11,17 +11,16 @@ import { ExternalLink } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
 import { useAnalytics } from "react-contextual-analytics";
+import { JoinYourTeamTakeover } from "~/components/JoinYourTeamTakeover";
 import { Link } from "~/components/ui/link";
+import { JoinInsteadNotice } from "~/features/auth";
+import { api } from "~/utils/api";
 import { LEGAL_LINKS } from "~/utils/legalLinks";
 import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCardGroup";
 import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
 import { BasicInfoConditionalFields } from "../components/sections/BasicInfoConditionalFields";
 import { IntentSelectionScreen } from "../components/sections/IntentSelectionScreen";
-import {
-  desireItems,
-  roleItems,
-  usageStyleItems,
-} from "../constants/onboarding-data";
+import { desireItems, roleItems, usageStyleItems } from "../constants/onboarding-data";
 import { useOnboardingFormContext } from "../contexts/form-context";
 import {
   type DesireType,
@@ -37,9 +36,36 @@ const OrganizationScreen: React.FC = () => {
   const { organizationName, agreement, setOrganizationName, setAgreement } =
     useOnboardingFormContext();
   const { emit } = useAnalytics();
+  // Answers only for this caller's OWN verified address, and answers nothing
+  // for an unverified one — so no organization name reaches the browser
+  // before the person has proved the domain they are being nudged about.
+  const joinLookup = api.joinRequests.lookup.useQuery();
 
   return (
     <VStack gap={5} align="stretch" w="full" minW="0">
+      {/* THE DECISION COMES FIRST, and it comes as a screen.
+
+          This was a soft alert in the middle of the create-organization form,
+          on the reasoning that starting a second organization at a company
+          that already has one is ordinary and must never be blocked. That
+          reasoning is right and it is not what went wrong: the notice was
+          right, and it was the wrong SIZE. Somebody who has just signed up is
+          looking at a form with their cursor in it, and a sentence beside the
+          field lost to the field every time — so people made the second
+          workspace without ever really being asked.
+
+          Still nudged, still never blocked. The screen leads with joining and
+          its way past says exactly what carrying on means, which lands them
+          right back on this form with nothing lost. What changed is only that
+          the question is now asked where it can be heard. */}
+      <JoinYourTeamTakeover dismissLabel="Create a new organization instead" />
+
+      {/* The soft notice stays for the case the screen above does not cover:
+          somebody who already declined for this domain, and is now looking at
+          the form again. They chose this, so they get the sentence and not
+          the screen. */}
+      <JoinInsteadNotice lookup={joinLookup.data} />
+
       <Field.Root colorPalette="orange" w="full">
         <Input
           autoFocus
@@ -73,12 +99,7 @@ const OrganizationScreen: React.FC = () => {
           </Checkbox.Control>
           <Checkbox.Label fontWeight="normal" fontSize="13px" color="fg.muted">
             {"I agree to the LangWatch "}
-            <Link
-              href={LEGAL_LINKS.terms.href}
-              isExternal
-              fontWeight="medium"
-              variant="underline"
-            >
+            <Link href={LEGAL_LINKS.terms.href} isExternal fontWeight="medium" variant="underline">
               {LEGAL_LINKS.terms.label}
               <Icon size="xs">
                 <ExternalLink />
@@ -186,9 +207,7 @@ interface IntroScreensProps {
   flow: OnboardingFlowConfig;
 }
 
-export const useCreateWelcomeScreens = ({
-  flow,
-}: IntroScreensProps): OnboardingScreen[] => {
+export const useCreateWelcomeScreens = ({ flow }: IntroScreensProps): OnboardingScreen[] => {
   const screensBase: Record<OnboardingScreenIndex, OnboardingScreen> = useMemo(
     () => ({
       [OnboardingScreenIndex.ORGANIZATION]: {
@@ -202,8 +221,7 @@ export const useCreateWelcomeScreens = ({
         id: "intent",
         required: true,
         heading: "What do you want to do?",
-        subHeading:
-          "Pick your starting point. You can explore the rest anytime",
+        subHeading: "Pick your starting point. You can explore the rest anytime",
         component: IntentSelectionScreen,
       },
       [OnboardingScreenIndex.BASIC_INFO]: {

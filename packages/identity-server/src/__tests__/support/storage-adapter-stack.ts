@@ -22,6 +22,7 @@ import {
   createIdentityStorageAdapter,
   type PasskeyRemovalPort,
 } from "../../better-auth/identity-storage-adapter";
+import { plaintextProviderConfigCipher } from "../../sso-provider-config-cipher";
 import type {
   IdentityAccountsPort,
   IdentityResolutionPort,

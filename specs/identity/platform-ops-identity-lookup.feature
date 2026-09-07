@@ -28,13 +28,14 @@ Feature: The platform operator identity lookup - the end of database surgery
   #   ├ methods ───── per person, every sign-in method in every state,     │
   #   │               what proved it and when                              │
   #   ├ waiting ───── sign-ins awaiting confirmation · invitations with    │
-  #   │               their expiry                                         │
+  #   │               their expiry · domain claims awaiting review         │
   #   └ history ───── the most recent identity facts, newest first         │
   #        │
   #        ▼
   #   actions, each one a guarded command with the operator on it:
   #     confirm a proposed sign-in · reject one · detach a method ·
-  #     resend an invitation · extend one · end somebody's sessions
+  #     resend an invitation · extend one · end somebody's sessions ·
+  #     approve a domain claim · reject a domain claim · attest a domain
   #
   # THE READ IS ITSELF THE ACT. Resolving an address here crosses every
   # organization on the installation, so it is authorized and recorded
@@ -118,7 +119,7 @@ Feature: The platform operator identity lookup - the end of database surgery
   @integration
   Scenario: Everything waiting on a human is on one panel
     When "olive" opens a person from the lookup
-    Then sign-ins awaiting confirmation and invitations with their expiry are on one panel
+    Then sign-ins awaiting confirmation, invitations with their expiry, and domain claims awaiting review are on one panel
     And a panel with nothing waiting collapses to a single line rather than filling the page to say so
 
   @unit
@@ -225,6 +226,43 @@ Feature: The platform operator identity lookup - the end of database surgery
     When "olive" extends it
     Then the new expiry is shown as a date, not as a duration the reader has to add up
     And the extension is recorded with "olive" on it
+
+  # ── Domain claims awaiting review ──────────────────────────────────────
+
+  @integration @unimplemented
+  Scenario: Approving a domain claim leaves the customer able to carry on alone
+    Given "acme" has claimed "acme.com" and is waiting
+    When "olive" approves the claim
+    Then "acme" can ask for its domain proof without anybody else acting
+    And the approval is recorded with "olive" on it
+
+  @integration @unimplemented
+  Scenario: Approving a claim for a customer being onboarded leads straight into attesting it
+    Given "olive" has just approved "acme"'s claim on "acme.com" while onboarding it
+    When she attests the domain in the same sitting
+    Then "acme" is asked to publish nothing and to wait for nobody
+    And the approval and the attestation are two facts, each recorded against "olive"
+
+  @integration @unimplemented
+  Scenario: Rejecting a domain claim needs a note, and the customer reads that note
+    Given "acme" has claimed "acme.com" and is waiting
+    When "olive" rejects the claim without writing a note
+    Then the rejection is refused until she writes one
+    And once written, the note is what "acme" reads, unchanged
+
+  @unit @unimplemented
+  Scenario: A claim another operator already decided cannot be decided again
+    Given another operator already approved "acme"'s claim
+    When "olive" decides it
+    Then it is refused with the code "sso_domain_claim_already_decided"
+    And the words say what was decided and by whom
+
+  @integration
+  Scenario: The claims queue puts the longest wait first and says how long it has been
+    Given claims from several organizations are waiting
+    When "olive" opens the queue
+    Then the longest-waiting claim is first, with how long it has waited
+    And the queue is empty-stated in one line when nothing is waiting
 
   # ── The surfaces stay separate, structurally ───────────────────────────
 

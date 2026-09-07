@@ -6,18 +6,29 @@ import {
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
+  type FoldsWholeUnion,
 } from "../../../projections/abstractFoldProjection";
 import type { StateProjectionStore } from "../../../projections/stateProjection.types";
 import {
   type ConnectionActivatedEvent,
+  type ConnectionArrivalPolicySetEvent,
   type ConnectionDiscardedEvent,
   type ConnectionRegisteredEvent,
+  type ReplacementConnectionRegisteredEvent,
+  type MigrationRouteSelectedEvent,
+  type MigrationFinalizationStartedEvent,
+  type MigrationFinalizedEvent,
   type ConnectionResumedEvent,
   type ConnectionSuspendedEvent,
   type ConnectionTornDownEvent,
   connectionActivatedEventSchema,
+  connectionArrivalPolicySetEventSchema,
   connectionDiscardedEventSchema,
   connectionRegisteredEventSchema,
+  replacementConnectionRegisteredEventSchema,
+  migrationRouteSelectedEventSchema,
+  migrationFinalizationStartedEventSchema,
+  migrationFinalizedEventSchema,
   connectionResumedEventSchema,
   connectionSuspendedEventSchema,
   connectionTornDownEventSchema,
@@ -25,12 +36,20 @@ import {
   type DomainClaimApprovedEvent,
   type DomainClaimedEvent,
   type DomainClaimRejectedEvent,
+  type DomainProofLapsedEvent,
+  type DomainProofRecoveredEvent,
+  type DomainProofWaveredEvent,
   type DomainVerifiedEvent,
+  type DomainWithdrawnEvent,
   domainAttestedEventSchema,
   domainClaimApprovedEventSchema,
   domainClaimedEventSchema,
   domainClaimRejectedEventSchema,
+  domainProofLapsedEventSchema,
+  domainProofRecoveredEventSchema,
+  domainProofWaveredEventSchema,
   domainVerifiedEventSchema,
+  domainWithdrawnEventSchema,
   type SsoConnectionEvent,
   ssoConnectionEventSchema,
   type TeardownRequestedEvent,
@@ -43,21 +62,48 @@ const SSO_CONNECTION_PROJECTION_VERSION = "2026-08-24";
 
 export const SSO_CONNECTION_PROJECTION_NAME = "ssoConnectionState" as const;
 
-const ssoConnectionEvents = [
+/**
+ * EVERY member of the wire union, and a test holds it to that
+ * (`ssoConnectionCommandWiring.unit.test.ts`, alongside the command pin).
+ * Five events once sat in the union and not in this list — the arrivals
+ * answer, a withdrawal, and the three re-check verdicts — and an unlisted
+ * event is not an error anywhere: it is stored, the projection is never
+ * handed it, and the head silently stops being the truth. The customer met
+ * that as an answer that saved and then read back unchanged.
+ */
+export const ssoConnectionEvents = [
   connectionRegisteredEventSchema,
+  replacementConnectionRegisteredEventSchema,
+  migrationRouteSelectedEventSchema,
+  migrationFinalizationStartedEventSchema,
+  migrationFinalizedEventSchema,
   domainClaimedEventSchema,
   domainClaimApprovedEventSchema,
   domainClaimRejectedEventSchema,
   connectionDiscardedEventSchema,
   verificationRequestedEventSchema,
   domainAttestedEventSchema,
+  domainWithdrawnEventSchema,
   domainVerifiedEventSchema,
   connectionActivatedEventSchema,
   connectionSuspendedEventSchema,
   connectionResumedEventSchema,
   teardownRequestedEventSchema,
   connectionTornDownEventSchema,
+  connectionArrivalPolicySetEventSchema,
+  domainProofWaveredEventSchema,
+  domainProofLapsedEventSchema,
+  domainProofRecoveredEventSchema,
 ] as const;
+
+/** The compiler's half of the pin: a union member missing from the list
+ *  above is named in the error here. The unit test holds the other
+ *  direction (nothing subscribed outside the union). */
+const _foldsWholeUnion: FoldsWholeUnion<
+  SsoConnectionEvent,
+  typeof ssoConnectionEvents
+> = true;
+void _foldsWholeUnion;
 
 /** The reducer's state plus the base class's bookkeeping stamps — server
  *  rig, deliberately outside the replay-proof reducer surface. */
@@ -129,6 +175,34 @@ export class SsoConnectionStateFoldProjection
 
   handleIdentityConnectionRegistered(
     event: ConnectionRegisteredEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityReplacementConnectionRegistered(
+    event: ReplacementConnectionRegisteredEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityMigrationRouteSelected(
+    event: MigrationRouteSelectedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityMigrationFinalizationStarted(
+    event: MigrationFinalizationStartedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityMigrationFinalized(
+    event: MigrationFinalizedEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
     return this.fold(event, state);
@@ -213,6 +287,41 @@ export class SsoConnectionStateFoldProjection
 
   handleIdentityConnectionTornDown(
     event: ConnectionTornDownEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityDomainWithdrawn(
+    event: DomainWithdrawnEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityConnectionArrivalPolicySet(
+    event: ConnectionArrivalPolicySetEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityDomainProofWavered(
+    event: DomainProofWaveredEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityDomainProofLapsed(
+    event: DomainProofLapsedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityDomainProofRecovered(
+    event: DomainProofRecoveredEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
     return this.fold(event, state);

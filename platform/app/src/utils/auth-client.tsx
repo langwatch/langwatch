@@ -1,6 +1,7 @@
 "use client";
 
 import { passkeyClient } from "@better-auth/passkey/client";
+import { ssoClient } from "@better-auth/sso/client";
 import { twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import {
@@ -34,9 +35,15 @@ import { readHandledError } from "~/features/errors/logic/readHandledError";
  * env first. One place decides, so a button that exists calling an endpoint
  * that does not cannot happen here either.
  *
+ * The single sign-on half is unconditional because its server half is: the
+ * plugin answers for providers in a table, and with no rows it answers "no
+ * such provider". What it buys is `signIn.sso({ providerId })`, which is how
+ * an administrator proves the connection they just registered carries a real
+ * sign-in — naming the connection outright rather than waiting for the
+ * per-organization routing flag that decides where everybody ELSE is sent.
  */
 const client = createAuthClient({
-  plugins: [passkeyClient(), twoFactorClient()],
+  plugins: [passkeyClient(), twoFactorClient(), ssoClient()],
 });
 
 export const authClient = client;

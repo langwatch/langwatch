@@ -101,6 +101,14 @@ export const identityLookupRouter = createTRPCRouter({
       return identityLookup().recentActivity();
     }),
 
+  claimQueue: protectedProcedure
+    .input(z.object({}))
+    .noPermission(NO_PERMISSION)
+    .query(async ({ ctx }) => {
+      await recorded({ ctx, action: "claimQueue", args: {} });
+      return identityLookup().claimQueue();
+    }),
+
   confirmProposedSignIn: protectedProcedure
     .input(
       z.object({

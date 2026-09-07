@@ -37,3 +37,34 @@ export class LocalDoorBreakGlassBinding
     return this.localMethods().length > 0;
   }
 }
+
+/**
+ * Activation's break-glass precondition as of D05: a named person who holds
+ * a live binding, AND a local door for that binding to be a way in through.
+ *
+ * Both, because they answer different halves of one question. A binding on
+ * an installation whose method policy mounts no local method names somebody
+ * who cannot actually sign in — it is a promise the deployment cannot keep.
+ * A local door with nobody named is the answer D04 shipped with, and the one
+ * D05 exists to replace: "somebody could sign in with a password if they had
+ * one" is not the same as "this person can get in on Monday".
+ *
+ * Requiring both means the two rollouts compose rather than fight: an
+ * installation that has not granted a binding yet is refused activation and
+ * told why, which is exactly the outcome the spec asks for.
+ */
+export class RequiresLocalDoorAndBinding
+  implements SsoBreakGlassBindingRepository
+{
+  constructor(
+    private readonly deps: {
+      localDoor: SsoBreakGlassBindingRepository;
+      bindings: SsoBreakGlassBindingRepository;
+    },
+  ) {}
+
+  async hasLiveBinding(args: { organizationId: string }): Promise<boolean> {
+    if (!(await this.deps.localDoor.hasLiveBinding(args))) return false;
+    return this.deps.bindings.hasLiveBinding(args);
+  }
+}

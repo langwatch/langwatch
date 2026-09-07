@@ -1,4 +1,5 @@
 import { passkey } from "@better-auth/passkey";
+import { sso } from "@better-auth/sso";
 import { buildGenericOAuthConfigs } from "@ee/sso/providers";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
@@ -8,6 +9,14 @@ import { passkeySignUpRegistration } from "../passkey-signup";
 import { passkeyRelyingParty } from "../passkeyRelyingParty";
 import type { ConfirmSignUpAddressContext } from "../sign-up-confirmation";
 import { signUpConfirmation } from "../sign-up-confirmation";
+
+/** Whether a customer's identity provider may assert this address. */
+export interface SsoAssertionPort {
+  decide(args: {
+    providerId: string;
+    email: string | null | undefined;
+  }): Promise<{ action: "continue" } | { action: "reject"; code: string }>;
+}
 
 export interface PluginsDeps {
   /**
@@ -24,6 +33,8 @@ export interface PluginsDeps {
   passkeySignUp: () => PasskeySignUpRegistration;
   /** Spending the sign-up confirmation link, and opening a session with it. */
   confirmSignUpAddress: (ctx: ConfirmSignUpAddressContext) => Promise<unknown>;
+  /** Whether an assertion may become a session, and may link to an account. */
+  ssoAssertion: () => SsoAssertionPort;
 }
 
 /**
@@ -55,6 +66,7 @@ export function plugins({
   backupCodeCount,
   passkeySignUp,
   confirmSignUpAddress,
+  ssoAssertion,
 }: PluginsDeps) {
   const genericOAuthConfigs = buildGenericOAuthConfigs(env);
   const mfaEnrollmentOpen = env.MFA_ENROLLMENT_OPEN === "on";
@@ -121,5 +133,72 @@ export function plugins({
     // The sign-up confirmation link, spent where a session can be opened for
     // it. See `sign-up-confirmation.ts` for why this is not a tRPC procedure.
     signUpConfirmation({ confirmSignUpAddress }),
+    /**
+     * Per-organization single sign-on (D09 — see
+     * specs/identity/sso-idp-termination.feature).
+     *
+     * Mounted BESIDE `genericOAuth`, never instead of it. The deployment's own
+     * provider — `NEXTAUTH_PROVIDER`, which is what every existing enterprise
+     * customer signs in through, Auth0-brokered SAML included — keeps its
+     * routes, its accounts and its behavior exactly as they were. This plugin
+     * adds a second way for a sign-in to arrive, keyed per connection, and the
+     * two coexist for as long as anybody is using either.
+     *
+     * Unconditional rather than flag-gated, and the two are different things.
+     * What the plugin being registered does is mount routes that answer for
+     * providers in a table; with no rows, `/sso/*` answers "no such provider"
+     * and nothing about anybody's sign-in changes. What decides whether a
+     * sign-in ROUTES to a connection is whether that connection is live, and
+     * that decision is the router's rather than the engine's.
+     *
+     * The provider rows themselves are never written through this plugin's own
+     * registration endpoint. They are folded from the connection log
+     * (`sso-connection-projection.prisma.repository.ts`), which is what keeps
+     * the aggregate the only source of truth and makes the engine's table
+     * rebuildable by replay.
+     */
+    sso({
+      // The identity provider's word on whether it verified the address.
+      //
+      // This is what lets an organization move from the brokered provider to
+      // its own without minting a second account for everybody: the subject an
+      // identity provider asserts natively is not the subject Auth0 brokered
+      // (`samlp|...`), so the new account can only find the existing person by
+      // ADDRESS. better-auth links on a verified address and refuses on an
+      // unverified one, and without this the plugin reports every address as
+      // unverified — so every cutover would be a fresh set of duplicates.
+      //
+      // Trusting it is warranted here in a way it would not be for a public
+      // provider: the domain is DNS-proved before the connection may route, and
+      // the assertion comes from the identity provider that domain named. The
+      // local half of the check is untouched — better-auth still refuses to
+      // link into a LangWatch account whose own address was never verified.
+      trustEmailVerified: true,
+      // Somebody with no LangWatch account who signs in through their
+      // employer's provider gets one, which is what an enterprise rollout
+      // means. Whether they then land in the organization is the connection's
+      // the arrival policy and the join policy's business, not this plugin's.
+      disableImplicitSignUp: false,
+      /**
+       * What makes trusting the flag above defensible.
+       *
+       * `trustEmailVerified` hands the decision "is this address real" to the
+       * customer's own identity provider, and better-auth will link a verified
+       * address onto an existing account. On its own that is an account
+       * takeover: register a connection, point it at a server you control,
+       * assert somebody else's address. The comment above this option claims
+       * "the domain is DNS-proved before the connection may route" — this hook
+       * is what makes that sentence true, because nothing else on the link path
+       * ever looked at the connection's proved domains.
+       *
+       * The only pre-link callback the plugin offers, which is why the check
+       * lives here and not in a database hook.
+       */
+      resolveUser: async (input) =>
+        ssoAssertion().decide({
+          providerId: input.providerId,
+          email: input.providerUser.email,
+        }),
+    }),
   ];
 }

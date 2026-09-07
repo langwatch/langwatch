@@ -27,7 +27,9 @@ import type {
   ScimSyncReadRepository,
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
+  SsoConnectionRegistrationRepository,
   SsoConnectionStrandingRepository,
+  SsoLicenseAuthorityRepository,
   SsoPlatformOperatorRepository,
 } from "@langwatch/identity-server";
 import {
@@ -434,6 +436,7 @@ export interface PipelineRepositories {
   ssoConnectionProjection: StateProjectionStore<SsoConnectionFoldState>;
   /** Postgres reads the connection guards run against (ADR-117 §5). */
   ssoConnectionReads: SsoConnectionReadRepository;
+  ssoConnectionRegistrationSlots: SsoConnectionRegistrationRepository;
   /** Who a teardown would strand, read over the identity heads. */
   ssoConnectionStranding: SsoConnectionStrandingRepository;
   /** Activation's break-glass precondition (D05 hardens it). */
@@ -441,6 +444,9 @@ export interface PipelineRepositories {
   /** Whether an actor is a LangWatch platform operator — what makes deciding
    *  a domain claim and attesting a domain operator acts (D05 tier 1). */
   ssoPlatformOperators: SsoPlatformOperatorRepository;
+  /** What the installation's licence may authorize — the tier-2 path where
+   *  a self-hosted customer's licence stands in for our approval (D05). */
+  ssoLicenseAuthority: SsoLicenseAuthorityRepository;
   /** How the teardown grace wake dispatches its completion command. */
   ssoConnectionTeardown: ConnectionTeardownPort;
   /** The directory-sync pipeline's `ScimSyncState` head + cursor (D08). */
@@ -789,18 +795,23 @@ export class PipelineRegistry {
         }),
       }),
     );
-    // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
-    // `SSOCONN_ROUTING` defaults to `off`, so nothing routes off its
-    // projection and no `Organization.ssoDomain` write stops.
+    // The SSO connection pipeline (ADR-117 §5, D04). Its rollout is the
+    // connection itself: nothing routes off this projection for an
+    // organization that has not registered and turned one on, and the
+    // grandfather migration is paced by per-organization enrollment like
+    // every other in-place migration — a deploy changes nothing on its own.
     this.deps.eventSourcing.register(
       createSsoConnectionPipeline({
         connectionProjectionStore:
           this.deps.repositories.ssoConnectionProjection,
         connectionGuards: new SsoConnectionGuards({
           connections: this.deps.repositories.ssoConnectionReads,
+          registrationSlots:
+            this.deps.repositories.ssoConnectionRegistrationSlots,
           breakGlass: this.deps.repositories.ssoBreakGlassBindings,
           stranding: this.deps.repositories.ssoConnectionStranding,
           platformOperators: this.deps.repositories.ssoPlatformOperators,
+          licenseAuthority: this.deps.repositories.ssoLicenseAuthority,
         }),
         teardown: this.deps.repositories.ssoConnectionTeardown,
       }),
@@ -822,8 +833,11 @@ export class PipelineRegistry {
       }),
     );
 
-    // The join-request pipeline (ADR-117, D12). Ships dark: `JOIN_REQUESTS`
-    // defaults off, so nothing dispatches a join command.
+    // The join-request pipeline (ADR-117, D12). The `JOIN_REQUESTS` flag that
+    // used to keep this dark is retired: nothing dispatches a join command
+    // unless an address is verified, its domain is a company one, and an
+    // organization opted in — which is the gate that was always doing the
+    // work. Rollback is the customer's own joining setting.
     this.deps.eventSourcing.register(
       createJoinRequestPipeline({
         joinRequestProjectionStore:

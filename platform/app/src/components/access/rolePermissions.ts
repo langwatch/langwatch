@@ -231,6 +231,11 @@ const RESOURCE_COPY = {
     blurb: "The in-product assistant and its conversations.",
     area: "Building",
   },
+  sso: {
+    label: "Single sign-on and directory",
+    blurb: "How people sign in, and the directory that provisions them.",
+    area: "Organization",
+  },
 } as const satisfies Record<AuthzResource, ResourceCopy>;
 
 const UNKNOWN_RESOURCE: ResourceCopy = {

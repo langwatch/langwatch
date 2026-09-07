@@ -43,12 +43,15 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   #
   #   TIER 3  hosted self-serve                           LAST, SEPARABLE
   #     an organization administrator, in Settings
-  #     register -> claim -> [waits for LangWatch] -> approve ->
-  #     prove (DNS record) -> activate
-  #     the only tier that lets a stranger claim a domain, and the only one
-  #     that waits on a queue somebody has to staff. Who staffs it and how
-  #     fast is unresolved (epic Open Q2), so this tier may ship late or
-  #     never, and nothing in tiers 1 and 2 waits for it.
+  #     register -> claim -> prove (DNS record, which decides the claim) ->
+  #     activate
+  #     the only tier that lets a stranger claim a domain, and the record is
+  #     what answers that: publishing it is the ownership evidence, so the
+  #     claim is approved on the authority `dns-proof` by the same act that
+  #     proves the domain. Nobody at LangWatch is in an uncontested journey.
+  #     The queue that remains is disputes only - a domain another
+  #     organization has already proved - which is the one question a DNS
+  #     record cannot answer.
   #
   # Ship order is value order. Tier 1 alone ends database surgery and makes
   # hosted onboarding ours to finish in minutes. Tier 2 alone is the whole
@@ -71,7 +74,7 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
 
   # ── What a tier is, and what it is not ─────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Every tier drives one connection through one lifecycle
     Given a connection that reached live traffic through any of the three tiers
     When its history is read back
@@ -168,140 +171,139 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
 
   # ── Tier 2: self-hosted, and the licence is the authorization ──────────
 
-  @integration @unimplemented
+  @integration
   Scenario: A self-hosted administrator sets single sign-on up with nobody else involved
     Given a self-hosted installation holding a genuine licence
     When "ana" registers the identity provider and claims "acme.com" in Settings
     Then the claim is approved on the licence's authority in the same step
     And nothing is queued for LangWatch to look at
 
-  @integration @unimplemented
+  @integration
   Scenario: The licence proves the domain, so there is no record to publish
     Given a self-hosted installation holding a genuine licence
     When "ana" asks to prove "acme.com"
     Then she is asked to confirm the installation's licence rather than publish anything
     And the domain is proved without her leaving the page
 
-  @unit @unimplemented
+  @unit
   Scenario: The proof is recorded as a hash and the identity provider's secret is not recorded at all
     When a domain is proved by any ceremony
     Then the recorded fact carries the proof's hash and a reference to the identity provider's configuration
     And neither the proof itself nor any secret appears in any recorded fact
 
-  @integration @unimplemented
+  @integration
   Scenario: An unlicensed self-hosted installation is told what would change that
     Given a self-hosted installation holding no genuine licence
     When "ana" opens single sign-on setup
     Then setup is refused with the code "sso_license_required"
     And the words name activating a licence, and name no environment variable, host or internal service
 
-  @unit @unimplemented
+  @unit
   Scenario: A licence activated while the installation is running takes effect at the next restart
     Given a self-hosted installation that was unlicensed when it started
     When a genuine licence is activated and single sign-on setup is opened
     Then setup stays unavailable until the installation restarts
     And the page says a restart is needed and does not pretend otherwise
 
-  @integration @unimplemented
+  @integration
   Scenario: The only connection on an installation still leaves a way in
     Given a self-hosted installation about to activate its only connection
     When "ana" activates it
     Then activation is available only while somebody holds a live way in that does not use the identity provider
     And that local way in keeps working after activation
 
-  @unit @unimplemented
+  @unit
   Scenario: A self-hosted administrator is not offered attestation either
     Given a self-hosted installation holding a genuine licence
     When "ana" asks to prove "acme.com"
     Then the licence is what proves it
     And attesting the domain is not something she can reach
 
-  @unit @unimplemented
+  @unit
   Scenario: The licence-bound path is not offered to a hosted organization
     Given "acme" is on the hosted service
     When "ana" opens single sign-on setup
     Then the licence-bound proof is not offered
     And proving the domain means publishing the record LangWatch gives her
 
-  # ── Tier 3: hosted self-serve, a claim, a record, and a queue ──────────
+  # ── Tier 3: hosted self-serve, a claim and a record ────────────────────
 
-  @integration @unimplemented
-  Scenario: A hosted administrator claims a domain and is told it is waiting
+  @integration
+  Scenario: A hosted administrator claims a domain and is given the record straight away
     Given "acme" has been opted in to setting single sign-on up itself
     When "ana" registers the identity provider and claims "acme.com"
-    Then the claim waits for LangWatch, and "ana" is told so in words that say what happens next
-    And nothing about "acme.com" routes any sign-in while it waits
+    Then she is given the record to publish, with nothing waiting on LangWatch
+    And nothing about "acme.com" routes any sign-in until the record is found
 
-  @unit @unimplemented
-  Scenario: The domain cannot be proved while the claim is still waiting
-    Given "acme"'s claim on "acme.com" is waiting for LangWatch
+  @unit
+  Scenario: A disputed claim is the one that cannot be proved yet
+    Given "acme"'s claim on "acme.com" is disputed and waiting for LangWatch
     When "ana" asks to prove the domain
     Then the request is refused with the code "sso_domain_claim_pending"
     And the words say the claim is being looked at, and nothing about who is looking
 
-  @integration @unimplemented
+  @integration
   Scenario: A rejected claim says why, and the domain can be claimed again
     Given "acme"'s claim on "acme.com" was rejected with a note
     When "ana" opens single sign-on setup
     Then she reads the note the reviewer wrote
     And claiming the domain again is available without registering a second connection
 
-  @unit @unimplemented
+  @unit
   Scenario: A domain another live connection already holds is refused without naming who holds it
     Given "acme.com" is already proved on another organization's live connection
     When "ana" claims "acme.com"
     Then the claim is refused with the code "sso_connection_domain_taken"
     And the refusal names neither the other organization nor anybody in it
 
-  @integration @unimplemented
+  @integration
   Scenario: A published record proves the domain, and a missing one says exactly that
     Given "acme"'s claim on "acme.com" is approved and the record has not been published
     When "ana" asks LangWatch to look for it
     Then the answer is a refusal with the code "sso_domain_proof_not_found"
     And the record to publish is still on screen, unchanged, with the same value as before
 
-  @unit @unimplemented
+  @unit
   Scenario: An expired proof verifies nothing and a fresh one costs no progress
     Given the record "acme" was given has passed its expiry
     When the record is found on the domain
     Then it proves nothing
     And asking again issues a fresh record against the same claim, with the claim's approval intact
 
-  @integration @unimplemented
+  @integration
   Scenario: How long a claim waited is recorded from the day the queue exists
     Given claims from several organizations are waiting for LangWatch
     When the queue is opened
     Then the longest-waiting claim is first
     And how long each one has waited is recorded and readable afterwards
 
-  @unit @unimplemented
+  @unit
   Scenario: A customer proving their own domain is the whole point of this tier
     Given "acme" is setting single sign-on up itself on the hosted service
     When "ana" looks for a way to skip publishing the record
     Then there is none, because attesting a domain is a LangWatch operator's act
     And her domain is proved by the record she publishes, or not at all
 
-  @unit @unimplemented
+  @unit
   Scenario: Setting single sign-on up yourself is unavailable until the organization is opted in
     Given "acme" has not been opted in to setting single sign-on up itself
     When "ana" opens single sign-on setup
     Then it is refused with the code "sso_self_serve_unavailable"
     And the words offer talking to LangWatch, and name no flag
 
-  # ── Only OIDC, and it says so ──────────────────────────────────────────
+  # ── Both protocols, since D09 ─────────────────────────────────────────
 
-  @unit
-  Scenario: Setting up a SAML connection is not something anybody does themselves yet
-    When a SAML connection is registered through the back office or through Settings
-    Then it is refused with the code "sso_saml_not_self_serve"
-    And the words say to talk to LangWatch, and name no protocol engine, library or future release
+  # This deliverable shipped OpenID Connect only and refused SAML by name,
+  # because nothing in the product could terminate it. D09 built the engine
+  # that can, so both the refusal and its code are gone rather than moved.
+  # What replaced them is specs/identity/sso-idp-termination.feature.
 
-  @integration @unimplemented
-  Scenario: A connection carried over from an earlier configuration is untouched by that refusal
+  @integration
+  Scenario: A connection carried over from an earlier configuration keeps routing
     Given an organization whose connection was created from the configuration it already had
     When its users sign in
     Then nothing about their sign-in changes
-    And only a newly registered connection meets the refusal
+    And a newly registered connection is the one that has to supply its own credentials
 
   # ── A way back in, and its expiry ──────────────────────────────────────
   #
@@ -311,27 +313,27 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   # Whether a single connection may override that installation-wide default
   # is still open (epic Open Q6) and is deliberately unspecified here.
 
-  @integration @unimplemented
+  @integration
   Scenario: Activation needs somebody who can still get in without the identity provider
     Given nobody in "acme" holds a way in that does not use the identity provider
     When activation is attempted on any tier
     Then it is refused with the code "sso_connection_activation_blocked"
     And granting somebody that way in, with a date it ends, makes activation available
 
-  @unit @unimplemented
+  @unit
   Scenario: A way back in ends on its own date, and says so before it does
     Given somebody in "acme" holds a way in that ends in fourteen days
     When each of fourteen, seven and one day remain
     Then whoever can renew it is told, each time, naming the person and the date
     And on the date it ends it stops working, with nobody having to act
 
-  @integration @unimplemented
+  @integration
   Scenario: Renewing a way back in is deliberate and recorded
     When a way back in is renewed
     Then the renewal records who granted it, to whom, and until when
     And the date it previously ended is still readable in the history
 
-  @unit @unimplemented
+  @unit
   Scenario: The local sign-in path is recorded and rate limited
     Given an installation whose only connection routes every sign-in
     When somebody signs in through the local path instead
@@ -340,28 +342,28 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
 
   # ── Directory provisioning tokens belong to a connection ───────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: A new directory provisioning token belongs to one connection
     Given "acme" holds a live connection
     When "ana" issues a directory provisioning token
     Then the token is issued against the connection she named
     And its secret is shown once and never shown again
 
-  @unit @unimplemented
+  @unit
   Scenario: Issuing a token without naming a connection is refused
     Given "acme" holds two live connections
     When a directory provisioning token is issued without naming one
     Then it is refused with the code "scim_connection_required"
     And the words say to pick the connection the directory will provision through
 
-  @unit @unimplemented
+  @unit
   Scenario: Tokens issued before connections existed keep exactly the reach they had
     Given "acme" holds a directory provisioning token issued before it had a connection
     When the token is used
     Then it works as it always did
     And nothing quietly attaches it to a connection
 
-  @integration @unimplemented
+  @integration
   Scenario: Removing a connection ends the tokens issued against it
     Given a directory provisions "acme" through a token issued against its connection
     When the connection is removed
@@ -370,27 +372,27 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
 
   # ── Permissions, real from the first day ───────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A role holding only the single sign-on permissions can do only that
-    Given a custom role holding only the single sign-on and directory provisioning permissions, bound across the organization
+    Given a custom role holding only the single sign-on permissions, bound across the organization
     When somebody holding it opens organization settings
-    Then they can set up and manage single sign-on and directory provisioning
+    Then they can set up and manage single sign-on and the directory that provisions through it
     And nothing else the organization holds is readable or changeable by them
 
-  @unit @unimplemented
+  @unit
   Scenario: Seeing single sign-on and changing it are two different permissions
     Given somebody who may see single sign-on but not manage it
     When they open the single sign-on settings
     Then the connection, its domains and its state are readable
     And no control they cannot use is rendered for them at all
 
-  @unit @unimplemented
+  @unit
   Scenario: The single sign-on permissions are granted across an organization or not at all
     When a grant of a single sign-on permission is attempted on one team or one project
     Then the grant is refused
     And only a grant across the whole organization is accepted
 
-  @integration @unimplemented
+  @integration
   Scenario: An administrator without the permission is not offered setup, and cannot reach it
     Given "ana" may administer "acme" but may not manage single sign-on
     When she opens organization settings
