@@ -20,6 +20,7 @@ export interface ConfirmedSignUpAddress {
   accountCreated: boolean;
   accountExists: boolean;
   addressProof: string | null;
+  freshClaim: boolean;
 }
 
 /** Spending the emailed link, and what it confirmed. */
@@ -122,9 +123,10 @@ export class SignUpConfirmationEndpoint {
     // Only a link spent HERE, on an account that exists, opens a door. A
     // reopened link confirms again and opens nothing; a link for an address
     // with no account behind it has nothing to open.
-    const signedIn = confirmed.accountExists
-      ? await this.openSession({ ctx, email: confirmed.email })
-      : false;
+    const signedIn =
+      confirmed.accountExists && confirmed.freshClaim
+        ? await this.openSession({ ctx, email: confirmed.email })
+        : false;
 
     return ctx.json({ ...confirmed, signedIn });
   }

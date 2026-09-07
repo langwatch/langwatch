@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
@@ -12,6 +13,25 @@ import type {
   SecureAccountFacts,
   UnlinkAttempt,
 } from "../credential-account.service";
+
+/** Only the browser that created unfinished passkey residue may adopt it. */
+export function passkeySignUpClaimMatches({
+  storedClaimHash,
+  presentedClaimHash,
+}: {
+  storedClaimHash: string | null;
+  presentedClaimHash: string;
+}): boolean {
+  if (!storedClaimHash) {
+    return false;
+  }
+  const stored = Buffer.from(storedClaimHash, "base64url");
+  const presented = Buffer.from(presentedClaimHash, "base64url");
+  if (stored.length !== 32 || presented.length !== 32) {
+    return false;
+  }
+  return timingSafeEqual(stored, presented);
+}
 
 /**
  * Every `Account`, `Passkey` and `User` row an account's own credentials are
@@ -183,7 +203,9 @@ export class PrismaCredentialAccountRepository
     passwordHash: string;
   }): Promise<CreatedCredentialUser> {
     const created = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({ data: { name, email } });
+      const user = await tx.user.create({
+        data: { name, email, signupConfirmationPending: true },
+      });
       const account = await tx.account.create({
         data: {
           userId: user.id,
@@ -239,17 +261,16 @@ export class PrismaCredentialAccountRepository
    */
   async createPasskeyUser({
     email,
+    claimHash,
   }: {
     email: string;
+    claimHash: string;
   }): Promise<{ id: string; created: boolean }> {
     return await this.prisma.$transaction(async (tx) => {
-      // Inside the transaction on purpose: the read and the write that depends
-      // on it are one decision, and two concurrent ceremonies for the same
-      // address must not both conclude the row is theirs to make. For the
-      // CREATE branch the unique index on the address settles that race anyway
-      // — the loser fails rather than writing a twin. For the ADOPT branch it
-      // cannot, because adopting touches no unique column, which is why the
-      // decision is re-taken below rather than inherited from the caller.
+      // Recheck inside the transaction rather than trusting the earlier route
+      // guard. The unique email index chooses one concurrent creator. Existing
+      // unfinished residue is adoptable only with its stored browser claim;
+      // transaction scope alone does not make an unguarded read-and-adopt safe.
       //
       // Case-insensitive for the same reason registration's check is: rows
       // written before addresses were stored lowercased may carry capitals,
@@ -258,6 +279,7 @@ export class PrismaCredentialAccountRepository
         where: { email: { equals: email, mode: "insensitive" } },
         select: {
           id: true,
+          passkeySignupClaimHash: true,
           accounts: { select: { id: true, provider: true, password: true } },
           accountCredentials: { select: { provider: true, password: true } },
           passkeys: { select: { id: true }, take: 1 },
@@ -277,6 +299,17 @@ export class PrismaCredentialAccountRepository
         if (belongsToSomebody(existing)) {
           throw new PasskeySignUpAddressTakenError(
             "the address gained a credential between the guard and the adoption",
+          );
+        }
+
+        if (
+          !passkeySignUpClaimMatches({
+            storedClaimHash: existing.passkeySignupClaimHash,
+            presentedClaimHash: claimHash,
+          })
+        ) {
+          throw new PasskeySignUpAddressTakenError(
+            "an unfinished passkey sign-up belongs to another browser",
           );
         }
 
@@ -303,7 +336,14 @@ export class PrismaCredentialAccountRepository
       // The address stands in for the name nobody has asked for, as on the
       // password path: a blank name renders as nothing everywhere a member is
       // listed, and onboarding still offers to replace it.
-      const user = await tx.user.create({ data: { name: email, email } });
+      const user = await tx.user.create({
+        data: {
+          name: email,
+          email,
+          signupConfirmationPending: true,
+          passkeySignupClaimHash: claimHash,
+        },
+      });
       await tx.account.create({
         data: {
           userId: user.id,

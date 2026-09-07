@@ -142,9 +142,10 @@ describe("given a sign-up address to confirm", () => {
     it("confirms the address, and says so again if asked again", async () => {
       await harness.service.requestVerification({ email: "sam@acme.com" });
 
-      await expect(
-        harness.service.completeVerification({ token: "token-1" }),
-      ).resolves.toEqual({
+      const first = await harness.service.completeVerification({
+        token: "token-1",
+      });
+      expect(first).toEqual({
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
@@ -152,14 +153,17 @@ describe("given a sign-up address to confirm", () => {
         // confirmation to whichever call creates the account next.
         addressProof: expect.any(String),
       });
+      expect(first.freshClaim).toBe(true);
 
       // The TOKEN is spent — the identifier it stood for can never be claimed
       // twice — but the ANSWER it earned survives its grace window, because a
       // link in an inbox gets opened more than once and the second opening is
       // the same person asking the same question.
-      await expect(
-        harness.service.completeVerification({ token: "token-1" }),
-      ).resolves.toMatchObject({ email: "sam@acme.com" });
+      const reopened = await harness.service.completeVerification({
+        token: "token-1",
+      });
+      expect(reopened).toMatchObject({ email: "sam@acme.com" });
+      expect(reopened.freshClaim).toBe(false);
     });
   });
 

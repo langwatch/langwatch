@@ -188,6 +188,26 @@ interface PendingSignUp {
   passwordHash: string | null;
 }
 
+type CompletedVerification = {
+  email: string;
+  accountCreated: boolean;
+  accountExists: boolean;
+  addressProof: string | null;
+  readonly freshClaim: boolean;
+};
+
+function completedVerification(
+  value: Omit<CompletedVerification, "freshClaim">,
+  freshClaim: boolean,
+): CompletedVerification {
+  const result: CompletedVerification = { ...value, freshClaim };
+  Object.defineProperty(result, "freshClaim", {
+    value: freshClaim,
+    enumerable: false,
+  });
+  return result;
+}
+
 export class SignUpVerificationService {
   private readonly deps: SignUpVerificationDeps;
 
@@ -242,10 +262,11 @@ export class SignUpVerificationService {
    * holding the link — the way on is to ask for a new one — and distinguishing
    * them would turn this into a probe for which links were ever issued.
    */
-  async completeVerification({ token }: { token: string }): Promise<{
-    email: string;
-    accountCreated: boolean;
-    accountExists: boolean;
+  async completeVerification({
+    token,
+  }: {
+    token: string;
+  }): Promise<CompletedVerification> {
     /**
      * Only where the confirmed address has NO account yet: the single-use
      * proof `user.register` spends to mark the account it is about to create
@@ -253,8 +274,6 @@ export class SignUpVerificationService {
      * twice. Null in every other case, where there is an account to mark and
      * it has just been marked.
      */
-    addressProof: string | null;
-  }> {
     const now = this.now();
     const claimed = await this.deps.tokens.claim({
       token,
@@ -280,12 +299,15 @@ export class SignUpVerificationService {
     // address catching up with it. Confirming is the whole job.
     if (alreadyRegistered) {
       await this.deps.accounts.markAddressConfirmed({ email: pending.email });
-      return {
-        email: pending.email,
-        accountCreated: false,
-        accountExists: true,
-        addressProof: null,
-      };
+      return completedVerification(
+        {
+          email: pending.email,
+          accountCreated: false,
+          accountExists: true,
+          addressProof: null,
+        },
+        true,
+      );
     }
 
     // No account, and no credential to make one from: the link came from the
@@ -294,12 +316,15 @@ export class SignUpVerificationService {
     // creates is born confirmed instead of being mailed a second link for the
     // address this one just proved.
     if (!pending.passwordHash) {
-      return {
-        email: pending.email,
-        accountCreated: false,
-        accountExists: false,
-        addressProof: await this.issueAddressProof({ email: pending.email }),
-      };
+      return completedVerification(
+        {
+          email: pending.email,
+          accountCreated: false,
+          accountExists: false,
+          addressProof: await this.issueAddressProof({ email: pending.email }),
+        },
+        true,
+      );
     }
 
     await this.deps.accounts.createCredentialAccount({
@@ -307,12 +332,15 @@ export class SignUpVerificationService {
       passwordHash: pending.passwordHash,
     });
     await this.deps.accounts.markAddressConfirmed({ email: pending.email });
-    return {
-      email: pending.email,
-      accountCreated: true,
-      accountExists: true,
-      addressProof: null,
-    };
+    return completedVerification(
+      {
+        email: pending.email,
+        accountCreated: true,
+        accountExists: true,
+        addressProof: null,
+      },
+      true,
+    );
   }
 
   /**
@@ -373,12 +401,11 @@ export class SignUpVerificationService {
    * store never issued, and one whose grace has run out, both answer null and
    * fall through to the refusal, so this cannot be asked which links exist.
    */
-  private async reopenSpentLink({ token }: { token: string }): Promise<{
-    email: string;
-    accountCreated: boolean;
-    accountExists: boolean;
-    addressProof: string | null;
-  } | null> {
+  private async reopenSpentLink({
+    token,
+  }: {
+    token: string;
+  }): Promise<CompletedVerification | null> {
     const spent = await this.deps.tokens.findSpent({ token, now: this.now() });
     const pending = spent ? readPendingSignUp(spent.identifier) : null;
     if (!pending) return null;
@@ -397,20 +424,26 @@ export class SignUpVerificationService {
     // already earned — the same address, proven by the same link, and the
     // proof is single-use and short-lived on its own account.
     if (state === "unknown") {
-      return {
-        email: pending.email,
-        accountCreated: false,
-        accountExists: false,
-        addressProof: await this.issueAddressProof({ email: pending.email }),
-      };
+      return completedVerification(
+        {
+          email: pending.email,
+          accountCreated: false,
+          accountExists: false,
+          addressProof: await this.issueAddressProof({ email: pending.email }),
+        },
+        false,
+      );
     }
 
-    return {
-      email: pending.email,
-      accountCreated: false,
-      accountExists: true,
-      addressProof: null,
-    };
+    return completedVerification(
+      {
+        email: pending.email,
+        accountCreated: false,
+        accountExists: true,
+        addressProof: null,
+      },
+      false,
+    );
   }
 
   private async issueAddressProof({

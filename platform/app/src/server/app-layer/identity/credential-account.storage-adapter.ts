@@ -190,6 +190,7 @@ export class CredentialAccountStorageAdapter
 
   createPasskeyUser(args: {
     email: string;
+    claimHash: string;
   }): Promise<{ id: string; created: boolean }> {
     return this.deps.legacy.createPasskeyUser(args);
   }

@@ -132,6 +132,8 @@ model User {
   name                          String?
   email                         String?                  @unique
   emailVerified                 Boolean                  @default(false)
+  signupConfirmationPending     Boolean                  @default(false)
+  passkeySignupClaimHash        String?
   image                         String?                  @db.Text
   pendingSsoSetup               Boolean                  @default(false)
   // Per-user HMAC key for identity event payload hashes (ADR-101 §4): minted

@@ -33,3 +33,9 @@ ALTER TABLE "Identifier" ADD COLUMN "lastUsedAt" TIMESTAMP(3);
 ALTER TABLE "AuditLog" ADD COLUMN "actorUserId" TEXT;
 
 CREATE INDEX "AuditLog_actorUserId_idx" ON "AuditLog"("actorUserId");
+
+-- New local accounts cannot mint a session until their confirmation proof is
+-- consumed. Existing rows retain the pre-latch behavior via the false default.
+ALTER TABLE "User"
+  ADD COLUMN "signupConfirmationPending" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN "passkeySignupClaimHash" TEXT;
