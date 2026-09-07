@@ -31,7 +31,7 @@ import { CriteriaInput } from "./ui/CriteriaInput";
 import { SectionHeader } from "./ui/SectionHeader";
 
 /** The words a person reads for each caller-voice effect. */
-const EFFECT_LABELS: Record<CallerVoiceEffect, string> = {
+export const EFFECT_LABELS: Record<CallerVoiceEffect, string> = {
   none: "None",
   phone_line: "Phone line",
   background_noise: "Background noise",
