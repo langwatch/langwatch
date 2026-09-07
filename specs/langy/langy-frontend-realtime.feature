@@ -254,12 +254,57 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Then no thinking line renders under the answer
     And no status placeholder renders under the answer
 
+  # The row at the end of the transcript is the turn's activity row (card
+  # taxonomy: activity). It hides while text arrives and comes back once the
+  # text has been quiet for one second, a pinned constant, so a pause between
+  # two paragraphs reads as Langy working and two deltas never flicker it.
+  @unit
+  Scenario: The activity row returns once the text has been quiet for a second
+    Given a turn is in flight and the reply's text just arrived
+    Then no activity row renders under the answer
+    When no further text arrives for one second
+    Then the activity row renders with a spinner and a cycling verb
+
+  # Thinking is the default word and shows more often than the others. The
+  # verbs cycle only while the turn is provably working, never while waiting
+  # for a worker to start.
+  @unit
+  Scenario: The activity row cycles a verb while Langy works between steps
+    Given a turn is in flight with a tool call already settled
+    Then the activity row shows a spinner and one of the thinking verbs
+    And the verb changes every few seconds
+    And Thinking appears more often than any other verb
+
+  @unit
+  Scenario: The activity row names the running work in my words
+    Given a turn is in flight with a tool call running
+    Then the row says "Running the command in your terminal" for a command on my machine
+    And "Reading the code" for a read, search or listing
+    And "Editing the code" for a write or an edit
+    And "Writing your LangWatch credentials" for the credentials file
+    And "Loading a skill" for a skill
+    And the capability headline for a LangWatch CLI call
+
+  # The record is what a tab that adopted the turn holds before its stream is
+  # back, and where a command on the developer's machine is recorded.
+  @unit
+  Scenario: A turn adopted from the record still names its running tool
+    Given a turn whose message on screen carries nothing
+    When the turn's durable record holds a running tool call
+    Then the activity row names that tool's work
+
   @unit
   Scenario: A turn held by a card says it is waiting for me
     Given a turn is in flight with a card waiting for my answer
     Then the thinking line says it is waiting for my answer on the card above
     And it never says the turn is taking longer than usual
     And it never says Langy may be stuck
+
+  @unit
+  Scenario: A permission ask open in the terminal says the approval is waited for there
+    Given a turn is in flight with a permission card waiting for my answer
+    And a folder is shared from a terminal
+    Then the thinking line says it is waiting for my approval in the terminal
 
   # The escalation used to measure the time since the line appeared, which is
   # turn length, not silence. So a turn that had answered a permission card and

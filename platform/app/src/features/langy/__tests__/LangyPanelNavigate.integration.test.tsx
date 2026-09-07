@@ -535,7 +535,9 @@ describe("Feature: Langy opens the resource it surfaced in the browser", () => {
 
       adoptTurnFromDurableRecord("turn-9");
 
-      await waitFor(() => expect(chatRef.resumeStream).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(chatRef.resumeStream).toHaveBeenCalledTimes(1),
+      );
 
       // useChat's resume asks the transport to reconnect; the transport
       // subscribes to the adopted turn, not to one of its own.
@@ -572,7 +574,9 @@ describe("Feature: Langy opens the resource it surfaced in the browser", () => {
       await waitFor(() => expect(transportRef.current).not.toBeNull());
 
       adoptTurnFromDurableRecord("turn-9");
-      await waitFor(() => expect(chatRef.resumeStream).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(chatRef.resumeStream).toHaveBeenCalledTimes(1),
+      );
 
       // The same durable turn re-asserted (a refetch, a fresher cursor) is not
       // a second resume.

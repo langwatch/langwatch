@@ -1,11 +1,18 @@
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack, Spinner } from "@chakra-ui/react";
 import type { UIMessage } from "ai";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCyclingVerb } from "~/features/traces-v2/components/ai/useCyclingVerb";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import type { LangyThinkingTone } from "../logic/langyThinkingLine";
-import { langyThinkingLine } from "../logic/langyThinkingLine";
+import type {
+  LangyThinkingTone,
+  RecordedToolCall,
+} from "../logic/langyThinkingLine";
+import {
+  currentTurnAssistant,
+  langyThinkingLine,
+  TEXT_QUIET_MS,
+} from "../logic/langyThinkingLine";
 import { useLangyStore } from "../stores/langyStore";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
 import { LANGY_THINKING_VERBS } from "./langyThinkingVerbs";
@@ -14,8 +21,8 @@ import { STATUS_LINE_ROW, StatusOrb } from "./StreamingStatusLine";
 const MotionText = motion.create(Box);
 
 /**
- * The line Langy shows while a turn is in flight — and it may only say TRUE
- * things.
+ * The activity row at the end of the transcript while a turn is in flight
+ * (card taxonomy: `activity`). It may only say TRUE things.
  *
  * It used to cycle whimsical verbs on a 3.6s timer for as long as a turn was
  * open, regardless of whether anything was happening. On a turn whose worker
@@ -25,31 +32,29 @@ const MotionText = motion.create(Box);
  * is slow" was diagnosed for a whole session before anyone noticed the turn had
  * never started at all.
  *
- * So the line is now derived from what is provably on the wire
- * (`logic/langyThinkingLine.ts`):
+ * So the row is derived from what is provably on the wire and in the turn's
+ * durable record (`logic/langyThinkingLine.ts`):
  *
- *   - a tool is running   → say which, from the tool stream's own command;
+ *   - a tool is running   → say which, in the reader's words ("Running the
+ *                           command in your terminal", "Reading the code");
  *   - tokens are arriving → render NOTHING: the streaming answer is on screen
- *                           and speaks for itself;
+ *                           and speaks for itself. The row is back once the
+ *                           text has been quiet for TEXT_QUIET_MS;
  *   - reasoning is flowing → "Thinking…", plainly;
+ *   - between steps       → a spinner and a cycling verb;
  *   - nothing at all      → say we are still starting, and ESCALATE. Cycling
  *                           implies progress, so it stops. A stuck turn ends up
  *                           looking stuck, which is the whole point.
- *
- * The shimmer stays: it signals "alive", not "achieving".
  *
  * REASONING IS A SIGNAL HERE, NEVER A SURFACE. `hasLiveReasoning` is the only
  * thing this component is told about the model's thinking, and it uses it for
  * exactly one purpose: to say "Thinking…" instead of falsely escalating toward
  * "stuck" on a turn that is provably working. The reasoning TEXT is deliberately
- * not rendered anywhere in the panel — it used to ride this line as a fading
- * glimpse with an expandable scrollback, and it is gone. The store still
- * accumulates it (it drives the fold's `thinking` motion); the UI simply does
- * not show the model's private thinking to the user.
+ * not rendered anywhere in the panel.
  */
 
-/** Double the shared 1800ms default — a 0.28s crossfade needs time to settle. */
-const THINKING_VERB_DWELL_MS = 3_600;
+/** How long each verb holds before the next one crossfades in. */
+export const THINKING_VERB_DWELL_MS = 2_400;
 /** Coarse: the line only changes at 12s / 35s / 75s, so a 1s tick is plenty. */
 const ELAPSED_TICK_MS = 1_000;
 
@@ -58,8 +63,10 @@ export function LangyThinkingLine({
   hasLiveReasoning = false,
   workerReady = false,
   awaitingAnswer = false,
+  awaitingPermission = false,
   terminalConnected = false,
   activityKey = "",
+  toolCalls = null,
 }: {
   messages: UIMessage[];
   /**
@@ -70,13 +77,21 @@ export function LangyThinkingLine({
    */
   activityKey?: string;
   /**
+   * The turn's tool calls off its durable record, so a tab that adopted the
+   * turn, or a local command on the developer's machine, still names the
+   * running work.
+   */
+  toolCalls?: readonly RecordedToolCall[] | null;
+  /**
    * A card is holding the turn for the developer's answer (ADR-129), so the
    * line says that instead of escalating toward "Langy may be stuck".
    */
   awaitingAnswer?: boolean;
+  /** The card holding the turn is a permission ask. */
+  awaitingPermission?: boolean;
   /**
    * A folder is shared from a terminal, so the ask that holds the turn is open
-   * there too and the line says both places.
+   * there too and the line says so.
    */
   terminalConnected?: boolean;
   /**
@@ -117,6 +132,24 @@ export function LangyThinkingLine({
     return () => clearInterval(id);
   }, [activityKey, pageActivity]);
 
+  // Whether a text token arrived within the last TEXT_QUIET_MS. The parts say
+  // how much prose exists, not when it came, so the growth is timed here: each
+  // growth hides the row and arms one timer that shows it again. Text already
+  // on the message when the row mounts (a replayed stream, a reopened tab)
+  // counts as quiet, because when it arrived is unknown and the turn is
+  // provably past it.
+  const proseLength = proseLengthOf(messages);
+  const seenProseLengthRef = useRef<number | null>(null);
+  const [proseArriving, setProseArriving] = useState(false);
+  useEffect(() => {
+    const seen = seenProseLengthRef.current;
+    seenProseLengthRef.current = proseLength;
+    if (seen === null || proseLength <= seen) return;
+    setProseArriving(true);
+    const id = setTimeout(() => setProseArriving(false), TEXT_QUIET_MS);
+    return () => clearTimeout(id);
+  }, [proseLength]);
+
   const line = langyThinkingLine({
     messages,
     elapsedMs,
@@ -124,11 +157,15 @@ export function LangyThinkingLine({
     workerReady,
     pageActivity,
     awaitingAnswer,
+    awaitingPermission,
     terminalConnected,
+    proseArriving,
+    toolCalls,
   });
 
-  // Whimsy ONLY where the truth signal permits it — i.e. the model is genuinely
-  // generating. Everywhere else the text is the honest, static line.
+  // The verbs cycle ONLY where the truth signal permits it, which is while
+  // the model is genuinely working. Everywhere else the text is the static
+  // line.
   const cyclingVerb = useCyclingVerb(
     line?.allowWhimsy ?? false,
     LANGY_THINKING_VERBS,
@@ -136,8 +173,8 @@ export function LangyThinkingLine({
   );
 
   // No line at all: the streaming answer is on screen and speaks for itself —
-  // any row under it (orb included) reads as the panel still waiting for the
-  // reply that is visibly arriving. After the hooks, so their order is stable.
+  // any row under it (spinner included) reads as the panel still waiting for
+  // the reply that is visibly arriving. After the hooks, so their order is stable.
   if (!line) return null;
 
   const text = line.allowWhimsy ? `${cyclingVerb}…` : line.text;
@@ -149,10 +186,10 @@ export function LangyThinkingLine({
     // shrinkable child is what lets the clip below engage.
     //
     // The row wears the SHARED status-line frame (STATUS_LINE_ROW, see
-    // StreamingStatusLine): same gap, same padding, and the same leading orb
-    // slot as the status rows this line alternates with — so "Preparing Langy's
-    // workspace…" → "Starting Langy…" → "Thinking…" reads as one line changing its words,
-    // never a line hopping between layouts.
+    // StreamingStatusLine): same gap, same padding, and the same leading
+    // indicator slot as the status rows this line alternates with — so
+    // "Preparing Langy's workspace…" → "Starting Langy…" → "Thinking…" reads
+    // as one line changing its words, never a line hopping between layouts.
     <HStack
       gap={STATUS_LINE_ROW.gap}
       alignSelf="stretch"
@@ -160,16 +197,59 @@ export function LangyThinkingLine({
       minWidth={0}
       paddingY={STATUS_LINE_ROW.paddingY}
       paddingLeft={STATUS_LINE_ROW.paddingLeft}
+      data-langy-activity-row=""
     >
-      {/* A stuck turn keeps the slot but not the glow: the orb claims
-          "alive", and by then that is the one thing we cannot claim. */}
-      <StatusOrb active={line.tone !== "stuck"} />
+      {/* A working turn spins; a waiting one glows; a stuck turn keeps the
+          slot but not the glow: the indicator claims "alive", and by then
+          that is the one thing we cannot claim. */}
+      {line.tone === "working" ? (
+        <ActivitySpinner reduceMotion={reduceMotion} />
+      ) : (
+        <StatusOrb active={line.tone !== "stuck"} />
+      )}
       <ThinkingLineText
         text={text}
         tone={line.tone}
         reduceMotion={reduceMotion}
       />
     </HStack>
+  );
+}
+
+/** The prose of the current turn's reply so far, as a length. */
+function proseLengthOf(messages: UIMessage[]): number {
+  const parts = currentTurnAssistant(messages)?.parts ?? [];
+  return parts.reduce(
+    (total, part) =>
+      total + (part.type === "text" ? (part.text?.length ?? 0) : 0),
+    0,
+  );
+}
+
+/**
+ * The spinner of a working turn. It sits in the same 10px slot as the status
+ * orb, so the text keeps one left offset whichever indicator leads the row.
+ */
+function ActivitySpinner({ reduceMotion }: { reduceMotion: boolean }) {
+  return (
+    <Box
+      data-status-orb="active"
+      data-langy-activity-spinner=""
+      position="relative"
+      width="10px"
+      height="10px"
+      flexShrink={0}
+      display="grid"
+      placeItems="center"
+    >
+      <Spinner
+        width="10px"
+        height="10px"
+        borderWidth="1.5px"
+        color="fg.muted"
+        css={reduceMotion ? { animation: "none" } : undefined}
+      />
+    </Box>
   );
 }
 

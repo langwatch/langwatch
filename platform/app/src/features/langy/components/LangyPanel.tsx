@@ -2542,8 +2542,11 @@ function LangyPanel({
   // says while that is true is not what it says while Langy is working: the
   // waiting line points at the card, and the composer stops claiming Langy is
   // busy (ADR-129).
+  const awaitingPermission = permissionCards.some(
+    (card) => card.status === "pending",
+  );
   const awaitingAnswer =
-    permissionCards.some((card) => card.status === "pending") ||
+    awaitingPermission ||
     [...questionWaits.values()].some((wait) => wait.status === "pending");
 
   // The live entries belong to one conversation; opening another drops them.
@@ -3804,10 +3807,16 @@ function LangyPanel({
                                   metrics={displaySignals.metrics}
                                   segment={displaySignals.segment}
                                 />
-                              ) : !hasInlineProgressOwner ? (
+                              ) : (
                                 <LangyThinkingLine
                                   messages={displayMessages}
                                   hasLiveReasoning={!!displaySignals.reasoning}
+                                  // The turn's durable record: a tab that
+                                  // adopted the turn, and a command running
+                                  // on the developer's machine, name their
+                                  // work from here.
+                                  toolCalls={turnToolCalls}
+                                  awaitingPermission={awaitingPermission}
                                   // A card is holding the turn: the line says
                                   // so and points at it, rather than
                                   // escalating toward "Langy may be stuck"
@@ -3835,7 +3844,7 @@ function LangyPanel({
                                         pendingConversationId)
                                   }
                                 />
-                              ) : null}
+                              )}
                             </VStack>
                           ) : null}
                           {/* Recovering beats failing. While the policy has a retry
