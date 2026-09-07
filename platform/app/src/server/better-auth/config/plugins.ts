@@ -168,6 +168,10 @@ export function plugins({
      * rebuildable by replay.
      */
     sso({
+      // Provider rows are projections of the managed connection log. The
+      // plugin's session-authenticated registration route must never become a
+      // second writer for the same configuration.
+      providersLimit: 0,
       // The identity provider's word on whether it verified the address.
       //
       // This is what lets an organization move from the brokered provider to

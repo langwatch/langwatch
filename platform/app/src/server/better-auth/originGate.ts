@@ -7,6 +7,8 @@
  *
  * Rules:
  * - GET/OPTIONS/HEAD always allowed (read-only / preflight).
+ * - The exact SAML ACS POST path accepts a cross-origin IdP form submission;
+ *   BetterAuth performs the assertion, provider and replay validation.
  * - State-changing methods (POST/PUT/DELETE/PATCH) require either
  *   `Origin` matching `baseUrl` OR (no `Origin`) `Referer` matching
  *   `baseUrl`. A real browser always sends one of them on POST.
@@ -25,11 +27,15 @@ function originOf(value: string | undefined): string | null {
 
 export function isAllowedAuthOrigin(opts: {
   method: string | undefined;
+  pathname?: string;
   origin: string | undefined;
   referer: string | undefined;
   baseUrl: string;
 }): boolean {
-  const { method, origin, referer, baseUrl } = opts;
+  const { method, pathname = "", origin, referer, baseUrl } = opts;
+  if (method === "POST" && /^\/api\/auth\/sso\/saml2\/sp\/acs\/[^/?#]+$/.test(pathname)) {
+    return true;
+  }
   if (!method || !STATE_CHANGING_METHODS.has(method)) return true;
 
   const expected = originOf(baseUrl);

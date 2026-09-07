@@ -146,6 +146,36 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     and nothing that identifies the identity provider
     Then the registration is refused with "sso_credentials_required"
 
+  @integration
+  Scenario: A valid signing certificate authenticates an assertion
+    Given a SAML connection configured with a known signing certificate
+    When its identity provider sends an assertion signed by the corresponding key
+    Then the assertion reaches the connection's identity policy
+
+  @integration
+  Scenario: A different or tampered signing certificate authenticates nothing
+    Given a SAML connection configured with a known signing certificate
+    When an assertion is signed by an unrelated key or altered after signing
+    Then the assertion is refused before identity policy
+    And no user, account or session is written
+
+  @integration
+  Scenario: Overlapping signing certificates in metadata both authenticate during rotation
+    Given a SAML connection whose metadata contains its old and new signing certificates
+    When the identity provider sends an assertion signed by either corresponding key
+    Then either assertion reaches the connection's identity policy
+
+  @unimplemented
+  Scenario: A signing certificate never proves an email domain
+    Given a SAML connection has a readable signing certificate and no proved domain
+    When its identity provider asserts an address belonging to nobody in the organization
+    Then the assertion is refused
+    And no account is provisioned and no session is minted
+
+  # Metadata is read when the administrator registers the connection. The
+  # current engine does not refresh it automatically, and service-provider
+  # signing-key rotation is not supported manually.
+
   # ---------------------------------------------------------------------
   # The vault
   # ---------------------------------------------------------------------
@@ -336,6 +366,13 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     When its administrator registers another identity provider
     Then the registration is refused with "sso_connection_already_registered"
     And the connection it already had is untouched
+
+  @unit
+  Scenario: A legacy connection may have exactly one explicit direct replacement
+    Given the organization has one grandfathered identity-provider connection
+    When its administrator registers the direct connection that names it as the predecessor
+    Then the replacement is registered beside the legacy connection for migration
+    But an ordinary second connection and any further replacement are refused with "sso_connection_already_registered"
 
   @unit
   Scenario: A discarded connection is not one it still holds
