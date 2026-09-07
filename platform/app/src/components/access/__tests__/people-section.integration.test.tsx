@@ -134,14 +134,6 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
-      getOrganizationPendingInvites: {
-        useQuery: () => ({
-          data: state.invites,
-          isError: false,
-          error: null,
-          refetch: vi.fn(),
-        }),
-      },
       getMemberProvenance: {
         useQuery: () => ({
           data: state.provenanceError ? undefined : state.provenance,
@@ -150,6 +142,16 @@ vi.mock("~/utils/api", () => ({
         }),
       },
       deleteMember: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    invite: {
+      getOrganizationPendingInvites: {
+        useQuery: () => ({
+          data: state.invites,
+          isError: false,
+          error: null,
+          refetch: vi.fn(),
+        }),
+      },
     },
     plan: {
       getActivePlan: {

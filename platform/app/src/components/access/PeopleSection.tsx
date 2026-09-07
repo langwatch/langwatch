@@ -170,7 +170,7 @@ function PeopleList({
   } = useDisclosure();
 
   const pendingInvites =
-    api.organization.getOrganizationPendingInvites.useQuery(
+    api.invite.getOrganizationPendingInvites.useQuery(
       { organizationId: organization.id },
       { enabled: !!organization.id },
     );

@@ -129,8 +129,8 @@ vi.mock("~/utils/api", () => ({
     team: { getTeamsWithRoleBindings: emptyQuery([]) },
     organization: {
       getOrganizationWithMembersAndTheirTeams: emptyQuery({ members: [] }),
-      getOrganizationPendingInvites: emptyQuery([]),
     },
+    invite: { getOrganizationPendingInvites: emptyQuery([]) },
     joinRequests: { pending: emptyQuery([]) },
   },
 }));

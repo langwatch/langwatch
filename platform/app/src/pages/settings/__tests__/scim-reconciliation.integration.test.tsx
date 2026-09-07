@@ -97,6 +97,8 @@ const apiDouble = {
           error: null,
         }),
       },
+    },
+    invite: {
       getOrganizationPendingInvites: {
         useQuery: () => ({
           data: [],

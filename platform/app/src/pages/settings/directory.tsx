@@ -153,7 +153,7 @@ function DirectorySettingsContent({
       { organizationId, includeDeactivated: true },
       { enabled: reach.mayManageMembership && !!organizationId },
     );
-  const invites = api.organization.getOrganizationPendingInvites.useQuery(
+  const invites = api.invite.getOrganizationPendingInvites.useQuery(
     { organizationId },
     { enabled: reach.mayManageMembership && !!organizationId },
   );
