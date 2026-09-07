@@ -20,7 +20,7 @@
 
 import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 export const BETTERSTACK_API_BASE = "https://uptime.betterstack.com/api/v2";
 export const BETTERSTACK_REGIONS = ["us", "eu", "as", "au"] as const;

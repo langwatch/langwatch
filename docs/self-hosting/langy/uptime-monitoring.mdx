@@ -50,7 +50,7 @@ new key on every run.
 
 Create these once, by hand, in the deployment you want to watch:
 
-1. **A dedicated project** for monitoring. Nothing else should live in it.
+1. **A dedicated project** for monitoring, holding only the user and key below.
 2. **A dedicated user** who is a member of that project and has Langy access
    (the Langy cohort). The check runs as this user; do not reuse a person's
    account.
@@ -75,10 +75,10 @@ LANGY_API_KEY=<the key from step 1> \
 npx tsx scripts/uptime/upsert-langy-greeting-monitor.ts --dry-run
 ```
 
-The dry run prints the monitor definition with the key redacted and writes
-nothing. Drop `--dry-run` to create the monitor, or to update it in place if one
-with the same name already exists. Run it again after any change to the script
-in `scripts/uptime/langy-greeting.betterstack.js`.
+The dry run prints the monitor definition with the key redacted and leaves
+Better Stack unchanged. Drop `--dry-run` to create the monitor, or to update it
+in place if one with the same name already exists. Run it again after any
+change to the script in `scripts/uptime/langy-greeting.betterstack.js`.
 
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
