@@ -4,7 +4,7 @@ import {
   AgentsApiService,
   type AgentResponse,
 } from "@/client-sdk/services/agents/agents-api.service";
-import { resolveCredentials } from "../../utils/apiKey";
+import { type ResolvedCredentials, resolveCredentials } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
@@ -56,6 +56,39 @@ const WAIT_POLL_MS = 3000;
 /** How long the wait lasts when the caller names no timeout. */
 export const DEFAULT_WAIT_SECONDS = 120;
 
+/** The credentials the list was read with, as the timeout line names them. */
+function identityOf(credentials: ResolvedCredentials): string {
+  switch (credentials.source) {
+    case "flag":
+      return "the API key given on the command line";
+    case "env":
+      return "the API key from the environment";
+    case "session":
+      return "your device login's personal project key";
+  }
+}
+
+/**
+ * What `--wait-online` says when the timeout passes, on stderr in every output
+ * format. It names the agent, the wait and the credentials the listing was
+ * read with, so the reader is left with the agent process as the thing to
+ * look at. It never mentions the login commands: under `--format json` the
+ * spinner is silent, and when the only line left on stderr was the identity
+ * notice with "langwatch login" in it, a model read the timeout as a login
+ * failure on a command line that was signed in.
+ */
+export function waitOnlineTimeoutLine({
+  wanted,
+  timeoutSeconds,
+  credentials,
+}: {
+  wanted: string;
+  timeoutSeconds: number;
+  credentials: ResolvedCredentials;
+}): string {
+  return `No agent named ${wanted} reported online within ${timeoutSeconds} seconds of --wait-online. The listing was read as ${identityOf(credentials)} at ${credentials.endpoint} and answered; the agent process never reported online.`;
+}
+
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -83,7 +116,7 @@ const reportsOnline = (agents: AgentResponse[], wanted: string): boolean =>
 export const listAgentsCommand = async (
   options: ListAgentsOptions = {},
 ): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
 
   const service = new AgentsApiService();
   const wanted = options.waitOnline?.trim();
@@ -98,8 +131,11 @@ export const listAgentsCommand = async (
       const deadline = Date.now() + timeoutSeconds * 1000;
       while (!reportsOnline(result.data, wanted)) {
         if (Date.now() >= deadline) {
-          spinner.fail(
-            `No agent named ${wanted} reported online within ${timeoutSeconds} seconds.`,
+          // Not spinner.fail: the spinner is silent under a machine format,
+          // and this line has to reach the caller whatever the format.
+          spinner.stop();
+          console.error(
+            waitOnlineTimeoutLine({ wanted, timeoutSeconds, credentials }),
           );
           console.error(
             chalk.gray(

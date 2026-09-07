@@ -17,6 +17,7 @@ vi.mock("../../../utils/apiKey", () => ({
 vi.mock("ora", () => ({
   default: () => ({
     start: vi.fn().mockReturnThis(),
+    stop: vi.fn().mockReturnThis(),
     succeed: vi.fn(),
     fail: vi.fn(),
   }),
@@ -172,6 +173,33 @@ describe("listAgentsCommand()", () => {
       expect(console.error).toHaveBeenCalledWith(
         expect.stringContaining("Read the process's own output for the reason"),
       );
+    });
+
+    /** @scenario "The wait's timeout names the agent, the wait and the credentials, never a login" */
+    it("says on stderr which agent it waited for, for how long, and which credentials read the list", async () => {
+      vi.useFakeTimers();
+      mockList.mockResolvedValue(offline());
+
+      const pending = listAgentsCommand({ waitOnline: "acme-checkout", timeout: 6 });
+      const outcome = pending.catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(3000);
+      await outcome;
+
+      const lines = vi
+        .mocked(console.error)
+        .mock.calls.map((call) => String(call[0]));
+      const timeoutLine = lines.find((line) => line.includes("--wait-online"));
+      expect(timeoutLine).toBe(
+        "No agent named acme-checkout reported online within 6 seconds of --wait-online. The listing was read as the API key from the environment at https://app.langwatch.ai and answered; the agent process never reported online.",
+      );
+      // The line goes through console.error, not the spinner, so it is
+      // printed under --format json as well, where the spinner is silent.
+      for (const line of lines) {
+        expect(line).not.toContain("login");
+        expect(line).not.toContain("Switch:");
+      }
     });
   });
 });
