@@ -370,11 +370,11 @@
 				"src/components/me/PasskeysSection.tsx",
 				"src/components/me/SignInMethodsSection.tsx",
 				"src/components/settings/ChangePasswordDialog.tsx",
-				"src/features/auth-front-door/components/CredentialSignInForm.tsx",
-				"src/features/auth-front-door/components/FrontDoorGround.tsx",
-				"src/features/auth-front-door/components/IdentifierFirstSignIn.tsx",
-				"src/features/auth-front-door/components/SignUpCredentialForm.tsx",
-				"src/features/auth-front-door/components/VerificationFirstSignUp.tsx"
+				"src/features/auth/components/AuthGround.tsx",
+				"src/features/auth/components/CredentialSignInForm.tsx",
+				"src/features/auth/components/IdentifierFirstSignIn.tsx",
+				"src/features/auth/components/SignUpCredentialForm.tsx",
+				"src/features/auth/components/VerificationFirstSignUp.tsx"
 			],
 			"linter": {
 				"rules": {

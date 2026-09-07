@@ -1,12 +1,14 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the /auth/reset-password page. The full component tree
- * renders under Chakra; only the BetterAuth client and the URL search-params
- * hook are mocked.
+ * The /auth/reset-password screen. The full component tree renders under
+ * Chakra; only the BetterAuth client, the public-env hook and the URL
+ * search-params hook are mocked — the error registry is the real one, because
+ * what the screen SAYS about a refusal is half of what these tests are for.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -16,15 +18,29 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockResetPassword, searchParamsRef } = vi.hoisted(() => ({
-  mockResetPassword: vi.fn(),
-  searchParamsRef: {
-    current: new URLSearchParams("token=tok_valid") as URLSearchParams | null,
+const { mockResetPassword, mockAddPasskey, searchParamsRef, publicEnvRef } =
+  vi.hoisted(() => ({
+    mockResetPassword: vi.fn(),
+    mockAddPasskey: vi.fn(),
+    searchParamsRef: {
+      current: new URLSearchParams("token=tok_valid") as URLSearchParams | null,
+    },
+    publicEnvRef: {
+      current: {
+        NEXTAUTH_PROVIDER: "email",
+      } as Record<string, unknown>,
+    },
+  }));
+
+vi.mock("~/utils/auth-client", () => ({
+  authClient: {
+    resetPassword: mockResetPassword,
+    passkey: { addPasskey: mockAddPasskey },
   },
 }));
 
-vi.mock("~/utils/auth-client", () => ({
-  authClient: { resetPassword: mockResetPassword },
+vi.mock("~/hooks/usePublicEnv", () => ({
+  usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
 vi.mock("~/utils/compat/next-navigation", () => ({
@@ -46,7 +62,11 @@ vi.mock("~/utils/compat/next-link", () => ({
   ),
 }));
 
+import { endPasskeyCeremony } from "~/features/auth/logic/passkeyCeremony";
 import ResetPassword from "../reset-password";
+
+/** A ceremony that never resolves, so the waiting state stays up to be read. */
+const neverAnswers = () => new Promise<never>(() => void 0);
 
 const setToken = (token: string | null) => {
   searchParamsRef.current = token
@@ -54,14 +74,12 @@ const setToken = (token: string | null) => {
     : new URLSearchParams("");
 };
 
-const renderPage = () => {
-  const view = render(
+const renderPage = () =>
+  render(
     <ChakraProvider value={defaultSystem}>
       <ResetPassword />
     </ChakraProvider>,
   );
-  return view;
-};
 
 const passwordInputs = (container: HTMLElement) =>
   Array.from(
@@ -83,6 +101,16 @@ const fillAndSubmit = ({
   fireEvent.click(screen.getByRole("button", { name: /reset password/i }));
 };
 
+const resetSuccessfully = async () => {
+  const { container } = renderPage();
+  fillAndSubmit({
+    container,
+    password: "newsecret123",
+    confirm: "newsecret123",
+  });
+  await screen.findByRole("heading", { name: /password updated/i });
+};
+
 describe("ResetPassword page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -90,15 +118,20 @@ describe("ResetPassword page", () => {
       data: { status: true },
       error: null,
     });
+    mockAddPasskey.mockResolvedValue({ data: {}, error: null });
     setToken("tok_valid");
+    publicEnvRef.current = {
+      NEXTAUTH_PROVIDER: "email",
+    };
   });
 
   afterEach(() => {
+    act(() => endPasskeyCeremony());
     cleanup();
   });
 
   describe("when the token is valid and the passwords match", () => {
-    /** @scenario Submitting a valid new password with a token resets it and returns to sign-in */
+    /** @scenario Submitting a valid new password with a token resets it and signs me in */
     it("calls resetPassword with the new password and token, then confirms with a sign-in link", async () => {
       const { container } = renderPage();
       fillAndSubmit({
@@ -115,10 +148,13 @@ describe("ResetPassword page", () => {
       });
 
       expect(
-        await screen.findByText(/your password has been reset/i),
+        await screen.findByRole("heading", { name: /password updated/i }),
       ).toBeTruthy();
-      const signInLink = screen.getByRole("link", { name: /sign in/i });
-      expect(signInLink.getAttribute("href")).toBe("/auth/signin");
+      // The reset signed them in, so the way on is into the app, not back to
+      // the log-in screen to type the password they just chose.
+      const continueLink = screen.getByTestId("reset-sign-in");
+      expect(continueLink.getAttribute("href")).toBe("/");
+      expect(continueLink).toHaveTextContent(/continue/i);
     });
   });
 
@@ -153,10 +189,13 @@ describe("ResetPassword page", () => {
 
   describe("when the token is invalid or expired", () => {
     /** @scenario An invalid or expired token surfaces an error and a way to retry */
-    it("surfaces an invalid-or-expired error with a link to request a new reset", async () => {
+    it("surfaces an expired-or-used error with a link to request a new reset", async () => {
       mockResetPassword.mockResolvedValueOnce({
         data: null,
-        error: { code: "INVALID_TOKEN", message: "invalid token" },
+        // The translated body: the auth boundary re-answers `INVALID_TOKEN` on
+        // /reset-password as our own code, and the flat REST shape is what
+        // `readHandledError` lifts it off.
+        error: { error: "identity_reset_link_invalid", status: 400 },
       });
       setToken("tok_expired");
       const { container } = renderPage();
@@ -166,11 +205,60 @@ describe("ResetPassword page", () => {
         confirm: "newsecret123",
       });
 
-      expect(await screen.findByText(/invalid or has expired/i)).toBeTruthy();
+      expect(
+        await screen.findByText(/expired or already been used/i),
+      ).toBeTruthy();
       const retry = screen.getByRole("link", {
         name: /request a new reset link/i,
       });
       expect(retry.getAttribute("href")).toBe("/auth/forgot-password");
+    });
+
+    /** @scenario A refused reset says why in words from the registry */
+    it("never puts the code itself or a raw message on screen", async () => {
+      mockResetPassword.mockResolvedValueOnce({
+        data: null,
+        error: {
+          error: "identity_reset_link_invalid",
+          message: "identity_reset_link_invalid",
+          status: 400,
+        },
+      });
+      const { container } = renderPage();
+      fillAndSubmit({
+        container,
+        password: "newsecret123",
+        confirm: "newsecret123",
+      });
+
+      await screen.findByText(/expired or already been used/i);
+      expect(document.body.textContent).not.toContain(
+        "identity_reset_link_invalid",
+      );
+    });
+  });
+
+  describe("when the password itself is refused rather than the link", () => {
+    /** @scenario A refused reset says why in words from the registry */
+    it("keeps the form live and does not offer a fresh link", async () => {
+      mockResetPassword.mockResolvedValueOnce({
+        data: null,
+        error: { error: "identity_password_rejected", status: 400 },
+      });
+      const { container } = renderPage();
+      fillAndSubmit({
+        container,
+        password: "newsecret123",
+        confirm: "newsecret123",
+      });
+
+      expect(await screen.findByText(/wasn't accepted/i)).toBeTruthy();
+      // A new link is the remedy only when the link is the problem: offered
+      // here it sends somebody to burn a fresh one and meet the same wall.
+      expect(
+        screen.queryByRole("link", { name: /request a new reset link/i }),
+      ).toBeNull();
+      expect(passwordInputs(container)).toHaveLength(2);
     });
   });
 
@@ -181,13 +269,136 @@ describe("ResetPassword page", () => {
       const { container } = renderPage();
 
       expect(
-        screen.getByRole("heading", { name: /invalid reset link/i }),
+        screen.getByRole("heading", { name: /that reset link didn't work/i }),
       ).toBeTruthy();
       expect(
         screen.getByRole("link", { name: /request a new reset link/i }),
       ).toBeTruthy();
       // No password form is rendered without a token.
       expect(passwordInputs(container)).toHaveLength(0);
+    });
+  });
+
+  describe("given a deployment whose auth screens takes passkeys", () => {
+    beforeEach(() => {
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "email",
+      };
+    });
+
+    describe("when the reset completes", () => {
+      /** @scenario A completed reset offers a passkey rather than assuming one */
+      it("offers a passkey beside the plain way on, not in front of it", async () => {
+        await resetSuccessfully();
+
+        expect(screen.getByTestId("post-reset-passkey-offer")).toBeTruthy();
+        // The plain action is still the unmissable one.
+        expect(screen.getByTestId("reset-sign-in").getAttribute("href")).toBe(
+          "/",
+        );
+        // The reset signed them in, so the passkey is made HERE rather than
+        // behind a second button on a settings page.
+        const add = screen.getByTestId("reset-add-passkey");
+        expect(add).toHaveTextContent(/add a passkey/i);
+        expect(add.getAttribute("href")).toBeNull();
+      });
+
+      /** @scenario A completed reset offers a passkey rather than assuming one */
+      it("opens no device prompt of its own", async () => {
+        await resetSuccessfully();
+
+        // The ceremony starts on a real gesture and on nothing else. A prompt
+        // over a confirmation somebody came to read is an ambush.
+        expect(mockAddPasskey).not.toHaveBeenCalled();
+        expect(screen.queryByTestId("passkey-ceremony")).toBeNull();
+      });
+    });
+
+    describe("when the offer is waved away", () => {
+      /** @scenario Declining the offer costs nothing */
+      it("leaves the confirmation and the way to sign in exactly where they were", async () => {
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-dismiss-passkey"));
+
+        expect(screen.queryByTestId("post-reset-passkey-offer")).toBeNull();
+        expect(
+          screen.getByRole("heading", { name: /password updated/i }),
+        ).toBeTruthy();
+        expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+      });
+    });
+
+    describe("when the offer is taken", () => {
+      /** @scenario Accepting the offer adds the passkey on this screen */
+      it("waits on the device, says whose prompt it is, and keeps the way on", async () => {
+        mockAddPasskey.mockImplementation(neverAnswers);
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-add-passkey"));
+
+        expect(await screen.findByTestId("passkey-ceremony")).toBeTruthy();
+        expect(mockAddPasskey).toHaveBeenCalledTimes(1);
+        expect(
+          screen.getByTestId("passkey-ceremony-explainer").textContent,
+        ).toMatch(/your browser or device/i);
+        // Registering from here is a passkey specifically, so the panel offers
+        // no "use a different method" — there is no other method to offer.
+        expect(
+          screen.queryByTestId("passkey-ceremony-other-methods"),
+        ).toBeNull();
+        expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+      });
+
+      /** @scenario Accepting the offer adds the passkey on this screen */
+      it("says the passkey was added once the device answers", async () => {
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-add-passkey"));
+
+        expect(await screen.findByTestId("reset-passkey-added")).toBeTruthy();
+        expect(screen.queryByTestId("passkey-ceremony")).toBeNull();
+        expect(screen.queryByTestId("post-reset-passkey-offer")).toBeNull();
+        expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+      });
+
+      /** @scenario Declining the offer costs nothing */
+      it("says nothing at all about a system prompt somebody closed", async () => {
+        // Status 0 is the prompt dismissed by hand: a decision, not a fault.
+        mockAddPasskey.mockResolvedValue({ error: { status: 0 } });
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-add-passkey"));
+
+        await waitFor(() => {
+          expect(screen.queryByTestId("passkey-ceremony")).toBeNull();
+        });
+        expect(screen.queryByRole("alert")).toBeNull();
+        // The offer is still there to take again, deliberately.
+        expect(screen.getByTestId("reset-add-passkey")).toBeTruthy();
+      });
+    });
+
+    describe("when the ceremony is refused", () => {
+      /** @scenario A refused ceremony says so in words and leaves the way on */
+      it("shows the registry's words for it, never the code, and keeps the way on", async () => {
+        mockAddPasskey.mockResolvedValue({ error: { status: 500 } });
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-add-passkey"));
+
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        expect(document.body.textContent).not.toContain(
+          "identity_passkey_ceremony_failed",
+        );
+        expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+      });
+
+      /** @scenario A refused ceremony says so in words and leaves the way on */
+      it("reports a ceremony that never reached the server the same way", async () => {
+        mockAddPasskey.mockRejectedValue(new Error("no authenticator"));
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-add-passkey"));
+
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        expect(document.body.textContent).not.toContain("no authenticator");
+        expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+      });
     });
   });
 });

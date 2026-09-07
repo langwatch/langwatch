@@ -78,7 +78,7 @@ describe("<SignInError/>", () => {
       renderError("DIFFERENT_EMAIL_NOT_ALLOWED");
       expect(screen.getByText(/can't link this account/i)).toBeTruthy();
       const back = screen.getByRole("link", { name: /back to settings/i });
-      expect(back.getAttribute("href")).toBe("/settings/authentication");
+      expect(back.getAttribute("href")).toBe("/settings/security");
     });
   });
 });

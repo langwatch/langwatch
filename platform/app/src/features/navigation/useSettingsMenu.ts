@@ -17,7 +17,6 @@ import {
   FolderOpen,
   Gauge,
   KeyRound,
-  Link2,
   Lock,
   type LucideIcon,
   MailX,
@@ -28,6 +27,8 @@ import {
   ShieldCheck,
   Sparkles,
   UserCog,
+  UserRound,
+  UserSearch,
   Users,
   UsersRound,
   Workflow,
@@ -100,6 +101,17 @@ interface SettingsMenuGates {
   isSaaS: boolean;
   showEnterpriseNav: boolean;
   isLiteMember: boolean;
+}
+
+function youGroup(): SettingsMenuGroup {
+  return {
+    id: "settings-you",
+    label: "You",
+    items: [
+      { label: "Profile", href: "/settings/profile", icon: UserRound },
+      { label: "Security", href: "/settings/security", icon: Fingerprint },
+    ],
+  };
 }
 
 function organizationGroup({
@@ -191,15 +203,10 @@ function enterpriseAccessItems(): SettingsMenuItem[] {
       isEnterprise: true,
     },
     {
-      label: "Roles & Permissions",
+      label: "Roles",
       href: "/settings/roles",
       icon: ShieldCheck,
-      isEnterprise: true,
-    },
-    {
-      label: "Role Bindings",
-      href: "/settings/role-bindings",
-      icon: Link2,
+      alsoActiveAt: ["/settings/role-bindings"],
       isEnterprise: true,
     },
     {
@@ -362,6 +369,11 @@ export function backofficeGroup(): SettingsMenuGroup {
         icon: ShieldCheck,
       },
       {
+        label: "Identity Lookup",
+        href: "/ops/backoffice/identity-lookup",
+        icon: UserSearch,
+      },
+      {
         label: "Bug Reports",
         href: "/ops/backoffice/bug-reports",
         icon: Bug,
@@ -401,6 +413,7 @@ export function useSettingsMenu(): SettingsMenuGroup[] {
   };
 
   const groups: SettingsMenuGroup[] = [
+    youGroup(),
     organizationGroup(gates),
     accessGroup(gates),
     aiInfrastructureGroup(gates),

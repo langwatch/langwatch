@@ -52,8 +52,12 @@ describe("better-auth config", () => {
     });
 
     /** @scenario Credentials-only on-prem mode */
-    /** @scenario The BetterAuth admin plugin is intentionally omitted */
-    // Verifies that impersonation stays in Session.impersonating, not the admin() plugin.
+    // The scenario that used to bind here retired at D06 (the legacy
+    // impersonation pair in phase-1-better-auth-config.feature, and with it
+    // the "only genericOAuth is present" assertion). The CHECK survives
+    // unchanged and is what matters: `admin()` would take impersonation over
+    // from the principal, and nothing but a deliberate registration may
+    // appear in this array.
     it("does not register the BetterAuth admin plugin", async () => {
       const { auth } = await import("../index");
       const options = (auth as any).options;
@@ -63,36 +67,40 @@ describe("better-auth config", () => {
       expect(pluginIds).not.toContain("admin");
       // The allow-list is the point: a plugin appearing here that nobody
       // deliberately registered is the failure this catches, and `admin` in
-      // particular would take impersonation over from the legacy
-      // Session.impersonating JSON column.
+      // particular would take impersonation over from the authorization
+      // principal that carries it.
       //
       // `two-factor` (D06) and `passkey` (D07) are registered only when
       // their env flag is on, which is why they are permitted rather than
       // required — with both flags off the array is genericOAuth or empty,
       // exactly as before.
-      const deliberate = ["generic-oauth", "two-factor", "passkey"];
+      //
+      // `sso` (D09, wave 3) is registered unconditionally: it is what
+      // terminates an organization's own identity provider, and its
+      // registration is deliberate in the same sense the others are.
+      const deliberate = [
+        "generic-oauth",
+        "two-factor",
+        "passkey",
+        "sso",
+        "langwatch-sign-up-confirmation",
+      ];
       for (const id of pluginIds) {
         expect(deliberate).toContain(id);
       }
     });
 
     /** @scenario "With the flag off nothing about two-step verification exists" */
-    /** @scenario "With the flag off, passkeys do not exist" */
-    it("registers a factor plugin only when its flag is on", async () => {
-      // Both flags default off, so re-importing the module under each
-      // setting is what makes this a real check rather than one that
-      // happens to pass because nothing was ever turned on.
-      const pluginIdsUnder = async (flags: {
-        MFA_ENROLLMENT_OPEN: string;
-        PASSKEYS_ENABLED: string;
-      }): Promise<string[]> => {
+    /** @scenario "A passkey is offered on every deployment, not on some of them" */
+    it("registers the two-factor plugin only when its flag is on", async () => {
+      // The flag defaults off, so re-importing the module under each setting
+      // is what makes this a real check rather than one that happens to pass
+      // because nothing was ever turned on.
+      const pluginIdsUnder = async (mfa: string): Promise<string[]> => {
         vi.resetModules();
         const { env } = await import("~/env.mjs");
         vi.spyOn(env, "MFA_ENROLLMENT_OPEN", "get").mockReturnValue(
-          flags.MFA_ENROLLMENT_OPEN as never,
-        );
-        vi.spyOn(env, "PASSKEYS_ENABLED", "get").mockReturnValue(
-          flags.PASSKEYS_ENABLED as never,
+          mfa as never,
         );
         const { auth } = await import("../index");
         return ((auth as any).options?.plugins ?? []).map(
@@ -103,19 +111,48 @@ describe("better-auth config", () => {
       // Not registered means the routes are not mounted, so nothing about
       // the feature is reachable — the flag governs the surface, not just
       // whether a screen renders.
-      const off = await pluginIdsUnder({
-        MFA_ENROLLMENT_OPEN: "off",
-        PASSKEYS_ENABLED: "off",
-      });
+      const off = await pluginIdsUnder("off");
       expect(off).not.toContain("two-factor");
-      expect(off).not.toContain("passkey");
 
-      const on = await pluginIdsUnder({
-        MFA_ENROLLMENT_OPEN: "on",
-        PASSKEYS_ENABLED: "on",
-      });
+      const on = await pluginIdsUnder("on");
       expect(on).toContain("two-factor");
+
+      // Passkeys are not a flag any more. They are mounted either way, which
+      // is the whole point of removing the setting: a deployment cannot be
+      // in a state where the button exists and the endpoint does not.
+      expect(off).toContain("passkey");
       expect(on).toContain("passkey");
+
+      vi.restoreAllMocks();
+      vi.resetModules();
+    });
+
+    /** @scenario "The passkey relying party is the deployment's public address" */
+    it("binds the passkey relying party to the address a browser reaches", async () => {
+      // The plugin derives its own rpID from `baseURL` (`NEXTAUTH_URL`), and
+      // on a preview host that is the internal address. Every ceremony was
+      // then built for "localhost" while the browser signed for the public
+      // host, and SimpleWebAuthn refused the RP-id-hash mismatch as
+      // `identity_passkey_not_recognized`. Asserted on the plugin's own
+      // options because that is what the ceremonies read.
+      vi.resetModules();
+      const { env } = await import("~/env.mjs");
+      vi.spyOn(env, "BASE_HOST", "get").mockReturnValue(
+        "https://lw7631.boxd.sh" as never,
+      );
+      vi.spyOn(env, "NEXTAUTH_URL", "get").mockReturnValue(
+        "http://localhost:5560" as never,
+      );
+
+      const { auth } = await import("../index");
+      const passkeyPlugin = ((auth as any).options?.plugins ?? []).find(
+        (p: { id?: string }) => p?.id === "passkey",
+      );
+
+      expect(passkeyPlugin?.options).toMatchObject({
+        rpID: "lw7631.boxd.sh",
+        origin: "https://lw7631.boxd.sh",
+      });
 
       vi.restoreAllMocks();
       vi.resetModules();
@@ -195,7 +232,9 @@ describe("better-auth config", () => {
       // The env-driven provider selection lives in pure builders so we can
       // exercise auth0 mode without re-initializing the module under a
       // different NEXTAUTH_PROVIDER (which would need vi.resetModules()).
-      const { isEmailPasswordEnabled } = await import("../index");
+      const { isEmailPasswordEnabled } = await import(
+        "../config/email-and-password"
+      );
       const { buildGenericOAuthConfigs } = await import("@ee/sso/providers");
       const e = {
         NEXTAUTH_PROVIDER: "auth0",
@@ -230,7 +269,9 @@ describe("better-auth config", () => {
 
     /** @scenario Self-hosted that never had a license hides SSO and offers email sign-in */
     it("mounts email/password on self-hosted so a denied deployment keeps a door", async () => {
-      const { isEmailPasswordEnabled } = await import("../index");
+      const { isEmailPasswordEnabled } = await import(
+        "../config/email-and-password"
+      );
 
       // ADR-027: mounting is not the gate. Self-hosted always mounts so an
       // unlicensed deployment can sign in, and a licensed one keeps password

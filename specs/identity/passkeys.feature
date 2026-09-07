@@ -51,22 +51,83 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
   # session already records what was proven, so the refinement is a policy
   # reading a claim that exists.
   #
-  # Everything ships behind PASSKEYS_ENABLED, which defaults off. The
-  # rollback is the flag; nothing about it is one-way.
+  # There is no setting. The plugin is mounted on every deployment, because a
+  # deployment where the button exists and the endpoint does not is a state
+  # nobody could be in on purpose.
 
   Background:
     Given an organization "acme" with a member "sam"
     And the identity pipeline is registered with the event-sourcing framework
-    And passkeys are available behind their flag
+    And passkeys are available
 
   # ── Registering ────────────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration @e2e
   Scenario: Registering a passkey from settings adds a way in
     Given "sam" is signed in
     When "sam" registers a passkey from their security settings
     Then the passkey appears in "sam"'s list of sign-in methods
     And "sam" can sign in with it from then on
+
+  # The settings page starts the ceremony with no address attached: the
+  # person is signed in, and the account is the one they are signed into.
+  # Reading a sign-up context anyway refused the passkey they had just
+  # created, on a page showing the very address it said was missing.
+  @unit
+  Scenario: Adding a passkey while signed in attaches it to that account
+    Given "sam" is signed in
+    When "sam" completes a passkey ceremony from their security settings
+    Then the passkey is attached to "sam"'s account
+    And no account is created and no address is asked for
+
+  # ONE offer, two halves (D06 follow-up). A person is asked once about their
+  # ACCOUNT rather than once about a passkey and again about two-step
+  # verification: two dialogs on the way in is a nag whatever each one says,
+  # and somebody who declines the first has answered the question the second
+  # would ask. Each half keeps its own gate, and one dismissal covers both.
+  @unit
+  Scenario: The offer covers whichever of the two the person lacks
+    Given "sam" holds no passkey and has not set up two-step verification
+    And both are offered on this deployment
+    When the signed-in shell asks what to offer "sam"
+    Then both a passkey and two-step verification are offered
+    And they are offered together, as one question about the account
+
+  @unit
+  Scenario: Each half disappears once the person has it
+    Given "sam" has set up two-step verification but holds no passkey
+    And both are offered on this deployment
+    When the signed-in shell asks what to offer "sam"
+    Then a passkey is offered and two-step verification is not
+
+  @unit
+  Scenario: Only what the deployment offers is offered
+    Given two-step verification is offered here and passkeys are not
+    And "sam" has neither
+    When the signed-in shell asks what to offer "sam"
+    Then two-step verification is offered and a passkey is not
+
+  @unit
+  Scenario: One dismissal answers the whole offer
+    Given "sam" holds neither and has just said not now
+    When the signed-in shell asks again the same day
+    Then nothing is offered, about either of them
+    But once the interval has passed the offer comes back
+
+  # ADR-120's rule is that a passkey is offered where it REPLACES a password.
+  # Somebody who just signed in through their employer's identity provider did
+  # not type one and cannot stop typing one, and somebody who signed in with a
+  # passkey already has the thing being offered — so the offer would be a
+  # dialog in the way of the product with nothing behind it. What the session
+  # recorded it proved (D06) is the answer, and a session that recorded nothing
+  # is not read as a password.
+  @integration @e2e
+  Scenario: The passkey offer follows a password, not a federated sign-in
+    Given "sam" holds no passkey and the offer is theirs to see
+    When "sam" reaches the product having signed in with a password
+    Then the offer is on screen
+    But it is not shown at all when the sign-in was a passkey or an identity provider
+    And it is not shown for a session that recorded no method
 
   @unit @unimplemented
   Scenario: A registered passkey becomes an identifier like every other method
@@ -158,7 +219,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then the session records that a phishing-resistant method was proven
     And the session records which of "sam"'s sign-in methods minted it
 
-  @unit @unimplemented
+  @unit
   Scenario: A passkey nobody holds is refused without telling anyone anything
     When a sign-in is attempted with a credential no user holds
     Then the refusal carries the code "identity_passkey_not_recognized"
@@ -172,12 +233,25 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then it is refused
     And the tombstone still resolves for anyone reading "sam"'s history
 
-  @integration @unimplemented
+  @integration
   Scenario: Cancelling the device prompt is not a dead end
     Given "sam" chose the passkey method
     When "sam" dismisses the device prompt
     Then the picker is still on screen with every other method usable
     And nothing tells "sam" they have failed at anything
+
+  # The offer waiting in the address field has no abort handle, so a screen on
+  # its way out cannot cancel the ceremony it started — and going away is
+  # exactly what a sign-in that WORKED does. The tear-down is reported as a
+  # refusal carrying the status that means "the server looked at this
+  # credential and said no", so the last thing somebody saw after typing the
+  # right password was a passkey they had never picked being turned down.
+  @integration
+  Scenario: Leaving the sign-in screen does not read as a passkey failure
+    Given the passkey offer is waiting in the address field of the sign-in screen
+    When "sam" signs in with their password and the screen navigates away
+    Then the abandoned passkey ceremony shows no error
+    And nothing about the sign-in that worked says anything went wrong
 
   # ── A passkey and an organization that requires two steps ──────────────
 
@@ -293,32 +367,38 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   # ── Failures read as words ─────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Every named failure has copy a first-time reader understands
     When registering, signing in with, or removing a passkey is refused with a named code
     Then the screen shows the copy registered for that code
     And the screen never shows the code itself or an internal error
     And no message names a credential identifier, a table or a service
 
-  @unit @unimplemented
+  @unit
   Scenario: A failure we cannot name stays unnamed
     When a passkey ceremony fails for a reason nothing anticipated
     Then no invented code is attached to it
     And the screen says it did not go through, with a trace identifier
     And the real cause is logged
 
-  # ── The flag ───────────────────────────────────────────────────────────
+  # ── Always there ───────────────────────────────────────────────────────
 
   @unit
-  Scenario: With the flag off, passkeys do not exist
-    Given the passkey flag is off
+  Scenario: A passkey is offered on every deployment, not on some of them
+    Given any installation of LangWatch
     When the method picker is rendered and the security settings are opened
-    Then no passkey is offered, registered or accepted
-    And every other sign-in method behaves exactly as it did before
+    Then a passkey can be registered and accepted
+    And the endpoint behind every passkey button is mounted
 
-  @unit @unimplemented
-  Scenario: Turning the flag off leaves registered passkeys alone
-    Given members of "acme" registered passkeys
-    When the flag is turned off
-    Then no passkey is deleted and no identifier is detached
-    And turning it back on offers the same passkeys again
+  # A passkey is bound to a relying party at the moment it is created, and the
+  # browser offers it back only to that one - which is exactly what makes it
+  # unphishable, and exactly what breaks when we name the wrong one. Behind a
+  # reverse proxy, and on every preview host, the address we dial ourselves on
+  # is not the address the person's browser typed. The public one is the only
+  # one the browser ever signed for.
+  @unit @e2e
+  Scenario: The passkey relying party is the deployment's public address
+    Given a deployment whose internal address differs from its public one
+    When better-auth's passkey plugin is configured
+    Then the relying party id and origin are the public address
+    And a passkey registered on the public host is recognized there

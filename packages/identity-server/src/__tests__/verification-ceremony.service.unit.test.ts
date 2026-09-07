@@ -74,6 +74,7 @@ function harness(options?: {
       // The ceremony reads exactly one head; the rest of the port is
       // present so the double is the contract, not a slice of it.
       findUserHashKey: async () => null,
+      hasFolded: async () => true,
       findHeads: async ({ userId }) => emptyIdentityHeads({ userId }),
       findActiveIdentifierByValue: async () => null,
       findIdentifierIdForAccount: async () => null,

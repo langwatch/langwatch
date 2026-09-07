@@ -465,6 +465,28 @@ export class IdentityMfaRequiredByOrganizationError extends MfaCommandRefusedErr
   }
 }
 
+export class IdentityMfaRequirementNotLicensedError extends MfaCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_mfa_requirement_not_licensed",
+      "identity_mfa_requirement_not_licensed",
+      { httpStatus: 403, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityMfaRequirementNotLicensedError";
+  }
+}
+
+export class IdentityMfaPasswordInvalidError extends MfaCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_mfa_password_invalid", "identity_mfa_password_invalid", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityMfaPasswordInvalidError";
+  }
+}
+
 /**
  * The enrollment gate: this organization requires a second factor and this
  * person cannot yet prove one. NOT an authentication failure — the session
@@ -506,6 +528,17 @@ export class IdentityPasskeyCeremonyFailedError extends PasskeyCommandRefusedErr
   }
 }
 
+export class IdentityPasskeyAlreadyRegisteredError extends PasskeyCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_passkey_already_registered",
+      "identity_passkey_already_registered",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityPasskeyAlreadyRegisteredError";
+  }
+}
+
 /** The credential presented is not one we hold — or is not one we hold for
  *  anybody. Deliberately the same answer either way. */
 export class IdentityPasskeyNotRecognizedError extends PasskeyCommandRefusedError {
@@ -533,6 +566,83 @@ export class IdentityDetachStrandsUserError extends IdentityCommandRefusedError 
       reasons: [new Error(detail)],
     });
     this.name = "IdentityDetachStrandsUserError";
+  }
+}
+
+export class IdentityIdentifierAlreadyHeldError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_identifier_already_held",
+      "identity_identifier_already_held",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityIdentifierAlreadyHeldError";
+  }
+}
+
+export class IdentityPasswordRejectedError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_password_rejected", "identity_password_rejected", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityPasswordRejectedError";
+  }
+}
+
+export class IdentityResetLinkInvalidError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_reset_link_invalid", "identity_reset_link_invalid", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityResetLinkInvalidError";
+  }
+}
+
+export class IdentitySignInRefusedError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_sign_in_refused", "identity_sign_in_refused", {
+      httpStatus: 401,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentitySignInRefusedError";
+  }
+}
+
+export class IdentityLinkProposalNotFoundError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_link_proposal_not_found",
+      "identity_link_proposal_not_found",
+      { httpStatus: 404, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityLinkProposalNotFoundError";
+  }
+}
+
+export class IdentityLinkProposalResolvedError extends IdentityCommandRefusedError {
+  constructor(
+    detail: string,
+    decision: { outcome: "confirmed" | "rejected"; byActorId: string | null },
+  ) {
+    super(
+      "identity_link_proposal_resolved",
+      "identity_link_proposal_resolved",
+      {
+        httpStatus: 409,
+        fault: "customer",
+        meta: {
+          decidedOutcome: decision.outcome,
+          decidedByActorId: decision.byActorId,
+        },
+        reasons: [new Error(detail)],
+      },
+    );
+    this.name = "IdentityLinkProposalResolvedError";
   }
 }
 

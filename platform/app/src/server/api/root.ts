@@ -17,6 +17,7 @@ import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
+import { authRouter } from "./routers/auth";
 import { authzRouter } from "./routers/authz";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
@@ -36,7 +37,6 @@ import { evaluatorsRouter } from "./routers/evaluators";
 import { experimentsRouter } from "./routers/experiments";
 import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "./routers/featureFlag";
-import { frontDoorRouter } from "./routers/frontDoor";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
@@ -48,6 +48,7 @@ import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
 import { identityRouter } from "./routers/identity";
+import { identityLookupRouter } from "./routers/identityLookup";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { joinRequestsRouter } from "./routers/joinRequests";
 import { langyRouter } from "./routers/langy";
@@ -92,6 +93,7 @@ import { traceEditOverlayRouter } from "./routers/traceEditOverlay";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
+import { twoStepVerificationRouter } from "./routers/twoStepVerification";
 import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { webhookEndpointsRouter } from "./routers/webhookEndpoints";
@@ -103,6 +105,7 @@ const coreRouters = {
   httpProxy: httpProxyRouter,
   organization: organizationRouter,
   joinRequests: joinRequestsRouter,
+  twoStepVerification: twoStepVerificationRouter,
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,
@@ -129,7 +132,8 @@ const coreRouters = {
   automation: automationRouter,
   authz: authzRouter,
   identity: identityRouter,
-  frontDoor: frontDoorRouter,
+  identityLookup: identityLookupRouter,
+  auth: authRouter,
   experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
   annotation: annotationRouter,
