@@ -210,15 +210,19 @@ Re-verified on scenario main `ae0c921c` on 2026-09-07: `place_call` still sends 
 
 ### 4.4 User flow
 
-1. **Settings, once per project.** Settings, Model providers, ElevenLabs. Paste the API key. Exists today. One line of copy is added: voice agents sign their sessions with this key.
-2. **Agents, New Agent.** The type selector gains one card, Voice agent, next to HTTP agent and Code agent.
-3. **Voice agent drawer.** Name. Reached via, a select with one V1 option, ElevenLabs agent. Agent id, from the ElevenLabs dashboard. A read-only Credentials line naming the provider row, or a callout with a link to Settings when no key exists. A Talk to it button. Save.
-4. **Talk to it.** A side panel opens: Connecting, then a live timer, a live two-speaker transcript, and Hang up. The browser opens the ElevenLabs session with the signed URL the gateway minted. Audio flows browser to ElevenLabs directly, the same shape the SDK adapter uses. On hang up the panel shows the transcript, a Play button, and a link to the run it created. This is the demo moment and the connection test in one.
-5. **Scenario editor.** Situation, persona and criteria unchanged. One new collapsed group, Caller voice: model picker filtered to voice models with a project default, Interrupts slider off, Effects none. Nothing here mentions ElevenLabs.
-6. **Run dialog.** The target picker lists the voice agent with a mic icon. Two buttons for a voice target. Run starts the simulated caller in the server-side pool, and per-turn audio streams into the run console as SDK voice runs do today. Call it myself opens the same mic panel as step 4, tagged with the scenario, so the judge scores your call against its criteria when you hang up.
-7. **Results.** The existing run view. Per-turn audio, transcript, verdict, criteria chips. A Caller column reads Simulated or You. A Play recording button when the ElevenLabs recording fetch succeeded.
+The flow starts where the user's intent starts, in the scenario, and detours out to create the agent and its credential before coming back to finish the wiring.
 
-Four of the seven screens are unchanged. New surface is one card, one drawer, one panel, one collapsed group and one button.
+1. **Create scenario.** Scenarios, New scenario. Situation, persona and criteria as today. Under Agent, the target picker lists existing agents and a New agent entry.
+2. **New agent, Voice agent.** The type selector opens from the scenario. It gains one card, Voice agent, next to HTTP agent and Code agent.
+3. **Voice agent drawer, first pass.** Name. Reached via, a select with one V1 option, ElevenLabs agent. Agent id, from the ElevenLabs dashboard. The Credentials line reads "No ElevenLabs key in this project" with an Add key link. The draft is kept while the user leaves.
+4. **Provider.** Settings, Model providers, ElevenLabs. Paste the API key, save. Exists today. One line of copy is added: voice agents sign their sessions with this key. A back link returns to the drawer.
+5. **Back to voice agent, finish setting up.** The Credentials line now names the provider row. Save. The agent appears in the scenario's picker, already selected.
+6. **Test.** Talk to it on the drawer. A side panel opens: Connecting, then a live timer, a live two-speaker transcript, and Hang up. The browser opens the ElevenLabs session with the signed URL the gateway minted. Audio flows browser to ElevenLabs directly, the same shape the SDK adapter uses. On hang up the panel shows the transcript, a Play button, and a link to the run it created. Connection test and demo moment in one.
+7. **Back to scenario, finish wiring.** The voice agent is the selected target. One new collapsed group, Caller voice: model picker filtered to voice models with a project default, Interrupts slider off, Effects none. Nothing here mentions ElevenLabs. Save the scenario.
+8. **Run.** Run starts the simulated caller in the server-side pool, and per-turn audio streams into the run console as SDK voice runs do today. Call it myself opens the same mic panel as step 6, tagged with the scenario, so the judge scores your call against its criteria when you hang up.
+9. **View results.** The existing run view. Per-turn audio, transcript, verdict, criteria chips. A Caller column reads Simulated or You. A Play recording button when the ElevenLabs recording fetch succeeded.
+
+Two screens are new, the drawer and the panel. The others gain a card, a callout, a back link, a collapsed group or a button.
 
 ### 4.5 Stories
 
