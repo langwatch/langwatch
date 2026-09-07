@@ -1,7 +1,7 @@
-import { Box, Button, Heading, HStack, Spacer } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
-import { BarChart2, Bell } from "lucide-react";
+import { Bell } from "lucide-react";
 import { useMemo } from "react";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { deriveSeriesIdentifier } from "~/components/analytics/seriesIdentifier";
@@ -11,10 +11,14 @@ import type { FilterField } from "~/server/filters/types";
 import { GraphCardMenu, type SizeOption } from "./GraphCardMenu";
 import { GraphFilterIndicator } from "./GraphFilterIndicator";
 
+const stripPackPrefix = (n: string) =>
+  n.replace(/^(North-star|Legacy):\s*/, "");
+
 interface GraphCardHeaderProps {
   graphId: string;
   name: string;
   graph: unknown;
+  projectId: string;
   projectSlug: string;
   dashboardId?: string;
   colSpan: number;
@@ -27,6 +31,8 @@ interface GraphCardHeaderProps {
   } | null;
   /** Whether this card is a saved LangWatchQL chart rather than a builder graph. */
   isWorkbenchChart?: boolean;
+  /** Whether this card is a custom-chart-playground widget. */
+  isPlaygroundWidget?: boolean;
   /** The datapoint step a workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
   isDragging: boolean;
@@ -42,6 +48,7 @@ export function GraphCardHeader({
   graphId,
   name,
   graph,
+  projectId,
   projectSlug,
   dashboardId,
   colSpan,
@@ -49,6 +56,7 @@ export function GraphCardHeader({
   filters,
   trigger,
   isWorkbenchChart = false,
+  isPlaygroundWidget = false,
   granularitySeconds,
   isDragging,
   dragAttributes,
@@ -105,12 +113,15 @@ export function GraphCardHeader({
 
   // Check if this is a saved graph (has valid database ID).
   //
-  // A workbench chart is excluded on purpose rather than by accident: the alert
-  // path reads a builder payload's `series` to name what it is thresholding,
-  // and a saved statement has no series to read. Offering the bell here would
+  // A workbench chart or playground widget is excluded on purpose rather than
+  // by accident: the alert path reads a builder payload's `series` to name
+  // what it is thresholding, and neither a saved statement nor a sandboxed
+  // author-code widget has a series to read. Offering the bell here would
   // author an alert against a chart the threshold dispatcher cannot evaluate.
   const isSavedGraph =
-    !isWorkbenchChart && !!(graphId && graphId !== "custom" && graph);
+    !isWorkbenchChart &&
+    !isPlaygroundWidget &&
+    !!(graphId && graphId !== "custom" && graph);
 
   // Opens the automations drawer in edit mode for this graph's existing
   // trigger. Shared by the bell's click and keyboard handlers so both entry
@@ -129,13 +140,12 @@ export function GraphCardHeader({
       {...dragAttributes}
       {...dragListeners}
       align="center"
-      marginBottom={4}
+      marginBottom={2}
       cursor={isDragging ? "grabbing" : "grab"}
     >
-      <BarChart2 color="orange" />
-      <Heading size="sm" marginLeft={2}>
-        {displayName}
-      </Heading>
+      <Text fontSize="13px" fontWeight="500" lineClamp={1} title={displayName}>
+        {stripPackPrefix(displayName)}
+      </Text>
       <Spacer />
 
       {isSavedGraph && (
@@ -209,11 +219,13 @@ export function GraphCardHeader({
 
       <GraphCardMenu
         graphId={graphId}
+        projectId={projectId}
         projectSlug={projectSlug}
         dashboardId={dashboardId}
         colSpan={colSpan}
         rowSpan={rowSpan}
         isWorkbenchChart={isWorkbenchChart}
+        isPlaygroundWidget={isPlaygroundWidget}
         {...(granularitySeconds === undefined ? {} : { granularitySeconds })}
         onSizeChange={onSizeChange}
         {...(onGranularityChange ? { onGranularityChange } : {})}

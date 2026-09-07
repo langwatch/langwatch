@@ -19,6 +19,7 @@
 import { createProjectApp } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { registerSavedWorkbenchChartRoutes } from "./app.charts.v1";
+import { registerPlaygroundWidgetRoutes } from "./app.playground-widgets.v1";
 
 patchZodOpenapi();
 
@@ -30,5 +31,6 @@ const secured = createProjectApp({
 });
 
 registerSavedWorkbenchChartRoutes(secured);
+registerPlaygroundWidgetRoutes(secured);
 
 export const app = secured.hono;

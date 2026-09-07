@@ -43,7 +43,12 @@ import {
   resolveLangyPrompt,
 } from "~/server/app-layer/langy/langyPromptRegistry";
 import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import {
+  disabledSkillIds,
+  renderLangyTurnContext,
+  skillGateFlagFor,
+  skillGateFlags,
+} from "~/server/app-layer/langy/langyTurnContext.schema";
 import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import type {
   LangyMessageRepository,
@@ -55,6 +60,7 @@ import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/la
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { featureFlagService } from "~/server/featureFlag";
+import type { FeatureFlagKey } from "~/server/featureFlag/registry";
 import { cancelLocalWorkForTurn } from "~/server/langy-local-control/runtime";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "~/server/prompt-config/prompt.service";
@@ -66,6 +72,7 @@ import {
   LangyInsufficientScopeError,
   LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
+  LangySkillNotAvailableError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
 } from "./errors";
@@ -228,6 +235,69 @@ async function resolveLangyUiActionsOpen({
     );
     return false;
   }
+}
+
+/**
+ * Which of this turn's requested skill ids are gated off for this caller.
+ *
+ * Only resolves flags for skills the turn actually asked for — with zero
+ * gated skills requested (the overwhelmingly common case today, since only
+ * the `playground-widgets` / `lwql-charts` pair declares a gate) this
+ * returns immediately with no flag lookup at all. Fails CLOSED per flag on
+ * a flag-store error: same reasoning as `resolveLangyUiActionsOpen` —
+ * treating an unreadable flag as off is the safe half of the trade both
+ * ways here, since it means the experimental skill
+ * (`release_custom_chart_playground`-gated) stays disabled AND the stable
+ * default it is mutually exclusive with stays available.
+ */
+async function resolveDisabledSkillIds({
+  turnContext,
+  userId,
+  projectId,
+  organizationId,
+}: {
+  turnContext: LangyTurnContext;
+  userId: string;
+  projectId: string;
+  organizationId: string;
+}): Promise<string[]> {
+  const requestedIds = (turnContext.skills ?? []).map((skill) => skill.id);
+  const flagsToCheck = skillGateFlags(requestedIds);
+  if (flagsToCheck.length === 0) return [];
+
+  const enabledFlags = new Set<string>();
+  await Promise.all(
+    flagsToCheck.map(async (flag) => {
+      try {
+        // `flag` comes from LANGY_SKILLS' `featureFlag`/`excludedByFlag`,
+        // both plain `string` at the skill-catalog level — nothing there
+        // proves membership in the registry, and `FeatureFlagKey` also
+        // admits the open-ended `es-*-*-*-killswitch` pattern, so no closed
+        // type guard could fully vouch for it either. Same cast, same
+        // reasoning as `input.flag as FeatureFlagKey` in
+        // `src/server/api/routers/featureFlag.ts`: `isEnabled` treats an
+        // unregistered key as a safe no-op (falls through to the legacy
+        // resolver and returns false) rather than throwing, so the cast
+        // stays sound at runtime even for a flag the registry doesn't know.
+        if (
+          await featureFlagService.isEnabled(flag as FeatureFlagKey, {
+            distinctId: userId,
+            projectId,
+            organizationId,
+          })
+        ) {
+          enabledFlags.add(flag);
+        }
+      } catch (error) {
+        logger.warn(
+          { error, projectId, flag },
+          "langy skill flag evaluation failed, treating the skill as gated off",
+        );
+      }
+    }),
+  );
+
+  return disabledSkillIds(requestedIds, (flag) => enabledFlags.has(flag));
 }
 
 /**
@@ -1203,6 +1273,26 @@ export class LangyTurnService {
         uiActionsOpenResult.status === "fulfilled"
           ? uiActionsOpenResult.value
           : true;
+
+      // A requested skill that is known but gated off for this caller gets
+      // rejected here, same as an unknown skill id would be at the zod
+      // boundary — never silently rendered without it. Costs nothing on the
+      // overwhelmingly common turn (no flagged skill requested): see
+      // `resolveDisabledSkillIds`.
+      const disabledSkills = await resolveDisabledSkillIds({
+        turnContext,
+        userId,
+        projectId,
+        organizationId: credentials.organizationId,
+      });
+      const [disabledSkillId] = disabledSkills;
+      if (disabledSkillId !== undefined) {
+        const flag = skillGateFlagFor(disabledSkillId);
+        getLangyTurnsCounter("rejected").inc();
+        // `flag` is always defined here: `disabledSkillIds` only returns ids
+        // `SKILL_GATES` (and therefore `skillGateFlagFor`) has an entry for.
+        throw new LangySkillNotAvailableError(disabledSkillId, flag ?? "");
+      }
 
       // The per-turn user-message lane: what the user is looking at and the
       // turn-scoped cap note precede a clearly labelled ask, so the model

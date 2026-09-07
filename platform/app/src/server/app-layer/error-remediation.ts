@@ -149,6 +149,18 @@ const registry = {
       "Ask an administrator to enable the SQL workbench for this project",
     ],
   },
+  custom_chart_playground_not_enabled: {
+    tips: [
+      "The custom-chart-playground feature is not enabled for this project; retrying will not help",
+      "Use the lwql-charts skill / `langwatch chart` commands for a saved dashboard chart instead",
+    ],
+  },
+  custom_graph_writes_disabled_for_playground: {
+    tips: [
+      "The custom-chart-playground is enabled for this project, which turns off creating or editing dashboard graphs; retrying will not help",
+      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
+    ],
+  },
   saved_workbench_chart_already_exists: {
     tips: [
       "A saved chart with this id already exists in this project",
@@ -178,6 +190,12 @@ const registry = {
     tips: [
       "This is a defect on our side; the stored chart cannot be read back and retrying will not help",
       "Save the chart again from the workbench to replace the unreadable definition",
+    ],
+  },
+  saved_workbench_charts_disabled_for_playground: {
+    tips: [
+      "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
+      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
     ],
   },
   lwql_unknown_identifier: {
@@ -585,6 +603,11 @@ const registry = {
   },
   langy_model_not_configured: {
     tips: ["Pick a model in the project's model settings, then retry"],
+  },
+  langy_skill_not_available: {
+    tips: [
+      "This skill is gated by a feature flag that is off for this project — use an available alternative instead of retrying",
+    ],
   },
   langy_model_not_allowed: {
     tips: ["Choose one of the models configured for this project and retry"],

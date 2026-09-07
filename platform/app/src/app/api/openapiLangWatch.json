@@ -9926,6 +9926,2275 @@
         ]
       }
     },
+    "/api/v1/projects/{projectId}/analytics/playground-widgets": {
+      "get": {
+        "operationId": "getApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgets",
+        "summary": "List custom-chart-playground widgets",
+        "description": "Lists every custom-chart-playground widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "responses": {
+          "200": {
+            "description": "The project's playground widgets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "definition": {
+                            "type": "object",
+                            "properties": {
+                              "version": {
+                                "type": "number"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "queries": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "sql": {
+                                      "type": "string"
+                                    },
+                                    "parameters": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "type": {
+                                            "type": "string",
+                                            "enum": [
+                                              "string",
+                                              "number",
+                                              "boolean"
+                                            ]
+                                          },
+                                          "default": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "name",
+                                          "type"
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "sql"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "version",
+                              "code",
+                              "queries"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          },
+                          "platformUrl": {
+                            "type": "string"
+                          },
+                          "dashboardId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "gridColumn": {
+                            "type": "integer"
+                          },
+                          "gridRow": {
+                            "type": "integer"
+                          },
+                          "colSpan": {
+                            "type": "integer"
+                          },
+                          "rowSpan": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "definition",
+                          "createdAt",
+                          "updatedAt",
+                          "platformUrl",
+                          "dashboardId",
+                          "gridColumn",
+                          "gridRow",
+                          "colSpan",
+                          "rowSpan"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "postApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgets",
+        "summary": "Create a custom-chart-playground widget",
+        "description": "Saves a React source file and the named LangWatchQL queries it runs as one playground widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "responses": {
+          "201": {
+            "description": "The widget was saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "definition": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "queries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "sql": {
+                                "type": "string"
+                              },
+                              "parameters": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "string",
+                                        "number",
+                                        "boolean"
+                                      ]
+                                    },
+                                    "default": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "type"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "sql"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "code",
+                        "queries"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "definition",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "code": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "queries": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "sql": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50000
+                        },
+                        "parameters": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "string",
+                                  "number",
+                                  "boolean"
+                                ]
+                              },
+                              "default": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 4000
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "type"
+                            ]
+                          },
+                          "maxItems": 32
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "sql"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "code",
+                  "queries"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}": {
+      "get": {
+        "operationId": "getApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId",
+        "summary": "Get a custom-chart-playground widget",
+        "description": "Returns one playground widget with its React source and named queries. A widget saved in another project is reported as not found.",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "responses": {
+          "200": {
+            "description": "The playground widget",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "definition": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "queries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "sql": {
+                                "type": "string"
+                              },
+                              "parameters": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "string",
+                                        "number",
+                                        "boolean"
+                                      ]
+                                    },
+                                    "default": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "type"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "sql"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "code",
+                        "queries"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "definition",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No playground widget with this id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "widgetId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "patchApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId",
+        "summary": "Update a custom-chart-playground widget",
+        "description": "Replaces a playground widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated widget",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "definition": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "queries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "sql": {
+                                "type": "string"
+                              },
+                              "parameters": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "string",
+                                        "number",
+                                        "boolean"
+                                      ]
+                                    },
+                                    "default": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "type"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "sql"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "code",
+                        "queries"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "definition",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No playground widget with this id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "code": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "queries": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "sql": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50000
+                        },
+                        "parameters": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "string",
+                                  "number",
+                                  "boolean"
+                                ]
+                              },
+                              "default": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 4000
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "type"
+                            ]
+                          },
+                          "maxItems": 32
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "sql"
+                      ]
+                    }
+                  }
+                },
+                "minProperties": 1
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "widgetId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId",
+        "summary": "Delete a custom-chart-playground widget",
+        "description": "Deletes one playground widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "responses": {
+          "204": {
+            "description": "The widget was deleted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No playground widget with this id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "widgetId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}/dashboard": {
+      "post": {
+        "operationId": "postApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetIdDashboard",
+        "summary": "Add a playground widget to a dashboard",
+        "description": "Assigns a playground widget to a dashboard. The widget is repositioned to the next free row on that dashboard; its size (colSpan/rowSpan) is preserved.",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "responses": {
+          "200": {
+            "description": "The widget was added to the dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "definition": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "queries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "sql": {
+                                "type": "string"
+                              },
+                              "parameters": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "string",
+                                        "number",
+                                        "boolean"
+                                      ]
+                                    },
+                                    "default": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "type"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "sql"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "code",
+                        "queries"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "definition",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No playground widget with this id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dashboardId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "dashboardId"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "widgetId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/v1/query": {
       "post": {
         "operationId": "postApiV1Query",
@@ -51539,7 +53808,8 @@
                           "FAILED",
                           "STALLED",
                           "QUEUED",
-                          "RUNNING"
+                          "RUNNING",
+                          "PENDING_EVALUATION"
                         ]
                       },
                       "results": {
@@ -57630,7 +59900,8 @@
                             ]
                           },
                           "status": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final."
                           },
                           "results": {
                             "type": [
@@ -57988,7 +60259,8 @@
                       ]
                     },
                     "status": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final."
                     },
                     "results": {
                       "type": [
@@ -61275,17 +63547,14 @@
                             "id": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 64,
-                              "description": "The attachment id. Stable across edits of the attachment."
+                              "maxLength": 64
                             },
                             "evaluatorId": {
                               "type": "string",
-                              "minLength": 1,
-                              "description": "The id of the saved evaluator this attachment runs."
+                              "minLength": 1
                             },
                             "required": {
-                              "type": "boolean",
-                              "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                              "type": "boolean"
                             },
                             "mappings": {
                               "type": "object",
@@ -61345,8 +63614,7 @@
                                       "value"
                                     ]
                                   }
-                                ],
-                                "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                                ]
                               },
                               "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                             }
@@ -61758,17 +64026,14 @@
                             "id": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 64,
-                              "description": "The attachment id. Stable across edits of the attachment."
+                              "maxLength": 64
                             },
                             "evaluatorId": {
                               "type": "string",
-                              "minLength": 1,
-                              "description": "The id of the saved evaluator this attachment runs."
+                              "minLength": 1
                             },
                             "required": {
-                              "type": "boolean",
-                              "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                              "type": "boolean"
                             },
                             "mappings": {
                               "type": "object",
@@ -61828,8 +64093,7 @@
                                       "value"
                                     ]
                                   }
-                                ],
-                                "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                                ]
                               },
                               "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                             }
@@ -62070,17 +64334,14 @@
                           "id": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The attachment id. Stable across edits of the attachment."
+                            "maxLength": 64
                           },
                           "evaluatorId": {
                             "type": "string",
-                            "minLength": 1,
-                            "description": "The id of the saved evaluator this attachment runs."
+                            "minLength": 1
                           },
                           "required": {
-                            "type": "boolean",
-                            "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                            "type": "boolean"
                           },
                           "mappings": {
                             "type": "object",
@@ -62140,8 +64401,7 @@
                                     "value"
                                   ]
                                 }
-                              ],
-                              "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                              ]
                             },
                             "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                           }
@@ -62540,8 +64800,7 @@
                               "type": "string",
                               "pattern": "^[a-z][a-z0-9_]*$",
                               "minLength": 1,
-                              "maxLength": 64,
-                              "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                              "maxLength": 64
                             },
                             "type": {
                               "type": "string",
@@ -62549,15 +64808,13 @@
                                 "text",
                                 "number",
                                 "boolean"
-                              ],
-                              "description": "The value type every scenario carries for this field."
+                              ]
                             }
                           },
                           "required": [
                             "identifier",
                             "type"
-                          ],
-                          "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                          ]
                         },
                         "maxItems": 30,
                         "description": "The fields the test suite declares. Absent on servers that predate fields on this family."
@@ -62570,17 +64827,14 @@
                             "id": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 64,
-                              "description": "The attachment id. Stable across edits of the attachment."
+                              "maxLength": 64
                             },
                             "evaluatorId": {
                               "type": "string",
-                              "minLength": 1,
-                              "description": "The id of the saved evaluator this attachment runs."
+                              "minLength": 1
                             },
                             "required": {
-                              "type": "boolean",
-                              "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                              "type": "boolean"
                             },
                             "mappings": {
                               "type": "object",
@@ -62640,8 +64894,7 @@
                                       "value"
                                     ]
                                   }
-                                ],
-                                "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                                ]
                               },
                               "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                             }
@@ -62758,8 +65011,7 @@
                             "type": "string",
                             "pattern": "^[a-z][a-z0-9_]*$",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                            "maxLength": 64
                           },
                           "type": {
                             "type": "string",
@@ -62767,15 +65019,13 @@
                               "text",
                               "number",
                               "boolean"
-                            ],
-                            "description": "The value type every scenario carries for this field."
+                            ]
                           }
                         },
                         "required": [
                           "identifier",
                           "type"
-                        ],
-                        "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                        ]
                       },
                       "maxItems": 30,
                       "description": "The fields the test suite declares. Absent on servers that predate fields on this family."
@@ -62788,17 +65038,14 @@
                           "id": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The attachment id. Stable across edits of the attachment."
+                            "maxLength": 64
                           },
                           "evaluatorId": {
                             "type": "string",
-                            "minLength": 1,
-                            "description": "The id of the saved evaluator this attachment runs."
+                            "minLength": 1
                           },
                           "required": {
-                            "type": "boolean",
-                            "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                            "type": "boolean"
                           },
                           "mappings": {
                             "type": "object",
@@ -62858,8 +65105,7 @@
                                     "value"
                                   ]
                                 }
-                              ],
-                              "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                              ]
                             },
                             "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                           }
@@ -62938,8 +65184,7 @@
                           "type": "string",
                           "pattern": "^[a-z][a-z0-9_]*$",
                           "minLength": 1,
-                          "maxLength": 64,
-                          "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                          "maxLength": 64
                         },
                         "type": {
                           "type": "string",
@@ -62947,15 +65192,13 @@
                             "text",
                             "number",
                             "boolean"
-                          ],
-                          "description": "The value type every scenario carries for this field."
+                          ]
                         }
                       },
                       "required": [
                         "identifier",
                         "type"
-                      ],
-                      "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                      ]
                     },
                     "maxItems": 30,
                     "description": "The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean."
@@ -62968,17 +65211,14 @@
                         "id": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 64,
-                          "description": "The attachment id. Stable across edits of the attachment."
+                          "maxLength": 64
                         },
                         "evaluatorId": {
                           "type": "string",
-                          "minLength": 1,
-                          "description": "The id of the saved evaluator this attachment runs."
+                          "minLength": 1
                         },
                         "required": {
-                          "type": "boolean",
-                          "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                          "type": "boolean"
                         },
                         "mappings": {
                           "type": "object",
@@ -63038,8 +65278,7 @@
                                   "value"
                                 ]
                               }
-                            ],
-                            "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                            ]
                           },
                           "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                         }
@@ -63113,8 +65352,7 @@
                             "type": "string",
                             "pattern": "^[a-z][a-z0-9_]*$",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                            "maxLength": 64
                           },
                           "type": {
                             "type": "string",
@@ -63122,15 +65360,13 @@
                               "text",
                               "number",
                               "boolean"
-                            ],
-                            "description": "The value type every scenario carries for this field."
+                            ]
                           }
                         },
                         "required": [
                           "identifier",
                           "type"
-                        ],
-                        "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                        ]
                       },
                       "maxItems": 30,
                       "description": "The fields the test suite declares. Absent on servers that predate fields on this family."
@@ -63143,17 +65379,14 @@
                           "id": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The attachment id. Stable across edits of the attachment."
+                            "maxLength": 64
                           },
                           "evaluatorId": {
                             "type": "string",
-                            "minLength": 1,
-                            "description": "The id of the saved evaluator this attachment runs."
+                            "minLength": 1
                           },
                           "required": {
-                            "type": "boolean",
-                            "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                            "type": "boolean"
                           },
                           "mappings": {
                             "type": "object",
@@ -63213,8 +65446,7 @@
                                     "value"
                                   ]
                                 }
-                              ],
-                              "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                              ]
                             },
                             "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                           }
@@ -63354,8 +65586,7 @@
                             "type": "string",
                             "pattern": "^[a-z][a-z0-9_]*$",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                            "maxLength": 64
                           },
                           "type": {
                             "type": "string",
@@ -63363,15 +65594,13 @@
                               "text",
                               "number",
                               "boolean"
-                            ],
-                            "description": "The value type every scenario carries for this field."
+                            ]
                           }
                         },
                         "required": [
                           "identifier",
                           "type"
-                        ],
-                        "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                        ]
                       },
                       "maxItems": 30,
                       "description": "The fields the test suite declares. Absent on servers that predate fields on this family."
@@ -63384,17 +65613,14 @@
                           "id": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The attachment id. Stable across edits of the attachment."
+                            "maxLength": 64
                           },
                           "evaluatorId": {
                             "type": "string",
-                            "minLength": 1,
-                            "description": "The id of the saved evaluator this attachment runs."
+                            "minLength": 1
                           },
                           "required": {
-                            "type": "boolean",
-                            "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                            "type": "boolean"
                           },
                           "mappings": {
                             "type": "object",
@@ -63454,8 +65680,7 @@
                                     "value"
                                   ]
                                 }
-                              ],
-                              "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                              ]
                             },
                             "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                           }
@@ -63546,8 +65771,7 @@
                           "type": "string",
                           "pattern": "^[a-z][a-z0-9_]*$",
                           "minLength": 1,
-                          "maxLength": 64,
-                          "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                          "maxLength": 64
                         },
                         "type": {
                           "type": "string",
@@ -63555,15 +65779,13 @@
                             "text",
                             "number",
                             "boolean"
-                          ],
-                          "description": "The value type every scenario carries for this field."
+                          ]
                         }
                       },
                       "required": [
                         "identifier",
                         "type"
-                      ],
-                      "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                      ]
                     },
                     "maxItems": 30,
                     "description": "The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use."
@@ -63576,17 +65798,14 @@
                         "id": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 64,
-                          "description": "The attachment id. Stable across edits of the attachment."
+                          "maxLength": 64
                         },
                         "evaluatorId": {
                           "type": "string",
-                          "minLength": 1,
-                          "description": "The id of the saved evaluator this attachment runs."
+                          "minLength": 1
                         },
                         "required": {
-                          "type": "boolean",
-                          "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                          "type": "boolean"
                         },
                         "mappings": {
                           "type": "object",
@@ -63646,8 +65865,7 @@
                                   "value"
                                 ]
                               }
-                            ],
-                            "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                            ]
                           },
                           "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                         }

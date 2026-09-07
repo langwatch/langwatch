@@ -38,6 +38,8 @@ import { LWQL_VEGA_LIMITS } from "~/features/analytics-query/visualization/vegaL
 import { measureSpecBytes } from "~/features/analytics-query/visualization/vegaLiteStructure";
 import type { Project } from "~/generated/prisma/client";
 
+import { customChartPlaygroundEnabled } from "~/server/analytics/playground-widgets/access";
+import { SavedWorkbenchChartsDisabledForPlaygroundError } from "~/server/analytics/saved-workbench-charts/errors";
 import {
   type SavedWorkbenchChart,
   SavedWorkbenchChartService,
@@ -226,6 +228,34 @@ function chartService(): SavedWorkbenchChartService {
 }
 
 /**
+ * The project this saved-chart request runs for: `lwqlProject`'s usual pair
+ * of checks, plus the INVERSE of the playground-widgets gate — saved
+ * workbench charts and the custom-chart-playground are mutually exclusive
+ * while the playground is experimental, so this route refuses instead of
+ * competing with `playground-widget` as two answers to "make me a chart."
+ *
+ * @throws {SavedWorkbenchChartsDisabledForPlaygroundError} when
+ *   `release_custom_chart_playground` is ON for this project.
+ */
+async function chartsProject({
+  project,
+  requestedProjectId,
+}: {
+  project: Project;
+  requestedProjectId: string | undefined;
+}): Promise<Project> {
+  const resolved = await lwqlProject({ project, requestedProjectId });
+  const playgroundEnabled = await customChartPlaygroundEnabled({
+    prisma,
+    projectId: resolved.id,
+  });
+  if (playgroundEnabled) {
+    throw new SavedWorkbenchChartsDisabledForPlaygroundError();
+  }
+  return resolved;
+}
+
+/**
  * The chart id the path matched.
  *
  * @throws {Error} when a chart route matched without one. That is a routing
@@ -259,7 +289,7 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -289,7 +319,7 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", createChartSchema),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -324,7 +354,7 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -356,7 +386,7 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", updateChartSchema),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -392,7 +422,7 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -424,7 +454,7 @@ function registerPlace(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", placeChartSchema),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -453,7 +483,7 @@ function registerUnplace(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });

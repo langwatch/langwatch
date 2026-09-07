@@ -93,8 +93,8 @@ export function ReportGrid({
       >
         <Grid
           templateColumns="repeat(2, 1fr)"
-          autoRows="minmax(350px, auto)"
-          gap={5}
+          autoRows="minmax(240px, auto)"
+          gap={4}
           width="100%"
         >
           {graphs.map((graph) => (
