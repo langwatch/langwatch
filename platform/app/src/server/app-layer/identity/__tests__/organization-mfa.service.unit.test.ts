@@ -30,18 +30,18 @@ const fixture = ({
     ["ana", { accountEnrollmentEnabled: enrolled, passkeyCount: 0 }],
     ["olga", { accountEnrollmentEnabled: true, passkeyCount: 1 }],
   ]);
-  const write = vi.fn(async (args: {
-    organizationId: string;
-    mfaRequired: boolean;
-  }) => {
-    storedRequired = args.mfaRequired;
-  });
-  const notify = vi.fn<OrganizationMfaServiceDeps["notifier"]["requirementTurnedOn"]>(
-    async () => void 0,
+  const write = vi.fn(
+    async (args: { organizationId: string; mfaRequired: boolean }) => {
+      storedRequired = args.mfaRequired;
+    },
   );
+  const notify = vi.fn<
+    OrganizationMfaServiceDeps["notifier"]["requirementTurnedOn"]
+  >(async () => void 0);
   const entitlement = vi.fn(async () => entitled);
-  const sessionReads = vi.fn(async ({ sessionId }: { sessionId: string }) =>
-    sessions.get(sessionId)?.amr ?? null,
+  const sessionReads = vi.fn(
+    async ({ sessionId }: { sessionId: string }) =>
+      sessions.get(sessionId)?.amr ?? null,
   );
   const deps: OrganizationMfaServiceDeps = {
     settings: {
@@ -174,7 +174,10 @@ describe("OrganizationMfaService requirement lifecycle", () => {
         organizationId,
         sessionId: "session-ana",
       }),
-    ).resolves.toMatchObject({ required: false, satisfaction: { satisfied: true } });
+    ).resolves.toMatchObject({
+      required: false,
+      satisfaction: { satisfied: true },
+    });
 
     expect(subject.factors.get("ana")).toEqual(factorBefore);
     expect(subject.sessions.get("session-ana")?.active).toBe(true);

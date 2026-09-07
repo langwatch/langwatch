@@ -8,6 +8,7 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationMfaService } from "~/server/app-layer/identity/organization-mfa.service";
+import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { apiKeyRouter } from "../apiKey";
 import { twoStepVerificationRouter } from "../twoStepVerification";
@@ -195,10 +196,13 @@ describe("twoStepVerification.setRequirement", () => {
   });
 
   it("uses the session actor and leaves the mutation in the audit trail", async () => {
-    const caller = callerFor("ana");
+    const caller = appRouter.createCaller(contextFor("ana"));
 
     await expect(
-      caller.setRequirement({ organizationId: "org-acme", mfaRequired: true }),
+      caller.twoStepVerification.setRequirement({
+        organizationId: "org-acme",
+        mfaRequired: true,
+      }),
     ).resolves.toEqual({ previous: false, next: true });
 
     expect(setRequirementMock).toHaveBeenCalledWith({
@@ -209,6 +213,9 @@ describe("twoStepVerification.setRequirement", () => {
     expect(auditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "ana",
+        // On an ordinary request `userId` is both actor and subject. The
+        // separate column is populated only when those people differ.
+        actorUserId: null,
         organizationId: "org-acme",
         action: "twoStepVerification.setRequirement",
         args: { organizationId: "org-acme", mfaRequired: true },

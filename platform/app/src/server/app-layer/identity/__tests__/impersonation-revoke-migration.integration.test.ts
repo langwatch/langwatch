@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
+import { Prisma } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 
 const migrationFile = join(
@@ -54,7 +55,7 @@ describe("identity auth migration impersonation revoke", () => {
               sessionToken: `token-${ordinaryId}`,
               userId,
               expires: new Date("2099-01-01T00:00:00.000Z"),
-              impersonating: null,
+              impersonating: Prisma.DbNull,
             },
           ],
         });
@@ -70,9 +71,7 @@ describe("identity auth migration impersonation revoke", () => {
           where: { id: { in: [impersonatingId, ordinaryId] } },
           select: { id: true, impersonating: true },
         });
-        expect(survivors).toEqual([
-          { id: ordinaryId, impersonating: null },
-        ]);
+        expect(survivors).toEqual([{ id: ordinaryId, impersonating: null }]);
 
         throw rollback;
       }),
