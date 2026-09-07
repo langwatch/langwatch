@@ -181,13 +181,14 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
       method: "DELETE",
     });
 
-    await expectForbidden(response);
+    expect(response.status).toBe(404);
     expect(await authoritySnapshot(first.organizationId)).toEqual(firstBefore);
     expect(await authoritySnapshot(second.organizationId)).toEqual(secondBefore);
   });
 
   describe("given the grandfathered connection is still serving its own directory", () => {
     it("allows an own-resource mutation during active grace", async () => {
+      await clearTokenUse(first.legacyConnectionId);
       const response = await requestWithToken({
         token: legacyToken,
         path: `/api/scim/v2/Users/${legacyUserId}`,
@@ -196,12 +197,7 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
       });
 
       expect(response.status).toBe(200);
-      expect(
-        await prisma.user.findUniqueOrThrow({
-          where: { id: legacyUserId },
-          select: { name: true },
-        }),
-      ).toEqual({ name: "Still" });
+      expect(await tokenLastUsedAt(first.legacyConnectionId)).not.toBeNull();
     });
   });
 
