@@ -231,11 +231,7 @@ export const ssoSetupRouter = createTRPCRouter({
       return ssoSelfServe().claimDomain({ ...input, actor });
     }),
 
-  /**
-   * Ask to prove a domain. On a licensed installation the licence proves it
-   * and this finishes; on the hosted service it answers the record to
-   * publish, whose value is shown once and never again.
-   */
+  /** Begins DNS or HTTPS proof and returns the one-time evidence to publish. */
   proveDomain: protectedProcedure
     .input(domainInput)
     .permission("sso:manage")

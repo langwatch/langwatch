@@ -94,9 +94,7 @@ beforeEach(() => {
   lookupRef.current = {
     data: {
       outcome: "ask",
-      organizations: [
-        { organizationId: "org_acme", name: "Acme", colleagueCount: 10 },
-      ],
+      organizations: [{ organizationId: "org_acme", name: "Acme", colleagueCount: 10 }],
     },
   };
   mineRef.current = { data: [] };
@@ -122,9 +120,7 @@ describe("given a verified address an organization is open to", () => {
     it("asks to join without creating anything", async () => {
       renderPage();
 
-      await userEvent.click(
-        await screen.findByRole("button", { name: /Join Acme/ }),
-      );
+      await userEvent.click(await screen.findByRole("button", { name: /Join Acme/ }));
 
       expect(requestMock.mock.calls[0]?.[0]).toEqual({
         organizationId: "org_acme",
@@ -189,10 +185,10 @@ describe("given a verified address nothing is open to", () => {
       lookupRef.current = { data: { outcome: "none" } };
       renderPage();
 
-      await vi.waitFor(() =>
-        expect(hardRedirectMock).toHaveBeenCalledWith("/"),
-      );
+      await vi.waitFor(() => expect(hardRedirectMock).toHaveBeenCalledWith("/"));
       expect(requestMock).not.toHaveBeenCalled();
+      expect(admitMock).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("join-before-create")).toBeNull();
     });
   });
 });

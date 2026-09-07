@@ -16,21 +16,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const hasOrganizationPermission = vi.fn();
 const auditLogMock = vi.fn(async () => undefined);
 const setJoiningMock = vi.fn();
+const verifiedEmailsOfMock = vi.fn();
+const findUserMock = vi.fn();
+const lookupMock = vi.fn();
+
+vi.mock("~/server/db", () => ({
+  prisma: { user: { findUnique: findUserMock } },
+}));
 
 vi.mock("~/server/api/rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   return {
     ...actual,
-    hasOrganizationPermission: (...args: unknown[]) =>
-      hasOrganizationPermission(...args),
+    hasOrganizationPermission: (...args: unknown[]) => hasOrganizationPermission(...args),
     organizationDenialReason: async () => undefined,
   };
 });
 
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
 
@@ -56,9 +60,13 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   ssoAssertion: () => ({}),
   databaseHooks: () => ({}),
   sessionClaims: () => ({}),
+  sessionCallbackEvidence: () => ({}),
   mfaCeremonies: () => ({}),
-  identityEmail: () => ({ verifiedEmailsOf: async () => null }),
-  joinRequestsService: () => ({ setJoining: setJoiningMock }),
+  identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
+  joinRequestsService: () => ({
+    setJoining: setJoiningMock,
+    lookup: lookupMock,
+  }),
   // The second-factor gate runs after every permitted decision (D06). Nothing
   // here is about it, so it answers "satisfied" and gets out of the way.
   organizationMfa: () => ({
@@ -66,13 +74,9 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   }),
 }));
 
-const { isAuditLogExempt, isSelfAudited } = await import(
-  "~/server/api/auditLogExemptions"
-);
+const { isAuditLogExempt, isSelfAudited } = await import("~/server/api/auditLogExemptions");
 const { createInnerTRPCContext } = await import("~/server/api/trpc");
-const { JOIN_SETTING_AUDIT_ACTION, joinRequestsRouter } = await import(
-  "../joinRequests"
-);
+const { JOIN_SETTING_AUDIT_ACTION, joinRequestsRouter } = await import("../joinRequests");
 
 const caller = () =>
   joinRequestsRouter.createCaller(
@@ -92,6 +96,58 @@ beforeEach(() => {
     next: "auto",
     previousDomains: [],
     nextDomains: ["acme.com"],
+  });
+  verifiedEmailsOfMock.mockResolvedValue(null);
+  findUserMock.mockResolvedValue(null);
+  lookupMock.mockResolvedValue({ outcome: "none" });
+});
+
+describe("given the caller's verified-address projection", () => {
+  describe("when it is present but empty", () => {
+    it("does not fall back to the legacy user email", async () => {
+      verifiedEmailsOfMock.mockResolvedValue([]);
+      findUserMock.mockResolvedValue({
+        email: "sam@acme.com",
+        emailVerified: true,
+      });
+
+      await caller().lookup();
+
+      expect(findUserMock).not.toHaveBeenCalled();
+      expect(lookupMock).toHaveBeenCalledWith({
+        userId: "user_ana",
+        verifiedEmail: null,
+      });
+    });
+  });
+
+  describe("when the projection has not reached this legacy user", () => {
+    it("falls back only to a database-verified email", async () => {
+      findUserMock.mockResolvedValue({
+        email: "ana@acme.com",
+        emailVerified: true,
+      });
+
+      await caller().lookup();
+
+      expect(lookupMock).toHaveBeenCalledWith({
+        userId: "user_ana",
+        verifiedEmail: "ana@acme.com",
+      });
+    });
+
+    it("passes a null verified email when the database email is unverified", async () => {
+      findUserMock.mockResolvedValue({
+        email: "ana@acme.com",
+        emailVerified: false,
+      });
+
+      await expect(caller().lookup()).resolves.toEqual({ outcome: "none" });
+      expect(lookupMock).toHaveBeenCalledWith({
+        userId: "user_ana",
+        verifiedEmail: null,
+      });
+    });
   });
 });
 
