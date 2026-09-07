@@ -448,6 +448,53 @@ describe("declaredNoPermission", () => {
     await expect(middleware(params as any)).resolves.toBe("next-called");
     expect(params.ctx.permissionChecked).toBe(true);
   });
+
+  describe("given an organization that holds this member at its MFA gate", () => {
+    const heldParams = () => {
+      const standingForSession = vi.fn(async () => ({
+        satisfaction: { satisfied: false } as const,
+      }));
+      const params = paramsFor({ organizationId: "org-acme" });
+      params.ctx.mfaGate = {
+        offered: () => true,
+        organizationMfa: () => ({ standingForSession }),
+      } as any;
+      return { params, standingForSession };
+    };
+
+    it("still blocks an ordinary no-permission route such as an API-key mutation", async () => {
+      const { params } = heldParams();
+      const middleware = declaredNoPermission({
+        reason: "the caller's own API keys",
+        allow: { organizationId: "creating a key in the caller's organization" },
+      });
+
+      await expect(middleware(params as any)).rejects.toMatchObject({
+        code: "identity_mfa_enrollment_required",
+      });
+      expect(params.next).not.toHaveBeenCalled();
+    });
+
+    it("allows only an explicitly declared recovery read past the MFA gate", async () => {
+      const { params, standingForSession } = heldParams();
+      const middleware = declaredNoPermission({
+        reason: "the caller's own MFA standing",
+        allow: { organizationId: "the organization whose gate they reached" },
+        mfaRecovery: {
+          reason: "the standing answer tells the caller how to satisfy the gate",
+        },
+      });
+
+      await expect(middleware(params as any)).resolves.toBe("next-called");
+      expect(standingForSession).not.toHaveBeenCalled();
+      expect(authzDeclarationOf(middleware)).toMatchObject({
+        kind: "no-permission",
+        mfaRecovery: {
+          reason: "the standing answer tells the caller how to satisfy the gate",
+        },
+      });
+    });
+  });
 });
 
 describe("declaredServiceAuthorization", () => {
