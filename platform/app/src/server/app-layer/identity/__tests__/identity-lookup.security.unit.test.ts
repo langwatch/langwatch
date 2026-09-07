@@ -328,8 +328,11 @@ function readsFor({
         organizationName: "Acme",
         role: "MEMBER",
       })),
+    findOrganizationNames: async () => new Map(),
     findSessions: async () => [],
     findInvitations: async () => invitations,
+    findClaimsAwaitingReview: async () => [],
+    findClaimQueue: async () => [],
     findConnectionForDomain: async () => null,
     findRecentOperatorActivity: async () => [],
   };

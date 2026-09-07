@@ -19,6 +19,20 @@ interface AuthenticationPair {
   legacy: { id: string; organizationId: string; providerId: string };
 }
 
+type MigrationAuthenticationDecision =
+  | { action: "continue" }
+  | {
+      action: "reject";
+      code:
+        | "SSO_LEGACY_AUTH_RETIRED"
+        | "SSO_MIGRATION_AUTH_AMBIGUOUS"
+        | "SSO_MIGRATION_AUTH_NOT_ALLOWED";
+    }
+  | {
+      action: "record";
+      connection: { id: string; organizationId: string };
+    };
+
 export function migrationAuthenticationDecision({
   callback,
   account,
@@ -27,13 +41,7 @@ export function migrationAuthenticationDecision({
   callback: { kind: "direct" | "legacy"; providerId: string };
   account: { provider: string; providerAccountId: string };
   pairs: readonly AuthenticationPair[];
-}):
-  | { action: "continue" }
-  | { action: "reject"; code: string }
-  | {
-      action: "record";
-      connection: { id: string; organizationId: string };
-    } {
+}): MigrationAuthenticationDecision {
   const matches: Array<{
     connection: { id: string; organizationId: string };
     replacementPhase: string | null;
@@ -82,19 +90,14 @@ export function migrationAuthenticationDecision({
       ? { action: "reject", code: "SSO_MIGRATION_AUTH_NOT_ALLOWED" }
       : { action: "continue" };
   }
-  if (
-    match.legacy &&
-    legacyAuthenticationIsRetired(match.replacementPhase)
-  ) {
+  if (match.legacy && legacyAuthenticationIsRetired(match.replacementPhase)) {
     return { action: "reject", code: "SSO_LEGACY_AUTH_RETIRED" };
   }
   return { action: "record", connection: match.connection };
 }
 
 /** Better Auth's migration callback policy, backed only by persisted facts. */
-export class PrismaSsoMigrationCallbackPolicy
-  implements DatabaseHookSsoMigrationPort
-{
+export class PrismaSsoMigrationCallbackPolicy implements DatabaseHookSsoMigrationPort {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly newActivityId: () => string,
@@ -472,7 +475,6 @@ export class PrismaSsoMigrationCallbackPolicy
       isSsoProviderMatch({ ssoProvider: legacy.providerId }, account)
     );
   }
-
 }
 
 const toHookAccount = (account: {

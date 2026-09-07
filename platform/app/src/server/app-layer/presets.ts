@@ -339,7 +339,6 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
-import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
@@ -402,6 +401,14 @@ export function initializeWebApp(): App {
 
 export function initializeWorkerApp(): App {
   return initializeDefaultApp({ processRole: "worker" });
+}
+
+/**
+ * One-shot system-migration role. It processes only migration event work on
+ * an isolated queue without starting shared consumers, schedulers, or workers.
+ */
+export function initializeMigrationApp(): App {
+  return initializeDefaultApp({ processRole: "migration" });
 }
 
 /**
@@ -1150,17 +1157,6 @@ export function initializeDefaultApp(options?: {
     : undefined;
   scheduler?.start();
 
-  // ADR-092 stage B: the in-place system migrations. Worker-only and
-  // fire-and-forget - passes run until the fleet stops moving and then stop,
-  // so held and parked organizations converge here rather than on the
-  // restart cadence with nobody running anything.
-  // Redis is handed in rather than read back off the App: this composes the
-  // App, so `tryGetApp()` is still null here, and a null handle would make
-  // the lease unacquirable and every pass a silent no-op.
-  const systemMigrations = roleRunsWorkers(config.processRole)
-    ? startSystemMigrations({ redis })
-    : undefined;
-
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
   // alerts). The scheduler registry is a process singleton.
@@ -1733,14 +1729,6 @@ export function initializeDefaultApp(options?: {
     gracefulCloseables.push({
       name: "scheduler",
       close: () => scheduler.stop(),
-    });
-  }
-  if (systemMigrations) {
-    // Aborts the pass between tenants; a truncated pass is harmless because
-    // every migration is idempotent and the next boot resumes the sweep.
-    gracefulCloseables.push({
-      name: "system-migrations",
-      close: () => systemMigrations.stop(),
     });
   }
   gracefulCloseables.push({

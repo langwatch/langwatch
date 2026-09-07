@@ -6,6 +6,7 @@ import {
 } from "@langwatch/identity";
 import type { SsoBreakGlassRepository } from "@langwatch/identity-server";
 import type {
+  Prisma,
   PrismaClient,
   SsoBreakGlassBinding as SsoBreakGlassBindingRow,
 } from "~/generated/prisma/client";
@@ -106,7 +107,9 @@ export class PrismaSsoBreakGlassRepository implements SsoBreakGlassRepository {
         where: { organizationId, state: "ACTIVE" },
         select: { id: true },
       });
-      const pendingReservations = await tx.$queryRaw<Array<{ commandId: string }>>`
+      const pendingReservations = await tx.$queryRaw<
+        Array<{ commandId: string }>
+      >`
         SELECT "commandId"
         FROM "SsoActivationRecoveryReservation"
         WHERE "organizationId" = ${organizationId}
