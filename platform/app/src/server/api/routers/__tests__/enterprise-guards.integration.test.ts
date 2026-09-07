@@ -546,7 +546,7 @@ describe("enterprise feature guards", () => {
 
   // --- createInvites conditional guard ---
 
-  describe("organization.createInvites", () => {
+  describe("invite.createInvites", () => {
     describe("when invites include custom role on non-enterprise plan", () => {
       /** @scenario Non-enterprise org cannot invite members with custom roles */
       /** @scenario Batch invite rejects entirely when any invite has a custom role */
@@ -555,7 +555,7 @@ describe("enterprise feature guards", () => {
         const caller = createCaller();
 
         await expect(
-          caller.organization.createInvites({
+          caller.invite.createInvites({
             organizationId,
             invites: [
               {
@@ -584,7 +584,7 @@ describe("enterprise feature guards", () => {
         mockGetActivePlan.mockResolvedValue(freePlan);
         const caller = createCaller();
 
-        const result = await caller.organization.createInvites({
+        const result = await caller.invite.createInvites({
           organizationId,
           invites: [
             {
@@ -684,7 +684,7 @@ describe("enterprise feature guards", () => {
   // through changed. AUDIT_MANIFEST.md already records the scenario itself
   // as a duplicate of the createInvites pair above.
 
-  describe("organization.createInvites via the invite-request surface", () => {
+  describe("invite.createInvites via the invite-request surface", () => {
     describe("when invites include custom role on non-enterprise plan", () => {
       /** @scenario Non-enterprise org cannot create invite requests with custom roles */
       it("rejects with FORBIDDEN", async () => {
@@ -692,7 +692,7 @@ describe("enterprise feature guards", () => {
         const caller = createCaller();
 
         await expect(
-          caller.organization.createInvites({
+          caller.invite.createInvites({
             organizationId,
             invites: [
               {
@@ -720,7 +720,7 @@ describe("enterprise feature guards", () => {
         mockGetActivePlan.mockResolvedValue(freePlan);
         const caller = createCaller();
 
-        const result = await caller.organization.createInvites({
+        const result = await caller.invite.createInvites({
           organizationId,
           invites: [
             {

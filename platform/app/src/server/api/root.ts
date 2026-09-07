@@ -46,6 +46,7 @@ import { httpProxyRouter } from "./routers/httpProxy";
 import { identityRouter } from "./routers/identity";
 import { identityLookupRouter } from "./routers/identityLookup";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { inviteRouter } from "./routers/invite";
 import { joinRequestsRouter } from "./routers/joinRequests";
 import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
@@ -100,6 +101,7 @@ const coreRouters = {
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
   organization: organizationRouter,
+  invite: inviteRouter,
   joinRequests: joinRequestsRouter,
   twoStepVerification: twoStepVerificationRouter,
   project: projectRouter,
