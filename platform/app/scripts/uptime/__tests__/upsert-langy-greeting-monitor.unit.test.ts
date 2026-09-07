@@ -81,7 +81,7 @@ describe("buildMonitorPayload", () => {
   describe("given a config and the script", () => {
     /** @scenario The monitor payload is a single-region Playwright monitor bounded under its own frequency */
     it("builds a playwright monitor with the script, env vars, one region and timeout <= frequency", () => {
-      const payload = buildMonitorPayload(config, script);
+      const payload = buildMonitorPayload({ config, script });
       expect(payload.monitor_type).toBe("playwright");
       expect(payload.playwright_script).toBe(script);
       expect(payload.scenario_name).toBe("Langy greeting");
@@ -98,22 +98,32 @@ describe("buildMonitorPayload", () => {
       );
       expect(payload).not.toHaveProperty("team_name");
       expect(
-        buildMonitorPayload({ ...config, teamName: "ops" }, script).team_name,
+        buildMonitorPayload({ config: { ...config, teamName: "ops" }, script })
+          .team_name,
       ).toBe("ops");
     });
 
     /** @scenario An unknown region or a timeout above the frequency is refused before any API call */
     it("refuses a bad region or a frequency under the timeout, naming the field", () => {
       expect(() =>
-        buildMonitorPayload({ ...config, region: "mars" }, script),
+        buildMonitorPayload({ config: { ...config, region: "mars" }, script }),
       ).toThrow(/region "mars"/);
       expect(() =>
-        buildMonitorPayload({ ...config, checkFrequencySeconds: 30 }, script),
+        buildMonitorPayload({
+          config: { ...config, checkFrequencySeconds: 30 },
+          script,
+        }),
       ).toThrow(/checkFrequencySeconds \(30\)/);
       expect(() =>
-        buildMonitorPayload({ ...config, langyApiKey: "" }, script),
+        buildMonitorPayload({ config: { ...config, langyApiKey: "" }, script }),
       ).toThrow(ProvisioningError);
-      expect(() => buildMonitorPayload(config, "  ")).toThrow(
+      expect(() =>
+        buildMonitorPayload({
+          config: { ...config, langyBaseUrl: "http://app.example.com" },
+          script,
+        }),
+      ).toThrow(/must use https/);
+      expect(() => buildMonitorPayload({ config, script: "  " })).toThrow(
         /script is empty/,
       );
     });
@@ -149,7 +159,7 @@ describe("upsertMonitor", () => {
         token: "t",
         config,
         script,
-        dryRun: false,
+        isDryRun: false,
         log: () => {},
       });
       expect(result).toEqual({
@@ -180,7 +190,7 @@ describe("upsertMonitor", () => {
         token: "t",
         config,
         script,
-        dryRun: false,
+        isDryRun: false,
         log: () => {},
       });
       expect(result).toMatchObject({ action: "updated", id: "41" });
@@ -204,7 +214,7 @@ describe("upsertMonitor", () => {
           token: "t",
           config,
           script,
-          dryRun: false,
+          isDryRun: false,
           log: () => {},
         }),
       ).rejects.toThrow(/2 monitors are named "Langy greeting" \(ids 41, 43\)/);
@@ -222,7 +232,7 @@ describe("upsertMonitor", () => {
         token: "t",
         config,
         script,
-        dryRun: true,
+        isDryRun: true,
         log: (line) => lines.push(line),
       });
       expect(result).toEqual({
@@ -237,7 +247,7 @@ describe("upsertMonitor", () => {
       expect(output).not.toContain("sk-lw-service-key");
       expect(output).not.toContain("@playwright/test");
       expect(
-        redactPayload(buildMonitorPayload(config, script))
+        redactPayload(buildMonitorPayload({ config, script }))
           .environment_variables,
       ).toEqual({
         LANGY_BASE_URL: "https://langwatch.example",
@@ -261,7 +271,7 @@ describe("upsertMonitor", () => {
         token: "t",
         config,
         script,
-        dryRun: false,
+        isDryRun: false,
         log: () => {},
       }).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(ProvisioningError);

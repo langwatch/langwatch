@@ -47,6 +47,22 @@ Feature: An uptime monitor that proves Langy answers a greeting
     When the greeting request is built
     Then the request URL has exactly one slash between host and path
 
+  # The credential travels in a header on every check, from a monitor that runs
+  # outside the deployment. A plaintext origin would publish it on every check.
+
+  @unit
+  Scenario: A plaintext base URL is refused before the key is attached
+    Given a base URL whose scheme is not https
+    When the greeting request is built
+    Then the build fails saying the base URL must use https
+    And no request carrying the credential is produced
+
+  @unit
+  Scenario: A base URL that is not a URL at all is refused by name
+    Given a base URL that does not parse as a URL
+    When the greeting request is built
+    Then the build fails saying the base URL is not a valid URL
+
   # ---------------------------------------------------------------------------
   # Classifying the answer — healthy means one thing only
   # ---------------------------------------------------------------------------

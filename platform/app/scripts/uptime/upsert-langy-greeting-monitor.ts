@@ -21,6 +21,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertHttpsBaseUrl } from "./langy-greeting-check";
 
 export const BETTERSTACK_API_BASE = "https://uptime.betterstack.com/api/v2";
 export const BETTERSTACK_REGIONS = ["us", "eu", "as", "au"] as const;
@@ -60,10 +61,13 @@ export class ProvisioningError extends Error {
   }
 }
 
-export function buildMonitorPayload(
-  config: MonitorConfig,
-  script: string,
-): MonitorPayload {
+export function buildMonitorPayload({
+  config,
+  script,
+}: {
+  config: MonitorConfig;
+  script: string;
+}): MonitorPayload {
   if (!(BETTERSTACK_REGIONS as readonly string[]).includes(config.region)) {
     throw new ProvisioningError(
       `region "${config.region}" is not one of ${BETTERSTACK_REGIONS.join(", ")}`,
@@ -79,6 +83,15 @@ export function buildMonitorPayload(
   }
   if (!config.langyBaseUrl || !config.langyApiKey) {
     throw new ProvisioningError("langyBaseUrl and langyApiKey are required");
+  }
+  // The key is stored on the monitor and sent as a header from Better Stack's
+  // cloud on every check, so an http:// origin leaks it on every check forever.
+  try {
+    assertHttpsBaseUrl(config.langyBaseUrl);
+  } catch (error) {
+    throw new ProvisioningError(
+      error instanceof Error ? error.message : String(error),
+    );
   }
   if (!script.trim()) {
     throw new ProvisioningError("monitor script is empty");
@@ -131,7 +144,13 @@ function parseJson(text: string): unknown {
   }
 }
 
-function describeApiError(parsed: unknown, text: string): string {
+function describeApiError({
+  parsed,
+  text,
+}: {
+  parsed: unknown;
+  text: string;
+}): string {
   return parsed && typeof parsed === "object" && "errors" in parsed
     ? JSON.stringify((parsed as { errors: unknown }).errors)
     : text.slice(0, 300);
@@ -139,10 +158,13 @@ function describeApiError(parsed: unknown, text: string): string {
 
 /** The Better Stack Uptime API, bound to one token. */
 class UptimeApi {
-  constructor(
-    private readonly fetch: ApiFetch,
-    private readonly token: string,
-  ) {}
+  private readonly fetch: ApiFetch;
+  private readonly token: string;
+
+  constructor({ fetch, token }: { fetch: ApiFetch; token: string }) {
+    this.fetch = fetch;
+    this.token = token;
+  }
 
   async call({ method, path, body }: ApiCall): Promise<unknown> {
     const response = await this.fetch(`${BETTERSTACK_API_BASE}${path}`, {
@@ -157,7 +179,7 @@ class UptimeApi {
     const parsed = parseJson(text);
     if (response.status < 200 || response.status >= 300) {
       throw new ProvisioningError(
-        `${method} ${path} answered ${response.status}: ${describeApiError(parsed, text)}`,
+        `${method} ${path} answered ${response.status}: ${describeApiError({ parsed, text })}`,
         response.status,
       );
     }
@@ -165,10 +187,13 @@ class UptimeApi {
   }
 
   /** Exact-name matches only: the API's filter is a match, not an equality. */
-  async findMonitorsByName(
-    name: string,
-    teamName?: string,
-  ): Promise<MonitorRow[]> {
+  async findMonitorsByName({
+    name,
+    teamName,
+  }: {
+    name: string;
+    teamName?: string;
+  }): Promise<MonitorRow[]> {
     const query = new URLSearchParams({ pronounceable_name: name });
     if (teamName) query.set("team_name", teamName);
     const found: MonitorRow[] = [];
@@ -201,14 +226,17 @@ export async function upsertMonitor(input: {
   token: string;
   config: MonitorConfig;
   script: string;
-  dryRun: boolean;
+  isDryRun: boolean;
   log: (line: string) => void;
 }): Promise<UpsertResult> {
-  const payload = buildMonitorPayload(input.config, input.script);
-  const api = new UptimeApi(input.fetch, input.token);
-  const current = await findTheOneMonitor(api, input.config);
+  const payload = buildMonitorPayload({
+    config: input.config,
+    script: input.script,
+  });
+  const api = new UptimeApi({ fetch: input.fetch, token: input.token });
+  const current = await findTheOneMonitor({ api, config: input.config });
 
-  if (input.dryRun) {
+  if (input.isDryRun) {
     input.log(
       `dry run: would ${current ? `update monitor ${current.id}` : "create a monitor"} with`,
     );
@@ -233,11 +261,17 @@ export async function upsertMonitor(input: {
 }
 
 /** Zero or one monitor by name; two is an error, because guessing is worse. */
-async function findTheOneMonitor(
-  api: UptimeApi,
-  config: MonitorConfig,
-): Promise<MonitorRow | null> {
-  const existing = await api.findMonitorsByName(config.name, config.teamName);
+async function findTheOneMonitor({
+  api,
+  config,
+}: {
+  api: UptimeApi;
+  config: MonitorConfig;
+}): Promise<MonitorRow | null> {
+  const existing = await api.findMonitorsByName({
+    name: config.name,
+    teamName: config.teamName,
+  });
   if (existing.length > 1) {
     throw new ProvisioningError(
       `${existing.length} monitors are named "${config.name}" (ids ${existing.map((m) => m.id).join(", ")}); rename or delete until one remains`,
@@ -276,14 +310,14 @@ export function readMonitorScript(): string {
 }
 
 async function main(): Promise<void> {
-  const dryRun = process.argv.includes("--dry-run");
+  const isDryRun = process.argv.includes("--dry-run");
   const token = requiredEnv("BETTERSTACK_API_TOKEN");
   const result = await upsertMonitor({
     fetch: globalThis.fetch as unknown as ApiFetch,
     token,
     config: configFromEnv(),
     script: readMonitorScript(),
-    dryRun,
+    isDryRun,
     log: (line) => console.log(line),
   });
   if (result.action !== "dry-run" && !result.id) {

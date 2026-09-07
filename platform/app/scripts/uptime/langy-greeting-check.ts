@@ -78,23 +78,49 @@ export type GreetingCheckResult = GreetingOutcome & {
   durationMs: number;
 };
 
-export function buildGreetingRequest(input: {
+/**
+ * The check sends its API key in `X-Auth-Token`, so the base URL decides
+ * whether that key crosses the network in the clear. Better Stack runs the
+ * monitor from its own cloud, so every hop is public internet; an `http://`
+ * origin would hand the key to anyone on the path. Reject the scheme here,
+ * where the header is attached, rather than trusting whoever set the variable.
+ */
+export function assertHttpsBaseUrl(baseUrl: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new Error(`baseUrl is not a valid URL: ${baseUrl}`);
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error(
+      `baseUrl must use https so the API key is not sent in the clear, got ${parsed.protocol}//`,
+    );
+  }
+}
+
+export function buildGreetingRequest({
+  baseUrl,
+  apiKey,
+  idempotencyKey,
+}: {
   baseUrl: string;
   apiKey: string;
   idempotencyKey: string;
 }): GreetingRequest {
-  const base = input.baseUrl.replace(/\/+$/, "");
+  assertHttpsBaseUrl(baseUrl);
+  const base = baseUrl.replace(/\/+$/, "");
   return {
     url: `${base}${LANGY_CONVERSATIONS_PATH}`,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Auth-Token": input.apiKey,
+      "X-Auth-Token": apiKey,
       Prefer: `wait=${LANGY_GREETING_WAIT_SECONDS}`,
     },
     body: JSON.stringify({
       messages: [{ role: "user", content: LANGY_GREETING_TEXT }],
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
     }),
   };
 }
@@ -125,7 +151,7 @@ export function classifyGreetingResponse(input: {
     turnId: readString(envelope?.turnId),
   };
 
-  if (status === 200) return classifySettled(envelope, ids);
+  if (status === 200) return classifySettled({ envelope, ids });
   if (status === 202) {
     return {
       healthy: false,
@@ -135,14 +161,17 @@ export function classifyGreetingResponse(input: {
       ...ids,
     };
   }
-  return classifyRefusal(status, envelope);
+  return classifyRefusal({ status, envelope });
 }
 
 /** A 200 is a settled turn; the body says whether the turn itself succeeded. */
-function classifySettled(
-  envelope: Record<string, unknown> | undefined,
-  ids: { conversationId?: string; turnId?: string },
-): GreetingOutcome {
+function classifySettled({
+  envelope,
+  ids,
+}: {
+  envelope: Record<string, unknown> | undefined;
+  ids: { conversationId?: string; turnId?: string };
+}): GreetingOutcome {
   const status = 200;
   const { conversationId, turnId } = ids;
   if (!envelope || !conversationId || !turnId) {
@@ -194,10 +223,13 @@ const REFUSAL_BY_STATUS: Record<
   },
 };
 
-function classifyRefusal(
-  status: number,
-  envelope: Record<string, unknown> | undefined,
-): GreetingOutcome {
+function classifyRefusal({
+  status,
+  envelope,
+}: {
+  status: number;
+  envelope: Record<string, unknown> | undefined;
+}): GreetingOutcome {
   const known = REFUSAL_BY_STATUS[status];
   const reason = known?.reason ?? "unexpected_status";
   const fallback = known?.fallback ?? `unexpected status ${status}`;
@@ -307,14 +339,22 @@ export async function runLangyGreetingCheck(input: {
     // where it is known, and nowhere downstream needs to know it.
     ...(outcome.healthy
       ? {}
-      : { detail: scrubSecret(outcome.detail, input.apiKey) }),
+      : {
+          detail: scrubSecret({ text: outcome.detail, secret: input.apiKey }),
+        }),
     idempotencyKey,
     durationMs,
   };
 }
 
-/** An empty secret would split between every character; there is nothing to hide. */
-function scrubSecret(text: string, secret: string): string {
+/** An empty secret would split between every character, hiding no credential. */
+function scrubSecret({
+  text,
+  secret,
+}: {
+  text: string;
+  secret: string;
+}): string {
   return secret.length === 0 ? text : text.split(secret).join(REDACTED_SECRET);
 }
 

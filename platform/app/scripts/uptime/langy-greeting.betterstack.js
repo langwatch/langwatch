@@ -28,6 +28,24 @@ function required(name) {
   return value;
 }
 
+// Mirrors assertHttpsBaseUrl in langy-greeting-check.ts. The API key rides in
+// an X-Auth-Token header from Better Stack's cloud, so an http:// origin would
+// put the key on the wire in the clear on every check.
+function requiredHttpsBaseUrl(name) {
+  const value = required(name);
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${name} is not a valid URL: ${value}`);
+  }
+  if (parsed.protocol !== "https:")
+    throw new Error(
+      `${name} must use https so the API key is not sent in the clear, got ${parsed.protocol}//`,
+    );
+  return value;
+}
+
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -97,7 +115,7 @@ test("Langy answers a greeting", async () => {
   // body, the one placement Playwright documents.
   test.setTimeout((WAIT_SECONDS + 20) * 1000);
 
-  const baseUrl = required("LANGY_BASE_URL").replace(/\/+$/, "");
+  const baseUrl = requiredHttpsBaseUrl("LANGY_BASE_URL").replace(/\/+$/, "");
   const apiKey = required("LANGY_API_KEY");
   const idempotencyKey = randomUUID();
 

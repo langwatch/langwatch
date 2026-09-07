@@ -97,6 +97,35 @@ describe("buildGreetingRequest", () => {
       expect(request.url).toBe(`${BASE_URL}${LANGY_CONVERSATIONS_PATH}`);
     });
   });
+
+  describe("when the base URL would put the API key on the wire in the clear", () => {
+    /** @scenario A plaintext base URL is refused before the key is attached */
+    it("refuses http and any scheme that is not https", () => {
+      for (const baseUrl of [
+        "http://app.example.com",
+        "ftp://app.example.com",
+      ]) {
+        expect(() =>
+          buildGreetingRequest({
+            baseUrl,
+            apiKey: API_KEY,
+            idempotencyKey: "k",
+          }),
+        ).toThrow(/must use https/);
+      }
+    });
+
+    /** @scenario A base URL that is not a URL at all is refused by name */
+    it("refuses a base URL that does not parse", () => {
+      expect(() =>
+        buildGreetingRequest({
+          baseUrl: "app.example.com",
+          apiKey: API_KEY,
+          idempotencyKey: "k",
+        }),
+      ).toThrow(/not a valid URL/);
+    });
+  });
 });
 
 describe("classifyGreetingResponse", () => {

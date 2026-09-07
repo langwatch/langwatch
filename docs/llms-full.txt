@@ -61480,8 +61480,10 @@ in the logged line.
   answer.
 - It exercises one turn with no tools, retrieval or session keys.
 - Each check opens a new conversation, which spawns a fresh Langy worker. At
-  the default frequency that is 480 worker boots a day on the monitoring
-  project; raise the frequency if that is too much.
+  the default interval of 180 seconds that is 480 worker boots a day on the
+  monitoring project. To check less often, raise
+  `BETTERSTACK_CHECK_FREQUENCY_SECONDS`: 300 gives 288 boots a day, 600 gives
+  144.
 - History and latency live in Better Stack. The platform keeps the turns
   themselves in the monitoring project's Langy history.
 
