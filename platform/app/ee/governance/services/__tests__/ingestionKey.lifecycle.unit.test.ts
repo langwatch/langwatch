@@ -15,7 +15,7 @@ const apiKeys = vi.hoisted(() => ({
 }));
 const apiKeyRepo = vi.hoisted(() => ({
   findIngestKeysForUser: vi.fn(),
-  findById: vi.fn(),
+  findByIdInOrg: vi.fn(),
   findByLookupId: vi.fn(),
 }));
 const workspace = vi.hoisted(() => ({
@@ -105,7 +105,7 @@ describe("IngestionKeyService", () => {
     service = IngestionKeyService.create({} as never);
     templates.findByIdForOrg.mockResolvedValue(null);
     workspace.findExisting.mockResolvedValue({ project: { id: "project_1" } });
-    apiKeyRepo.findById.mockResolvedValue(loginKey());
+    apiKeyRepo.findByIdInOrg.mockResolvedValue(loginKey());
     apiKeyRepo.findIngestKeysForUser.mockResolvedValue([]);
     apiKeys.create.mockResolvedValue({
       token: "ik-lw-fresh-token",
@@ -113,7 +113,7 @@ describe("IngestionKeyService", () => {
     });
   });
 
-  describe("mint", () => {
+  describe("when a personal ingestion key is minted", () => {
     describe("given a CLI session whose login key is live", () => {
       /** @scenario "A key minted by a CLI session is parented to that session's login key" */
       it("parents the key to the login key and stamps the session's label", async () => {
@@ -156,7 +156,7 @@ describe("IngestionKeyService", () => {
     describe("given a CLI session whose login key was revoked", () => {
       /** @scenario "A mint from a session whose login key is revoked is refused as signed out" */
       it("refuses as signed out and mints nothing", async () => {
-        apiKeyRepo.findById.mockResolvedValue(loginKey({ revoked: true }));
+        apiKeyRepo.findByIdInOrg.mockResolvedValue(loginKey({ revoked: true }));
 
         await expect(
           service.mint({
@@ -171,7 +171,7 @@ describe("IngestionKeyService", () => {
       });
 
       it("reads another person's login key as signed out too", async () => {
-        apiKeyRepo.findById.mockResolvedValue({
+        apiKeyRepo.findByIdInOrg.mockResolvedValue({
           ...loginKey(),
           userId: "someone_else",
         });
@@ -209,7 +209,7 @@ describe("IngestionKeyService", () => {
             ingestionTemplateId: "tmpl_cowork",
           }),
         );
-        expect(apiKeyRepo.findById).not.toHaveBeenCalled();
+        expect(apiKeyRepo.findByIdInOrg).not.toHaveBeenCalled();
       });
 
       /** @scenario "A mint outside a CLI session accepts only a template-named source" */
@@ -270,7 +270,7 @@ describe("IngestionKeyService", () => {
     });
   });
 
-  describe("revokeForSession", () => {
+  describe("when a login key's session is retired", () => {
     describe("given keys under two sessions", () => {
       /** @scenario "A re-login from the same device retires the keys of the session it replaces" */
       it("revokes the keys under the named login key with the cause given, and no other", async () => {
@@ -364,10 +364,12 @@ describe("IngestionKeyService", () => {
     });
   });
 
-  describe("revoke", () => {
+  describe("when the caller revokes one key", () => {
     describe("given one of the caller's own live keys", () => {
       it("revokes it as the person's decision", async () => {
-        apiKeyRepo.findById.mockResolvedValue(ingestKey({ id: "ak_mine" }));
+        apiKeyRepo.findByIdInOrg.mockResolvedValue(
+          ingestKey({ id: "ak_mine" }),
+        );
 
         await service.revoke({
           userId: USER,
@@ -383,7 +385,7 @@ describe("IngestionKeyService", () => {
 
     describe("given a key already revoked", () => {
       it("leaves it as it is and does not fail", async () => {
-        apiKeyRepo.findById.mockResolvedValue(
+        apiKeyRepo.findByIdInOrg.mockResolvedValue(
           ingestKey({ id: "ak_dead", revokedAt: new Date() }),
         );
 
@@ -399,7 +401,7 @@ describe("IngestionKeyService", () => {
 
     describe("given another person's key, or a key that is not an ingestion key", () => {
       it("answers not found without confirming the key exists", async () => {
-        apiKeyRepo.findById.mockResolvedValue({
+        apiKeyRepo.findByIdInOrg.mockResolvedValue({
           ...ingestKey({ id: "ak_theirs" }),
           userId: "someone_else",
         });
@@ -411,7 +413,7 @@ describe("IngestionKeyService", () => {
           }),
         ).rejects.toBeInstanceOf(IngestionKeyNotFoundError);
 
-        apiKeyRepo.findById.mockResolvedValue(loginKey());
+        apiKeyRepo.findByIdInOrg.mockResolvedValue(loginKey());
         await expect(
           service.revoke({
             userId: USER,
@@ -425,30 +427,32 @@ describe("IngestionKeyService", () => {
     });
   });
 
-  describe("list", () => {
-    it("reports each key with the session it belongs to", async () => {
-      apiKeyRepo.findIngestKeysForUser.mockResolvedValue([
-        ingestKey({ id: "ak_laptop" }),
-        ingestKey({ id: "ak_tile", parentApiKeyId: null, deviceLabel: null }),
-      ]);
+  describe("when the caller lists their keys", () => {
+    describe("given a session-parented key and a tile key", () => {
+      it("reports each key with the session it belongs to", async () => {
+        apiKeyRepo.findIngestKeysForUser.mockResolvedValue([
+          ingestKey({ id: "ak_laptop" }),
+          ingestKey({ id: "ak_tile", parentApiKeyId: null, deviceLabel: null }),
+        ]);
 
-      const rows = await service.list({ userId: USER, organizationId: ORG });
+        const rows = await service.list({ userId: USER, organizationId: ORG });
 
-      expect(rows).toEqual([
-        expect.objectContaining({
-          apiKeyId: "ak_laptop",
-          parentApiKeyId: LOGIN_KEY,
-          deviceLabel: "laptop",
-          sourceType: "claude_code",
-          lookupId: "lookup_ak_laptop",
-          lastUsedAtMs: null,
-        }),
-        expect.objectContaining({
-          apiKeyId: "ak_tile",
-          parentApiKeyId: null,
-          deviceLabel: null,
-        }),
-      ]);
+        expect(rows).toEqual([
+          expect.objectContaining({
+            apiKeyId: "ak_laptop",
+            parentApiKeyId: LOGIN_KEY,
+            deviceLabel: "laptop",
+            sourceType: "claude_code",
+            lookupId: "lookup_ak_laptop",
+            lastUsedAtMs: null,
+          }),
+          expect.objectContaining({
+            apiKeyId: "ak_tile",
+            parentApiKeyId: null,
+            deviceLabel: null,
+          }),
+        ]);
+      });
     });
   });
 });

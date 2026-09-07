@@ -727,14 +727,16 @@ export async function listIngestionKeys(
 /**
  * Why a key was revoked, as the server records it: `user` for a person's
  * revoke, `session` when the login key it was parented to was revoked,
- * `expired` when that session ran out, `rotation` when a mint replaced it,
- * `cap` from an older server's per-tool cap.
+ * `expired` when that session ran out, `offboarded` when the person's
+ * membership of the organization ended, `rotation` when a rotate from the
+ * personal tile replaced it, `cap` from an older server's per-tool cap.
  */
 export type IngestionKeyRevocationCause =
   | "user"
   | "rotation"
   | "session"
   | "expired"
+  | "offboarded"
   | "cap";
 
 export interface IngestionKeyDescription {

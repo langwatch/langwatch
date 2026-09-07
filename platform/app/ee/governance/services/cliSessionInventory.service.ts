@@ -94,10 +94,19 @@ interface AccessOrRefreshRecord {
 }
 
 export class CliSessionInventoryService {
-  constructor(
-    private readonly injectedRedis: RedisLike | null | undefined,
-    private readonly injectedPrisma: PrismaClient | undefined,
-  ) {}
+  private readonly injectedRedis: RedisLike | null | undefined;
+  private readonly injectedPrisma: PrismaClient | undefined;
+
+  constructor({
+    injectedRedis,
+    injectedPrisma,
+  }: {
+    injectedRedis: RedisLike | null | undefined;
+    injectedPrisma: PrismaClient | undefined;
+  }) {
+    this.injectedRedis = injectedRedis;
+    this.injectedPrisma = injectedPrisma;
+  }
 
   /**
    * Builds the service. Takes connections when the caller has them;
@@ -111,7 +120,10 @@ export class CliSessionInventoryService {
     redis?: RedisLike | null;
     prisma?: PrismaClient;
   } = {}): CliSessionInventoryService {
-    return new CliSessionInventoryService(redis, prisma);
+    return new CliSessionInventoryService({
+      injectedRedis: redis,
+      injectedPrisma: prisma,
+    });
   }
 
   /** The injected connection, else the App's, resolved at the point of use. */

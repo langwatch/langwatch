@@ -183,6 +183,27 @@ describe("healRevokedIngestKey", () => {
     });
   });
 
+  describe("given a platform that says the person was offboarded", () => {
+    /** @scenario "A session whose person left the organization is retired as offboarded" */
+    it("reports the device signed out without spending a mint that would be refused", async () => {
+      const d = deps({
+        describeIngestionKey: vi.fn().mockResolvedValue({
+          status: "revoked",
+          revocationCause: "offboarded",
+        }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      expect(healed.status).toBe("expired");
+      expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a platform that names any other cause of its own", () => {
     it("re-mints for a rotation and for an older server's cap alike", async () => {
       for (const revocationCause of ["rotation", "cap"]) {

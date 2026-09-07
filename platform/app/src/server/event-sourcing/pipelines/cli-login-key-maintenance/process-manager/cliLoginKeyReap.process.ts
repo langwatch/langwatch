@@ -60,15 +60,19 @@ export const cliLoginKeyReapWake: WakeHandler<
   intents: [ctx.intents.reap(`reap:${ctx.at}`, { scheduledFor: ctx.at })],
 });
 
-export function runCliLoginKeyReap(deps: CliLoginKeyReapDeps) {
+export function runCliLoginKeyReap({
+  reap,
+  deleteDispatchedBefore,
+  now,
+}: CliLoginKeyReapDeps) {
   return async (): Promise<void> => {
-    const startedAt = (deps.now ?? Date.now)();
+    const startedAt = (now ?? Date.now)();
     // `reap` reports its own outcome under `langwatch:api-key:cli-login-key-reaper`.
     // A second line here would split one event across two log streams.
-    await deps.reap();
+    await reap();
 
     try {
-      await deps.deleteDispatchedBefore({
+      await deleteDispatchedBefore({
         processName: CLI_LOGIN_KEY_REAP_PROCESS_NAME,
         before: startedAt - REAP_ROW_RETENTION_MS,
       });

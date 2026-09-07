@@ -247,13 +247,11 @@ export class IngestionKeyService {
     organizationId: string;
     apiKeyId: string;
   }): Promise<void> {
-    const key = await this.apiKeyRepo.findById({ id: apiKeyId });
-    if (
-      !key ||
-      key.organizationId !== organizationId ||
-      key.userId !== userId ||
-      !key.ingestSourceType
-    ) {
+    const key = await this.apiKeyRepo.findByIdInOrg({
+      id: apiKeyId,
+      organizationId,
+    });
+    if (!key || key.userId !== userId || !key.ingestSourceType) {
       throw new IngestionKeyNotFoundError(apiKeyId);
     }
     if (key.revokedAt) return;
@@ -287,7 +285,7 @@ export class IngestionKeyService {
     parentApiKeyId: string;
     userId: string;
     organizationId: string;
-    cause: "session" | "expired";
+    cause: "session" | "expired" | "offboarded";
   }): Promise<{ revokedCount: number }> {
     const children = (
       await this.apiKeyRepo.findIngestKeysForUser({ organizationId, userId })
@@ -518,13 +516,11 @@ export class IngestionKeyService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const parent = await this.apiKeyRepo.findById({ id: parentApiKeyId });
-    if (
-      !parent ||
-      parent.organizationId !== organizationId ||
-      parent.userId !== userId ||
-      parent.revokedAt !== null
-    ) {
+    const parent = await this.apiKeyRepo.findByIdInOrg({
+      id: parentApiKeyId,
+      organizationId,
+    });
+    if (!parent || parent.userId !== userId || parent.revokedAt !== null) {
       throw new IngestionKeySessionRevokedError();
     }
   }

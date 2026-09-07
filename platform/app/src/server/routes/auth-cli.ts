@@ -59,6 +59,7 @@ import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
   type CliKeySelection,
+  type CliLoginKeyRevocationCause,
   CliLoginKeyService,
   loginKeyExpiresAt,
 } from "~/server/api-key/cli-login-key.service";
@@ -1168,7 +1169,10 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   });
   if (!activeMembership) {
     await redis.del(refreshTokenKey(refresh_token));
-    await retireExpiredSessionKey(record);
+    // Not `expired`: this session had time left and lost its person instead.
+    // The cause reaches the ingest keys under it, and the CLI reads it as a
+    // sign-out no mint on this machine can repair.
+    await retireExpiredSessionKey(record, "offboarded");
     logger.info(
       { userId: record.user_id, organizationId: record.organization_id },
       "rejecting refresh: caller is not an active member of the organization",
@@ -1324,6 +1328,7 @@ async function sessionCeiling({
  */
 async function retireExpiredSessionKey(
   record: RefreshTokenRecord,
+  cause: CliLoginKeyRevocationCause = "expired",
 ): Promise<void> {
   if (!record.cli_api_key_id) return;
   try {
@@ -1331,7 +1336,7 @@ async function retireExpiredSessionKey(
       apiKeyId: record.cli_api_key_id,
       userId: record.user_id,
       organizationId: record.organization_id,
-      cause: "expired",
+      cause,
     });
   } catch (err) {
     logger.warn(

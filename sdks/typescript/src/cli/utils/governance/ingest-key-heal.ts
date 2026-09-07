@@ -103,6 +103,14 @@ const DESCRIBE_TIMEOUT_MS = 3_000;
  */
 const USER_REVOCATION_CAUSE = "user";
 
+/**
+ * The person lost their membership of the organization, so the session that
+ * held this key was retired with them. A mint would be refused for the same
+ * reason, so the heal ends here on the signed-out outcome rather than
+ * spending a round trip to be told so.
+ */
+const OFFBOARDED_REVOCATION_CAUSE = "offboarded";
+
 /** The wiring tool slug for each agent the hook runs for. */
 const TOOL_BY_AGENT: Record<string, string> = {
   claude_code: "claude",
@@ -124,7 +132,9 @@ const TOOL_BY_AGENT: Record<string, string> = {
  * key, or recorded no cause for the revoke. A revoke from the API-keys page
  * is a decision about this device, and a device that minted its way past it
  * would make that page a no-op. A key retired with its session, replaced by
- * a rotation or evicted by an older server's cap is re-minted.
+ * a rotation or evicted by an older server's cap is re-minted; one retired
+ * because its person was offboarded reads as a sign-out instead, since the
+ * mint would be refused anyway.
  *
  * Reports a failure once it has gone to the platform and not come back with a
  * wired tool that this device can recognise again: a status call that did not
@@ -180,7 +190,8 @@ export async function healRevokedIngestKey({
  * A platform that refused the session is the same wall for a different
  * reason: the mint after this check would be refused too, so the heal ends
  * on `expired`, which is the one outcome that names a repair the person can
- * make.
+ * make. A key retired because its person was offboarded is that same wall,
+ * read from the key rather than from a refused call.
  */
 async function revocationBlocksHeal({
   cfg,
@@ -201,12 +212,16 @@ async function revocationBlocksHeal({
     );
   if (!described) return { status: "failed" };
   if (described === EXPIRED_SESSION) return { status: "expired" };
-  if (
-    described.status === "revoked" &&
-    (described.revocationCause === USER_REVOCATION_CAUSE ||
-      described.revocationCause === null)
-  ) {
-    return { status: "withheld" };
+  if (described.status === "revoked") {
+    if (
+      described.revocationCause === USER_REVOCATION_CAUSE ||
+      described.revocationCause === null
+    ) {
+      return { status: "withheld" };
+    }
+    if (described.revocationCause === OFFBOARDED_REVOCATION_CAUSE) {
+      return { status: "expired" };
+    }
   }
   return null;
 }

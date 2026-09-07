@@ -39,7 +39,8 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
       Given the user signed in with `langwatch login --device`
       And this machine minted an ingest key for claude
       When the user runs `langwatch logout`
-      Then the server revokes the session's login key and that ingest key
+      Then the server revokes the session's login key with cause "user"
+      And it revokes that ingest key with cause "session"
       And an ingest key minted by another machine under the same login keeps working
 
     Scenario: logout is idempotent when not logged in
@@ -170,7 +171,7 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
       When the user runs `langwatch logout --keep-credentials`
       Then the telemetry wiring is removed
       And the device session on disk is left intact
-      And the session's ingest keys stay live, since the session does
+      And the session's ingest keys stay live, because the session itself is untouched
 
   Rule: logout is a single command, symmetric to login
 

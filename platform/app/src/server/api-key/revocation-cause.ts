@@ -9,6 +9,8 @@
  *   went with its session.
  * - `expired`: its session ran out, at a refused refresh or in the hourly
  *   sweep over elapsed login keys.
+ * - `offboarded`: the person's membership of the organization ended, so the
+ *   session was retired at its next refresh rather than at its own expiry.
  * - `cap`: the retired per-tool cap revoked it. Kept so old rows still parse.
  *
  * The CLI reads the cause to decide whether a dead ingest key may be
@@ -22,6 +24,7 @@ export const API_KEY_REVOCATION_CAUSES = [
   "rotation",
   "session",
   "expired",
+  "offboarded",
   "cap",
 ] as const;
 

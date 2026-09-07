@@ -1,6 +1,6 @@
 import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { KeyRound, Laptop, Monitor, Server, Smartphone } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ComponentProps, type ReactNode, useState } from "react";
 
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
@@ -78,26 +78,14 @@ export function DevicesPanel() {
 
   return (
     <VStack align="stretch" gap={4}>
-      {sessions.length > 1 && !isPendingRevokeAll && (
-        <HStack justify="end">
-          <Button
-            size="sm"
-            variant="outline"
-            colorPalette="red"
-            onClick={() => setIsPendingRevokeAll(true)}
-          >
-            Revoke all
-          </Button>
-        </HStack>
-      )}
-
-      {isPendingRevokeAll && (
-        <RevokeAllConfirmation
-          isRevoking={revocation.isRevokingEveryDevice}
-          onCancel={() => setIsPendingRevokeAll(false)}
-          onConfirm={revocation.revokeEveryDevice}
-        />
-      )}
+      <RevokeAllControl
+        isOffered={sessions.length > 1}
+        isPending={isPendingRevokeAll}
+        isRevoking={revocation.isRevokingEveryDevice}
+        onRequest={() => setIsPendingRevokeAll(true)}
+        onCancel={() => setIsPendingRevokeAll(false)}
+        onConfirm={revocation.revokeEveryDevice}
+      />
 
       {!ready || sessionsQuery.isLoading ? (
         <Text fontSize="sm" color="fg.muted" paddingY={8}>
@@ -106,40 +94,122 @@ export function DevicesPanel() {
       ) : sessions.length === 0 && orphanKeys.length === 0 ? (
         <NoDevicesState />
       ) : (
-        <VStack align="stretch" gap={2}>
-          {sessions.map((session) => (
-            <DeviceRow
-              key={session.sessionStartedAtMs}
-              session={session}
-              isPendingRevoke={pendingRevokeId === session.sessionStartedAtMs}
-              isRevoking={
-                revocation.isRevokingDevice &&
-                pendingRevokeId === session.sessionStartedAtMs
-              }
-              onRequestRevoke={() =>
-                setPendingRevokeId(session.sessionStartedAtMs)
-              }
-              onCancelRevoke={() => setPendingRevokeId(null)}
-              onConfirmRevoke={() =>
-                revocation.revokeDevice(session.sessionStartedAtMs)
-              }
-            >
-              {(keysBySession.get(session.sessionStartedAtMs) ?? []).map(
-                renderKeyRow,
-              )}
-            </DeviceRow>
-          ))}
+        <CredentialCards
+          sessions={sessions}
+          keysBySession={keysBySession}
+          orphanKeys={orphanKeys}
+          pendingRevokeId={pendingRevokeId}
+          isRevokingDevice={revocation.isRevokingDevice}
+          onRequestRevoke={setPendingRevokeId}
+          onCancelRevoke={() => setPendingRevokeId(null)}
+          onConfirmRevoke={revocation.revokeDevice}
+          renderKeyRow={renderKeyRow}
+        />
+      )}
+    </VStack>
+  );
+}
 
-          {orphanKeys.length > 0 && (
-            <CredentialCard
-              icon={<KeyRound size={20} />}
-              title="Other keys"
-              subline="Ingestion keys that no signed-in device is behind, minted from this page or by an agent."
-            >
-              {orphanKeys.map(renderKeyRow)}
-            </CredentialCard>
+/**
+ * The one button that takes every device's access away, and the question it
+ * asks first. Offered only when there is more than one device to revoke: with
+ * a single session it is the same errand as that session's own revoke.
+ */
+function RevokeAllControl({
+  isOffered,
+  isPending,
+  isRevoking,
+  onRequest,
+  onCancel,
+  onConfirm,
+}: {
+  isOffered: boolean;
+  isPending: boolean;
+  isRevoking: boolean;
+  onRequest: () => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (isPending) {
+    return (
+      <RevokeAllConfirmation
+        isRevoking={isRevoking}
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />
+    );
+  }
+  if (!isOffered) return null;
+  return (
+    <HStack justify="end">
+      <Button
+        size="sm"
+        variant="outline"
+        colorPalette="red"
+        onClick={onRequest}
+      >
+        Revoke all
+      </Button>
+    </HStack>
+  );
+}
+
+/** One signed-in device, as `personalSessions.list` reports it. */
+type DeviceSessionView = ComponentProps<typeof DeviceRow>["session"];
+
+/**
+ * One card per signed-in device, each holding the keys that session minted,
+ * followed by the keys no session is behind.
+ */
+function CredentialCards({
+  sessions,
+  keysBySession,
+  orphanKeys,
+  pendingRevokeId,
+  isRevokingDevice,
+  onRequestRevoke,
+  onCancelRevoke,
+  onConfirmRevoke,
+  renderKeyRow,
+}: {
+  sessions: DeviceSessionView[];
+  keysBySession: Map<number, IngestionKeyView[]>;
+  orphanKeys: IngestionKeyView[];
+  pendingRevokeId: number | null;
+  isRevokingDevice: boolean;
+  onRequestRevoke: (sessionStartedAtMs: number) => void;
+  onCancelRevoke: () => void;
+  onConfirmRevoke: (sessionStartedAtMs: number) => void;
+  renderKeyRow: (key: IngestionKeyView) => ReactNode;
+}) {
+  return (
+    <VStack align="stretch" gap={2}>
+      {sessions.map((session) => (
+        <DeviceRow
+          key={session.sessionStartedAtMs}
+          session={session}
+          isPendingRevoke={pendingRevokeId === session.sessionStartedAtMs}
+          isRevoking={
+            isRevokingDevice && pendingRevokeId === session.sessionStartedAtMs
+          }
+          onRequestRevoke={() => onRequestRevoke(session.sessionStartedAtMs)}
+          onCancelRevoke={onCancelRevoke}
+          onConfirmRevoke={() => onConfirmRevoke(session.sessionStartedAtMs)}
+        >
+          {(keysBySession.get(session.sessionStartedAtMs) ?? []).map(
+            renderKeyRow,
           )}
-        </VStack>
+        </DeviceRow>
+      ))}
+
+      {orphanKeys.length > 0 && (
+        <CredentialCard
+          icon={<KeyRound size={20} />}
+          title="Other keys"
+          subline="Ingestion keys that no signed-in device is behind, minted from this page or by an agent."
+        >
+          {orphanKeys.map(renderKeyRow)}
+        </CredentialCard>
       )}
     </VStack>
   );

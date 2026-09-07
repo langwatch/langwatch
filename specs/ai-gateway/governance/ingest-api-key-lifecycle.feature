@@ -49,10 +49,11 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
 
   @bdd @ingest-api-key @issue
   Scenario: Issuing an ingestion key mints an ApiKey with an ingest-only project role
-    When jane requests an ingestion key for "personal-jane" with sourceType "claude_code"
+    Given jane holds a device session whose login key is K
+    When the CLI requests an ingestion key for "personal-jane" with sourceType "claude_code"
     Then an ApiKey row is created with:
       | column            | value                                          |
-      | parentApiKeyId    | the session's CLI login key id                 |
+      | parentApiKeyId    | K                                              |
       | hashedSecret      | HMAC-SHA256(secret, pepper)                    |
       | ingestSourceType  | "claude_code"                                  |
       | ingestionTemplateId | NULL (no template for a unified CLI tool)    |
@@ -165,15 +166,18 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   # ---------------------------------------------------------------------------
   # Four things retire a login key: `langwatch logout`, the revoke on the
   # devices tab, a re-login from the same device, and the session running out
-  # (the refresh window, or the organization's max session duration). Each of
-  # them retires the ingest keys under that login key with cause "session"
-  # or "expired". Keys under another session are never touched.
+  # (the refresh window, or the organization's max session duration). The login
+  # key carries the cause of its own death; the ingest keys under it carry
+  # "session", except when the session ran out ("expired") or its person was
+  # offboarded ("offboarded"), which they inherit. Keys under another session
+  # are never touched.
 
   @integration @ingest-api-key @session @logout
   Scenario: Logging out retires the session's ingest keys and leaves another session's live
     Given jane's laptop and desktop each hold a device session and a "claude_code" key
     When the laptop calls logout with its tokens
-    Then the laptop's login key and ingest key are revoked with cause "session"
+    Then the laptop's login key is revoked with cause "user"
+    And its ingest key is revoked with cause "session"
     And the desktop's key still authorizes trace writes
 
   @integration @ingest-api-key @session @revoke
@@ -203,6 +207,15 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     When the CLI refreshes the session
     Then the refresh is refused
     And the session's login key and ingest key are revoked with cause "expired"
+
+  @integration @ingest-api-key @session @expiry
+  Scenario: A session whose person left the organization is retired as offboarded
+    Given jane's membership of "acme" ended while her session was still live
+    When the CLI refreshes the session
+    Then the refresh is refused
+    And the session's login key and ingest key are revoked with cause "offboarded"
+    # Not "expired": the session had time left and lost its person instead, and
+    # the CLI reads the cause as a sign-out this machine cannot repair.
 
   @unit @ingest-api-key @session @expiry
   Scenario: The reaper retires login keys whose session window ran out
@@ -318,10 +331,11 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   # A device whose key died asks the platform why before it re-mints. The
   # platform's own revocations name themselves: "session" when the login key
   # the ingest key was parented to was revoked, "expired" when that session
-  # ran out, "rotation" when a re-login replaced the login key. Everything a
-  # person does through the API-keys page or the REST API is recorded as that
-  # person's decision, and the CLI leaves such a key dead until the person
-  # sets the device up again.
+  # ran out, "offboarded" when the person's membership ended, "rotation" when a
+  # rotate from the personal tile replaced it. Everything a person does through
+  # the API-keys page or the REST API is recorded as that person's decision,
+  # and the CLI leaves such a key dead until the person sets the device up
+  # again.
 
   @unit @ingest-api-key
   Scenario: A revoke from the API keys page records a person as its cause
@@ -454,7 +468,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Given organization "acme" has a team project "shared-app"
     And the caller has aiTools:manage on "acme"
     When an ingestion key is issued for "shared-app" with sourceType "claude_code"
-    Then an ApiKey(keyType="ingest") is created bound to "shared-app" with the Ingest Only role
+    Then an ApiKey with ingestSourceType set is created bound to "shared-app" with the Ingest Only role
     And it authorizes OTLP writes into "shared-app" and nothing else
     # Same primitive, same ingest-only role; not a personal-only concept.
 

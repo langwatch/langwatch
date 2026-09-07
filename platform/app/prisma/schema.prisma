@@ -3303,9 +3303,10 @@ model ApiKey {
   /// Why the key was revoked, set with `revokedAt`: "user" when a person
   /// revoked it (the API-keys page, the REST API, the devices tab), "rotation"
   /// when a mint replaced it, "session" when the CLI login key it was parented
-  /// to was revoked, "expired" when that session ran out. "cap" survives on
-  /// rows the retired per-tool cap revoked. The CLI reads it to decide whether
-  /// a dead ingest key may be re-minted: a key a person revoked stays dead.
+  /// to was revoked, "expired" when that session ran out, "offboarded" when the
+  /// person's membership of the organization ended. "cap" survives on rows the
+  /// retired per-tool cap revoked. The CLI reads it to decide whether a dead
+  /// ingest key may be re-minted: a key a person revoked stays dead.
   /// NULL for live keys and for keys revoked before the cause was recorded.
   revocationCause String?
 

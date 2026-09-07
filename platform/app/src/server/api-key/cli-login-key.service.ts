@@ -43,12 +43,12 @@ export interface CliKeyScopeSummary {
 
 /**
  * Why a login key dies. The ingest keys under it die with it: a session that
- * ran out passes `expired` on to them, every other cause reaches them as
- * `session`.
+ * ran out passes `expired` on to them and one whose person was offboarded
+ * passes `offboarded`, every other cause reaches them as `session`.
  */
 export type CliLoginKeyRevocationCause = Extract<
   ApiKeyRevocationCause,
-  "user" | "rotation" | "expired"
+  "user" | "rotation" | "expired" | "offboarded"
 >;
 
 /** What one revoke did, so a caller can count for the person who asked. */
@@ -68,7 +68,7 @@ export interface SessionIngestKeyRevoker {
     parentApiKeyId: string;
     userId: string;
     organizationId: string;
-    cause: "session" | "expired";
+    cause: "session" | "expired" | "offboarded";
   }): Promise<{ revokedCount: number }>;
 }
 
@@ -556,7 +556,8 @@ export class CliLoginKeyService {
           parentApiKeyId: apiKeyId,
           userId,
           organizationId,
-          cause: cause === "expired" ? "expired" : "session",
+          cause:
+            cause === "expired" || cause === "offboarded" ? cause : "session",
         }));
     } catch (err) {
       logger.warn(

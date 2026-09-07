@@ -177,6 +177,9 @@ describe("POST /api/auth/cli/refresh and the login key's expiry", () => {
     await prisma.organization
       .deleteMany({ where: { id: ORG_ID } })
       .catch(() => undefined);
+    // The App holds the container's Redis connection, so it is cleared before
+    // that connection is closed rather than left behind holding a dead client.
+    await resetApp();
     await stopTestContainers();
   });
 
@@ -197,6 +200,37 @@ describe("POST /api/auth/cli/refresh and the login key's expiry", () => {
       expect(
         await resolver.resolve({ token: stale.ingestToken, projectId: null }),
       ).toBeNull();
+    });
+  });
+
+  describe("given a session whose person left the organization", () => {
+    /** @scenario "A session whose person left the organization is retired as offboarded" */
+    it("refuses the refresh and retires the login key and its ingest key with cause offboarded", async () => {
+      const left = await openSession({ hostname: "left", ageDays: 1 });
+      await prisma.organizationUser.updateMany({
+        where: { organizationId: ORG_ID, userId: USER_ID },
+        data: { disabledAt: new Date() },
+      });
+
+      try {
+        expect(await refresh(left.refreshToken)).toBe(401);
+
+        // Not "expired": this session had 29 days left and lost its person.
+        expect(await keyState(left.loginKeyId)).toMatchObject({
+          revocationCause: "offboarded",
+        });
+        expect(await keyState(left.ingestKeyId)).toMatchObject({
+          revocationCause: "offboarded",
+        });
+        expect(
+          await resolver.resolve({ token: left.ingestToken, projectId: null }),
+        ).toBeNull();
+      } finally {
+        await prisma.organizationUser.updateMany({
+          where: { organizationId: ORG_ID, userId: USER_ID },
+          data: { disabledAt: null },
+        });
+      }
     });
   });
 

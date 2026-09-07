@@ -51,11 +51,15 @@ type McpServerLike = {
   ): unknown;
 };
 
+import { createLogger } from "@langwatch/observability";
+
 import { auditLog } from "../../ee/audit-log/auditLog";
 import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
 import type { Permission } from "../server/api/rbac";
 import { probeOrganizationPermission } from "../server/app-layer/permissions/imperative";
+
+const logger = createLogger("langwatch:mcp:governance-tools");
 
 const SURFACE = "mcp" as const;
 
@@ -347,16 +351,22 @@ export function registerGovernanceMcpTools(
         sourceType: source_type,
         ingestionTemplateId: template_id ?? null,
       });
+      // The call surface lives in `metadata.surface`, the field every other
+      // governance mutation stamps and incident response queries. The mint is
+      // not held up by the audit write: a write that fails must not swallow a
+      // token this response shows exactly once.
       void auditLog({
         userId: r.callerUserId!,
         organizationId: r.organizationId,
         action: "ingestionKey.mint",
-        args: {
-          apiKeyId: result.apiKeyId,
-          sourceType: source_type,
-          surface: SURFACE,
-        },
-      });
+        args: { apiKeyId: result.apiKeyId, sourceType: source_type },
+        metadata: { surface: SURFACE },
+      }).catch((error: unknown) =>
+        logger.warn(
+          { error },
+          "could not write the ingestionKey.mint audit row",
+        ),
+      );
       return json(result);
     },
   );
@@ -374,11 +384,15 @@ export function registerGovernanceMcpTools(
         organizationId: r.organizationId,
         apiKeyId: api_key_id,
       });
-      void auditLog({
+      // A revoke reports success only once its audit row is durable: unlike
+      // the mint there is nothing to lose by failing here, and the row is the
+      // record of who retired the key.
+      await auditLog({
         userId: r.callerUserId!,
         organizationId: r.organizationId,
         action: "ingestionKey.revoke",
-        args: { apiKeyId: api_key_id, surface: SURFACE },
+        args: { apiKeyId: api_key_id },
+        metadata: { surface: SURFACE },
       });
       return text(`revoked ${api_key_id}`);
     },

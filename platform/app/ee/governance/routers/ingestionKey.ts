@@ -20,9 +20,12 @@
 
 import { auditLog } from "@ee/audit-log/auditLog";
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+
+const logger = createLogger("langwatch:governance:ingestion-key-router");
 
 const mintInput = z.object({
   organizationId: z.string(),
@@ -72,7 +75,12 @@ export const ingestionKeyRouter = createTRPCRouter({
         organizationId: input.organizationId,
         action: "ingestionKey.mint",
         args: { apiKeyId: issued.apiKeyId, sourceType: input.sourceType },
-      });
+      }).catch((error: unknown) =>
+        logger.warn(
+          { error, apiKeyId: issued.apiKeyId },
+          "could not write the ingestionKey.mint audit row",
+        ),
+      );
       return issued;
     }),
 
@@ -109,7 +117,12 @@ export const ingestionKeyRouter = createTRPCRouter({
           sourceType: input.sourceType,
           revokedCount: revoked.revokedCount,
         },
-      });
+      }).catch((error: unknown) =>
+        logger.warn(
+          { error, apiKeyId: issued.apiKeyId },
+          "could not write the ingestionKey.rotate audit row",
+        ),
+      );
       return {
         ...issued,
         revokedCount: revoked.revokedCount,
@@ -132,7 +145,9 @@ export const ingestionKeyRouter = createTRPCRouter({
         organizationId: input.organizationId,
         apiKeyId: input.apiKeyId,
       });
-      void auditLog({
+      // The revoke reports success only once its audit row is durable: the
+      // key is already dead, and the row is the record of who killed it.
+      await auditLog({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
         action: "ingestionKey.revoke",

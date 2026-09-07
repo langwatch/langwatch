@@ -305,7 +305,7 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
     });
   });
 
-  describe("given keys a person, a session and nothing revoked", () => {
+  describe("given a live key alongside keys revoked by a person and by a session cascade", () => {
     describe("when the CLI asks what became of a lookup id", () => {
       /** @scenario "The CLI can ask what became of its own key" */
       it("answers with the cause, live for a live key, unknown for a stranger's", async () => {

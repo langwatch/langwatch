@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { reapExpiredCliLoginKeys } from "~/server/api-key/cli-login-key-reaper";
+import {
+  applySessionCeiling,
+  reapExpiredCliLoginKeys,
+} from "~/server/api-key/cli-login-key-reaper";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import { PrismaSystemMigrationEnrollmentRepository } from "~/server/app-layer/system-migrations/repositories/system-migration-enrollment.prisma.repository";
 import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
@@ -735,6 +738,29 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
           args: { where: { ...where, userId: { not: null } } },
         }),
       ).rejects.toThrow(/tenancy key/);
+    });
+
+    /**
+     * An admin lowering the organization's session ceiling runs the same
+     * sweep bounded to that organization, so the read carries a fourth
+     * clause. It passes on the ordinary organizationId bound rather than the
+     * cross-tenant hatch, which is what keeps that hatch at exactly the three
+     * clauses above.
+     */
+    it("passes the guard when a ceiling change scopes the sweep to one organization", async () => {
+      const { client, calls } = guardedReadPrisma([]);
+
+      await expect(
+        applySessionCeiling({
+          prisma: client as unknown as PrismaClient,
+          organizationId: "org_1",
+          maxSessionDurationDays: 0,
+          now: new Date("2026-09-07T12:00:00Z"),
+          loginKeys: { revokeSessionKey: vi.fn() },
+        }),
+      ).resolves.toBe(0);
+
+      expect(calls[0]).toMatchObject({ where: { organizationId: "org_1" } });
     });
   });
 
