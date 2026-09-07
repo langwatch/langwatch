@@ -319,4 +319,8 @@ export interface EventSourcedQueueProcessor<
   waitUntilReady(): Promise<void>;
   /** Migration-preflight only: prove its allow-listed groups have settled. */
   waitUntilPreflightIdle?(): Promise<void>;
+  /** Migration-preflight only: register every group an aggregate may reach. */
+  registerPreflightGroups?(
+    resolveGroupIds: () => readonly (string | undefined)[],
+  ): Promise<void>;
 }

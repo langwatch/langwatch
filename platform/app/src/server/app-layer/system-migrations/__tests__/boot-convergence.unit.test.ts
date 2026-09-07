@@ -94,6 +94,24 @@ describe("runSystemMigrationsToQuiescence", () => {
     await expect(runSystemMigrationsToQuiescence()).rejects.toThrow(
       "finite migrations held",
     );
+    expect(stubs.runPass).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs a proof pass after draining effects before rejecting a finite hold", async () => {
+    const settle = vi.fn().mockResolvedValue(void 0);
+    stubs.runPass
+      .mockResolvedValueOnce({
+        ...summaryOf({ advanced: 0 }),
+        held: 1,
+        finiteHeld: 1,
+      })
+      .mockResolvedValueOnce(summaryOf({ advanced: 0 }));
+
+    await expect(
+      runSystemMigrationsToQuiescence({ awaitPassEffects: settle }),
+    ).resolves.toMatchObject({ advanced: 0, held: 0 });
+    expect(settle).toHaveBeenCalledTimes(2);
+    expect(stubs.runPass).toHaveBeenCalledTimes(2);
   });
 
   /** @scenario A pass shut out by another process is not convergence */
