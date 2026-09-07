@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { applyUserParameterDefaults } from "~/server/agents/parameter-defaults";
 import type {
   RunParameterValues,
   ScenarioParameterDefinition,
@@ -272,6 +273,59 @@ describe("resolveRunParameters", () => {
         expect(resolved.get("scen_1")?.parameters).toMatchObject({
           plan: "free",
         });
+      });
+    });
+  });
+
+  describe("given a connected agent whose owner set a user default", () => {
+    // The overlay the runtime applies at agentParameterDefinitionsOf: the code
+    // default "gpt-4" is replaced by the user default "gpt-5" before the
+    // definitions ever reach resolveRunParameters. From here the scenario
+    // default and the run value are what still win.
+    const targetDefinitions = applyUserParameterDefaults({
+      definitions: [{ name: "model", type: "string", defaultValue: "gpt-4" }],
+      userDefaults: { model: "gpt-5" },
+    });
+
+    describe("when the run supplies its own value for the parameter", () => {
+      /** @scenario "A run value overrides the user default" */
+      it("uses the run value, not the user default", async () => {
+        const resolved = await resolveRunParameters({
+          scenarios: [scenario({ parameters: [] })],
+          targetDefinitions,
+          values: { model: "gpt-4" },
+        });
+
+        expect(resolved.get("scen_1")?.parameters).toEqual({ model: "gpt-4" });
+      });
+    });
+
+    describe("when the scenario declares its own default and the run supplies none", () => {
+      /** @scenario "A scenario default overrides the user default" */
+      it("uses the scenario default, not the user default", async () => {
+        const resolved = await resolveRunParameters({
+          scenarios: [
+            scenario({
+              parameters: [{ name: "model", defaultValue: "gpt-3.5" }],
+            }),
+          ],
+          targetDefinitions,
+        });
+
+        expect(resolved.get("scen_1")?.parameters).toEqual({
+          model: "gpt-3.5",
+        });
+      });
+    });
+
+    describe("when neither the scenario nor the run names it", () => {
+      it("falls back to the user default the overlay wrote", async () => {
+        const resolved = await resolveRunParameters({
+          scenarios: [scenario({ parameters: [] })],
+          targetDefinitions,
+        });
+
+        expect(resolved.get("scen_1")?.parameters).toEqual({ model: "gpt-5" });
       });
     });
   });

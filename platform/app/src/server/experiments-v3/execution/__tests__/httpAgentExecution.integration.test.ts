@@ -112,6 +112,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
     ownerUserId: null,
     hostLabel: null,
     identityKey: null,
+    parameterDefaults: null,
     lastSeenAt: null,
     archivedAt: null,
     createdAt: new Date(),

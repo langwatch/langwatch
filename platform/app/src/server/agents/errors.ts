@@ -42,6 +42,35 @@ export class AgentNotFoundError extends HandledError {
 }
 
 /**
+ * Refuses a user-set default value for a connected agent's parameter that the
+ * current declaration cannot accept: an undeclared name, a secret parameter, a
+ * value of the wrong type, or a value outside a declared option list.
+ *
+ * Validated at save time against what the agent declares right now, so a
+ * refusal is something the user can act on: pick a declared parameter, or a
+ * value the declaration allows. `reason` is a short customer-safe phrase.
+ */
+export class AgentParameterDefaultInvalidError extends HandledError {
+  declare readonly code: "agent_parameter_default_invalid";
+
+  constructor({ name, reason }: { name: string | null; reason: string }) {
+    super(
+      "agent_parameter_default_invalid",
+      name
+        ? `The default for "${name}" cannot be set: ${reason}`
+        : `The default cannot be set: ${reason}`,
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { name, reason },
+        ...remediation("agent_parameter_default_invalid"),
+      },
+    );
+    this.name = "AgentParameterDefaultInvalidError";
+  }
+}
+
+/**
  * Refuses a write that only the SDK may make on a connected agent.
  *
  * A connected agent is registered from the process that runs it, so its type,

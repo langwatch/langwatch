@@ -1,11 +1,14 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import type {
   ConnectedComponentConfig,
   Workflow,
 } from "~/optimization_studio/types/dsl";
-import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import type {
+  ScenarioParameterDefinition,
+  ScenarioParameterValue,
+} from "~/server/scenarios/parameters";
 import type { RunActor } from "~/server/scenarios/run-actor";
 import {
   type AgentComponentConfig,
@@ -27,7 +30,16 @@ import {
   createAgentTestRunDeps,
   scheduleAgentTestRun,
 } from "./agent-test-run";
-import { AgentNotFoundError, AgentRegisterOnlyError } from "./errors";
+import {
+  AgentNotFoundError,
+  AgentParameterDefaultInvalidError,
+  AgentRegisterOnlyError,
+} from "./errors";
+import {
+  type AgentParameterDefaults,
+  parseAgentParameterDefaults,
+  validateUserParameterDefault,
+} from "./parameter-defaults";
 
 /**
  * One agent as the REST list and read answer it: the row, plus the identity
@@ -53,6 +65,17 @@ export function declaredAgentParameters(
 ): ScenarioParameterDefinition[] {
   if (agent.type !== "connected") return [];
   return (agent.config as ConnectedComponentConfig).parameters ?? [];
+}
+
+/**
+ * The user-set parameter defaults of an agent (issue 7948), read tolerantly
+ * off the raw column. Every agent carries the map; a non-connected one, and a
+ * connected one nobody has set a default on, reads as `{}`.
+ */
+export function userParameterDefaultsOf(
+  agent: Pick<TypedAgent, "parameterDefaults">,
+): AgentParameterDefaults {
+  return parseAgentParameterDefaults(agent.parameterDefaults);
 }
 
 export function toAgentListRow(agent: TypedAgent): AgentListRow {
@@ -315,6 +338,62 @@ export class AgentService {
       projectId: input.projectId,
     });
     if (existing?.type === "connected") throw new AgentRegisterOnlyError();
+  }
+
+  /**
+   * Sets or clears one user default for a connected agent's parameter (issue
+   * 7948).
+   *
+   * This is the only user-mutable write on a connected agent: its config stays
+   * SDK-owned, so this never goes through {@link update} and never touches
+   * `config`. A non-null value is validated against what the agent declares
+   * right now — a name it no longer declares, a secret, a wrong type or a value
+   * outside its options is refused. A null value clears the key, which is
+   * allowed even for a stale name so an override left over from a reconnect can
+   * be cleared.
+   *
+   * @throws {AgentNotFoundError} when no such agent is in the project
+   * @throws {AgentParameterDefaultInvalidError} when the agent declares no
+   *   parameters, or the value is one the declaration cannot accept
+   */
+  async setParameterDefault(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    value: ScenarioParameterValue | null;
+  }): Promise<TypedAgent> {
+    const agent = await this.repository.findById({
+      id: input.id,
+      projectId: input.projectId,
+    });
+    if (!agent) throw new AgentNotFoundError();
+    if (agent.type !== "connected") {
+      throw new AgentParameterDefaultInvalidError({
+        name: input.name,
+        reason: "declares no parameters",
+      });
+    }
+
+    if (input.value !== null) {
+      validateUserParameterDefault({
+        definitions: declaredAgentParameters(agent),
+        name: input.name,
+        value: input.value,
+      });
+    }
+
+    const defaults = userParameterDefaultsOf(agent);
+    if (input.value === null) {
+      delete defaults[input.name];
+    } else {
+      defaults[input.name] = input.value;
+    }
+
+    return this.repository.updateParameterDefaults({
+      id: input.id,
+      projectId: input.projectId,
+      parameterDefaults: defaults as Prisma.InputJsonValue,
+    });
   }
 
   /**

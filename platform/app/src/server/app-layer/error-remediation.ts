@@ -453,6 +453,14 @@ const registry = {
       "Raise `concurrency` on the decorated function, or connect more instances",
     ],
   },
+  agent_parameter_default_invalid: {
+    tips: [
+      "Set a default only on a parameter the agent still declares",
+      "The value must match the parameter's type, and be one of its options when it lists them",
+      "A secret parameter carries no user default",
+    ],
+    docsPath: "/agent-testing/run-parameters",
+  },
   agent_parameter_invalid: {
     tips: [
       "Parameter names start with a letter or underscore and hold only letters, digits and underscores",

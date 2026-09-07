@@ -2817,6 +2817,9 @@ model Agent {
   hostLabel         String?
   identityKey       String?
   lastSeenAt        DateTime?
+  // User-set default values per declared parameter name, kept outside config so
+  // a re-register cannot replace them (issue 7948).
+  parameterDefaults Json?
   archivedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt

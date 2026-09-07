@@ -578,6 +578,17 @@ const presentations = {
     describe: () =>
       "The connected instances are at their concurrency. Wait a moment and try again, or raise the concurrency on the decorated function.",
   },
+  agent_parameter_default_invalid: {
+    title: "A default value cannot be set",
+    describe: (error) => {
+      const name = str(error, "name", "");
+      const reason = safeProse(str(error, "reason", ""));
+      const subject = name ? `The default for "${name}"` : "The default";
+      return reason
+        ? `${subject} cannot be set: ${reason}.`
+        : `${subject} cannot be set. Check the value against the parameter's type and options.`;
+    },
+  },
   agent_parameter_invalid: {
     title: "A declared parameter cannot be used",
     describe: (error) => {

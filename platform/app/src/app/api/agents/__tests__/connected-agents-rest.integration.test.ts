@@ -211,4 +211,27 @@ describe("Feature: connected agents on the REST agents API", () => {
       expect(row?.archivedAt).not.toBeNull();
     });
   });
+
+  describe("when a client sends a parameter override over REST", () => {
+    /** @scenario "An SDK-only agent mutation is still refused" */
+    it("refuses with agent_register_only and lands no override", async () => {
+      const agent = await registeredAgent();
+
+      const response = await app.request(`/api/v1/agents/${agent.id}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({ parameterDefaults: { model: "gpt-5" } }),
+      });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({
+        code: "agent_register_only",
+      });
+      const row = await prisma.agent.findFirst({
+        where: { id: agent.id, projectId: project.id },
+        select: { parameterDefaults: true },
+      });
+      expect(row?.parameterDefaults ?? null).toBeNull();
+    });
+  });
 });

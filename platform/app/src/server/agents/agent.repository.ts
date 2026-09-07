@@ -425,6 +425,26 @@ export class AgentRepository {
     return parseAgent(agent);
   }
 
+  /**
+   * Writes the user-set parameter defaults of one agent (issue 7948).
+   *
+   * Kept out of `reregisterConnected`, so an SDK re-register replaces the
+   * config's code defaults without touching this layer. Passing `{}` clears
+   * every user default. `parameterDefaults` is a plain map of name to a
+   * string, number or boolean.
+   */
+  async updateParameterDefaults(input: {
+    id: string;
+    projectId: string;
+    parameterDefaults: Prisma.InputJsonValue;
+  }): Promise<TypedAgent> {
+    const agent = await this.prisma.agent.update({
+      where: { id: input.id, projectId: input.projectId },
+      data: { parameterDefaults: input.parameterDefaults },
+    });
+    return parseAgent(agent);
+  }
+
   /** Writes the presence projection of one agent. */
   async touchLastSeenAt(input: {
     id: string;
@@ -615,6 +635,7 @@ const IDENTITY_SELECT = {
   ownerUserId: true,
   hostLabel: true,
   lastSeenAt: true,
+  parameterDefaults: true,
   archivedAt: true,
 } as const;
 
@@ -636,6 +657,8 @@ export type AgentIdentityRow = {
   ownerUserId: string | null;
   hostLabel: string | null;
   lastSeenAt: Date | null;
+  /** The user-set parameter defaults (issue 7948), kept outside `config`. */
+  parameterDefaults: Prisma.JsonValue;
   archivedAt: Date | null;
 };
 

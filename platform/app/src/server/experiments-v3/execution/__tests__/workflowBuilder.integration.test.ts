@@ -504,6 +504,7 @@ describe("WorkflowBuilder", () => {
       ownerUserId: null,
       hostLabel: null,
       identityKey: null,
+      parameterDefaults: null,
       lastSeenAt: null,
       archivedAt: null,
       createdAt: new Date(),

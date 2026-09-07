@@ -691,6 +691,10 @@ describe("explainHandledError", () => {
         // check picks its sentence from the rule that failed rather than
         // repeating the schema's own message, which names the parameter.
         agent_parameter_invalid: new Set(["reason"]),
+        // `reason` is the sentence parameter-defaults.ts wrote for this exact
+        // save ("must be one of: free, pro"), authored server-side and never
+        // relayed from a customer or an SDK.
+        agent_parameter_default_invalid: new Set(["reason"]),
         // The provider's own reason for rejecting delivery is the entire
         // value of this error — "invite the bot with /invite @LangWatch".
         // Authored server-side by `explainSlackPostError`, never relayed.

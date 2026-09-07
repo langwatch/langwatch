@@ -65,6 +65,7 @@ function httpAgent(): AgentWithFields {
     ownerUserId: null,
     hostLabel: null,
     identityKey: null,
+    parameterDefaults: null,
     lastSeenAt: null,
     copiedFromAgentId: null,
     archivedAt: null,

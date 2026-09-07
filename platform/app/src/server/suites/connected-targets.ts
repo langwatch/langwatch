@@ -23,6 +23,10 @@ import type {
 } from "../agents/agent.repository";
 import { isConnectedAgentStale } from "../agents/connected-agent-visibility";
 import {
+  applyUserParameterDefaults,
+  parseAgentParameterDefaults,
+} from "../agents/parameter-defaults";
+import {
   AgentEnvironmentUnresolvedError,
   AgentOfflineError,
   AgentOwnerOnlyError,
@@ -307,10 +311,17 @@ export async function assertConnectedAgentsOnline({
 }
 
 /**
- * The parameters the agent of a target declares; none for other targets.
+ * The parameters the agent of a target declares, with the owner's user
+ * defaults overlaid; none for other targets.
  *
  * Read tolerantly off the raw config, the way a scenario's own column is: a
- * row whose declarations this version does not understand runs with none.
+ * row whose declarations this version does not understand runs with none. The
+ * user defaults (issue 7948) are overlaid onto each non-secret declaration's
+ * `defaultValue` here, so the run resolves code default < user default; a
+ * stale user default, whose parameter the code no longer declares, is ignored.
+ * This is the single runtime insertion point for the user-default layer: the
+ * scenario default and the run value still win over it, in
+ * {@link resolveRunParameters}, because they merge after these definitions.
  */
 export function agentParameterDefinitionsOf(
   agent: AgentIdentityRow | undefined,
@@ -320,7 +331,11 @@ export function agentParameterDefinitionsOf(
   if (typeof config !== "object" || config === null || Array.isArray(config)) {
     return [];
   }
-  return parseScenarioParameterDefinitions(config.parameters);
+  const definitions = parseScenarioParameterDefinitions(config.parameters);
+  return applyUserParameterDefaults({
+    definitions,
+    userDefaults: parseAgentParameterDefaults(agent.parameterDefaults),
+  });
 }
 
 /** The display names of the owners of the personal agents among these. */

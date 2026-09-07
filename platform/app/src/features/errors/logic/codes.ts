@@ -29,6 +29,7 @@ export const APP_ERROR_CODES = [
   "agent_not_found",
   "agent_offline",
   "agent_owner_only",
+  "agent_parameter_default_invalid",
   "agent_parameter_invalid",
   "agent_payload_too_large",
   "agent_register_only",

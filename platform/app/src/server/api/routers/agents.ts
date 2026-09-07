@@ -19,6 +19,7 @@ import {
 import {
   AgentService,
   declaredAgentParameters,
+  userParameterDefaultsOf,
 } from "../../agents/agent.service";
 import type { AgentWithFields } from "../../agents/agent-fields";
 import { sendAgentTestTurn } from "../../agents/agent-test-turn";
@@ -26,6 +27,7 @@ import {
   AgentNotFoundError,
   AgentRegisterOnlyError,
 } from "../../agents/errors";
+import type { AgentParameterDefaults } from "../../agents/parameter-defaults";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   copyWorkflowWithDatasets,
@@ -51,6 +53,7 @@ async function withConnectedAgentViews<T extends AgentWithFields>({
 }): Promise<
   (T & {
     parameters: ScenarioParameterDefinition[];
+    parameterDefaults: AgentParameterDefaults;
     owner: { userId: string; name: string | null } | null;
     status: AgentPresenceStatus;
     instances: AgentInstanceView[];
@@ -63,6 +66,9 @@ async function withConnectedAgentViews<T extends AgentWithFields>({
   return agents.map((agent) => ({
     ...agent,
     parameters: declaredAgentParameters(agent),
+    // The declared code defaults stay in `parameters`; the user defaults ride
+    // alongside so the drawer can tell code from user (issue 7948).
+    parameterDefaults: userParameterDefaultsOf(agent),
     ...agentPresenceView({ agent, owners, presence, viewerUserId }),
   }));
 }
@@ -203,6 +209,36 @@ export const agentsRouter = createTRPCRouter({
           }),
         },
       });
+    }),
+
+  /**
+   * Sets or clears one user default for a connected agent's parameter (issue
+   * 7948).
+   *
+   * Deliberately not `update`: a connected agent's config stays SDK-owned, so
+   * this writes only the separate user-default layer and never touches config.
+   * A null value clears the key. Answers with the agent's user defaults after
+   * the write.
+   */
+  setParameterDefault: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        id: z.string(),
+        name: z.string(),
+        value: z.union([z.string(), z.number(), z.boolean()]).nullable(),
+      }),
+    )
+    .permission("evaluations:manage")
+    .mutation(async ({ ctx, input }) => {
+      const agentService = AgentService.create(ctx.prisma);
+      const agent = await agentService.setParameterDefault({
+        id: input.id,
+        projectId: input.projectId,
+        name: input.name,
+        value: input.value,
+      });
+      return { parameterDefaults: userParameterDefaultsOf(agent) };
     }),
 
   /**
