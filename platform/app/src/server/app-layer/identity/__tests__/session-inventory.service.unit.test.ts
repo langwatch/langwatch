@@ -77,7 +77,10 @@ describe("SessionInventoryService.endSession", () => {
         sessionId: "current",
         currentSessionId: "current",
       }),
-    ).rejects.toBeInstanceOf(SessionIsCurrentError);
+    ).rejects.toMatchObject({
+      code: "session_is_current",
+      name: SessionIsCurrentError.name,
+    });
 
     expect(stores.droppedTokens).toEqual([]);
     expect(stores.liveSessionIds()).toEqual(["current", "other"]);
@@ -100,5 +103,23 @@ describe("SessionInventoryService.endSession", () => {
 
     expect(stores.droppedTokens).toEqual([]);
     expect(stores.liveSessionIds()).toEqual(["ana-session", "other-session"]);
+  });
+
+  it("ends a different session of the caller in both stores", async () => {
+    const stores = inventoryOver([
+      session({ id: "current" }),
+      session({ id: "old-browser" }),
+    ]);
+
+    await expect(
+      stores.service.endSession({
+        userId: "ana",
+        sessionId: "old-browser",
+        currentSessionId: "current",
+      }),
+    ).resolves.toEqual({ ended: 1 });
+
+    expect(stores.droppedTokens).toEqual(["token-old-browser"]);
+    expect(stores.liveSessionIds()).toEqual(["current"]);
   });
 });

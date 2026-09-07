@@ -83,11 +83,11 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
   # and its subject, which reached the person as a generic "something went
   # wrong". Every RETURNING person on a connection hit it.
   #
-  # The lookup carries the ISSUER AND THE SUBJECT and no provider id at all,
-  # so nothing in the clause can be decoded: the mapping has to be read from
-  # the connection's own registration. An issuer nobody registered is still
-  # unanswerable, which is what keeps one provider's subject from resolving
-  # another's user.
+  # The lookup carries the ISSUER AND THE SUBJECT and no provider id at all.
+  # The account table now holds that real issuer and indexes the exact pair,
+  # so the legacy branch must preserve the issuer clause rather than decode or
+  # drop it. An issuer the account did not record is still unanswerable, which
+  # is what keeps one provider's subject from resolving another's user.
   #
   # Both directions matter. Finding the row is not enough on its own — the
   # row is handed back to a library that compares the issuer on it against
@@ -100,7 +100,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     When better-auth looks that account up by the issuer and the subject alone
     Then the account row is returned
     And it carries the issuer the connection registered, not a synthesized one
-    And the legacy engine is never queried with the issuer column
+    And the legacy engine is queried with that exact issuer, never a widened key
 
   @unit
   Scenario: A legacy account write never carries the issuer column

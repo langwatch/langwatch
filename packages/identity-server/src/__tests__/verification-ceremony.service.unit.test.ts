@@ -91,6 +91,7 @@ function harness(options?: {
 describe("the email verification ceremony", () => {
   describe("when completion presents the token and the matching PKCE verifier", () => {
     /** @scenario "Email verification completes only with the ceremony's proof" */
+    /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
     it("verifies via a verify_identifier command carrying the verificationId", async () => {
       const { service, verifyIdentifier } = harness();
       const codeVerifier = "the-initiating-context-secret";
@@ -117,6 +118,7 @@ describe("the email verification ceremony", () => {
       });
     });
 
+    /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
     it("refuses the emailed token alone when the verifier does not match", async () => {
       const { service, verifyIdentifier } = harness();
       const minted = await service.mintEmailVerification({

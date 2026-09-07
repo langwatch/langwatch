@@ -75,6 +75,7 @@ describe("attachIdentifier guard", () => {
       expect(facts[0]?.data).toMatchObject({ identifierHash: null });
     });
 
+    /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
     it("attaches email-provider identifiers ATTACHED, awaiting the ceremony", async () => {
       const facts = await new IdentityGuards(new InMemoryHeads(), users, new InMemoryReservations()).attachIdentifier(
         attachData({
@@ -380,6 +381,7 @@ describe("verifyIdentifier guard", () => {
   });
 
   describe("when the value is unheld", () => {
+    /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
     it("verifies the ATTACHED identifier with the ceremony's proof trail", async () => {
       const heads = new InMemoryHeads();
       heads.heads.set(USER, headsWith(fact({ state: "ATTACHED", verifiedAtMs: null })));
@@ -799,7 +801,6 @@ describe("detachIdentifier strands guard", () => {
     });
 
     /** @scenario "Removal follows the same guards as every other identifier" */
-    /** @scenario "Removing an address that is not the last way in" */
     it("allows the removal once a verified email is there to recover through", async () => {
       const heads = new InMemoryHeads();
       heads.heads.set(
@@ -821,6 +822,36 @@ describe("detachIdentifier strands guard", () => {
           data: { identifierId: "idf_passkey_a", actor: ACTOR },
         },
       ]);
+    });
+
+    /** @scenario "Removing an address that is not the last way in" */
+    it("allows one verified email to be removed when another remains", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({
+            identifierId: "idf_email_old",
+            provider: "email",
+            value: "sam.old@acme.com",
+          }),
+          fact({
+            identifierId: "idf_email_keep",
+            provider: "email",
+            value: "sam.keep@acme.com",
+          }),
+        ),
+      );
+
+      expect(await detach(heads, "idf_email_old")).toEqual([
+        {
+          type: IDENTIFIER_DETACHED_EVENT_TYPE,
+          data: { identifierId: "idf_email_old", actor: ACTOR },
+        },
+      ]);
+      expect(heads.heads.get(USER)?.identifiers.idf_email_keep?.state).toBe(
+        "VERIFIED",
+      );
     });
 
     it("does not refuse an unverified identifier, which strands nobody", async () => {

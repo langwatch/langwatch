@@ -5,15 +5,24 @@
  * condition must be able to read the standing that paints their setup screen,
  * without weakening the procedure's session or membership boundaries.
  */
+import { auditLog } from "@ee/audit-log/auditLog";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationMfaService } from "~/server/app-layer/identity/organization-mfa.service";
 import { createInnerTRPCContext } from "../../trpc";
 import { apiKeyRouter } from "../apiKey";
 import { twoStepVerificationRouter } from "../twoStepVerification";
 
-const { organizationMfaMock } = vi.hoisted(() => ({
+const { organizationMfaMock, setRequirementMock } = vi.hoisted(() => ({
   organizationMfaMock: vi.fn(),
+  setRequirementMock: vi.fn(),
 }));
+
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
 
 vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   ...(await importOriginal<
@@ -167,5 +176,38 @@ describe("twoStepVerification.standing", () => {
 
       expect(members.accountFactorFor).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("twoStepVerification.setRequirement", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setRequirementMock.mockResolvedValue({ previous: false, next: true });
+    organizationMfaMock.mockReturnValue({
+      setRequirement: setRequirementMock,
+    });
+  });
+
+  /** @scenario "Turning the requirement on is recorded with who did it" */
+  it("uses the session actor and leaves the mutation in the audit trail", async () => {
+    const caller = callerFor("ana");
+
+    await expect(
+      caller.setRequirement({ organizationId: "org-acme", mfaRequired: true }),
+    ).resolves.toEqual({ previous: false, next: true });
+
+    expect(setRequirementMock).toHaveBeenCalledWith({
+      organizationId: "org-acme",
+      mfaRequired: true,
+      actorUserId: "ana",
+    });
+    expect(auditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "ana",
+        organizationId: "org-acme",
+        action: "twoStepVerification.setRequirement",
+        args: { organizationId: "org-acme", mfaRequired: true },
+      }),
+    );
   });
 });
