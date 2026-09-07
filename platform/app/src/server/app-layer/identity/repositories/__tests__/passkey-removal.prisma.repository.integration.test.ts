@@ -104,22 +104,15 @@ describe("PrismaPasskeyRemovalRepository", () => {
       suffix: "concurrent",
       passkeyCount: 2,
     });
-    const waitForBothCounts = twoPartyBarrier();
-    const synchronizedPrisma = prisma.$extends({
-      name: "passkey-removal-barrier",
-      query: {
-        passkey: {
-          async count({ args, query }) {
-            const count = await query(args);
-            await waitForBothCounts();
-            return count;
-          },
-        },
-      },
-    });
+    const waitForBothSnapshots = twoPartyBarrier();
     const repository = PrismaPasskeyRemovalRepository.create({
-      prisma: synchronizedPrisma,
-      routesToIdentity: async () => false,
+      prisma,
+      routesToIdentity: async () => {
+        // The target read has already fixed each SERIALIZABLE snapshot.
+        // Both transactions must observe the original two-passkey state.
+        await waitForBothSnapshots();
+        return false;
+      },
     });
     const firstId = passkeyIds[0];
     const secondId = passkeyIds[1];
