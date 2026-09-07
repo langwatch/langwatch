@@ -853,9 +853,8 @@ function identityCustomAdapter({
      * the same reason `withIssuer` mints it on the identity branch: 1.7
      * checks the issuer on rows it is handed — a credential row without one
      * fails its own `local:credential` comparison, which reaches the person
-     * as a wrong password. Every legacy row's issuer is the synthetic form,
-     * because the legacy table never stored a real one: a provider with an
-     * issuer of its own arrived after the identity branch existed to hold it.
+     * as a wrong password. Current rows persist the issuer better-auth chose;
+     * this fallback only supplies the synthetic value for an older/null row.
      */
     /**
      * The engine row's dialing configuration, opened on its way out.
