@@ -48,6 +48,8 @@ export {
 export {
   createIdentityStorageAdapter,
   type IdentityStorageAdapterDeps,
+  type PasskeyRemovalOutcome,
+  type PasskeyRemovalPort,
 } from "./better-auth/identity-storage-adapter";
 export {
   IdentityAccountWriter,
