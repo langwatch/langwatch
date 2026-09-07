@@ -89,6 +89,20 @@ export type EvaluationStateOffense = {
  * guard all call this instead of re-deriving the canonical set or
  * re-walking the shape themselves.
  */
+function collectOffendingStates(
+  evaluatorKey: string,
+  states: unknown,
+): EvaluationStateOffense[] {
+  if (!Array.isArray(states)) return [];
+  return states
+    .filter(
+      (state): state is string =>
+        typeof state === "string" &&
+        !CANONICAL_EVALUATION_STATE_VALUES.has(state),
+    )
+    .map((offendingValue) => ({ evaluatorKey, offendingValue }));
+}
+
 export function findOffendingEvaluationStateEntries(
   evaluationStateValue: unknown,
 ): EvaluationStateOffense[] {
@@ -100,21 +114,11 @@ export function findOffendingEvaluationStateEntries(
     return [];
   }
 
-  const offenses: EvaluationStateOffense[] = [];
-  for (const [evaluatorKey, states] of Object.entries(
+  return Object.entries(
     evaluationStateValue as Record<string, unknown>,
-  )) {
-    if (!Array.isArray(states)) continue;
-    for (const state of states) {
-      if (
-        typeof state === "string" &&
-        !CANONICAL_EVALUATION_STATE_VALUES.has(state)
-      ) {
-        offenses.push({ evaluatorKey, offendingValue: state });
-      }
-    }
-  }
-  return offenses;
+  ).flatMap(([evaluatorKey, states]) =>
+    collectOffendingStates(evaluatorKey, states),
+  );
 }
 
 /**

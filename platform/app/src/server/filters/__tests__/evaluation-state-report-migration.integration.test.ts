@@ -29,6 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type Prisma, PrismaClient } from "~/generated/prisma/client";
 import { evaluationRunDataSchema } from "~/server/app-layer/evaluations/types";
 import { prisma } from "~/server/db";
+import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 
 /**
  * The canonical execution-state domain, derived from the schema so this
@@ -221,7 +222,9 @@ describe("evaluation-state report-only migration (TriggerFilterFinding)", () => 
   let xminBeforeScan: Record<string, string>;
 
   beforeAll(async () => {
-    rawDb = new PrismaClient();
+    rawDb = new PrismaClient({
+      adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+    });
 
     await prisma.organization.create({
       data: { id: ORG_ID, name: `TFF Org ${suffix}`, slug: `tff-${suffix}` },
