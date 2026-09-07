@@ -43,6 +43,7 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 }));
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  clearSignUpConfirmationPending: async () => void 0,
   // better-auth reads these at module load; the values are irrelevant to
   // anything here — they only have to exist for the import graph to settle.
   BACKUP_CODE_COUNT: 10,

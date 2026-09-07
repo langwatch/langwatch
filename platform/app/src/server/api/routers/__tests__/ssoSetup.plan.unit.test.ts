@@ -58,6 +58,7 @@ const stubBetterAuthAdapter = vi.hoisted(() => ({
  * named explicitly below.
  */
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  clearSignUpConfirmationPending: async () => void 0,
   ssoSelfServe: () => mockSelfServe,
   ssoBreakGlass: () => mockBreakGlass,
   // Read at module load by `better-auth/index.ts`, which is on this router's

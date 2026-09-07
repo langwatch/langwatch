@@ -63,6 +63,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
     "organizationMfa",
     "scimReconciliation",
     "sessionClaims",
+    "sessionCallbackEvidence",
     "sessionInventory",
     "signInDomainRoutingPort",
     "signInRouter",
@@ -85,6 +86,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
   ];
   return {
     ...Object.fromEntries(factories.map((name) => [name, inert])),
+    clearSignUpConfirmationPending: async () => void 0,
     // The one factory this suite asserts about: the surface under test.
     scimOversight: () => mockService,
     // index.ts hands the built instance to this holder at module load.
