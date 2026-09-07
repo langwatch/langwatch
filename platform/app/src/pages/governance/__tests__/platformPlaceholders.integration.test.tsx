@@ -16,6 +16,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
@@ -70,6 +71,50 @@ vi.mock("~/components/LoadingScreen", () => ({
   LoadingScreen: () => <div>loading</div>,
 }));
 
+// The Model row reads the same two queries the Langy panel seeds its picker
+// from. Stubbed at the tRPC boundary so the assertion is about the WIRING:
+// what Langy is configured with is what the row shows.
+const LANGY_CONFIGURED_MODEL = "anthropic/claude-sonnet-4.5";
+const modelQueries = vi.hoisted(() => ({
+  getResolvedDefault: vi.fn(),
+  modelsAllowed: vi.fn(),
+}));
+vi.mock("~/utils/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/utils/api")>()),
+  api: {
+    modelProvider: {
+      getResolvedDefault: { useQuery: modelQueries.getResolvedDefault },
+    },
+    langy: { modelsAllowed: { useQuery: modelQueries.modelsAllowed } },
+  },
+}));
+// The shared picker drags the providers query and the registry along; a
+// native select standing in for it keeps this file about the drawer.
+vi.mock("~/components/ModelSelector", () => ({
+  allModelOptions: ["openai/gpt-5-mini"],
+  ModelSelector: ({
+    model,
+    options,
+    onChange,
+  }: {
+    model: string;
+    options: string[];
+    onChange: (model: string) => void;
+  }) => (
+    <select
+      data-testid="model-selector"
+      value={model}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+  ),
+}));
+
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import AnalyticsPage from "../analytics";
 import InsightsPage from "../insights";
@@ -83,9 +128,36 @@ function renderPage(Page: React.ComponentType) {
   );
 }
 
+/** The standard Select keeps a hidden native <select> in sync with its
+ *  state (zag's hidden select handles change), and the Field label names
+ *  both it and the trigger. The native one is the one a test can read and
+ *  change without portals. */
+const hiddenSelect = (label: string) =>
+  screen.getByLabelText(label, { selector: "select" });
+const findHiddenSelect = (label: string) =>
+  screen.findByLabelText(label, { selector: "select" });
+/** The state machine delivers the change a tick later; the trigger's text
+ *  is the proof it landed, so wait on that before pressing anything. */
+const pickOption = async (label: string, value: string, shown: string) => {
+  fireEvent.change(await findHiddenSelect(label), { target: { value } });
+  await waitFor(() =>
+    expect(screen.getByRole("combobox", { name: label })).toHaveTextContent(
+      shown,
+    ),
+  );
+};
+
 beforeEach(() => {
   harness.permissions = getOrganizationRolePermissions("ADMIN");
   harness.flagEnabled = true;
+  modelQueries.getResolvedDefault.mockReturnValue({
+    data: { model: LANGY_CONFIGURED_MODEL },
+    isLoading: false,
+  });
+  modelQueries.modelsAllowed.mockReturnValue({
+    data: { modelsAllowed: [LANGY_CONFIGURED_MODEL, "openai/gpt-5-mini"] },
+    isLoading: false,
+  });
   // The store persists `isOpen` and the unit lane shares the module between
   // files, so the panel can arrive already open. Start closed, every time.
   localStorage.clear();
@@ -153,6 +225,37 @@ describe("given the Insights screen", () => {
     expect(container.querySelector(".langy-root linearGradient")).toBeNull();
   });
 
+  /** @scenario "The inbox rail is in place at zero" */
+  it("shows the five folders at zero and swaps the body per folder", () => {
+    renderPage(InsightsPage);
+    const rail = screen.getByRole("navigation", { name: "Insights folders" });
+
+    for (const label of [
+      "Inbox",
+      "Stale",
+      "Archived",
+      "Alerts",
+      "Notifications",
+    ]) {
+      expect(within(rail).getByLabelText(`${label} count`)).toHaveTextContent(
+        "0",
+      );
+    }
+    expect(within(rail).getByRole("button", { name: /Inbox/ })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+
+    fireEvent.click(within(rail).getByRole("button", { name: /Stale/ }));
+    expect(screen.getByText(/Nothing has gone stale/)).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("insights-empty-brief"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(rail).getByRole("button", { name: /Inbox/ }));
+    expect(screen.getByTestId("insights-empty-brief")).toBeInTheDocument();
+  });
+
   /** @scenario "Open Langy opens the Langy panel" */
   it("opens the Langy panel from Open Langy", () => {
     renderPage(InsightsPage);
@@ -168,9 +271,8 @@ describe("given the Insights screen", () => {
     renderPage(InsightsPage);
 
     fireEvent.click(screen.getByRole("button", { name: "Set up data" }));
-    const runs = await screen.findByLabelText("Runs");
-    expect(runs).toHaveValue("daily");
-    fireEvent.change(runs, { target: { value: "weekly" } });
+    expect(await findHiddenSelect("Runs")).toHaveValue("daily");
+    await pickOption("Runs", "weekly", "Weekly");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
@@ -179,7 +281,27 @@ describe("given the Insights screen", () => {
     expect(screen.queryByText(/saved/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Set up data" }));
-    expect(await screen.findByLabelText("Runs")).toHaveValue("weekly");
+    expect(await findHiddenSelect("Runs")).toHaveValue("weekly");
+  });
+
+  /** @scenario "The Model row follows Langy's configured model" */
+  it("shows the model Langy is configured with, from Langy's own gate", async () => {
+    renderPage(InsightsPage);
+
+    fireEvent.click(screen.getByRole("button", { name: "Set up data" }));
+
+    expect(await screen.findByTestId("model-selector")).toHaveValue(
+      LANGY_CONFIGURED_MODEL,
+    );
+    expect(modelQueries.getResolvedDefault).toHaveBeenCalledWith(
+      expect.objectContaining({ featureKey: "langy.chat" }),
+      expect.anything(),
+    );
+    expect(
+      screen.getByText(
+        "Langy's configured model. Pick another to override it here.",
+      ),
+    ).toBeInTheDocument();
   });
 
   /** @scenario "Cancel discards the sitting's edits" */
@@ -187,16 +309,14 @@ describe("given the Insights screen", () => {
     renderPage(InsightsPage);
 
     fireEvent.click(screen.getByRole("button", { name: "Set up data" }));
-    fireEvent.change(await screen.findByLabelText("Runs"), {
-      target: { value: "weekly" },
-    });
+    await pickOption("Runs", "weekly", "Weekly");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() =>
       expect(screen.queryByLabelText("Runs")).not.toBeInTheDocument(),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Set up data" }));
-    expect(await screen.findByLabelText("Runs")).toHaveValue("daily");
+    expect(await findHiddenSelect("Runs")).toHaveValue("daily");
   });
 });
 
@@ -243,9 +363,9 @@ describe("given the Analytics screen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Requests by model" }));
 
-    expect(screen.getByLabelText("Measure")).toHaveValue("requests");
-    expect(screen.getByLabelText("Break down by")).toHaveValue("model");
-    expect(screen.getByLabelText("Over time")).toHaveValue("day");
+    expect(hiddenSelect("Measure")).toHaveValue("requests");
+    expect(hiddenSelect("Break down by")).toHaveValue("model");
+    expect(hiddenSelect("Over time")).toHaveValue("day");
     expect(
       screen.getByText("usage | summarize count() by model, bin(1d)"),
     ).toBeInTheDocument();

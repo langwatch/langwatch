@@ -2,15 +2,15 @@ import {
   Badge,
   Box,
   Button,
+  createListCollection,
   Heading,
   HStack,
-  NativeSelect,
   Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Copy, Filter } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import {
@@ -31,6 +31,7 @@ import {
   matchesTemplate,
 } from "~/components/governance/platform/exploreQuery";
 import { SegmentedControl } from "~/components/ui/segmented-control";
+import { Select } from "~/components/ui/select";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -252,27 +253,42 @@ function ControlSelect({
   onChange: (value: string) => void;
   options: ReadonlyArray<{ value: string; label: string }>;
 }) {
+  const collection = useMemo(
+    () => createListCollection({ items: [...options] }),
+    [options],
+  );
   return (
-    <HStack gap={2}>
-      <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">
+    <Select.Root
+      collection={collection}
+      size="sm"
+      width="auto"
+      flexDirection="row"
+      alignItems="center"
+      gap={2}
+      value={[value]}
+      onValueChange={({ value: next }) => {
+        if (next[0]) onChange(next[0]);
+      }}
+    >
+      <Select.Label
+        fontSize="sm"
+        color="fg.muted"
+        fontWeight="normal"
+        whiteSpace="nowrap"
+      >
         {label}
-      </Text>
-      <NativeSelect.Root size="sm" width="150px">
-        <NativeSelect.Field
-          aria-label={label}
-          value={value}
-          fontWeight="medium"
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
-    </HStack>
+      </Select.Label>
+      <Select.Trigger width="150px" fontWeight="medium">
+        <Select.ValueText />
+      </Select.Trigger>
+      <Select.Content>
+        {options.map((option) => (
+          <Select.Item key={option.value} item={option}>
+            {option.label}
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
   );
 }
 

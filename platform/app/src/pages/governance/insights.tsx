@@ -1,7 +1,13 @@
-import { Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import {
+  EMPTY_FOLDER_LINE,
+  EMPTY_INSIGHTS_COUNTS,
+  type InsightsFolder,
+  InsightsRail,
+} from "~/components/governance/platform/InsightsRail";
 import {
   DEFAULT_INSIGHTS_SETTINGS,
   InsightsSetupDrawer,
@@ -26,6 +32,7 @@ import { useLangyStore } from "~/features/langy/stores/langyStore";
 function InsightsPage() {
   const [setupOpen, setSetupOpen] = useState(false);
   const [settings, setSettings] = useState(DEFAULT_INSIGHTS_SETTINGS);
+  const [folder, setFolder] = useState<InsightsFolder>("inbox");
   const openLangy = useLangyStore((state) => state.openPanel);
 
   return (
@@ -39,71 +46,25 @@ function InsightsPage() {
           </Text>
         </VStack>
 
-        {/* Langy's own empty state on Langy's own material. The surface is
-            the one the home briefing wears (`langy-root`, hairline, no
-            shadow, the panel's palette in dark); inside it, the panel's
-            empty-state grammar: the bare mark, the serif display line, one
-            quiet sentence, then the keys — see
-            features/langy/components/EmptyState.tsx. The scope also paints
-            the mark in currentColor (langyTheme.css), which is why the card
-            carries no gradient defs: outside it the mark would fill from a
-            paint server only the Langy panel mounts. */}
-        <LangyPanelSurface
-          data-testid="insights-empty-brief"
-          alignSelf="center"
-          maxWidth="900px"
-        >
-          <VStack gap={0} paddingY={16} paddingX={8}>
-            <LangyMark size={44} />
-            <Text
-              as="h2"
-              fontFamily={SERIF}
-              // 44px mark ÷ φ, the same pairing the panel's greeting uses.
-              fontSize="27px"
-              fontWeight="500"
-              letterSpacing="-0.02em"
-              lineHeight="1.2"
-              color="fg"
-              textAlign="center"
-              marginTop={4}
-            >
-              Langy writes your brief here
-            </Text>
-            <Text
-              textStyle="sm"
-              color="fg.muted"
-              lineHeight="1.5"
-              textAlign="center"
-              textWrap="balance"
-              maxWidth="380px"
-              marginTop={2}
-            >
-              Every morning a background job reads yesterday&apos;s traffic and
-              files a couple of high-signal insights: not fifteen a day.
-            </Text>
-            <HStack gap={2} marginTop={6}>
-              <Button
-                size="sm"
-                colorPalette="orange"
-                onClick={() => setSetupOpen(true)}
-              >
-                Set up data
-              </Button>
-              <Button size="sm" variant="subtle" onClick={openLangy}>
-                Open Langy
-              </Button>
-            </HStack>
-            <Button
-              variant="plain"
-              size="xs"
-              fontWeight="400"
-              color="fg.subtle"
-              marginTop={3}
-            >
-              or preview a sample inbox
-            </Button>
-          </VStack>
-        </LangyPanelSurface>
+        <HStack align="start" gap={8} width="full">
+          <InsightsRail
+            selected={folder}
+            counts={EMPTY_INSIGHTS_COUNTS}
+            onSelect={setFolder}
+          />
+          <Box flex={1} minWidth={0}>
+            {folder === "inbox" ? (
+              <InboxEmptyBrief
+                onSetup={() => setSetupOpen(true)}
+                onOpenLangy={openLangy}
+              />
+            ) : (
+              <Text color="fg.muted" paddingY={4}>
+                {EMPTY_FOLDER_LINE[folder]}
+              </Text>
+            )}
+          </Box>
+        </HStack>
       </VStack>
 
       <InsightsSetupDrawer
@@ -116,6 +77,82 @@ function InsightsPage() {
         }}
       />
     </GovernanceLayout>
+  );
+}
+
+function InboxEmptyBrief({
+  onSetup,
+  onOpenLangy,
+}: {
+  onSetup: () => void;
+  onOpenLangy: () => void;
+}) {
+  return (
+    <>
+      {/* Langy's own empty state on Langy's own material. The surface is
+            the one the home briefing wears (`langy-root`, hairline, no
+            shadow, the panel's palette in dark); inside it, the panel's
+            empty-state grammar: the bare mark, the serif display line, one
+            quiet sentence, then the keys — see
+            features/langy/components/EmptyState.tsx. The scope also paints
+            the mark in currentColor (langyTheme.css), which is why the card
+            carries no gradient defs: outside it the mark would fill from a
+            paint server only the Langy panel mounts. */}
+      {/* The surface wraps its card in a full-width scope box, so the
+            card centres as a block (auto margins), not as a flex item. */}
+      <LangyPanelSurface
+        data-testid="insights-empty-brief"
+        maxWidth="900px"
+        marginX="auto"
+      >
+        <VStack gap={0} paddingY={16} paddingX={8}>
+          <LangyMark size={44} />
+          <Text
+            as="h2"
+            fontFamily={SERIF}
+            // 44px mark ÷ φ, the same pairing the panel's greeting uses.
+            fontSize="27px"
+            fontWeight="500"
+            letterSpacing="-0.02em"
+            lineHeight="1.2"
+            color="fg"
+            textAlign="center"
+            marginTop={4}
+          >
+            Langy writes your brief here
+          </Text>
+          <Text
+            textStyle="sm"
+            color="fg.muted"
+            lineHeight="1.5"
+            textAlign="center"
+            textWrap="balance"
+            maxWidth="380px"
+            marginTop={2}
+          >
+            Every morning a background job reads yesterday&apos;s traffic and
+            files a couple of high-signal insights: not fifteen a day.
+          </Text>
+          <HStack gap={2} marginTop={6}>
+            <Button size="sm" colorPalette="orange" onClick={onSetup}>
+              Set up data
+            </Button>
+            <Button size="sm" variant="subtle" onClick={onOpenLangy}>
+              Open Langy
+            </Button>
+          </HStack>
+          <Button
+            variant="plain"
+            size="xs"
+            fontWeight="400"
+            color="fg.subtle"
+            marginTop={3}
+          >
+            or preview a sample inbox
+          </Button>
+        </VStack>
+      </LangyPanelSurface>
+    </>
   );
 }
 

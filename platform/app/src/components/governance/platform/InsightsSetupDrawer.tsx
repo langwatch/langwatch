@@ -1,8 +1,9 @@
 import {
   Button,
+  createListCollection,
+  Field,
   HStack,
   Input,
-  NativeSelect,
   Separator,
   Spacer,
   Text,
@@ -10,9 +11,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { UserRoundCog } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
+import { allModelOptions, ModelSelector } from "~/components/ModelSelector";
 import { Drawer } from "~/components/ui/drawer";
+import { Select } from "~/components/ui/select";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
+import { api } from "~/utils/api";
 
 /**
  * What the daily Insights job would be told, if there were a job.
@@ -30,13 +36,21 @@ import { Drawer } from "~/components/ui/drawer";
  * onSave callback. The known cost is that Langy's drawer dodge keys on the
  * registry, so a floating Langy can sit over this sheet.
  *
+ * The Model row is the one control already wired to something real: it
+ * reads the model Langy's own routing resolves for this project (the same
+ * query the Langy panel seeds its picker from) and lists the same allowed
+ * models, through the shared ModelSelector. `model: null` means "whatever
+ * Langy is configured with", so a change in Model Providers follows here
+ * without anyone re-saving this drawer.
+ *
  * Spec: specs/governance/governance-platform-placeholders.feature
  */
 export interface InsightsSettings {
   runs: "daily" | "weekdays" | "weekly";
   at: string;
   volume: "langy" | "one" | "three";
-  model: "langy-default";
+  /** `provider/name`, or null to follow Langy's configured default. */
+  model: string | null;
   skillInstructions: string;
 }
 
@@ -44,7 +58,7 @@ export const DEFAULT_INSIGHTS_SETTINGS: InsightsSettings = {
   runs: "daily",
   at: "07:00",
   volume: "langy",
-  model: "langy-default",
+  model: null,
   skillInstructions: [
     "Every morning at 07:00, review yesterday's traffic across the whole substrate.",
     "",
@@ -56,6 +70,22 @@ export const DEFAULT_INSIGHTS_SETTINGS: InsightsSettings = {
     "- Attach evidence: the query and chart that show it, the signal that caught it, or the traces that prove it.",
   ].join("\n"),
 };
+
+const RUNS_OPTIONS = createListCollection({
+  items: [
+    { value: "daily", label: "Daily" },
+    { value: "weekdays", label: "Weekdays" },
+    { value: "weekly", label: "Weekly" },
+  ] satisfies Array<{ value: InsightsSettings["runs"]; label: string }>,
+});
+
+const VOLUME_OPTIONS = createListCollection({
+  items: [
+    { value: "langy", label: "Let Langy decide (recommended)" },
+    { value: "one", label: "At most one a day" },
+    { value: "three", label: "At most three a day" },
+  ] satisfies Array<{ value: InsightsSettings["volume"]; label: string }>,
+});
 
 /** What steering would have left behind. Illustrative until there is a session. */
 const LEARNED_PREFERENCES = [
@@ -74,17 +104,17 @@ function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <VStack align="stretch" gap={2} paddingY={4}>
+    <Field.Root paddingY={4} gap={2}>
       <VStack align="start" gap={0.5}>
-        <Text fontSize="sm" fontWeight="medium">
+        <Field.Label fontSize="sm" fontWeight="medium">
           {label}
-        </Text>
-        <Text fontSize="xs" color="fg.muted">
+        </Field.Label>
+        <Field.HelperText fontSize="xs" color="fg.muted" marginTop={0}>
           {hint}
-        </Text>
+        </Field.HelperText>
       </VStack>
       {children}
-    </VStack>
+    </Field.Root>
   );
 }
 
@@ -107,6 +137,25 @@ export function InsightsSetupDrawer({
   }, [open, settings]);
   const patch = (next: Partial<InsightsSettings>) =>
     setDraft((current) => ({ ...current, ...next }));
+
+  // Same two queries the Langy panel seeds its own picker from: the model
+  // Langy's gate resolves for this project, and the models it may use.
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
+  const langyDefaultQuery = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId, featureKey: LANGY_CHAT_FEATURE_KEY },
+    { enabled: !!projectId && open, staleTime: 300_000 },
+  );
+  const modelsAllowedQuery = api.langy.modelsAllowed.useQuery(
+    { projectId },
+    { enabled: !!projectId && open, staleTime: 300_000 },
+  );
+  const modelOptions = useMemo(
+    () => modelsAllowedQuery.data?.modelsAllowed ?? allModelOptions,
+    [modelsAllowedQuery.data?.modelsAllowed],
+  );
+  const langyDefaultModel = langyDefaultQuery.data?.model ?? "";
+  const shownModel = draft.model ?? langyDefaultModel;
 
   return (
     <Drawer.Root
@@ -133,26 +182,29 @@ export function InsightsSetupDrawer({
               label="Runs"
               hint="How often the background job messages Langy"
             >
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  aria-label="Runs"
-                  value={draft.runs}
-                  onChange={(event) =>
-                    patch({
-                      runs: event.target.value as InsightsSettings["runs"],
-                    })
-                  }
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekdays">Weekdays</option>
-                  <option value="weekly">Weekly</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
+              <Select.Root
+                collection={RUNS_OPTIONS}
+                size="sm"
+                value={[draft.runs]}
+                onValueChange={({ value }) => {
+                  const runs = value[0] as InsightsSettings["runs"] | undefined;
+                  if (runs) patch({ runs });
+                }}
+              >
+                <Select.Trigger>
+                  <Select.ValueText />
+                </Select.Trigger>
+                <Select.Content>
+                  {RUNS_OPTIONS.items.map((item) => (
+                    <Select.Item key={item.value} item={item}>
+                      {item.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
             </SettingRow>
             <SettingRow label="At" hint="Europe/Amsterdam">
               <Input
-                aria-label="At"
                 type="time"
                 size="sm"
                 value={draft.at}
@@ -163,40 +215,46 @@ export function InsightsSetupDrawer({
               label="Volume"
               hint="Few insights that matter beat fifteen that don't"
             >
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  aria-label="Volume"
-                  value={draft.volume}
-                  onChange={(event) =>
-                    patch({
-                      volume: event.target.value as InsightsSettings["volume"],
-                    })
-                  }
-                >
-                  <option value="langy">Let Langy decide (recommended)</option>
-                  <option value="one">At most one a day</option>
-                  <option value="three">At most three a day</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
+              <Select.Root
+                collection={VOLUME_OPTIONS}
+                size="sm"
+                value={[draft.volume]}
+                onValueChange={({ value }) => {
+                  const volume = value[0] as
+                    | InsightsSettings["volume"]
+                    | undefined;
+                  if (volume) patch({ volume });
+                }}
+              >
+                <Select.Trigger>
+                  <Select.ValueText />
+                </Select.Trigger>
+                <Select.Content>
+                  {VOLUME_OPTIONS.items.map((item) => (
+                    <Select.Item key={item.value} item={item}>
+                      {item.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
             </SettingRow>
             <SettingRow
               label="Model"
-              hint="The model the eternal session runs on"
+              hint={
+                draft.model
+                  ? "The model the eternal session runs on"
+                  : "Langy's configured model. Pick another to override it here."
+              }
             >
-              {/* One option and nothing to write it to: read-only, not a
-                  controlled field pretending to accept a change. */}
-              <NativeSelect.Root size="sm" disabled>
-                <NativeSelect.Field
-                  aria-label="Model"
-                  defaultValue={draft.model}
-                >
-                  <option value="langy-default">
-                    claude-sonnet-4.5 · Langy default
-                  </option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
+              <ModelSelector
+                model={shownModel}
+                options={modelOptions}
+                onChange={(model) => patch({ model })}
+                size="full"
+                mode="chat"
+                showConfigureAction
+                forFeatureLabel="for Insights"
+              />
             </SettingRow>
             <SettingRow
               label="Session"
@@ -216,7 +274,6 @@ export function InsightsSetupDrawer({
               hint="What the daily job tells Langy. Edit it and the next run obeys."
             >
               <Textarea
-                aria-label="Skill instructions"
                 value={draft.skillInstructions}
                 onChange={(event) =>
                   patch({ skillInstructions: event.target.value })

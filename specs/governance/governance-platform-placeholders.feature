@@ -56,6 +56,15 @@ Feature: Platform placeholders — Insights, Analytics, Signals & Alerts
     And a "Set up data" action and an "Open Langy" action are offered
 
   @integration
+  Scenario: The inbox rail is in place at zero
+    Then the screen carries a folder rail: Inbox, Stale, Archived, then Alerts and Notifications under a rule
+    And every folder counts zero, shown rather than hidden
+    And Inbox is the current folder, with Langy's brief as its body
+    When the member picks another folder
+    Then the body is that folder's one-line empty state
+    # Folders are page state, not routes: nothing lives behind them yet.
+
+  @integration
   Scenario: Open Langy opens the Langy panel
     When the member presses "Open Langy" on the Insights screen
     Then the Langy panel is opened
@@ -71,6 +80,15 @@ Feature: Platform placeholders — Insights, Analytics, Signals & Alerts
     And reopening the drawer shows the changed schedule
     # Local state for the sitting. A reload returns the defaults; there
     # is no store behind this drawer yet and no toast may pretend there is.
+
+  @integration
+  Scenario: The Model row follows Langy's configured model
+    When the member presses "Set up data"
+    Then the Model row shows the model Langy's own routing resolves for the project
+    And offers the same models Langy is allowed to use, through the shared model picker
+    # The one control on this drawer that is wired to something real. It
+    # reads Langy's gate (feature key "langy.chat"), not a hand-typed name,
+    # so a change under Settings > Model Providers follows here unasked.
 
   @integration
   Scenario: Cancel discards the sitting's edits
