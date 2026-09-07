@@ -12,7 +12,6 @@ import { uiSlots } from "@langwatch/ui-host/slots";
 import { useBrowserUiSession } from "../behavior/ui-session";
 import { agentFeature } from "./agent";
 import { analyticsFeature } from "./analytics";
-import { annotationFeature } from "./annotation";
 import { annotationScoresFeature } from "./annotation-scores";
 import { apiKeyFeature } from "./api-key";
 import { authFeature } from "./auth";
@@ -50,12 +49,14 @@ import { simulationsFeature } from "./simulations";
 import { topicFeature } from "./topic";
 import { traceFeature } from "./traces";
 import { workflowFeature } from "./workflows";
+import { annotationWeb } from "./annotation";
+import { collectWebInstallations } from "../behavior/ui-web-installation";
 
 /** Every feature this package installs. Order is preserved into `apis`. */
 const features = [
   agentFeature,
   analyticsFeature,
-  annotationFeature,
+  annotationWeb,
   annotationScoresFeature,
   apiKeyFeature,
   authFeature,
@@ -95,8 +96,8 @@ const features = [
   workflowFeature,
 ] as const;
 
-export const installedUiFeatures = installUiFeatures({
-  features,
+const installedLegacyUiFeatures = installUiFeatures({
+  features: features.filter((feature) => !("install" in feature)),
   capabilities: {
     feedback: BrowserUiFeedback.create(),
     // The blocks core screens leave open, filled by whoever owns the words.
@@ -112,6 +113,16 @@ export const installedUiFeatures = installUiFeatures({
   },
   session: useBrowserUiSession,
 });
+
+const installedWeb = collectWebInstallations({
+  installations: features,
+});
+
+export const installedUiFeatures = {
+  ...installedLegacyUiFeatures,
+  apis: installedWeb.apis,
+  routes: installedWeb.routes,
+};
 
 /** Every drawer this application answers, one map composed from every feature's own. */
 export const installedUiDrawers = installedUiFeatures.drawers;

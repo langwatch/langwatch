@@ -14,6 +14,8 @@ import type {
   UiFeatureApiTransport,
 } from "./ui-feature-transport";
 import type { UiPageLoaderRegistry } from "./ui-page-loaders";
+import type { UiWebRouteParent } from "./ui-web-installation";
+import type { RouteObject } from "react-router";
 import type { UiRpcPort } from "./ui-rpc";
 import type { UiSessionSource } from "./ui-session";
 
@@ -55,6 +57,7 @@ export type UiFeatureInstall = {
    * serve the reader, the scope and the permissions from the deployment.
    */
   session?: UiSessionSource;
+  routes?: Readonly<Record<UiWebRouteParent, readonly RouteObject[]>>;
 };
 
 /** One feature package's whole contribution to the browser application. */
@@ -92,6 +95,16 @@ export function uiFeature<TClient, const D extends UiDrawerRegistry = Record<str
     loaders,
     drawers: (drawers ?? {}) as D,
   };
+}
+
+/** Normalizes a typed provider at the one existing shell boundary. */
+export function uiApiBinding<TClient>(
+  name: string,
+  api: {
+    Provider: ComponentType<{ client: TClient; queryClient: QueryClient; children: ReactNode }>;
+  },
+): UiFeatureApiBinding {
+  return uiFeature({ name, api }).api!;
 }
 
 type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (

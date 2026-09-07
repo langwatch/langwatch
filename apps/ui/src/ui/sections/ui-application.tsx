@@ -51,7 +51,11 @@ export function createUiApplication({
   return {
     outerProvider: createUiOuterProvider(providers),
     router: createUiRouter({
-      routes: createUiRouteObjects({ table: uiRouteTable, loaders }),
+      routes: createUiRouteObjects({
+        table: uiRouteTable,
+        loaders,
+        installedRoutes: features.routes,
+      }),
       rootComponent: createUiRootLayout({
         innerProvider: createUiInnerProvider(providers),
         featureShell: createUiFeatureShell({

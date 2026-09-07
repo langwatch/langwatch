@@ -367,7 +367,6 @@ describe("given what apps/ui serves itself", () => {
         [
           ...AGENT_PAGE_KEYS,
           ...ANALYTICS_PAGE_KEYS,
-          ...ANNOTATION_PAGE_KEYS,
           ...ANNOTATION_SCORES_PAGE_KEYS,
           ...API_KEY_PAGE_KEYS,
           ...AUTH_PAGE_KEYS,

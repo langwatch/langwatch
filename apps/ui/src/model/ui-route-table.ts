@@ -31,6 +31,8 @@ export type UiPageRouteDescriptor = {
   readonly path?: string;
   /** The key the composing application registers this page's loader under. */
   readonly page: string;
+  /** The explicit native route mount point for a pre-router web installation. */
+  readonly webRouteParent?: "project";
   readonly children?: readonly UiRouteDescriptor[];
 };
 
@@ -475,6 +477,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       // survive navigation between project pages.
       {
         page: "features/langy/ProjectLangyLayout",
+        webRouteParent: "project",
         children: [
           {
             path: "/:project",
@@ -660,28 +663,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           {
             path: "/:project/studio/:workflow",
             page: "pages/[project]/studio/[workflow]",
-          },
-
-          // Annotations
-          {
-            path: "/:project/annotations",
-            page: "pages/[project]/annotations",
-          },
-          {
-            path: "/:project/annotations/all",
-            page: "pages/[project]/annotations/all",
-          },
-          {
-            path: "/:project/annotations/me",
-            page: "pages/[project]/annotations/me",
-          },
-          {
-            path: "/:project/annotations/my-queue",
-            page: "pages/[project]/annotations/my-queue",
-          },
-          {
-            path: "/:project/annotations/:slug",
-            page: "pages/[project]/annotations/[slug]",
           },
 
           // Analytics

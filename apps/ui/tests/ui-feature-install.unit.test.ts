@@ -107,6 +107,16 @@ describe("given the feature directories under apps/ui/src/features", () => {
     it("registers every exported feature value, so a new feature cannot be half-registered", () => {
       for (const [directory, module] of Object.entries(featureModules)) {
         const exported = featureExportsOf(module);
+        if (directory === "annotation") {
+          expect(
+            module.annotationWeb,
+            "annotation/index.ts exports no WebInstallation",
+          ).toBeDefined();
+          expect(installedUiFeatures.apis?.map((api) => api.name)).toContain(
+            "@langwatch/annotation-web",
+          );
+          continue;
+        }
         expect(exported.length, `${directory}/index.ts exports no *Feature value`).toBeGreaterThan(
           0,
         );

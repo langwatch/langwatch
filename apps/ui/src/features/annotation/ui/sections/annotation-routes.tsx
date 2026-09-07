@@ -10,7 +10,9 @@ import {
   type AnnotationView,
 } from "@langwatch/annotation-web/screens/annotations";
 import type { ComponentType } from "react";
-import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import type { UiPageLoader } from "../../../../behavior/ui-page-loaders";
+import { lazyRoute } from "../../../../behavior/lazy-route";
+import type { RouteObject } from "react-router";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { AnnotationHost } from "./annotation-host";
 
@@ -30,13 +32,47 @@ function annotationPage(view: AnnotationView, permission?: string): UiPageLoader
   });
 }
 
-export const annotationPageLoaders: UiPageLoaderRegistry = {
+const annotationRoute = (path: string, page: string, loader: UiPageLoader): RouteObject => ({
+  path,
+  ...lazyRoute(loader),
+  handle: { page },
+});
+
+export const annotationPageLoaders: Readonly<Record<string, UiPageLoader>> = {
   "pages/[project]/annotations": annotationPage("inbox", ANNOTATION_PAGE_PERMISSION),
-  "pages/[project]/annotations/me": annotationPage("mine"),
   "pages/[project]/annotations/all": annotationPage("all"),
-  "pages/[project]/annotations/[slug]": annotationPage("queue"),
+  "pages/[project]/annotations/me": annotationPage("mine"),
   "pages/[project]/annotations/my-queue": uiPage({
     screen: async () => ({ default: (await myQueueScreens.myQueue()).default }),
     host: AnnotationHost,
   }),
+  "pages/[project]/annotations/[slug]": annotationPage("queue"),
 };
+
+export const annotationRoutes: readonly RouteObject[] = [
+  annotationRoute(
+    "/:project/annotations",
+    "pages/[project]/annotations",
+    annotationPageLoaders["pages/[project]/annotations"]!,
+  ),
+  annotationRoute(
+    "/:project/annotations/all",
+    "pages/[project]/annotations/all",
+    annotationPageLoaders["pages/[project]/annotations/all"]!,
+  ),
+  annotationRoute(
+    "/:project/annotations/me",
+    "pages/[project]/annotations/me",
+    annotationPageLoaders["pages/[project]/annotations/me"]!,
+  ),
+  annotationRoute(
+    "/:project/annotations/my-queue",
+    "pages/[project]/annotations/my-queue",
+    annotationPageLoaders["pages/[project]/annotations/my-queue"]!,
+  ),
+  annotationRoute(
+    "/:project/annotations/:slug",
+    "pages/[project]/annotations/[slug]",
+    annotationPageLoaders["pages/[project]/annotations/[slug]"]!,
+  ),
+];

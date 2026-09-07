@@ -5,7 +5,8 @@
 import { Outlet, useMatches, type RouteObject } from "react-router";
 import { lazyRoute } from "../../behavior/lazy-route";
 import { resolveUiPageLoader, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
-import type { UiRouteDescriptor } from "../../model/ui-route-table";
+import { uiRouteDescriptors, type UiRouteDescriptor } from "../../model/ui-route-table";
+import type { UiWebRouteParent } from "../../behavior/ui-web-installation";
 import { UiPrefixRedirect } from "../elements/ui-prefix-redirect";
 
 /** What a materialised page route carries on its match. */
@@ -36,10 +37,29 @@ export function UiRouteOutlet() {
 export type UiRouteObjectsOptions = {
   table: readonly UiRouteDescriptor[];
   loaders: UiPageLoaderRegistry;
+  installedRoutes?: Readonly<Record<UiWebRouteParent, readonly RouteObject[]>>;
 };
 
-export function createUiRouteObjects({ table, loaders }: UiRouteObjectsOptions): RouteObject[] {
-  return table.map((descriptor) => {
+export function createUiRouteObjects(options: UiRouteObjectsOptions): RouteObject[] {
+  const hasProjectContributions = (options.installedRoutes?.project.length ?? 0) > 0;
+  if (hasProjectContributions) {
+    const anchors = uiRouteDescriptors(options.table).filter(
+      (descriptor) => "webRouteParent" in descriptor && descriptor.webRouteParent === "project",
+    );
+    if (anchors.length !== 1) {
+      throw new Error('Web installation route parent "project" must have exactly one anchor.');
+    }
+  }
+
+  return materializeRoutes(options);
+}
+
+function materializeRoutes({
+  table,
+  loaders,
+  installedRoutes,
+}: UiRouteObjectsOptions): RouteObject[] {
+  const routes = table.map((descriptor) => {
     if ("redirect" in descriptor) {
       const { from, to, pinParams, mapSegment } = descriptor.redirect;
       return {
@@ -57,9 +77,20 @@ export function createUiRouteObjects({ table, loaders }: UiRouteObjectsOptions):
       handle: { page: descriptor.page } satisfies UiRouteHandle,
     };
     if (descriptor.path !== void 0) route.path = descriptor.path;
-    if (descriptor.children) {
-      route.children = createUiRouteObjects({ table: descriptor.children, loaders });
+    const children = descriptor.children
+      ? materializeRoutes({
+          table: descriptor.children,
+          loaders,
+          installedRoutes,
+        })
+      : [];
+    if (descriptor.webRouteParent === "project") {
+      children.push(...(installedRoutes?.project ?? []));
+    }
+    if (children.length > 0) {
+      route.children = children;
     }
     return route;
   });
+  return routes;
 }
