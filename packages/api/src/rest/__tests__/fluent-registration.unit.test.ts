@@ -450,7 +450,7 @@ describe("provide", () => {
     const app = createService({
       name: "test",
       basePath: "/api/test",
-      actor: () => ({ id: "user-1" }),
+      actor: () => ({ type: "user", id: "user-1" }),
     })
       .withoutPermission("framework test endpoint")
       .registerRoute(
@@ -470,7 +470,7 @@ describe("provide", () => {
 
   /** @scenario "Handlers use the process-composed application" */
   it("does not resolve an actor until a handler asks for it", async () => {
-    const resolveActor = vi.fn(() => ({ id: "user-1" }));
+    const resolveActor = vi.fn(() => ({ type: "user" as const, id: "user-1" }));
     const app = createService({
       name: "test",
       basePath: "/api/test",

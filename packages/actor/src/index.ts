@@ -1,21 +1,8 @@
+import { z } from "zod";
+
 /**
- * The actor vocabulary: one closed answer to "who caused this action",
- * minted at the boundary that authenticated it and carried to every durable
- * record. The shape follows mojo's actor model — one union, boundary-minted,
- * with platform-initiated work attributed to the code that did it — with the
- * typing this package already applies to scopes and principals: a
- * discriminated union, not a bag of parameters.
- *
- * Two layers, on purpose:
- *
- * - {@link Actor} is the rich, in-process identity. It can say things the
- *   stored record does not need every consumer to parse — which person an
- *   impersonator was acting as, which code path an internal action ran from.
- * - {@link LedgerActor} is the durable record stamped onto ledger facts. Its
- *   shape (`{ type: "user" | "system", id }`) is frozen by every event
- *   already written; {@link toLedgerActor} is the ONE place the rich actor
- *   serializes down to it. No call site builds a `"system:..."` or
- *   `"apikey:..."` string by hand.
+ * Actor is the boundary-minted in-process identity; LedgerActor is its durable
+ * event shape. Use toLedgerActor for the single rich-to-durable conversion.
  */
 
 /**
@@ -61,6 +48,31 @@ export type Actor =
       /** The running deploy, when the caller has it. */
       revision?: string;
     };
+
+const systemActorNameSchema = z.custom<SystemActorName>(
+  (value) =>
+    typeof value === "string" && Object.prototype.hasOwnProperty.call(SYSTEM_ACTORS, value),
+);
+
+/** The canonical runtime schema for actors crossing a typed boundary. */
+export const actorSchema: z.ZodType<Actor> = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("user"),
+      id: z.string().min(1),
+      impersonatorId: z.string().min(1).optional(),
+    })
+    .strict(),
+  z.object({ type: z.literal("api_key"), id: z.string().min(1) }).strict(),
+  z.object({ type: z.literal("system"), name: systemActorNameSchema }).strict(),
+  z
+    .object({
+      type: z.literal("internal"),
+      codePath: z.string().min(1),
+      revision: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
 
 /** Mint the actor for platform-initiated work, named by its code path. */
 export function internalActor(codePath: string, options?: { revision?: string }): Actor {

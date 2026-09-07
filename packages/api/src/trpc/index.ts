@@ -1,14 +1,5 @@
-// ---------------------------------------------------------------------------
-// @langwatch/api/trpc -- the typed tRPC root and the policy spine it runs
-//
-// Tracing, request logging, handled-error translation, scope lineage, declared
-// authorization and audit, all over injected ports. Process-agnostic: nothing
-// here reads a database, a session or an environment variable.
-//
-// The error vocabulary and the access-policy vocabulary live at
-// `@langwatch/api`; the Hono service framework is `@langwatch/api/rest`.
-// Neither is re-exported here.
-// ---------------------------------------------------------------------------
+// Typed tRPC root and policy exports. Runtime dependencies remain injected;
+// the framework and error vocabularies are exported from their own entrypoints.
 
 export { TrpcRootDefinition, type TrpcRoot } from "./trpc-root.ts";
 export {
@@ -92,4 +83,6 @@ export {
 } from "./trpc-service-builder.ts";
 export { createTrpcRuntimePolicy, type TrpcRuntimePolicyPorts } from "./trpc-runtime-policy.ts";
 export { createScopeLineageGuard } from "./trpc-scope-lineage.ts";
-export { trpcApi, type TrpcApiDescriptor } from "./trpc-api.ts";
+export { createTrpcRouter, type TrpcTransportDescriptor } from "./create-trpc-router.ts";
+export type { TrpcHandlerBinding } from "./trpc-handler.ts";
+export type { ApiHandlerArguments } from "../handler-arguments.ts";

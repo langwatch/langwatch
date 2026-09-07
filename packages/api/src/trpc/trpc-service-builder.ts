@@ -39,6 +39,9 @@ import type {
   TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import type { z } from "zod";
+import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import type { TrpcHandlerBinding } from "./trpc-handler.ts";
+import { parseGovernedOutput, resolveTrustedHandlerArguments } from "./trpc-handler.ts";
 
 /** One procedure, wrapped in the process's policy chain. */
 export type TrpcPolicyDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
@@ -68,6 +71,7 @@ export type TrpcServiceConfig<
   TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
+  TApp = never,
 > = Readonly<{
   root: TRPCRootObject<TContext, object, TOptions, TRoot>;
   procedures: TrpcServiceProcedures<TContext, TOptions, TRoot>;
@@ -76,8 +80,10 @@ export type TrpcServiceConfig<
    * mismatch. The process decides — this package reads no environment — and
    * production leaves it off: the schema documents, it does not gate.
    */
-  validateOutput?: boolean;
-}>;
+}> &
+  ([TApp] extends [never]
+    ? Readonly<{ validateOutput?: boolean }>
+    : Readonly<{ handlerBinding: TrpcHandlerBinding<TContext, TApp>; validateOutput?: never }>);
 
 /** A declaration this chain has not made yet. */
 export type TrpcUndeclared = Readonly<{ readonly __undeclared: true }>;
@@ -135,6 +141,20 @@ type OutputOf<TKind extends ProcedureKind, TResult> = TKind extends "subscriptio
   ? SubscriptionOutput<Awaited<TResult>>
   : Awaited<TResult>;
 
+type GovernedOutputOf<
+  TKind extends ProcedureKind,
+  TSchema extends z.ZodType,
+> = TKind extends "subscription"
+  ? SubscriptionOutput<AsyncIterable<z.output<TSchema>>>
+  : z.output<TSchema>;
+
+type GovernedHandlerResult<
+  TKind extends ProcedureKind,
+  TSchema extends z.ZodType,
+> = TKind extends "subscription"
+  ? AsyncIterable<z.input<TSchema>> | Promise<AsyncIterable<z.input<TSchema>>>
+  : z.input<TSchema> | Promise<z.input<TSchema>>;
+
 /**
  * `handle` exists only on a chain that has declared its input, its output and
  * its access. Anything else resolves its `this` to `never` — TS2684 at the
@@ -146,12 +166,15 @@ type ReadyChain<
   TInput extends ChainInput,
   TOutput extends ChainOutput,
   TDeclared extends boolean,
+  TApp = never,
+  TActor = never,
+  TScope = never,
 > = TDeclared extends true
   ? TInput extends TrpcUndeclared
     ? never
     : TOutput extends TrpcUndeclared
       ? never
-      : TrpcProcedureChain<TContext, TKind, TInput, TOutput, TDeclared>
+      : TrpcProcedureChain<TContext, TKind, TInput, TOutput, TDeclared, TApp, TActor, TScope>
   : never;
 
 /** The definition chain of one procedure. */
@@ -161,26 +184,47 @@ export interface TrpcProcedureChain<
   TInput extends ChainInput = TrpcUndeclared,
   TOutput extends ChainOutput = TrpcUndeclared,
   TDeclared extends boolean = false,
+  TApp = never,
+  TActor = never,
+  TScope = never,
 > {
   /** The request parser. Applied to the procedure BEFORE the policy chain. */
   withInput<TSchema extends z.ZodType>(
     schema: TSchema,
-  ): TrpcProcedureChain<TContext, TKind, TSchema, TOutput, TDeclared>;
+  ): TrpcProcedureChain<TContext, TKind, TSchema, TOutput, TDeclared, TApp, TActor, TScope>;
   /** No request data at all, with the reason it needs none. */
   withoutInput(
     reason: string,
-  ): TrpcProcedureChain<TContext, TKind, TrpcDeclaredAbsent, TOutput, TDeclared>;
+  ): TrpcProcedureChain<
+    TContext,
+    TKind,
+    TrpcDeclaredAbsent,
+    TOutput,
+    TDeclared,
+    TApp,
+    TActor,
+    TScope
+  >;
   /**
    * The answer's shape. Validated when the process asks for it; never handed
    * to tRPC's `.output()`, so the client's inferred type is the handler's own.
    */
   withOutput<TSchema extends z.ZodType>(
     schema: TSchema,
-  ): TrpcProcedureChain<TContext, TKind, TInput, TSchema, TDeclared>;
+  ): TrpcProcedureChain<TContext, TKind, TInput, TSchema, TDeclared, TApp, TActor, TScope>;
   /** The answer is not this feature's to describe, with the reason. */
   withoutOutput(
     reason: string,
-  ): TrpcProcedureChain<TContext, TKind, TInput, TrpcDeclaredAbsent, TDeclared>;
+  ): TrpcProcedureChain<
+    TContext,
+    TKind,
+    TInput,
+    TrpcDeclaredAbsent,
+    TDeclared,
+    TApp,
+    TActor,
+    TScope
+  >;
   /**
    * The access decision, in AuthZ vocabulary: one permission, or a whole
    * declaration (`permission-any`, `no-permission`, `service-authorized`).
@@ -188,7 +232,7 @@ export interface TrpcProcedureChain<
    */
   withPermission(
     access: AuthzPermission | AuthzDeclaration,
-  ): TrpcProcedureChain<TContext, TKind, TInput, TOutput, true>;
+  ): TrpcProcedureChain<TContext, TKind, TInput, TOutput, true, TApp, TActor, TScope>;
   /**
    * The process's ALREADY-BUILT policy, for a gate it resolves itself from
    * validated input. `reason` is what makes it as reviewable as a declaration.
@@ -196,22 +240,34 @@ export interface TrpcProcedureChain<
   withCustomPermission(
     policy: TrpcPolicyDecorator,
     reason: string,
-  ): TrpcProcedureChain<TContext, TKind, TInput, TOutput, true>;
+  ): TrpcProcedureChain<TContext, TKind, TInput, TOutput, true, TApp, TActor, TScope>;
   /**
    * The handler. Its `input` is the parsed value of the declared schema, and
    * `signal` is tRPC's own request signal — `AbortSignal | undefined`, exactly
    * as tRPC types it — which is what a stream stops on when the client leaves.
    */
   handle<TResult>(
-    this: ReadyChain<TContext, TKind, TInput, TOutput, TDeclared>,
-    handler: (
-      opts: Readonly<{
-        ctx: TContext;
-        input: HandlerInput<TInput>;
-        signal: AbortSignal | undefined;
-      }>,
-    ) => TResult | Promise<TResult>,
-  ): BuiltProcedure<TKind, TInput, OutputOf<TKind, TResult>>;
+    this: [TApp] extends [never]
+      ? ReadyChain<TContext, TKind, TInput, TOutput, TDeclared, TApp, TActor, TScope>
+      : TInput extends z.ZodType
+        ? TOutput extends z.ZodType
+          ? ReadyChain<TContext, TKind, TInput, TOutput, TDeclared, TApp, TActor, TScope>
+          : never
+        : never,
+    handler: [TApp] extends [never]
+      ? (
+          opts: Readonly<{
+            ctx: TContext;
+            input: HandlerInput<TInput>;
+            signal: AbortSignal | undefined;
+          }>,
+        ) => TResult | Promise<TResult>
+      : (
+          opts: ApiHandlerArguments<HandlerInput<TInput>, TApp>,
+        ) => GovernedHandlerResult<TKind, Extract<TOutput, z.ZodType>>,
+  ): [TApp] extends [never]
+    ? BuiltProcedure<TKind, TInput, OutputOf<TKind, TResult>>
+    : BuiltProcedure<TKind, TInput, GovernedOutputOf<TKind, Extract<TOutput, z.ZodType>>>;
 }
 
 /**
@@ -240,28 +296,55 @@ export interface TrpcService<
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
   TProcedures extends TRPCCreateRouterOptions,
+  TApp = never,
+  TActor = never,
+  TScope = never,
 > {
   query<TName extends string, TInput extends ChainInput, TOutput>(
     name: TName,
     define: (
-      chain: TrpcProcedureChain<TContext, "query">,
+      chain: TrpcProcedureChain<
+        TContext,
+        "query",
+        TrpcUndeclared,
+        TrpcUndeclared,
+        false,
+        TApp,
+        TActor,
+        TScope
+      >,
     ) => BuiltProcedure<"query", TInput, TOutput>,
   ): TrpcService<
     TContext,
     TOptions,
     TRoot,
-    WithProcedure<TProcedures, TName, BuiltProcedure<"query", TInput, TOutput>>
+    WithProcedure<TProcedures, TName, BuiltProcedure<"query", TInput, TOutput>>,
+    TApp,
+    TActor,
+    TScope
   >;
   mutation<TName extends string, TInput extends ChainInput, TOutput>(
     name: TName,
     define: (
-      chain: TrpcProcedureChain<TContext, "mutation">,
+      chain: TrpcProcedureChain<
+        TContext,
+        "mutation",
+        TrpcUndeclared,
+        TrpcUndeclared,
+        false,
+        TApp,
+        TActor,
+        TScope
+      >,
     ) => BuiltProcedure<"mutation", TInput, TOutput>,
   ): TrpcService<
     TContext,
     TOptions,
     TRoot,
-    WithProcedure<TProcedures, TName, BuiltProcedure<"mutation", TInput, TOutput>>
+    WithProcedure<TProcedures, TName, BuiltProcedure<"mutation", TInput, TOutput>>,
+    TApp,
+    TActor,
+    TScope
   >;
   /**
    * A stream. Its handler is an async generator, and `withOutput` — when the
@@ -271,13 +354,25 @@ export interface TrpcService<
   subscription<TName extends string, TInput extends ChainInput, TOutput>(
     name: TName,
     define: (
-      chain: TrpcProcedureChain<TContext, "subscription">,
+      chain: TrpcProcedureChain<
+        TContext,
+        "subscription",
+        TrpcUndeclared,
+        TrpcUndeclared,
+        false,
+        TApp,
+        TActor,
+        TScope
+      >,
     ) => BuiltProcedure<"subscription", TInput, TOutput>,
   ): TrpcService<
     TContext,
     TOptions,
     TRoot,
-    WithProcedure<TProcedures, TName, BuiltProcedure<"subscription", TInput, TOutput>>
+    WithProcedure<TProcedures, TName, BuiltProcedure<"subscription", TInput, TOutput>>,
+    TApp,
+    TActor,
+    TScope
   >;
   /**
    * A child router under `name`, already built — its own `createTrpcService`,
@@ -288,7 +383,15 @@ export interface TrpcService<
   router<TName extends string, TRouter extends TRPCCreateRouterOptions[string]>(
     name: TName,
     child: TRouter,
-  ): TrpcService<TContext, TOptions, TRoot, WithProcedure<TProcedures, TName, TRouter>>;
+  ): TrpcService<
+    TContext,
+    TOptions,
+    TRoot,
+    WithProcedure<TProcedures, TName, TRouter>,
+    TApp,
+    TActor,
+    TScope
+  >;
   /** The router the process mounts, built by the root's own factory. */
   build(): TRPCBuiltRouter<TRoot, TRPCDecorateCreateRouterOptions<TProcedures>>;
 }
@@ -332,12 +435,12 @@ function guardOutput(
   name: string,
   schema: z.ZodType,
   handler: (opts: never) => unknown,
+  parse: boolean,
 ): (opts: never) => Promise<unknown> {
   return async (opts: never) => {
     const result = await handler(opts);
+    if (parse) return parseGovernedOutput(schema, result);
     assertDeclaredOutput(name, schema, result);
-    // The handler's own value, unparsed: validating must not strip or coerce
-    // what the client already receives.
     return result;
   };
 }
@@ -351,13 +454,18 @@ function guardStream(
   name: string,
   schema: z.ZodType,
   handler: (opts: never) => unknown,
+  parse: boolean,
 ): (opts: never) => AsyncIterable<unknown> {
   return (opts: never) => ({
     async *[Symbol.asyncIterator]() {
       const stream = (await handler(opts)) as AsyncIterable<unknown>;
       for await (const value of stream) {
-        assertDeclaredOutput(name, schema, value);
-        yield value;
+        if (parse) {
+          yield await parseGovernedOutput(schema, value);
+        } else {
+          assertDeclaredOutput(name, schema, value);
+          yield value;
+        }
       }
     },
   });
@@ -369,6 +477,7 @@ function buildProcedure({
   state,
   procedure,
   validateOutput,
+  parseOutput,
   handler,
 }: {
   name: string;
@@ -377,7 +486,14 @@ function buildProcedure({
   procedure: BuildableProcedure;
   validateOutput: boolean;
   handler: (opts: never) => unknown;
+  parseOutput?: boolean;
 }): unknown {
+  if (parseOutput && !state.output) {
+    throw new Error(`tRPC procedure "${name}" requires an output schema at the governed boundary`);
+  }
+  if (parseOutput && !state.input) {
+    throw new Error(`tRPC procedure "${name}" requires an input schema at the governed boundary`);
+  }
   if (!state.policy) {
     throw new Error(`tRPC procedure "${name}" was built without an access declaration`);
   }
@@ -387,8 +503,8 @@ function buildProcedure({
   const guarded =
     validateOutput && state.output
       ? kind === "subscription"
-        ? guardStream(name, state.output, handler)
-        : guardOutput(name, state.output, handler)
+        ? guardStream(name, state.output, handler, parseOutput ?? false)
+        : guardOutput(name, state.output, handler, parseOutput ?? false)
       : handler;
   const decorated = state.policy(parsed);
   if (kind === "query") return decorated.query(guarded);
@@ -402,6 +518,9 @@ function createChain<
   TInput extends ChainInput,
   TOutput extends ChainOutput,
   TDeclared extends boolean,
+  TApp = never,
+  TActor = never,
+  TScope = never,
 >(context: {
   name: string;
   kind: TKind;
@@ -409,15 +528,19 @@ function createChain<
   procedure: BuildableProcedure;
   policy: ((access: AuthzPermission | AuthzDeclaration) => TrpcPolicyDecorator) | undefined;
   validateOutput: boolean;
-}): TrpcProcedureChain<TContext, TKind, TInput, TOutput, TDeclared> {
+  handlerBinding?: TrpcHandlerBinding<TContext, TApp>;
+}): TrpcProcedureChain<TContext, TKind, TInput, TOutput, TDeclared, TApp, TActor, TScope> {
   const next = <
     TNextInput extends ChainInput,
     TNextOutput extends ChainOutput,
     TNext extends boolean,
   >(
     state: ChainState,
-  ): TrpcProcedureChain<TContext, TKind, TNextInput, TNextOutput, TNext> =>
-    createChain<TContext, TKind, TNextInput, TNextOutput, TNext>({ ...context, state });
+  ): TrpcProcedureChain<TContext, TKind, TNextInput, TNextOutput, TNext, TApp, TActor, TScope> =>
+    createChain<TContext, TKind, TNextInput, TNextOutput, TNext, TApp, TActor, TScope>({
+      ...context,
+      state,
+    });
 
   return {
     withInput: (schema) => next({ ...context.state, input: schema }),
@@ -440,10 +563,34 @@ function createChain<
         kind: context.kind,
         state: context.state,
         procedure: context.procedure,
-        validateOutput: context.validateOutput,
-        handler: handler as (opts: never) => unknown,
+        validateOutput: context.handlerBinding ? true : context.validateOutput,
+        parseOutput: Boolean(context.handlerBinding),
+        handler: async (opts: never) => {
+          const request = opts as {
+            ctx: TContext;
+            input: HandlerInput<TInput>;
+            signal: AbortSignal | undefined;
+          };
+          if (context.handlerBinding) {
+            const trusted = await resolveTrustedHandlerArguments(context.handlerBinding, request);
+            return (handler as (args: ApiHandlerArguments<HandlerInput<TInput>, TApp>) => unknown)({
+              input: request.input,
+              app: trusted.app,
+              actor: trusted.actor,
+              scope: trusted.scope,
+              signal: request.signal,
+            });
+          }
+          return (
+            handler as (args: {
+              ctx: TContext;
+              input: HandlerInput<TInput>;
+              signal: AbortSignal | undefined;
+            }) => unknown
+          )(request);
+        },
       }) as BuiltProcedure<TKind, ChainInput, unknown>,
-  } as TrpcProcedureChain<TContext, TKind, TInput, TOutput, TDeclared>;
+  } as TrpcProcedureChain<TContext, TKind, TInput, TOutput, TDeclared, TApp, TActor, TScope>;
 }
 
 /**
@@ -455,15 +602,16 @@ export function createTrpcService<
   TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
+  TApp = never,
 >(
-  config: TrpcServiceConfig<TContext, TOptions, TRoot>,
-): TrpcService<TContext, TOptions, TRoot, TrpcNoProcedures> {
+  config: TrpcServiceConfig<TContext, TOptions, TRoot, TApp>,
+): TrpcService<TContext, TOptions, TRoot, TrpcNoProcedures, TApp, never, never> {
   const procedure = config.procedures.protected as unknown as BuildableProcedure;
   const validateOutput = config.validateOutput ?? false;
 
   const service = <TProcedures extends TRPCCreateRouterOptions>(
     record: TRPCRouterRecord,
-  ): TrpcService<TContext, TOptions, TRoot, TProcedures> => ({
+  ): TrpcService<TContext, TOptions, TRoot, TProcedures, TApp, never, never> => ({
     query: (name, define) =>
       service({
         ...record,
@@ -475,6 +623,7 @@ export function createTrpcService<
             procedure,
             policy: config.procedures.policy,
             validateOutput,
+            handlerBinding: "handlerBinding" in config ? config.handlerBinding : undefined,
           }),
         ),
       }),
@@ -489,6 +638,7 @@ export function createTrpcService<
             procedure,
             policy: config.procedures.policy,
             validateOutput,
+            handlerBinding: "handlerBinding" in config ? config.handlerBinding : undefined,
           }),
         ),
       }),
@@ -503,6 +653,7 @@ export function createTrpcService<
             procedure,
             policy: config.procedures.policy,
             validateOutput,
+            handlerBinding: "handlerBinding" in config ? config.handlerBinding : undefined,
           }),
         ),
       }),

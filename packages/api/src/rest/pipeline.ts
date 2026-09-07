@@ -1,4 +1,6 @@
 import { updateCurrentContext } from "@langwatch/observability/context";
+import { actorSchema } from "@langwatch/actor";
+import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
 import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import {
@@ -35,6 +37,12 @@ import { isDeclined, serializeEndpointResult } from "./response.ts";
 import { requestValidationErrorFrom } from "./validation.ts";
 import { createSSEResponse } from "./sse.ts";
 import { ENDPOINT_INPUT, ENDPOINT_ROUTE, REQUEST_FAMILY } from "./types.ts";
+import type { ServiceContext } from "./types.ts";
+import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import { declaredScopeIdSchema } from "@langwatch/authz-contract";
+
+const AUTHORIZED_SCOPE = "__langwatch_authorized_scope" as const;
+const PREPARED_SCOPE = "__langwatch_prepared_scope" as const;
 import type {
   BaseApp,
   EndpointDef,
@@ -103,9 +111,14 @@ export function buildEndpointMiddlewareStack<TProject>(
         paramSource: options.paramSource ?? "route",
       }),
     );
+  }
+  if (ep.kind === "public-rest") {
     stack.push(projectInputMiddleware(serviceConfig, config));
   }
   appendPermissionMiddleware({ stack, config, serviceConfig });
+  if (ep.kind === "public-rest") {
+    stack.push(commitScopeReceiptMiddleware());
+  }
   stack.push(
     requestCapabilitiesMiddleware({
       actor: serviceConfig.actor,
@@ -738,10 +751,10 @@ function handlerMiddleware<TProject>({
         input,
         kind: ep.kind,
         runner: serviceConfig.idempotency,
-        handler: () => ep.handler(c, input),
+        handler: () => invokeEndpointHandler({ c, ep, input, serviceConfig }),
       });
     }
-    const result = await ep.handler(c, input);
+    const result = await invokeEndpointHandler({ c, ep, input, serviceConfig });
     // A handler that declined has answered nothing: the request carries on to
     // whatever is mounted after this family, which is the only way a broad
     // any-method route can sit in front of namespaces it does not own.
@@ -757,6 +770,48 @@ function handlerMiddleware<TProject>({
     }
     return response;
   };
+}
+
+function invokeEndpointHandler({
+  c,
+  ep,
+  input,
+  serviceConfig,
+}: {
+  c: Context;
+  ep: EndpointRegistration;
+  input: unknown;
+  serviceConfig: ServiceConfig;
+}): unknown {
+  if (ep.kind !== "public-rest") {
+    return ep.handler(c, input);
+  }
+
+  const context = c as ServiceContext<Record<string, unknown>, unknown>;
+  const actor = serviceConfig.actor === void 0 ? void 0 : context.actor();
+  const args: ApiHandlerArguments<unknown, unknown> = {
+    input,
+    app: context.app,
+    actor: actor === void 0 ? null : actorSchema.parse(actorSnapshot(actor)),
+    scope: c.get(AUTHORIZED_SCOPE) ?? null,
+    signal: c.req.raw.signal,
+  };
+  return ep.handler(args);
+}
+
+function actorSnapshot(
+  actor: ReturnType<ServiceContext["actor"]>,
+): ReturnType<ServiceContext["actor"]> {
+  switch (actor.type) {
+    case "user":
+      return { type: "user", id: actor.id, impersonatorId: actor.impersonatorId };
+    case "api_key":
+      return { type: "api_key", id: actor.id };
+    case "system":
+      return { type: "system", name: actor.name };
+    case "internal":
+      return { type: "internal", codePath: actor.codePath, revision: actor.revision };
+  }
 }
 
 /**
@@ -809,13 +864,37 @@ function projectInputMiddleware(
     // off by default — so every endpoint on a service that never opted in was
     // authorized against the credential while its handler read the input.
     if (config.permissionScope) {
-      assertAuthorizedScopeInput({ context, input, scope: config.permissionScope });
+      const authorizedScope = assertAuthorizedScopeInput({
+        context,
+        input,
+        scope: config.permissionScope,
+      });
+      context.set(PREPARED_SCOPE, declaredScopeIdSchema.parse(authorizedScope));
     } else {
       assertAuthorizedProjectInput({
         context,
         input,
         required: serviceConfig.projectIdInput === true,
       });
+      if (serviceConfig.projectIdInput === true) {
+        const projectId = readField(input, "projectId");
+        if (projectId !== void 0) {
+          context.set(
+            PREPARED_SCOPE,
+            declaredScopeIdSchema.parse({ tier: "project", id: projectId }),
+          );
+        }
+      }
+    }
+    await next();
+  };
+}
+
+function commitScopeReceiptMiddleware(): MiddlewareHandler {
+  return async (context, next) => {
+    const prepared = context.get(PREPARED_SCOPE);
+    if (prepared !== void 0) {
+      context.set(AUTHORIZED_SCOPE, declaredScopeIdSchema.parse(prepared));
     }
     await next();
   };
@@ -852,7 +931,7 @@ const SCOPE_SOURCES: Record<string, (context: Context) => unknown> = {
   userId: (context) => context.get("apiKeyUserId"),
 };
 
-function readField(value: unknown, field: string): unknown {
+function readField(value: unknown, field: string): string | undefined {
   const parsed = z.object({ [field]: z.string() }).safeParse(value);
   return parsed.success ? parsed.data[field] : undefined;
 }
@@ -868,12 +947,14 @@ function assertAuthorizedScopeInput({
   context: Context;
   input: unknown;
   scope: string;
-}): void {
+}): AuthzDeclaredScopeId {
   // projectId keeps its own refusal: it is the one scope with an established
   // error code, and changing what a caller sees is not this change's business.
   if (scope === "projectId") {
     assertAuthorizedProjectInput({ context, input, required: true });
-    return;
+    const projectId = readField(input, "projectId");
+    if (projectId === void 0) throw new ScopeInputMismatchError(scope);
+    return { tier: "project", id: projectId };
   }
 
   const named = readField(input, scope);
@@ -881,4 +962,7 @@ function assertAuthorizedScopeInput({
   if (named === undefined || authorized === undefined || named !== authorized) {
     throw new ScopeInputMismatchError(scope);
   }
+  if (scope === "teamId") return { tier: "team", id: named };
+  if (scope === "organizationId") return { tier: "organization", id: named };
+  throw new TypeError(`REST handler scope field "${scope}" is not a declared scope`);
 }

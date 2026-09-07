@@ -16,7 +16,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./rest": "./src/rest/index.ts",
-    "./trpc": "./src/trpc/index.ts"
+    "./trpc": "./src/trpc/index.ts",
+    "./composition": "./src/composition.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit && tsc -p tsconfig.type-tests.json",
@@ -24,6 +25,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/actor": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

@@ -1,4 +1,4 @@
-import { SYSTEM_ACTORS, type Actor, type SystemActorName } from "@langwatch/actor";
+import { actorSchema } from "@langwatch/actor";
 import { z } from "zod";
 import {
   grantableAuthzScopeRefSchema,
@@ -395,28 +395,6 @@ export type AuthzDeleteRoleOutput = z.infer<typeof authzDeleteRoleOutputSchema>;
 
 export const authzGrantActorSchema = z.object({ userId: z.string().min(1) }).strict();
 export type AuthzGrantActor = z.infer<typeof authzGrantActorSchema>;
-
-const systemActorNameSchema = z.custom<SystemActorName>(
-  (value) => typeof value === "string" && Object.hasOwn(SYSTEM_ACTORS, value),
-);
-const actorSchema: z.ZodType<Actor> = z.discriminatedUnion("type", [
-  z
-    .object({
-      type: z.literal("user"),
-      id: z.string().min(1),
-      impersonatorId: z.string().min(1).optional(),
-    })
-    .strict(),
-  z.object({ type: z.literal("api_key"), id: z.string().min(1) }).strict(),
-  z.object({ type: z.literal("system"), name: systemActorNameSchema }).strict(),
-  z
-    .object({
-      type: z.literal("internal"),
-      codePath: z.string().min(1),
-      revision: z.string().min(1).optional(),
-    })
-    .strict(),
-]);
 
 export const grantPrincipalSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("user"), id: z.string().min(1) }).strict(),

@@ -131,7 +131,7 @@ describe("modern REST", () => {
         endpoint
           .withInput(z.object({ id: z.string(), reveal: z.enum(["true", "false"]) }))
           .withOutput(z.object({ id: z.string(), reveal: z.boolean() }))
-          .handle(async (_context, input) => ({
+          .handle(async ({ input }) => ({
             id: input.id,
             reveal: input.reveal === "true",
           })),
@@ -152,7 +152,7 @@ describe("modern REST", () => {
         endpoint
           .withInput(z.object({ id: z.string(), name: z.string().min(1) }))
           .withOutput(z.object({ id: z.string(), name: z.string() }))
-          .handle(async (_context, input) => {
+          .handle(async ({ input }) => {
             calls++;
             return input;
           }),
@@ -195,7 +195,7 @@ describe("modern REST", () => {
         endpoint
           .withInput(input)
           .withOutput(z.object({ id: z.string(), tag: z.array(z.string()) }))
-          .handle(async (_context, value) => value),
+          .handle(async ({ input: value }) => value),
       )
       .build();
 
@@ -204,6 +204,97 @@ describe("modern REST", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ id: "item_1", tag: ["error", "llm"] });
     expect(parses).toBe(1);
+  });
+
+  it("hands governed handlers only trusted runtime arguments and parsed output", async () => {
+    let received: Record<string, unknown> | undefined;
+    const app = createRestService({
+      name: "trusted",
+      logger: false,
+      maxInputBytes: 1_024,
+      tracer: false,
+      app: () => ({ capability: "composed" }),
+      actor: () => ({
+        type: "user",
+        id: "actor-1",
+        impersonatorId: "admin-1",
+        session: { secret: "must-not-cross" },
+        request: { headers: { authorization: "must-not-cross" } },
+      }),
+      auth: async (context, next) => {
+        context.set("project", { id: "project-1" });
+        await next();
+      },
+      permissionEnforcer: () => async (_context, next) => next(),
+      openapiSecurity: [{ bearerAuth: [] }],
+    })
+      .withPermission("project:view")
+      .withoutRateLimit("framework test endpoint")
+      .withoutResourceLimit("framework test endpoint")
+      .get("/items", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(z.object({ projectId: z.string().trim() }))
+          .withOutput(z.object({ value: z.string() }))
+          .withPermissionScope("projectId")
+          .handle(async (args) => {
+            received = args;
+            return { value: "ok", extra: "stripped" };
+          }),
+      )
+      .build();
+
+    const response = await app.request("/api/v1/trusted/items?projectId=project-1");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ value: "ok" });
+    expect(received).toMatchObject({
+      input: { projectId: "project-1" },
+      app: { capability: "composed" },
+      actor: { type: "user", id: "actor-1", impersonatorId: "admin-1" },
+      scope: { tier: "project", id: "project-1" },
+    });
+    expect(received?.signal).toBeInstanceOf(AbortSignal);
+    expect(Object.keys(received ?? {}).sort()).toEqual([
+      "actor",
+      "app",
+      "input",
+      "scope",
+      "signal",
+    ]);
+    expect(received).not.toHaveProperty("context");
+    expect(received).not.toHaveProperty("request");
+    expect(received?.actor).not.toHaveProperty("session");
+  });
+
+  it("rejects a malformed authenticated actor before the handler", async () => {
+    let handlerCalls = 0;
+    const app = createRestService({
+      name: "malformed-actor",
+      logger: false,
+      maxInputBytes: 1_024,
+      tracer: false,
+      actor: () => ({ type: "user", id: "" }),
+      auth: async (_context, next) => next(),
+      openapiSecurity: [{ bearerAuth: [] }],
+    })
+      .withoutPermission("framework test endpoint")
+      .withoutRateLimit("framework test endpoint")
+      .withoutResourceLimit("framework test endpoint")
+      .get("/items", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(z.object({}))
+          .withOutput(z.object({ ok: z.boolean() }))
+          .handle(async () => {
+            handlerCalls++;
+            return { ok: true };
+          }),
+      )
+      .build();
+
+    const response = await app.request("/api/v1/malformed-actor/items");
+
+    expect(response.status).toBe(422);
+    expect(handlerCalls).toBe(0);
   });
 
   /** @scenario "The method selects the non-path input source" */
@@ -216,7 +307,7 @@ describe("modern REST", () => {
           endpoint
             .withInput(z.object({ id: z.string(), name: z.string().trim() }))
             .withOutput(z.object({ id: z.string(), name: z.string() }))
-            .handle(async (_context, input) => input);
+            .handle(async ({ input }) => input);
         if (method === "post") return rest.post("/items/:id", "2026-08-07", definition);
         if (method === "put") return rest.put("/items/:id", "2026-08-07", definition);
         if (method === "patch") return rest.patch("/items/:id", "2026-08-07", definition);
@@ -294,7 +385,7 @@ describe("modern REST", () => {
           .withInput(z.object({ id: z.string() }))
           .withOutput(z.object({ id: z.string() }))
           .withDocs({ operationId: "getThing" })
-          .handle(async (_context, input) => input),
+          .handle(async ({ input }) => input),
       )
       .build();
 
@@ -406,7 +497,7 @@ describe("modern REST", () => {
           .withInput(z.object({ id: z.string() }))
           .withOutput(z.object({ id: z.string() }))
           .withDocs({ operationId: "getAuthenticatedThing" })
-          .handle(async (_context, input) => input),
+          .handle(async ({ input }) => input),
       )
       .build();
     const spec = await generateSpecs(app, { excludeStaticFile: false });

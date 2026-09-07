@@ -45,7 +45,7 @@ export type AppDefinitionWithoutConfig<
 }>;
 
 /** An inert API descriptor retained for the process root to mount later. */
-export type FeatureApiDescriptor = Readonly<{
+export type FeatureTransportDescriptor = Readonly<{
   readonly protocol: "rest" | "trpc";
   readonly router: (...args: never[]) => object;
 }>;
@@ -647,10 +647,17 @@ class ConfiguredAppBuilder<
     private readonly app: AppDefinition<Dependencies, Infrastructure, Config, App>,
   ) {}
 
-  withTransports<const Apis extends readonly FeatureApiDescriptor[]>(
-    ...apis: Apis
-  ): ConfiguredAppWithApisBuilder<Name, Dependencies, Infrastructure, Config, App, Apis> {
-    return new ConfiguredAppWithApisBuilder(this.name, this.app, apis);
+  withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
+    ...transports: Transports
+  ): ConfiguredAppWithTransportsBuilder<
+    Name,
+    Dependencies,
+    Infrastructure,
+    Config,
+    App,
+    Transports
+  > {
+    return new ConfiguredAppWithTransportsBuilder(this.name, this.app, transports);
   }
 
   build(): ServerFeatureDeclaration<
@@ -693,10 +700,10 @@ class UnconfiguredAppBuilder<
     private readonly app: AppDefinitionWithoutConfig<Dependencies, Infrastructure, App>,
   ) {}
 
-  withTransports<const Apis extends readonly FeatureApiDescriptor[]>(
-    ...apis: Apis
-  ): UnconfiguredAppWithApisBuilder<Name, Dependencies, Infrastructure, App, Apis> {
-    return new UnconfiguredAppWithApisBuilder(this.name, this.app, apis);
+  withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
+    ...transports: Transports
+  ): UnconfiguredAppWithTransportsBuilder<Name, Dependencies, Infrastructure, App, Transports> {
+    return new UnconfiguredAppWithTransportsBuilder(this.name, this.app, transports);
   }
 
   build(): ServerFeatureDeclaration<
@@ -727,18 +734,18 @@ class UnconfiguredAppBuilder<
   }
 }
 
-class ConfiguredAppWithApisBuilder<
+class ConfiguredAppWithTransportsBuilder<
   Name extends FeatureName,
   Dependencies extends TokenMap,
   Infrastructure,
   Config,
   App,
-  Apis extends readonly FeatureApiDescriptor[],
+  Transports extends readonly FeatureTransportDescriptor[],
 > {
   constructor(
     private readonly name: Name,
     private readonly app: AppDefinition<Dependencies, Infrastructure, Config, App>,
-    private readonly apis: Apis,
+    private readonly transports: Transports,
   ) {}
 
   build(): ServerFeatureDeclaration<
@@ -751,27 +758,27 @@ class ConfiguredAppWithApisBuilder<
     undefined,
     undefined,
     undefined
-  > & { readonly apis: Apis; readonly namespace: PublicNamespace<Name> } {
+  > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> } {
     const declaration = new ConfiguredAppBuilder(this.name, this.app).build();
     return {
       ...declaration,
-      apis: this.apis,
+      transports: this.transports,
       namespace: publicNamespace(this.name),
     };
   }
 }
 
-class UnconfiguredAppWithApisBuilder<
+class UnconfiguredAppWithTransportsBuilder<
   Name extends FeatureName,
   Dependencies extends TokenMap,
   Infrastructure,
   App,
-  Apis extends readonly FeatureApiDescriptor[],
+  Transports extends readonly FeatureTransportDescriptor[],
 > {
   constructor(
     private readonly name: Name,
     private readonly app: AppDefinitionWithoutConfig<Dependencies, Infrastructure, App>,
-    private readonly apis: Apis,
+    private readonly transports: Transports,
   ) {}
 
   build(): ServerFeatureDeclaration<
@@ -784,11 +791,11 @@ class UnconfiguredAppWithApisBuilder<
     undefined,
     undefined,
     undefined
-  > & { readonly apis: Apis; readonly namespace: PublicNamespace<Name> } {
+  > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> } {
     const declaration = new UnconfiguredAppBuilder(this.name, this.app).build();
     return {
       ...declaration,
-      apis: this.apis,
+      transports: this.transports,
       namespace: publicNamespace(this.name),
     };
   }

@@ -38,7 +38,7 @@ const directoryApis = [
   { protocol: "rest", router: (host: string) => ({ host }) },
   { protocol: "trpc", router: (host: string) => ({ host }) },
 ] as const;
-const directoryWithApis = defineFeature("annotation")
+const directoryWithTransports = defineFeature("annotation")
   .withApp(ComposedDirectoryApp)
   .withTransports(...directoryApis)
   .build();
@@ -96,11 +96,11 @@ describe("defineFeature", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it("keeps API descriptors inert and preserves their tuple", () => {
-    expect(directoryWithApis.apis).toEqual(directoryApis);
-    expect(directoryWithApis.apis[0]).toBe(directoryApis[0]);
-    expect(directoryWithApis.apis[1]).toBe(directoryApis[1]);
-    expect(directoryWithApis.namespace).toBe("annotations");
-    expect(directoryWithApis.apis[0].protocol).toBe("rest");
+  it("keeps transport descriptors inert and preserves their tuple", () => {
+    expect(directoryWithTransports.transports).toEqual(directoryApis);
+    expect(directoryWithTransports.transports[0]).toBe(directoryApis[0]);
+    expect(directoryWithTransports.transports[1]).toBe(directoryApis[1]);
+    expect(directoryWithTransports.namespace).toBe("annotations");
+    expect(directoryWithTransports.transports[0].protocol).toBe("rest");
   });
 });

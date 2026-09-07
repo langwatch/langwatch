@@ -19,8 +19,6 @@ const scopedInput = z.object({ projectId: z.string(), name: z.string() });
 const unscopedInput = z.object({ name: z.string() });
 const output = z.object({ ok: z.boolean() });
 
-type Context = Parameters<RestEndpointHandler<{ app: true }, undefined, undefined>>[0];
-
 // ---------------------------------------------------------------------------
 // A handler is given input only when input was declared
 // ---------------------------------------------------------------------------
@@ -28,7 +26,7 @@ type Context = Parameters<RestEndpointHandler<{ app: true }, undefined, undefine
 type WithInput = RestEndpointHandler<unknown, typeof unscopedInput, typeof output>;
 type WithoutInput = RestEndpointHandler<unknown, undefined, typeof output>;
 
-type _InputArrivesValidated = Assert<Equal<Parameters<WithInput>[1], { name: string }>>;
+type _InputArrivesValidated = Assert<Equal<Parameters<WithInput>[0]["input"], { name: string }>>;
 /** Not merely optional — the parameter does not exist, so it cannot be read. */
 type _NoInputMeansNoParameter = Assert<Equal<Parameters<WithoutInput>["length"], 1>>;
 
@@ -64,7 +62,7 @@ const complete = endpoint
   .withPermission("project:view", { scope: "projectId" })
   .withRateLimit()
   .withoutResourceLimit("read of an already-scoped row")
-  .handle((_context: Context, input) => ({ ok: input.projectId.length > 0 }));
+  .handle(({ input }) => ({ ok: input.projectId.length > 0 }));
 
 type _HandledIsRecorded = Assert<
   Equal<

@@ -12,6 +12,7 @@ import {
   type EnforcedScopeFields,
 } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { TrpcHandlerBinding } from "./trpc-handler.ts";
 
 /** The `.use()` surface every tRPC procedure builder shares, so nothing here needs `any`. */
 type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
@@ -125,26 +126,14 @@ export function appTrpcCustomPolicy(middlewares: AppTrpcPolicyMiddlewares) {
         .use(middlewares.auditMutations) as unknown as TProcedure;
 }
 
-// ---------------------------------------------------------------------------
-// The mount
-// ---------------------------------------------------------------------------
-
-/**
- * What every feature mount takes from the process it is mounted in: the one
- * tRPC root (a feature router must never create a second), the authenticated
- * procedure it builds on, and the concrete middlewares its policy chain is
- * composed from.
- *
- * The three type parameters are load-bearing and cannot be hidden behind one.
- * `<Feature>TrpcApi.create` infers the process's real context from the root it
- * is handed; naming a fixed root type here instead would resolve every
- * procedure against the feature's own context constraint and silently narrow
- * what the client sees.
+/** Process-owned tRPC dependencies for a feature mount.
+ * The root and policy procedure must retain the process's inferred context.
  */
 export type TrpcApiMount<
   TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
+  TApp = never,
 > = Readonly<{
   root: TRPCRootObject<TContext, object, TOptions, TRoot>;
   protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
@@ -154,8 +143,10 @@ export type TrpcApiMount<
    * process decides — this package reads no environment — and production
    * leaves it off: a declared shape documents the answer, it does not gate it.
    */
-  validateOutput?: boolean;
-}>;
+}> &
+  ([TApp] extends [never]
+    ? Readonly<{ validateOutput?: boolean }>
+    : Readonly<{ handlerBinding: TrpcHandlerBinding<TContext, TApp>; validateOutput?: never }>);
 
 /**
  * Intersected onto a mount, not made optional, so a feature requiring the
@@ -183,6 +174,7 @@ export type TrpcApiService<
   TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
+  TApp = never,
 > = Readonly<{
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
@@ -210,7 +202,8 @@ export type TrpcApiService<
   custom(check: unknown): TrpcApiPolicyDecorator;
   /** @see the mount field of the same name. */
   validateOutput: boolean;
-}>;
+}> &
+  Readonly<{ handlerBinding?: TrpcHandlerBinding<TContext, TApp> }>;
 
 /**
  * One factory with two overloads, not two functions: a mount author writes
@@ -231,9 +224,12 @@ export function createTrpcApiService<
   TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
+  TApp,
 >(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPublicMount<TContext, TOptions, TRoot>,
-): TrpcApiPublicService<TContext, TOptions, TRoot>;
+  mount: TrpcApiMount<TContext, TOptions, TRoot, TApp> &
+    TrpcApiPublicMount<TContext, TOptions, TRoot>,
+): TrpcApiPublicService<TContext, TOptions, TRoot> &
+  TrpcApiService<TContext, TOptions, TRoot, TApp>;
 export function createTrpcApiService<
   TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -243,15 +239,23 @@ export function createTrpcApiService<
   TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
+  TApp = never,
 >(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> &
+  mount: Readonly<{
+    root: TRPCRootObject<TContext, object, TOptions, TRoot>;
+    protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
+    middlewares: AppTrpcPolicyMiddlewares;
+    validateOutput?: boolean;
+    handlerBinding?: TrpcHandlerBinding<TContext, TApp>;
+  }> &
     Partial<TrpcApiPublicMount<TContext, TOptions, TRoot>>,
-): TrpcApiService<TContext, TOptions, TRoot> &
+): TrpcApiService<TContext, TOptions, TRoot, TApp> &
   Partial<Pick<TrpcApiPublicService<TContext, TOptions, TRoot>, "public">> {
   const declared = declaredPolicy(mount.middlewares);
 
   return {
     protected: mount.protectedProcedure,
+    ...(!("handlerBinding" in mount) ? {} : { handlerBinding: mount.handlerBinding }),
     validateOutput: mount.validateOutput ?? false,
     // Spread rather than set to undefined: a mount with no signed-out surface
     // must not hand a feature a `public` key at all.

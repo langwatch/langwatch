@@ -3,6 +3,7 @@ import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import { parseApiSchemaSync, type ApiSchema } from "../schema.ts";
+import type { ApiHandlerArguments } from "../handler-arguments.ts";
 
 import type {
   EndpointDef,
@@ -10,7 +11,6 @@ import type {
   EndpointIdempotency,
   HttpMethod,
   RawEndpointDef,
-  ServiceContext,
 } from "./types.ts";
 import { VERSION_LATEST, VERSION_PREVIEW } from "./types.ts";
 
@@ -160,11 +160,8 @@ export type RestEndpointHandler<
   TInput extends z.ZodObject | undefined,
   TOutput extends z.ZodType | undefined,
 > = TInput extends z.ZodObject
-  ? (
-      context: ServiceContext<Record<string, unknown>, TApp>,
-      input: z.output<TInput>,
-    ) => RestHandlerResult<TOutput>
-  : (context: ServiceContext<Record<string, unknown>, TApp>) => RestHandlerResult<TOutput>;
+  ? (args: ApiHandlerArguments<z.output<TInput>, TApp>) => RestHandlerResult<TOutput>
+  : (args: ApiHandlerArguments<undefined, TApp>) => RestHandlerResult<TOutput>;
 
 /**
  * A REQUEST-named scope, not necessarily the CREDENTIAL's scope. Unchecked,

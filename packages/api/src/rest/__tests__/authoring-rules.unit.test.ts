@@ -92,8 +92,10 @@ const RULES = [
 function buildWith(declare: (typeof RULES)[number]["declare"]): void {
   createRestService({ name: "rules", logger: false, tracer: false, maxInputBytes: 1_024 })
     .get("/things", "2026-08-07", ((endpoint: RestEndpoint<unknown>) => {
-      const declared = declare(endpoint.withInput(input)) as unknown as {
-        handle(handler: () => Promise<{ ok: boolean }>): unknown;
+      const declared = declare(
+        endpoint.withInput(input) as unknown as RestEndpoint<unknown>,
+      ) as unknown as {
+        handle(handler: (args: { input: unknown }) => Promise<{ ok: boolean }>): unknown;
       };
       return declared.handle(async () => ({ ok: true }));
     }) as never)

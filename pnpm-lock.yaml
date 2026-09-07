@@ -1419,6 +1419,10 @@ importers:
         version: 5.0.0(zod@4.4.3)
 
   packages/actor:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -1432,6 +1436,9 @@ importers:
 
   packages/api:
     dependencies:
+      '@langwatch/actor':
+        specifier: workspace:*
+        version: link:../actor
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../features/api-key/contract

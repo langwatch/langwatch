@@ -1,4 +1,5 @@
 import type { AccessDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import type { Actor } from "@langwatch/actor";
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";
@@ -304,9 +305,7 @@ export type ServiceContext<
 };
 
 /** Authenticated principal exposed directly to service handlers. */
-export interface RequestActor {
-  readonly id: string;
-}
+export type RequestActor = Actor;
 
 // ---------------------------------------------------------------------------
 // Route-mounting report

@@ -10,6 +10,7 @@ import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contrac
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { TrpcRootDefinition } from "../trpc-root.ts";
+import { createTrpcHandlerBinding, type TrpcHandlerBinding } from "../trpc-handler.ts";
 import {
   createTrpcProcedure,
   createTrpcService,
@@ -57,7 +58,139 @@ function serviceUnder({
   });
 }
 
+function governedServiceUnder({
+  policy,
+  handlerBinding,
+}: {
+  policy: (access: AuthzPermission | AuthzDeclaration) => TrpcPolicyDecorator;
+  validateOutput?: boolean;
+  handlerBinding: TrpcHandlerBinding<TestContext, { projects: string }>;
+}) {
+  return createTrpcService({
+    root,
+    procedures: { protected: root.procedure, policy },
+    handlerBinding,
+  });
+}
+
 describe("createTrpcService", () => {
+  describe("when a governed handler boundary is used", () => {
+    it("hands the handler a fresh trusted argument object and returns parsed output", async () => {
+      const { policy } = recordingPolicy();
+      const app = { projects: "composed" };
+      const actor = { type: "api_key", id: "key-1" } as const;
+      const scope = { tier: "project", id: "project-1" } as const;
+      const router = governedServiceUnder({
+        policy,
+        handlerBinding: createTrpcHandlerBinding(async () => ({ app, actor, scope })),
+      })
+        .query("governed", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string() }))
+            .withOutput(z.object({ id: z.string() }))
+            .withPermission("project:view")
+            .handle(({ input, app: resolvedApp, actor: resolvedActor, scope: resolvedScope }) => {
+              if (!resolvedActor || resolvedActor.type !== "api_key" || !resolvedScope) {
+                throw new Error("trusted context missing");
+              }
+              return {
+                id: `${resolvedActor.id}:${resolvedScope.id}:${resolvedApp.projects}:${input.projectId}`,
+                extra: "stripped",
+              };
+            }),
+        )
+        .build();
+
+      await expect(
+        router.createCaller({ actor: { id: "forged" } }).governed({ projectId: "project-1" }),
+      ).resolves.toEqual({ id: "key-1:project-1:composed:project-1" });
+    });
+
+    it("rejects malformed governed output", async () => {
+      const { policy } = recordingPolicy();
+      const router = governedServiceUnder({
+        policy,
+        handlerBinding: createTrpcHandlerBinding(async () => ({
+          app: { projects: "unused" },
+          actor: { type: "user", id: "u1" },
+          scope: { tier: "project", id: "p1" },
+        })),
+      })
+        .query("governed", (p) =>
+          p
+            .withInput(z.undefined())
+            .withOutput(z.object({ id: z.string().refine(() => false) }))
+            .withPermission("project:view")
+            .handle(() => ({ id: "rejected" })),
+        )
+        .build();
+
+      await expect(router.createCaller({ actor: { id: "u1" } }).governed()).rejects.toThrow();
+    });
+
+    it("fails closed when the process binding returns malformed trust data", async () => {
+      const { policy } = recordingPolicy();
+      let called = false;
+      const router = governedServiceUnder({
+        policy,
+        handlerBinding: createTrpcHandlerBinding(async () => ({
+          app: { projects: "unused" },
+          actor: { type: "forged", id: "u1" },
+          scope: { tier: "not-a-scope", id: "p1" },
+        })),
+      })
+        .query("governed", (p) =>
+          p
+            .withInput(z.undefined())
+            .withOutput(z.object({ id: z.string() }))
+            .withPermission("project:view")
+            .handle(() => {
+              called = true;
+              return { id: "unexpected" };
+            }),
+        )
+        .build();
+
+      await expect(router.createCaller({ actor: { id: "u1" } }).governed()).rejects.toThrow();
+      expect(called).toBe(false);
+    });
+
+    it("does not resolve trust after a denied policy", async () => {
+      let bindingCalled = false;
+      let handlerCalled = false;
+      const denied =
+        () =>
+        <TProcedure>(procedure: TProcedure): TProcedure =>
+          (procedure as { use(middleware: unknown): TProcedure }).use(async () => {
+            throw new Error("denied");
+          });
+      const router = governedServiceUnder({
+        policy: denied,
+        handlerBinding: createTrpcHandlerBinding(async () => {
+          bindingCalled = true;
+          return { app: { projects: "unused" }, actor: null, scope: null };
+        }),
+      })
+        .query("governed", (p) =>
+          p
+            .withInput(z.undefined())
+            .withOutput(z.object({ id: z.string() }))
+            .withPermission("project:view")
+            .handle(() => {
+              handlerCalled = true;
+              return { id: "unexpected" };
+            }),
+        )
+        .build();
+
+      await expect(router.createCaller({ actor: { id: "u1" } }).governed()).rejects.toThrow(
+        "denied",
+      );
+      expect(bindingCalled).toBe(false);
+      expect(handlerCalled).toBe(false);
+    });
+  });
+
   describe("when a procedure declares an input, an output and a permission", () => {
     /** @scenario "A chain-defined procedure runs the process policy around its parsed input" */
     it("parses the input before the policy, and answers through the handler", async () => {
@@ -147,7 +280,7 @@ describe("createTrpcService", () => {
   });
 
   describe("when the process asks for output validation", () => {
-    /** @scenario "An answer that its declared output schema refuses is raised where it is cheap to find" */
+    /** @scenario "Invalid output is rejected during validation" */
     it("names the procedure and the offending field, and leaves the answer untouched when it fits", async () => {
       const { policy } = recordingPolicy();
       const service = serviceUnder({ policy, validateOutput: true });
@@ -177,7 +310,7 @@ describe("createTrpcService", () => {
       await expect(caller.right()).resolves.toEqual({ id: "project-1", extra: true });
     });
 
-    /** @scenario "An answer that its declared output schema refuses is raised where it is cheap to find" */
+    /** @scenario "Output is unchecked when validation is disabled" */
     it("checks nothing when the process did not ask, which is how production runs", async () => {
       const { policy } = recordingPolicy();
       const router = serviceUnder({ policy })
@@ -258,7 +391,7 @@ describe("createTrpcService", () => {
 
 describe("createTrpcService.subscription", () => {
   describe("given a stream declared through the chain", () => {
-    /** @scenario "A stream declared through the chain is the same procedure the client subscribes to" */
+    /** @scenario "A chained stream matches the handwritten subscription" */
     it("is the same type the hand-written subscription produced, and yields through the policy", async () => {
       const { declarations, order, policy } = recordingPolicy();
       const input = z.object({ projectId: z.string() });
@@ -295,7 +428,7 @@ describe("createTrpcService.subscription", () => {
       expect(order).toEqual(['policy:{"projectId":"p"}']);
     });
 
-    /** @scenario "A stream declared through the chain is the same procedure the client subscribes to" */
+    /** @scenario "Each streamed value is validated" */
     it("checks every value it yields against the declared shape, not only the first", async () => {
       const { policy } = recordingPolicy();
       const router = serviceUnder({ policy, validateOutput: true })

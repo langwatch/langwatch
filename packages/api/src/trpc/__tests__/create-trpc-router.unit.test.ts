@@ -1,11 +1,11 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { TrpcRootDefinition } from "../trpc-root.ts";
-import { trpcApi } from "../trpc-api.ts";
+import { createTrpcRouter } from "../create-trpc-router.ts";
 
 type Context = Readonly<{ actorId: string }>;
 const root = TrpcRootDefinition.forContext<Context>().create({});
 
-describe("trpcApi", () => {
+describe("createTrpcRouter", () => {
   it("preserves the native router factory and its procedure types", () => {
     let calls = 0;
     const router = (mount: typeof root) => {
@@ -15,7 +15,7 @@ describe("trpcApi", () => {
       });
     };
 
-    const descriptor = trpcApi({ router });
+    const descriptor = createTrpcRouter(router);
 
     expect(descriptor).toEqual({ protocol: "trpc", router });
     expect(Object.isFrozen(descriptor)).toBe(true);

@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { restApi } from "../rest-api.ts";
+import { createRestRouter } from "../create-rest-router.ts";
 
-describe("restApi", () => {
+describe("createRestRouter", () => {
   it("preserves the native router factory and does not invoke it", () => {
     let calls = 0;
     const router = (mount: Hono) => {
@@ -10,7 +10,7 @@ describe("restApi", () => {
       return mount;
     };
 
-    const descriptor = restApi({ router });
+    const descriptor = createRestRouter(router);
 
     expect(descriptor).toEqual({ protocol: "rest", router });
     expect(Object.isFrozen(descriptor)).toBe(true);

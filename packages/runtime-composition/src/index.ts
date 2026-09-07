@@ -25,7 +25,7 @@ export {
   type AppDefinition,
   type AppDefinitionWithoutConfig,
   defineFeature,
-  type FeatureApiDescriptor,
+  type FeatureTransportDescriptor,
   type FeatureSetup,
   type FeatureInstallArguments,
   type FeatureProvider,

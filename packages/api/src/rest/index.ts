@@ -269,4 +269,4 @@ export { requestTraceIds } from "./trace-ids.ts";
 
 // The request validator that fails the way the rest of the boundary fails.
 export { type FieldViolation, RequestValidationError, validator } from "./validation.ts";
-export { restApi, type RestApiDescriptor } from "./rest-api.ts";
+export { createRestRouter, type RestTransportDescriptor } from "./create-rest-router.ts";
