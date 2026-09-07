@@ -112,7 +112,7 @@ describe("the guided-onboarding skill", () => {
 
     /** @scenario "Sharing the folder leads to a proposal, not a creation" */
     it("puts the proposal in the question field of a bare question whose first option names the scenario", () => {
-      const bare = rendered.indexOf("Ask with the `question` tool with `bare: true`");
+      const bare = rendered.indexOf("ask with the `question` tool with `bare: true`");
       const proposal = rendered.indexOf(VERBATIM_LINES["the proposal"]);
       const create = rendered.indexOf('1. Create "{title}" as your first scenario test');
       const chat = rendered.indexOf('2. "Chat about this", quiet');
@@ -124,11 +124,28 @@ describe("the guided-onboarding skill", () => {
         "so the proposal is the `question` field itself, verbatim",
       );
       expect(rendered).toContain(
-        "say nothing before the call beyond the step 2 lines",
+        "With the step 2 lines already written above it, ask with the `question` tool with `bare: true`, in that same reply, and nothing else before the call",
       );
       expect(rendered).not.toContain("Say the proposal as your reply");
       expect(rendered).not.toContain("it is recorded with the answer and not drawn");
       expect(rendered).not.toContain("Sure, go ahead!");
+    });
+
+    /** @scenario "The step 2 lines come before the card, and the answer is the go" */
+    it("writes the step 2 lines above the question call and goes straight to the checklist after the answer", () => {
+      const lines = rendered.indexOf(
+        "These lines of step 2, the framework you found, the pull request line and the branch line, are written before the question of step 3 is called: they go in the text of the same reply, above the call, never after the answer.",
+      );
+      const ask = rendered.indexOf("With the step 2 lines already written above it, ask with the `question` tool");
+      const go = rendered.indexOf(
+        'The answer to the question is the go. On the create option, or on the scenario agreed after "Chat about this", the next thing you do is this list, then the first command: no sentence between the answer and them, and nothing from step 2 said again; a reply that only speaks after the answer ends the turn with the path open. So, before any command, write this list into `todowrite`',
+      );
+      const list = rendered.indexOf("write this list into `todowrite`");
+      expect(lines).toBeGreaterThan(-1);
+      expect(ask).toBeGreaterThan(lines);
+      expect(go).toBeGreaterThan(ask);
+      expect(list).toBeGreaterThan(go);
+      expect(rendered).not.toContain("say nothing before the call beyond the step 2 lines");
     });
 
     it("ends every path by recording its completion", () => {
@@ -368,7 +385,7 @@ describe("the guided-onboarding skill", () => {
       expect(sentence).toBeGreaterThan(push);
       expect(noRemote).toBeGreaterThan(sentence);
       expect(proposal).toBeGreaterThan(noRemote);
-      expect(rendered).toContain("The proposal of step 3 comes right after, in the same turn.");
+      expect(rendered).toContain("The proposal of step 3 comes right after them, in the same turn.");
     });
 
     /** @scenario "The closing line waits for the suite run" */
@@ -500,7 +517,7 @@ describe("the guided-onboarding skill", () => {
       );
       expect(rendered).toContain("After that pick, their next message describes the scenario.");
       expect(rendered).toContain(
-        'On the create option, or on the scenario agreed after "Chat about this", before any command',
+        'On the create option, or on the scenario agreed after "Chat about this", the next thing you do is this list, then the first command',
       );
     });
 

@@ -93,13 +93,13 @@ git add <the files you changed> && git commit -m "Add LangWatch tracing and the 
 
 I opened a pull request with the tracing change: {link}. You can merge it already.
 
-No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and the step is done. Either way, keep that branch checked out: the agent you started runs on it, and say so in one line. The proposal of step 3 comes right after, in the same turn.
+No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and the step is done. Either way, keep that branch checked out: the agent you started runs on it, and say so in one line. These lines of step 2, the framework you found, the pull request line and the branch line, are written before the question of step 3 is called: they go in the text of the same reply, above the call, never after the answer. The proposal of step 3 comes right after them, in the same turn.
 
 ### 3. Propose the first scenario, and stop
 
 This question is the gate of step 4: no `scenario create`, no run and no suite before the person has answered it. Whatever arrives first, a message describing a scenario, a question, or a setup that stopped at a failed step and was then fixed, finish step 2 and ask it; a scenario the person described before the question becomes `{title}` in it, and the answer is still theirs to give.
 
-Do not create it yet. Ask with the `question` tool with `bare: true`, and say nothing before the call beyond the step 2 lines: a bare question draws its `question` field as ordinary reply prose above the options, so the proposal is the `question` field itself, verbatim, with the braces filled from what you read:
+Do not create it yet. With the step 2 lines already written above it, ask with the `question` tool with `bare: true`, in that same reply, and nothing else before the call: a bare question draws its `question` field as ordinary reply prose above the options, so the proposal is the `question` field itself, verbatim, with the braces filled from what you read:
 
 Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is {title}, because {reason}.
 
@@ -118,7 +118,7 @@ After that pick, their next message describes the scenario. Write it with them, 
 
 ### 4. The checklist, then create, explain, run
 
-On the create option, or on the scenario agreed after "Chat about this", before any command, write this list into `todowrite`, in this order and these words, every item pending:
+The answer to the question is the go. On the create option, or on the scenario agreed after "Chat about this", the next thing you do is this list, then the first command: no sentence between the answer and them, and nothing from step 2 said again; a reply that only speaks after the answer ends the turn with the path open. So, before any command, write this list into `todowrite`, in this order and these words, every item pending:
 
 1. Create the first scenario
 2. Open it beside the panel

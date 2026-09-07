@@ -742,7 +742,8 @@ Feature: Langy guides the first setup after sign-up
       And Langy instruments tracing and the connect endpoint through the tracing, connect-agent and code-changes skills
       And Langy starts the agent
       And Langy asks with a bare question whose own text reads "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is Guest completes checkout, because it is the path most of your users take and it crosses the discount, payment and confirmation steps in one conversation."
-      And that text is drawn as a reply paragraph above the options "Create "Guest completes checkout" as your first scenario test" and the quiet "Chat about this", with nothing said before the card
+      And that text is drawn as a reply paragraph above the options "Create "Guest completes checkout" as your first scenario test" and the quiet "Chat about this"
+      And the framework line, the pull request line and the branch line come before the card, in the same reply, with nothing else said before it
       And no scenario exists yet
 
     @e2e
@@ -753,11 +754,23 @@ Feature: Langy guides the first setup after sign-up
       And the composer takes the cursor
       And no scenario exists yet
 
+    # A film had the model call the question with no text, write the step 2
+    # lines after the answer, and end the turn there: prose after a tool
+    # result reads as the end of a reply. The lines go above the call, and
+    # the answer is followed by the checklist and the command, never a
+    # sentence. The tool result itself carries the go as well
+    # (langy-choice-questions: "The tool result carries the go").
+    @unit
+    Scenario: The step 2 lines come before the card, and the answer is the go
+      When the compiled guided-onboarding skill is read
+      Then the framework line, the pull request line and the branch line are written in the text of the reply that calls the question, above the call
+      And on the create option the next thing is the checklist and the first command, with no sentence between the answer and them
+
     @e2e
     Scenario: Going ahead creates the scenario in the drawer beside the panel
       Given Langy proposed the first scenario
       When I pick "Create "Guest completes checkout" as your first scenario test"
-      Then Langy creates the scenario
+      Then Langy creates the scenario, with no sentence between my answer and the creation
       And the scenario editor drawer opens beside the docked panel with the draft in it
       And the panel stays open while the turn continues
       And Langy says "Before I run it, why a scenario and not a plain test? A scenario is a simulated user talking to your agent turn by turn while a judge checks the outcome, so one run covers a whole conversation instead of a single input and output. And tracing captures every step underneath while it runs."

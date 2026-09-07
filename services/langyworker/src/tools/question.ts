@@ -76,10 +76,19 @@ function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
   });
 }
 
+/**
+ * What the model reads after the answers, so the go is in the tool result
+ * itself, whichever skill asked. A reply that only speaks after an answer
+ * ends the turn with the work undone, and a wording rule in a skill was not
+ * enough to stop that; this line sits at the exact moment it matters.
+ */
+export const ANSWERED_CONTINUE_LINE =
+  "The user has answered. Continue with the work that follows this answer in this turn.";
+
 /** The answers as the model reads them. */
 export function renderAnswers(answers: QuestionAnswer[]): string {
   if (answers.length === 0) return NO_ANSWER_PUSHBACK;
-  return answers
+  const rendered = answers
     .map((answer) => {
       const parts: string[] = [];
       if (answer.selected.length > 0) parts.push(answer.selected.join(", "));
@@ -87,6 +96,7 @@ export function renderAnswers(answers: QuestionAnswer[]): string {
       return `Q: ${answer.question}\nA: ${parts.length > 0 ? parts.join("; ") : "no option picked"}`;
     })
     .join("\n\n");
+  return `${rendered}\n\n${ANSWERED_CONTINUE_LINE}`;
 }
 
 export async function askQuestions({

@@ -181,6 +181,20 @@ Feature: Langy asks a real question with selectable options
       And Langy continues the same turn with the plan it had
       And the card renders locked with my choice marked
 
+    # A film had the model read the answer and end its turn on a sentence,
+    # leaving the work after the question undone. A skill's wording was not
+    # enough, so the go rides in the tool result: after the answer lines the
+    # worker appends "The user has answered. Continue with the work that
+    # follows this answer in this turn." An expired or empty answer set keeps
+    # the end-your-turn line instead.
+    @integration
+    Scenario: The tool result carries the go
+      Given an open question card asked by the tool
+      When I select an option through the panel's answer path
+      Then the wait the tool polls reads answered, with my question and my selection as the worker reads them
+      And the tool result ends with "The user has answered. Continue with the work that follows this answer in this turn."
+      And a question no one answered carries no such line
+
     @integration
     Scenario: A free-text answer reaches the tool as words
       Given an open question card asked by the tool that allows a free-text answer
