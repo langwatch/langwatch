@@ -203,6 +203,7 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     Then setup runs below the import that loads the environment, in Python and in TypeScript
     And the env loader is added to the entry file when the project has it and the entry file does not load it
     And the key is checked visible to the process the way the project reads it, without printing it
+    And the given command is the first and only check, copied as written for the project's runner, with no probe before it
 
   @unit
   Scenario: A run cleans up the demo folders the runs before it left

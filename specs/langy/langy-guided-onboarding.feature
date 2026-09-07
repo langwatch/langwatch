@@ -318,6 +318,7 @@ Feature: Langy guides the first setup after sign-up
     Scenario: The opener is followed by the card and nothing else
       When the compiled guided-onboarding skill is read
       Then it says nothing goes between the opener and the code access card
+      And the opener is said first and the card is called right after it in the same step, never before the line
 
   # ===========================================================================
   # The llmops path: the branch, the credentials, the order and the stops
@@ -343,6 +344,14 @@ Feature: Langy guides the first setup after sign-up
     # A film left the tracing edit uncommitted in the working tree: the branch
     # existed and its diff against main was empty. The commit is the first
     # thing after the agent reads online, not the last thing of the path.
+    # No message of a film ever named the framework Langy found; the judge
+    # reads the report, not the edits.
+    @unit
+    Scenario: Langy names the framework it found
+      When the compiled guided-onboarding skill is read
+      Then after reading the code Langy says one line naming the framework and the file it found it in
+      And that line comes before the branch and the first edit
+
     @unit
     Scenario: The instrumentation is committed once the agent is online
       When the compiled guided-onboarding skill is read
@@ -407,8 +416,8 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: Chat about this ends the turn on the line alone
       When the compiled guided-onboarding skill is read
-      Then the reply to "Chat about this" is the chat line alone, nothing before or after it, no tool call
-      And the turn ends on it
+      Then the reply to "Chat about this" is the chat line itself, said in full, with nothing before or after it and no tool call
+      And the turn ends after the line is said, never instead of it
 
     # A film ran seven docs lookups hunting for a connect-agent page that does
     # not exist, and the key check twice with two loaders.

@@ -82,12 +82,19 @@ The exact pattern depends on the framework, so follow the docs, not these exampl
 - Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
 - TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
 
-Before you start the process, check that the key is visible to it the way the project reads it. Run the line for the language once, from the project root, through the project's own runner (`uv run`, `poetry run`, the venv's python, `npx tsx`, `node`), and print only whether `LANGWATCH_API_KEY` is set, never its value:
+Before you start the process, check that the key is visible to it the way the project reads it. This is the first and only check: copy the command for the language as written, run it once from the project root, and read the answer. No variant before it (a probe such as `import langwatch` with no loader reads the bare process and always answers missing on a dotenv project) and none after it.
 
-- Python: `python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"`
-- TypeScript: `node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"`
+```bash
+uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
+```
 
-Swap the loader for the project's own when it is not dotenv. `False` means the file is not where the loader looks or the order above is wrong: fix that, never retry the check with another path.
+`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. TypeScript:
+
+```bash
+node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"
+```
+
+The command prints only whether `LANGWATCH_API_KEY` is set, never its value. Swap the loader for the project's own when it is not dotenv. `False` means the file is not where the loader looks or the order above is wrong: fix that, never retry the check with another path.
 
 ## Step 4: Verify
 

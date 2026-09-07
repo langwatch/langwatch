@@ -93,6 +93,13 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain(
         "Nothing goes between the opener and the card: when the tool waits for the user, the turn is over, so say nothing more.",
       );
+      expect(rendered).toContain(
+        "The line is said first and the card follows it, never the other way round.",
+      );
+      const opener = rendered.indexOf(VERBATIM_LINES["the llmops opener"]);
+      const card = rendered.indexOf("call `code_access` with `offer_describe: true`");
+      expect(opener).toBeGreaterThan(-1);
+      expect(card).toBeGreaterThan(opener);
     });
 
     it("marks the chat option quiet and asks before creating anything", () => {
@@ -255,8 +262,19 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "Chat about this ends the turn on the line alone" */
     it("answers Chat about this with the line alone and ends the turn", () => {
       expect(rendered).toContain(
-        "the reply is this line alone, verbatim, and the turn ends on it so the composer takes the cursor. Nothing before it, nothing after it, no tool call:",
+        "say the line below as your reply, verbatim and in full, and end the turn right after saying it, so the composer takes the cursor. The line is the whole reply: no sentence before or after it, no tool call, and never an empty turn in its place:",
       );
+    });
+
+    /** @scenario "Langy names the framework it found" */
+    it("says one line naming the framework and the file before the first edit", () => {
+      expect(rendered).toContain(
+        'then say one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That line is part of this step, before the branch and the first edit.',
+      );
+      const report = rendered.indexOf("say one line naming what you found");
+      const branch = rendered.indexOf("`git checkout -b langy/<slug> origin/<default>`");
+      expect(report).toBeGreaterThan(-1);
+      expect(branch).toBeGreaterThan(report);
     });
 
     /** @scenario "The connect endpoint comes from the connect-agent skill" */
@@ -347,12 +365,15 @@ describe("the guided-onboarding skill", () => {
         "`langwatch.setup()` sits below the import that loads the env file, never at the top of the entry file",
       );
       const check = rendered.indexOf(
-        "Run the tracing skill's key check once, with its one-liner for the language",
+        "Run the tracing skill's key check once, copied as written for the language",
       );
       const start = rendered.indexOf("Start the agent from that branch");
       expect(check).toBeGreaterThan(-1);
       expect(start).toBeGreaterThan(check);
-      expect(rendered).toContain("One run: never a second try with another path or another loader.");
+      expect(rendered).toContain(
+        "One run: never a second try with another path or another loader, and no probe of your own before it.",
+      );
+      expect(rendered).toContain("It is the first and only check");
     });
 
     /** @scenario "The instrumentation that cannot be applied stops the path" */
