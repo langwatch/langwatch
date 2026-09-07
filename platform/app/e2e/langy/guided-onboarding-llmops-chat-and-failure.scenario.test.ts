@@ -46,6 +46,7 @@ import {
   type DemoRepo,
   setCodeAccessPreference,
   startShareControl,
+  storedProse,
   teardown,
   terminalSection,
   waitForConnectedWorkspace,
@@ -324,9 +325,7 @@ function storedAssistantText(
 ): string {
   return messages
     .filter((message) => message.role === "assistant")
-    .flatMap((message) => message.parts)
-    .filter((part) => part.type === "text" && typeof part.text === "string")
-    .map((part) => String(part.text))
+    .map((message) => storedProse(message.parts))
     .join("\n");
 }
 

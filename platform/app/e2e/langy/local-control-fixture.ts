@@ -1135,6 +1135,39 @@ export interface StoredMessage {
 }
 
 /**
+ * The words one stored part carries, or null when it carries none.
+ *
+ * A line said with the `say` tool is Langy's own prose, drawn where the call
+ * happened, so it reads here exactly as a text part does. The empty text part
+ * a turn ends on when every line was said that way carries nothing.
+ */
+export function partProse(part: Record<string, unknown>): string | null {
+  const said =
+    part.type === "tool-say"
+      ? (part.input as { text?: unknown } | undefined)?.text
+      : part.text;
+  return typeof said === "string" && said.trim() !== "" ? said : null;
+}
+
+/** Whether one stored part is a tool call rather than something Langy wrote. */
+export function isToolCallPart(part: Record<string, unknown>): boolean {
+  return (
+    typeof part.type === "string" &&
+    part.type.startsWith("tool-") &&
+    part.type !== "tool-say" &&
+    typeof part.toolCallId === "string"
+  );
+}
+
+/** Everything a stored message says, in the order the panel draws it. */
+export function storedProse(parts: Array<Record<string, unknown>>): string {
+  return parts
+    .map((part) => partProse(part))
+    .filter((text): text is string => text !== null)
+    .join("\n");
+}
+
+/**
  * The stored answer of one turn.
  *
  * The answer message of a turn carries the turn id inside its own message id,
@@ -1472,59 +1505,87 @@ export function watchLangyConversation({
   const messageText = (message: {
     role: string;
     parts: Array<Record<string, unknown>>;
-  }): string =>
-    message.parts
-      .filter((part) => typeof part.text === "string")
-      .map((part) => String(part.text))
-      .join("\n");
+  }): string => storedProse(message.parts);
 
   /**
    * One stored message as the judge reads it: the tool calls and their results
-   * as their own messages, then the reply. The part type carries the tool name
-   * as `tool-<name>`, which is the panel's own shape.
+   * as their own messages, in the order the turn ran them, with the lines
+   * written between them in front of the calls they introduce. The part type
+   * carries the tool name as `tool-<name>`, which is the panel's own shape.
+   *
+   * This is the shape the streaming adapter builds for a turn the scenario
+   * drives itself, so a turn the panel started on its own grades the same way.
    */
   const judgeMessagesOf = (message: {
     role: string;
     parts: Array<Record<string, unknown>>;
   }): JudgeMessage[] => {
-    const calls = message.parts.filter(
-      (part) =>
-        typeof part.type === "string" &&
-        part.type.startsWith("tool-") &&
-        typeof part.toolCallId === "string",
-    );
-    const text = messageText(message);
-    if (calls.length === 0) return [{ role: "assistant", content: text }];
-    return [
-      {
+    const messages: JudgeMessage[] = [];
+    let narration: string[] = [];
+    let batch: Array<Record<string, unknown>> = [];
+    let endedOnText = false;
+
+    const flush = () => {
+      if (batch.length === 0 && narration.length === 0) return;
+      messages.push({
         role: "assistant",
-        content: calls.map((part) => ({
-          type: "tool-call" as const,
-          toolCallId: String(part.toolCallId),
-          toolName: String(part.type).slice("tool-".length),
-          input: part.input,
-        })),
-      },
-      {
-        role: "tool",
-        content: calls.map((part) => ({
-          type: "tool-result" as const,
-          toolCallId: String(part.toolCallId),
-          toolName: String(part.type).slice("tool-".length),
-          output: {
-            type:
-              part.state === "output-error"
-                ? ("error-text" as const)
-                : ("text" as const),
-            value:
-              typeof part.output === "string"
-                ? part.output
-                : JSON.stringify(part.output ?? ""),
-          },
-        })),
-      },
-      { role: "assistant", content: text },
-    ];
+        content: [
+          ...narration.map((text) => ({ type: "text" as const, text })),
+          ...batch.map((part) => ({
+            type: "tool-call" as const,
+            toolCallId: String(part.toolCallId),
+            toolName: String(part.type).slice("tool-".length),
+            input: part.input,
+          })),
+        ],
+      });
+      if (batch.length > 0) {
+        messages.push({
+          role: "tool",
+          content: batch.map((part) => ({
+            type: "tool-result" as const,
+            toolCallId: String(part.toolCallId),
+            toolName: String(part.type).slice("tool-".length),
+            output: {
+              type:
+                part.state === "output-error"
+                  ? ("error-text" as const)
+                  : ("text" as const),
+              value:
+                typeof part.output === "string"
+                  ? part.output
+                  : JSON.stringify(part.output ?? ""),
+            },
+          })),
+        });
+      }
+      narration = [];
+      batch = [];
+    };
+
+    for (const part of message.parts) {
+      const said = partProse(part);
+      if (said !== null) {
+        // A passage after a call opens the next stretch of work, so the calls
+        // already gathered close here and keep their place in front of it.
+        if (batch.length > 0) flush();
+        narration.push(said);
+        endedOnText = true;
+        continue;
+      }
+      if (isToolCallPart(part)) {
+        batch.push(part);
+        endedOnText = false;
+      }
+    }
+    flush();
+
+    // A turn that ran tools and then went quiet has no reply of its own: the
+    // passages are already above, and appending them would say each twice.
+    if (endedOnText || messages.length === 0) {
+      messages.push({ role: "assistant", content: messageText(message) });
+    }
+    return messages;
   };
 
   /**
