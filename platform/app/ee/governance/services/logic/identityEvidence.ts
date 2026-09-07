@@ -167,10 +167,11 @@ function lookup(
  * Decide what the evidence proves about one discovered person.
  *
  * Both provider-supplied strings are tried against both indexes, because
- * providers disagree about which field holds what: OpenAI puts the address in
- * `user_email` and an opaque id in `user_id`, Databricks puts the address in the
- * id field itself, and Anthropic puts an opaque member id in both. Trying only
- * the field we expected would silently match nobody for two of the three.
+ * providers disagree about which field holds what: Databricks puts the address
+ * in the id field itself, while OpenAI's cost report names the person only by an
+ * opaque `user_id` and no address at all, and Anthropic puts an opaque member id
+ * in both. Trying only the field we expected would silently match nobody for two
+ * of the three.
  *
  * The answers, in the order they are decided:
  *

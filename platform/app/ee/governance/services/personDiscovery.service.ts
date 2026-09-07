@@ -118,6 +118,7 @@ export class PersonDiscoveryService {
         provider,
         rawActorId,
         displayText: sighting.displayText,
+        department: sighting.department,
         seenAt: sighting.seenAt,
       });
     }
@@ -126,10 +127,16 @@ export class PersonDiscoveryService {
   }
 }
 
-/** One entry per distinct actor: activity as a seen range, directory as the freshest name. */
+/**
+ * One entry per distinct actor: activity as a seen range, directory as the
+ * freshest name and department.
+ */
 function bucketByActor(events: NormalizedPullEvent[]): {
   activityByActor: Map<string, { earliestAt: Date; latestAt: Date }>;
-  directoryByActor: Map<string, { displayText: string; seenAt: Date }>;
+  directoryByActor: Map<
+    string,
+    { displayText: string; department: string; seenAt: Date }
+  >;
 } {
   const activityByActor = new Map<
     string,
@@ -137,7 +144,7 @@ function bucketByActor(events: NormalizedPullEvent[]): {
   >();
   const directoryByActor = new Map<
     string,
-    { displayText: string; seenAt: Date }
+    { displayText: string; department: string; seenAt: Date }
   >();
 
   for (const event of events) {
@@ -151,6 +158,10 @@ function bucketByActor(events: NormalizedPullEvent[]): {
     if (event.action === DIRECTORY_REPORT_ACTION) {
       directoryByActor.set(event.actor, {
         displayText: directoryDisplayText(event),
+        // Trimmed, and the same trim the department sync applies: a field
+        // holding only spaces is a tenant leaving it blank, not a department
+        // named " ". "" here means the row named none.
+        department: extraString(event, "department").trim(),
         seenAt,
       });
       continue;

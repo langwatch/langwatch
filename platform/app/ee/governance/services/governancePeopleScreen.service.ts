@@ -4,11 +4,16 @@
  * The People screen's reads, composed once on the server.
  *
  * The screen shows three things no single table holds: what a provider said
- * (the discovered person), what the engine decided (the open link and its
- * evidence), and where the linked member sits (name and department). Joining
- * them here rather than in the page keeps the page on one query and keeps
- * the join rules — an erased person shows a stand-in, a link with a blanked
- * user shows as unlinked — in code a test can hold down.
+ * (the discovered person, including the department their directory filed them
+ * under), what the engine decided (the open link and its evidence), and where
+ * the linked member sits (name and department). Joining them here rather than
+ * in the page keeps the page on one query and keeps the join rules — an erased
+ * person shows a stand-in, a link with a blanked user shows as unlinked — in
+ * code a test can hold down.
+ *
+ * The two departments stay two fields. Which one a row DISPLAYS is a screen
+ * decision (`logic/observedDepartments.ts`); collapsing them here would make
+ * "what do the providers say?" unanswerable from the list.
  *
  * Spec: specs/governance/governance-people-screen.feature
  */
@@ -30,6 +35,18 @@ export interface PeopleScreenPerson {
   /** The pseudonym when erased — the identifier column IS this text then. */
   displayText: string;
   rawActorId: string;
+  /**
+   * What the provider's directory said this person's department is, verbatim,
+   * or null when no directory has named one.
+   *
+   * Deliberately NOT merged with `link.departmentName` here. They answer two
+   * different questions — "what does the provider say?" and "where does this
+   * organization attribute their spend?" — and only the first is available for
+   * the many discovered people who hold no LangWatch account. The screen
+   * resolves one label out of the pair; the panel that counts what the
+   * providers see must not count the second.
+   */
+  directoryDepartment: string | null;
   firstSeenAt: Date;
   lastSeenAt: Date;
   erasedAt: Date | null;
@@ -39,6 +56,7 @@ export interface PeopleScreenPerson {
     userId: string;
     evidenceKind: string;
     memberName: string | null;
+    /** The linked member's `Department` — the organization's own accounting. */
     departmentName: string | null;
   } | null;
 }
@@ -120,6 +138,7 @@ export class GovernancePeopleScreenService {
         kind: person.kind,
         displayText: person.displayText,
         rawActorId: person.rawActorId,
+        directoryDepartment: person.department,
         firstSeenAt: person.firstSeenAt,
         lastSeenAt: person.lastSeenAt,
         erasedAt: person.erasedAt,

@@ -108,6 +108,8 @@ function observedEvent({
   occurredAtMs = DAY_MS,
   costStatus = "estimate",
   id = `evt-pulled-${observedAtMs}`,
+  rawActorId,
+  agentId,
 }: {
   costNanoMinor: number;
   currencyCode?: string;
@@ -117,6 +119,10 @@ function observedEvent({
   occurredAtMs?: number;
   costStatus?: "exact" | "estimate";
   id?: string;
+  /** Omitted by default: the legacy shape, from before spend named a spender. */
+  rawActorId?: string;
+  /** Omitted by default, same legacy contract as `rawActorId` (#7881). */
+  agentId?: string;
 }) {
   return {
     id,
@@ -143,6 +149,10 @@ function observedEvent({
       rateVersion: "registry@2026-08-01",
       costBasis: "computed",
       costStatus,
+      // Spread rather than always present, so an omitted value produces the
+      // exact field-less shape every event before ADR-129 has on the log.
+      ...(rawActorId === undefined ? {} : { rawActorId }),
+      ...(agentId === undefined ? {} : { agentId }),
       occurredAtMs,
       observedAtMs,
     },
@@ -233,6 +243,85 @@ describe("governanceCostRollupKey", () => {
         observedEvent({ costNanoMinor: 1, observedAtMs: DAY_MS }),
       );
       expect(gateway).not.toBe(pulled);
+    });
+  });
+
+  describe("given pulled events and the spender they name (ADR-129)", () => {
+    it("puts each named spender in its own group", () => {
+      const ada = governanceCostRollupKey(
+        observedEvent({
+          costNanoMinor: 1,
+          observedAtMs: DAY_MS,
+          rawActorId: "user-ada",
+        }),
+      );
+      const grace = governanceCostRollupKey(
+        observedEvent({
+          costNanoMinor: 1,
+          observedAtMs: DAY_MS,
+          rawActorId: "user-grace",
+        }),
+      );
+      expect(ada).not.toBe(grace);
+    });
+
+    it("folds a legacy event into the same group as a blank-actor one", () => {
+      // The whole no-migration promise of ADR-129: an event written before
+      // the field existed and one that says "" mean the same thing and must
+      // land on the same row — a rebuild over mixed history may never split
+      // a day's money by schema vintage.
+      const legacy = governanceCostRollupKey(
+        observedEvent({ costNanoMinor: 1, observedAtMs: DAY_MS }),
+      );
+      const blank = governanceCostRollupKey(
+        observedEvent({
+          costNanoMinor: 1,
+          observedAtMs: DAY_MS,
+          rawActorId: "",
+        }),
+      );
+      expect(legacy).toBe(blank);
+    });
+
+    it("puts each named agent in its own group, and legacy beside blank (#7881)", () => {
+      const spaceOne = governanceCostRollupKey(
+        observedEvent({
+          costNanoMinor: 1,
+          observedAtMs: DAY_MS,
+          agentId: "space_1",
+        }),
+      );
+      const spaceTwo = governanceCostRollupKey(
+        observedEvent({
+          costNanoMinor: 1,
+          observedAtMs: DAY_MS,
+          agentId: "space_2",
+        }),
+      );
+      const legacy = governanceCostRollupKey(
+        observedEvent({ costNanoMinor: 1, observedAtMs: DAY_MS }),
+      );
+      const blank = governanceCostRollupKey(
+        observedEvent({ costNanoMinor: 1, observedAtMs: DAY_MS, agentId: "" }),
+      );
+
+      expect(spaceOne).not.toBe(spaceTwo);
+      expect(spaceOne).not.toBe(blank);
+      expect(legacy).toBe(blank);
+    });
+
+    it("keeps a named event out of the blank group", () => {
+      const blank = governanceCostRollupKey(
+        observedEvent({ costNanoMinor: 1, observedAtMs: DAY_MS }),
+      );
+      const named = governanceCostRollupKey(
+        observedEvent({
+          costNanoMinor: 1,
+          observedAtMs: DAY_MS,
+          rawActorId: "user-ada",
+        }),
+      );
+      expect(named).not.toBe(blank);
     });
   });
 });

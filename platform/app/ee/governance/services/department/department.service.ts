@@ -221,13 +221,91 @@ export class DepartmentService {
     departmentId: string | null;
   }): Promise<void> {
     await this.assertDepartmentInOrg(params);
-    const result = await this.prisma.organizationUser.updateMany({
-      where: { userId: params.userId, organizationId: params.organizationId },
-      data: { departmentId: params.departmentId },
+    // The pointer and its history land in one transaction, because they are
+    // one fact stated twice: `departmentId` is what every screen reads today,
+    // the dated link is what the cost reads resolve a PAST day against
+    // (ADR-128 §13, #7882). Written apart they drift, and a drifted history
+    // quietly re-files January's spend under today's reorg.
+    await this.prisma.$transaction(async (tx) => {
+      const result = await tx.organizationUser.updateMany({
+        where: { userId: params.userId, organizationId: params.organizationId },
+        data: { departmentId: params.departmentId },
+      });
+      if (result.count === 0) {
+        throw new DepartmentAssignmentTargetNotFoundError("user");
+      }
+
+      const open = await tx.departmentMembershipHistory.findFirst({
+        where: {
+          organizationId: params.organizationId,
+          userId: params.userId,
+          validTo: null,
+        },
+      });
+      // Idempotent on the daily directory read: re-asserting the standing
+      // assignment must not close and reopen the link, or every sync day
+      // becomes a fake reorg and no read can tell a real one apart.
+      if (open?.departmentId === params.departmentId) return;
+
+      const now = new Date();
+      if (open) {
+        await tx.departmentMembershipHistory.update({
+          where: { id: open.id },
+          data: { validTo: now },
+        });
+      }
+      // Clearing (null) closes the open link and opens nothing: "unassigned"
+      // is the absence of a link, not a link to an absence.
+      if (params.departmentId !== null) {
+        await tx.departmentMembershipHistory.create({
+          data: {
+            organizationId: params.organizationId,
+            userId: params.userId,
+            departmentId: params.departmentId,
+            validFrom: now,
+          },
+        });
+      }
     });
-    if (result.count === 0) {
-      throw new DepartmentAssignmentTargetNotFoundError("user");
-    }
+  }
+
+  /**
+   * The department each member was in on a given UTC day, resolved against
+   * the link that was open at that day's END — a mid-day reassignment hands
+   * the day to where the member ended it, so one day never splits across two
+   * departments (ADR-128 §13).
+   *
+   * Members with no link on the day are simply absent from the map: absent
+   * means "unassigned", never an error. This is the read the cost screens
+   * group by, so it takes the whole batch of users at once.
+   */
+  async departmentsOnDay({
+    organizationId,
+    userIds,
+    dayUtc,
+  }: {
+    organizationId: string;
+    userIds: string[];
+    /** The cost row's day, `YYYY-MM-DD`. */
+    dayUtc: string;
+  }): Promise<Map<string, string>> {
+    if (userIds.length === 0) return new Map();
+    const endOfDay = new Date(`${dayUtc}T23:59:59.999Z`);
+
+    const links = await this.prisma.departmentMembershipHistory.findMany({
+      where: {
+        organizationId,
+        userId: { in: userIds },
+        validFrom: { lte: endOfDay },
+        OR: [{ validTo: null }, { validTo: { gt: endOfDay } }],
+      },
+      select: { userId: true, departmentId: true },
+    });
+
+    // The one-open-link index makes this at most one row per user: links are
+    // half-open intervals [validFrom, validTo), and only one can straddle the
+    // instant we asked about.
+    return new Map(links.map((link) => [link.userId, link.departmentId]));
   }
 
   async assignTeam(params: {

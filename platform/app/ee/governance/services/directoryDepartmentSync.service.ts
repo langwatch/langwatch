@@ -129,6 +129,23 @@ export class DirectoryDepartmentSyncService {
     const currentByUser = new Map(
       memberships.map((m) => [m.userId, m.departmentId]),
     );
+    // The dated links beside the pointer (ADR-128 §13, #7882). Read so the
+    // no-op check below can require BOTH to match: a member assigned before
+    // links existed has the right pointer and no open link, and skipping them
+    // would leave "who was here in January" answering "unassigned" until
+    // their first real reorg. One indexed query; on the steady-state day it
+    // still leads to zero writes.
+    const openLinks = await this.prisma.departmentMembershipHistory.findMany({
+      where: {
+        organizationId,
+        userId: { in: [...desired.keys()] },
+        validTo: null,
+      },
+      select: { userId: true, departmentId: true },
+    });
+    const openLinkByUser = new Map(
+      openLinks.map((link) => [link.userId, link.departmentId]),
+    );
 
     const departmentByName = new Map<string, string>();
     let assigned = 0;
@@ -145,7 +162,12 @@ export class DirectoryDepartmentSyncService {
         departmentByName.set(name, departmentId);
       }
 
-      if (currentByUser.get(userId) === departmentId) continue;
+      if (
+        currentByUser.get(userId) === departmentId &&
+        openLinkByUser.get(userId) === departmentId
+      ) {
+        continue;
+      }
       await this.departments.assignUser({
         organizationId,
         userId,

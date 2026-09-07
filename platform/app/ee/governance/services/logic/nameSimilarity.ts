@@ -66,10 +66,13 @@ export function nameTokens(text: string): Set<string> {
  *
  * Both sides arrive as addresses often enough that this is the difference
  * between the engine working and not working at all. `DiscoveredPerson.displayText`
- * IS an address for two of the three providers `identityEvidence.ts` handles —
- * Databricks puts it in the id field, OpenAI in `user_email` — and on the account
- * side `OrganizationAccountDirectoryRepository.findMemberNames` falls back to
- * `user.email` for any member with no display name.
+ * IS an address for the providers that carry one — Databricks puts it in the id
+ * field, and a Microsoft directory row upgrades the name to the mail address —
+ * and on the account side
+ * `OrganizationAccountDirectoryRepository.findMemberNames` falls back to
+ * `user.email` for any member with no display name. (OpenAI is the counterexample:
+ * its cost rows name a person only by an opaque id, so those go to the engine
+ * with nothing for this pass to split.)
  *
  * Leaving the domain on breaks the pass in both directions, measured at
  * ADR-128's own 2,000 x 500:

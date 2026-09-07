@@ -160,6 +160,36 @@ function actorTheFoldWouldWrite(principalUserId: string): string {
   ).rawActorId;
 }
 
+/** One priced pulled item naming its spender (ADR-129). */
+function pulledSpendEvent(rawActorId: string) {
+  return {
+    type: "lw.obs.pulled_usage.observed",
+    tenantId: TENANT,
+    data: {
+      restatementKey: "bucket-hash",
+      source: "openai_admin",
+      ingestionSourceId: "src_1",
+      model: "openai/gpt-5-mini",
+      costNanoMinor: 1,
+      currencyCode: "USD",
+      rawActorId,
+      occurredAtMs: Date.UTC(2026, 7, 20),
+      observedAtMs: Date.UTC(2026, 7, 21),
+    } as Record<string, unknown>,
+  };
+}
+
+/**
+ * Same question, pulled lane. The two lanes substitute through one helper, but
+ * only these lines prove the pulled branch actually calls it — the gateway
+ * cases above would stay green if it silently wrote `""` or the raw id.
+ */
+function actorThePulledFoldWouldWrite(rawActorId: string): string {
+  return decodeGovernanceCostRollupKey(
+    governanceCostRollupKey(pulledSpendEvent(rawActorId)),
+  ).rawActorId;
+}
+
 function buildErasure(prisma: PrismaClient) {
   return new IdentityErasureService({
     prisma,
@@ -214,6 +244,23 @@ describe("given an erasure that has to change what the money fold writes", () =>
       expect(actorTheFoldWouldWrite(ERASED)).toBe(outcome.pseudonym);
       expect(actorTheFoldWouldWrite(ERASED)).not.toBe(ERASED);
       expect(actorTheFoldWouldWrite(STAYS)).toBe(STAYS);
+    });
+
+    /** @scenario "Pulled spend is erased by the same substitution as gateway spend" */
+    it("substitutes on the pulled lane too, and leaves blank pulled rows blank", async () => {
+      const prisma = inMemoryPrisma();
+      installGovernanceSuppressionSnapshot(prisma);
+
+      const outcome = await buildErasure(prisma).erase({
+        organizationId: ORG,
+        discoveredPersonId: PERSON,
+      });
+
+      expect(actorThePulledFoldWouldWrite(ERASED)).toBe(outcome.pseudonym);
+      expect(actorThePulledFoldWouldWrite(STAYS)).toBe(STAYS);
+      // Blank is "provider named nobody", not an identifier; a pseudonym for
+      // it would sweep every unattributed row into one fake person.
+      expect(actorThePulledFoldWouldWrite("")).toBe("");
     });
 
     /** @scenario "The rebuild the erasure asks for cannot re-derive the identifier" */
