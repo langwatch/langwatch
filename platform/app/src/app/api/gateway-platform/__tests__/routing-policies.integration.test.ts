@@ -302,12 +302,7 @@ describe("GET /routing-policies", () => {
 
     for (const policy of body.data) {
       const keys = Object.keys(policy);
-      expect(keys).toEqual([
-        "id",
-        "name",
-        "description",
-        "is_default",
-      ]);
+      expect(keys).toEqual(["id", "name", "description", "is_default"]);
 
       // Ensure no sensitive fields are included
       expect(policy).not.toHaveProperty("policyRules");
@@ -360,12 +355,7 @@ describe("GET /routing-policies/:id", () => {
     const body = await response.json();
 
     const keys = Object.keys(body);
-    expect(keys).toEqual([
-      "id",
-      "name",
-      "description",
-      "is_default",
-    ]);
+    expect(keys).toEqual(["id", "name", "description", "is_default"]);
   });
 
   it("returns 404 for a policy in another organization", async () => {
