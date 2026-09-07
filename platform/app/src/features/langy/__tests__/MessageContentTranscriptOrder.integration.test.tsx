@@ -21,6 +21,15 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// The choices card reads the public env over tRPC; this suite covers where
+// the card sits, not what it loads.
+vi.mock("~/utils/api", () => ({
+  api: {
+    useUtils: () => ({}),
+    publicEnv: { useQuery: () => ({ data: {} }) },
+  },
+}));
+
 import { MessageContent } from "../components/MessageContent";
 
 afterEach(cleanup);
@@ -150,6 +159,93 @@ describe("given a turn that wrote, ran a call, and wrote again", () => {
         blockHolding(SECOND),
       ),
     ).toBe(true);
+  });
+});
+
+describe("given a turn that raised a card with a call and then wrote on", () => {
+  const CLOSING = "That is the whole path. Enjoy the tests.";
+
+  function questionPart(id: string) {
+    return {
+      type: "tool-question",
+      toolCallId: id,
+      state: "output-available",
+      input: {
+        questions: [
+          {
+            question: "Can I create and run it for you?",
+            options: [
+              { label: "Sure, go ahead!" },
+              { label: "Chat about this" },
+            ],
+          },
+        ],
+      },
+      output: "answered",
+    };
+  }
+
+  /** @scenario "A card raised by a call sits where the call ran" */
+  it("draws the question card before the paragraph written after it", () => {
+    renderMessage(
+      assistantMessage([
+        { type: "text", text: FIRST },
+        questionPart("q1"),
+        { type: "text", text: CLOSING },
+      ]),
+    );
+
+    expect(
+      orderOf(
+        screen.getByText(FIRST),
+        screen.getByText("Sure, go ahead!"),
+        screen.getByText(CLOSING),
+      ),
+    ).toBe(true);
+  });
+
+  /** @scenario "A card raised by a call sits where the call ran" */
+  it("draws the progress card after the call that moved the flow, not under the closing line", () => {
+    renderMessage(
+      assistantMessage([
+        { type: "text", text: FIRST },
+        toolPart("git add -A && git commit -m 'Add tracing'", "c1"),
+        { type: "text", text: SECOND },
+        toolPart("langwatch scenario run", "c2"),
+        { type: "text", text: CLOSING },
+      ]),
+    );
+
+    expect(
+      orderOf(
+        screen.getByText(FIRST),
+        screen.getByText("Commit"),
+        screen.getByText(SECOND),
+        screen.getByText(CLOSING),
+      ),
+    ).toBe(true);
+  });
+
+  it("leaves the progress card out when the caller hides it", () => {
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <MessageContent
+          message={assistantMessage([
+            toolPart("git commit -m 'Add tracing'", "c1"),
+            { type: "text", text: CLOSING },
+          ])}
+          appliedOutcomes={{}}
+          discardedProposals={new Set()}
+          applyingProposals={new Set()}
+          onApply={async () => {}}
+          onDiscard={() => {}}
+          hideGithubProgress
+        />
+      </ChakraProvider>,
+    );
+
+    expect(screen.queryByText("Commit")).toBeNull();
+    expect(screen.getByText(CLOSING)).toBeDefined();
   });
 });
 

@@ -346,6 +346,17 @@ Feature: Langy renders domain-capability cards for tool calls
       When it settles
       Then the settled turn keeps the order the reader watched it arrive in
 
+    # The cards a call raises (a question, a pull request, a proposal, the
+    # code access ask, a secret) rendered in a pile under the whole reply, so
+    # the closing line of a guided path sat above the question the path had
+    # asked three steps earlier, and above the commit receipt.
+    @integration
+    Scenario: A card raised by a call sits where the call ran
+      Given Langy asked a question with a tool call and went on to write a closing line
+      Then the question card is shown before the closing line
+      And the pull request progress card sits after the call that committed, not under the closing line
+      And a guided conversation leaves the progress card out
+
     # The record was built as every tool call first and the reply after them,
     # from the text the agent wrote after its LAST call. Everything written
     # between calls existed only on the live edge, so a reader who refreshed
