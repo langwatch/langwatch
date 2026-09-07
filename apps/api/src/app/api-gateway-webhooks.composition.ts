@@ -85,17 +85,11 @@ export type ApiGatewayWebhooksOptions = Readonly<{
 export function composeApiGatewayWebhooks(
   options: ApiGatewayWebhooksOptions,
 ): ApiGatewaySpendWebhookPort | undefined {
-  const { database, encryption, resolveClickHouseClient } = options;
+  const { database, encryption } = options;
   if (!database || !encryption) return undefined;
-
-  const endpoints: WebhookEndpointRuntime = WebhookEndpointAdapter.create({
-    prisma: database,
-    ids: new ApiWebhookIds(),
-    secrets: ApiWebhookSecrets.create(encryption),
-    // No `configuration` and no `pruneDeliveries`: both are the WRITE side's
-    // — destination validation on create, and the maintenance sweep the
-    // delivery process manager runs. This process only reads an endpoint.
-  });
+  const platform = composeApiWebhookPlatform(options);
+  if (!platform) return undefined;
+  const { endpoints, events } = platform;
 
   const delivery = WebhookDeliveryService.create({
     // The endpoint stream a replay appends to is a durable process row, so it
@@ -106,6 +100,40 @@ export function composeApiGatewayWebhooks(
     ...unrunExecutorCollaborators(),
   });
 
+  return { endpoints, events, delivery };
+}
+
+/** The endpoint registry and the emitted-envelope log, as ANY door on this process reads them. */
+export type ApiWebhookPlatform = Readonly<{
+  endpoints: WebhookEndpointRuntime;
+  events: WebhookEventsService | undefined;
+}>;
+
+/**
+ * The two members every webhook door shares, composed ONCE.
+ *
+ * The replay route reads them beside a delivery service; `ctx.app.webhooks` and
+ * `/api/webhooks/v1` read them beside a health service and an entitlement gate. What must
+ * not fork is the pair below them: the id format an endpoint is minted under and the cipher
+ * its signing secret is written with. Two compositions of those would mint endpoints one
+ * door could no longer read.
+ */
+export function composeApiWebhookPlatform(
+  options: ApiGatewayWebhooksOptions,
+): ApiWebhookPlatform | undefined {
+  const { database, encryption, resolveClickHouseClient } = options;
+  if (!database || !encryption) return undefined;
+
+  const endpoints: WebhookEndpointRuntime = WebhookEndpointAdapter.create({
+    prisma: database,
+    ids: new ApiWebhookIds(),
+    secrets: ApiWebhookSecrets.create(encryption),
+    // No `configuration` and no `pruneDeliveries`, which is what main composed
+    // too: the first is a per-deployment destination policy nothing here states,
+    // and the second is the maintenance sweep the delivery process manager runs
+    // on the worker.
+  });
+
   return {
     endpoints,
     events: resolveClickHouseClient
@@ -114,7 +142,6 @@ export function composeApiGatewayWebhooks(
           repository: WebhookEventsAdapter.create(resolveClickHouseClient),
         })
       : undefined,
-    delivery,
   };
 }
 

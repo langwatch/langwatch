@@ -243,6 +243,10 @@ export type {
   SsoConnectionBackofficeRepository,
 } from "./repositories/sso-connection-backoffice.repository.ts";
 export {
+  PrismaSsoConnectionBackofficeRepository,
+  type PrismaSsoConnectionBackofficeDatabase,
+} from "./repositories/prisma/prisma.sso-connection-backoffice.repository.ts";
+export {
   PrismaJoinCandidateRepository,
   PrismaJoinRequestReadRepository,
 } from "./repositories/prisma/prisma.join-request.repository.ts";

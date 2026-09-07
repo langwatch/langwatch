@@ -269,3 +269,10 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     When they change the connection
     Then the change is a guarded command with the actor recorded
     And no raw table edit exists on the surface
+
+  @unit
+  Scenario: The back office commands through the pipeline's own connection service
+    Given a process composing the connection pipeline
+    When it also asks the pipeline for the connection write surface
+    Then it is handed the same service the pipeline itself commands through
+    And the operator's commands run the same guards and the same break-glass budget

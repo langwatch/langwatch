@@ -53,6 +53,13 @@ export type PostgresSsoConnectionPipelineOptions = {
   directory?: SsoConnectionDirectoryRevocationPort;
 };
 
+/** The one graph the definition and the back office both command through. */
+type SsoConnectionPipelineGraph = {
+  head: ReturnType<typeof PrismaSsoConnectionProjectionRepository.create>;
+  guards: SsoConnectionGuardsService;
+  connections: SsoConnectionService;
+};
+
 /**
  * The Postgres composition seam for the SSO connection pipeline (D04, This is the ONLY graph that
  * can advance TEARDOWN_PENDING to TORN_DOWN:
@@ -67,7 +74,35 @@ export class PostgresSsoConnectionPipelineAdapter {
 
   private constructor(private readonly options: PostgresSsoConnectionPipelineOptions) {}
 
+  private composed: SsoConnectionPipelineGraph | undefined;
+
+  /**
+   * The connection write surface itself, for a process that commands connections without
+   * running the pipeline — the operator back office is the one that does.
+   *
+   * The SAME instance {@link build} hands the teardown subscriber, so an operator's command
+   * and the pipeline's own run the same guards over the same ledger writer. A second
+   * composition here would give the back office its own break-glass budget.
+   */
+  connections(): SsoConnectionService {
+    return this.compose().connections;
+  }
+
   build(): ReturnType<typeof SsoConnectionPipelineDefinitionAdapter.create> {
+    const { head, guards, connections } = this.compose();
+
+    return SsoConnectionPipelineDefinitionAdapter.create({
+      connectionProjectionStore: head,
+      connectionGuards: guards,
+      teardown: EventingSsoConnectionTeardownAdapter.create({
+        connections: () => connections,
+        directory: this.options.directory ?? UnrevokedSsoConnectionDirectory.create(),
+      }),
+    });
+  }
+
+  private compose(): SsoConnectionPipelineGraph {
+    if (this.composed) return this.composed;
     const { database, eventSourcing, operators } = this.options;
     const head = PrismaSsoConnectionProjectionRepository.create(database);
     const guards = SsoConnectionGuardsService.create({
@@ -109,13 +144,7 @@ export class PostgresSsoConnectionPipelineAdapter {
       }),
     );
 
-    return SsoConnectionPipelineDefinitionAdapter.create({
-      connectionProjectionStore: head,
-      connectionGuards: guards,
-      teardown: EventingSsoConnectionTeardownAdapter.create({
-        connections: () => connections,
-        directory: this.options.directory ?? UnrevokedSsoConnectionDirectory.create(),
-      }),
-    });
+    this.composed = { head, guards, connections };
+    return this.composed;
   }
 }

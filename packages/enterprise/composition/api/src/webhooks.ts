@@ -34,6 +34,7 @@ export {
   WebhookEnvelopeService,
   WebhookEventsAdapter,
   WebhookEventsService,
+  WebhookHealthService,
   WebhookIdPort,
   WebhookSecretPort,
   type WebhookDeliveryProcessDeps,

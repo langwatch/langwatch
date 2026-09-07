@@ -35,23 +35,38 @@ export abstract class ApiSeatAllowancePort {
 }
 
 /**
- * The Enterprise application the nineteen Enterprise namespaces read.
+ * The Enterprise application the nineteen Enterprise namespaces read, MEMBER BY MEMBER.
+ *
+ * Every member is separately optional, and that is the whole point of the shape. The
+ * members do not share a graph — the session-policy store is one Postgres repository, the
+ * webhook platform is the endpoint registry and its process store, the licence surfaces
+ * want a licence store nothing here implements — so a port that carried them as two
+ * objects made the deployment answer one question ("did you compose Enterprise?") for
+ * eight independent ones, and a process that could serve six of them served none.
+ *
+ * An absent member is not a lesser member: the consumer reads it by name and refuses by
+ * name when it is missing, so a customer is told which capability this deployment does not
+ * have rather than that Enterprise is off.
  */
 export abstract class ApiEnterpriseApplicationPort {
-  /** The `ctx.app` slices the four tenant surfaces read. */
-  abstract readonly application: Pick<
-    ApiTrpcFeatureApplication,
-    "licensing" | "scimApp" | "usageLimits"
-  >;
-  /**
-   * The `ctx.app` slices the fifteen governance and gateway-governance surfaces read.
-   */
-  abstract readonly governance: Pick<
-    ApiTrpcFeatureApplication,
-    "governance" | "governanceApp" | "sessionPolicy" | "webhooks"
-  >;
+  /** Reading and writing this instance's licence. */
+  abstract readonly licensing?: ApiTrpcFeatureApplication["licensing"] | undefined;
+  /** The directory-sync application a SCIM token is listed and minted through. */
+  abstract readonly scimApp?: ApiTrpcFeatureApplication["scimApp"] | undefined;
+  /** Where a resource-limit notification is reported. */
+  abstract readonly usageLimits?: ApiTrpcFeatureApplication["usageLimits"] | undefined;
+  /** The governance capability the console's ten surfaces read. */
+  abstract readonly governance?: ApiTrpcFeatureApplication["governance"] | undefined;
+  /** The personal virtual keys and routing policies beside the capability. */
+  abstract readonly governanceApp?: ApiTrpcFeatureApplication["governanceApp"] | undefined;
+  /** The rules an organization bounds its members' sessions by. */
+  abstract readonly sessionPolicy?: ApiTrpcFeatureApplication["sessionPolicy"] | undefined;
+  /** Where a spend event is delivered, as the endpoint surface registers and lists them. */
+  abstract readonly webhooks?: ApiTrpcFeatureApplication["webhooks"] | undefined;
   /** The back office's single sign-on connection ledger. */
-  abstract backoffice(): ReturnType<EnterpriseTrpcMountPorts["ssoConnections"]["backoffice"]>;
+  abstract readonly backoffice?:
+    | (() => ReturnType<EnterpriseTrpcMountPorts["ssoConnections"]["backoffice"]>)
+    | undefined;
 }
 
 import type { ComposedEnterpriseFeature } from "./enterprise.composition.types.ts";
@@ -67,7 +82,7 @@ export function composeEnterpriseFeature(options: {
 }): ComposedEnterpriseFeature {
   const logger = createLogger("langwatch:api:enterprise");
   const application = enterpriseApplication(options.enterprise, options.seats, logger);
-  const ports = enterprisePorts(options, logger);
+  const ports = composeEnterpriseMountPorts(options, logger);
 
   return {
     application,
@@ -111,13 +126,17 @@ export function refusingEnterpriseFeature(): ComposedEnterpriseFeature {
 
 /**
  * The two Enterprise ports, and the refusal that stands in for one of them.
+ *
+ * Exported because the refusal is the part worth pinning: the back office reads a MEMBER of
+ * the application, so a deployment that composed seven of the eight must still refuse this
+ * one by name rather than reach into a half-built object.
  */
-function enterprisePorts(
+export function composeEnterpriseMountPorts(
   options: Readonly<{
     audit: ApiAuditPort | undefined;
     enterprise?: ApiEnterpriseApplicationPort | undefined;
   }>,
-  logger: Logger,
+  logger: Pick<Logger, "debug">,
 ): EnterpriseTrpcMountPorts {
   return {
     scimToken: {
@@ -131,11 +150,14 @@ function enterprisePorts(
     },
     ssoConnections: {
       backoffice: () => {
-        const enterprise = options.enterprise;
-        if (!enterprise) {
+        // The MEMBER, not the application: a deployment that composed a
+        // session-policy store and no connection ledger still refuses here by
+        // name rather than answering off a half-built object.
+        const backoffice = options.enterprise?.backoffice;
+        if (!backoffice) {
           return unavailableSsoBackoffice();
         }
-        return enterprise.backoffice();
+        return backoffice();
       },
       recordAudit: async (entry) => {
         await options.audit?.record({
@@ -176,23 +198,44 @@ function enterpriseApplication(
   seats: ApiSeatAllowancePort | undefined,
   logger: Logger,
 ): Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits"> {
-  if (enterprise) return enterprise.application;
+  const licensing = enterprise?.licensing;
+  const scimApp = enterprise?.scimApp;
+  const usageLimits = enterprise?.usageLimits;
 
-  logger.info(
-    { seatAllowances: Boolean(seats) },
-    "API composed no Enterprise application: the licence, SCIM-token and single sign-on surfaces mount and refuse by name",
-  );
+  // One line per absent member, at boot. A deployment reads which capability it
+  // does not have rather than inferring three from one sentence about Enterprise.
+  if (!licensing) {
+    logger.info(
+      { member: "licensing", seatAllowances: Boolean(seats) },
+      "API composed no Enterprise licence store: reading and writing this instance's licence refuses by name, and the seat allowances answer from this process's own plan provider",
+    );
+  }
+  if (!scimApp) {
+    logger.info(
+      { member: "scimApp" },
+      "API composed no Enterprise SCIM application: listing and minting a directory-sync token refuse by name",
+    );
+  }
+  if (!usageLimits) {
+    logger.info(
+      { member: "usageLimits" },
+      "API composed no Enterprise usage-limit store: a resource-limit notification is not reported",
+    );
+  }
 
   return {
-    licensing: (seats
-      ? unlicensedLicensing(seats, logger)
-      : refusingApplicationSlice(
-          "Enterprise licence store, so it cannot read or write an instance licence",
-        )) as ApiTrpcFeatureApplication["licensing"],
-    scimApp: refusingApplicationSlice(
-      "Enterprise SCIM application, so it can neither list nor mint a token",
-    ),
-    usageLimits: unreportableUsageLimits(),
+    licensing: (licensing ??
+      (seats
+        ? unlicensedLicensing(seats, logger)
+        : refusingApplicationSlice(
+            "Enterprise licence store, so it cannot read or write an instance licence",
+          ))) as ApiTrpcFeatureApplication["licensing"],
+    scimApp:
+      scimApp ??
+      refusingApplicationSlice(
+        "Enterprise SCIM application, so it can neither list nor mint a token",
+      ),
+    usageLimits: usageLimits ?? unreportableUsageLimits(),
   } as Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits">;
 }
 

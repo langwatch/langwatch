@@ -361,15 +361,15 @@ function organizationPorts(
     asResourceLimitExceeded: () => null,
     isOrganizationNotFound: (error) => error instanceof OrganizationNotFoundError,
     notifyResourceLimitReached: async (_ctx, input) => {
-      const enterprise = peers.enterprise;
-      if (!enterprise) {
+      const usageLimits = peers.enterprise?.usageLimits;
+      if (!usageLimits) {
         logger.debug(
           { organizationId: input.organizationId, limitType: input.limitType },
-          "no Enterprise application is composed: the resource-limit notification for this organization is not sent",
+          "no Enterprise usage-limit store is composed: the resource-limit notification for this organization is not sent",
         );
         return;
       }
-      await enterprise.application.usageLimits.notifyResourceLimitReached(input as never);
+      await usageLimits.notifyResourceLimitReached(input as never);
     },
     isTeamRoleAllowedForOrganizationRole: ({ organizationRole, teamRole }) =>
       isTeamRoleAllowedForOrganizationRole({

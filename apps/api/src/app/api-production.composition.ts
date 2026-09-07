@@ -430,6 +430,12 @@ import {
   composeApiEnterpriseAudit,
   LoggedApiEnterpriseAuditAbsence,
 } from "./api-enterprise-audit.composition.ts";
+import type { PlatformOperatorPort } from "@langwatch/identity-server";
+import { RedisNlpLambdaArnCacheAdapter } from "@langwatch/workflow-server";
+import {
+  composeApiEnterpriseApplication,
+  LoggedApiEnterpriseApplicationAbsence,
+} from "./api-enterprise-application.composition.ts";
 import type { AuthCliDeviceFlowRestPorts, AuthRestPorts } from "@langwatch/auth-server";
 import type {
   GovernanceCliRestPorts,
@@ -632,6 +638,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The audit trail this process records on, composed once and held.
    */
   private composedAudit: ApiAuditPort | undefined;
+  /**
+   * The Enterprise application members this process composed over its own graph, or none.
+   * An injected application wins — see {@link resolveEnterprise}.
+   */
+  private composedEnterpriseApplication: ApiEnterpriseApplicationPort | undefined;
+  private composedPlatformOperators: PlatformOperatorPort | undefined;
   private composedFeaturePorts: ApiOwnedRestFeaturePorts | undefined;
   private composedDatabase: ApiDatabaseInfrastructure | undefined;
   private composedEventing: ApiEventingInfrastructure | undefined;
@@ -1311,7 +1323,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           scenarios: this.composedScenario.scenarios,
           storedObjectApp: this.composedStoredObject.app,
           suites: this.composedScenario.suites,
-          ...composeEnterpriseGovernanceApplication(this.options.enterprise),
+          ...composeEnterpriseGovernanceApplication(this.resolveEnterprise()),
         },
       },
       report: LoggedApiTrpcFeaturesAbsence.create(createLogger(options.config.serviceName)),
@@ -2121,7 +2133,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The two Enterprise governance slices the REST families are handed —
       // the SAME ones `ctx.app` carries, so the two doors cannot answer
       // differently.
-      enterpriseGovernance: composeEnterpriseGovernanceApplication(this.options.enterprise),
+      enterpriseGovernance: composeEnterpriseGovernanceApplication(this.resolveEnterprise()),
       presence: this.composedPresence,
       organization: this.composedOrganization,
       automation: this.composedAutomation,
@@ -2777,7 +2789,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   ): GovernanceCliRestPorts | undefined {
     const sessions = deviceFlow?.sessions;
     return composeApiGovernanceCliRest({
-      governance: this.options.enterprise?.governance.governance,
+      governance: this.resolveEnterprise()?.governance,
       accessTokens: sessions
         ? {
             resolve: (authHeader) => sessions.tryResolveAccessToken(authHeader),
@@ -2806,7 +2818,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       grants: this.composedAuthz?.grants,
       users: session?.users,
       auth: session?.auth,
-      governance: this.options.enterprise?.governance.governance,
+      governance: this.resolveEnterprise()?.governance,
       plans: this.composedPlanProvider,
       eventing: this.composedIdentityEventing,
       provenOffboarding: this.composedScimEnvironment.provenOffboarding,
@@ -2822,7 +2834,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     traceCollection: GovernanceIngestTraceCollectionPort | undefined,
   ): GovernanceIngestRestPorts | undefined {
     return composeApiGovernanceIngestRest({
-      governance: this.options.enterprise?.governance.governance,
+      governance: this.resolveEnterprise()?.governance,
       projects: this.composedTenancy?.projects,
       traceCollection,
       prisma: this.composedDatabase?.connection.client,
@@ -2877,6 +2889,27 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         report: LoggedApiEnterpriseAuditAbsence.create(createLogger("langwatch:api:audit")),
       });
     return this.composedAudit;
+  }
+
+  /**
+   * The Enterprise application, member by member: the one a host supplied, else the members
+   * this process composed for itself. Never a merge of the two — a host that states the slot
+   * states all of it, and a partial injection silently backed by our own graph would leave
+   * nobody able to say which member answered.
+   */
+  private resolveEnterprise(): ApiEnterpriseApplicationPort | undefined {
+    return this.options.enterprise ?? this.composedEnterpriseApplication;
+  }
+
+  /** Who this deployment counts as a platform operator, by address, composed once. */
+  private platformOperators(options: ApiRuntimeCompositionOptions): PlatformOperatorPort {
+    this.composedPlatformOperators ??= (() => {
+      const access = AdminAccessService.create({
+        adminEmails: this.personDeployment(options).adminEmails ?? "",
+      });
+      return { isPlatformOperatorEmail: ({ email }) => access.isAdmin({ email }) };
+    })();
+    return this.composedPlatformOperators;
   }
 
   /**
@@ -3372,6 +3405,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         payloadStaging: DeferredPayloadStagingAdapter.create(
           () => this.composedStoredObject.payloadStaging,
         ),
+        nlpLambdaFleet: options.config.nlpLambdaFleet,
+        nlpLambdaFleetNamed: options.config.nlpLambdaFleetNamed,
+        // The process's own queue Redis, so a resolved function ARN is cached
+        // across this process's restarts rather than per instance.
+        arnCache: this.composedQueueRedis
+          ? RedisNlpLambdaArnCacheAdapter.create(this.composedQueueRedis)
+          : undefined,
       })
     );
   }
@@ -3457,6 +3497,27 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       return;
     }
 
+    // The Enterprise application members this process can serve, composed once and read by
+    // every surface below through `resolveEnterprise()`. Three of the eight; the other five
+    // stay absent and say so at boot.
+    this.composedEnterpriseApplication = composeApiEnterpriseApplication({
+      prisma: database.client,
+      encryption,
+      // The SAME ClickHouse the spend ledger is projected into, so the emitted webhook
+      // envelopes and the rows they were rendered from stay one connection.
+      resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+      plans: this.resolvePlanProvider(options),
+      eventSourcing: this.composedEventing?.eventSourcing,
+      // The SAME `ADMIN_EMAILS` list the back office is gated on, deliberately not `ops:*` —
+      // if that permission ever widens, who may attest a customer's domain must not widen
+      // with it.
+      operators: this.platformOperators(options),
+      report: LoggedApiEnterpriseApplicationAbsence.create(
+        createLogger("langwatch:api:enterprise-application"),
+      ),
+    });
+    const enterprise = this.resolveEnterprise();
+
     // Injected wins; otherwise the service this process composed over its own
     // graph. Resolved here rather than left to the organization feature's own
     // fold because the management REST family administers the same
@@ -3498,7 +3559,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       peers: {
         encryption,
         ...(invites ? { invites } : {}),
-        ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
+        ...(enterprise ? { enterprise } : {}),
         ...(membership?.eventing
           ? { membership: { ...membership, eventing: membership.eventing } }
           : {}),
@@ -3571,7 +3632,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     );
     this.composedEnterprise = composeEnterpriseFeature({
       audit: this.resolveAudit(),
-      ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
+      ...(enterprise ? { enterprise } : {}),
       // The seat allowances `/settings/members` asks about on every open. Answered whether or
       // not this deployment composed an Enterprise application, over the SAME plan provider and
       // membership counts the organization half spends a seat against: a member refused there
