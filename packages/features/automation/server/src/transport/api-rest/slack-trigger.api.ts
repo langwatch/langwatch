@@ -23,7 +23,7 @@ import {
   type MountableRestApp,
   resolver,
 } from "@langwatch/api/rest";
-import { isZodLikeError } from "@langwatch/handled-error";
+import { HandledError, isZodLikeError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context, ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -124,6 +124,13 @@ export function createSlackTriggerRestApp(options: {
  * trigger. The caller has no branch to take on which application failure it
  * was, so it stays one 500 sentence and the structured detail goes to this
  * process's log with a trace id.
+ *
+ * A rejected body reaches here as the request pipeline's own refusal —
+ * `malformed_request` for something that is not JSON, `validation_error` for
+ * something the schema refused — rather than as the bare zod error the
+ * retired door raised. Both are the CALLER's mistake and both belong in the
+ * 400 this route documents; read as "everything else" they became a 500 that
+ * told the caller to retry a body that will never be accepted.
  */
 const slackTriggerErrorHandler =
   (_boundary: ErrorHandler): ErrorHandler =>
@@ -131,9 +138,25 @@ const slackTriggerErrorHandler =
     if (error instanceof HTTPException && error.status === 400) {
       return c.json({ message: "Bad request" }, 400);
     }
+    if (HandledError.isHandled(error) && error.code === "malformed_request") {
+      return c.json({ message: "Bad request" }, 400);
+    }
+    if (HandledError.isHandled(error) && error.code === "validation_error") {
+      return c.json({ message: "Invalid request data", errors: fieldFailuresOf(error) }, 400);
+    }
     if (isZodLikeError(error)) {
       return c.json({ message: "Invalid request data", errors: error.issues }, 400);
     }
     logger.error({ error }, "Error creating trigger");
     return c.json({ message: "Error creating trigger" }, 500);
   };
+
+/**
+ * The offending fields a `validation_error` carries, one entry each, in the
+ * `errors` array this route has always published them in.
+ */
+function fieldFailuresOf(error: { reasons: readonly Error[] }): Record<string, unknown>[] {
+  return error.reasons.flatMap((reason) =>
+    HandledError.isHandled(reason) ? [{ ...reason.meta, message: reason.message }] : [],
+  );
+}

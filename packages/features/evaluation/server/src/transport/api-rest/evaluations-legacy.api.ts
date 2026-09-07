@@ -22,7 +22,6 @@ import {
   coerceEvaluatorScalar,
   type CustomEvaluatorDefinition,
   type EvaluationResult,
-  evaluatorDisplayName,
   EvaluatorInvalidConfigError,
   type EvaluatorDefinition,
   EvaluatorNotFoundError,
@@ -50,9 +49,9 @@ import { getInputsOutputs, type StudioEdge, type StudioNode } from "@langwatch/w
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { nanoid } from "nanoid";
 import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { fromZodError } from "zod-validation-error";
 
+import { buildEvaluatorCatalogue } from "../../rules/evaluator-catalogue.rules.ts";
 import {
   acknowledgementSchema,
   datasetEvaluateRequestSchema,
@@ -307,34 +306,10 @@ export function createEvaluationsLegacyRestApp(options: {
 
   // ---------- GET /api/evaluations/list ----------
   /**
-   * The catalogue, built once. `zodToJsonSchema` over ~40 settings schemas is not free, and the
-   * answer is the same for every caller on every request: the evaluator list is compiled in.
+   * The catalogue, built once. Deriving JSON Schema over ~40 settings schemas is not free, and
+   * the answer is the same for every caller on every request: the evaluator list is compiled in.
    */
   let evaluatorCatalogue: Record<string, unknown> | undefined;
-
-  const buildEvaluatorCatalogue = (): Record<string, unknown> =>
-    Object.fromEntries(
-      Object.entries(AVAILABLE_EVALUATORS)
-        .filter(
-          ([key]) =>
-            !key.startsWith("example/") &&
-            key !== "aws/comprehend_pii_detection" &&
-            key !== "google_cloud/dlp_pii_detection",
-        )
-        .map(([key, value]) => [
-          key,
-          {
-            ...value,
-            name: evaluatorDisplayName(value.name),
-            settings_json_schema: zodToJsonSchema(
-              // @ts-expect-error `key` indexes the union of every evaluator
-              // type, so `.shape.settings` resolves to a heterogeneous union
-              // that zodToJsonSchema accepts at runtime but TS can't narrow.
-              evaluatorsSchema.shape[key].shape.settings,
-            ),
-          },
-        ]),
-    );
 
   service.registerRoute(
     "get",

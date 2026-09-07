@@ -205,16 +205,20 @@ describe("given a self-hosted deployment with the instance credential configured
     });
   });
 
-  describe("when the family is addressed without its version segment", () => {
-    it("answers the bare alias identically to the dated path", async () => {
+  describe("when the family is addressed at each of the paths it answers on", () => {
+    /** @scenario "The roster reads the same at every path the family answers on" */
+    it("answers the bare and the versioned alias identically to the dated path", async () => {
       const { api } = mountProvisioning();
       await api.post("/api/v1/organizations", { name: "Alias", slug: "alias" }, instanceHeaders);
 
       const dated = await api.get("/api/v1/organizations", instanceHeaders);
-      const bare = await api.get("/api/organizations", instanceHeaders);
+      const expected = await dated.json();
 
-      expect(bare.status).toBe(dated.status);
-      await expect(bare.json()).resolves.toEqual(await dated.json());
+      for (const path of ["/api/organizations", "/api/v1/organizations"]) {
+        const answer = await api.get(path, instanceHeaders);
+        expect(answer.status).toBe(dated.status);
+        await expect(answer.json()).resolves.toEqual(expected);
+      }
     });
   });
 });
