@@ -90,6 +90,11 @@ async function postGreeting(baseUrl, apiKey, idempotencyKey) {
   });
 }
 
+// Playwright's default per-test timeout is 30s, shorter than the wait. The
+// test must outlive the server-side wait plus transport, or a slow cold start
+// fails as a test timeout instead of a named reason.
+test.setTimeout((WAIT_SECONDS + 20) * 1000);
+
 test("Langy answers a greeting", async () => {
   const baseUrl = required("LANGY_BASE_URL").replace(/\/+$/, "");
   const apiKey = required("LANGY_API_KEY");

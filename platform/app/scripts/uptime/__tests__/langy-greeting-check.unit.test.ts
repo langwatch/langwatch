@@ -325,6 +325,8 @@ describe("the Better Stack script", () => {
       );
       expect(script).toContain('"X-Auth-Token": apiKey');
       expect(script).toContain("randomUUID()");
+      // Playwright defaults to a 30s test timeout; the script must raise it past the wait.
+      expect(script).toContain("test.setTimeout((WAIT_SECONDS + 20) * 1000);");
       expect(script).toContain('import { randomUUID } from "node:crypto";');
       for (const reason of GREETING_FAILURE_REASONS) {
         expect(script, `script must name reason ${reason}`).toContain(

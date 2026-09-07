@@ -146,6 +146,7 @@ Feature: An uptime monitor that proves Langy answers a greeting
     Then it sends the same greeting text and the same wait as the module
     And it names every failure reason the module can produce
     And it mints its idempotency key with a random UUID per run
+    And it raises the Playwright test timeout past the wait, so a slow turn fails with a named reason rather than a test timeout
 
   # ---------------------------------------------------------------------------
   # Provisioning the monitor idempotently
