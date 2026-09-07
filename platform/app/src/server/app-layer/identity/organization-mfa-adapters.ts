@@ -22,7 +22,9 @@ const logger = createLogger("langwatch:identity:organization-mfa");
  * which the impersonation guard already reads, so there is exactly one answer
  * to "has this person got one" across the product.
  */
-export class PrismaOrganizationMfaSettings implements OrganizationMfaSettingPort {
+export class PrismaOrganizationMfaSettings
+  implements OrganizationMfaSettingPort
+{
   constructor(private readonly prisma: PrismaClient) {}
 
   async read({ organizationId }: { organizationId: string }): Promise<{
@@ -59,7 +61,9 @@ export class PrismaOrganizationMfaSettings implements OrganizationMfaSettingPort
 }
 
 /** Who holds a seat, and what their account carries. */
-export class PrismaOrganizationMemberFactors implements OrganizationMemberFactorPort {
+export class PrismaOrganizationMemberFactors
+  implements OrganizationMemberFactorPort
+{
   constructor(private readonly prisma: PrismaClient) {}
 
   async membersOf({ organizationId }: { organizationId: string }): Promise<
@@ -154,7 +158,9 @@ export class PrismaOrganizationMemberFactors implements OrganizationMemberFactor
  * different answer from `[]` — a connection asserting nothing is a thing the
  * administrator has to be told about, and no connection is not.
  */
-export class PrismaOrganizationConnectionFactors implements OrganizationConnectionFactorPort {
+export class PrismaOrganizationConnectionFactors
+  implements OrganizationConnectionFactorPort
+{
   constructor(private readonly prisma: PrismaClient) {}
 
   async assertedFactorsFor({
