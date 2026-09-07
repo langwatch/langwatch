@@ -90,7 +90,6 @@ import {
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
-  recordDroppedJob,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
@@ -99,6 +98,7 @@ import {
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
   gqRetryEncodeFailuresTotal,
+  recordDroppedJob,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
 import {
@@ -300,9 +300,9 @@ const dropReasonOf = (err: unknown): DecodeFailureReason | "unknown" =>
  * - Weighted round-robin (sqrt(pendingCount)) provides fair scheduling across groups
  * - fastq provides concurrency-limited async task execution with backpressure
  */
-export class GroupQueueProcessor<
-  Payload extends Record<string, unknown>,
-> implements EventSourcedQueueProcessor<Payload> {
+export class GroupQueueProcessor<Payload extends Record<string, unknown>>
+  implements EventSourcedQueueProcessor<Payload>
+{
   private readonly logger = createLogger(
     "langwatch:event-sourcing:group-queue",
   );
@@ -390,7 +390,8 @@ export class GroupQueueProcessor<
    * a restarted pod must never inherit the identity of the one it replaced, or
    * its predecessor's death would resolve to "that's me, still running".
    */
-  private readonly workerId = `${hostname()}-${pid}-${randomUUID().slice(0, 8)}`;
+  private readonly workerId =
+    `${hostname()}-${pid}-${randomUUID().slice(0, 8)}`;
 
   /** Beacon refresh timer; stopped before the retirement write in {@link close}. */
   private livenessTimer: ReturnType<typeof setInterval> | undefined;

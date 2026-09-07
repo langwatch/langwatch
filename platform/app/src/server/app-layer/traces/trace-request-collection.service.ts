@@ -18,9 +18,9 @@ import {
   spanSchema,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import { SpanIngestionTally } from "./span-ingestion-tally";
 import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
 import type { SpanDedupService } from "./span-dedupe.service";
+import { SpanIngestionTally } from "./span-ingestion-tally";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 /**
