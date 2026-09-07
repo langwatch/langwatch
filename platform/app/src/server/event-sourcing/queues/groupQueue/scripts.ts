@@ -9,6 +9,7 @@ import {
 } from "./blobConstants";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 import { CachedLuaScript } from "./cachedLuaScript";
+import { resolveDispatchAllowListRedisKey } from "./dispatch-scope";
 import { gqJobsDispatchedOverrideTotal } from "./metrics";
 
 // Lua scripts inlined as string constants.
@@ -931,6 +932,7 @@ local staticCap      = tonumber(ARGV[5]) or 0
 -- hard ceiling = pods x concurrency; the water-fill divides the WHOLE capacity.
 -- 0 = dynamic disabled, dispatch uses the static cap unchanged (back-compat).
 local globalBudget   = tonumber(ARGV[6]) or 0
+local restrictedDispatch = ARGV[7] == "1"
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local activeUntil = nowMs + activeTtlSec * 1000
@@ -990,7 +992,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
 
   while scanned < scanBudget and dispatched < maxJobs do
     local groups
-    if allowedGroupsKey == "" then
+    if not restrictedDispatch then
       groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
     else
       groups = redis.call("ZRANGE", allowedGroupsKey, offset, offset + pageSize - 1)
@@ -1011,9 +1013,19 @@ local function scanBatch(effCap, bypassPark, dispatched)
     for _, groupId in ipairs(groups) do
       if dispatched >= maxJobs then break end
 
+      -- A preflight's complete target set is registered before its root command.
+      -- Keep every target in the candidate index until the preflight key expires:
+      -- an older worker may enqueue a downstream job without knowing how to add
+      -- it back. Moving examined targets to the tail gives pending targets a
+      -- bounded path through a set that also contains not-yet-enqueued groups.
+      if restrictedDispatch then
+        redis.call("ZADD", allowedGroupsKey, nowMs, groupId)
+        removedAllowed = removedAllowed + 1
+      end
+
       local readyScore = nil
       local groupDue = true
-      if allowedGroupsKey ~= "" then
+      if restrictedDispatch then
         readyScore = redis.call("ZSCORE", readyKey, groupId)
         groupDue = readyScore and tonumber(readyScore) <= nowMs
       end
@@ -1142,19 +1154,13 @@ local function scanBatch(effCap, bypassPark, dispatched)
       end
       end
       end
-      elseif allowedGroupsKey ~= "" and not readyScore then
-        local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
-        local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-        if redis.call("EXISTS", activeKey) == 0 and redis.call("ZCARD", jobsKey) == 0 then
-          removedAllowed = removedAllowed + redis.call("ZREM", allowedGroupsKey, groupId)
-        end
       end
     end
 
     if #groups < pageSize then break end
     -- Advance only past the entries that stayed in the due window; the removed
     -- ones shifted everything after them left by exactly that many positions.
-    if allowedGroupsKey == "" then
+    if not restrictedDispatch then
       offset = offset + #groups - removed
     else
       offset = offset + #groups - removedAllowed
@@ -1983,6 +1989,29 @@ const stageScript = new CachedLuaScript(STAGE_LUA);
 const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
 const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
 
+const REGISTER_PREFLIGHT_TARGETS_LUA = `
+local targetKey = KEYS[1]
+local candidatesKey = KEYS[2]
+local signalKey = KEYS[3]
+local ttlSec = tonumber(ARGV[1])
+for index = 2, #ARGV do
+  local groupId = ARGV[index]
+  redis.call("SADD", targetKey, groupId)
+  -- Registration puts a target ahead of the dispatch loop's wall-clock
+  -- rotation scores. This also re-activates a target when an older worker
+  -- stages it without knowing the preflight protocol.
+  redis.call("ZADD", candidatesKey, index - 1, groupId)
+end
+redis.call("EXPIRE", targetKey, ttlSec)
+redis.call("EXPIRE", candidatesKey, ttlSec)
+redis.call("LPUSH", signalKey, "1")
+redis.call("LTRIM", signalKey, 0, 999)
+return #ARGV - 1
+`;
+const registerPreflightTargetsScript = new CachedLuaScript(
+  REGISTER_PREFLIGHT_TARGETS_LUA,
+);
+
 const INSPECT_PREFLIGHT_TARGETS_LUA = `
 local targetKey = KEYS[1]
 local blockedKey = KEYS[2]
@@ -2252,13 +2281,17 @@ export class GroupStagingScripts {
       blockedKey,
       pausedJobKey,
       totalPendingKey,
-      allowedGroupsKey ?? "",
+      resolveDispatchAllowListRedisKey({
+        keyPrefix: this.keyPrefix,
+        allowedGroupsKey,
+      }),
       this.keyPrefix,
       String(nowMs),
       String(activeTtlSec),
       String(maxJobs),
       String(tenantCap),
       String(readGlobalBudget()),
+      allowedGroupsKey ? "1" : "",
     );
 
     // The script returns [flatResults, overrideDispatched]. The count rides
@@ -2802,6 +2835,25 @@ export class GroupStagingScripts {
       blocked: Number(result[3] ?? 0),
       groups: Number(result[4] ?? 0),
     };
+  }
+
+  async registerPreflightTargets({
+    targetKey,
+    groupIds,
+  }: {
+    targetKey: string;
+    groupIds: readonly string[];
+  }): Promise<void> {
+    if (groupIds.length === 0) return;
+    await registerPreflightTargetsScript.run(
+      this.redis,
+      3,
+      targetKey,
+      `${targetKey}:candidates`,
+      this.getSignalKey(),
+      "3600",
+      ...groupIds,
+    );
   }
 
   /**
