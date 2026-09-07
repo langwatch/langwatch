@@ -26,6 +26,10 @@ const VERBATIM_LINES = {
     "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is {title}, because {reason}.",
   "the pull request line":
     "I opened a pull request with the tracing change: {link}. You can merge it already.",
+  "the no-remote line":
+    "No pull request was opened, since the folder has no remote or gh is not signed in: branch {branch} holds the commit.",
+  "the branch line":
+    "I left branch {branch} checked out: the agent you started runs on it.",
   "the chat-about-this line":
     "Of course. Tell me what the scenario should cover and I'll write it with you.",
   "the why-a-scenario line":
@@ -134,13 +138,14 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The step 2 lines are said before the card, and the answer is the go" */
     it("says the step 2 lines with the say tool right before the question call and goes straight to the checklist after the answer", () => {
       const lines = rendered.indexOf(
-        "These three lines of step 2, the framework line, the pull request line and the branch line, are said with the `say` tool, one call each, in that order, right before the question of step 3 is called: never after the answer, and never in the reply text.",
+        "These three lines of step 2, the framework line, the pull request line or the no-remote line, and the branch line, are said with the `say` tool, one call each, in that order, in this same step, right after the pull request command answered and right before the question of step 3: never after the answer, and never in the reply text.",
       );
       const ask = rendered.indexOf("With the three step 2 lines said, ask with the `question` tool");
       const go = rendered.indexOf(
         'The answer to the question is the go. On the create option, or on the scenario agreed after "Chat about this", the next thing you do is this list, then the first command: no sentence between the answer and them, and nothing from step 2 said again; a reply that only speaks after the answer ends the turn with the path open. So, before any command, write this list into `todowrite`',
       );
-      const list = rendered.indexOf("write this list into `todowrite`");
+      // Step 4's own list: step 2 has one of its own, earlier in the skill.
+      const list = rendered.indexOf("write this list into `todowrite`", go);
       expect(lines).toBeGreaterThan(-1);
       expect(ask).toBeGreaterThan(lines);
       expect(go).toBeGreaterThan(ask);
@@ -434,7 +439,7 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain("never the env file and never `git add -A`");
       expect(rendered).toContain("with this message and no trailer");
       expect(rendered).toContain(
-        "keep that branch checked out: the agent you started runs on it, and the branch line is one line saying so",
+        "keep that branch checked out: the agent you started runs on it, and the branch line says so, verbatim, with the same brace:",
       );
     });
 
@@ -448,7 +453,7 @@ describe("the guided-onboarding skill", () => {
       );
       const sentence = rendered.indexOf(VERBATIM_LINES["the pull request line"]);
       const noRemote = rendered.indexOf(
-        "No remote, or no `gh` login: one line saying that branch `langy/<slug>` holds the commit and no pull request was opened takes the pull request line's place, and the step is done.",
+        "No remote, or no `gh` login: no pull request was opened, so this line takes the pull request line's place, verbatim, with the brace filled with the branch name, and the step is done:",
       );
       const proposal = rendered.indexOf("### 3. Propose the first scenario, and stop");
       expect(commit).toBeGreaterThan(-1);
@@ -457,6 +462,61 @@ describe("the guided-onboarding skill", () => {
       expect(noRemote).toBeGreaterThan(sentence);
       expect(proposal).toBeGreaterThan(noRemote);
       expect(rendered).toContain("The proposal of step 3 comes right after them, in the same turn.");
+    });
+
+    /** @scenario "Step 2 is a checklist Langy keeps" */
+    it("writes step 2 into the plan tool as a fixed checklist before the first edit, and asks the proposal only when every item is done", () => {
+      const items = [
+        "1. Read the code and name the framework",
+        "2. The langy branch checked out",
+        "3. The tracing edit",
+        "4. The connect adapter",
+        "5. Credentials written and checked",
+        "6. The agent started in the background",
+        "7. The agent online, through agent list --wait-online",
+        "8. The commit",
+        "9. The push and the pull request, or the no-remote line",
+        "10. The three step 2 lines said",
+      ];
+      const positions = items.map((item) => rendered.indexOf(item));
+      for (const [index, position] of positions.entries()) {
+        expect(position, items[index]).toBeGreaterThan(index === 0 ? -1 : positions[index - 1]!);
+      }
+      const list = rendered.indexOf(
+        "Before the branch and the first edit, write this list into `todowrite`, in this order and these words, every item pending",
+      );
+      const branch = rendered.indexOf("`git checkout -b langy/<slug> origin/<default>`");
+      expect(list).toBeGreaterThan(-1);
+      expect(positions[0]).toBeGreaterThan(list);
+      expect(branch).toBeGreaterThan(positions[9]!);
+      expect(rendered).toContain(
+        "The bare question of step 3 is asked only when every item of this list is done, never with one open: an item skipped is a step skipped, whatever the lines say.",
+      );
+    });
+
+    /** @scenario "The step 2 lines name only what the commands made" */
+    it("fills the step 2 lines from what the commands printed, and never from a fallback", () => {
+      expect(rendered).toContain(
+        "Then run `git branch --show-current`: its output is the name the lines below carry.",
+      );
+      expect(rendered).toContain(
+        "with the brace filled with the address `gh pr create` printed, and said only when it printed one:",
+      );
+      expect(rendered).toContain(
+        "never fill a brace with a fallback sentence, and never name a branch, a commit or a pull request that a command did not make; a line about a thing that did not happen is a false claim about the user's repository",
+      );
+      expect(rendered).toContain(
+        "in this same step, right after the pull request command answered and right before the question of step 3",
+      );
+      const pullRequest = rendered.indexOf(VERBATIM_LINES["the pull request line"]);
+      const noRemote = rendered.indexOf(VERBATIM_LINES["the no-remote line"]);
+      const branchLine = rendered.indexOf(VERBATIM_LINES["the branch line"]);
+      expect(pullRequest).toBeGreaterThan(-1);
+      expect(noRemote).toBeGreaterThan(pullRequest);
+      expect(branchLine).toBeGreaterThan(noRemote);
+      // One brace each, and only the one the commands fill.
+      expect(VERBATIM_LINES["the no-remote line"].match(/\{[a-z]+\}/g)).toEqual(["{branch}"]);
+      expect(VERBATIM_LINES["the branch line"].match(/\{[a-z]+\}/g)).toEqual(["{branch}"]);
     });
 
     /** @scenario "The closing line waits for the suite run" */
@@ -553,7 +613,7 @@ describe("the guided-onboarding skill", () => {
         "A missing remote, a missing `gh` login and a failed verdict are not errors: the step is done with its line, and the next one starts.",
       );
       expect(rendered).toContain(
-        "No remote, or no `gh` login: one line saying that branch `langy/<slug>` holds the commit and no pull request was opened takes the pull request line's place, and the step is done.",
+        "No remote, or no `gh` login: no pull request was opened, so this line takes the pull request line's place, verbatim, with the brace filled with the branch name, and the step is done:",
       );
       const noRemote = rendered.indexOf("No remote, or no `gh` login:");
       const closing = rendered.indexOf(VERBATIM_LINES["the closing line"]);

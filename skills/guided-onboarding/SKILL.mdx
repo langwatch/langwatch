@@ -72,6 +72,21 @@ and call `code_access` again, this time without `offer_describe`. Keep their des
 
 With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language, then keep one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That is the framework line: it is said with `say` right before the question of step 3, with the two lines of item 7. The file it names is one you read with `local_read` in this step, and the framework is what that file imports: a docs page is never a source for the line, and a framework no file of theirs shows was not found.
 
+Before the branch and the first edit, write this list into `todowrite`, in this order and these words, every item pending:
+
+1. Read the code and name the framework
+2. The langy branch checked out
+3. The tracing edit
+4. The connect adapter
+5. Credentials written and checked
+6. The agent started in the background
+7. The agent online, through agent list --wait-online
+8. The commit
+9. The push and the pull request, or the no-remote line
+10. The three step 2 lines said
+
+Mark each item done as you finish it, and read the list before you end a turn: **a turn never ends with an open item**, unless a command answered an error (see "When a step fails"). The bare question of step 3 is asked only when every item of this list is done, never with one open: an item skipped is a step skipped, whatever the lines say.
+
 Work on a branch of your own, never on the branch the user has checked out: `git checkout -b langy/<slug> origin/<default>` (a worktree when the tree is dirty), as step 2 of `code-changes` says. On that branch, load the `tracing` and `connect-agent` skills with the `skill` tool, then, in this order:
 
 1. `tracing` for the detected framework. Read one docs page, `langwatch docs integration/<python|typescript>/integrations/<framework>` (for example `integration/python/integrations/langgraph`), and no other. Keep the order the tracing skill pins: the environment loads first and LangWatch initialises after it, so `langwatch.setup()` sits below the import that loads the env file, never at the top of the entry file.
@@ -91,11 +106,19 @@ Work on a branch of your own, never on the branch the user has checked out: `git
 git add <the files you changed> && git commit -m "Add LangWatch tracing and the connect endpoint"
 ```
 
-7. Push the branch and open the pull request, as steps 5 and 6 of `code-changes` say, with the title `Add LangWatch tracing and the connect endpoint`. The pull request line is this, verbatim, with the braces filled with the address `gh pr create` printed:
+7. Push the branch and open the pull request, as steps 5 and 6 of `code-changes` say, with the title `Add LangWatch tracing and the connect endpoint`. Then run `git branch --show-current`: its output is the name the lines below carry. The pull request line is this, verbatim, with the brace filled with the address `gh pr create` printed, and said only when it printed one:
 
 I opened a pull request with the tracing change: {link}. You can merge it already.
 
-No remote, or no `gh` login: one line saying that branch `langy/<slug>` holds the commit and no pull request was opened takes the pull request line's place, and the step is done. Either way, keep that branch checked out: the agent you started runs on it, and the branch line is one line saying so. These three lines of step 2, the framework line, the pull request line and the branch line, are said with the `say` tool, one call each, in that order, right before the question of step 3 is called: never after the answer, and never in the reply text. The proposal of step 3 comes right after them, in the same turn.
+No remote, or no `gh` login: no pull request was opened, so this line takes the pull request line's place, verbatim, with the brace filled with the branch name, and the step is done:
+
+No pull request was opened, since the folder has no remote or gh is not signed in: branch {branch} holds the commit.
+
+Either way, keep that branch checked out: the agent you started runs on it, and the branch line says so, verbatim, with the same brace:
+
+I left branch {branch} checked out: the agent you started runs on it.
+
+These three lines of step 2, the framework line, the pull request line or the no-remote line, and the branch line, are said with the `say` tool, one call each, in that order, in this same step, right after the pull request command answered and right before the question of step 3: never after the answer, and never in the reply text. They are said only about things that happened, from what the commands printed: never fill a brace with a fallback sentence, and never name a branch, a commit or a pull request that a command did not make; a line about a thing that did not happen is a false claim about the user's repository. The proposal of step 3 comes right after them, in the same turn.
 
 ### 3. Propose the first scenario, and stop
 

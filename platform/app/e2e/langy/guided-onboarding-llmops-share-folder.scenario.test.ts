@@ -25,6 +25,8 @@ import {
   conversationMessages,
   createFirstScenarioLabel,
   createGuidedCheckout,
+  expectAgentOnlineBeforeFirstRun,
+  expectSaidLinesMatchRepo,
   GUIDED_LINES,
   GUIDED_OPTIONS,
   GUIDED_TONE_CRITERIA,
@@ -37,6 +39,7 @@ import {
   queueGuidedKickoff,
   saysVerbatim,
   seedGuidedOrganization,
+  storedSaidLines,
   waitForPathDone,
 } from "./guided-onboarding-fixture";
 import { makeLangyAdapter } from "./langy-agent";
@@ -138,7 +141,9 @@ describe("Langy sets up the llmops path through the shared folder", () => {
                   "Langy asks for code access through the code access card in its first step; the opener line and the card in that same step are the expected shape. Fail only if Langy writes more text or takes another action after the card and before the user answers it.",
                   "When the developer types an unrelated question while the card is up, Langy answers in one warm line that keeps the setup going and never drops the path it was on.",
                   "After the folder connects, Langy reads the code, reports the framework it found, and wires tracing and the connect call into the developer's own code.",
-                  `Before proposing the first scenario, Langy either says "${GUIDED_LINES.pullRequestOpened} <the address the command printed>. ${GUIDED_LINES.pullRequestMerge}" with a real address, or, when the folder has no remote or GitHub is not signed in, says in one line that the branch holds the commit and no pull request was opened. Either way it never leaves the pull request to the end of the path.`,
+                  `Before proposing the first scenario, Langy either says "${GUIDED_LINES.pullRequestOpened} <the address the command printed>. ${GUIDED_LINES.pullRequestMerge}" with a real address, or, when the folder has no remote or GitHub is not signed in, says "${GUIDED_LINES.noRemoteStart} <the branch> holds the commit." instead. Either way it never leaves the pull request to the end of the path.`,
+                  "Every line Langy says about its branch, commit or pull request names a thing a command made: the branch line names the branch it checked out, and the pull request line carries the address the command printed or is replaced by the no-remote line. A line naming a branch, a commit or a pull request that no command made fails this criterion.",
+                  "Before the first scenario runs, Langy starts the agent and confirms it is online with one langwatch agent list --wait-online call; no scenario or suite runs against an agent that did not report online.",
                   `Langy proposes the first scenario as one bare question card: the card's own text is the proposal, word for word from "${GUIDED_LINES.proposalStart}" up to the reason, shown as a paragraph above exactly two options, one reading Create "<the scenario title>" as your first scenario test and the quiet "${GUIDED_OPTIONS.chatAboutThis}". The framework line, the pull request sentence and the branch line arrive as Langy's own lines right before that card, in that order, and nothing is said between the branch line and the card. It creates nothing before the developer picks the create option, and once the developer picks it, its next action is creating the scenario, with no sentence first and none of the step 2 lines said again.`,
                   `After the go, Langy says, word for word: "${GUIDED_LINES.whyScenario}"`,
                   `Langy says, word for word: "${GUIDED_LINES.running}"`,
@@ -257,6 +262,13 @@ describe("Langy sets up the llmops path through the shared folder", () => {
         expect(diff).toMatch(/pyproject\.toml/);
         expect(diff).toMatch(/connect|serve\(/i);
         expect(repo.log().length).toBeGreaterThan(1);
+        // Layer 2: the lines Langy said name the branch, the commit and the
+        // pull request the commands made, and the agent was online before
+        // the first run.
+        const said = storedSaidLines(stored);
+        console.log("[layer2] said:", said.join(" | "));
+        expectSaidLinesMatchRepo({ lines: said, repo });
+        expectAgentOnlineBeforeFirstRun(stored);
 
         // Layer 2: the proposal came as a question with the quiet way out,
         // and nothing existed while it was open.

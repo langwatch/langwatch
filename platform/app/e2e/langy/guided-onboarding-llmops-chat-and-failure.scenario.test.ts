@@ -23,6 +23,8 @@ import {
   carriesProposalText,
   conversationMessages,
   createGuidedCheckout,
+  expectAgentOnlineBeforeFirstRun,
+  expectSaidLinesMatchRepo,
   GUIDED_LINES,
   GUIDED_OPTIONS,
   GUIDED_TONE_CRITERIA,
@@ -35,6 +37,7 @@ import {
   queueGuidedKickoff,
   saysVerbatim,
   seedGuidedOrganization,
+  storedSaidLines,
   waitForPathDone,
 } from "./guided-onboarding-fixture";
 import { makeLangyAdapter } from "./langy-agent";
@@ -131,6 +134,8 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
                 criteria: [
                   `Langy opens with, word for word: "${GUIDED_LINES.llmopsOpener}"`,
                   `Langy proposes the first scenario as one bare question card whose own text is the proposal, word for word from "${GUIDED_LINES.proposalStart}" up to the reason, above two options: one reading Create "<the scenario title>" as your first scenario test and the quiet "${GUIDED_OPTIONS.chatAboutThis}". The framework line, the pull request sentence and the branch line arrive as Langy's own lines right before that card, in that order, and nothing is said between the branch line and the card.`,
+                  "Every line Langy says about its branch, commit or pull request names a thing a command made: the branch line names the branch it checked out, and the pull request line carries the address the command printed or is replaced by the no-remote line. A line naming a branch, a commit or a pull request that no command made fails this criterion.",
+                  "Before the first scenario runs, Langy starts the agent and confirms it is online with one langwatch agent list --wait-online call; no scenario or suite runs against an agent that did not report online.",
                   `When the developer picks "${GUIDED_OPTIONS.chatAboutThis}", Langy says, word for word, "${GUIDED_LINES.chatAboutThis}" and ends its turn there, creating nothing.`,
                   "After the developer describes the scenario, Langy writes it as described, opens it, runs it against the connected agent, and does not argue the developer out of it.",
                   "When the run fails, Langy explains in plain words what the judge saw and why the agent did not meet the criteria (the code was refused as expired), without blaming the developer and without hiding the failure.",
@@ -288,6 +293,10 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
         expect(branches.some((branch) => branch.startsWith("langy/"))).toBe(
           true,
         );
+        const said = storedSaidLines(stored);
+        console.log("[layer2] said:", said.join(" | "));
+        expectSaidLinesMatchRepo({ lines: said, repo });
+        expectAgentOnlineBeforeFirstRun(stored);
 
         if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
         expect(result.success).toBe(true);

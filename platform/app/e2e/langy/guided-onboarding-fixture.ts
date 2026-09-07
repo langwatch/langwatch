@@ -66,6 +66,10 @@ export const GUIDED_LINES = {
     "Now that your agent is integrated, I think we should write some tests for it: scenario tests prove your agent handles the conversations it exists for, and each run is traced so you see every step. The first one I'd write is",
   pullRequestOpened: "I opened a pull request with the tracing change:",
   pullRequestMerge: "You can merge it already.",
+  noRemoteStart:
+    "No pull request was opened, since the folder has no remote or gh is not signed in: branch",
+  branchLineStart: "I left branch",
+  branchLineEnd: "checked out: the agent you started runs on it.",
   chatAboutThis:
     "Of course. Tell me what the scenario should cover and I'll write it with you.",
   whyScenario:
@@ -111,6 +115,109 @@ export function isProposalQuestion(question: {
       CREATE_FIRST_SCENARIO_OPTION.test(option.label),
     )
   );
+}
+
+/** The lines Langy said with the say tool, in order, from the stored parts. */
+export function storedSaidLines(
+  messages: ReadonlyArray<{ parts: Array<Record<string, unknown>> }>,
+): string[] {
+  return messages.flatMap((message) =>
+    message.parts
+      .filter((part) => part.type === "tool-say")
+      .map((part) =>
+        String((part.input as { text?: unknown } | undefined)?.text ?? ""),
+      ),
+  );
+}
+
+/** The branch the branch line names, or null when no branch line was said. */
+export function branchNamedInSaidLines(
+  lines: readonly string[],
+): string | null {
+  for (const line of lines) {
+    const match = /I left branch `?([^`\s]+)`? checked out/.exec(line);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
+/**
+ * Layer 2: every branch, commit and pull request the said lines name is a
+ * thing a command made. A run once pasted the no-remote sentence into the
+ * brace of the pull request line and named a branch no command had created.
+ */
+export function expectSaidLinesMatchRepo({
+  lines,
+  repo,
+}: {
+  lines: readonly string[];
+  repo: { branches: () => string[]; log: () => string[] };
+}): void {
+  const branch = branchNamedInSaidLines(lines);
+  expect(branch, "the branch line names a branch").not.toBeNull();
+  expect(
+    repo.branches(),
+    "the branch line names a branch that exists",
+  ).toContain(branch);
+  expect(
+    repo.log().some((entry) => /Add LangWatch tracing/.test(entry)),
+    "the tracing commit exists",
+  ).toBe(true);
+  const pullRequest = lines.find((line) =>
+    line.includes(GUIDED_LINES.pullRequestOpened),
+  );
+  const noRemote = lines.find((line) =>
+    line.includes(GUIDED_LINES.noRemoteStart),
+  );
+  expect(
+    Boolean(pullRequest) !== Boolean(noRemote),
+    "either the pull request line or the no-remote line, never both or neither",
+  ).toBe(true);
+  if (pullRequest) {
+    expect(pullRequest, "the pull request line carries an address").toMatch(
+      /https?:\/\/\S+/,
+    );
+    expect(pullRequest.toLowerCase()).not.toContain("no pull request");
+  }
+  if (noRemote) expect(noRemote).toContain(branch);
+}
+
+/**
+ * Layer 2: the agent was confirmed online, through one agent list
+ * --wait-online call that answered online, before the first run.
+ */
+export function expectAgentOnlineBeforeFirstRun(
+  messages: ReadonlyArray<{ parts: Array<Record<string, unknown>> }>,
+): void {
+  const calls = messages.flatMap((message) =>
+    message.parts.filter(
+      (part) =>
+        typeof part.type === "string" &&
+        part.type.startsWith("tool-") &&
+        typeof (part.input as { command?: unknown } | undefined)?.command ===
+          "string",
+    ),
+  );
+  const commandOf = (part: Record<string, unknown>) =>
+    String((part.input as { command: string }).command);
+  const waitIndex = calls.findIndex((part) =>
+    /langwatch agent list --wait-online/.test(commandOf(part)),
+  );
+  const runIndex = calls.findIndex((part) =>
+    /langwatch (scenario|test-suite) run/.test(commandOf(part)),
+  );
+  expect(waitIndex, "agent list --wait-online ran").toBeGreaterThan(-1);
+  expect(runIndex, "a run happened").toBeGreaterThan(-1);
+  expect(runIndex, "the wait came before the first run").toBeGreaterThan(
+    waitIndex,
+  );
+  const wait = calls[waitIndex]!;
+  const output =
+    typeof wait.output === "string"
+      ? wait.output
+      : JSON.stringify(wait.output ?? "");
+  expect(output, "the agent reported online").toMatch(/"status":\s*"online"/);
+  expect(output).not.toMatch(/No agent named/);
 }
 
 /** Does the question's own text carry the proposal, word for word? */

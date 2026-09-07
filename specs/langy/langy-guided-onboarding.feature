@@ -478,7 +478,7 @@ Feature: Langy guides the first setup after sign-up
       When the compiled guided-onboarding skill is read
       Then the tracing edit and the connect adapter are committed on the langy/ branch as soon as the agent is online
       And the commit stages the changed files by name, never the env file, with the message "Add LangWatch tracing and the connect endpoint" and no trailer
-      And Langy keeps that branch checked out for the agent it started, and says so in one line
+      And Langy keeps that branch checked out for the agent it started, and says so with the branch line, naming the branch the command printed
 
     # The pull request used to come at the very end of the path, after the
     # suite, so the person waited the whole path to see the change they could
@@ -491,6 +491,27 @@ Feature: Langy guides the first setup after sign-up
       And Langy says "I opened a pull request with the tracing change: {link}. You can merge it already." with the address the command printed in the braces
       And a missing remote or gh login is the one-line branch note instead
       And the proposal comes right after, in the same turn
+
+    # A run with a smaller model wired tracing and said the lines, but never
+    # ran the branch, the commit, the push or the agent start, and then ran a
+    # scenario against an agent that was never online. Step 2 gets the same
+    # checklist that made step 4 hold.
+    @unit
+    Scenario: Step 2 is a checklist Langy keeps
+      When the compiled guided-onboarding skill is read
+      Then before the branch and the first edit Langy writes the step 2 items into the plan tool, in fixed words and order: the code read, the branch, the tracing edit, the connect adapter, the credentials, the agent started, the agent online, the commit, the push and pull request or the no-remote line, and the three lines said
+      And a turn never ends with an open item
+      And the bare question of step 3 is asked only when every item is done
+
+    # The same run pasted the fallback sentence into the brace of the pull
+    # request line and named a branch no command had made.
+    @unit
+    Scenario: The step 2 lines name only what the commands made
+      When the compiled guided-onboarding skill is read
+      Then the pull request line is said only with the address the command printed, and the fixed no-remote line takes its place otherwise
+      And the branch line names the branch that git branch --show-current printed after the commit
+      And no brace is ever filled with a fallback, and no branch, commit or pull request a command did not make is ever named
+      And the three lines are said right after the pull request command answered, before the question
 
     # A film said "All ready!" between the first run and the suite. The line
     # closes the path, so it waits for the suite run and its open run.
