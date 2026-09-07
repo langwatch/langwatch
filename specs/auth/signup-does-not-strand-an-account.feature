@@ -82,7 +82,7 @@ Feature: Signing up never strands an account
   Scenario: Concurrent browsers cannot both claim one free address
     Given two browsers hold distinct claims for the same free address
     When both complete passkey registration concurrently
-    Then exactly one creates and owns the pending account
+    Then exactly one creates and owns the verified account
     And the other is refused without adopting it
 
   @integration

@@ -1,6 +1,8 @@
 import { test as setup, expect } from "@playwright/test";
 import path from "path";
 import fs from "fs";
+import { closeDb, findUserIdByEmail } from "./front-door/db";
+import { requestSignUpAddressProof } from "./front-door/steps";
 
 const AUTH_DIR = path.join(__dirname, "..", ".auth");
 const AUTH_FILE = path.join(AUTH_DIR, "user.json");
@@ -28,31 +30,41 @@ const TEST_USER = {
 };
 
 setup("authenticate", async ({ page, request }) => {
-  // Step 1: Try to register the test user (may already exist)
-  const registerResponse = await request.post("/api/trpc/user.register?batch=1", {
-    data: {
-      "0": {
-        json: {
-          name: TEST_USER.name,
-          email: TEST_USER.email,
-          password: TEST_USER.password,
+  // Step 1: Register the test user when it does not already exist. Credential
+  // enrollment requires the same mailbox proof the sign-up UI consumes.
+  try {
+    const existingUserId = await findUserIdByEmail(TEST_USER.email);
+    if (existingUserId === null) {
+      const addressProof = await requestSignUpAddressProof(
+        request,
+        TEST_USER.email,
+      );
+      const registerResponse = await request.post(
+        "/api/trpc/user.register?batch=1",
+        {
+          data: {
+            "0": {
+              json: {
+                name: TEST_USER.name,
+                email: TEST_USER.email,
+                password: TEST_USER.password,
+                addressProof,
+              },
+            },
+          },
         },
-      },
-    },
-  });
-  const registerBody = await registerResponse.text();
-  const userAlreadyExists =
-    registerResponse.status() === 409 &&
-    /"code"\s*:\s*"email_already_registered"/.test(registerBody);
-
-  if (registerResponse.ok()) {
-    console.log("Test user created successfully");
-  } else if (userAlreadyExists) {
-    console.log("Test user already exists, proceeding with log in");
-  } else {
-    throw new Error(
-      `Test user registration failed (${registerResponse.status()}): ${registerBody.slice(0, 500)}`,
-    );
+      );
+      if (!registerResponse.ok()) {
+        throw new Error(
+          `Test user registration failed (${registerResponse.status()}): ${(await registerResponse.text()).slice(0, 500)}`,
+        );
+      }
+      console.log("Test user created successfully");
+    } else {
+      console.log("Test user already exists, proceeding with log in");
+    }
+  } finally {
+    await closeDb();
   }
 
   // Step 2: Log in through the identifier-first UI. callbackUrl ensures the
@@ -70,7 +82,9 @@ setup("authenticate", async ({ page, request }) => {
   // that step also proves the router resolved the seeded user before auth.
   const passwordField = page.getByLabel("Password", { exact: true });
   await expect(passwordField).toBeVisible();
-  await expect(page.getByTestId("routed-identifier")).toContainText(TEST_USER.email);
+  await expect(page.getByTestId("routed-identifier")).toContainText(
+    TEST_USER.email,
+  );
   await passwordField.fill(TEST_USER.password);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
 
@@ -160,9 +174,9 @@ setup("authenticate", async ({ page, request }) => {
     });
     // href is stable regardless of sidebar expand state (collapsed links
     // drop their text label), so match the Settings nav link by href.
-    await expect(
-      page.locator('a[href="/settings"]').first(),
-    ).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('a[href="/settings"]').first()).toBeVisible({
+      timeout: 30000,
+    });
   } catch (err) {
     console.log("Authenticated shell not confirmed. URL:", page.url());
     await page.screenshot({
